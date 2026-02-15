@@ -193,18 +193,18 @@ impl UnifiedGrammar {
         // Create sparse category HVs
         let mut category_hvs = HashMap::new();
         for cat in &config.categories {
-            let hv = sparsity.random_hv(&format!("cat_{}", cat));
+            let hv = sparsity.random_hv(&format!("cat_{cat}"));
             category_hvs.insert(cat.clone(), hv);
         }
 
         // Create duration bin HVs
         let duration_hvs: Vec<HV16> = (0..config.duration_bins)
-            .map(|i| sparsity.random_hv(&format!("dur_{}", i)))
+            .map(|i| sparsity.random_hv(&format!("dur_{i}")))
             .collect();
 
         // Create intensity bin HVs
         let intensity_hvs: Vec<HV16> = (0..config.intensity_bins)
-            .map(|i| sparsity.random_hv(&format!("int_{}", i)))
+            .map(|i| sparsity.random_hv(&format!("int_{i}")))
             .collect();
 
         // Build clusters from config

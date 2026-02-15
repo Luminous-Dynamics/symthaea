@@ -101,8 +101,14 @@ fn main() {
     for (i, hv) in hvs.iter().take(cli.num_frames).enumerate() {
         let scores = decoder.decode_all_scores(hv);
 
-        let (top_phoneme, top_score) = scores.first().unwrap();
-        let (_, min_score) = scores.last().unwrap();
+        let (top_phoneme, top_score) = match scores.first() {
+            Some(v) => v,
+            None => continue,
+        };
+        let (_, min_score) = match scores.last() {
+            Some(v) => v,
+            None => continue,
+        };
         let range = top_score - min_score;
 
         total_max_sim += top_score;

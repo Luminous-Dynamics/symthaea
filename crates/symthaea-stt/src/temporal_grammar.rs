@@ -235,7 +235,7 @@ impl DomainConfig {
                 ];
                 let octave = (i + 9) / 12;
                 let name = names[i % 12];
-                format!("{}{}", name, octave)
+                format!("{name}{octave}")
             })
             .collect();
 

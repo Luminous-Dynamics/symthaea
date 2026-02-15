@@ -497,7 +497,7 @@ impl std::fmt::Display for EvaluationReport {
             writeln!(f, "Top Confusions")?;
             write!(f, "{}", "-".repeat(30))?;
             for ((r, h), count) in cm.top_confusions(10) {
-                write!(f, "\n  {} -> {}: {}", r, h, count)?;
+                write!(f, "\n  {r} -> {h}: {count}")?;
             }
             writeln!(f)?;
         }

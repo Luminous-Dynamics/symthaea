@@ -86,16 +86,16 @@ impl HierarchicalScorer {
         ];
 
         for phoneme in phonemes.iter() {
-            let seed = format!("phoneme_basis_{}", phoneme);
+            let seed = format!("phoneme_basis_{phoneme}");
             phoneme_basis.insert(phoneme.to_string(), HV16::random(&seed));
         }
 
         // Initialize hierarchical memories with unique seeds
         let manner_memories =
-            std::array::from_fn(|i| HV16::random(&format!("manner_memory_{}", i)));
+            std::array::from_fn(|i| HV16::random(&format!("manner_memory_{i}")));
 
         let manner_place_memories = std::array::from_fn(|m| {
-            std::array::from_fn(|p| HV16::random(&format!("manner_place_memory_{}_{}", m, p)))
+            std::array::from_fn(|p| HV16::random(&format!("manner_place_memory_{m}_{p}")))
         });
 
         // Build phoneme → features mapping
@@ -195,7 +195,12 @@ impl HierarchicalScorer {
         self.phoneme_basis
             .get(phoneme)
             .copied()
-            .unwrap_or_else(|| *self.phoneme_basis.get("UNK").unwrap())
+            .unwrap_or_else(|| {
+                self.phoneme_basis
+                    .get("UNK")
+                    .copied()
+                    .unwrap_or_else(HV16::zero)
+            })
     }
 
     /// Get articulatory features for a phoneme

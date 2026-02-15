@@ -278,7 +278,7 @@ impl BatchProcessor {
     fn process_file(path: &Path, projector: &mut AudioProjector) -> Result<FileSuccess, String> {
         // Load audio
         let (audio, sample_rate) =
-            AudioFrontend::load_audio(path).map_err(|e| format!("Failed to load audio: {}", e))?;
+            AudioFrontend::load_audio(path).map_err(|e| format!("Failed to load audio: {e}"))?;
 
         let audio_duration = audio.len() as f32 / sample_rate as f32;
 
@@ -495,7 +495,7 @@ impl BatchTrainer {
     ) -> Result<f32, String> {
         // Load audio
         let (audio, sample_rate) =
-            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {}", e))?;
+            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
         let duration = audio.len() as f32 / sample_rate as f32;
 
@@ -692,7 +692,7 @@ impl BatchTrainer {
     ) -> Result<f32, String> {
         // Load audio
         let (audio, sample_rate) =
-            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {}", e))?;
+            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
         let duration = audio.len() as f32 / sample_rate as f32;
 
@@ -921,7 +921,7 @@ impl BatchDiscovery {
     ) -> Result<f32, String> {
         // Load audio
         let (audio, sample_rate) =
-            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {}", e))?;
+            AudioFrontend::load_audio(path).map_err(|e| format!("Load error: {e}"))?;
 
         let duration = audio.len() as f32 / sample_rate as f32;
 

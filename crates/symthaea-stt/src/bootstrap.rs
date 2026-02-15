@@ -178,8 +178,7 @@ impl TrainedPrototypes {
 
             if iteration == 0 || iteration % 10 == 0 || pairs_fixed == 0 {
                 eprintln!(
-                    "  Separation iter {}: {} pairs above {:.2}, max_sim={:.4}",
-                    iteration, pairs_fixed, min_separation, max_sim_seen
+                    "  Separation iter {iteration}: {pairs_fixed} pairs above {min_separation:.2}, max_sim={max_sim_seen:.4}"
                 );
             }
 
@@ -586,8 +585,7 @@ impl AdaptivePrototypeSet {
             // Print progress
             if iteration == 0 || pairs_fixed > 0 {
                 eprintln!(
-                    "  Separation iter {}: {} pairs above {:.2}, max_sim={:.4}",
-                    iteration, pairs_fixed, min_separation, max_sim_seen
+                    "  Separation iter {iteration}: {pairs_fixed} pairs above {min_separation:.2}, max_sim={max_sim_seen:.4}"
                 );
             }
 

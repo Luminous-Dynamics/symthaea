@@ -93,7 +93,7 @@ impl AudioFrontend {
             "flac" => Self::load_flac(path),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("Unsupported audio format: {}", ext),
+                format!("Unsupported audio format: {ext}"),
             )),
         }
     }

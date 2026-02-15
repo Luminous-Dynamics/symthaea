@@ -61,7 +61,7 @@ impl HolographicScorer {
 
         for phoneme in phonemes.iter() {
             // Use phoneme name as seed for deterministic basis vectors
-            let seed = format!("phoneme_basis_{}", phoneme);
+            let seed = format!("phoneme_basis_{phoneme}");
             let hv = HV16::random(&seed);
             phoneme_basis.insert(phoneme.to_string(), hv);
         }
@@ -91,7 +91,7 @@ impl HolographicScorer {
         if dim != HDC_DIM {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("Dimension mismatch: file has {}, expected {}", dim, HDC_DIM),
+                format!("Dimension mismatch: file has {dim}, expected {HDC_DIM}"),
             ));
         }
 
@@ -243,7 +243,7 @@ impl HolographicScorer {
         }
 
         self.grammar_memory = grammar_accumulator;
-        println!("Grammar memory trained on {} sequences", count);
+        println!("Grammar memory trained on {count} sequences");
     }
 
     /// Build trigram constraints from corpus (fast local system)

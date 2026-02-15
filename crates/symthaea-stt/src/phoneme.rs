@@ -176,7 +176,7 @@ impl PhonemeInventory {
             Central,
             Back,
         ] {
-            place_hvs.insert(place, HV16::random(&format!("place:{:?}", place)));
+            place_hvs.insert(place, HV16::random(&format!("place:{place:?}")));
         }
 
         let mut manner_hvs = HashMap::new();
@@ -191,7 +191,7 @@ impl PhonemeInventory {
             Mid,
             Low,
         ] {
-            manner_hvs.insert(manner, HV16::random(&format!("manner:{:?}", manner)));
+            manner_hvs.insert(manner, HV16::random(&format!("manner:{manner:?}")));
         }
 
         let mut voicing_hvs = HashMap::new();

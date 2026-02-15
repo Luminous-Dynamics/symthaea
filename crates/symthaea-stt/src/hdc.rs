@@ -31,7 +31,7 @@ impl Default for HV16 {
 impl fmt::Debug for HV16 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let ones = self.popcount();
-        write!(f, "HV16[popcount={}/{}]", ones, HDC_DIM)
+        write!(f, "HV16[popcount={ones}/{HDC_DIM}]")
     }
 }
 
@@ -319,7 +319,7 @@ impl HV16 {
     ///
     /// Values > 0 become 1, values <= 0 become 0.
     pub fn from_continuous(values: &[f32]) -> Self {
-        assert!(values.len() >= HDC_DIM, "Need at least {} values", HDC_DIM);
+        assert!(values.len() >= HDC_DIM, "Need at least {HDC_DIM} values");
 
         let mut result = Self::zero();
         for i in 0..HDC_DIM {
@@ -417,8 +417,7 @@ impl HV16 {
     pub fn from_core_continuous(values: &[f32]) -> Self {
         assert!(
             values.len() >= CORE_HDC_DIM,
-            "Need at least {} values",
-            CORE_HDC_DIM
+            "Need at least {CORE_HDC_DIM} values"
         );
 
         let mut result = Self::zero();

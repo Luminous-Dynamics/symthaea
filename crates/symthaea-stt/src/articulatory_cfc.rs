@@ -51,21 +51,21 @@ pub struct CfCWeights {
 impl CfCWeights {
     /// Load weights from a binary file exported by Python training script
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, String> {
-        let file = File::open(path).map_err(|e| format!("Failed to open weights: {}", e))?;
+        let file = File::open(path).map_err(|e| format!("Failed to open weights: {e}"))?;
         let mut reader = BufReader::new(file);
 
         // Read metadata length
         let mut len_bytes = [0u8; 4];
         reader
             .read_exact(&mut len_bytes)
-            .map_err(|e| format!("Failed to read header: {}", e))?;
+            .map_err(|e| format!("Failed to read header: {e}"))?;
         let metadata_len = u32::from_le_bytes(len_bytes) as usize;
 
         // Read metadata JSON
         let mut metadata_bytes = vec![0u8; metadata_len];
         reader
             .read_exact(&mut metadata_bytes)
-            .map_err(|e| format!("Failed to read metadata: {}", e))?;
+            .map_err(|e| format!("Failed to read metadata: {e}"))?;
 
         // Remove null terminator and parse JSON
         let metadata_str = String::from_utf8_lossy(&metadata_bytes)
@@ -73,7 +73,7 @@ impl CfCWeights {
             .to_string();
 
         let metadata: serde_json::Value = serde_json::from_str(&metadata_str)
-            .map_err(|e| format!("Failed to parse metadata: {}", e))?;
+            .map_err(|e| format!("Failed to parse metadata: {e}"))?;
 
         let input_size = metadata["input_size"].as_u64().unwrap_or(40) as usize;
         let hidden_size = metadata["hidden_size"].as_u64().unwrap_or(64) as usize;
@@ -97,7 +97,7 @@ impl CfCWeights {
             let meta = &weights_meta[name];
             let shape: Vec<usize> = meta["shape"]
                 .as_array()
-                .ok_or_else(|| format!("Missing shape for {}", name))?
+                .ok_or_else(|| format!("Missing shape for {name}"))?
                 .iter()
                 .map(|v| v.as_u64().unwrap_or(0) as usize)
                 .collect();
@@ -105,7 +105,7 @@ impl CfCWeights {
             let _size = meta["size"].as_u64().unwrap_or(0) as usize;
 
             if shape.len() != 2 {
-                return Err(format!("Expected 2D array for {}", name));
+                return Err(format!("Expected 2D array for {name}"));
             }
 
             let mut result = Vec::with_capacity(shape[0]);
@@ -113,7 +113,7 @@ impl CfCWeights {
                 let start = offset + i * shape[1];
                 let end = start + shape[1];
                 if end > all_weights.len() {
-                    return Err(format!("Weight data out of bounds for {}", name));
+                    return Err(format!("Weight data out of bounds for {name}"));
                 }
                 result.push(all_weights[start..end].to_vec());
             }
@@ -126,7 +126,7 @@ impl CfCWeights {
             let size = meta["size"].as_u64().unwrap_or(0) as usize;
 
             if offset + size > all_weights.len() {
-                return Err(format!("Weight data out of bounds for {}", name));
+                return Err(format!("Weight data out of bounds for {name}"));
             }
             Ok(all_weights[offset..offset + size].to_vec())
         };

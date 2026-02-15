@@ -657,8 +657,7 @@ impl DiscoveryResult {
                 ""
             };
             json.push_str(&format!(
-                "    {{\n      \"start\": {:.3},\n      \"end\": {:.3},\n      \"unit\": \"{}\"\n    }}{}\n",
-                start, end, label, comma
+                "    {{\n      \"start\": {start:.3},\n      \"end\": {end:.3},\n      \"unit\": \"{label}\"\n    }}{comma}\n"
             ));
         }
         json.push_str("  ],\n");
@@ -675,8 +674,7 @@ impl DiscoveryResult {
                 ""
             };
             json.push_str(&format!(
-                "    {{\n      \"from\": \"{}\",\n      \"to\": \"{}\",\n      \"count\": {}\n    }}{}\n",
-                from, to, count, comma
+                "    {{\n      \"from\": \"{from}\",\n      \"to\": \"{to}\",\n      \"count\": {count}\n    }}{comma}\n"
             ));
         }
         json.push_str("  ]\n");
@@ -689,7 +687,7 @@ impl DiscoveryResult {
     pub fn to_tsv(&self) -> String {
         let mut tsv = String::from("start\tend\tlabel\n");
         for (start, end, label) in &self.segment_labels {
-            tsv.push_str(&format!("{:.6}\t{:.6}\t{}\n", start, end, label));
+            tsv.push_str(&format!("{start:.6}\t{end:.6}\t{label}\n"));
         }
         tsv
     }

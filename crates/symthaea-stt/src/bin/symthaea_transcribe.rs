@@ -627,7 +627,7 @@ fn cmd_benchmark(audio_file: &Path, iterations: usize) -> std::io::Result<()> {
     pb.finish_and_clear();
 
     // Statistics
-    times.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    times.sort_by(|a, b| a.total_cmp(b));
     let mean: f32 = times.iter().sum::<f32>() / times.len() as f32;
     let median = times[times.len() / 2];
     let min = times[0];
