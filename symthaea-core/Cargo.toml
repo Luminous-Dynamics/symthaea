@@ -58,6 +58,10 @@ path = "examples/scaling_study_demo.rs"
 required-features = ["_scaling_study"]
 
 [[bench]]
+name = "hdc_benchmarks"
+harness = false
+
+[[bench]]
 name = "hdc_ltc_learning"
 harness = false
 
