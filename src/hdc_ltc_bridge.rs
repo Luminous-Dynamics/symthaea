@@ -463,13 +463,13 @@ impl HdcLtcBridge {
             let resize_label = format!("bridge::resize_{}", self.total_steps);
             self.input_projection = Self::init_projection_from_genesis(
                 genesis,
-                &format!("{}::input", resize_label),
+                &format!("{resize_label}::input"),
                 self.config.input_dim,
                 new_dim,
             );
             self.output_projection = Self::init_projection_from_genesis(
                 genesis,
-                &format!("{}::output", resize_label),
+                &format!("{resize_label}::output"),
                 new_dim,
                 self.config.output_dim,
             );

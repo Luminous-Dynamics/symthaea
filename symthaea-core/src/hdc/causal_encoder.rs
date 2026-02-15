@@ -187,8 +187,8 @@ impl CausalSpace {
         self.temporal_order.push(None);
 
         // Update indices (using string representation for HashMap compatibility)
-        let cause_key = format!("{:?}", cause);
-        let effect_key = format!("{:?}", effect);
+        let cause_key = format!("{cause:?}");
+        let effect_key = format!("{effect:?}");
 
         self.cause_index.entry(cause_key).or_default().push(idx);
         self.effect_index.entry(effect_key).or_default().push(idx);

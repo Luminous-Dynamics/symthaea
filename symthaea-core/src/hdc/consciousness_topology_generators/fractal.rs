@@ -499,8 +499,7 @@ impl ConsciousnessTopology {
 
         assert!(
             n_nodes <= 10000,
-            "Too many nodes ({}). Reduce depth or branching factor.",
-            n_nodes
+            "Too many nodes ({n_nodes}). Reduce depth or branching factor."
         );
 
         // Create node identities with variation

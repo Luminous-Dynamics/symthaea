@@ -86,8 +86,8 @@ impl NumberTheoryEngine {
         // Encode as bundle of MULTIPLICATION.bind(prime_enc).bind(exp_enc)
         let mut factor_encodings = Vec::new();
         for (prime, exponent) in &factors {
-            let prime_enc = BinaryHV::random(seed_from_name(&format!("prime_{}", prime)));
-            let exp_enc = BinaryHV::random(seed_from_name(&format!("exp_{}", exponent)));
+            let prime_enc = BinaryHV::random(seed_from_name(&format!("prime_{prime}")));
+            let exp_enc = BinaryHV::random(seed_from_name(&format!("exp_{exponent}")));
             let factor_enc = self.multiplication.bind(&prime_enc).bind(&exp_enc);
             factor_encodings.push(factor_enc);
         }
@@ -191,7 +191,7 @@ impl NumberTheoryEngine {
             .filter(|(_, &prime)| prime)
             .map(|(i, _)| {
                 let p = i as u64;
-                let encoding = BinaryHV::random(seed_from_name(&format!("prime_{}", p)));
+                let encoding = BinaryHV::random(seed_from_name(&format!("prime_{p}")));
                 (p, encoding)
             })
             .collect()
@@ -262,7 +262,7 @@ pub struct ModularRing {
 
 impl ModularRing {
     pub fn new(modulus: u64) -> Self {
-        let modulus_encoding = BinaryHV::random(seed_from_name(&format!("mod_{}", modulus)));
+        let modulus_encoding = BinaryHV::random(seed_from_name(&format!("mod_{modulus}")));
         Self {
             modulus,
             modulus_encoding,

@@ -297,7 +297,7 @@ impl NixParser {
                 let full_path = if prefix.is_empty() {
                     path_text.clone()
                 } else {
-                    format!("{}.{}", prefix, path_text)
+                    format!("{prefix}.{path_text}")
                 };
 
                 // Skip imports (handled separately)

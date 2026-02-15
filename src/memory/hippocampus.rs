@@ -363,7 +363,7 @@ impl HippocampusActor {
         valence: EmotionalValence,
     ) -> Result<u64> {
         let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| anyhow::anyhow!("No runtime: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("No runtime: {e}"))?;
 
         rt.block_on(self.encode(content, embedding, valence))
     }
@@ -456,7 +456,7 @@ impl HippocampusActor {
     /// Recall synchronously
     pub fn recall_sync(&mut self, query: RecallQuery) -> Result<RecallResult> {
         let rt = tokio::runtime::Handle::try_current()
-            .map_err(|e| anyhow::anyhow!("No runtime: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("No runtime: {e}"))?;
 
         rt.block_on(self.recall(query))
     }

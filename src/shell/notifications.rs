@@ -294,7 +294,7 @@ impl DesktopNotifier {
         };
 
         let body = if self.config.show_phi {
-            format!("{}\nPhi: {:.2}", command, phi)
+            format!("{command}\nPhi: {phi:.2}")
         } else {
             command.to_string()
         };
@@ -319,8 +319,7 @@ impl DesktopNotifier {
         let notification = Notification::new(
             "Low Consciousness Level",
             format!(
-                "Current Phi ({:.2}) is below required level ({:.2})\nConsider centering before proceeding",
-                current_phi, required_phi
+                "Current Phi ({current_phi:.2}) is below required level ({required_phi:.2})\nConsider centering before proceeding"
             ),
         )
         .category(NotificationCategory::PhiWarning)
@@ -339,7 +338,7 @@ impl DesktopNotifier {
     ) -> Result<u32, NotificationError> {
         let notification = Notification::new(
             "Command Vetoed",
-            format!("Command: {}\nReason: {}", command, reason),
+            format!("Command: {command}\nReason: {reason}"),
         )
         .category(NotificationCategory::SafetyVeto)
         .urgency(NotificationUrgency::Critical)
@@ -355,11 +354,11 @@ impl DesktopNotifier {
         service_name: &str,
     ) -> Result<u32, NotificationError> {
         let (summary, body) = if connected {
-            ("Connected", format!("Connected to {}", service_name))
+            ("Connected", format!("Connected to {service_name}"))
         } else {
             (
                 "Disconnected",
-                format!("Lost connection to {}", service_name),
+                format!("Lost connection to {service_name}"),
             )
         };
 
@@ -415,10 +414,10 @@ pub enum NotificationError {
 impl std::fmt::Display for NotificationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ConnectionFailed(e) => write!(f, "D-Bus connection failed: {}", e),
+            Self::ConnectionFailed(e) => write!(f, "D-Bus connection failed: {e}"),
             Self::NotConnected => write!(f, "Not connected to D-Bus"),
-            Self::ProxyFailed(e) => write!(f, "Failed to create notification proxy: {}", e),
-            Self::SendFailed(e) => write!(f, "Failed to send notification: {}", e),
+            Self::ProxyFailed(e) => write!(f, "Failed to create notification proxy: {e}"),
+            Self::SendFailed(e) => write!(f, "Failed to send notification: {e}"),
             Self::Disabled => write!(f, "Notifications are disabled"),
         }
     }

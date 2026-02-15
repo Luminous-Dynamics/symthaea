@@ -61,7 +61,7 @@ impl PrimitiveGraph {
         Self {
             nodes,
             edges,
-            title: format!("{:?} Tier Primitives", tier),
+            title: format!("{tier:?} Tier Primitives"),
         }
     }
 
@@ -85,7 +85,7 @@ impl PrimitiveGraph {
         Self {
             nodes,
             edges,
-            title: format!("{} Domain Primitives", domain),
+            title: format!("{domain} Domain Primitives"),
         }
     }
 
@@ -133,7 +133,7 @@ impl PrimitiveGraph {
         Self {
             nodes,
             edges,
-            title: format!("Neighborhood of {}", center),
+            title: format!("Neighborhood of {center}"),
         }
     }
 
@@ -169,8 +169,7 @@ impl PrimitiveGraph {
             let color = tier_color(*tier);
             let shape = if *is_base { "box" } else { "ellipse" };
             dot.push_str(&format!(
-                "  n{} [label=\"{}\", fillcolor=\"{}\", style=\"filled,rounded\", shape={}];\n",
-                i, name, color, shape
+                "  n{i} [label=\"{name}\", fillcolor=\"{color}\", style=\"filled,rounded\", shape={shape}];\n"
             ));
         }
 
@@ -183,8 +182,7 @@ impl PrimitiveGraph {
             let color = if *sim > 0.6 { "darkgreen" } else { "gray50" };
 
             dot.push_str(&format!(
-                "  n{} -> n{} [dir=none, weight={}, penwidth={:.1}, color=\"{}\", label=\"{:.2}\"];\n",
-                from, to, weight, penwidth, color, sim
+                "  n{from} -> n{to} [dir=none, weight={weight}, penwidth={penwidth:.1}, color=\"{color}\", label=\"{sim:.2}\"];\n"
             ));
         }
 
@@ -206,7 +204,7 @@ impl PrimitiveGraph {
         out.push_str("Nodes:\n");
         for (name, tier, is_base) in &self.nodes {
             let marker = if *is_base { "\u{25c6}" } else { "\u{25c7}" };
-            out.push_str(&format!("  {} {} ({:?})\n", marker, name, tier));
+            out.push_str(&format!("  {marker} {name} ({tier:?})\n"));
         }
 
         out.push_str("\nEdges (by similarity):\n");
@@ -219,8 +217,7 @@ impl PrimitiveGraph {
             let bar_len = ((sim - 0.5) * 40.0) as usize;
             let bar: String = "\u{2588}".repeat(bar_len.min(20));
             out.push_str(&format!(
-                "  {} \u{2194} {} : {:.3} {}\n",
-                from_name, to_name, sim, bar
+                "  {from_name} \u{2194} {to_name} : {sim:.3} {bar}\n"
             ));
         }
 

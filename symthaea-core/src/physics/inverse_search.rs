@@ -484,7 +484,7 @@ impl InverseSearchEngine {
         let mut all_candidates: Vec<(SearchCandidate, usize)> = Vec::new();
 
         for i in 0..n_seeds {
-            let phrase = format!("{} variant {}", base_phrase, i);
+            let phrase = format!("{base_phrase} variant {i}");
             let genesis = GenesisSeed::from_phrase(&phrase);
 
             let model = super::StandardModel::from_genesis(&genesis);

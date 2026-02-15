@@ -120,7 +120,7 @@ pub enum PrimitiveError {
 impl std::fmt::Display for PrimitiveError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PrimitiveError::NotFound(name) => write!(f, "primitive not found: {}", name),
+            PrimitiveError::NotFound(name) => write!(f, "primitive not found: {name}"),
             PrimitiveError::EmptyInput => write!(f, "operation requires at least one input"),
             PrimitiveError::InvalidWeight => write!(f, "weights must sum to positive value"),
         }

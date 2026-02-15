@@ -126,8 +126,8 @@ impl GenerationManager {
     ///
     /// Uses `nix store diff-closures` to compare the store paths.
     pub fn diff(from: u32, to: u32) -> Result<GenerationDiff, std::io::Error> {
-        let from_path = format!("/nix/var/nix/profiles/system-{}-link", from);
-        let to_path = format!("/nix/var/nix/profiles/system-{}-link", to);
+        let from_path = format!("/nix/var/nix/profiles/system-{from}-link");
+        let to_path = format!("/nix/var/nix/profiles/system-{to}-link");
 
         let output = Command::new("nix")
             .args(["store", "diff-closures", &from_path, &to_path])

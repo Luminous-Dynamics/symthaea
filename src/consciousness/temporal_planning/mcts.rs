@@ -151,7 +151,7 @@ impl MctsPlanner {
             .max_by(|(_, a), (_, b)| {
                 let ucb_a = a.ucb1(node.visits, c);
                 let ucb_b = b.ucb1(node.visits, c);
-                ucb_a.partial_cmp(&ucb_b).unwrap()
+                ucb_a.total_cmp(&ucb_b)
             })
             .map(|(i, _)| i)
             .unwrap_or(0)
@@ -219,8 +219,8 @@ impl MctsPlanner {
         // Simple: pick the epistemic action with highest prior
         let (best_idx, _) = epistemic_actions
             .iter()
-            .max_by(|(_, a), (_, b)| a.prior.partial_cmp(&b.prior).unwrap())
-            .unwrap();
+            .max_by(|(_, a), (_, b)| a.prior.total_cmp(&b.prior))
+            .expect("epistemic_actions confirmed non-empty above");
 
         MctsResult {
             best_action_idx: Some(*best_idx),

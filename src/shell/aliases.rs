@@ -69,7 +69,7 @@ impl Alias {
 
         // Clean up unused placeholders
         for i in (args.len() + 1)..=9 {
-            result = result.replace(&format!("${}", i), "");
+            result = result.replace(&format!("${i}"), "");
         }
 
         result.trim().to_string()

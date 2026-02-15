@@ -705,7 +705,7 @@ impl PhiAttractor {
         self.state_history = phi_trajectory.to_vec();
 
         let initial_phi = phi_trajectory[0];
-        let final_phi = *phi_trajectory.last().unwrap();
+        let final_phi = *phi_trajectory.last().expect("phi_trajectory verified non-empty above");
 
         // 1. Detect convergence
         let (converged, convergence_time) = self.detect_convergence(phi_trajectory);
@@ -871,7 +871,7 @@ impl PhiAttractor {
             return (0.5, vec![]);
         }
 
-        let final_phi = *trajectory.last().unwrap();
+        let final_phi = *trajectory.last().expect("trajectory verified len >= 5 above");
 
         // Estimate basin by checking how often trajectory returns to attractor region
         let tolerance = self.config.convergence_threshold * 10.0;

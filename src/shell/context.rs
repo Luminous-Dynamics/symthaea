@@ -163,7 +163,7 @@ impl ShellContext {
         let user_host = format!("{}@{}", self.user, self.hostname);
         let symbol = if self.is_root { "#" } else { "λ" };
 
-        format!("{} {} {} ", user_host, path_display, symbol)
+        format!("{user_host} {path_display} {symbol} ")
     }
 
     /// Get ANSI color code based on current Phi level
@@ -711,10 +711,9 @@ impl PhiGate {
             return GateDecision::NeedsConfirmation {
                 phi: self.current_phi,
                 reason: format!(
-                    "Command classified as {:?} - confirmation required",
-                    destructiveness
+                    "Command classified as {destructiveness:?} - confirmation required"
                 ),
-                prompt: format!("About to execute: {}", command),
+                prompt: format!("About to execute: {command}"),
             };
         }
 
@@ -734,7 +733,7 @@ impl PhiGate {
                     "Medium consciousness ({:.2}) - confirming {:?} action",
                     self.current_phi, destructiveness
                 ),
-                prompt: format!("Execute: {}", command),
+                prompt: format!("Execute: {command}"),
             };
         }
 

@@ -171,7 +171,7 @@ impl ConversationMemory {
 
         self.conn
             .execute("INSERT INTO conversations (id) VALUES (?1)", params![&id])
-            .map_err(|e| anyhow!("Failed to create conversation: {}", e))?;
+            .map_err(|e| anyhow!("Failed to create conversation: {e}"))?;
 
         self.current_conversation_id = Some(id.clone());
         self.turn_count = 0;
@@ -197,7 +197,7 @@ impl ConversationMemory {
             .unwrap_or(false);
 
         if !exists {
-            return Err(anyhow!("Conversation not found: {}", conversation_id));
+            return Err(anyhow!("Conversation not found: {conversation_id}"));
         }
 
         self.current_conversation_id = Some(conversation_id.to_string());
@@ -376,7 +376,7 @@ impl ConversationMemory {
                 phi_after - phi_before
             )
         } else {
-            format!("NEUTRAL: '{}' had minimal Φ impact", action)
+            format!("NEUTRAL: '{action}' had minimal Φ impact")
         };
 
         self.conn.execute(

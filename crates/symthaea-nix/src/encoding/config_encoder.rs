@@ -53,7 +53,7 @@ impl<'a> ConfigEncoder<'a> {
         for import in &config.imports {
             let import_hv = {
                 let mut opt_enc = OptionEncoder::new(self.codebook);
-                opt_enc.encode_path(&format!("imports.{}", import))
+                opt_enc.encode_path(&format!("imports.{import}"))
             };
             components.push(import_hv);
             weights.push(0.5);

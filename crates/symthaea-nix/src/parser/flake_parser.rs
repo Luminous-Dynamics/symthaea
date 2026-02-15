@@ -126,7 +126,7 @@ impl FlakeParser {
     /// Parse a flake.lock JSON string.
     pub fn parse_flake_lock(lock_json: &str) -> Result<FlakeLockInfo, String> {
         let value: serde_json::Value = serde_json::from_str(lock_json)
-            .map_err(|e| format!("Failed to parse flake.lock: {}", e))?;
+            .map_err(|e| format!("Failed to parse flake.lock: {e}"))?;
 
         let version = value["version"].as_u64().unwrap_or(7) as u32;
 
@@ -184,13 +184,13 @@ impl FlakeParser {
         let flake_lock_path = dir.join("flake.lock");
 
         let source = std::fs::read_to_string(&flake_nix_path)
-            .map_err(|e| format!("Failed to read flake.nix: {}", e))?;
+            .map_err(|e| format!("Failed to read flake.nix: {e}"))?;
 
         let flake_info = self.parse_flake_nix(&source)?;
 
         let lock_info = if flake_lock_path.exists() {
             let lock_json = std::fs::read_to_string(&flake_lock_path)
-                .map_err(|e| format!("Failed to read flake.lock: {}", e))?;
+                .map_err(|e| format!("Failed to read flake.lock: {e}"))?;
             Some(Self::parse_flake_lock(&lock_json)?)
         } else {
             None
@@ -323,7 +323,7 @@ impl FlakeParser {
         let mut parts = Vec::new();
 
         if let Some(ref desc) = info.description {
-            parts.push(format!("Description: {}", desc));
+            parts.push(format!("Description: {desc}"));
         }
 
         if !info.inputs.is_empty() {

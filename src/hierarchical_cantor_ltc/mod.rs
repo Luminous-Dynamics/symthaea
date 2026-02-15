@@ -591,8 +591,7 @@ impl std::fmt::Display for NetworkSummary {
             let tau = self.base_tau * (1.0_f32 / 3.0).powi(level as i32);
             writeln!(
                 f,
-                "║    Level {}: Φ = {:.4} (τ = {:>7.2} ms)                    ║",
-                level, phi, tau
+                "║    Level {level}: Φ = {phi:.4} (τ = {tau:>7.2} ms)                    ║"
             )?;
         }
         writeln!(

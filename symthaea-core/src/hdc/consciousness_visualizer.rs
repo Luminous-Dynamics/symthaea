@@ -70,7 +70,7 @@ impl ConsciousnessVisualizer {
                     label, color_code, bar, "\x1b[0m", value
                 ));
             } else {
-                output.push_str(&format!("│ {} {} {:.3} │\n", label, bar, value));
+                output.push_str(&format!("│ {label} {bar} {value:.3} │\n"));
             }
         }
 
@@ -118,9 +118,8 @@ impl ConsciousnessVisualizer {
 
         format!(
             "┌─ COGNITIVE MODE ───────────────────────────────────────┐\n\
-                 │  {} {:50} │\n\
-                 └────────────────────────────────────────────────────────┘\n",
-            icon, desc
+                 │  {icon} {desc:50} │\n\
+                 └────────────────────────────────────────────────────────┘\n"
         )
     }
 
@@ -190,11 +189,10 @@ impl ConsciousnessVisualizer {
         format!(
             "┌─ Φ INTEGRATED INFORMATION ────────────────────────────┐\n\
              │                                                        │\n\
-             │     {}┃{}┃{}  Φ = {:.4}                         │\n\
+             │     {color}┃{meter}┃{reset}  Φ = {phi:.4}                         │\n\
              │                                                        │\n\
              │     0.0 ├────────────────────┤ 1.0                    │\n\
-             └────────────────────────────────────────────────────────┘\n",
-            color, meter, reset, phi
+             └────────────────────────────────────────────────────────┘\n"
         )
     }
 
@@ -251,7 +249,7 @@ impl ConsciousnessVisualizer {
     /// Render sparkline from history
     pub fn render_sparkline(&self, values: &[f64], label: &str) -> String {
         if values.is_empty() {
-            return format!("{}: (no data)\n", label);
+            return format!("{label}: (no data)\n");
         }
 
         let chars = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -272,7 +270,7 @@ impl ConsciousnessVisualizer {
             })
             .collect();
 
-        format!("{}: {} ({:.3}-{:.3})\n", label, sparkline, min, max)
+        format!("{label}: {sparkline} ({min:.3}-{max:.3})\n")
     }
 
     /// Render complete consciousness dashboard

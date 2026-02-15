@@ -714,8 +714,7 @@ impl HolographicConsciousnessAnalyzer {
         };
 
         format!(
-            "Holographic consciousness: {} field with {} superposition, {}",
-            coherence_desc, depth_desc, unity_desc
+            "Holographic consciousness: {coherence_desc} field with {depth_desc} superposition, {unity_desc}"
         )
     }
 }

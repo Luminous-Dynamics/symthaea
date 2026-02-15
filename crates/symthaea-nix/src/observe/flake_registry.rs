@@ -156,7 +156,7 @@ impl FlakeRegistry {
         let value: serde_json::Value = serde_json::from_str(json_str).map_err(|e| {
             std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
-                format!("failed to parse flake metadata JSON: {}", e),
+                format!("failed to parse flake metadata JSON: {e}"),
             )
         })?;
 

@@ -178,7 +178,7 @@ impl RadiationDamageSystem {
                 "Sluggish Diffusion" => self.sluggish_diffusion.clone(),
                 "Dynamic Recrystallization" => self.recrystallization.clone(),
                 "Thermal Annealing" => self.annealing.clone(),
-                _ => genesis.hv(&format!("healing::{}", name), PHYSICS_DIM),
+                _ => genesis.hv(&format!("healing::{name}"), PHYSICS_DIM),
             };
 
             self.mechanisms.push(SelfHealingMechanism {

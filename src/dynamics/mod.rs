@@ -122,7 +122,7 @@ impl CrystalizedConcept {
     pub fn new(id: u64, name: impl Into<String>, embedding: Vec<f32>) -> Self {
         Self {
             id,
-            uid: format!("concept_{}", id),
+            uid: format!("concept_{id}"),
             name: name.into(),
             description: None,
             embedding: embedding.clone(),
@@ -148,7 +148,7 @@ impl CrystalizedConcept {
     ) -> Self {
         Self {
             id,
-            uid: format!("concept_{}", id),
+            uid: format!("concept_{id}"),
             name: name.into(),
             description: Some(description.into()),
             embedding: embedding.clone(),
@@ -316,7 +316,9 @@ pub use stochastic_dynamics::{
 
 // Narrative arc dynamics
 pub use narrative_dynamics::{NarrativeSignal, StoryArcConfig, StoryArcDynamics};
-pub use story_session::{ConflictEntry, SceneRecord, StorySession, StoryState};
+pub use story_session::{
+    CharacterArc, ConflictEntry, SceneRecord, StorySession, StorySessionSnapshot, StoryState,
+};
 
 #[cfg(test)]
 mod tests {

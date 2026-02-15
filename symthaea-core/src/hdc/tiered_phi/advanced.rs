@@ -749,10 +749,10 @@ impl InterventionType {
     pub fn description(&self) -> String {
         match self {
             Self::Knockout => "knockout (remove node)".to_string(),
-            Self::Amplify(f) => format!("amplify (×{:.1})", f),
-            Self::Dampen(f) => format!("dampen (÷{:.1})", f),
+            Self::Amplify(f) => format!("amplify (×{f:.1})"),
+            Self::Dampen(f) => format!("dampen (÷{f:.1})"),
             Self::Noise => "noise (randomize)".to_string(),
-            Self::Clamp(v) => format!("clamp (set to {:.2})", v),
+            Self::Clamp(v) => format!("clamp (set to {v:.2})"),
         }
     }
 

@@ -488,8 +488,8 @@ impl KosmicSong {
         use rand::RngCore;
         let mut bytes = [0u8; 16];
         rand::rngs::OsRng.fill_bytes(&mut bytes);
-        let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
-        format!("kosmic_{}", hex)
+        let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+        format!("kosmic_{hex}")
     }
 
     /// Synthesize all layers into coherent state

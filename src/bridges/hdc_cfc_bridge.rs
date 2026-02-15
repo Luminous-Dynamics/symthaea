@@ -599,7 +599,7 @@ impl HdcCfcBridge {
             config.intermediate_dim,
             config.num_attention_heads,
             genesis,
-            &format!("{}::attention", label),
+            &format!("{label}::attention"),
         );
 
         // Layer norm parameters

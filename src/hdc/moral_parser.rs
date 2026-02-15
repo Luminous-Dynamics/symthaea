@@ -1106,7 +1106,7 @@ impl MoralParser {
                 let end = rest.find([',', '.', ';']).unwrap_or(rest.len());
                 let clause = rest[..end.min(80)].trim();
                 if !clause.is_empty() {
-                    return Some(format!("{} {}", pattern, clause));
+                    return Some(format!("{pattern} {clause}"));
                 }
             }
         }
@@ -1191,7 +1191,7 @@ impl MoralParser {
                     .detect_magnitude(&clause_words)
                     .unwrap_or(Magnitude::Medium);
 
-                return Some((format!("{} {}", pattern, clause), magnitude));
+                return Some((format!("{pattern} {clause}"), magnitude));
             }
         }
         None
@@ -1352,7 +1352,7 @@ impl MoralParser {
         format!(
             r#"Extract moral roles from this scenario. Be precise and concise.
 
-Scenario: "{}"
+Scenario: "{text}"
 
 Respond in this exact format (use "none" if not detectable):
 AGENT: [who performs the action]
@@ -1360,8 +1360,7 @@ ACTION: [the main verb/action]
 PATIENT: [who is affected by the action]
 INTENT: [good/bad/neutral]
 CONSENT: [given/denied/absent/implied]
-MAGNITUDE: [tiny/small/medium/large/huge]"#,
-            text
+MAGNITUDE: [tiny/small/medium/large/huge]"#
         )
     }
 

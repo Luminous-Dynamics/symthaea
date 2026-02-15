@@ -503,7 +503,7 @@ impl UnifiedGlobalWorkspace {
         let content = WorkspaceContent::new(
             representation,
             final_activation,
-            format!("strategy:{}", strategy_name),
+            format!("strategy:{strategy_name}"),
         );
 
         // Submit to HDC workspace
@@ -678,7 +678,7 @@ impl UnifiedGlobalWorkspace {
         self.hdc_workspace
             .get_conscious_contents()
             .iter()
-            .any(|c| c.source == format!("strategy:{}", strategy_name))
+            .any(|c| c.source == format!("strategy:{strategy_name}"))
     }
 
     /// Get statistics

@@ -72,7 +72,7 @@ impl NixOptionSchema {
 /// Parse the JSON output of `nixos-option --json` into structured schemas.
 pub fn parse_nixos_options(json: &str) -> Result<Vec<NixOptionSchema>, String> {
     let raw: HashMap<String, RawOptionEntry> =
-        serde_json::from_str(json).map_err(|e| format!("Failed to parse options JSON: {}", e))?;
+        serde_json::from_str(json).map_err(|e| format!("Failed to parse options JSON: {e}"))?;
 
     let mut schemas = Vec::with_capacity(raw.len());
 
@@ -108,7 +108,7 @@ pub fn load_nixos_options() -> Result<Vec<NixOptionSchema>, String> {
     let output = std::process::Command::new("nixos-option")
         .arg("--json")
         .output()
-        .map_err(|e| format!("Failed to execute nixos-option: {}", e))?;
+        .map_err(|e| format!("Failed to execute nixos-option: {e}"))?;
 
     if !output.status.success() {
         return Err(format!(

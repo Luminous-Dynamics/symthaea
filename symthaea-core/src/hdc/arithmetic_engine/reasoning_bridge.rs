@@ -106,7 +106,7 @@ impl MathReasoningBridge {
                     (r.value, r.phi, r.abstract_proof)
                 } else {
                     return MathAssertion {
-                        subject: format!("{} - {}", a, b),
+                        subject: format!("{a} - {b}"),
                         relation: MathRelation::Equals,
                         object: "undefined (negative in naturals)".to_string(),
                         confidence: 1.0,
@@ -120,7 +120,7 @@ impl MathReasoningBridge {
                     (r.value, r.phi, r.abstract_proof)
                 } else {
                     return MathAssertion {
-                        subject: format!("{} / {}", a, b),
+                        subject: format!("{a} / {b}"),
                         relation: MathRelation::Equals,
                         object: "undefined (division by zero)".to_string(),
                         confidence: 1.0,
@@ -134,7 +134,7 @@ impl MathReasoningBridge {
                     (r.value, r.phi, r.abstract_proof)
                 } else {
                     return MathAssertion {
-                        subject: format!("{} % {}", a, b),
+                        subject: format!("{a} % {b}"),
                         relation: MathRelation::Equals,
                         object: "undefined (modulo by zero)".to_string(),
                         confidence: 1.0,
@@ -153,7 +153,7 @@ impl MathReasoningBridge {
             }
             _ => {
                 return MathAssertion {
-                    subject: format!("{} {} {}", a, op, b),
+                    subject: format!("{a} {op} {b}"),
                     relation: MathRelation::Equals,
                     object: "unknown operation".to_string(),
                     confidence: 0.0,
@@ -164,7 +164,7 @@ impl MathReasoningBridge {
         };
 
         let assertion = MathAssertion {
-            subject: format!("{} {} {}", a, op, b),
+            subject: format!("{a} {op} {b}"),
             relation: MathRelation::Equals,
             object: value.to_string(),
             confidence: 1.0, // Mathematical facts are certain
@@ -444,7 +444,7 @@ impl MathReasoningBridge {
             confidence: 1.0,
             phi: total_phi,
             proof_source: Some(AbstractProof {
-                theorem: format!("{} divides {} by transitivity", a, c),
+                theorem: format!("{a} divides {c} by transitivity"),
                 base_cases: vec![format!("{} | {}", a, b), format!("{} | {}", b, c)],
                 inductive_step: "Divisibility is transitive: a|b ∧ b|c → a|c".to_string(),
                 justification: vec![
@@ -498,9 +498,9 @@ impl MathReasoningBridge {
 
         // Property 4: gcd(a, b) = gcd(b, a) (commutativity)
         results.push(MathAssertion {
-            subject: format!("gcd({}, {})", a, b),
+            subject: format!("gcd({a}, {b})"),
             relation: MathRelation::Equals,
-            object: format!("gcd({}, {})", b, a),
+            object: format!("gcd({b}, {a})"),
             confidence: 1.0,
             phi: gcd.phi * 0.2,
             proof_source: None,

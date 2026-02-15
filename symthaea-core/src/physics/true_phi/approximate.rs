@@ -149,10 +149,10 @@ impl ApproximateMIPFinder {
 
         // Ensure non-empty partitions
         if new_a.is_empty() && !new_b.is_empty() {
-            new_a.push(new_b.pop().unwrap());
+            new_a.push(new_b.pop().expect("new_b verified non-empty"));
         }
         if new_b.is_empty() && !new_a.is_empty() {
-            new_b.push(new_a.pop().unwrap());
+            new_b.push(new_a.pop().expect("new_a verified non-empty"));
         }
 
         TruePartition {

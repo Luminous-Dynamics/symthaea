@@ -591,7 +591,7 @@ impl UnifiedConsciousBeing {
                 salience: 0.7 + 0.3 * (i as f64 / sample_count.max(1) as f64),
                 confidence: 0.85,
                 timestamp: i as u64,
-                label: Some(format!("{}[t={}]", system_name, i)),
+                label: Some(format!("{system_name}[t={i}]")),
             })
             .collect();
 

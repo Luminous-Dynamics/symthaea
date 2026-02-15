@@ -621,7 +621,7 @@ impl ReplSession {
     pub fn warmup(&mut self, cycles: usize) -> f32 {
         let mut last_error = f32::MAX;
         for i in 0..cycles {
-            let warmup_input = format!("Cognitive warmup cycle {}", i);
+            let warmup_input = format!("Cognitive warmup cycle {i}");
             let result = self.cognitive.cycle(&warmup_input);
             last_error = result.prediction_error;
         }
@@ -848,7 +848,7 @@ impl ReplSession {
             self.stats.actions_blocked += 1;
             return Ok(ActionResult {
                 command: command.clone(),
-                destructiveness: format!("{:?}", destructiveness),
+                destructiveness: format!("{destructiveness:?}"),
                 executed: false,
                 output: None,
                 blocked_reason: Some(format!(
@@ -870,14 +870,13 @@ impl ReplSession {
                 self.stats.actions_blocked += 1;
                 return Ok(ActionResult {
                     command: command.clone(),
-                    destructiveness: format!("{:?}", destructiveness),
+                    destructiveness: format!("{destructiveness:?}"),
                     executed: false,
                     output: None,
-                    blocked_reason: Some(format!("Policy violation: {:?}", e)),
+                    blocked_reason: Some(format!("Policy violation: {e:?}")),
                     display_output: format!(
-                        "[POLICY BLOCKED] Action '{}' violates policy: {:?}\n\
-                         Risk: {:?}, Destructiveness: {:?}",
-                        command, e, risk, destructiveness
+                        "[POLICY BLOCKED] Action '{command}' violates policy: {e:?}\n\
+                         Risk: {risk:?}, Destructiveness: {destructiveness:?}"
                     ),
                 });
             }
@@ -889,7 +888,7 @@ impl ReplSession {
         {
             return Ok(ActionResult {
                 command: command.clone(),
-                destructiveness: format!("{:?}", destructiveness),
+                destructiveness: format!("{destructiveness:?}"),
                 executed: false,
                 output: None,
                 blocked_reason: Some("Requires confirmation".to_string()),
@@ -910,7 +909,7 @@ impl ReplSession {
         match self.executor.mode() {
             ExecutionMode::Simulated => Ok(ActionResult {
                 command: command.clone(),
-                destructiveness: format!("{:?}", destructiveness),
+                destructiveness: format!("{destructiveness:?}"),
                 executed: false,
                 output: None,
                 blocked_reason: None,
@@ -939,38 +938,36 @@ impl ReplSession {
                                     let stdout_str = String::from_utf8_lossy(stdout);
                                     let stderr_str = String::from_utf8_lossy(stderr);
                                     format!(
-                                        "Exit code: {}\nStdout: {}\nStderr: {}",
-                                        exit_code, stdout_str, stderr_str
+                                        "Exit code: {exit_code}\nStdout: {stdout_str}\nStderr: {stderr_str}"
                                     )
                                 }
-                                other => format!("{:?}", other),
+                                other => format!("{other:?}"),
                             };
                             Ok(ActionResult {
                                 command: command.clone(),
-                                destructiveness: format!("{:?}", destructiveness),
+                                destructiveness: format!("{destructiveness:?}"),
                                 executed: true,
                                 output: Some(output_str.clone()),
                                 blocked_reason: None,
-                                display_output: format!("[EXECUTED] {}\n\n{}", command, output_str),
+                                display_output: format!("[EXECUTED] {command}\n\n{output_str}"),
                             })
                         }
                         Err(e) => Ok(ActionResult {
                             command: command.clone(),
-                            destructiveness: format!("{:?}", destructiveness),
+                            destructiveness: format!("{destructiveness:?}"),
                             executed: false,
                             output: None,
-                            blocked_reason: Some(format!("Execution error: {}", e)),
+                            blocked_reason: Some(format!("Execution error: {e}")),
                             display_output: format!(
-                                "[ERROR] Failed to execute: {}\n\
-                                     Error: {}",
-                                command, e
+                                "[ERROR] Failed to execute: {command}\n\
+                                     Error: {e}"
                             ),
                         }),
                     }
                 } else {
                     Ok(ActionResult {
                         command,
-                        destructiveness: format!("{:?}", destructiveness),
+                        destructiveness: format!("{destructiveness:?}"),
                         executed: false,
                         output: None,
                         blocked_reason: Some("No sandbox available".to_string()),

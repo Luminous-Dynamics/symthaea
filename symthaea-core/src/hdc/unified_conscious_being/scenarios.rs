@@ -42,7 +42,7 @@ pub fn run_test_scenario(
         for expected in &scenario.expected_qualities {
             let (name, passed) = match expected {
                 ExpectedQuality::MinPhi(min) => (
-                    format!("Input {}: Phi >= {:.2}", i, min),
+                    format!("Input {i}: Phi >= {min:.2}"),
                     result.comprehension.consciousness_phi >= *min,
                 ),
                 ExpectedQuality::DetectsEmotion(emotion) => {
@@ -53,27 +53,27 @@ pub fn run_test_scenario(
                         .emotional_state
                         .primary;
                     (
-                        format!("Input {}: Detects {}", i, emotion),
+                        format!("Input {i}: Detects {emotion}"),
                         detected.to_lowercase().contains(&emotion.to_lowercase()),
                     )
                 }
                 ExpectedQuality::EmpathyRequired => (
-                    format!("Input {}: Empathetic response", i),
+                    format!("Input {i}: Empathetic response"),
                     result.response.style == DialogueStyle::Empathetic
                         || result.response.text.to_lowercase().contains("understand")
                         || result.response.text.to_lowercase().contains("feel"),
                 ),
                 ExpectedQuality::CounterfactualTriggered => (
-                    format!("Input {}: Counterfactual triggered", i),
+                    format!("Input {i}: Counterfactual triggered"),
                     !result.comprehension.counterfactuals.is_empty()
                         || result.pearl_counterfactual.is_some(),
                 ),
                 ExpectedQuality::MemoryRecall => (
-                    format!("Input {}: Memory recalled", i),
+                    format!("Input {i}: Memory recalled"),
                     result.comprehension.memory.recalled_count > 0,
                 ),
                 ExpectedQuality::CausalDetection => (
-                    format!("Input {}: Causal structure detected", i),
+                    format!("Input {i}: Causal structure detected"),
                     result
                         .comprehension
                         .understanding

@@ -2071,10 +2071,10 @@ impl SymthaeaMind {
                     }
                 ));
                 if let Some(latency) = db_health.latency_ms {
-                    report.push_str(&format!("Latency: {}ms\n", latency));
+                    report.push_str(&format!("Latency: {latency}ms\n"));
                 }
                 if let Some(ref err) = db_health.error_message {
-                    report.push_str(&format!("Error: {}\n", err));
+                    report.push_str(&format!("Error: {err}\n"));
                 }
             }
 

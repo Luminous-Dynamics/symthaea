@@ -181,7 +181,7 @@ impl GoalInference {
         } else if lower.contains("rebuild") || lower.contains("switch") {
             "Apply system configuration".to_string()
         } else {
-            format!("Process: {}", input)
+            format!("Process: {input}")
         }
     }
 

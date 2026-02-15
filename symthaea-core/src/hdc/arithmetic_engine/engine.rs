@@ -166,7 +166,7 @@ impl ArithmeticEngine {
         let mut result_encoding = num_a.encoding;
 
         proof.push(ProofStep {
-            description: format!("Start with {} (base case)", a),
+            description: format!("Start with {a} (base case)"),
             primitives_used: vec!["NUMBER".to_string()],
             transformation: "identity".to_string(),
             phi: num_a.construction_phi,
@@ -304,7 +304,7 @@ impl ArithmeticEngine {
         let mut running_value = 0u64;
 
         proof.push(ProofStep {
-            description: format!("Base case: {} × 0 = 0", a),
+            description: format!("Base case: {a} × 0 = 0"),
             primitives_used: vec!["ZERO".to_string()],
             transformation: "identity".to_string(),
             phi: 0.0,
@@ -429,7 +429,7 @@ impl ArithmeticEngine {
 
         let mut proof = Vec::new();
         proof.push(ProofStep {
-            description: format!("{} - {} = {} (find c where {} + c = {})", a, b, c, b, a),
+            description: format!("{a} - {b} = {c} (find c where {b} + c = {a})"),
             primitives_used: vec!["SUBTRACTION".to_string()],
             transformation: "inverse".to_string(),
             phi: result.construction_phi,
@@ -443,7 +443,7 @@ impl ArithmeticEngine {
         let verified = verification.result.similarity(&num_a) > vt.threshold();
 
         proof.push(ProofStep {
-            description: format!("Verify: {} + {} = {} ✓", b, c, a),
+            description: format!("Verify: {b} + {c} = {a} ✓"),
             primitives_used: vec!["ADDITION".to_string()],
             transformation: "verification".to_string(),
             phi: verification.total_phi,
@@ -496,7 +496,7 @@ impl ArithmeticEngine {
         let mut result = self.number(1);
 
         proof.push(ProofStep {
-            description: format!("Base case: {}^0 = 1", base),
+            description: format!("Base case: {base}^0 = 1"),
             primitives_used: vec!["ONE".to_string()],
             transformation: "identity".to_string(),
             phi: result.construction_phi,

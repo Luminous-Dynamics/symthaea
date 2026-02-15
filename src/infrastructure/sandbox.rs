@@ -192,7 +192,7 @@ impl Sandbox {
     pub fn nix_eval(&mut self, expr: &str) -> Result<SandboxResult, SandboxError> {
         if self.simulation_only {
             return Ok(SandboxResult {
-                command: format!("nix-instantiate --eval -E '{}'", expr),
+                command: format!("nix-instantiate --eval -E '{expr}'"),
                 exit_code: 0,
                 stdout: "[Simulated] Nix expression valid".to_string(),
                 stderr: String::new(),
@@ -321,7 +321,7 @@ impl Sandbox {
         let (exit_code, stdout, stderr) = match command {
             "nix" | "nix-build" | "nix-shell" | "nix-env" => (
                 0,
-                format!("[Simulated] {} would execute successfully", full_cmd),
+                format!("[Simulated] {full_cmd} would execute successfully"),
                 String::new(),
             ),
             "nixos-rebuild" => {
@@ -346,12 +346,12 @@ impl Sandbox {
                 } else if args.contains(&"--eval") {
                     (0, "[Simulated] Expression valid".to_string(), String::new())
                 } else {
-                    (0, format!("[Simulated] {}", full_cmd), String::new())
+                    (0, format!("[Simulated] {full_cmd}"), String::new())
                 }
             }
             _ => (
                 0,
-                format!("[Simulated] {} completed", full_cmd),
+                format!("[Simulated] {full_cmd} completed"),
                 String::new(),
             ),
         };
@@ -444,12 +444,12 @@ pub enum SandboxError {
 impl std::fmt::Display for SandboxError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InitFailed(e) => write!(f, "Sandbox init failed: {}", e),
-            Self::CommandNotAllowed(cmd) => write!(f, "Command not allowed: {}", cmd),
-            Self::ExecutionFailed(e) => write!(f, "Execution failed: {}", e),
+            Self::InitFailed(e) => write!(f, "Sandbox init failed: {e}"),
+            Self::CommandNotAllowed(cmd) => write!(f, "Command not allowed: {cmd}"),
+            Self::ExecutionFailed(e) => write!(f, "Execution failed: {e}"),
             Self::RealExecutionDisabled => write!(f, "Real execution disabled"),
             Self::Timeout => write!(f, "Sandbox operation timed out"),
-            Self::CleanupFailed(e) => write!(f, "Cleanup failed: {}", e),
+            Self::CleanupFailed(e) => write!(f, "Cleanup failed: {e}"),
         }
     }
 }

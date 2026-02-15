@@ -166,7 +166,7 @@ impl GenerativeModel {
                 .associations
                 .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| a.2.partial_cmp(&b.2).unwrap())
+                .min_by(|(_, a), (_, b)| a.2.total_cmp(&b.2))
             {
                 self.associations[idx] = (cause, effect, strength);
             }
@@ -212,7 +212,7 @@ impl RecognitionModel {
             .inferences
             .iter()
             .enumerate()
-            .min_by(|(_, a), (_, b)| a.2.partial_cmp(&b.2).unwrap())
+            .min_by(|(_, a), (_, b)| a.2.total_cmp(&b.2))
         {
             self.inferences[idx] = (observation, cause, strength);
         }
@@ -674,7 +674,7 @@ impl ActiveInferenceEngine {
         self.action_repertoire.iter().min_by(|a, b| {
             let efe_a = self.expected_free_energy.get(&a.id).unwrap_or(&1.0);
             let efe_b = self.expected_free_energy.get(&b.id).unwrap_or(&1.0);
-            efe_a.partial_cmp(efe_b).unwrap()
+            efe_a.total_cmp(efe_b)
         })
     }
 

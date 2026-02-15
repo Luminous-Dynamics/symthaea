@@ -56,13 +56,13 @@ impl ConfigPatch {
             let new = new_lines.get(i).copied().unwrap_or("");
             if old != new {
                 if !old.is_empty() {
-                    diff.push_str(&format!("-{}\n", old));
+                    diff.push_str(&format!("-{old}\n"));
                 }
                 if !new.is_empty() {
-                    diff.push_str(&format!("+{}\n", new));
+                    diff.push_str(&format!("+{new}\n"));
                 }
             } else {
-                diff.push_str(&format!(" {}\n", old));
+                diff.push_str(&format!(" {old}\n"));
             }
         }
 
@@ -123,15 +123,15 @@ impl ConfigWriter {
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
-        let pkg_entry = format!("    pkgs.{}", package);
+        let pkg_entry = format!("    pkgs.{package}");
 
         // Check if already present
-        if original.contains(&format!("pkgs.{}", package)) {
+        if original.contains(&format!("pkgs.{package}")) {
             return Ok(ConfigPatch {
                 target: config_path,
                 original: original.clone(),
                 modified: original,
-                description: format!("{} is already in systemPackages", package),
+                description: format!("{package} is already in systemPackages"),
             });
         }
 
@@ -162,7 +162,7 @@ impl ConfigWriter {
             target: config_path,
             original,
             modified,
-            description: format!("Add pkgs.{} to environment.systemPackages", package),
+            description: format!("Add pkgs.{package} to environment.systemPackages"),
         })
     }
 
@@ -172,10 +172,10 @@ impl ConfigWriter {
         let original = std::fs::read_to_string(&config_path)?;
 
         let patterns = [
-            format!("    pkgs.{}\n", package),
-            format!("    pkgs.{}", package),
-            format!("pkgs.{}\n", package),
-            format!("pkgs.{}", package),
+            format!("    pkgs.{package}\n"),
+            format!("    pkgs.{package}"),
+            format!("pkgs.{package}\n"),
+            format!("pkgs.{package}"),
         ];
 
         let mut modified = original.clone();
@@ -187,7 +187,7 @@ impl ConfigWriter {
             target: config_path,
             original,
             modified,
-            description: format!("Remove pkgs.{} from environment.systemPackages", package),
+            description: format!("Remove pkgs.{package} from environment.systemPackages"),
         })
     }
 
@@ -203,7 +203,7 @@ impl ConfigWriter {
         let config_path = self.config_root.join("configuration.nix");
         let original = std::fs::read_to_string(&config_path)?;
 
-        let option_line = format!("  {} = {};", option_path, value);
+        let option_line = format!("  {option_path} = {value};");
 
         let modified = if let Some(pos) = original.find(option_path) {
             // Find the end of this line (semicolon)
@@ -236,7 +236,7 @@ impl ConfigWriter {
             target: config_path,
             original,
             modified,
-            description: format!("Set {} = {}", option_path, value),
+            description: format!("Set {option_path} = {value}"),
         })
     }
 
@@ -342,7 +342,7 @@ impl ConfigWriter {
             .status();
 
         // Commit
-        let commit_msg = format!("nix-mind backup: {}", message);
+        let commit_msg = format!("nix-mind backup: {message}");
         let _ = Command::new("git")
             .args(["commit", "-m", &commit_msg, "--allow-empty"])
             .current_dir(&self.config_root)

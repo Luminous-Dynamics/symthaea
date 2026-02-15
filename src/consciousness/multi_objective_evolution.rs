@@ -284,8 +284,8 @@ impl MultiObjectiveEvolution {
     fn find_highest_phi(&self) -> PrimitiveWithProfile {
         self.population
             .iter()
-            .max_by(|a, b| a.profile.phi.partial_cmp(&b.profile.phi).unwrap())
-            .unwrap()
+            .max_by(|a, b| a.profile.phi.total_cmp(&b.profile.phi))
+            .expect("population must not be empty when finding highest phi")
             .clone()
     }
 
@@ -293,8 +293,8 @@ impl MultiObjectiveEvolution {
     fn find_highest_entropy(&self) -> PrimitiveWithProfile {
         self.population
             .iter()
-            .max_by(|a, b| a.profile.entropy.partial_cmp(&b.profile.entropy).unwrap())
-            .unwrap()
+            .max_by(|a, b| a.profile.entropy.total_cmp(&b.profile.entropy))
+            .expect("population must not be empty when finding highest entropy")
             .clone()
     }
 
@@ -305,10 +305,9 @@ impl MultiObjectiveEvolution {
             .max_by(|a, b| {
                 a.profile
                     .complexity
-                    .partial_cmp(&b.profile.complexity)
-                    .unwrap()
+                    .total_cmp(&b.profile.complexity)
             })
-            .unwrap()
+            .expect("population must not be empty when finding highest complexity")
             .clone()
     }
 
@@ -349,9 +348,9 @@ impl MultiObjectiveEvolution {
             / frontier.profiles.len() as f64;
 
         println!("   Frontier stats:");
-        println!("      Mean Φ: {:.4}", mean_phi);
-        println!("      Mean Entropy: {:.4}", mean_entropy);
-        println!("      Mean Complexity: {:.4}", mean_complexity);
+        println!("      Mean Φ: {mean_phi:.4}");
+        println!("      Mean Entropy: {mean_entropy:.4}");
+        println!("      Mean Complexity: {mean_complexity:.4}");
     }
 }
 

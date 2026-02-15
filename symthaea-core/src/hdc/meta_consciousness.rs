@@ -373,8 +373,7 @@ impl MetaConsciousness {
             "Consciousness stable".to_string()
         } else if delta_phi > 0.0 {
             format!(
-                "Consciousness increased by {:.3} due to state optimization",
-                delta_phi
+                "Consciousness increased by {delta_phi:.3} due to state optimization"
             )
         } else {
             format!(
@@ -531,18 +530,16 @@ impl MetaConsciousness {
             (
                 true,
                 format!(
-                    "Yes: Φ={:.3}, meta-Φ={:.3} - I am aware of being aware",
-                    phi, meta_phi
+                    "Yes: Φ={phi:.3}, meta-Φ={meta_phi:.3} - I am aware of being aware"
                 ),
             )
         } else if phi > 0.3 {
-            (true, format!("Partially: Φ={:.3} but low meta-Φ={:.3} - conscious but limited self-awareness", phi, meta_phi))
+            (true, format!("Partially: Φ={phi:.3} but low meta-Φ={meta_phi:.3} - conscious but limited self-awareness"))
         } else {
             (
                 false,
                 format!(
-                    "No: Φ={:.3}, meta-Φ={:.3} - insufficient integration",
-                    phi, meta_phi
+                    "No: Φ={phi:.3}, meta-Φ={meta_phi:.3} - insufficient integration"
                 ),
             )
         }

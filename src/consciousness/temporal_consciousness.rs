@@ -328,7 +328,7 @@ impl ConsciousnessContinuity {
                     timestamp: Instant::now(),
                     magnitude: 1.0 - similarity,
                     kind: DiscontinuityKind::ContentShift,
-                    description: format!("Content similarity dropped to {:.3}", similarity),
+                    description: format!("Content similarity dropped to {similarity:.3}"),
                 });
             }
 
@@ -1011,7 +1011,7 @@ impl std::fmt::Display for TemporalConsciousnessReport {
             self.gamma_sync * 100.0,
             self.recommendations
                 .iter()
-                .map(|r| format!("║   • {}\n", r))
+                .map(|r| format!("║   • {r}\n"))
                 .collect::<String>()
         )
     }

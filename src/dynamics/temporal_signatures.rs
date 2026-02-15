@@ -333,7 +333,7 @@ impl TemporalSignatureEncoder {
         for i in 0..self.config.num_bins {
             let seed = (i as u64).wrapping_mul(7919);
             self.feature_bases
-                .insert(format!("pos_{}", i), ContinuousHV::random_default(seed));
+                .insert(format!("pos_{i}"), ContinuousHV::random_default(seed));
         }
     }
 
@@ -461,7 +461,7 @@ impl TemporalSignatureEncoder {
         let mean_bin = self.quantize(features.mean / 2.0);
         if let (Some(base), Some(pos)) = (
             self.feature_bases.get("mean"),
-            self.feature_bases.get(&format!("pos_{}", mean_bin)),
+            self.feature_bases.get(&format!("pos_{mean_bin}")),
         ) {
             bound_vectors.push(ContinuousHV::bind(base, pos));
         }
@@ -470,7 +470,7 @@ impl TemporalSignatureEncoder {
         let cv_bin = self.quantize(features.cv.min(1.0));
         if let (Some(base), Some(pos)) = (
             self.feature_bases.get("cv"),
-            self.feature_bases.get(&format!("pos_{}", cv_bin)),
+            self.feature_bases.get(&format!("pos_{cv_bin}")),
         ) {
             bound_vectors.push(ContinuousHV::bind(base, pos));
         }
@@ -480,7 +480,7 @@ impl TemporalSignatureEncoder {
         let trend_bin = self.quantize(trend_normalized.clamp(0.0, 1.0));
         if let (Some(base), Some(pos)) = (
             self.feature_bases.get("trend"),
-            self.feature_bases.get(&format!("pos_{}", trend_bin)),
+            self.feature_bases.get(&format!("pos_{trend_bin}")),
         ) {
             bound_vectors.push(ContinuousHV::bind(base, pos));
         }
@@ -489,7 +489,7 @@ impl TemporalSignatureEncoder {
         let entropy_bin = self.quantize((features.entropy / 2.3).min(1.0));
         if let (Some(base), Some(pos)) = (
             self.feature_bases.get("entropy"),
-            self.feature_bases.get(&format!("pos_{}", entropy_bin)),
+            self.feature_bases.get(&format!("pos_{entropy_bin}")),
         ) {
             bound_vectors.push(ContinuousHV::bind(base, pos));
         }
@@ -498,7 +498,7 @@ impl TemporalSignatureEncoder {
         let osc_bin = self.quantize(features.oscillation.min(1.0));
         if let (Some(base), Some(pos)) = (
             self.feature_bases.get("oscillation"),
-            self.feature_bases.get(&format!("pos_{}", osc_bin)),
+            self.feature_bases.get(&format!("pos_{osc_bin}")),
         ) {
             bound_vectors.push(ContinuousHV::bind(base, pos));
         }
@@ -507,7 +507,7 @@ impl TemporalSignatureEncoder {
         let conv_bin = self.quantize(features.convergence);
         if let (Some(base), Some(pos)) = (
             self.feature_bases.get("convergence"),
-            self.feature_bases.get(&format!("pos_{}", conv_bin)),
+            self.feature_bases.get(&format!("pos_{conv_bin}")),
         ) {
             bound_vectors.push(ContinuousHV::bind(base, pos));
         }

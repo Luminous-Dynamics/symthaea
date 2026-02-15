@@ -136,7 +136,7 @@ impl PlanExecutor {
                 results.push((self.steps[i].clone(), Some(result)));
             } else if self.steps[i].critical {
                 // Critical failure — rollback previous steps
-                self.steps[i].status = StepStatus::Failed(format!("{:?}", result));
+                self.steps[i].status = StepStatus::Failed(format!("{result:?}"));
                 results.push((self.steps[i].clone(), Some(result)));
 
                 let rolled_back = self
@@ -157,7 +157,7 @@ impl PlanExecutor {
                 };
             } else {
                 // Non-critical failure — continue
-                self.steps[i].status = StepStatus::Failed(format!("{:?}", result));
+                self.steps[i].status = StepStatus::Failed(format!("{result:?}"));
                 results.push((self.steps[i].clone(), Some(result)));
             }
         }

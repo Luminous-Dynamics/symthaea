@@ -94,7 +94,7 @@ impl PeanoPhysicsBridge {
     /// Convert an integer to f64 with HDC encoding.
     pub fn integer_to_f64(&self, n: i64) -> (f64, BinaryHV) {
         let value = n as f64;
-        let seed = seed_from_name(&format!("INT_{}", n));
+        let seed = seed_from_name(&format!("INT_{n}"));
         let encoding = BinaryHV::random(seed);
         (value, encoding)
     }
@@ -102,7 +102,7 @@ impl PeanoPhysicsBridge {
     /// Convert a rational number to HdcReal.
     pub fn rational_to_f64(&self, num: i64, den: i64) -> HdcReal {
         let exact_value = num as f64 / den as f64;
-        let seed = seed_from_name(&format!("RAT_{}_{}", num, den));
+        let seed = seed_from_name(&format!("RAT_{num}_{den}"));
         HdcReal::new(num, den, exact_value, seed)
     }
 
@@ -185,12 +185,12 @@ impl PeanoPhysicsBridge {
 
         // Create encodings for both exact and approximate results
         let approx_encoding =
-            BinaryHV::random(seed_from_name(&format!("APPROX_{}", approximate_value)));
+            BinaryHV::random(seed_from_name(&format!("APPROX_{approximate_value}")));
 
         let coherence = if let Some((num, den)) = exact_value {
             let exact_result_value = num as f64 / den as f64;
             let exact_encoding =
-                BinaryHV::random(seed_from_name(&format!("EXACT_{}_{}", num, den)));
+                BinaryHV::random(seed_from_name(&format!("EXACT_{num}_{den}")));
 
             // Measure coherence as similarity between exact and approximate encodings
             let similarity = exact_encoding.similarity(&approx_encoding);

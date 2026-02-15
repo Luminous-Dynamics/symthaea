@@ -573,10 +573,10 @@ impl RelationalConsciousness {
     ) -> String {
         let mut parts = Vec::new();
 
-        parts.push(format!("Relational Φ: {:.3}", phi_relation));
+        parts.push(format!("Relational Φ: {phi_relation:.3}"));
         parts.push(format!("Stage: {:?} ({})", stage, stage.description()));
-        parts.push(format!("Synchrony: {:.2}", synchrony));
-        parts.push(format!("Turn-taking: {:.2}", turn_taking));
+        parts.push(format!("Synchrony: {synchrony:.2}"));
+        parts.push(format!("Turn-taking: {turn_taking:.2}"));
 
         match mode {
             RelationMode::IThou => parts.push("✓ I-Thou mode (genuine encounter)".to_string()),

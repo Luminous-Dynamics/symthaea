@@ -1421,7 +1421,7 @@ mod tests {
 
         // Create a bottleneck using the new() constructor
         let bottleneck = Bottleneck::new(
-            ComponentId::MetaCognition(),
+            ComponentId::meta_cognition(),
             BottleneckType::LowPhi,
             0.7,
             "Test phi degradation",

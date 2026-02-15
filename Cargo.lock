@@ -12558,6 +12558,7 @@ dependencies = [
  "sha2 0.10.9",
  "sha3",
  "strsim",
+ "symthaea-causal-reasoning",
  "symthaea-core",
  "symthaea-nix",
  "symthaea-sentinel",
@@ -12577,6 +12578,15 @@ dependencies = [
  "uuid",
  "wait-timeout",
  "zbus 4.4.0",
+]
+
+[[package]]
+name = "symthaea-causal-reasoning"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "serde",
+ "symthaea-core",
 ]
 
 [[package]]

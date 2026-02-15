@@ -202,11 +202,11 @@ impl PrimitivePersistence {
         // Header
         let mut header = String::from(",");
         header.push_str(&names.join(","));
-        writeln!(file, "{}", header).map_err(|e| PersistenceError::IoError(e.to_string()))?;
+        writeln!(file, "{header}").map_err(|e| PersistenceError::IoError(e.to_string()))?;
 
         // Rows
         for (i, row) in matrix.iter().enumerate() {
-            let row_str: Vec<String> = row.iter().map(|v| format!("{:.4}", v)).collect();
+            let row_str: Vec<String> = row.iter().map(|v| format!("{v:.4}")).collect();
             writeln!(file, "{},{}", names[i], row_str.join(","))
                 .map_err(|e| PersistenceError::IoError(e.to_string()))?;
         }
@@ -231,12 +231,12 @@ pub enum PersistenceError {
 impl std::fmt::Display for PersistenceError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PersistenceError::IoError(msg) => write!(f, "IO error: {}", msg),
-            PersistenceError::SerializationError(msg) => write!(f, "serialization error: {}", msg),
+            PersistenceError::IoError(msg) => write!(f, "IO error: {msg}"),
+            PersistenceError::SerializationError(msg) => write!(f, "serialization error: {msg}"),
             PersistenceError::DeserializationError(msg) => {
-                write!(f, "deserialization error: {}", msg)
+                write!(f, "deserialization error: {msg}")
             }
-            PersistenceError::CompositionError(msg) => write!(f, "composition error: {}", msg),
+            PersistenceError::CompositionError(msg) => write!(f, "composition error: {msg}"),
         }
     }
 }

@@ -732,7 +732,7 @@ impl ChaosEncoder {
     pub fn encode_attractor_type(&self, attractor_type: &str) -> ContinuousHV {
         let type_hv = self
             .genesis
-            .hv(&format!("attractor::{}", attractor_type), PHYSICS_DIM);
+            .hv(&format!("attractor::{attractor_type}"), PHYSICS_DIM);
         self.attractor.bind(&type_hv)
     }
 
@@ -748,7 +748,7 @@ impl ChaosEncoder {
         };
         let type_hv = self
             .genesis
-            .hv(&format!("bifurcation::{}", type_label), PHYSICS_DIM);
+            .hv(&format!("bifurcation::{type_label}"), PHYSICS_DIM);
         self.bifurcation.bind(&type_hv)
     }
 }

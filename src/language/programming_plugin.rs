@@ -644,13 +644,13 @@ impl DomainPlugin for ProgrammingPlugin {
         }
 
         if paren_depth != 0 {
-            errors.push(format!("Mismatched parentheses (depth: {})", paren_depth));
+            errors.push(format!("Mismatched parentheses (depth: {paren_depth})"));
         }
         if bracket_depth != 0 {
-            errors.push(format!("Mismatched brackets (depth: {})", bracket_depth));
+            errors.push(format!("Mismatched brackets (depth: {bracket_depth})"));
         }
         if brace_depth != 0 {
-            errors.push(format!("Mismatched braces (depth: {})", brace_depth));
+            errors.push(format!("Mismatched braces (depth: {brace_depth})"));
         }
 
         // Check for common code smells in short snippets

@@ -164,7 +164,7 @@ impl WhatIfSimulator {
         // Check if any packages are already installed
         for pkg in &packages {
             if self.known_packages.contains(pkg) {
-                warnings.push(format!("{} is already installed", pkg));
+                warnings.push(format!("{pkg} is already installed"));
             }
         }
 
@@ -198,7 +198,7 @@ impl WhatIfSimulator {
         // Check if packages are actually installed
         for pkg in &packages {
             if !self.known_packages.contains(pkg) {
-                warnings.push(format!("{} may not be installed", pkg));
+                warnings.push(format!("{pkg} may not be installed"));
             }
         }
 
@@ -206,7 +206,7 @@ impl WhatIfSimulator {
         let critical = ["bash", "coreutils", "systemd", "nix", "linux"];
         for pkg in &packages {
             if critical.iter().any(|c| pkg.contains(c)) {
-                warnings.push(format!("WARNING: {} is a critical system package!", pkg));
+                warnings.push(format!("WARNING: {pkg} is a critical system package!"));
             }
         }
 
@@ -240,7 +240,7 @@ impl WhatIfSimulator {
         // Check if service is known
         for svc in &services {
             if !self.known_services.contains(svc) {
-                warnings.push(format!("{} is not a recognized service", svc));
+                warnings.push(format!("{svc} is not a recognized service"));
             }
         }
 
@@ -273,8 +273,7 @@ impl WhatIfSimulator {
         for svc in &services {
             if critical.iter().any(|c| svc.contains(c)) {
                 warnings.push(format!(
-                    "WARNING: Disabling {} may affect system accessibility!",
-                    svc
+                    "WARNING: Disabling {svc} may affect system accessibility!"
                 ));
             }
         }
@@ -490,7 +489,7 @@ impl WhatIfSimulator {
 
         // Time estimate
         if let Some(ref time) = result.estimated_time {
-            lines.push(format!("⏱ Estimated time: {}", time));
+            lines.push(format!("⏱ Estimated time: {time}"));
         }
 
         // Reboot
@@ -501,7 +500,7 @@ impl WhatIfSimulator {
         // Reversibility
         if result.reversible {
             if let Some(ref cmd) = result.rollback_command {
-                lines.push(format!("↩ Rollback: {}", cmd));
+                lines.push(format!("↩ Rollback: {cmd}"));
             } else {
                 lines.push("↩ Reversible".to_string());
             }
@@ -511,12 +510,12 @@ impl WhatIfSimulator {
 
         // Warnings
         for warning in &result.warnings {
-            lines.push(format!("⚠ {}", warning));
+            lines.push(format!("⚠ {warning}"));
         }
 
         // Dry-run command
         if let Some(ref cmd) = result.dry_run_command {
-            lines.push(format!("🔍 Dry-run: {}", cmd));
+            lines.push(format!("🔍 Dry-run: {cmd}"));
         }
 
         lines

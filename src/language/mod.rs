@@ -904,13 +904,13 @@ impl ConsciousnessLanguageCore {
 
         // Generate description
         let description = match intent {
-            NixOSIntent::Install => format!("Install package: {:?}", entities),
-            NixOSIntent::Remove => format!("Remove package: {:?}", entities),
-            NixOSIntent::Search => format!("Search for: {:?}", entities),
+            NixOSIntent::Install => format!("Install package: {entities:?}"),
+            NixOSIntent::Remove => format!("Remove package: {entities:?}"),
+            NixOSIntent::Search => format!("Search for: {entities:?}"),
             NixOSIntent::Upgrade => "Upgrade system".to_string(),
             NixOSIntent::Configure => "Configure system".to_string(),
             NixOSIntent::List => "List packages".to_string(),
-            _ => format!("Process: {}", input),
+            _ => format!("Process: {input}"),
         };
 
         let nix_understanding = NixOSUnderstanding {
@@ -934,7 +934,7 @@ impl ConsciousnessLanguageCore {
         // Generate clarifying questions if uncertain
         let clarifying_questions = if confidence < self.config.confidence_threshold {
             vec![ClarifyingQuestion {
-                question: format!("Could you clarify what you'd like to do with '{}'?", input),
+                question: format!("Could you clarify what you'd like to do with '{input}'?"),
                 rationale: "The intent wasn't clear from the input".to_string(),
                 options: vec![
                     "Install".to_string(),

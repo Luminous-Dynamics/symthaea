@@ -663,7 +663,7 @@ impl LiteratureValidation {
             println!();
 
             for param in &result.parameters {
-                println!("  {}", param);
+                println!("  {param}");
                 if !param.notes.is_empty() {
                     println!("    Note: {}", param.notes);
                 }
@@ -679,8 +679,8 @@ impl LiteratureValidation {
         println!("                        VALIDATION SUMMARY");
         println!("═══════════════════════════════════════════════════════════════════════");
         println!();
-        println!("  Total parameters validated: {}", total_count);
-        println!("  Parameters within tolerance: {}", total_valid);
+        println!("  Total parameters validated: {total_count}");
+        println!("  Parameters within tolerance: {total_valid}");
         println!(
             "  Overall pass rate: {:.1}%",
             100.0 * total_valid as f64 / total_count as f64

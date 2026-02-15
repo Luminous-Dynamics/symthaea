@@ -317,9 +317,9 @@ impl HebbianEngine {
         let synapse = self
             .synapses
             .get_mut(pre_id)
-            .unwrap()
+            .expect("ensure_synapse guarantees pre_id entry exists")
             .get_mut(post_id)
-            .unwrap();
+            .expect("ensure_synapse guarantees post_id entry exists");
 
         // Calculate learning rate with metaplasticity
         let effective_lr = if self.config.enable_metaplasticity {
@@ -407,9 +407,9 @@ impl HebbianEngine {
         let synapse = self
             .synapses
             .get_mut(pre_id)
-            .unwrap()
+            .expect("ensure_synapse guarantees pre_id entry exists")
             .get_mut(post_id)
-            .unwrap();
+            .expect("ensure_synapse guarantees post_id entry exists");
 
         synapse.weight = (synapse.weight + delta_w).clamp(0.0, 1.0);
         synapse.record_change(delta_w);
@@ -518,7 +518,7 @@ impl HebbianEngine {
         // Weaken losers
         for (id, sim) in candidates.iter().skip(self.config.competitive_k) {
             self.ensure_synapse(id, target);
-            let synapse = self.synapses.get_mut(*id).unwrap().get_mut(target).unwrap();
+            let synapse = self.synapses.get_mut(*id).expect("ensure_synapse guarantees id entry exists").get_mut(target).expect("ensure_synapse guarantees target entry exists");
 
             // Anti-Hebbian for losers
             let delta = -self.config.learning_rate * sim * 0.5;

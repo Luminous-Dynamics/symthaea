@@ -157,7 +157,7 @@ impl StoreObserver {
 
         Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
-            format!("could not parse size from nix path-info output: {}", output),
+            format!("could not parse size from nix path-info output: {output}"),
         ))
     }
 

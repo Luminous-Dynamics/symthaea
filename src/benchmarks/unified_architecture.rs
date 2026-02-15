@@ -353,7 +353,7 @@ fn benchmark_episodic_memory(
         let embedding: Vec<f32> = (0..config.embedding_dim)
             .map(|j| ((i * j) as f32).sin())
             .collect();
-        bridge.encode(format!("memory {}", i), embedding, 0.5, 0.6, i);
+        bridge.encode(format!("memory {i}"), embedding, 0.5, 0.6, i);
     }
 
     // Benchmark encode
@@ -363,7 +363,7 @@ fn benchmark_episodic_memory(
             .collect();
 
         let start = Instant::now();
-        let _ = bridge.encode(format!("test memory {}", i), embedding, 0.5, 0.6, i);
+        let _ = bridge.encode(format!("test memory {i}"), embedding, 0.5, 0.6, i);
         encode_timings.push(start.elapsed());
     }
 
@@ -391,8 +391,8 @@ fn benchmark_goal_system(config: &UnifiedArchitectureBenchmarkConfig) -> Benchma
     // Add some goals
     for i in 0..config.goal_count {
         bridge.add_goal(CognitiveGoal::new(
-            format!("goal_{}", i),
-            format!("Test goal {}", i),
+            format!("goal_{i}"),
+            format!("Test goal {i}"),
             (i as f32 + 1.0) / (config.goal_count as f32 + 1.0),
         ));
     }

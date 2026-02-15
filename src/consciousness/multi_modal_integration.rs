@@ -377,7 +377,7 @@ impl MultiModalIntegrator {
         let mut max_attention = 0.0;
 
         for (modality, channel) in &self.channels {
-            let key = format!("{:?}", modality);
+            let key = format!("{modality:?}");
             attention_weights.insert(key.clone(), channel.attention);
             if channel.attention > max_attention {
                 max_attention = channel.attention;
@@ -395,7 +395,7 @@ impl MultiModalIntegrator {
                 sources: z
                     .source_modalities
                     .iter()
-                    .map(|m| format!("{:?}", m))
+                    .map(|m| format!("{m:?}"))
                     .collect(),
                 binding_strength: z.binding_strength,
                 activation: z.activation,

@@ -477,7 +477,7 @@ impl CrossModalBinder {
 
                 weighted_hvs.push((rep.hv.clone(), weight));
                 modalities.push(*modality);
-                contributions.insert(format!("{:?}", modality), weight);
+                contributions.insert(format!("{modality:?}"), weight);
             }
         }
 

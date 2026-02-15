@@ -104,7 +104,7 @@ impl CausalDAG {
         dot.push_str("  rankdir=LR;\n");
 
         for (i, name) in self.variables.iter().enumerate() {
-            dot.push_str(&format!("  {} [label=\"{}\"];\n", i, name));
+            dot.push_str(&format!("  {i} [label=\"{name}\"];\n"));
         }
 
         for edge in &self.edges {
@@ -115,7 +115,7 @@ impl CausalDAG {
         }
 
         for (a, b) in &self.undirected {
-            dot.push_str(&format!("  {} -- {} [style=dashed];\n", a, b));
+            dot.push_str(&format!("  {a} -- {b} [style=dashed];\n"));
         }
 
         dot.push_str("}\n");

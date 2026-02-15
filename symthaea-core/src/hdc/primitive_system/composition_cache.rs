@@ -58,7 +58,7 @@ impl CompositionCache {
         a: &str,
         b: &str,
     ) -> Result<PrimitiveResult, PrimitiveError> {
-        let key = format!("bind:{}:{}", a, b);
+        let key = format!("bind:{a}:{b}");
 
         if let Some(result) = self.get(&key) {
             return Ok(result.clone());
@@ -97,7 +97,7 @@ impl CompositionCache {
             "bundle_weighted:{}",
             weighted
                 .iter()
-                .map(|(n, w)| format!("{}:{:.2}", n, w))
+                .map(|(n, w)| format!("{n}:{w:.2}"))
                 .collect::<Vec<_>>()
                 .join(":")
         );
@@ -136,7 +136,7 @@ impl CompositionCache {
         b: &str,
         c: &str,
     ) -> Result<PrimitiveResult, PrimitiveError> {
-        let key = format!("analogy:{}:{}:{}", a, b, c);
+        let key = format!("analogy:{a}:{b}:{c}");
 
         if let Some(result) = self.get(&key) {
             return Ok(result.clone());
@@ -154,7 +154,7 @@ impl CompositionCache {
         name: &str,
         steps: usize,
     ) -> Result<PrimitiveResult, PrimitiveError> {
-        let key = format!("permute:{}:{}", name, steps);
+        let key = format!("permute:{name}:{steps}");
 
         if let Some(result) = self.get(&key) {
             return Ok(result.clone());

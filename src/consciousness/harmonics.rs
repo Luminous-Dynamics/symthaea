@@ -945,7 +945,7 @@ impl fmt::Display for ResolutionStrategy {
             Self::EncourageExploration => write!(f, "Encourage Exploration"),
             Self::RestoreBoundaries => write!(f, "Restore Boundaries"),
             Self::HierarchicalBalance => write!(f, "Hierarchical Balance"),
-            Self::Custom(s) => write!(f, "Custom: {}", s),
+            Self::Custom(s) => write!(f, "Custom: {s}"),
         }
     }
 }

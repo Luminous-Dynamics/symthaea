@@ -50,7 +50,7 @@ impl Proposition {
     /// Human-readable representation of the proposition
     pub fn display(&self) -> String {
         match self {
-            Proposition::Equals(lhs, rhs) => format!("{} = {}", lhs, rhs),
+            Proposition::Equals(lhs, rhs) => format!("{lhs} = {rhs}"),
             Proposition::ForAll { variable, body } => {
                 format!("∀{}. {}", variable, body.display())
             }
@@ -81,8 +81,8 @@ impl Proposition {
         match self {
             Proposition::Equals(lhs, rhs) => {
                 let eq_seed = seed_from_name("equals");
-                let lhs_seed = seed_from_name(&format!("int_{}", lhs));
-                let rhs_seed = seed_from_name(&format!("int_{}", rhs));
+                let lhs_seed = seed_from_name(&format!("int_{lhs}"));
+                let rhs_seed = seed_from_name(&format!("int_{rhs}"));
 
                 let eq_hv = BinaryHV::random(eq_seed);
                 let lhs_hv = BinaryHV::random(lhs_seed);
@@ -125,7 +125,7 @@ impl Proposition {
 
                 let arg_hvs: Vec<BinaryHV> = args
                     .iter()
-                    .map(|a| BinaryHV::random(seed_from_name(&format!("int_{}", a))))
+                    .map(|a| BinaryHV::random(seed_from_name(&format!("int_{a}"))))
                     .collect();
 
                 let args_bundle = if arg_hvs.is_empty() {
@@ -343,7 +343,7 @@ impl ProofTerm {
             }
             ProofTerm::UniversalInstantiation { universal, witness } => {
                 let ui_seed = seed_from_name("universal_instantiation");
-                let wit_seed = seed_from_name(&format!("witness_{}", witness));
+                let wit_seed = seed_from_name(&format!("witness_{witness}"));
 
                 let ui_hv = BinaryHV::random(ui_seed);
                 let wit_hv = BinaryHV::random(wit_seed);
@@ -373,8 +373,8 @@ impl ProofTerm {
             } => {
                 let comp_seed = seed_from_name("computation");
                 let desc_seed = seed_from_name(description);
-                let lhs_seed = seed_from_name(&format!("int_{}", lhs));
-                let rhs_seed = seed_from_name(&format!("int_{}", rhs));
+                let lhs_seed = seed_from_name(&format!("int_{lhs}"));
+                let rhs_seed = seed_from_name(&format!("int_{rhs}"));
 
                 let comp_hv = BinaryHV::random(comp_seed);
                 let desc_hv = BinaryHV::random(desc_seed);
@@ -427,7 +427,7 @@ impl InductionEngine {
         let base_valid = base_check(0);
         let base_case = ProofCheckResult {
             valid: base_valid,
-            description: format!("Base case P(0) for '{}'", property_name),
+            description: format!("Base case P(0) for '{property_name}'"),
             phi: if base_valid { 1.0 } else { 0.0 },
         };
 
@@ -445,7 +445,7 @@ impl InductionEngine {
 
         let inductive_step = ProofCheckResult {
             valid: step_valid,
-            description: format!("Inductive step verified for {} samples", step_count),
+            description: format!("Inductive step verified for {step_count} samples"),
             phi: if step_valid {
                 1.0 + (step_count as f64 * 0.1)
             } else {

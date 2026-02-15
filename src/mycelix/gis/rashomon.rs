@@ -433,7 +433,7 @@ impl RashomonEngine {
 
         // Add frame-specific prompts as insights (placeholder)
         for prompt in &frame.prompts {
-            perspective.add_insight(&format!("Consider: {}", prompt));
+            perspective.add_insight(&format!("Consider: {prompt}"));
         }
 
         // Set confidence based on frame relevance

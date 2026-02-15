@@ -184,7 +184,7 @@ pub fn parse_flake_lock(
     lock_json: &str,
 ) -> Result<(Vec<FlakeInput>, Vec<FlakeDependencyEdge>), String> {
     let value: serde_json::Value = serde_json::from_str(lock_json)
-        .map_err(|e| format!("Failed to parse flake.lock: {}", e))?;
+        .map_err(|e| format!("Failed to parse flake.lock: {e}"))?;
 
     let nodes = value["nodes"]
         .as_object()

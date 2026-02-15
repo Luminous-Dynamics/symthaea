@@ -73,12 +73,11 @@ impl fmt::Display for SwarmError {
             } => {
                 write!(
                     f,
-                    "Peer {} is not trusted (level: {:.2}, required: {:.2})",
-                    peer_id, trust_level, required
+                    "Peer {peer_id} is not trusted (level: {trust_level:.2}, required: {required:.2})"
                 )
             }
             Self::ConnectionFailed { peer_id, reason } => {
-                write!(f, "Connection to {} failed: {}", peer_id, reason)
+                write!(f, "Connection to {peer_id} failed: {reason}")
             }
             Self::ConnectionTimeout {
                 peer_id,
@@ -86,48 +85,47 @@ impl fmt::Display for SwarmError {
             } => {
                 write!(
                     f,
-                    "Connection to {} timed out after {}ms",
-                    peer_id, timeout_ms
+                    "Connection to {peer_id} timed out after {timeout_ms}ms"
                 )
             }
             Self::PeerNotFound { peer_id } => {
-                write!(f, "Peer {} not found in network", peer_id)
+                write!(f, "Peer {peer_id} not found in network")
             }
             Self::InvalidTicket { reason } => {
-                write!(f, "Invalid connection ticket: {}", reason)
+                write!(f, "Invalid connection ticket: {reason}")
             }
             Self::ChannelClosed { peer_id } => {
-                write!(f, "Channel to {} closed unexpectedly", peer_id)
+                write!(f, "Channel to {peer_id} closed unexpectedly")
             }
             Self::SendFailed { peer_id, reason } => {
-                write!(f, "Failed to send to {}: {}", peer_id, reason)
+                write!(f, "Failed to send to {peer_id}: {reason}")
             }
             Self::ReceiveFailed { peer_id, reason } => {
-                write!(f, "Failed to receive from {}: {}", peer_id, reason)
+                write!(f, "Failed to receive from {peer_id}: {reason}")
             }
             Self::TensorStreamError { reason } => {
-                write!(f, "Tensor streaming error: {}", reason)
+                write!(f, "Tensor streaming error: {reason}")
             }
             Self::TrustVerificationError { reason } => {
-                write!(f, "Trust verification failed: {}", reason)
+                write!(f, "Trust verification failed: {reason}")
             }
             Self::NotInitialized => {
                 write!(f, "Swarm node not initialized")
             }
             Self::MaxPeersReached { current, max } => {
-                write!(f, "Maximum peers reached ({}/{})", current, max)
+                write!(f, "Maximum peers reached ({current}/{max})")
             }
             Self::FeatureNotEnabled { feature } => {
-                write!(f, "Feature '{}' not enabled", feature)
+                write!(f, "Feature '{feature}' not enabled")
             }
             Self::IoError(e) => {
-                write!(f, "IO error: {}", e)
+                write!(f, "IO error: {e}")
             }
             Self::SerializationError(msg) => {
-                write!(f, "Serialization error: {}", msg)
+                write!(f, "Serialization error: {msg}")
             }
             Self::Internal(msg) => {
-                write!(f, "Internal error: {}", msg)
+                write!(f, "Internal error: {msg}")
             }
         }
     }

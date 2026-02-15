@@ -609,8 +609,7 @@ impl TemporalConsciousness {
         let mut parts = Vec::new();
 
         parts.push(format!(
-            "Instantaneous Φ: {:.3}, Temporal Φ: {:.3}",
-            phi_instant, phi_temporal
+            "Instantaneous Φ: {phi_instant:.3}, Temporal Φ: {phi_temporal:.3}"
         ));
 
         parts.push(format!(
@@ -619,7 +618,7 @@ impl TemporalConsciousness {
             dominant.duration_secs()
         ));
 
-        parts.push(format!("Temporal thickness: {:.2}", thickness));
+        parts.push(format!("Temporal thickness: {thickness:.2}"));
 
         if thickness < 0.2 {
             parts.push("Consciousness stuck in moment (low temporal integration)".to_string());

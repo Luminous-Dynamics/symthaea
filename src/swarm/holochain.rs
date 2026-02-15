@@ -94,7 +94,7 @@ impl AgentPubKey {
 
     /// Create a test key
     pub fn test_key(id: u32) -> Self {
-        Self(format!("test_agent_{:08x}", id))
+        Self(format!("test_agent_{id:08x}"))
     }
 }
 
@@ -687,12 +687,12 @@ pub enum CortexError {
 impl std::fmt::Display for CortexError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotImplemented(msg) => write!(f, "Not implemented: {}", msg),
-            Self::ConnectionError(msg) => write!(f, "Connection error: {}", msg),
-            Self::AgentNotFound(key) => write!(f, "Agent not found: {}", key),
+            Self::NotImplemented(msg) => write!(f, "Not implemented: {msg}"),
+            Self::ConnectionError(msg) => write!(f, "Connection error: {msg}"),
+            Self::AgentNotFound(key) => write!(f, "Agent not found: {key}"),
             Self::NoLocalAgent => write!(f, "No local agent set"),
-            Self::VerificationFailed(msg) => write!(f, "Verification failed: {}", msg),
-            Self::DhtError(msg) => write!(f, "DHT error: {}", msg),
+            Self::VerificationFailed(msg) => write!(f, "Verification failed: {msg}"),
+            Self::DhtError(msg) => write!(f, "DHT error: {msg}"),
         }
     }
 }

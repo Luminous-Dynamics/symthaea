@@ -252,7 +252,7 @@ impl PhononDynamics {
             let element_vec = table
                 .element(z)
                 .map(|e| e.vector.clone())
-                .unwrap_or_else(|| genesis.hv(&format!("element::{}", z), PHYSICS_DIM));
+                .unwrap_or_else(|| genesis.hv(&format!("element::{z}"), PHYSICS_DIM));
 
             // Material = Element bound with structure
             let mat_vec = element_vec.bind(struct_vec);

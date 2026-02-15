@@ -594,6 +594,7 @@ mod tests {
     use super::super::primitive_evolution::EvolutionConfig;
     use super::*;
     use crate::hdc::primitive_system::PrimitiveTier;
+    use symthaea_core::hdc::BinaryHV;
 
     #[test]
     fn test_meta_learning_creation() {
@@ -612,13 +613,15 @@ mod tests {
 
     #[test]
     fn test_feature_extraction() {
-        let primitive = CandidatePrimitive::new(
-            "TEST".to_string(),
-            PrimitiveTier::Physical,
-            "test",
-            "test description",
-            0,
-        );
+        let primitive = CandidatePrimitive {
+            name: "TEST".to_string(),
+            tier: PrimitiveTier::Physical,
+            definition: "test description".to_string(),
+            fitness: 0.0,
+            encoding: BinaryHV::random(0),
+            epistemic_coordinate: Default::default(),
+            harmonic_alignment: 0.5,
+        };
 
         let features = AttackFeatures::from_primitive(&primitive);
 

@@ -595,7 +595,7 @@ impl std::fmt::Display for MultiScalePhi {
             if i > 0 {
                 write!(f, ", ")?;
             }
-            write!(f, "S{}={:.4}", scale, phi)?;
+            write!(f, "S{scale}={phi:.4}")?;
         }
         write!(f, "]")
     }

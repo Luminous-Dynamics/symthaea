@@ -444,7 +444,7 @@ impl SymbolicDifferentiator {
 
             // Unknown function: return generic derivative marker
             _ => TermType::Function {
-                name: format!("{}'", name),
+                name: format!("{name}'"),
                 arg: Box::new(arg.clone()),
             },
         }
@@ -474,7 +474,7 @@ impl SymbolicDifferentiator {
             TermType::Function { name, arg } => {
                 let inner = Self::term_to_expr(arg, primitives);
                 // Encode function application in HDC space
-                let fn_seed = seed_from_name(&format!("FN_{}", name));
+                let fn_seed = seed_from_name(&format!("FN_{name}"));
                 let fn_encoding = BinaryHV::random(fn_seed);
                 let encoding = fn_encoding.bind(&inner.encoding);
                 let display = format!("{}({})", name, inner.display);
@@ -576,7 +576,7 @@ pub fn func(name: &str, arg: TermType) -> TermType {
 
 /// Helper: construct a SymbolicExpr for a function application
 pub fn func_expr(name: &str, arg: &SymbolicExpr, primitives: &PrimitiveSystem) -> SymbolicExpr {
-    let fn_seed = seed_from_name(&format!("FN_{}", name));
+    let fn_seed = seed_from_name(&format!("FN_{name}"));
     let fn_encoding = BinaryHV::random(fn_seed);
     let encoding = fn_encoding.bind(&arg.encoding);
     let display = format!("{}({})", name, arg.display);

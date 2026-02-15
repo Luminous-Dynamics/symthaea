@@ -131,7 +131,7 @@ impl FlakeContext {
         parser
             .parser
             .set_language(&tree_sitter_nix::LANGUAGE.into())
-            .map_err(|e| format!("Failed to set language: {}", e))?;
+            .map_err(|e| format!("Failed to set language: {e}"))?;
 
         let config = parser
             .parse(content)
@@ -253,8 +253,8 @@ impl FlakeContext {
             for pkg in &self.installed_packages {
                 if pkg.to_lowercase().contains(&query.to_lowercase()) {
                     suggestions.push(ContextualSuggestion {
-                        text: format!("{}{}", prefix, pkg),
-                        description: format!("Remove {} (currently installed)", pkg),
+                        text: format!("{prefix}{pkg}"),
+                        description: format!("Remove {pkg} (currently installed)"),
                         source: SuggestionSource::InstalledPackage,
                         confidence: 0.9,
                     });
@@ -267,8 +267,8 @@ impl FlakeContext {
             for service in &self.enabled_services {
                 if service.to_lowercase().contains(&input_lower) {
                     suggestions.push(ContextualSuggestion {
-                        text: format!("disable {}", service),
-                        description: format!("Disable {} (currently enabled)", service),
+                        text: format!("disable {service}"),
+                        description: format!("Disable {service} (currently enabled)"),
                         source: SuggestionSource::EnabledService,
                         confidence: 0.85,
                     });
@@ -283,8 +283,8 @@ impl FlakeContext {
                     && service.to_lowercase().contains(&input_lower)
                 {
                     suggestions.push(ContextualSuggestion {
-                        text: format!("enable {}", service),
-                        description: format!("Enable {} service", service),
+                        text: format!("enable {service}"),
+                        description: format!("Enable {service} service"),
                         source: SuggestionSource::KnownService,
                         confidence: 0.8,
                     });
@@ -297,8 +297,8 @@ impl FlakeContext {
             for path in &self.option_paths {
                 if path.to_lowercase().contains(&input_lower) {
                     suggestions.push(ContextualSuggestion {
-                        text: format!("set {}", path),
-                        description: format!("Configure {}", path),
+                        text: format!("set {path}"),
+                        description: format!("Configure {path}"),
                         source: SuggestionSource::OptionPath,
                         confidence: 0.7,
                     });
@@ -330,8 +330,7 @@ impl FlakeContext {
             .unwrap_or_else(|| "none".to_string());
 
         format!(
-            "Flake: {} | {} packages | {} services enabled",
-            path, pkg_count, svc_count
+            "Flake: {path} | {pkg_count} packages | {svc_count} services enabled"
         )
     }
 }

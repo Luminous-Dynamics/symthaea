@@ -675,17 +675,17 @@ impl SubstrateIndependence {
                 comp.consciousness_feasibility * 100.0,
                 comp.advantages
                     .iter()
-                    .map(|a| format!("  + {}", a))
+                    .map(|a| format!("  + {a}"))
                     .collect::<Vec<_>>()
                     .join("\n"),
                 comp.disadvantages
                     .iter()
-                    .map(|d| format!("  - {}", d))
+                    .map(|d| format!("  - {d}"))
                     .collect::<Vec<_>>()
                     .join("\n"),
                 comp.best_for
                     .iter()
-                    .map(|b| format!("  • {}", b))
+                    .map(|b| format!("  • {b}"))
                     .collect::<Vec<_>>()
                     .join("\n"),
             )

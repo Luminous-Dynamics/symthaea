@@ -122,8 +122,7 @@ impl PhiToEpistemicMapper {
                         ..output.classification
                     },
                     reason: format!(
-                        "Has {} cryptographic proof(s), can upgrade to E3",
-                        crypto_evidence_count
+                        "Has {crypto_evidence_count} cryptographic proof(s), can upgrade to E3"
                     ),
                 });
             }
@@ -163,8 +162,7 @@ impl PhiToEpistemicMapper {
                     ..output.classification
                 },
                 reason: format!(
-                    "Consensus from {} sources supports E2 minimum",
-                    consensus_count
+                    "Consensus from {consensus_count} sources supports E2 minimum"
                 ),
             });
         }

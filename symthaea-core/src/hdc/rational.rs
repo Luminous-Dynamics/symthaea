@@ -79,7 +79,7 @@ impl std::fmt::Display for RationalOverflow {
 fn checked_mul_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
     a.checked_mul(b).ok_or_else(|| RationalOverflow {
         operation: "multiply".to_string(),
-        detail: format!("{} * {} overflows i64", a, b),
+        detail: format!("{a} * {b} overflows i64"),
     })
 }
 
@@ -87,7 +87,7 @@ fn checked_mul_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
 fn checked_add_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
     a.checked_add(b).ok_or_else(|| RationalOverflow {
         operation: "add".to_string(),
-        detail: format!("{} + {} overflows i64", a, b),
+        detail: format!("{a} + {b} overflows i64"),
     })
 }
 
@@ -95,7 +95,7 @@ fn checked_add_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
 fn checked_sub_i64(a: i64, b: i64) -> Result<i64, RationalOverflow> {
     a.checked_sub(b).ok_or_else(|| RationalOverflow {
         operation: "subtract".to_string(),
-        detail: format!("{} - {} overflows i64", a, b),
+        detail: format!("{a} - {b} overflows i64"),
     })
 }
 
@@ -119,7 +119,7 @@ impl RationalArithmeticEngine {
     /// most 64 iterations for any i64.
     fn encode_int(&self, n: i64) -> BinaryHV {
         if n == 0 {
-            return self.primitives.get("ZERO").unwrap().encoding;
+            return self.primitives.get("ZERO").expect("ZERO primitive must exist").encoding;
         }
 
         let is_negative = n < 0;
@@ -141,7 +141,7 @@ impl RationalArithmeticEngine {
         // Binary decomposition: bind a deterministic basis vector for each set bit
         for bit_pos in 0..64 {
             if abs_n & (1u64 << bit_pos) != 0 {
-                let bit_basis = BinaryHV::random(seed_from_name(&format!("INT_BIT_{}", bit_pos)));
+                let bit_basis = BinaryHV::random(seed_from_name(&format!("INT_BIT_{bit_pos}")));
                 components.push(bit_basis);
             }
         }
@@ -153,7 +153,7 @@ impl RationalArithmeticEngine {
     pub fn encode(&self, numerator: i64, denominator: i64) -> HdcRational {
         let (num, den) = normalize(numerator, denominator);
 
-        let ratio = self.primitives.get("RATIO").unwrap().encoding;
+        let ratio = self.primitives.get("RATIO").expect("RATIO primitive must exist").encoding;
         let num_encoding = self.encode_int(num);
         let den_encoding = self.encode_int(den);
 

@@ -459,7 +459,7 @@ impl SemanticErrorExplainer {
         if !explanation.causes.is_empty() {
             output.push_str("Possible causes:\n");
             for cause in &explanation.causes {
-                output.push_str(&format!("  • {}\n", cause));
+                output.push_str(&format!("  • {cause}\n"));
             }
             output.push('\n');
         }
@@ -467,7 +467,7 @@ impl SemanticErrorExplainer {
         if !explanation.suggestions.is_empty() {
             output.push_str("Suggestions:\n");
             for suggestion in &explanation.suggestions {
-                output.push_str(&format!("  → {}\n", suggestion));
+                output.push_str(&format!("  → {suggestion}\n"));
             }
         }
 

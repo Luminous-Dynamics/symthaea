@@ -134,7 +134,7 @@ impl MultiPathVerifier {
     /// Verify addition commutativity via multiple paths
     pub fn verify_addition_commutative(&mut self, a: u64, b: u64) -> MultiPathResult {
         self.stats.theorems_verified += 1;
-        let theorem = format!("{} + {} = {} + {}", a, b, b, a);
+        let theorem = format!("{a} + {b} = {b} + {a}");
         let mut paths = Vec::new();
 
         // Path 1: Direct computation of both sides
@@ -155,7 +155,7 @@ impl MultiPathVerifier {
     /// Verify multiplication commutativity via multiple paths
     pub fn verify_multiplication_commutative(&mut self, a: u64, b: u64) -> MultiPathResult {
         self.stats.theorems_verified += 1;
-        let theorem = format!("{} × {} = {} × {}", a, b, b, a);
+        let theorem = format!("{a} × {b} = {b} × {a}");
         let mut paths = Vec::new();
 
         // Path 1: Direct computation
@@ -177,8 +177,7 @@ impl MultiPathVerifier {
     pub fn verify_associativity(&mut self, a: u64, b: u64, c: u64, op: &str) -> MultiPathResult {
         self.stats.theorems_verified += 1;
         let theorem = format!(
-            "({} {} {}) {} {} = {} {} ({} {} {})",
-            a, op, b, op, c, a, op, b, op, c
+            "({a} {op} {b}) {op} {c} = {a} {op} ({b} {op} {c})"
         );
         let mut paths = Vec::new();
 
@@ -200,7 +199,7 @@ impl MultiPathVerifier {
     /// Verify distributivity via multiple paths
     pub fn verify_distributive(&mut self, a: u64, b: u64, c: u64) -> MultiPathResult {
         self.stats.theorems_verified += 1;
-        let theorem = format!("{} × ({} + {}) = {} × {} + {} × {}", a, b, c, a, b, a, c);
+        let theorem = format!("{a} × ({b} + {c}) = {a} × {b} + {a} × {c}");
         let mut paths = Vec::new();
 
         // Path 1: Left side first
@@ -221,7 +220,7 @@ impl MultiPathVerifier {
     /// Verify a number theory property via multiple paths
     pub fn verify_divisibility(&mut self, d: u64, n: u64) -> MultiPathResult {
         self.stats.theorems_verified += 1;
-        let theorem = format!("{} divides {}", d, n);
+        let theorem = format!("{d} divides {n}");
         let mut paths = Vec::new();
 
         // Path 1: Direct division
@@ -255,7 +254,7 @@ impl MultiPathVerifier {
         };
         steps.push(ProofPathStep {
             description: format!("Compute {} {} {} = {}", a, op, b, result1.value),
-            operation: format!("{} {} {}", a, op, b),
+            operation: format!("{a} {op} {b}"),
             phi: result1.phi,
             value: Some(result1.value),
         });
@@ -269,7 +268,7 @@ impl MultiPathVerifier {
         };
         steps.push(ProofPathStep {
             description: format!("Compute {} {} {} = {}", b, op, a, result2.value),
-            operation: format!("{} {} {}", b, op, a),
+            operation: format!("{b} {op} {a}"),
             phi: result2.phi,
             value: Some(result2.value),
         });
@@ -305,7 +304,7 @@ impl MultiPathVerifier {
 
         // Build numbers via successor
         steps.push(ProofPathStep {
-            description: format!("Construct {} via {} successor applications", a, a),
+            description: format!("Construct {a} via {a} successor applications"),
             operation: "successor_construction".to_string(),
             phi: a as f64 * 0.1,
             value: Some(a),
@@ -313,7 +312,7 @@ impl MultiPathVerifier {
         total_phi += a as f64 * 0.1;
 
         steps.push(ProofPathStep {
-            description: format!("Construct {} via {} successor applications", b, b),
+            description: format!("Construct {b} via {b} successor applications"),
             operation: "successor_construction".to_string(),
             phi: b as f64 * 0.1,
             value: Some(b),
@@ -328,8 +327,8 @@ impl MultiPathVerifier {
         };
 
         steps.push(ProofPathStep {
-            description: format!("Apply {} via Peano axioms", op),
-            operation: format!("peano_{}", op),
+            description: format!("Apply {op} via Peano axioms"),
+            operation: format!("peano_{op}"),
             phi: result.phi,
             value: Some(result.value),
         });
@@ -389,8 +388,7 @@ impl MultiPathVerifier {
         // Inductive step (conceptual)
         steps.push(ProofPathStep {
             description: format!(
-                "Inductive hypothesis: assume {} {} k = k {} {}",
-                a, op, op, a
+                "Inductive hypothesis: assume {a} {op} k = k {op} {a}"
             ),
             operation: "inductive_hypothesis".to_string(),
             phi: 0.5,
@@ -446,7 +444,7 @@ impl MultiPathVerifier {
         }
 
         steps.push(ProofPathStep {
-            description: format!("{} × {} as {} added {} times = {}", a, b, a, b, sum),
+            description: format!("{a} × {b} as {a} added {b} times = {sum}"),
             operation: "repeated_addition_forward".to_string(),
             phi: total_phi,
             value: Some(sum),
@@ -462,7 +460,7 @@ impl MultiPathVerifier {
         }
 
         steps.push(ProofPathStep {
-            description: format!("{} × {} as {} added {} times = {}", b, a, b, a, sum2),
+            description: format!("{b} × {a} as {b} added {a} times = {sum2}"),
             operation: "repeated_addition_reverse".to_string(),
             phi: phi2,
             value: Some(sum2),
@@ -472,7 +470,7 @@ impl MultiPathVerifier {
         let is_valid = sum == sum2;
 
         steps.push(ProofPathStep {
-            description: format!("Both paths yield: {}", sum),
+            description: format!("Both paths yield: {sum}"),
             operation: "path_comparison".to_string(),
             phi: if is_valid { 0.5 } else { 0.0 },
             value: Some(sum),
@@ -500,7 +498,7 @@ impl MultiPathVerifier {
         };
         steps.push(ProofPathStep {
             description: format!("Step 1: {} {} {} = {}", a, op, b, ab.value),
-            operation: format!("{} {} {}", a, op, b),
+            operation: format!("{a} {op} {b}"),
             phi: ab.phi,
             value: Some(ab.value),
         });
@@ -554,7 +552,7 @@ impl MultiPathVerifier {
         };
         steps.push(ProofPathStep {
             description: format!("Step 1: {} {} {} = {}", b, op, c, bc.value),
-            operation: format!("{} {} {}", b, op, c),
+            operation: format!("{b} {op} {c}"),
             phi: bc.phi,
             value: Some(bc.value),
         });
@@ -679,7 +677,7 @@ impl MultiPathVerifier {
         let sum = self.cached_add(b, c);
         steps.push(ProofPathStep {
             description: format!("{} + {} = {}", b, c, sum.value),
-            operation: format!("{} + {}", b, c),
+            operation: format!("{b} + {c}"),
             phi: sum.phi,
             value: Some(sum.value),
         });
@@ -726,7 +724,7 @@ impl MultiPathVerifier {
         let ab = self.cached_multiply(a, b);
         steps.push(ProofPathStep {
             description: format!("{} × {} = {}", a, b, ab.value),
-            operation: format!("{} × {}", a, b),
+            operation: format!("{a} × {b}"),
             phi: ab.phi,
             value: Some(ab.value),
         });
@@ -735,7 +733,7 @@ impl MultiPathVerifier {
         let ac = self.cached_multiply(a, c);
         steps.push(ProofPathStep {
             description: format!("{} × {} = {}", a, c, ac.value),
-            operation: format!("{} × {}", a, c),
+            operation: format!("{a} × {c}"),
             phi: ac.phi,
             value: Some(ac.value),
         });
@@ -839,7 +837,7 @@ impl MultiPathVerifier {
             Some(result) => {
                 steps.push(ProofPathStep {
                     description: format!("{} ÷ {} = {} (exact)", n, d, result.value),
-                    operation: format!("{} ÷ {}", n, d),
+                    operation: format!("{n} ÷ {d}"),
                     phi: result.phi,
                     value: Some(result.value),
                 });
@@ -867,8 +865,8 @@ impl MultiPathVerifier {
             }
             None => {
                 steps.push(ProofPathStep {
-                    description: format!("{} ÷ {} has remainder (not divisible)", n, d),
-                    operation: format!("{} ÷ {}", n, d),
+                    description: format!("{n} ÷ {d} has remainder (not divisible)"),
+                    operation: format!("{n} ÷ {d}"),
                     phi: 0.1,
                     value: None,
                 });
@@ -911,7 +909,7 @@ impl MultiPathVerifier {
 
                 steps.push(ProofPathStep {
                     description: format!("{} mod {} = {}", n, d, result.value),
-                    operation: format!("{} mod {}", n, d),
+                    operation: format!("{n} mod {d}"),
                     phi: result.phi,
                     value: Some(result.value),
                 });
@@ -919,7 +917,7 @@ impl MultiPathVerifier {
 
                 steps.push(ProofPathStep {
                     description: if is_valid {
-                        format!("Remainder is 0, so {} divides {}", d, n)
+                        format!("Remainder is 0, so {d} divides {n}")
                     } else {
                         format!(
                             "Remainder is {}, so {} does not divide {}",
@@ -979,7 +977,7 @@ impl MultiPathVerifier {
         let product = self.cached_multiply(d, quotient);
 
         steps.push(ProofPathStep {
-            description: format!("Testing: {} = {} × {}", n, d, quotient),
+            description: format!("Testing: {n} = {d} × {quotient}"),
             operation: "factor_test".to_string(),
             phi: product.phi,
             value: Some(quotient),

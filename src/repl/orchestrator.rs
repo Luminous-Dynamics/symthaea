@@ -194,7 +194,7 @@ impl ReplOrchestrator {
         // In a full implementation, this would use the IPC client
         // For now, return a placeholder
         Ok(OrchestratorResult {
-            response: format!("[Remote processing not yet implemented] Input: {}", input),
+            response: format!("[Remote processing not yet implemented] Input: {input}"),
             consciousness: None,
             remote_metrics: self.remote_metrics.clone(),
             action_executed: false,
@@ -233,8 +233,7 @@ impl ReplOrchestrator {
             )),
 
             _ if input.starts_with('/') => Some(format!(
-                "Unknown command: {}. Type /help for available commands.",
-                input
+                "Unknown command: {input}. Type /help for available commands."
             )),
 
             _ => None, // Not a command
@@ -415,7 +414,7 @@ impl ReplOrchestrator {
 
             // Handle commands
             if let Some(response) = self.handle_command(input) {
-                println!("{}", response);
+                println!("{response}");
                 if self.should_shutdown() {
                     break;
                 }
@@ -428,7 +427,7 @@ impl ReplOrchestrator {
                     println!("{}", self.format_result(&result));
                 }
                 Err(e) => {
-                    eprintln!("Error: {}", e);
+                    eprintln!("Error: {e}");
                 }
             }
         }

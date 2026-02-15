@@ -173,7 +173,7 @@ impl ObjectiveWeights {
     pub fn new(phi: f64, harmonic: f64, epistemic: f64) -> Result<Self> {
         let sum = phi + harmonic + epistemic;
         if (sum - 1.0).abs() > 0.001 {
-            anyhow::bail!("Weights must sum to 1.0 (got {})", sum);
+            anyhow::bail!("Weights must sum to 1.0 (got {sum})");
         }
 
         Ok(Self {

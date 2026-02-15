@@ -348,8 +348,8 @@ pub fn measure_error_growth(config: &ValidationConfig) -> ValidationResult {
 
     // Compute error growth rate (slope of error vs time)
     let growth_rate = if errors.len() >= 2 {
-        let (t1, e1) = errors.first().unwrap();
-        let (t2, e2) = errors.last().unwrap();
+        let (t1, e1) = errors.first().expect("errors verified len >= 2");
+        let (t2, e2) = errors.last().expect("errors verified len >= 2");
         Some((e2 - e1) / (*t2 - *t1) as f64)
     } else {
         None
@@ -557,8 +557,7 @@ pub fn print_validation_report(results: &[ValidationResult]) {
         );
         if let Some(growth) = result.error_growth {
             println!(
-                "║   Error Growth: {:12.6}/s                                      ║",
-                growth
+                "║   Error Growth: {growth:12.6}/s                                      ║"
             );
         }
         println!(

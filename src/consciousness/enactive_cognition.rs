@@ -1028,7 +1028,7 @@ impl EmbodiedSimulator {
                 self.simulation_state.predicted_perceptions.push(predicted);
 
                 // Update context for next step
-                context = format!("{}_{:?}", context, action);
+                context = format!("{context}_{action:?}");
             } else {
                 // No schema available, reduce confidence significantly
                 total_confidence *= 0.3;
@@ -1253,7 +1253,7 @@ impl EnactiveCognition {
         context: &str,
     ) -> EnactedMeaning {
         self.stats.total_cycles += 1;
-        let action_key = format!("{:?}", action);
+        let action_key = format!("{action:?}");
         *self.stats.actions_by_type.entry(action_key).or_insert(0) += 1;
 
         // 1. Record the action-perception pair

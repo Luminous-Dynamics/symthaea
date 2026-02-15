@@ -397,7 +397,7 @@ impl ConsciousnessPersistence {
     pub fn new(config: PersistenceConfig) -> Self {
         // Ensure base directory exists
         if let Err(e) = fs::create_dir_all(&config.base_path) {
-            eprintln!("[Persistence] Warning: Could not create directory: {}", e);
+            eprintln!("[Persistence] Warning: Could not create directory: {e}");
         }
 
         Self {
@@ -413,7 +413,7 @@ impl ConsciousnessPersistence {
     pub fn save_snapshot(&mut self, snapshot: &ConsciousnessSnapshot) -> Result<PathBuf, String> {
         // Serialize snapshot
         let payload =
-            bincode::serialize(snapshot).map_err(|e| format!("Serialization error: {}", e))?;
+            bincode::serialize(snapshot).map_err(|e| format!("Serialization error: {e}"))?;
 
         // Optionally compress
         let (final_payload, compression_type) = if self.config.compression_enabled {
@@ -428,19 +428,19 @@ impl ConsciousnessPersistence {
         // Create version header
         let header = StateVersion::new(payload.len() as u64, checksum, compression_type);
         let header_bytes = bincode::serialize(&header)
-            .map_err(|e| format!("Header serialization error: {}", e))?;
+            .map_err(|e| format!("Header serialization error: {e}"))?;
 
         // Write to file
         let filename = format!("snapshot_{:08}.sym", snapshot.id);
         let filepath = self.config.base_path.join(&filename);
 
         let mut file =
-            fs::File::create(&filepath).map_err(|e| format!("File creation error: {}", e))?;
+            fs::File::create(&filepath).map_err(|e| format!("File creation error: {e}"))?;
 
         file.write_all(&header_bytes)
-            .map_err(|e| format!("Header write error: {}", e))?;
+            .map_err(|e| format!("Header write error: {e}"))?;
         file.write_all(&final_payload)
-            .map_err(|e| format!("Payload write error: {}", e))?;
+            .map_err(|e| format!("Payload write error: {e}"))?;
 
         // Add to history
         self.history.push_back(snapshot.clone());
@@ -479,18 +479,18 @@ impl ConsciousnessPersistence {
 
     /// Load a snapshot from disk
     pub fn load_snapshot(&self, id: u64) -> Result<ConsciousnessSnapshot, String> {
-        let filename = format!("snapshot_{:08}.sym", id);
+        let filename = format!("snapshot_{id:08}.sym");
         let filepath = self.config.base_path.join(&filename);
 
-        let mut file = fs::File::open(&filepath).map_err(|e| format!("File open error: {}", e))?;
+        let mut file = fs::File::open(&filepath).map_err(|e| format!("File open error: {e}"))?;
 
         // Read header (fixed size = HEADER_SIZE bytes)
         let mut header_bytes = vec![0u8; HEADER_SIZE];
         file.read_exact(&mut header_bytes)
-            .map_err(|e| format!("Header read error: {}", e))?;
+            .map_err(|e| format!("Header read error: {e}"))?;
 
         let header: StateVersion = bincode::deserialize(&header_bytes)
-            .map_err(|e| format!("Header deserialize error: {}", e))?;
+            .map_err(|e| format!("Header deserialize error: {e}"))?;
 
         // Verify header
         if !header.is_valid() {
@@ -506,7 +506,7 @@ impl ConsciousnessPersistence {
         // Read payload
         let mut payload = Vec::new();
         file.read_to_end(&mut payload)
-            .map_err(|e| format!("Payload read error: {}", e))?;
+            .map_err(|e| format!("Payload read error: {e}"))?;
 
         // Verify checksum
         if self.config.verify_checksum {
@@ -528,14 +528,14 @@ impl ConsciousnessPersistence {
 
         // Deserialize
         bincode::deserialize(&decompressed)
-            .map_err(|e| format!("Snapshot deserialize error: {}", e))
+            .map_err(|e| format!("Snapshot deserialize error: {e}"))
     }
 
     /// Load the latest snapshot
     pub fn load_latest(&self) -> Result<ConsciousnessSnapshot, String> {
         // Find latest snapshot file
         let entries = fs::read_dir(&self.config.base_path)
-            .map_err(|e| format!("Directory read error: {}", e))?;
+            .map_err(|e| format!("Directory read error: {e}"))?;
 
         let mut latest_id: Option<u64> = None;
 
@@ -595,7 +595,7 @@ impl ConsciousnessPersistence {
     /// List all available snapshots
     pub fn list_snapshots(&self) -> Result<Vec<(u64, String)>, String> {
         let entries = fs::read_dir(&self.config.base_path)
-            .map_err(|e| format!("Directory read error: {}", e))?;
+            .map_err(|e| format!("Directory read error: {e}"))?;
 
         let mut snapshots = Vec::new();
 
@@ -666,7 +666,7 @@ impl ConsciousnessPersistence {
 
                 if let Some(mut snapshot) = snapshot_opt {
                     snapshot.id = auto_id;
-                    snapshot.label = Some(format!("auto_save_{}", auto_id));
+                    snapshot.label = Some(format!("auto_save_{auto_id}"));
 
                     // Serialize and save
                     if let Ok(payload) = bincode::serialize(&snapshot) {
@@ -684,7 +684,7 @@ impl ConsciousnessPersistence {
                         );
 
                         if let Ok(header_bytes) = bincode::serialize(&header) {
-                            let filename = format!("autosave_{:08}.sym", auto_id);
+                            let filename = format!("autosave_{auto_id:08}.sym");
                             let filepath = base_path.join(&filename);
 
                             if let Ok(mut file) = fs::File::create(&filepath) {

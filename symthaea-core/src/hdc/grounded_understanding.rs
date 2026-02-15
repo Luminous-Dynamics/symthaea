@@ -1092,7 +1092,7 @@ impl GroundedUnderstanding {
             "softly"
         };
 
-        format!("{} felt, {}", intensity_word, emotion_word)
+        format!("{intensity_word} felt, {emotion_word}")
     }
 
     /// Get the lexicon for inspection

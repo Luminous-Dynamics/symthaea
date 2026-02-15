@@ -492,12 +492,12 @@ impl CaptionFallback {
             .brightness
             .get(brightness_idx.min(6))
             .unwrap_or(&"moderately lit");
-        parts.push(format!("A {} image", brightness_desc));
+        parts.push(format!("A {brightness_desc} image"));
 
         // Color description
         if saturation > 0.3 {
             let color_desc = self.hue_to_color(dominant_hue);
-            parts.push(format!("with {} tones", color_desc));
+            parts.push(format!("with {color_desc} tones"));
         } else if brightness < 0.2 {
             parts.push("in dark tones".to_string());
         } else if brightness > 0.8 {
@@ -634,7 +634,7 @@ impl LoadingStatus {
     pub fn fail(&mut self, error: &str) {
         self.complete = true;
         self.error = Some(error.to_string());
-        self.message = format!("Failed: {}", error);
+        self.message = format!("Failed: {error}");
     }
 }
 

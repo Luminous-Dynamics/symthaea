@@ -216,7 +216,7 @@ impl PrimitiveEvolver {
     pub fn initialize_random(&mut self, dim: usize, count: usize) {
         for i in 0..count {
             let hv = ContinuousHV::random(dim, 42);
-            let concept = EvolvingConcept::new(0, format!("concept_{}", i), hv);
+            let concept = EvolvingConcept::new(0, format!("concept_{i}"), hv);
             self.add_concept(concept);
         }
     }
@@ -609,7 +609,7 @@ impl CandidatePrimitive {
             };
         }
         Self {
-            name: format!("cross_g{}", generation),
+            name: format!("cross_g{generation}"),
             tier: parent1.tier,
             definition: parent1.definition.clone(),
             fitness: 0.0,

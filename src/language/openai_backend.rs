@@ -119,18 +119,18 @@ impl LLMBackend for OpenAiBackend {
             .json(&body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("OpenAI request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("OpenAI request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            anyhow::bail!("OpenAI returned {}: {}", status, text);
+            anyhow::bail!("OpenAI returned {status}: {text}");
         }
 
         let chat_resp: ChatResponse = response
             .json()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to parse OpenAI response: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to parse OpenAI response: {e}"))?;
 
         chat_resp
             .choices
@@ -172,12 +172,12 @@ impl LLMBackend for OpenAiBackend {
             .json(&body)
             .send()
             .await
-            .map_err(|e| anyhow::anyhow!("OpenAI streaming request failed: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("OpenAI streaming request failed: {e}"))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
-            anyhow::bail!("OpenAI returned {}: {}", status, text);
+            anyhow::bail!("OpenAI returned {status}: {text}");
         }
 
         let mut full_response = String::new();
@@ -187,7 +187,7 @@ impl LLMBackend for OpenAiBackend {
         while let Some(chunk) = stream
             .chunk()
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to read OpenAI stream: {}", e))?
+            .map_err(|e| anyhow::anyhow!("Failed to read OpenAI stream: {e}"))?
         {
             buffer.extend_from_slice(&chunk);
 

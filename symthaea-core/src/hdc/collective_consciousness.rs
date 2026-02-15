@@ -637,17 +637,15 @@ impl CollectiveConsciousness {
         // Emergence
         if emergence > 1.2 {
             parts.push(format!(
-                "Strong emergence: {:.1}x (whole >> sum of parts!)",
-                emergence
+                "Strong emergence: {emergence:.1}x (whole >> sum of parts!)"
             ));
         } else if emergence > 1.05 {
-            parts.push(format!("Moderate emergence: {:.1}x", emergence));
+            parts.push(format!("Moderate emergence: {emergence:.1}x"));
         } else if emergence > 0.95 {
             parts.push("Aggregate consciousness (sum of individuals)".to_string());
         } else {
             parts.push(format!(
-                "Suppressed consciousness: {:.1}x (interference reduces total)",
-                emergence
+                "Suppressed consciousness: {emergence:.1}x (interference reduces total)"
             ));
         }
 

@@ -317,8 +317,7 @@ impl SynergyProfile {
             properties.push(EmergentProperty {
                 name: "Golden Consciousness".to_string(),
                 description: format!(
-                    "Φ/Entropy ratio ({:.3}) near golden ratio - optimal balance",
-                    ratio
+                    "Φ/Entropy ratio ({ratio:.3}) near golden ratio - optimal balance"
                 ),
                 strength: (1.0 - golden_distance / 0.3) * ((profile.phi + profile.entropy) / 2.0),
                 required_synergies: vec![(DimensionType::Phi, DimensionType::Entropy)],

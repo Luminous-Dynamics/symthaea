@@ -329,8 +329,7 @@ TRANSLATION QUALITY:
         };
 
         format!(
-            "Φ Level: {} ({:.2})\nGuidance: {}\n\n",
-            level, phi, guidance
+            "Φ Level: {level} ({phi:.2})\nGuidance: {guidance}\n\n"
         )
     }
 

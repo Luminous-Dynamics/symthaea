@@ -280,7 +280,7 @@ impl CognitiveLoopService {
         self.stats.emotional_arousal = self.emotion_contagion.smoothed_arousal();
         let (nudge_pattern, nudge_strength) = self.emotion_contagion.pattern_nudge();
         self.stats.emotion_nudge_pattern = nudge_pattern
-            .map(|p| format!("{:?}", p))
+            .map(|p| format!("{p:?}"))
             .unwrap_or_else(|| "None".to_string());
         self.stats.emotion_nudge_strength = nudge_strength;
 
@@ -318,7 +318,7 @@ impl CognitiveLoopService {
         self.stats.unified_emotional_dominance = unified_state.dominance as f32;
         self.stats.unified_emotion = unified_state
             .discrete_emotion
-            .map(|e| format!("{:?}", e))
+            .map(|e| format!("{e:?}"))
             .unwrap_or_else(|| "Neutral".to_string());
 
         // Emotional pattern from the bridge

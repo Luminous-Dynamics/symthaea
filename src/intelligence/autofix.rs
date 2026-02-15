@@ -78,15 +78,15 @@ impl Fix {
         let mut diff = String::new();
 
         if let Some(line) = self.line {
-            diff.push_str(&format!("@@ -{} +{} @@\n", line, line));
+            diff.push_str(&format!("@@ -{line} +{line} @@\n"));
         }
 
         for orig_line in self.original.lines() {
-            diff.push_str(&format!("-{}\n", orig_line));
+            diff.push_str(&format!("-{orig_line}\n"));
         }
 
         for repl_line in self.replacement.lines() {
-            diff.push_str(&format!("+{}\n", repl_line));
+            diff.push_str(&format!("+{repl_line}\n"));
         }
 
         diff
@@ -293,7 +293,7 @@ impl AutoFixer {
                 if trimmed.contains('=') && !trimmed.ends_with(';') && !trimmed.ends_with('{') {
                     let fix = Fix::new("Add missing semicolon")
                         .at_line(i + 1)
-                        .replace(line.to_string(), format!("{};", line))
+                        .replace(line.to_string(), format!("{line};"))
                         .with_confidence(0.8)
                         .safe_to_apply();
 
@@ -333,17 +333,15 @@ impl AutoFixer {
 
                     self.suggestions
                         .push(FixSuggestion::from_fix(fix).with_rationale(format!(
-                            "'{}' is a standard NixOS module argument",
-                            var_name
+                            "'{var_name}' is a standard NixOS module argument"
                         )));
                 } else {
                     // Might be a package
-                    let fix = Fix::new(format!("Add {} to packages", var_name))
+                    let fix = Fix::new(format!("Add {var_name} to packages"))
                         .replace(
                             "environment.systemPackages = with pkgs; [",
                             format!(
-                                "environment.systemPackages = with pkgs; [\n    {}",
-                                var_name
+                                "environment.systemPackages = with pkgs; [\n    {var_name}"
                             ),
                         )
                         .with_confidence(0.6);
@@ -365,17 +363,17 @@ impl AutoFixer {
                 let option_path = &rest[..end];
 
                 // Suggest mkForce
-                let fix = Fix::new(format!("Use mkForce to override {}", option_path))
+                let fix = Fix::new(format!("Use mkForce to override {option_path}"))
                     .replace(
-                        format!("{} =", option_path),
-                        format!("{} = lib.mkForce", option_path),
+                        format!("{option_path} ="),
+                        format!("{option_path} = lib.mkForce"),
                     )
                     .with_confidence(0.85);
 
                 let alt = Fix::new("Use mkDefault for lower priority".to_string())
                     .replace(
-                        format!("{} =", option_path),
-                        format!("{} = lib.mkDefault", option_path),
+                        format!("{option_path} ="),
+                        format!("{option_path} = lib.mkDefault"),
                     )
                     .with_confidence(0.7);
 
@@ -461,7 +459,7 @@ impl AutoFixer {
 
                 self.suggestions.push(
                     FixSuggestion::from_fix(fix)
-                        .with_rationale(format!("'{}' is deprecated in favor of '{}'", old, new)),
+                        .with_rationale(format!("'{old}' is deprecated in favor of '{new}'")),
                 );
                 break;
             }

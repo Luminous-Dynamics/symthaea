@@ -744,7 +744,7 @@ impl PrototypeSpecification {
         output.push_str(&"─".repeat(70));
         output.push('\n');
         for note in &self.regulatory_notes {
-            output.push_str(&format!("• {}\n", note));
+            output.push_str(&format!("• {note}\n"));
         }
 
         output.push('\n');

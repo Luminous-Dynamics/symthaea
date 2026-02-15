@@ -777,7 +777,7 @@ impl ContingencyLearner {
                 if let Some(idx) = contingencies
                     .iter()
                     .enumerate()
-                    .min_by(|(_, a), (_, b)| a.confidence.partial_cmp(&b.confidence).unwrap())
+                    .min_by(|(_, a), (_, b)| a.confidence.total_cmp(&b.confidence))
                     .map(|(i, _)| i)
                 {
                     contingencies.remove(idx);
@@ -806,7 +806,7 @@ impl ContingencyLearner {
             .max_by(|a, b| {
                 let sim_a = a.context.similarity(context) * a.confidence;
                 let sim_b = b.context.similarity(context) * b.confidence;
-                sim_a.partial_cmp(&sim_b).unwrap()
+                sim_a.total_cmp(&sim_b)
             })?;
 
         Some(best.predict())
@@ -1082,7 +1082,7 @@ impl EnactivistPerception {
             .map(|(&action, &readiness)| (action, readiness))
             .collect();
 
-        actions.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        actions.sort_by(|a, b| b.1.total_cmp(&a.1));
         actions
     }
 
@@ -1288,7 +1288,7 @@ impl AffordanceDetector {
 
         // Sort by attractiveness
         self.current_affordances
-            .sort_by(|a, b| b.attractiveness().partial_cmp(&a.attractiveness()).unwrap());
+            .sort_by(|a, b| b.attractiveness().total_cmp(&a.attractiveness()));
 
         // Limit
         self.current_affordances

@@ -267,7 +267,7 @@ impl RangeProofParams {
     pub fn new(bit_length: usize) -> Self {
         let bit_generators: Vec<FieldElement> = (0..bit_length)
             .map(|i| {
-                let seed = format!("Range Proof Generator {}", i);
+                let seed = format!("Range Proof Generator {i}");
                 FieldElement::from_bytes(seed.as_bytes())
             })
             .collect();

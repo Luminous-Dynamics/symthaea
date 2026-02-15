@@ -331,7 +331,7 @@ impl HierarchicalCfCWorldModel {
             let input_dim = config.level_dims[i];
             let hidden_dim = config.level_dims[i];
             let time_scale = config.time_scales[i];
-            let layer_label = format!("{}::layer_{}", label, i);
+            let layer_label = format!("{label}::layer_{i}");
 
             layers.push(WorldModelLayer::from_genesis(
                 i,
@@ -351,13 +351,13 @@ impl HierarchicalCfCWorldModel {
             let upper_dim = config.level_dims[i + 1];
             let scale = (2.0 / (lower_dim + upper_dim) as f32).sqrt();
 
-            let mut up_rng = genesis.domain(&format!("{}::up_{}", label, i));
+            let mut up_rng = genesis.domain(&format!("{label}::up_{i}"));
             let up_proj = Array2::from_shape_fn((upper_dim, lower_dim), |_| {
                 (up_rng.gen::<f32>() - 0.5) * 2.0 * scale
             });
             up_projections.push(up_proj);
 
-            let mut down_rng = genesis.domain(&format!("{}::down_{}", label, i));
+            let mut down_rng = genesis.domain(&format!("{label}::down_{i}"));
             let down_proj = Array2::from_shape_fn((lower_dim, upper_dim), |_| {
                 (down_rng.gen::<f32>() - 0.5) * 2.0 * scale
             });

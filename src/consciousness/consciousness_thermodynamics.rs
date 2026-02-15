@@ -679,8 +679,7 @@ impl ThermodynamicsNSMGrounding {
             .unwrap_or_default();
 
         format!(
-            "Phase[{}] & Energy[{}] & Balance[{}]",
-            phase_formula, fe_formula, eq_formula
+            "Phase[{phase_formula}] & Energy[{fe_formula}] & Balance[{eq_formula}]"
         )
     }
 }

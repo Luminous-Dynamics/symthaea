@@ -412,7 +412,7 @@ impl MycelixBridge {
         match &eval_result.decision {
             Decision::Veto(reason) => {
                 return Err(BridgeError::ValueViolation {
-                    reason: format!("{:?}", reason),
+                    reason: format!("{reason:?}"),
                 });
             }
             Decision::Warn(_warnings) => {
@@ -714,14 +714,13 @@ impl std::fmt::Display for BridgeError {
             } => {
                 write!(
                     f,
-                    "Insufficient consciousness for {}: {} < {}",
-                    action, current, required
+                    "Insufficient consciousness for {action}: {current} < {required}"
                 )
             }
-            Self::ValueViolation { reason } => write!(f, "Value violation: {}", reason),
+            Self::ValueViolation { reason } => write!(f, "Value violation: {reason}"),
             Self::CannotEvaluate => write!(f, "Cannot evaluate proposal"),
-            Self::NetworkError { message } => write!(f, "Network error: {}", message),
-            Self::InvalidProposal { reason } => write!(f, "Invalid proposal: {}", reason),
+            Self::NetworkError { message } => write!(f, "Network error: {message}"),
+            Self::InvalidProposal { reason } => write!(f, "Invalid proposal: {reason}"),
         }
     }
 }

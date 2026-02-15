@@ -318,7 +318,7 @@ impl HomeManagerBridge {
 
                     HomeResult {
                         success: true,
-                        output: format!("Rolled back to generation {}", prev_id),
+                        output: format!("Rolled back to generation {prev_id}"),
                         error: None,
                         new_generation: Some(prev_id),
                     }
@@ -353,7 +353,7 @@ impl HomeManagerBridge {
 
                     HomeResult {
                         success: true,
-                        output: format!("Switched to generation {}", gen_id),
+                        output: format!("Switched to generation {gen_id}"),
                         error: None,
                         new_generation: Some(gen_id),
                     }
@@ -378,7 +378,7 @@ impl HomeManagerBridge {
     /// Delete old generations
     pub fn expire_generations(&mut self, keep: usize) -> HomeResult {
         let output = Command::new("home-manager")
-            .args(["expire-generations", &format!("-{}d", keep)])
+            .args(["expire-generations", &format!("-{keep}d")])
             .output();
 
         match output {
@@ -452,7 +452,7 @@ impl HomeManagerBridge {
             output.push_str(&format!("Config: {}\n", config.config_path.display()));
 
             if let Some(gen) = config.generation {
-                output.push_str(&format!("Generation: {}\n", gen));
+                output.push_str(&format!("Generation: {gen}\n"));
             }
 
             output.push_str(&format!("\nGenerations ({}):\n", self.generations.len()));

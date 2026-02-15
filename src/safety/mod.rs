@@ -80,7 +80,7 @@ impl AmygdalaActor {
             .filter_map(|p| match regex::Regex::new(p) {
                 Ok(re) => Some(re),
                 Err(e) => {
-                    eprintln!("[safety] Failed to compile regex pattern '{}': {}", p, e);
+                    eprintln!("[safety] Failed to compile regex pattern '{p}': {e}");
                     compile_failures += 1;
                     None
                 }

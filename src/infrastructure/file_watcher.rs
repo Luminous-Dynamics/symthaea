@@ -297,7 +297,7 @@ impl std::fmt::Display for WatchError {
         match self {
             Self::PathNotFound(p) => write!(f, "Path not found: {}", p.display()),
             Self::PermissionDenied(p) => write!(f, "Permission denied: {}", p.display()),
-            Self::IoError(e) => write!(f, "IO error: {}", e),
+            Self::IoError(e) => write!(f, "IO error: {e}"),
             Self::AlreadyRunning => write!(f, "Watcher already running"),
         }
     }
@@ -463,14 +463,14 @@ fn compute_simple_diff(old: &str, new: &str) -> String {
 
         match (old_line, new_line) {
             (Some(o), Some(n)) if o != n => {
-                diff.push_str(&format!("-{}\n", o));
-                diff.push_str(&format!("+{}\n", n));
+                diff.push_str(&format!("-{o}\n"));
+                diff.push_str(&format!("+{n}\n"));
             }
             (Some(o), None) => {
-                diff.push_str(&format!("-{}\n", o));
+                diff.push_str(&format!("-{o}\n"));
             }
             (None, Some(n)) => {
-                diff.push_str(&format!("+{}\n", n));
+                diff.push_str(&format!("+{n}\n"));
             }
             _ => {}
         }

@@ -594,14 +594,14 @@ pub enum QdrantMemoryError {
 impl std::fmt::Display for QdrantMemoryError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::ConnectionFailed(msg) => write!(f, "Qdrant connection failed: {}", msg),
-            Self::CollectionError(msg) => write!(f, "Collection error: {}", msg),
-            Self::StoreError(msg) => write!(f, "Store error: {}", msg),
-            Self::RetrievalError(msg) => write!(f, "Retrieval error: {}", msg),
-            Self::DeleteError(msg) => write!(f, "Delete error: {}", msg),
-            Self::SerializationError(msg) => write!(f, "Serialization error: {}", msg),
-            Self::ConfigError(msg) => write!(f, "Configuration error: {}", msg),
-            Self::Timeout(msg) => write!(f, "Operation timed out: {}", msg),
+            Self::ConnectionFailed(msg) => write!(f, "Qdrant connection failed: {msg}"),
+            Self::CollectionError(msg) => write!(f, "Collection error: {msg}"),
+            Self::StoreError(msg) => write!(f, "Store error: {msg}"),
+            Self::RetrievalError(msg) => write!(f, "Retrieval error: {msg}"),
+            Self::DeleteError(msg) => write!(f, "Delete error: {msg}"),
+            Self::SerializationError(msg) => write!(f, "Serialization error: {msg}"),
+            Self::ConfigError(msg) => write!(f, "Configuration error: {msg}"),
+            Self::Timeout(msg) => write!(f, "Operation timed out: {msg}"),
         }
     }
 }

@@ -75,16 +75,16 @@ impl ReasoningTask {
     /// Get a human-readable description
     pub fn description(&self) -> String {
         match self {
-            ReasoningTask::SetTheoryReasoning { problem, .. } => format!("Set Theory: {}", problem),
+            ReasoningTask::SetTheoryReasoning { problem, .. } => format!("Set Theory: {problem}"),
             ReasoningTask::LogicalInference {
                 premises,
                 conclusion,
             } => format!("Infer '{}' from {} premises", conclusion, premises.len()),
-            ReasoningTask::ArithmeticProof { statement, .. } => format!("Prove: {}", statement),
+            ReasoningTask::ArithmeticProof { statement, .. } => format!("Prove: {statement}"),
             ReasoningTask::Custom {
                 description,
                 complexity,
-            } => format!("{} (complexity: {})", description, complexity),
+            } => format!("{description} (complexity: {complexity})"),
         }
     }
 

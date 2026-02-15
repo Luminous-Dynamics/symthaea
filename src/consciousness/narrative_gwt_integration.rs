@@ -636,16 +636,16 @@ impl NarrativeGWTIntegration {
                         harmony.clone()
                     }
                     crate::consciousness::unified_value_evaluator::VetoReason::InauthenicBenevolence { care_level, required } => {
-                        format!("Authenticity (care {:.2} < {:.2})", care_level, required)
+                        format!("Authenticity (care {care_level:.2} < {required:.2})")
                     }
                     crate::consciousness::unified_value_evaluator::VetoReason::NegativeAffectDominant { rage, fear } => {
-                        format!("Affective Balance (rage={:.2}, fear={:.2})", rage, fear)
+                        format!("Affective Balance (rage={rage:.2}, fear={fear:.2})")
                     }
                     crate::consciousness::unified_value_evaluator::VetoReason::InsufficientConsciousness { current, required, .. } => {
-                        format!("Consciousness ({:.2} < {:.2})", current, required)
+                        format!("Consciousness ({current:.2} < {required:.2})")
                     }
                     crate::consciousness::unified_value_evaluator::VetoReason::CompoundedWarnings { count, .. } => {
-                        format!("Multiple Warnings ({})", count)
+                        format!("Multiple Warnings ({count})")
                     }
                 };
                 (false, Some(violated))

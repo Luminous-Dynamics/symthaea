@@ -334,7 +334,7 @@ impl Antimatter {
         let vector = ContinuousHV::bundle(&[&nucleus, &cloud]);
 
         Antiatom {
-            name: format!("Anti-Z{}", antiprotons),
+            name: format!("Anti-Z{antiprotons}"),
             antiprotons,
             antineutrons,
             positrons: antiprotons,

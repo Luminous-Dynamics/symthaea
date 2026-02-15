@@ -156,18 +156,18 @@ impl MathValue {
 impl std::fmt::Display for MathValue {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MathValue::Natural(n) => write!(f, "{}", n),
-            MathValue::Integer(n) => write!(f, "{}", n),
+            MathValue::Natural(n) => write!(f, "{n}"),
+            MathValue::Integer(n) => write!(f, "{n}"),
             MathValue::Rational {
                 numerator,
                 denominator,
             } => {
-                write!(f, "{}/{}", numerator, denominator)
+                write!(f, "{numerator}/{denominator}")
             }
-            MathValue::Real(x) => write!(f, "{:.10}", x),
+            MathValue::Real(x) => write!(f, "{x:.10}"),
             MathValue::Complex { re, im } => {
                 if *im >= 0.0 {
-                    write!(f, "{} + {}i", re, im)
+                    write!(f, "{re} + {im}i")
                 } else {
                     write!(f, "{} - {}i", re, -im)
                 }
@@ -291,7 +291,7 @@ impl UnifiedMathEngine {
     /// Record a domain promotion from one domain label to another.
     fn record_promotion(promotions: &mut Vec<String>, from: &str, to: &str) {
         if from != to {
-            promotions.push(format!("{} \u{2192} {}", from, to));
+            promotions.push(format!("{from} \u{2192} {to}"));
         }
     }
 

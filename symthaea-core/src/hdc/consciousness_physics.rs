@@ -305,7 +305,7 @@ impl PhysicsConsciousnessObserver {
                 let value_hv = BinaryHV::random(value_seed);
 
                 // Position marker for this partition
-                let pos_name = format!("partition_{}", i);
+                let pos_name = format!("partition_{i}");
                 let pos_seed = seed_from_name(&pos_name);
                 let pos_hv = BinaryHV::random(pos_seed);
 

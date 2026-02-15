@@ -571,10 +571,10 @@ impl TruePhiCalculator {
         }
 
         if part_a.is_empty() && !part_b.is_empty() {
-            let moved = part_b.pop().unwrap();
+            let moved = part_b.pop().expect("part_b verified non-empty");
             part_a.push(moved);
         } else if part_b.is_empty() && !part_a.is_empty() {
-            let moved = part_a.pop().unwrap();
+            let moved = part_a.pop().expect("part_a verified non-empty");
             part_b.push(moved);
         }
 

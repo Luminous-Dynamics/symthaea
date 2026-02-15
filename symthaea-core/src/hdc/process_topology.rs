@@ -172,7 +172,7 @@ impl ProcessTopologyOrganizer {
                 let leaf_id = (i - l3_start) % leaves_per_module.max(1);
                 let default_name = String::from("Unknown");
                 let base = self.module_names.get(module).unwrap_or(&default_name);
-                let name = format!("{}_Leaf{}", base, leaf_id);
+                let name = format!("{base}_Leaf{leaf_id}");
                 (3, module, name)
             };
 

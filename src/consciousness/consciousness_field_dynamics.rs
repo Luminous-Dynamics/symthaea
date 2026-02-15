@@ -692,7 +692,7 @@ impl ConsciousnessFieldAnalyzer {
                     amplitude: max_correlation.sqrt() / harmonic as f64,
                     phase: 0.0,
                     stability: max_correlation / harmonic as f64,
-                    interpretation: format!("Harmonic {} of fundamental", harmonic),
+                    interpretation: format!("Harmonic {harmonic} of fundamental"),
                 };
                 modes.push(mode);
             }

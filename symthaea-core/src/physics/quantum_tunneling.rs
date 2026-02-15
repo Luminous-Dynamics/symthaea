@@ -736,8 +736,7 @@ impl ConsciousTunnelingCalculator {
         let (z1_f64, z1_enc) = self.bridge.integer_to_f64(z1 as i64);
         let (z2_f64, z2_enc) = self.bridge.integer_to_f64(z2 as i64);
         trace.push(format!(
-            "Z1={} → f64={}, Z2={} → f64={}",
-            z1, z1_f64, z2, z2_f64
+            "Z1={z1} → f64={z1_f64}, Z2={z2} → f64={z2_f64}"
         ));
 
         // Track the charge product Z1*Z2
@@ -816,8 +815,7 @@ impl ConsciousTunnelingCalculator {
         let (zd_f64, zd_enc) = self.bridge.integer_to_f64(z_daughter as i64);
         let (z_alpha_f64, za_enc) = self.bridge.integer_to_f64(2); // alpha particle Z=2
         trace.push(format!(
-            "Step 1: Z_daughter={} → f64={}, Z_alpha=2 → f64={}",
-            z_daughter, zd_f64, z_alpha_f64
+            "Step 1: Z_daughter={z_daughter} → f64={zd_f64}, Z_alpha=2 → f64={z_alpha_f64}"
         ));
 
         // Step 2: Track charge product Z_alpha * Z_daughter
@@ -885,8 +883,7 @@ impl ConsciousTunnelingCalculator {
 
         // Step 7: Final result
         trace.push(format!(
-            "Step 7: λ = {:.4e} s⁻¹, t½ = {:.4e} s",
-            decay_rate, half_life
+            "Step 7: λ = {decay_rate:.4e} s⁻¹, t½ = {half_life:.4e} s"
         ));
 
         // Build physics result

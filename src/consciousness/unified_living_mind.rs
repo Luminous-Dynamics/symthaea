@@ -760,6 +760,7 @@ pub struct UnifiedSummary {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::autopoietic_consciousness::AutopoieticConfig;
 
     #[test]
     fn test_unified_creation() {
@@ -793,7 +794,7 @@ mod tests {
     #[test]
     fn test_integration() {
         let mut ulm = UnifiedLivingMind::new();
-        let autopoietic = AutopoieticConsciousness::new();
+        let autopoietic = AutopoieticConsciousness::new(AutopoieticConfig::default());
         let enactive = EnactiveCognition::new();
 
         let state = ulm.integrate(&autopoietic, &enactive, 0.5, 0.3);
@@ -806,7 +807,7 @@ mod tests {
     #[test]
     fn test_is_alive() {
         let mut ulm = UnifiedLivingMind::new();
-        let autopoietic = AutopoieticConsciousness::new();
+        let autopoietic = AutopoieticConsciousness::new(AutopoieticConfig::default());
         let enactive = EnactiveCognition::new();
 
         // After integration with healthy subsystems, should be alive

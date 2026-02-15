@@ -494,7 +494,7 @@ pub fn discover_socket() -> Option<PathBuf> {
 
     // Try /run/user/$UID
     if let Ok(uid) = std::env::var("UID") {
-        let socket = PathBuf::from(format!("/run/user/{}/symthaea/symthaea.sock", uid));
+        let socket = PathBuf::from(format!("/run/user/{uid}/symthaea/symthaea.sock"));
         if socket.exists() {
             return Some(socket);
         }
@@ -592,7 +592,7 @@ impl ShellIpcClient {
                 ..
             } => Ok((phi, coherence, is_conscious)),
             Response::Error { code, message } => {
-                anyhow::bail!("GetStatus failed: {} (code {})", message, code)
+                anyhow::bail!("GetStatus failed: {message} (code {code})")
             }
             _ => {
                 anyhow::bail!("Unexpected response to GetStatus request")
@@ -620,7 +620,7 @@ impl ShellIpcClient {
                 }
             }
         }
-        anyhow::bail!("Failed to connect after {} attempts", max_retries)
+        anyhow::bail!("Failed to connect after {max_retries} attempts")
     }
 
     /// Get current connection state
@@ -744,7 +744,7 @@ impl ShellIpcClient {
                 Ok(())
             }
             Response::Error { code, message } => {
-                anyhow::bail!("Heartbeat failed: {} (code {})", message, code)
+                anyhow::bail!("Heartbeat failed: {message} (code {code})")
             }
             _ => {
                 anyhow::bail!("Unexpected response to heartbeat")
@@ -795,7 +795,7 @@ impl ShellIpcClient {
         let mut responses = Vec::with_capacity(requests.len());
 
         for (i, request) in requests.into_iter().enumerate() {
-            let id = format!("batch-{}", i);
+            let id = format!("batch-{i}");
             let envelope = self.send_request_with_id(request, Some(id)).await?;
             responses.push(envelope);
         }
@@ -927,8 +927,8 @@ impl ShellIpcClient {
             IpcResponse::HelloAck { server_version } if server_version == IPC_PROTOCOL_VERSION => {
                 Ok(())
             }
-            IpcResponse::Error(message) => anyhow::bail!("Handshake rejected: {}", message),
-            other => anyhow::bail!("Unexpected handshake response: {:?}", other),
+            IpcResponse::Error(message) => anyhow::bail!("Handshake rejected: {message}"),
+            other => anyhow::bail!("Unexpected handshake response: {other:?}"),
         }
     }
 
@@ -943,7 +943,7 @@ impl ShellIpcClient {
             .context("Failed to read response length")?;
         let len = u32::from_le_bytes(len_buf) as usize;
         if len == 0 || len > max_size {
-            anyhow::bail!("Invalid IPC frame size: {}", len);
+            anyhow::bail!("Invalid IPC frame size: {len}");
         }
 
         let mut buf = vec![0u8; len];
@@ -1045,7 +1045,7 @@ impl ShellIpcClient {
             | (Request::UnsubscribeMetrics, IpcResponse::Subscribed) => Response::Subscribed,
             (_, IpcResponse::HelloAck { server_version }) => Response::Error {
                 code: 2,
-                message: format!("Unexpected hello ack (server version {})", server_version),
+                message: format!("Unexpected hello ack (server version {server_version})"),
             },
             (_, IpcResponse::Metrics(metrics)) => Response::Status {
                 phi: metrics.phi,
@@ -1149,7 +1149,7 @@ impl ShellIpcClient {
                 confidence,
             } => Ok((completions, command_preview, phi, confidence)),
             Response::Error { code, message } => {
-                anyhow::bail!("IntelliSense error: {} (code {})", message, code)
+                anyhow::bail!("IntelliSense error: {message} (code {code})")
             }
             _ => {
                 anyhow::bail!("Unexpected response to IntelliSense request")
@@ -1178,7 +1178,7 @@ impl ShellIpcClient {
                 warnings,
             } => Ok((valid, safety_level, phi_required, warnings)),
             Response::Error { code, message } => {
-                anyhow::bail!("Validation error: {} (code {})", message, code)
+                anyhow::bail!("Validation error: {message} (code {code})")
             }
             _ => {
                 anyhow::bail!("Unexpected response to validation request")
@@ -1209,7 +1209,7 @@ impl ShellIpcClient {
                 gate_reason,
             } => Ok((executed, output, phi_at_execution, gate_reason)),
             Response::Error { code, message } => {
-                anyhow::bail!("Execution error: {} (code {})", message, code)
+                anyhow::bail!("Execution error: {message} (code {code})")
             }
             _ => {
                 anyhow::bail!("Unexpected response to execution request")

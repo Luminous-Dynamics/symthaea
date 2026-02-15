@@ -194,7 +194,7 @@ impl NixActorBridge {
                 messages.push(NixActorMessage {
                     kind: NixMessageKind::SurpriseAlert,
                     content: engine.world_model().system_state().clone(),
-                    summary: format!("High prediction error: FE={:.3}", fe),
+                    summary: format!("High prediction error: FE={fe:.3}"),
                     from_role: NixActorRoles::EVALUATOR,
                     to_role: NixActorRoles::COORDINATOR,
                     priority: 0.9,
@@ -294,19 +294,19 @@ impl NixActorBridge {
         // Outcome message: Effector → Memory
         let mut meta = HashMap::new();
         meta.insert("action".into(), action.to_string());
-        meta.insert("valence".into(), format!("{:.2}", valence));
+        meta.insert("valence".into(), format!("{valence:.2}"));
         let outcome_str = match &outcome {
             EpisodeOutcome::Success => "success".to_string(),
-            EpisodeOutcome::Failure(r) => format!("failure: {}", r),
-            EpisodeOutcome::PartialSuccess(r) => format!("partial: {}", r),
-            EpisodeOutcome::RolledBack(r) => format!("rollback: {}", r),
+            EpisodeOutcome::Failure(r) => format!("failure: {r}"),
+            EpisodeOutcome::PartialSuccess(r) => format!("partial: {r}"),
+            EpisodeOutcome::RolledBack(r) => format!("rollback: {r}"),
         };
         meta.insert("outcome".into(), outcome_str.clone());
 
         messages.push(NixActorMessage {
             kind: NixMessageKind::ActionOutcome,
             content: state_after,
-            summary: format!("Outcome of '{}': {}", action, outcome_str),
+            summary: format!("Outcome of '{action}': {outcome_str}"),
             from_role: NixActorRoles::EFFECTOR,
             to_role: NixActorRoles::MEMORY,
             priority: 0.6,
@@ -337,7 +337,7 @@ impl NixActorBridge {
         meta.insert("edge_count".into(), edges.len().to_string());
         for (i, edge) in edges.iter().take(10).enumerate() {
             meta.insert(
-                format!("edge_{}", i),
+                format!("edge_{i}"),
                 format!("{} → {} ({:.2})", edge.from, edge.to, edge.confidence),
             );
         }

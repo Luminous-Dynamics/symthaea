@@ -415,5 +415,86 @@ fn main() {
         );
     }
 
+    // ================================================================
+    // Vonnegut Story Shapes Classification
+    // ================================================================
+
+    println!("\n=== Vonnegut Story Shapes ===\n");
+
+    // Six canonical shapes as tension profiles (normalized to [0,1])
+    let vonnegut_shapes: Vec<(&str, Vec<f32>)> = vec![
+        // "Man in Hole" — fall then rise
+        (
+            "Man in Hole",
+            vec![0.5, 0.3, 0.15, 0.1, 0.2, 0.4, 0.6, 0.8],
+        ),
+        // "Boy Meets Girl" — rise, fall, rise
+        (
+            "Boy Meets Girl",
+            vec![0.3, 0.5, 0.7, 0.8, 0.5, 0.3, 0.5, 0.8],
+        ),
+        // "From Bad to Worse" — steady decline / rising tension
+        (
+            "From Bad to Worse",
+            vec![0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9],
+        ),
+        // "Which Way Is Up" — oscillation
+        (
+            "Which Way Is Up",
+            vec![0.5, 0.7, 0.4, 0.6, 0.3, 0.7, 0.4, 0.5],
+        ),
+        // "Creation Story" — steady rise then plateau
+        (
+            "Creation Story",
+            vec![0.1, 0.2, 0.35, 0.5, 0.65, 0.75, 0.8, 0.8],
+        ),
+        // "Old Testament" — rise then crash
+        (
+            "Old Testament",
+            vec![0.2, 0.4, 0.6, 0.8, 0.9, 0.7, 0.3, 0.1],
+        ),
+    ];
+
+    // Simple DTW distance (no external deps)
+    fn dtw_distance(a: &[f32], b: &[f32]) -> f32 {
+        let n = a.len();
+        let m = b.len();
+        let mut dp = vec![vec![f32::INFINITY; m + 1]; n + 1];
+        dp[0][0] = 0.0;
+        for i in 1..=n {
+            for j in 1..=m {
+                let cost = (a[i - 1] - b[j - 1]).abs();
+                dp[i][j] =
+                    cost + dp[i - 1][j].min(dp[i][j - 1]).min(dp[i - 1][j - 1]);
+            }
+        }
+        dp[n][m]
+    }
+
+    // Classify each benchmark arc against the 6 shapes
+    println!(
+        "{:<25} {:<20} {:>10}",
+        "Arc", "Best Shape", "DTW Dist"
+    );
+    println!("{}", "-".repeat(55));
+
+    for (name, _scenes, signals) in &all {
+        // Extract tension profile from signals
+        let tension_profile: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+
+        let mut best_shape = "Unknown";
+        let mut best_dist = f32::INFINITY;
+
+        for (shape_name, shape_profile) in &vonnegut_shapes {
+            let dist = dtw_distance(&tension_profile, shape_profile);
+            if dist < best_dist {
+                best_dist = dist;
+                best_shape = shape_name;
+            }
+        }
+
+        println!("{:<25} {:<20} {:>10.4}", name, best_shape, best_dist);
+    }
+
     println!("\nDone.");
 }

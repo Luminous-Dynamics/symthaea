@@ -121,9 +121,7 @@ impl NeuralBridge {
 
         if output_dim != HDC_DIMENSION {
             bail!(
-                "Output dimension mismatch: expected {}, got {}",
-                HDC_DIMENSION,
-                output_dim
+                "Output dimension mismatch: expected {HDC_DIMENSION}, got {output_dim}"
             );
         }
 
@@ -263,7 +261,7 @@ fn parse_npy<R: Read>(reader: &mut R) -> Result<(Vec<usize>, Vec<f32>)> {
     reader.read_exact(&mut magic)?;
 
     if &magic != b"\x93NUMPY" {
-        bail!("Invalid NumPy magic number: {:?}", magic);
+        bail!("Invalid NumPy magic number: {magic:?}");
     }
 
     // Read version (major, minor)
@@ -358,7 +356,7 @@ fn parse_shape(header: &str) -> Result<Vec<usize>> {
         .collect();
 
     if dims.is_empty() {
-        bail!("Could not parse any dimensions from shape: {}", shape_str);
+        bail!("Could not parse any dimensions from shape: {shape_str}");
     }
 
     Ok(dims)

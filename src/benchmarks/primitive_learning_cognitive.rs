@@ -101,7 +101,7 @@ impl CognitivePrimitiveTask {
                 let completion = completions[rng.gen_range(0..completions.len())];
                 // Create a string that the encoder can process
                 // Format: "start completion end" - the full reasoning chain
-                format!("{} {} {}", start, completion, end)
+                format!("{start} {completion} {end}")
             })
             .collect()
     }
@@ -327,9 +327,7 @@ impl CognitivePrimitiveLearning {
         let passed = accuracy_improvement > 10.0;
 
         let reasoning = format!(
-            "Error: {:.1}% reduction | Accuracy: {:.1}% → {:.1}% (Δ{:+.1}%) | No attention (one-way)",
-            error_reduction,
-            initial_accuracy, final_accuracy, accuracy_improvement
+            "Error: {error_reduction:.1}% reduction | Accuracy: {initial_accuracy:.1}% → {final_accuracy:.1}% (Δ{accuracy_improvement:+.1}%) | No attention (one-way)"
         );
 
         Ok(CognitivePrimitiveLearningResults {

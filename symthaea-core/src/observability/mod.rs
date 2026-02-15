@@ -283,7 +283,7 @@ impl Observer for MetricsCollector {
                 to_phi: phi,
                 from_level: self.last_consciousness_level,
                 to_level: self.last_consciousness_level,
-                trigger: format!("phi_delta_{:.4}", delta),
+                trigger: format!("phi_delta_{delta:.4}"),
             };
             self.state_transitions.push(transition);
             if self.state_transitions.len() > self.max_history {

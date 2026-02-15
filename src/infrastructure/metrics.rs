@@ -460,9 +460,9 @@ impl MetricsCollector {
         values: &[(Vec<(String, String)>, f64)],
     ) {
         // HELP line
-        output.push_str(&format!("# HELP {} {}\n", name, help));
+        output.push_str(&format!("# HELP {name} {help}\n"));
         // TYPE line
-        output.push_str(&format!("# TYPE {} {}\n", name, metric_type));
+        output.push_str(&format!("# TYPE {name} {metric_type}\n"));
         // Value lines
         for (labels, value) in values {
             if labels.is_empty() {
@@ -501,7 +501,7 @@ fn format_value(v: f64) -> String {
     } else if v.fract() == 0.0 && v.abs() < 1e15 {
         format!("{}", v as i64)
     } else {
-        format!("{}", v)
+        format!("{v}")
     }
 }
 

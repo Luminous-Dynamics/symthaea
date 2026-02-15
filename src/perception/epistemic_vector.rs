@@ -93,8 +93,7 @@ impl UncertaintySource {
             }
             Self::EmbeddingNorm { norm, expected } => {
                 format!(
-                    "Unusual embedding norm: {:.3} (expected ~{:.1})",
-                    norm, expected
+                    "Unusual embedding norm: {norm:.3} (expected ~{expected:.1})"
                 )
             }
             Self::ShortText {
@@ -102,8 +101,7 @@ impl UncertaintySource {
                 min_recommended,
             } => {
                 format!(
-                    "Short text: {} tokens (recommend ≥{})",
-                    token_count, min_recommended
+                    "Short text: {token_count} tokens (recommend ≥{min_recommended})"
                 )
             }
             Self::Truncated {
@@ -111,14 +109,12 @@ impl UncertaintySource {
                 max_tokens,
             } => {
                 format!(
-                    "Text truncated: {} → {} tokens",
-                    original_tokens, max_tokens
+                    "Text truncated: {original_tokens} → {max_tokens} tokens"
                 )
             }
             Self::OutOfDistribution { score, threshold } => {
                 format!(
-                    "Out-of-distribution: score {:.3} > threshold {:.3}",
-                    score, threshold
+                    "Out-of-distribution: score {score:.3} > threshold {threshold:.3}"
                 )
             }
             Self::Polysemy {
@@ -141,7 +137,7 @@ impl UncertaintySource {
                 )
             }
             Self::Custom { name, value } => {
-                format!("{}: {:.3}", name, value)
+                format!("{name}: {value:.3}")
             }
         }
     }

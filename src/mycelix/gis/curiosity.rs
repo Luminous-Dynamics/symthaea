@@ -433,8 +433,8 @@ impl ActiveExplorer {
 
         // Check for causal questions
         if query.to_lowercase().contains("why") {
-            sub_questions.push(format!("What is the context for: {}?", query));
-            sub_questions.push(format!("What factors influence: {}?", query));
+            sub_questions.push(format!("What is the context for: {query}?"));
+            sub_questions.push(format!("What factors influence: {query}?"));
         }
 
         // Check for definitional questions
@@ -446,8 +446,8 @@ impl ActiveExplorer {
                 .trim()
                 .to_string();
             if !term.is_empty() {
-                sub_questions.push(format!("What category does {} belong to?", term));
-                sub_questions.push(format!("What are the key properties of {}?", term));
+                sub_questions.push(format!("What category does {term} belong to?"));
+                sub_questions.push(format!("What are the key properties of {term}?"));
             }
         }
 
@@ -506,7 +506,7 @@ impl ActiveExplorer {
         // Add query-specific terms (simple tokenization)
         for word in query.split_whitespace() {
             if word.len() > 4 {
-                related.push(format!("{} (related)", word));
+                related.push(format!("{word} (related)"));
             }
         }
 
@@ -526,25 +526,25 @@ impl ActiveExplorer {
             Domain::Mathematics => {
                 analogies.push((
                     Domain::Physics,
-                    format!("Physical interpretation of: {}", query),
+                    format!("Physical interpretation of: {query}"),
                 ));
-                analogies.push((Domain::General, format!("Everyday analogy for: {}", query)));
+                analogies.push((Domain::General, format!("Everyday analogy for: {query}")));
             }
             Domain::Physics => {
                 analogies.push((
                     Domain::Mathematics,
-                    format!("Mathematical formulation of: {}", query),
+                    format!("Mathematical formulation of: {query}"),
                 ));
                 analogies.push((
                     Domain::General,
-                    format!("Intuitive explanation of: {}", query),
+                    format!("Intuitive explanation of: {query}"),
                 ));
             }
             Domain::History => {
-                analogies.push((Domain::General, format!("Modern parallel to: {}", query)));
+                analogies.push((Domain::General, format!("Modern parallel to: {query}")));
             }
             _ => {
-                analogies.push((Domain::General, format!("Simplified version of: {}", query)));
+                analogies.push((Domain::General, format!("Simplified version of: {query}")));
             }
         }
 

@@ -154,14 +154,14 @@ pub enum LoadError {
 impl std::fmt::Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LoadError::FileNotFound(path) => write!(f, "File not found: {}", path),
-            LoadError::IoError(e) => write!(f, "IO error: {}", e),
-            LoadError::JsonError(e) => write!(f, "JSON parse error: {}", e),
-            LoadError::YamlError(msg) => write!(f, "YAML parse error: {}", msg),
-            LoadError::UnsupportedFormat(ext) => write!(f, "Unsupported file format: {}", ext),
-            LoadError::ValidationError(e) => write!(f, "Validation error: {}", e),
-            LoadError::InvalidDifficulty(s) => write!(f, "Invalid difficulty: {}", s),
-            LoadError::InvalidDomain(s) => write!(f, "Invalid domain: {}", s),
+            LoadError::FileNotFound(path) => write!(f, "File not found: {path}"),
+            LoadError::IoError(e) => write!(f, "IO error: {e}"),
+            LoadError::JsonError(e) => write!(f, "JSON parse error: {e}"),
+            LoadError::YamlError(msg) => write!(f, "YAML parse error: {msg}"),
+            LoadError::UnsupportedFormat(ext) => write!(f, "Unsupported file format: {ext}"),
+            LoadError::ValidationError(e) => write!(f, "Validation error: {e}"),
+            LoadError::InvalidDifficulty(s) => write!(f, "Invalid difficulty: {s}"),
+            LoadError::InvalidDomain(s) => write!(f, "Invalid domain: {s}"),
         }
     }
 }
@@ -429,7 +429,7 @@ fn yaml_to_json(yaml: &str) -> Result<String, String> {
 
                 if value.is_empty() {
                     // Start of a nested structure or list
-                    result.push_str(&format!("\"{}\":", key));
+                    result.push_str(&format!("\"{key}\":"));
                     // Check next line to determine if list or object
                     result.push('['); // Assume list for now
                     in_list = true;
@@ -456,8 +456,7 @@ fn yaml_to_json(yaml: &str) -> Result<String, String> {
         Err(e) => {
             // For complex YAML, suggest using JSON directly
             Err(format!(
-                "YAML parsing failed: {}. For complex curricula, consider using JSON format directly.",
-                e
+                "YAML parsing failed: {e}. For complex curricula, consider using JSON format directly."
             ))
         }
     }

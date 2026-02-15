@@ -133,8 +133,7 @@ impl Conflict {
                 dependency,
             } => {
                 format!(
-                    "Package '{}' requires '{}' which is not installed",
-                    package, dependency
+                    "Package '{package}' requires '{dependency}' which is not installed"
                 )
             }
             ConflictType::PortConflict { port, services } => {
@@ -156,9 +155,9 @@ impl Conflict {
             }
             ConflictType::DeprecatedOption { old_path, new_path } => {
                 if let Some(new) = new_path {
-                    format!("Option '{}' is deprecated, use '{}' instead", old_path, new)
+                    format!("Option '{old_path}' is deprecated, use '{new}' instead")
                 } else {
-                    format!("Option '{}' is deprecated and should be removed", old_path)
+                    format!("Option '{old_path}' is deprecated and should be removed")
                 }
             }
             ConflictType::TypeMismatch {
@@ -166,7 +165,7 @@ impl Conflict {
                 expected,
                 actual,
             } => {
-                format!("Option '{}' expects {} but got {}", path, expected, actual)
+                format!("Option '{path}' expects {expected} but got {actual}")
             }
         }
     }
@@ -183,8 +182,7 @@ impl Conflict {
                 Some("Pin to a specific version or use an overlay".to_string())
             }
             ConflictType::MissingDependency { dependency, .. } => Some(format!(
-                "Add '{}' to environment.systemPackages",
-                dependency
+                "Add '{dependency}' to environment.systemPackages"
             )),
             ConflictType::PortConflict { .. } => {
                 Some("Change the port for one of the services".to_string())
@@ -196,10 +194,10 @@ impl Conflict {
                 Some("Break the cycle by restructuring module dependencies".to_string())
             }
             ConflictType::DeprecatedOption { new_path, .. } => {
-                new_path.as_ref().map(|p| format!("Replace with '{}'", p))
+                new_path.as_ref().map(|p| format!("Replace with '{p}'"))
             }
             ConflictType::TypeMismatch { expected, .. } => {
-                Some(format!("Convert the value to {}", expected))
+                Some(format!("Convert the value to {expected}"))
             }
         }
     }
@@ -436,7 +434,7 @@ impl ConflictDetector {
             }
 
             if let Some(suggestion) = &conflict.suggestion {
-                output.push_str(&format!("   Suggestion: {}\n", suggestion));
+                output.push_str(&format!("   Suggestion: {suggestion}\n"));
             }
 
             output.push('\n');

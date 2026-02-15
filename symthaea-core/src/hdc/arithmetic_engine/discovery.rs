@@ -90,7 +90,7 @@ impl MathDiscovery {
                 if ab.value == ba.value {
                     proofs.push((
                         AbstractProof {
-                            theorem: format!("{} + {} = {} + {}", a, b, b, a),
+                            theorem: format!("{a} + {b} = {b} + {a}"),
                             base_cases: vec!["Proven for all pairs up to 50".to_string()],
                             inductive_step: "Direct computation verification".to_string(),
                             justification: vec![
@@ -108,7 +108,7 @@ impl MathDiscovery {
                 let inductive_phi = self.engine.config.phi_scale_factor * 2.0;
                 proofs.push((
                     AbstractProof {
-                        theorem: format!("{} + {} = {} + {}", a, b, b, a),
+                        theorem: format!("{a} + {b} = {b} + {a}"),
                         base_cases: vec!["Base: a + 0 = 0 + a = a".to_string()],
                         inductive_step:
                             "Assume a + k = k + a. Then a + S(k) = S(a + k) = S(k + a) = S(k) + a"
@@ -136,7 +136,7 @@ impl MathDiscovery {
                 if ab_c.value == a_bc.value {
                     proofs.push((
                         AbstractProof {
-                            theorem: format!("({} + {}) + {} = {} + ({} + {})", a, b, c, a, b, c),
+                            theorem: format!("({a} + {b}) + {c} = {a} + ({b} + {c})"),
                             base_cases: vec!["(a + b) + 0 = a + b = a + (b + 0)".to_string()],
                             inductive_step: format!(
                                 "({} + {}) + {} = {} = {} + ({} + {})",
@@ -174,8 +174,7 @@ impl MathDiscovery {
                     proofs.push((
                         AbstractProof {
                             theorem: format!(
-                                "{} × ({} + {}) = {} × {} + {} × {}",
-                                a, b, c, a, b, a, c
+                                "{a} × ({b} + {c}) = {a} × {b} + {a} × {c}"
                             ),
                             base_cases: vec!["a × (b + 0) = a × b = a × b + a × 0".to_string()],
                             inductive_step: format!(
@@ -196,14 +195,13 @@ impl MathDiscovery {
                     ));
 
                     insights.push(format!(
-                        "Distributive law Φ = {:.4} (elegant proof)",
-                        total_phi
+                        "Distributive law Φ = {total_phi:.4} (elegant proof)"
                     ));
                 }
             }
 
             _ => {
-                insights.push(format!("Unknown theorem type: {}", theorem_type));
+                insights.push(format!("Unknown theorem type: {theorem_type}"));
             }
         }
 
@@ -213,7 +211,7 @@ impl MathDiscovery {
         let most_elegant = proofs.first().map(|(p, _)| p.clone());
 
         let exploration = ProofExploration {
-            theorem: format!("{}({}, {}, {})", theorem_type, a, b, c),
+            theorem: format!("{theorem_type}({a}, {b}, {c})"),
             proofs,
             most_elegant,
             insights,
@@ -284,7 +282,7 @@ impl MathDiscovery {
                 // Find (b, a) pair
                 if let Some((_, _, phi_ba)) = add_data.iter().find(|(x, y, _)| x == b && y == a) {
                     if (phi_ab - phi_ba).abs() < 0.01 {
-                        symmetric_evidence.push(format!("Φ({} + {}) ≈ Φ({} + {})", a, b, b, a));
+                        symmetric_evidence.push(format!("Φ({a} + {b}) ≈ Φ({b} + {a})"));
                     }
                 }
             }

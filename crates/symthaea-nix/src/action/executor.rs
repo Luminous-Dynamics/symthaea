@@ -209,7 +209,7 @@ impl NixOSCommand {
             Self::EnvInstall { packages } => {
                 let mut args = vec!["-iA".to_string()];
                 for pkg in packages {
-                    args.push(format!("nixpkgs.{}", pkg));
+                    args.push(format!("nixpkgs.{pkg}"));
                 }
                 ("nix-env".to_string(), args)
             }
@@ -282,7 +282,7 @@ impl NixOSCommand {
                 let mut args = vec!["-d".to_string()];
                 if let Some(days) = older_than_days {
                     args.push("--delete-older-than".to_string());
-                    args.push(format!("{}d", days));
+                    args.push(format!("{days}d"));
                 }
                 if *delete_all {
                     args.push("--delete-old".to_string());

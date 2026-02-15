@@ -776,7 +776,7 @@ impl ReactorDesigner {
         // Flowing Pb-Li eutectic with dissolved deuterium
         let trigger = self.trigger_library.systems.iter()
             .find(|s| s.method == ExtendedTriggerMethod::ElectronBeam)
-            .unwrap()
+            .expect("trigger library must contain ElectronBeam system")
             .clone();
 
         let core_volume = params.target_power_w / 30_000.0; // Lower power density for flowing
@@ -857,7 +857,7 @@ impl ReactorDesigner {
         // Use piezo phonon + laser for multi-mode trigger
         let trigger = self.trigger_library.systems.iter()
             .find(|s| s.method == ExtendedTriggerMethod::LaserBremsstrahlung)
-            .unwrap()
+            .expect("trigger library must contain LaserBremsstrahlung system")
             .clone();
 
         let fuel = FuelSystem {
@@ -941,7 +941,7 @@ impl ReactorDesigner {
     fn design_electrolysis(&self, params: &ReactorDesignParams) -> ReactorSpec {
         let trigger = self.trigger_library.systems.iter()
             .find(|s| s.method == ExtendedTriggerMethod::PulsedElectrolysis)
-            .unwrap()
+            .expect("trigger library must contain PulsedElectrolysis system")
             .clone();
 
         let fuel = FuelSystem {
@@ -1013,7 +1013,7 @@ impl ReactorDesigner {
     fn design_molten_salt(&self, params: &ReactorDesignParams) -> ReactorSpec {
         let trigger = self.trigger_library.systems.iter()
             .find(|s| s.method == ExtendedTriggerMethod::CompactXRay)
-            .unwrap()
+            .expect("trigger library must contain CompactXRay system")
             .clone();
 
         let fuel = FuelSystem {
@@ -1093,7 +1093,7 @@ impl ReactorDesigner {
 
         let trigger = self.trigger_library.systems.iter()
             .find(|s| s.method == ExtendedTriggerMethod::PiezoPhonon)
-            .unwrap()
+            .expect("trigger library must contain PiezoPhonon system")
             .clone();
 
         let fuel = FuelSystem {
@@ -1179,7 +1179,7 @@ impl ReactorDesigner {
         // MTF uses magnetic compression of plasma target
         let trigger = self.trigger_library.systems.iter()
             .find(|s| s.method == ExtendedTriggerMethod::LaserBremsstrahlung)
-            .unwrap()
+            .expect("trigger library must contain LaserBremsstrahlung system")
             .clone();
 
         let fuel = FuelSystem {

@@ -354,10 +354,10 @@ impl PseudonymousId {
         use rand::RngCore;
         let mut bytes = [0u8; 16];
         rand::rngs::OsRng.fill_bytes(&mut bytes);
-        let hex: String = bytes.iter().map(|b| format!("{:02x}", b)).collect();
+        let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
 
         Self {
-            id: format!("pseudo_{}", hex),
+            id: format!("pseudo_{hex}"),
             session_bound: true,
         }
     }
@@ -445,7 +445,7 @@ impl DarkSpotDHT {
         // 5. Create Bulletproofs-style EIG range proof
         // Proves 0 ≤ EIG ≤ 1 without revealing exact value
         let eig_range_proof = ZKEIGRangeProof::create(eig)
-            .ok_or_else(|| GISError::CryptoError(format!("EIG {} out of range [0, 1]", eig)))?;
+            .ok_or_else(|| GISError::CryptoError(format!("EIG {eig} out of range [0, 1]")))?;
 
         // 6. Generate nonce for uniqueness
         let mut nonce = [0u8; 16];
@@ -456,7 +456,7 @@ impl DarkSpotDHT {
         nonce[..16].copy_from_slice(&now.to_le_bytes());
 
         // 7. Generate unique ID
-        let id = format!("zk_{}_{:016x}", category, now);
+        let id = format!("zk_{category}_{now:016x}");
 
         Ok(ZKIgnoranceSignature {
             id,

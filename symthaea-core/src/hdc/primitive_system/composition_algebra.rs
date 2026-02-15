@@ -375,9 +375,9 @@ pub enum CompositionAlgebraError {
 impl std::fmt::Display for CompositionAlgebraError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CompositionAlgebraError::NotFound(name) => write!(f, "not found: {}", name),
-            CompositionAlgebraError::InvalidName(msg) => write!(f, "invalid name: {}", msg),
-            CompositionAlgebraError::ParseError(msg) => write!(f, "parse error: {}", msg),
+            CompositionAlgebraError::NotFound(name) => write!(f, "not found: {name}"),
+            CompositionAlgebraError::InvalidName(msg) => write!(f, "invalid name: {msg}"),
+            CompositionAlgebraError::ParseError(msg) => write!(f, "parse error: {msg}"),
         }
     }
 }

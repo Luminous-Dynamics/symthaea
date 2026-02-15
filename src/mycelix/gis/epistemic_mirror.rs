@@ -262,7 +262,7 @@ impl EpistemicMirror {
                 }
             } else {
                 CalibrationDiagnosis::Miscalibrated {
-                    details: format!("ECE: {:.3}, Brier: {:.3}", ece, brier),
+                    details: format!("ECE: {ece:.3}, Brier: {brier:.3}"),
                 }
             }
         } else {

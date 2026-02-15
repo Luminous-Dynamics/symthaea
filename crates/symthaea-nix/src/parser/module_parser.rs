@@ -173,7 +173,7 @@ impl ModuleParser {
     /// Extract a field value from a raw mkOption string.
     fn extract_field(raw: &str, field: &str) -> Option<String> {
         // Simple heuristic: look for `field = value;`
-        let pattern = format!("{} = ", field);
+        let pattern = format!("{field} = ");
         if let Some(start) = raw.find(&pattern) {
             let after = &raw[start + pattern.len()..];
             // Find the semicolon that ends this field

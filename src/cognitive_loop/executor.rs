@@ -96,8 +96,8 @@ impl CommandExecutor for CognitiveLoopExecutor {
 
         ValidationResult {
             valid: true,
-            safety_level: format!("{:?}", safety_level),
-            preview: Some(format!("Would execute: {}", command)),
+            safety_level: format!("{safety_level:?}"),
+            preview: Some(format!("Would execute: {command}")),
             warnings,
         }
     }

@@ -268,11 +268,11 @@ impl HdcLtcUnifiedNeuron {
         let dim = config.dimension;
         Self {
             state: ContinuousHV::zero(dim),
-            weight_hv: genesis.hv(&format!("{}::weight_hv", label), dim),
-            input_mask: genesis.hv(&format!("{}::input_mask", label), dim),
-            tau_modulator: genesis.hv(&format!("{}::tau_modulator", label), dim),
-            gate_weight: genesis.hv(&format!("{}::gate_weight", label), dim),
-            gate_bias: genesis.hv(&format!("{}::gate_bias", label), dim).scale(0.1),
+            weight_hv: genesis.hv(&format!("{label}::weight_hv"), dim),
+            input_mask: genesis.hv(&format!("{label}::input_mask"), dim),
+            tau_modulator: genesis.hv(&format!("{label}::tau_modulator"), dim),
+            gate_weight: genesis.hv(&format!("{label}::gate_weight"), dim),
+            gate_bias: genesis.hv(&format!("{label}::gate_bias"), dim).scale(0.1),
             weight_momentum: ContinuousHV::zero(dim),
             input_momentum: ContinuousHV::zero(dim),
             running_mean: 0.0,
@@ -1133,7 +1133,7 @@ impl HdcLtcUnifiedNetwork {
         for (l, &layer_size) in config.layer_sizes.iter().enumerate() {
             let layer: Vec<HdcLtcUnifiedNeuron> = (0..layer_size)
                 .map(|n| {
-                    let label = format!("layer_{}::neuron_{}", l, n);
+                    let label = format!("layer_{l}::neuron_{n}");
                     HdcLtcUnifiedNeuron::from_genesis(config.neuron_config.clone(), genesis, &label)
                 })
                 .collect();
@@ -1142,7 +1142,7 @@ impl HdcLtcUnifiedNetwork {
 
         let dim = config.neuron_config.dimension;
         let layer_bindings: Vec<ContinuousHV> = (0..config.layer_sizes.len())
-            .map(|l| genesis.hv(&format!("layer_binding_{}", l), dim))
+            .map(|l| genesis.hv(&format!("layer_binding_{l}"), dim))
             .collect();
 
         let layer_outputs = config

@@ -148,7 +148,7 @@ impl FlakeUpdater {
                                 .and_then(|o| o.get("repo"))
                                 .and_then(|r| r.as_str())
                                 .unwrap_or("");
-                            format!("github:{}/{}", owner, repo)
+                            format!("github:{owner}/{repo}")
                         } else {
                             v.as_str().unwrap_or("").to_string()
                         }
@@ -167,7 +167,7 @@ impl FlakeUpdater {
                         // Format timestamp
                         let duration = std::time::Duration::from_secs(ts);
                         let datetime = std::time::UNIX_EPOCH + duration;
-                        format!("{:?}", datetime)
+                        format!("{datetime:?}")
                     });
 
                 let input = FlakeInput {
@@ -442,10 +442,10 @@ impl std::fmt::Display for FlakeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::NoLockFile => write!(f, "No flake.lock file found"),
-            Self::InputNotFound(n) => write!(f, "Input not found: {}", n),
-            Self::IoError(e) => write!(f, "IO error: {}", e),
-            Self::ParseError(e) => write!(f, "Parse error: {}", e),
-            Self::CommandFailed(e) => write!(f, "Command failed: {}", e),
+            Self::InputNotFound(n) => write!(f, "Input not found: {n}"),
+            Self::IoError(e) => write!(f, "IO error: {e}"),
+            Self::ParseError(e) => write!(f, "Parse error: {e}"),
+            Self::CommandFailed(e) => write!(f, "Command failed: {e}"),
         }
     }
 }

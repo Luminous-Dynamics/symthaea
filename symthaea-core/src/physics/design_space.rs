@@ -231,7 +231,7 @@ impl DesignSpaceMapper {
                 param_value: cost_per_kw,
                 feasible: result.feasible,
                 metric_value: cost_per_kw,
-                notes: format!("${:.0}/kW", cost_per_kw),
+                notes: format!("${cost_per_kw:.0}/kW"),
             });
 
             if result.feasible {
@@ -343,7 +343,7 @@ impl DesignSpaceMapper {
 
             // Y-axis label
             if row == 0 || row == height / 2 || row == height - 1 {
-                output.push_str(&format!("{:>7.0} │", y_val));
+                output.push_str(&format!("{y_val:>7.0} │"));
             } else {
                 output.push_str(&format!("{:>7} │", ""));
             }

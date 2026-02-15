@@ -72,23 +72,22 @@ impl fmt::Display for HandshakeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnexpectedMessageType { expected, actual } => {
-                write!(f, "Expected {} message, got {}", expected, actual)
+                write!(f, "Expected {expected} message, got {actual}")
             }
             Self::ChallengeExtractionFailed { reason } => {
-                write!(f, "Failed to extract challenge: {}", reason)
+                write!(f, "Failed to extract challenge: {reason}")
             }
             Self::ResponseExtractionFailed { reason } => {
-                write!(f, "Failed to extract response: {}", reason)
+                write!(f, "Failed to extract response: {reason}")
             }
             Self::InvalidState { expected, actual } => {
                 write!(
                     f,
-                    "Invalid handshake state: expected {}, got {}",
-                    expected, actual
+                    "Invalid handshake state: expected {expected}, got {actual}"
                 )
             }
             Self::ProtocolViolation { message } => {
-                write!(f, "Handshake protocol violation: {}", message)
+                write!(f, "Handshake protocol violation: {message}")
             }
         }
     }

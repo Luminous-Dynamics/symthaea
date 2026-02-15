@@ -434,8 +434,7 @@ impl DomainPlugin for MathPlugin {
         let close_parens = input.matches(')').count();
         if open_parens != close_parens {
             errors.push(format!(
-                "Mismatched parentheses: {} opening vs {} closing",
-                open_parens, close_parens
+                "Mismatched parentheses: {open_parens} opening vs {close_parens} closing"
             ));
             suggestions.push("Check that every '(' has a matching ')'".to_string());
         }
@@ -628,7 +627,7 @@ impl DomainPlugin for MathPlugin {
         if lower.contains("derivative") {
             if let Some((poly_str, deriv_str)) = Self::compute_derivative_from_text(&lower) {
                 return Some(ComputedResult {
-                    answer: format!("d/dx [{}] = {}", poly_str, deriv_str),
+                    answer: format!("d/dx [{poly_str}] = {deriv_str}"),
                     cube: math_cube,
                     phi: 0.0,
                     proof_available: false,
@@ -652,7 +651,7 @@ impl MathPlugin {
             let exp_str: String = after.chars().take_while(|c| c.is_ascii_digit()).collect();
             if let Ok(exp) = exp_str.parse::<u32>() {
                 if exp > 0 && exp <= 20 {
-                    let original = format!("x^{}", exp);
+                    let original = format!("x^{exp}");
                     let derivative = if exp == 1 {
                         "1".to_string()
                     } else if exp == 2 {

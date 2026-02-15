@@ -578,13 +578,12 @@ impl MinimalPhiValidation {
             // DEBUG: Print cosine similarities for first sample
             if i == 0 {
                 println!(
-                    "   🔍 DEBUG: Cosine similarities for first {} topology:",
-                    topology_type
+                    "   🔍 DEBUG: Cosine similarities for first {topology_type} topology:"
                 );
                 for node_i in 0..components.len().min(5) {
                     for node_j in (node_i + 1)..components.len().min(5) {
                         let sim = components[node_i].similarity(&components[node_j]);
-                        println!("      Node {} ↔ Node {}: {:.4}", node_i, node_j, sim);
+                        println!("      Node {node_i} ↔ Node {node_j}: {sim:.4}");
                     }
                 }
                 println!();
@@ -596,7 +595,7 @@ impl MinimalPhiValidation {
             // DEBUG: Print Φ value for each sample
             if i < 5 {
                 // First 5 samples only
-                println!("      Sample {}: Φ = {:.6}", i, phi);
+                println!("      Sample {i}: Φ = {phi:.6}");
             }
 
             phi_values.push(phi);
@@ -605,7 +604,7 @@ impl MinimalPhiValidation {
             if (i + 1) % 10 == 0 || i == n_samples - 1 {
                 print!("   Progress: {}/{} samples completed\r", i + 1, n_samples);
                 use std::io::{self, Write};
-                io::stdout().flush().unwrap();
+                let _ = io::stdout().flush();
             }
         }
 
@@ -650,8 +649,7 @@ impl MinimalPhiValidation {
             // DEBUG: Print Hamming distances for first sample
             if i == 0 {
                 println!(
-                    "   🔍 DEBUG: Hamming distances for first {} topology:",
-                    topology_type
+                    "   🔍 DEBUG: Hamming distances for first {topology_type} topology:"
                 );
                 for node_i in 0..components.len() {
                     for node_j in (node_i + 1)..components.len() {
@@ -674,7 +672,7 @@ impl MinimalPhiValidation {
             // DEBUG: Print Φ value for each sample
             if i < 5 {
                 // First 5 samples only
-                println!("      Sample {}: Φ = {:.6}", i, phi);
+                println!("      Sample {i}: Φ = {phi:.6}");
             }
 
             phi_values.push(phi);
@@ -683,7 +681,7 @@ impl MinimalPhiValidation {
             if (i + 1) % 10 == 0 || i == n_samples - 1 {
                 print!("   Progress: {}/{} samples completed\r", i + 1, n_samples);
                 use std::io::{self, Write};
-                io::stdout().flush().unwrap();
+                let _ = io::stdout().flush();
             }
         }
 

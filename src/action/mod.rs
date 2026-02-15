@@ -755,7 +755,7 @@ impl SimpleExecutor {
 /// This provides NixOS-aware classification that goes beyond simple pattern matching.
 pub fn classify_command_destructiveness(program: &str, args: &[String]) -> DestructivenessLevel {
     let args_str = args.join(" ");
-    let full_cmd = format!("{} {}", program, args_str);
+    let full_cmd = format!("{program} {args_str}");
 
     // Destructive commands (no rollback possible)
     let destructive_patterns = [
@@ -892,7 +892,7 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
     if program.contains("nix-env") && (args_str.contains("-i") || args_str.contains("--install")) {
         // Extract package name from args
         let pkg = args.last().map(|s| s.as_str()).unwrap_or("PACKAGE");
-        return Some(format!("nix-env -e {}", pkg));
+        return Some(format!("nix-env -e {pkg}"));
     }
 
     if program.contains("nix") && args_str.contains("profile install") {
@@ -902,11 +902,11 @@ pub fn get_rollback_hint(program: &str, args: &[String]) -> Option<String> {
     if program.contains("systemctl") {
         if args_str.contains("stop") {
             let service = args.last().map(|s| s.as_str()).unwrap_or("SERVICE");
-            return Some(format!("systemctl start {}", service));
+            return Some(format!("systemctl start {service}"));
         }
         if args_str.contains("disable") {
             let service = args.last().map(|s| s.as_str()).unwrap_or("SERVICE");
-            return Some(format!("systemctl enable {}", service));
+            return Some(format!("systemctl enable {service}"));
         }
     }
 

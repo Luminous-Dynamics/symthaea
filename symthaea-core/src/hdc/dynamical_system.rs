@@ -1027,7 +1027,7 @@ pub fn state_to_hv(state: &[f64]) -> ContinuousHV {
     let mut values = vec![0.0f32; dim];
 
     for (idx, &val) in state.iter().enumerate() {
-        let seed = seed_from_name(&format!("dynstate::{}", idx));
+        let seed = seed_from_name(&format!("dynstate::{idx}"));
         let basis = ContinuousHV::random(dim, seed);
         let weight = val as f32;
         for (v, b) in values.iter_mut().zip(basis.values.iter()) {

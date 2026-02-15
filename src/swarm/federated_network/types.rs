@@ -263,8 +263,8 @@ pub enum NodeAddress {
 impl std::fmt::Display for NodeAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Socket(addr) => write!(f, "tcp://{}", addr),
-            Self::Channel(id) => write!(f, "channel://{}", id),
+            Self::Socket(addr) => write!(f, "tcp://{addr}"),
+            Self::Channel(id) => write!(f, "channel://{id}"),
             Self::Unassigned => write!(f, "unassigned"),
         }
     }
@@ -362,28 +362,28 @@ impl std::fmt::Display for NetworkError {
                 operation,
                 timeout_ms,
             } => {
-                write!(f, "Timeout after {}ms: {}", timeout_ms, operation)
+                write!(f, "Timeout after {timeout_ms}ms: {operation}")
             }
             Self::ConnectionFailed { target, reason } => {
-                write!(f, "Connection to {} failed: {}", target, reason)
+                write!(f, "Connection to {target} failed: {reason}")
             }
             Self::ChannelClosed { reason } => {
-                write!(f, "Channel closed: {}", reason)
+                write!(f, "Channel closed: {reason}")
             }
             Self::SendFailed { reason } => {
-                write!(f, "Send failed: {}", reason)
+                write!(f, "Send failed: {reason}")
             }
             Self::ReceiveFailed { reason } => {
-                write!(f, "Receive failed: {}", reason)
+                write!(f, "Receive failed: {reason}")
             }
             Self::NodeNotFound { node_id } => {
-                write!(f, "Node not found: {}", node_id)
+                write!(f, "Node not found: {node_id}")
             }
             Self::Serialization { reason } => {
-                write!(f, "Serialization error: {}", reason)
+                write!(f, "Serialization error: {reason}")
             }
             Self::Internal { reason } => {
-                write!(f, "Internal error: {}", reason)
+                write!(f, "Internal error: {reason}")
             }
         }
     }

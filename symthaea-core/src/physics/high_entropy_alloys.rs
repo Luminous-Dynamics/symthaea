@@ -585,7 +585,7 @@ impl HEADesigner {
 
         self.compose_alloy(
             genesis,
-            &format!("Generated ({})", composition_str),
+            &format!("Generated ({composition_str})"),
             &top_5,
             CrystalStructure::BCC, // BCC preferred for radiation resistance
         )
@@ -642,7 +642,7 @@ pub fn multi_seed_hea_search(
     let mut all_results: HashMap<String, Vec<(HEASearchResult, usize)>> = HashMap::new();
 
     for seed_idx in 0..n_seeds {
-        let phrase = format!("{} seed {}", base_phrase, seed_idx);
+        let phrase = format!("{base_phrase} seed {seed_idx}");
         let genesis = GenesisSeed::from_phrase(&phrase);
 
         let designer = HEADesigner::from_genesis(&genesis);

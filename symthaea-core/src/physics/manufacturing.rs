@@ -811,7 +811,7 @@ impl ManufacturingEngine {
             println!("│  ⚠ COMPATIBILITY ISSUES                                           │");
             println!("│  ─────────────────────────────────────────────────────────────     │");
             for issue in &assessment.compatibility_issues {
-                println!("│  • {}  │", issue);
+                println!("│  • {issue}  │");
             }
         }
 
@@ -847,7 +847,7 @@ impl ManufacturingEngine {
             println!("│  RECOMMENDATIONS                                                   │");
             println!("│  ─────────────────────────────────────────────────────────────     │");
             for rec in &assessment.recommendations {
-                println!("│  • {}  │", rec);
+                println!("│  • {rec}  │");
             }
         }
 

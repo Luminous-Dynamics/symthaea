@@ -394,7 +394,7 @@ impl SelfImprovementSystem {
                 priority: 0.7,
                 expected_phi_gain: 0.1,
                 confidence: 0.7,
-                reason: format!("Φ declining (trend: {:.3}). Increase focus.", phi_trend),
+                reason: format!("Φ declining (trend: {phi_trend:.3}). Increase focus."),
             });
         }
 

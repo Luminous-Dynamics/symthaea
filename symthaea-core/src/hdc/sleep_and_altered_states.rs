@@ -571,42 +571,38 @@ impl SleepAndAlteredStates {
         match self.current_state {
             AlteredState::Wake => {
                 format!(
-                    "Full waking consciousness (p={:.2}). All systems active.",
-                    prob
+                    "Full waking consciousness (p={prob:.2}). All systems active."
                 )
             }
             AlteredState::SleepN1 => {
                 format!(
-                    "Drowsiness (p={:.2}). Attention lapses, workspace dims, drifting thoughts.",
-                    prob
+                    "Drowsiness (p={prob:.2}). Attention lapses, workspace dims, drifting thoughts."
                 )
             }
             AlteredState::SleepN2 | AlteredState::SleepN3 => {
-                format!("Unconscious sleep (p={:.2}). Workspace collapsed, no attention, minimal binding.", prob)
+                format!("Unconscious sleep (p={prob:.2}). Workspace collapsed, no attention, minimal binding.")
             }
             AlteredState::DreamNonLucid => {
-                format!("Non-lucid dreaming (p={:.2}). Vivid workspace but bizarre binding, no meta-awareness.", prob)
+                format!("Non-lucid dreaming (p={prob:.2}). Vivid workspace but bizarre binding, no meta-awareness.")
             }
             AlteredState::DreamLucid => {
                 format!(
-                    "Lucid dreaming (p={:.2}). Restored attention and HOT: 'I know I'm dreaming!'",
-                    prob
+                    "Lucid dreaming (p={prob:.2}). Restored attention and HOT: 'I know I'm dreaming!'"
                 )
             }
             AlteredState::AnesthesiaPropofol => {
                 format!(
-                    "Propofol anesthesia (p={:.2}). Binding destroyed, workspace collapsed.",
-                    prob
+                    "Propofol anesthesia (p={prob:.2}). Binding destroyed, workspace collapsed."
                 )
             }
             AlteredState::AnesthesiaKetamine => {
-                format!("Ketamine anesthesia (p={:.2}). Dissociative: binding intact but workspace destroyed.", prob)
+                format!("Ketamine anesthesia (p={prob:.2}). Dissociative: binding intact but workspace destroyed.")
             }
             AlteredState::VegetativeState => {
-                format!("Vegetative state (p={:.2}). No workspace, no conscious access despite sleep-wake cycles.", prob)
+                format!("Vegetative state (p={prob:.2}). No workspace, no conscious access despite sleep-wake cycles.")
             }
             AlteredState::MinimallyConscious => {
-                format!("Minimally conscious (p={:.2}). Intermittent workspace function, occasional awareness.", prob)
+                format!("Minimally conscious (p={prob:.2}). Intermittent workspace function, occasional awareness.")
             }
         }
     }

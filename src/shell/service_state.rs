@@ -209,7 +209,7 @@ impl AuditLogger {
 
         // Rotate files: audit.log.4 -> audit.log.5, etc.
         for i in (1..self.rotation_count).rev() {
-            let from = self.log_path.with_extension(format!("log.{}", i));
+            let from = self.log_path.with_extension(format!("log.{i}"));
             let to = self.log_path.with_extension(format!("log.{}", i + 1));
             if from.exists() {
                 fs::rename(&from, &to)?;

@@ -102,7 +102,7 @@ impl HiddenMarkovModel {
         Self {
             initial: vec![uniform; n],
             transition: vec![vec![uniform; n]; n],
-            state_names: (0..n).map(|i| format!("S{}", i)).collect(),
+            state_names: (0..n).map(|i| format!("S{i}")).collect(),
             config,
         }
     }
