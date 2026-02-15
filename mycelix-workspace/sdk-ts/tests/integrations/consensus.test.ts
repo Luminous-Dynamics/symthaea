@@ -820,7 +820,8 @@ describe('ConsensusService', () => {
       });
 
       const result = service.checkConsensus('many-options');
-      expect(Object.keys(result.optionBreakdown)).toHaveLength(0);
+      // All 8 options appear in breakdown even with no votes
+      expect(Object.keys(result.optionBreakdown)).toHaveLength(8);
     });
 
     it('should handle zero conviction', () => {
