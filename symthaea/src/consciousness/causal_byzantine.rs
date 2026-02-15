@@ -611,6 +611,7 @@ impl CausalByzantineDefense {
         };
 
         if patterns.is_empty() {
+            self.stats.interventions_recommended += 1;
             return Ok(InterventionPlan {
                 id: "NO_PATTERNS".to_string(),
                 parameter: "None".to_string(),
@@ -803,9 +804,12 @@ impl CausalByzantineDefense {
     }
 
     fn extract_number(text: &str) -> Option<f64> {
-        // Simple number extraction from text
+        // Simple number extraction from text — strip trailing punctuation
         text.split_whitespace()
-            .find_map(|word| word.parse::<f64>().ok())
+            .find_map(|word| {
+                let trimmed = word.trim_end_matches(|c: char| !c.is_ascii_digit() && c != '.');
+                trimmed.parse::<f64>().ok()
+            })
     }
 
     /// Get causal statistics

@@ -1016,21 +1016,22 @@ impl IntrinsicMotivationSystem {
     /// This creates a single BinaryHV that represents the current motivational state
     /// by bundling all drive encodings weighted by their tension.
     pub fn motivation_encoding(&self) -> BinaryHV {
-        let mut combined = BinaryHV::zero();
-        let mut _total_weight = 0.0;
+        let mut encodings = Vec::new();
 
         for (drive_type, drive_state) in &self.drives {
             if let Some(grounding) = self.primitive_groundings.get(drive_type) {
                 let weight = drive_state.tension * drive_state.importance;
                 if weight > 0.01 {
-                    // Bundle with weight (approximate via repeated bundling)
-                    combined = BinaryHV::bundle(&[combined, grounding.primitive_encoding.clone()]);
-                    _total_weight += weight;
+                    encodings.push(grounding.primitive_encoding.clone());
                 }
             }
         }
 
-        combined
+        if encodings.is_empty() {
+            BinaryHV::zero()
+        } else {
+            BinaryHV::bundle(&encodings)
+        }
     }
 
     /// Get primitive-grounded tension for a specific drive
