@@ -91,8 +91,9 @@ pub mod temporal_planning;
 
 // Counterfactual reasoning v0: backdoor/frontdoor identification,
 // HDC graph surgery, semantic role substitution, reference harness
+// (extracted to symthaea-causal-reasoning crate)
 #[cfg(feature = "counterfactual")]
-pub mod counterfactual;
+pub use symthaea_causal_reasoning::counterfactual;
 
 // Unified Conscious Reasoning Engine: composes conflict detection, temporal
 // planning, counterfactual reasoning, and tool gating into a 7-step cycle
@@ -440,8 +441,9 @@ pub mod temporal_primitives;
 pub mod primitive_validation;
 
 // ── Tier 3: Consciousness Integration ──────────────────────────────────────
-pub mod causal_calculus;
-pub mod causal_emergence;
+// causal_calculus and causal_emergence extracted to symthaea-causal-reasoning crate
+pub use symthaea_causal_reasoning::causal_calculus;
+pub use symthaea_causal_reasoning::causal_emergence;
 pub mod compositionality_primitives;
 pub mod consciousness_signatures;
 pub mod factor_graph;
