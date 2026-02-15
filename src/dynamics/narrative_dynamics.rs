@@ -23,7 +23,9 @@ use ndarray::Array1;
 use symthaea_core::hdc::ContinuousHV;
 
 use super::hierarchical_cfc::{HierarchicalCfC, HierarchicalCfCConfig};
-use crate::hdc::narrative_algebra::{ArcPhase, NARRATIVE_DIM};
+use crate::hdc::narrative_algebra::{
+    ArcPhase, NarrativeAlgebra, NarrativeMood, TensionLevel, NARRATIVE_DIM,
+};
 
 // ============================================================================
 // Narrative Archetypes — deterministic HDC reference vectors
@@ -42,7 +44,49 @@ pub struct NarrativeArchetypes {
 }
 
 impl NarrativeArchetypes {
-    /// Create archetypes with deterministic seeds in the 13_000_000 range.
+    /// Create archetypes composed from narrative algebra primitives.
+    ///
+    /// Instead of random vectors (which have ~0 similarity to any scene),
+    /// these archetypes are built from the same primitives used to encode
+    /// scenes, so cosine similarity produces meaningful signal variation.
+    pub fn from_algebra(algebra: &NarrativeAlgebra) -> Self {
+        // High energy: stakes + tense mood + conflict (action-packed scenes)
+        let high_energy = ContinuousHV::bundle(&[
+            &algebra.primitives.stakes,
+            &algebra.encode_mood(NarrativeMood::Tense),
+            &algebra.primitives.conflict,
+        ]);
+
+        // Surprise: conflict + mysterious mood (unexpected twists)
+        let surprise = ContinuousHV::bundle(&[
+            &algebra.primitives.conflict,
+            &algebra.encode_mood(NarrativeMood::Mysterious),
+            &algebra.encode_tension(TensionLevel::Peak),
+        ]);
+
+        // Positive valence: hopeful + triumphant moods (uplifting scenes)
+        let positive_valence = ContinuousHV::bundle(&[
+            &algebra.encode_mood(NarrativeMood::Hopeful),
+            &algebra.encode_mood(NarrativeMood::Triumphant),
+            &algebra.encode_mood(NarrativeMood::Peaceful),
+        ]);
+
+        // High tension: peak tension + conflict + escalation operator
+        let high_tension = ContinuousHV::bundle(&[
+            &algebra.encode_tension(TensionLevel::Peak),
+            &algebra.primitives.conflict,
+            &algebra.operators.escalates,
+        ]);
+
+        Self {
+            high_energy,
+            surprise,
+            positive_valence,
+            high_tension,
+        }
+    }
+
+    /// Create archetypes with deterministic random seeds (fallback).
     pub fn new(dim: usize) -> Self {
         Self {
             high_energy: ContinuousHV::random(dim, 13_000_003),
@@ -145,6 +189,10 @@ pub struct StoryArcDynamics {
     archetypes: NarrativeArchetypes,
     /// Blend factor: alpha * CfC + (1-alpha) * HDC (default 0.3)
     hdc_blend_alpha: f32,
+    /// Whether to train the CfC online using HDC signal as target
+    online_learning: bool,
+    /// Learning rate for CfC online learning
+    online_lr: f32,
 }
 
 /// Maximum signal history length
@@ -192,7 +240,19 @@ impl StoryArcDynamics {
             prev_energy: 0.0,
             archetypes,
             hdc_blend_alpha: 0.3,
+            online_learning: true,
+            online_lr: 0.01,
         }
+    }
+
+    /// Create with semantic archetypes derived from the narrative algebra.
+    ///
+    /// This produces much better signal variation than random archetypes
+    /// because the archetype HVs share structure with scene HVs.
+    pub fn with_algebra(config: StoryArcConfig, algebra: &NarrativeAlgebra) -> Self {
+        let mut dynamics = Self::new(config);
+        dynamics.archetypes = NarrativeArchetypes::from_algebra(algebra);
+        dynamics
     }
 
     /// Create with default configuration.
@@ -292,16 +352,27 @@ impl StoryArcDynamics {
 
     /// Advance dynamics one step with hybrid HDC+CfC signal extraction.
     ///
-    /// Blends CfC temporal dynamics with instantaneous HDC archetype similarity:
-    /// `signal = alpha * cfc_value + (1 - alpha) * hdc_value`
+    /// Blends CfC temporal dynamics with instantaneous HDC archetype similarity,
+    /// applies mood-based signal offsets, and optionally trains the CfC online
+    /// using the HDC-derived signal as a target.
     ///
-    /// This ensures the Ghost Signal varies even when CfC weights are random,
-    /// because the HDC similarity captures scene-level differences directly.
+    /// `signal = alpha * cfc_value + (1 - alpha) * hdc_value + mood_offset`
     pub fn step_hybrid(
         &mut self,
         scene_input: &Array1<f32>,
         scene_hv: &ContinuousHV,
         dt: f32,
+    ) -> NarrativeSignal {
+        self.step_hybrid_with_mood(scene_input, scene_hv, dt, None)
+    }
+
+    /// Advance dynamics with explicit mood for signal bias.
+    pub fn step_hybrid_with_mood(
+        &mut self,
+        scene_input: &Array1<f32>,
+        scene_hv: &ContinuousHV,
+        dt: f32,
+        mood: Option<NarrativeMood>,
     ) -> NarrativeSignal {
         let output = self.cfc.forward_hierarchical(scene_input, dt);
         self.step_count += 1;
@@ -321,17 +392,37 @@ impl StoryArcDynamics {
         let hdc_tension = (scene_hv.similarity(&self.archetypes.high_tension) + 1.0) / 2.0;
         let hdc_valence = scene_hv.similarity(&self.archetypes.positive_valence); // [-1,1]
 
-        // Blend
-        let energy = (alpha * cfc_energy + one_minus_alpha * hdc_energy).clamp(0.0, 1.0);
-        let surprise = (alpha * cfc_surprise + one_minus_alpha * hdc_surprise).clamp(0.0, 1.0);
-        let tension = (alpha * cfc_tension + one_minus_alpha * hdc_tension).clamp(0.0, 1.0);
-        let valence = (alpha * cfc_valence + one_minus_alpha * hdc_valence).clamp(-1.0, 1.0);
+        // Blend HDC + CfC
+        let mut energy = alpha * cfc_energy + one_minus_alpha * hdc_energy;
+        let mut surprise = alpha * cfc_surprise + one_minus_alpha * hdc_surprise;
+        let mut tension = alpha * cfc_tension + one_minus_alpha * hdc_tension;
+        let mut valence = alpha * cfc_valence + one_minus_alpha * hdc_valence;
+
+        // Apply mood-based signal offsets (Fix #2)
+        if let Some(m) = mood {
+            let (de, ds, dt_, dv) = Self::mood_offsets(m);
+            energy += de;
+            surprise += ds;
+            tension += dt_;
+            valence += dv;
+        }
+
+        // Clamp to valid ranges
+        let energy = energy.clamp(0.0, 1.0);
+        let surprise = surprise.clamp(0.0, 1.0);
+        let tension = tension.clamp(0.0, 1.0);
+        let valence = valence.clamp(-1.0, 1.0);
 
         let momentum_raw = energy - self.prev_energy;
         self.prev_energy = energy;
         let momentum = momentum_raw.clamp(-1.0, 1.0);
 
         let arc_phase = Self::infer_arc_phase(tension, momentum, self.step_count);
+
+        // CfC online learning: use HDC-derived values as training targets (Fix #3)
+        if self.online_learning {
+            self.train_cfc_online(scene_input, hdc_energy, hdc_surprise, hdc_tension, hdc_valence, dt);
+        }
 
         let signal = NarrativeSignal {
             energy,
@@ -353,6 +444,64 @@ impl StoryArcDynamics {
     // ========================================================================
     // Internal helpers
     // ========================================================================
+
+    /// Mood-to-signal offsets: (energy, surprise, tension, valence).
+    ///
+    /// Each mood nudges the blended signal in a narratively appropriate direction.
+    fn mood_offsets(mood: NarrativeMood) -> (f32, f32, f32, f32) {
+        match mood {
+            //                         energy  surprise  tension  valence
+            NarrativeMood::Tense =>      ( 0.10,  0.05,    0.20,  -0.10),
+            NarrativeMood::Peaceful =>   (-0.10, -0.10,   -0.20,   0.15),
+            NarrativeMood::Mysterious => ( 0.00,  0.15,    0.10,   0.00),
+            NarrativeMood::Melancholy => (-0.05,  0.00,    0.05,  -0.20),
+            NarrativeMood::Triumphant => ( 0.15, -0.05,   -0.10,   0.25),
+            NarrativeMood::Hopeful =>    ( 0.05, -0.05,   -0.15,   0.20),
+        }
+    }
+
+    /// Train CfC toward HDC-derived signal values (online learning).
+    ///
+    /// Constructs per-layer target arrays from the HDC signal components and
+    /// runs one gradient step via `train_step_multiscale`. This lets the CfC
+    /// gradually learn narrative dynamics from accumulating scene data.
+    fn train_cfc_online(
+        &mut self,
+        scene_input: &Array1<f32>,
+        hdc_energy: f32,
+        hdc_surprise: f32,
+        hdc_tension: f32,
+        hdc_valence: f32,
+        dt: f32,
+    ) {
+        let hidden_dim = self.config.hidden_dim;
+        let lr = self.online_lr;
+
+        // Build per-layer targets: each layer's target is an Array1 where
+        // the first element encodes the layer's target signal value (inverse
+        // sigmoid for [0,1] fields, atanh for [-1,1] valence).
+        let inv_sigmoid = |x: f32| -> f32 {
+            let x = x.clamp(0.01, 0.99);
+            (x / (1.0 - x)).ln()
+        };
+
+        let targets: Vec<Array1<f32>> = vec![
+            Self::make_target(hidden_dim, inv_sigmoid(hdc_energy)),   // layer 0: energy
+            Self::make_target(hidden_dim, inv_sigmoid(hdc_surprise)), // layer 1: surprise
+            Self::make_target(hidden_dim, inv_sigmoid(hdc_tension)),  // layer 2: tension
+            Self::make_target(hidden_dim, hdc_valence.clamp(-0.99, 0.99).atanh()), // layer 3: valence
+        ];
+
+        // Ignore errors (training is best-effort)
+        let _ = self.cfc.train_step_multiscale(scene_input, &targets, dt, lr);
+    }
+
+    /// Build a target array: first element set to `value`, rest zero.
+    fn make_target(dim: usize, value: f32) -> Array1<f32> {
+        let mut target = Array1::zeros(dim);
+        target[0] = value;
+        target
+    }
 
     /// Apply narrative-specific output biases so the resting state isn't flat 0.5.
     fn apply_narrative_bias(cfc: &mut HierarchicalCfC, hidden_dim: usize) {

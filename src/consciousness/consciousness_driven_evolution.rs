@@ -210,7 +210,7 @@ impl ConsciousnessOracle {
     /// Estimate Φ gradient with respect to a parameter perturbation
     pub fn estimate_phi_gradient(&mut self, parameter_delta: f64) -> f64 {
         // Get current Φ
-        let phi_current = self.stats.current_phi_ema;
+        let _phi_current = self.stats.current_phi_ema;
 
         // Simulate Φ change based on parameter delta
         // In a full implementation, this would actually perturb the LTC parameters
@@ -308,7 +308,7 @@ pub struct ConsciousnessDrivenEvolver {
     optimizer: RecursiveOptimizer,
 
     /// Gradient optimizer for continuous improvement
-    gradient_optimizer: ConsciousnessGradientOptimizer,
+    _gradient_optimizer: ConsciousnessGradientOptimizer,
 
     /// Architectural genome (parameters being evolved)
     genome: ArchitecturalGenome,
@@ -513,7 +513,7 @@ impl ConsciousnessDrivenEvolver {
         Self {
             oracle: ConsciousnessOracle::new(OracleConfig::default()),
             optimizer: RecursiveOptimizer::new(OptimizerConfig::default()),
-            gradient_optimizer: ConsciousnessGradientOptimizer::new(
+            _gradient_optimizer: ConsciousnessGradientOptimizer::new(
                 GradientOptimizerConfig::default(),
             ),
             genome: ArchitecturalGenome::default(),
@@ -614,8 +614,8 @@ impl ConsciousnessDrivenEvolver {
             let oracle_stats = self.oracle.stats();
             if oracle_stats.current_phi_ema < 0.3 {
                 bottlenecks.push(PhiBottleneck {
-                    component: "coherence".to_string(),
-                    severity: 0.3 - oracle_stats.current_phi_ema,
+                    _component: "coherence".to_string(),
+                    _severity: 0.3 - oracle_stats.current_phi_ema,
                     suggested_genes: vec!["ltc_coupling_strength", "coherence_weight"],
                 });
             }
@@ -623,8 +623,8 @@ impl ConsciousnessDrivenEvolver {
             // Check trend
             if oracle_stats.phi_trend < 0.0 {
                 bottlenecks.push(PhiBottleneck {
-                    component: "trend".to_string(),
-                    severity: oracle_stats.phi_trend.abs(),
+                    _component: "trend".to_string(),
+                    _severity: oracle_stats.phi_trend.abs(),
                     suggested_genes: vec!["ltc_time_constant", "integration_threshold"],
                 });
             }
@@ -632,8 +632,8 @@ impl ConsciousnessDrivenEvolver {
             // Check if Φ is stagnant
             if oracle_stats.phi_trend.abs() < 0.001 && self.stats.total_cycles > 10 {
                 bottlenecks.push(PhiBottleneck {
-                    component: "stagnation".to_string(),
-                    severity: 0.5,
+                    _component: "stagnation".to_string(),
+                    _severity: 0.5,
                     suggested_genes: vec!["mutation_rate", "selection_pressure"],
                 });
             }
@@ -701,12 +701,12 @@ impl ConsciousnessDrivenEvolver {
         // based on the genome values. For now, we simulate the effect.
 
         // Example: Update time constant
-        if let Some(gene) = self.genome.genes.get("ltc_time_constant") {
+        if let Some(_gene) = self.genome.genes.get("ltc_time_constant") {
             // self.oracle.ltc_mut().set_time_constant(gene.value as f32);
         }
 
         // Example: Update coupling strength
-        if let Some(gene) = self.genome.genes.get("ltc_coupling_strength") {
+        if let Some(_gene) = self.genome.genes.get("ltc_coupling_strength") {
             // self.oracle.ltc_mut().set_coupling(gene.value as f32);
         }
     }
@@ -791,10 +791,10 @@ impl ConsciousnessDrivenEvolver {
 #[derive(Debug, Clone)]
 struct PhiBottleneck {
     /// Which component is bottlenecked
-    component: String,
+    _component: String,
 
     /// Severity (0.0 - 1.0)
-    severity: f64,
+    _severity: f64,
 
     /// Genes that might help
     suggested_genes: Vec<&'static str>,
@@ -833,7 +833,7 @@ mod tests {
     #[test]
     fn test_gene_mutation() {
         let mut gene = Gene::new(0.5, 0.0, 1.0);
-        let original = gene.value;
+        let _original = gene.value;
         gene.mutate(1.0);
 
         // Value should have changed (with high probability)

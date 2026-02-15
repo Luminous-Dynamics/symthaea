@@ -50,7 +50,7 @@ pub struct SafeExperiment {
     config: ExperimentConfig,
 
     /// Created at
-    created_at: Instant,
+    _created_at: Instant,
 }
 
 /// System snapshot capturing current state
@@ -255,7 +255,7 @@ impl SafeExperiment {
             status: ExperimentStatus::Pending,
             validation_runs: Vec::new(),
             config,
-            created_at: Instant::now(),
+            _created_at: Instant::now(),
         }
     }
 

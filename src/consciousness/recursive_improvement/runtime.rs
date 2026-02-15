@@ -58,10 +58,9 @@ use tokio::sync::mpsc;
 use tokio::time::interval;
 
 use super::{
-    ActiveInferenceBridge, ActiveInferenceBridgeConfig, BrierScoreTracker, CalibrationQuality,
+    ActiveInferenceBridge, ActiveInferenceBridgeConfig, CalibrationQuality,
     ConstraintGate, ConstraintGateConfig, DryRunReason, ExecutionMode, MagiPersistentModel,
-    OutcomeCategory, PersistenceConfig, PredictionDomain, SupervisionReason,
-    WorldGroundedSelfModel, WorldPrediction,
+    OutcomeCategory, PersistenceConfig, PredictionDomain, SupervisionReason, WorldPrediction,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -280,7 +279,7 @@ pub struct MagiLoopRuntime {
     bridge: Arc<Mutex<ActiveInferenceBridge>>,
 
     /// Constraint gate for safety
-    gate: Arc<Mutex<ConstraintGate>>,
+    _gate: Arc<Mutex<ConstraintGate>>,
 
     /// Current runtime state
     state: Arc<RwLock<RuntimeState>>,
@@ -343,7 +342,7 @@ impl MagiLoopRuntime {
             config,
             model: Arc::new(Mutex::new(model)),
             bridge: Arc::new(Mutex::new(bridge)),
-            gate: Arc::new(Mutex::new(gate)),
+            _gate: Arc::new(Mutex::new(gate)),
             state: Arc::new(RwLock::new(RuntimeState::Initializing)),
             tick_count: Arc::new(AtomicU64::new(0)),
             running: Arc::new(AtomicBool::new(false)),

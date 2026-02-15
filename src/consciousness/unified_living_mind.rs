@@ -63,7 +63,7 @@ use std::collections::VecDeque;
 use std::time::Instant;
 
 use super::autopoietic_consciousness::{AutopoieticConsciousness, LifeState};
-use super::enactive_cognition::{ActionType, EnactiveCognition, EnactiveState, MeaningCategory};
+use super::enactive_cognition::{ActionType, EnactiveCognition, EnactiveState};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VITALITY DYNAMICS - The core of living cognition

@@ -131,7 +131,7 @@ pub struct MetaOptimizer {
     /// Population of hyperparameter variants (for evolutionary approach)
     population: Vec<OptimizationHyperparameters>,
     /// Population size
-    population_size: usize,
+    _population_size: usize,
     /// Mutation rate
     mutation_rate: f64,
     /// Random state
@@ -156,7 +156,7 @@ impl MetaOptimizer {
             best_hyperparameters: OptimizationHyperparameters::default(),
             best_efficiency: 0.0,
             population,
-            population_size,
+            _population_size: population_size,
             mutation_rate,
             rng_state,
         }
