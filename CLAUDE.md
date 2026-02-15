@@ -55,7 +55,7 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Cross-cluster bridge**: Commons↔Civic via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
 - **SDK TS clients**: `mycelix-workspace/sdk-ts/src/integrations/{commons,civic}/` (includes cross-cluster methods)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
-- **Tests**: 33 SDK TS cluster tests + 5,991 Rust unit tests (3,910 commons + 2,026 civic + 55 bridge-common)
+- **Tests**: 33 SDK TS cluster tests + 6,211 Rust unit tests (4,126 commons + 2,030 civic + 55 bridge-common)
 
 ---
 
