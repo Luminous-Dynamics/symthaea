@@ -394,7 +394,7 @@ Literature search (Google Scholar, Semantic Scholar, arXiv, February 2026) confi
 - **Deep active inference** [Fountas et al., 2020]: FEP + deep learning, but not HDC
 - **Structured world models** [Ha & Schmidhuber, 2018]: Use autoencoders/transformers, not HDC
 
-HAI uniquely occupies the intersection of all three: probabilistic inference (FEP), compositional representation (HDC), and temporal dynamics (CfC).
+HAI uniquely occupies the intersection of all three: probabilistic inference (FEP), compositional representation (HDC), and temporal dynamics (CfC). The architecture further extends to causal reasoning through a dedicated counterfactual module implementing HDC-native causal surgery (do-calculus interventions in hypervector space), causal discovery via DAG identification, and treatment effect estimation—enabling the system to reason about "what if" scenarios without leaving the HDC representation.
 
 ---
 
@@ -467,7 +467,7 @@ We developed a unified federated learning pipeline (`mycelix-fl-core`) that chai
 3. **Multi-signal Byzantine Detection** — Four-signal ensemble: magnitude anomaly (z-score), direction anomaly (cosine similarity to centroid), cross-validation (Krum-style neighbor distances), and coordinate-wise anomaly (per-dimension z-scores)
 4. **Hybrid BFT Trimming** — Reputation-weighted outlier scoring with configurable trim fraction
 5. **Reputation²-weighted Aggregation** — Final weighted mean where weights scale with the square of participant reputation
-6. **Plugin System** — Extensible hooks for external Byzantine analysis, compression, and verification
+6. **Plugin System** — Extensible hooks for external Byzantine analysis, compression, and verification. The `ConsciousnessAwareByzantinePlugin` maps per-participant Φ scores to weight adjustments: nodes below a veto threshold (Φ < 0.1) are excluded entirely, low-Φ nodes (< 0.3) are dampened (0.3× weight), and high-Φ nodes (> 0.6) are boosted (1.5× weight)
 
 **Table 5: Unified pipeline benchmark results (100-node network, 8 tests)**
 
@@ -593,7 +593,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
 5. **Compositional ethical reasoning:** A moral algebra system using HDC operators directly—without neural-symbolic translation—achieves 92.9% on the ETHICS benchmark (Commonsense 95.6%, Justice 92.4%, Deontology 91.0%, Virtue 92.8%), demonstrating that hypervector algebra supports compositional semantics for real-world reasoning tasks
 6. **Unified federated learning:** A consciousness-aware FL pipeline combining differential privacy, multi-signal Byzantine detection, reputation-weighted aggregation, and plugin extensibility—validated on real MNIST (67.4% accuracy, 20% Byzantine fully neutralized) with a 9-point Byzantine phase diagram showing three defense tiers
 
-HAI opens new directions for efficient, interpretable cognitive architectures that combine the theoretical rigor of active inference with the computational elegance of hyperdimensional computing.
+The full implementation spans ~338K lines of Rust across 3,200+ tests, with all benchmarks independently reproducible from the open-source repository. HAI opens new directions for efficient, interpretable cognitive architectures that combine the theoretical rigor of active inference with the computational elegance of hyperdimensional computing.
 
 ---
 
