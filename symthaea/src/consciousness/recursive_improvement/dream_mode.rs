@@ -31,7 +31,7 @@
 
 use super::world_model::{
     ActionType, ConsciousnessAction, ConsciousnessTransition, ConsciousnessWorldModel,
-    LatentConsciousnessState, WorldModelConfig,
+    LatentConsciousnessState,
 };
 use crate::dynamics::CrystalizedConcept;
 use crate::soul::{ConceptDiscovery, WeaverActor};
@@ -327,6 +327,7 @@ impl DreamResults {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::world_model::WorldModelConfig;
 
     #[test]
     fn test_dream_mode_creation() {

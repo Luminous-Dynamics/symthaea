@@ -37,9 +37,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
 
-use crate::consciousness::recursive_improvement::core::{Bottleneck, BottleneckType, ComponentId};
+use crate::consciousness::recursive_improvement::core::{Bottleneck, BottleneckType};
 use crate::consciousness::recursive_improvement::intrinsic_motivation::{
-    DriveType, IntrinsicMotivationSystem, MotivationConfig,
+    DriveType, IntrinsicMotivationSystem,
 };
 use crate::consciousness::recursive_improvement::types::instant_now;
 
@@ -1213,6 +1213,8 @@ pub struct ControllerOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::consciousness::recursive_improvement::core::ComponentId;
+    use crate::consciousness::recursive_improvement::intrinsic_motivation::MotivationConfig;
 
     #[test]
     fn test_capability_estimate_creation() {

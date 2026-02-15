@@ -67,14 +67,14 @@ pub trait ConsciousnessRouter: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct DirectRouter {
     /// Available actions
-    actions: Vec<ConsciousnessAction>,
+    _actions: Vec<ConsciousnessAction>,
 }
 
 impl DirectRouter {
     /// Create with default actions
     pub fn new() -> Self {
         Self {
-            actions: vec![
+            _actions: vec![
                 ConsciousnessAction::new("attend", ActionType::Attend),
                 ConsciousnessAction::new("integrate", ActionType::Integrate),
                 ConsciousnessAction::new("generate", ActionType::Generate),
@@ -104,7 +104,7 @@ impl ConsciousnessRouter for DirectRouter {
         // Simple heuristic: choose action based on biggest gap
         let d_phi = target.phi - current.phi;
         let d_int = target.integration - current.integration;
-        let d_coh = target.coherence - current.coherence;
+        let _d_coh = target.coherence - current.coherence;
         let d_att = target.attention - current.attention;
 
         let action = if d_att.abs() > d_phi.abs() && d_att.abs() > d_int.abs() {

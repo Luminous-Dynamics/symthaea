@@ -50,9 +50,7 @@ use super::world_prediction::{
     ContractRegistry, OutcomeCategory, PredictionDomain, Resolution, ResolutionContract, RiskTier,
     WorldActionContext, WorldPrediction,
 };
-use crate::consciousness::compositionality::{
-    ComposedPrimitive, CompositionType, CompositionalityEngine,
-};
+use crate::consciousness::compositionality::CompositionalityEngine;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SELF-MODEL STUB TYPES (Standalone for MAGI Loop)
@@ -134,7 +132,7 @@ pub struct SelfModel {
     /// Current capability estimates per domain
     capabilities: HashMap<CapabilityDomain, f64>,
     /// Configuration
-    config: SelfModelConfig,
+    _config: SelfModelConfig,
     /// Behavior predictions history
     behavior_history: VecDeque<BehaviorPrediction>,
 }
@@ -149,7 +147,7 @@ impl SelfModel {
         }
         Self {
             capabilities,
-            config,
+            _config: config,
             behavior_history: VecDeque::new(),
         }
     }
@@ -404,7 +402,7 @@ pub struct WorldGroundedSelfModel {
     loop_state: MagiLoopState,
 
     /// When this model was created
-    created_at: Instant,
+    _created_at: Instant,
 
     /// Optional compositionality engine for composing primitives during improvement.
     /// When set, the update step can create composed primitives (e.g. fallback
@@ -431,7 +429,7 @@ impl WorldGroundedSelfModel {
                 calibration_quality: CalibrationQuality::Insufficient,
             },
             config,
-            created_at: Instant::now(),
+            _created_at: Instant::now(),
             compositionality_engine: None,
         }
     }
@@ -523,7 +521,7 @@ impl WorldGroundedSelfModel {
             attributions: VecDeque::new(),
             loop_state,
             config,
-            created_at: Instant::now(),
+            _created_at: Instant::now(),
             compositionality_engine: None,
         }
     }

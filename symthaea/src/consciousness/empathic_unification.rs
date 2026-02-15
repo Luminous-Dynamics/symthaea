@@ -363,7 +363,7 @@ pub struct EmpathicUnification {
     /// Empathy model for emotion detection/mirroring
     empathy_model: EmpathyModel,
     /// Emotional regulator for Symthaea's stability
-    regulator: EmotionalRegulator,
+    _regulator: EmotionalRegulator,
     /// Emotional bridge to unified state
     emotional_bridge: EmotionalBridge,
     /// Empathic memory
@@ -409,7 +409,7 @@ impl EmpathicUnification {
         Self {
             user_inference: UserStateInference::new(),
             empathy_model: EmpathyModel::new(),
-            regulator: EmotionalRegulator::new(),
+            _regulator: EmotionalRegulator::new(),
             emotional_bridge: EmotionalBridge::new(),
             memory: EmpathicMemory::new(),
             current_user_state: UserEmotionalState::default(),
@@ -905,10 +905,12 @@ impl Default for EmpathicUnification {
 
 // Note: CoreEmotion doesn't have Frustration variant, using Anger as proxy
 impl CoreEmotion {
+    #[allow(dead_code)]
     fn default_valence_f64(&self) -> f64 {
         self.default_valence() as f64
     }
 
+    #[allow(dead_code)]
     fn default_arousal_f64(&self) -> f64 {
         self.default_arousal() as f64
     }

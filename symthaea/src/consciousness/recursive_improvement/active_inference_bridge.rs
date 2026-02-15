@@ -34,10 +34,7 @@ use serde::{Deserialize, Serialize};
 use crate::consciousness::pac::PacTracker;
 use crate::experience::signals::PrincipledSignals;
 
-use super::{
-    BrierScoreTracker, CalibrationQuality, CausalAttribution, MagiLoopState, PredictionDomain,
-    WorldGroundedSelfModel, WorldPrediction,
-};
+use super::{CalibrationQuality, WorldGroundedSelfModel, WorldPrediction};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CONFIGURATION
@@ -557,7 +554,7 @@ mod tests {
         let bridge = ActiveInferenceBridge::with_defaults();
         let model = WorldGroundedSelfModel::with_defaults();
 
-        let (pragmatic, epistemic, novelty) = bridge.adjusted_efe_weights(&model);
+        let (pragmatic, epistemic, _novelty) = bridge.adjusted_efe_weights(&model);
 
         // With insufficient data, should favor exploration
         assert!(epistemic > 0.7);

@@ -25,7 +25,7 @@ use std::time::Duration;
 use regex::Regex;
 
 use super::world_prediction::{
-    DiffTolerance, OutcomeCategory, ResolutionAuthority, ResourceExpectation, WorldPrediction,
+    OutcomeCategory, ResolutionAuthority, ResourceExpectation, WorldPrediction,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -144,7 +144,7 @@ impl ExitCodeResolver {
     }
 
     /// Execute and get result
-    pub fn execute(&self, timeout: Duration) -> ResolutionResult {
+    pub fn execute(&self, _timeout: Duration) -> ResolutionResult {
         let mut cmd = Command::new(&self.command);
         cmd.args(&self.args);
 
@@ -235,7 +235,7 @@ impl TestSuiteResolver {
     }
 
     /// Execute tests and get result
-    pub fn execute(&self, timeout: Duration) -> ResolutionResult {
+    pub fn execute(&self, _timeout: Duration) -> ResolutionResult {
         let mut cmd = Command::new(&self.test_command);
 
         // Build arguments based on test command type
@@ -547,7 +547,7 @@ impl HumanConfirmationResolver {
     }
 
     /// Execute confirmation request
-    pub fn execute(&self, timeout: Duration) -> ResolutionResult {
+    pub fn execute(&self, _timeout: Duration) -> ResolutionResult {
         // If we have a callback, use it
         if let Some(ref callback) = self.callback {
             match callback(&self.prompt) {

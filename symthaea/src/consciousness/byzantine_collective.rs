@@ -194,10 +194,10 @@ struct MerkleNode {
     checksum: u64,
 
     /// Child checksums (if internal node)
-    children: Option<Vec<u64>>,
+    _children: Option<Vec<u64>>,
 
     /// Primitive (if leaf node)
-    primitive: Option<CandidatePrimitive>,
+    _primitive: Option<CandidatePrimitive>,
 }
 
 /// Byzantine-resistant collective intelligence system
@@ -221,7 +221,7 @@ pub struct ByzantineResistantCollective {
     verification_quorum: f64,
 
     /// Minimum trust score for contribution
-    min_contribution_trust: f64,
+    _min_contribution_trust: f64,
 
     /// System timestamp counter
     timestamp: u64,
@@ -269,7 +269,7 @@ impl ByzantineResistantCollective {
             merkle_tree: Vec::new(),
             detection_threshold: 0.7,
             verification_quorum: 0.67, // 2/3 majority
-            min_contribution_trust: 0.3,
+            _min_contribution_trust: 0.3,
             timestamp: 0,
             stats: ByzantineStats::default(),
         }
@@ -495,8 +495,8 @@ impl ByzantineResistantCollective {
 
         let leaf = MerkleNode {
             checksum,
-            children: None,
-            primitive: Some(primitive.clone()),
+            _children: None,
+            _primitive: Some(primitive.clone()),
         };
 
         // Add to tree
@@ -585,7 +585,7 @@ impl ByzantineResistantCollective {
     }
 
     /// Quarantine instance (isolate from collective)
-    fn quarantine_instance(&mut self, instance_id: &str) -> Result<()> {
+    fn quarantine_instance(&mut self, _instance_id: &str) -> Result<()> {
         self.stats.instances_quarantined += 1;
 
         // In real implementation, would mark instance as quarantined

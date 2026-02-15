@@ -27,7 +27,7 @@
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
-use super::calibration::{BrierScoreTracker, DomainCalibration};
+use super::calibration::BrierScoreTracker;
 use super::world_prediction::{RiskTier, WorldActionContext};
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -50,16 +50,15 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fs;
 use std::io::{self, BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use super::calibration::{CalibrationConfig, DomainStats};
 use super::constraint_gate::ConstraintGateConfig;
 use super::magi_integration::{
-    CalibrationQuality, CapabilityDomain, CausalAttribution, MagiLoopState, WorldGroundedConfig,
+    CalibrationQuality, CapabilityDomain, CausalAttribution, MagiLoopState,
 };
 use super::world_prediction::PredictionDomain;
 
@@ -840,7 +839,7 @@ impl MagiPersistentModel {
         let model = match &startup_mode {
             StartupMode::WarmStart { .. } => {
                 // Merge snapshot with custom config where appropriate
-                let mut restored = super::magi_integration::WorldGroundedSelfModel::from_snapshot(
+                let restored = super::magi_integration::WorldGroundedSelfModel::from_snapshot(
                     persistence.current(),
                 );
                 // The snapshot takes precedence for learned state,

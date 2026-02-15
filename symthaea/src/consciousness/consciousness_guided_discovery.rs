@@ -22,11 +22,10 @@
 //! 4. **EmergentDiscovery** - Discovers novel compositions that maximize Φ
 
 use crate::consciousness::compositionality_primitives::{
-    ComposedPrimitive, CompositionMetadata, CompositionType, CompositionalityConfig,
+    ComposedPrimitive, CompositionType, CompositionalityConfig,
     CompositionalityEngine,
 };
 use crate::consciousness::consciousness_driven_evolution::{ConsciousnessOracle, OracleConfig};
-use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
 use anyhow::Result;
 use std::cmp::Ordering;
@@ -818,7 +817,7 @@ impl PhiGradientOptimizer {
         let param_vec = params.to_vec();
         let mut gradient = vec![0.0; param_vec.len()];
 
-        let base_phi = self.evaluate_phi(composition, params);
+        let _base_phi = self.evaluate_phi(composition, params);
 
         for i in 0..param_vec.len() {
             // Positive perturbation
@@ -878,7 +877,7 @@ impl PhiOptimizedDiscovery {
         cycles: usize,
     ) -> Result<Vec<(CompositionCandidate, f64)>> {
         // First, discover compositions
-        let candidates = self.discovery.discover_cycles(cycles)?;
+        let _candidates = self.discovery.discover_cycles(cycles)?;
 
         // Then optimize the top candidates
         let mut results = Vec::new();

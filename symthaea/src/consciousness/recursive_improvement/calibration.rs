@@ -395,7 +395,7 @@ pub struct BrierScoreTracker {
     prediction_history: VecDeque<ResolvedPredictionRecord>,
 
     /// When this tracker was created
-    created_at: Instant,
+    _created_at: Instant,
 }
 
 /// Record of a resolved prediction
@@ -440,7 +440,7 @@ impl BrierScoreTracker {
             domain_calibration,
             global_calibration: DomainCalibration::new(PredictionDomain::Factual), // Placeholder domain
             prediction_history: VecDeque::new(),
-            created_at: Instant::now(),
+            _created_at: Instant::now(),
         }
     }
 
@@ -635,7 +635,7 @@ impl BrierScoreTracker {
             domain_calibration,
             global_calibration,
             prediction_history: VecDeque::new(), // History is not persisted (too large)
-            created_at: Instant::now(),
+            _created_at: Instant::now(),
         }
     }
 
@@ -684,7 +684,7 @@ mod tests {
         ResolutionContract, RiskTier, WorldActionContext,
     };
 
-    fn create_test_prediction(confidence: f64, domain: PredictionDomain) -> WorldPrediction {
+    fn create_test_prediction(confidence: f64, _domain: PredictionDomain) -> WorldPrediction {
         let action =
             WorldActionContext::new("test", "test effect").with_risk_tier(RiskTier::Observation);
         let contract = ResolutionContract::shell_command();

@@ -774,9 +774,9 @@ impl CausalByzantineDefense {
 
     fn record_scenario(
         &mut self,
-        features: &AttackFeatures,
-        thresholds: &ThresholdSnapshot,
-        outcome: &ContributionOutcome,
+        _features: &AttackFeatures,
+        _thresholds: &ThresholdSnapshot,
+        _outcome: &ContributionOutcome,
     ) {
         // Scenarios are implicitly recorded in MLBD attack history
         // This could be enhanced to maintain explicit scenario database
@@ -841,7 +841,7 @@ impl CausalByzantineDefense {
     /// Mock detection for testing (when MLBD not initialized)
     fn mock_detect(&self, features: &AttackFeatures) -> ContributionOutcome {
         // Simple rule-based detection for testing
-        let thresholds = self.get_threshold_snapshot();
+        let _thresholds = self.get_threshold_snapshot();
 
         // Check Φ suspicion
         if features.phi_suspicion > 0.5 {

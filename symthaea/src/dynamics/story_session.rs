@@ -77,12 +77,17 @@ pub struct StorySession {
 
 impl StorySession {
     /// Create a new story session with default configuration.
+    ///
+    /// Uses semantic archetypes derived from the narrative algebra for
+    /// meaningful HDC signal variation.
     pub fn new() -> Self {
         let config = StoryArcConfig::default();
         let input_dim = config.input_dim;
+        let algebra = NarrativeAlgebra::default_dim();
+        let dynamics = StoryArcDynamics::with_algebra(config, &algebra);
         Self {
-            algebra: NarrativeAlgebra::default_dim(),
-            dynamics: StoryArcDynamics::new(config),
+            algebra,
+            dynamics,
             characters: HashMap::new(),
             character_arcs: HashMap::new(),
             conflicts: Vec::new(),
@@ -95,9 +100,11 @@ impl StorySession {
     /// Create with a custom `StoryArcConfig`.
     pub fn with_config(config: StoryArcConfig) -> Self {
         let input_dim = config.input_dim;
+        let algebra = NarrativeAlgebra::default_dim();
+        let dynamics = StoryArcDynamics::with_algebra(config, &algebra);
         Self {
-            algebra: NarrativeAlgebra::default_dim(),
-            dynamics: StoryArcDynamics::new(config),
+            algebra,
+            dynamics,
             characters: HashMap::new(),
             character_arcs: HashMap::new(),
             conflicts: Vec::new(),
@@ -182,8 +189,8 @@ impl StorySession {
             }
         }
 
-        // Advance dynamics using hybrid HDC+CfC signal
-        let signal = self.dynamics.step_hybrid(&projected, &scene_hv, 0.1);
+        // Advance dynamics using hybrid HDC+CfC signal with mood bias
+        let signal = self.dynamics.step_hybrid_with_mood(&projected, &scene_hv, 0.1, Some(mood));
 
         let index = self.scene_log.len();
         self.scene_log.push(SceneRecord {
@@ -421,9 +428,11 @@ impl StorySession {
             }
         }
 
+        let algebra = NarrativeAlgebra::default_dim();
+        let dynamics = StoryArcDynamics::with_algebra(config, &algebra);
         let mut session = Self {
-            algebra: NarrativeAlgebra::default_dim(),
-            dynamics: StoryArcDynamics::new(config),
+            algebra,
+            dynamics,
             characters,
             character_arcs,
             conflicts: snapshot.conflicts,
@@ -436,7 +445,7 @@ impl StorySession {
             let projected = session.project_hv(&record.scene_hv);
             session
                 .dynamics
-                .step_hybrid(&projected, &record.scene_hv, 0.1);
+                .step_hybrid_with_mood(&projected, &record.scene_hv, 0.1, Some(record.mood));
         }
         Ok(session)
     }
