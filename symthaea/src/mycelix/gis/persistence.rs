@@ -116,9 +116,7 @@ impl StoredIgnoranceRecord {
                 .duration_since(UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_secs();
-            format!(
-                "{method}|{answer}|{confidence}|{source}|{resolved_at}"
-            )
+            format!("{method}|{answer}|{confidence}|{source}|{resolved_at}")
         });
 
         Self {

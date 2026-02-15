@@ -634,8 +634,10 @@ impl ConsciousnessDatabase for SqliteMemory {
                          consolidation_strength = MIN(consolidation_strength + 0.05, 1.0) \
                          WHERE id IN ({placeholders})"
                     );
-                    let params: Vec<&dyn rusqlite::types::ToSql> =
-                        chunk.iter().map(|id| id as &dyn rusqlite::types::ToSql).collect();
+                    let params: Vec<&dyn rusqlite::types::ToSql> = chunk
+                        .iter()
+                        .map(|id| id as &dyn rusqlite::types::ToSql)
+                        .collect();
                     let _ = conn.execute(&sql, params.as_slice());
                 }
             }
@@ -1152,7 +1154,10 @@ mod tests {
         assert!((retrieved.valence - 0.9).abs() < 0.01);
         assert!((retrieved.arousal - 0.3).abs() < 0.01);
         assert!((retrieved.phi - 0.85).abs() < 0.001);
-        assert_eq!(retrieved.topics, vec!["test".to_string(), "retrieval".to_string()]);
+        assert_eq!(
+            retrieved.topics,
+            vec!["test".to_string(), "retrieval".to_string()]
+        );
         assert_eq!(retrieved.metadata, r#"{"session":"abc"}"#);
         assert_eq!(retrieved.consolidation_strength, 0.0);
         assert_eq!(retrieved.retrieval_count, 0);
@@ -1230,7 +1235,9 @@ mod tests {
         }
 
         // Store a far vector, the near vector, and the exact match
-        db.store(make_record("far", 999, MemoryType::Episodic)).await.unwrap();
+        db.store(make_record("far", 999, MemoryType::Episodic))
+            .await
+            .unwrap();
 
         let near_record = MemoryRecord {
             id: "near".to_string(),
@@ -1291,9 +1298,13 @@ mod tests {
 
         // Store 10 records
         for i in 0..10u64 {
-            db.store(make_record(&format!("topk-{}", i), i + 100, MemoryType::Episodic))
-                .await
-                .unwrap();
+            db.store(make_record(
+                &format!("topk-{}", i),
+                i + 100,
+                MemoryType::Episodic,
+            ))
+            .await
+            .unwrap();
         }
 
         // Request top_k=3 — should return at most 3
@@ -1345,7 +1356,10 @@ mod tests {
 
         // Above threshold: LSH-accelerated path should still find the target
         let results_above = db.search_similar(&target_hv, 1).await.unwrap();
-        assert!(!results_above.is_empty(), "LSH path should find at least one result");
+        assert!(
+            !results_above.is_empty(),
+            "LSH path should find at least one result"
+        );
         assert_eq!(
             results_above[0].record.id, "lsh-threshold-target",
             "LSH path should find the exact-match target as top result"
@@ -1572,10 +1586,10 @@ mod tests {
         // 4. The evicted items are also persisted to the database as Working type records
         // 5. Subsequent searches find the persisted items and trigger reconsolidation
 
+        use crate::memory::episodic_replay::{EpisodicMemory, EpisodicReplayConfig};
         use crate::memory::memory_coordinator::{
             CoordinatorConfig, GraduationEvent, MemoryCoordinator,
         };
-        use crate::memory::episodic_replay::{EpisodicMemory, EpisodicReplayConfig};
         use symthaea_core::hdc::unified_hv::ContinuousHV;
 
         let db = SqliteMemory::in_memory().unwrap();
@@ -1587,9 +1601,8 @@ mod tests {
         });
         coordinator.update_signals(0.7, 0.8);
 
-        let evicted_hvs: Vec<ContinuousHV> = (0..4)
-            .map(|i| ContinuousHV::random(1024, i + 10))
-            .collect();
+        let evicted_hvs: Vec<ContinuousHV> =
+            (0..4).map(|i| ContinuousHV::random(1024, i + 10)).collect();
 
         for (i, hv) in evicted_hvs.iter().enumerate() {
             coordinator.queue_graduation(GraduationEvent {
@@ -1610,9 +1623,18 @@ mod tests {
         let mut episodic = EpisodicMemory::new(episodic_config);
         let graduated = coordinator.process_graduations(&mut episodic);
 
-        assert_eq!(coordinator.stats.graduations_rejected, 2, "Two items should be rejected (too few steps)");
-        assert_eq!(coordinator.stats.graduations_processed, 2, "Two items should be processed");
-        assert_eq!(graduated, 2, "Two items should be stored in episodic memory");
+        assert_eq!(
+            coordinator.stats.graduations_rejected, 2,
+            "Two items should be rejected (too few steps)"
+        );
+        assert_eq!(
+            coordinator.stats.graduations_processed, 2,
+            "Two items should be processed"
+        );
+        assert_eq!(
+            graduated, 2,
+            "Two items should be stored in episodic memory"
+        );
 
         // Step 4: Persist all evicted items to the database (mimicking symthaea.rs tick())
         let timestamp_ms = 1_700_000_000_000u64;
@@ -1643,8 +1665,14 @@ mod tests {
         // The matching record should have its retrieval_count bumped
         let top_id = &results[0].record.id;
         let bumped = db.get(top_id).await.unwrap().unwrap();
-        assert_eq!(bumped.retrieval_count, 1, "Retrieval count should be bumped after search");
-        assert!(bumped.consolidation_strength > 0.0, "Consolidation strength should increase");
+        assert_eq!(
+            bumped.retrieval_count, 1,
+            "Retrieval count should be bumped after search"
+        );
+        assert!(
+            bumped.consolidation_strength > 0.0,
+            "Consolidation strength should increase"
+        );
     }
 
     #[tokio::test]
@@ -1667,7 +1695,11 @@ mod tests {
         // Verify each type round-trips correctly
         for (id, expected_type) in &types {
             let record = db.get(id).await.unwrap().unwrap();
-            assert_eq!(record.memory_type, *expected_type, "Memory type should round-trip for {}", id);
+            assert_eq!(
+                record.memory_type, *expected_type,
+                "Memory type should round-trip for {}",
+                id
+            );
         }
 
         // Stats should show the distribution
@@ -1686,7 +1718,10 @@ mod tests {
     async fn test_database_delete_nonexistent_returns_false() {
         let db = SqliteMemory::in_memory().unwrap();
         let deleted = db.delete("ghost-id").await.unwrap();
-        assert!(!deleted, "Deleting a nonexistent record should return false");
+        assert!(
+            !deleted,
+            "Deleting a nonexistent record should return false"
+        );
     }
 
     #[tokio::test]

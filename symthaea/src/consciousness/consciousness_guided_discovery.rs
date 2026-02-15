@@ -22,8 +22,7 @@
 //! 4. **EmergentDiscovery** - Discovers novel compositions that maximize Φ
 
 use crate::consciousness::compositionality_primitives::{
-    ComposedPrimitive, CompositionType, CompositionalityConfig,
-    CompositionalityEngine,
+    ComposedPrimitive, CompositionType, CompositionalityConfig, CompositionalityEngine,
 };
 use crate::consciousness::consciousness_driven_evolution::{ConsciousnessOracle, OracleConfig};
 use crate::hdc::primitive_system::PrimitiveSystem;

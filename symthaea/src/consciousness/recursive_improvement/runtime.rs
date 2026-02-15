@@ -58,9 +58,9 @@ use tokio::sync::mpsc;
 use tokio::time::interval;
 
 use super::{
-    ActiveInferenceBridge, ActiveInferenceBridgeConfig, CalibrationQuality,
-    ConstraintGate, ConstraintGateConfig, DryRunReason, ExecutionMode, MagiPersistentModel,
-    OutcomeCategory, PersistenceConfig, PredictionDomain, SupervisionReason, WorldPrediction,
+    ActiveInferenceBridge, ActiveInferenceBridgeConfig, CalibrationQuality, ConstraintGate,
+    ConstraintGateConfig, DryRunReason, ExecutionMode, MagiPersistentModel, OutcomeCategory,
+    PersistenceConfig, PredictionDomain, SupervisionReason, WorldPrediction,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════

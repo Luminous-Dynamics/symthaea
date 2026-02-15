@@ -102,17 +102,36 @@ fn test_quantum_pure_vs_mixed() {
     );
 
     // Both results should have valid, finite values
-    assert!(pure_result.purity.is_finite(), "Pure state purity should be finite");
-    assert!(mixed_result.purity.is_finite(), "Mixed state purity should be finite");
-    assert!(pure_result.von_neumann_entropy.is_finite(), "Pure state entropy should be finite");
-    assert!(mixed_result.von_neumann_entropy.is_finite(), "Mixed state entropy should be finite");
-    assert!(pure_result.von_neumann_entropy >= 0.0, "Pure state entropy should be non-negative");
-    assert!(mixed_result.von_neumann_entropy >= 0.0, "Mixed state entropy should be non-negative");
+    assert!(
+        pure_result.purity.is_finite(),
+        "Pure state purity should be finite"
+    );
+    assert!(
+        mixed_result.purity.is_finite(),
+        "Mixed state purity should be finite"
+    );
+    assert!(
+        pure_result.von_neumann_entropy.is_finite(),
+        "Pure state entropy should be finite"
+    );
+    assert!(
+        mixed_result.von_neumann_entropy.is_finite(),
+        "Mixed state entropy should be finite"
+    );
+    assert!(
+        pure_result.von_neumann_entropy >= 0.0,
+        "Pure state entropy should be non-negative"
+    );
+    assert!(
+        mixed_result.von_neumann_entropy >= 0.0,
+        "Mixed state entropy should be non-negative"
+    );
 
     // Pure state should have higher purity than mixed state
     assert!(
         pure_result.purity >= mixed_result.purity - 0.01,
         "Pure state purity ({:.6}) should be >= mixed state purity ({:.6})",
-        pure_result.purity, mixed_result.purity
+        pure_result.purity,
+        mixed_result.purity
     );
 }

@@ -642,7 +642,10 @@ mod tests {
         );
 
         // All integration values should be finite and non-negative
-        for val in feasible_integration.iter().chain(infeasible_integration.iter()) {
+        for val in feasible_integration
+            .iter()
+            .chain(infeasible_integration.iter())
+        {
             assert!(val.is_finite(), "Integration value should be finite");
             assert!(*val >= 0.0, "Integration value should be non-negative");
         }

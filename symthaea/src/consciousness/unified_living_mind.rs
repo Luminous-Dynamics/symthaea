@@ -759,8 +759,8 @@ pub struct UnifiedSummary {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::autopoietic_consciousness::AutopoieticConfig;
+    use super::*;
 
     #[test]
     fn test_unified_creation() {

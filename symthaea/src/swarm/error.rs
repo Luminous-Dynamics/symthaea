@@ -83,10 +83,7 @@ impl fmt::Display for SwarmError {
                 peer_id,
                 timeout_ms,
             } => {
-                write!(
-                    f,
-                    "Connection to {peer_id} timed out after {timeout_ms}ms"
-                )
+                write!(f, "Connection to {peer_id} timed out after {timeout_ms}ms")
             }
             Self::PeerNotFound { peer_id } => {
                 write!(f, "Peer {peer_id} not found in network")

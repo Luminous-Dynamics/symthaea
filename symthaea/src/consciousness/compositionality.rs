@@ -459,9 +459,7 @@ impl CompositionalityEngine {
                 depth: self.get_depth(f_id).max(self.get_depth(g_id)) + 1,
                 base_count: self.get_base_count(f_id) + self.get_base_count(g_id),
                 expected_phi_contribution: 0.04,
-                description: format!(
-                    "If input matches '{pattern}', use {f_id}, else {g_id}"
-                ),
+                description: format!("If input matches '{pattern}', use {f_id}, else {g_id}"),
                 tags: vec!["conditional".to_string(), "branching".to_string()],
             },
         };

@@ -1148,11 +1148,9 @@ impl HybridArithmeticEngine {
             Some(d) => {
                 self.primality_result(n, false, &format!("{} = {} × {} (composite)", n, d, n / d))
             }
-            None => self.primality_result(
-                n,
-                true,
-                &format!("No divisors found up to √{n} ≈ {sqrt_n}"),
-            ),
+            None => {
+                self.primality_result(n, true, &format!("No divisors found up to √{n} ≈ {sqrt_n}"))
+            }
         }
     }
 

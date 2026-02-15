@@ -517,7 +517,10 @@ async fn test_sqlite_reconsolidation_tracking() {
     db.store(record).await.expect("Should store memory");
 
     // Search triggers reconsolidation
-    let results = db.search_similar(&encoding, 5).await.expect("Search should succeed");
+    let results = db
+        .search_similar(&encoding, 5)
+        .await
+        .expect("Search should succeed");
     assert!(!results.is_empty(), "Should find the record");
     assert_eq!(results[0].record.id, "recon-test");
 

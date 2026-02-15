@@ -678,9 +678,7 @@ impl ThermodynamicsNSMGrounding {
             .map(|g| g.semantic_formula())
             .unwrap_or_default();
 
-        format!(
-            "Phase[{phase_formula}] & Energy[{fe_formula}] & Balance[{eq_formula}]"
-        )
+        format!("Phase[{phase_formula}] & Energy[{fe_formula}] & Balance[{eq_formula}]")
     }
 }
 

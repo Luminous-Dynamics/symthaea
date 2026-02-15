@@ -176,9 +176,7 @@ impl MultiPathVerifier {
     /// Verify associativity via multiple paths
     pub fn verify_associativity(&mut self, a: u64, b: u64, c: u64, op: &str) -> MultiPathResult {
         self.stats.theorems_verified += 1;
-        let theorem = format!(
-            "({a} {op} {b}) {op} {c} = {a} {op} ({b} {op} {c})"
-        );
+        let theorem = format!("({a} {op} {b}) {op} {c} = {a} {op} ({b} {op} {c})");
         let mut paths = Vec::new();
 
         // Path 1: Left-first evaluation
@@ -387,9 +385,7 @@ impl MultiPathVerifier {
 
         // Inductive step (conceptual)
         steps.push(ProofPathStep {
-            description: format!(
-                "Inductive hypothesis: assume {a} {op} k = k {op} {a}"
-            ),
+            description: format!("Inductive hypothesis: assume {a} {op} k = k {op} {a}"),
             operation: "inductive_hypothesis".to_string(),
             phi: 0.5,
             value: None,

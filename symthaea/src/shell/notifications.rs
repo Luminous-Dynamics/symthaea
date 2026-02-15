@@ -356,10 +356,7 @@ impl DesktopNotifier {
         let (summary, body) = if connected {
             ("Connected", format!("Connected to {service_name}"))
         } else {
-            (
-                "Disconnected",
-                format!("Lost connection to {service_name}"),
-            )
+            ("Disconnected", format!("Lost connection to {service_name}"))
         };
 
         let notification = Notification::new(summary, body)

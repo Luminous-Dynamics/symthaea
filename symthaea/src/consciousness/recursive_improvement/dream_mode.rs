@@ -326,8 +326,8 @@ impl DreamResults {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::world_model::WorldModelConfig;
+    use super::*;
 
     #[test]
     fn test_dream_mode_creation() {

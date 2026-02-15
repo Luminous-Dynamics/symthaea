@@ -427,8 +427,8 @@ impl ConsciousnessPersistence {
 
         // Create version header
         let header = StateVersion::new(payload.len() as u64, checksum, compression_type);
-        let header_bytes = bincode::serialize(&header)
-            .map_err(|e| format!("Header serialization error: {e}"))?;
+        let header_bytes =
+            bincode::serialize(&header).map_err(|e| format!("Header serialization error: {e}"))?;
 
         // Write to file
         let filename = format!("snapshot_{:08}.sym", snapshot.id);
@@ -527,8 +527,7 @@ impl ConsciousnessPersistence {
         };
 
         // Deserialize
-        bincode::deserialize(&decompressed)
-            .map_err(|e| format!("Snapshot deserialize error: {e}"))
+        bincode::deserialize(&decompressed).map_err(|e| format!("Snapshot deserialize error: {e}"))
     }
 
     /// Load the latest snapshot

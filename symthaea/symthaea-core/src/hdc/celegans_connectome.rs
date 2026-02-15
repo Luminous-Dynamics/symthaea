@@ -956,6 +956,9 @@ mod tests {
         // C. elegans rank should be a valid position
         let rank = comparison.celegans_rank();
         assert!(rank >= 1, "Rank should be at least 1");
-        assert!(rank <= ranking.len(), "Rank should not exceed number of topologies");
+        assert!(
+            rank <= ranking.len(),
+            "Rank should not exceed number of topologies"
+        );
     }
 }

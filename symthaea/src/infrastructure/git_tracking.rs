@@ -240,8 +240,7 @@ impl GitTracker {
 
     /// Get commit history
     pub fn log(&self, limit: usize) -> Result<Vec<CommitInfo>, GitError> {
-        let output =
-            self.run_git(&["log", &format!("-{limit}"), "--format=%H|%an|%ae|%at|%s"])?;
+        let output = self.run_git(&["log", &format!("-{limit}"), "--format=%H|%an|%ae|%at|%s"])?;
 
         let stdout = String::from_utf8_lossy(&output.stdout);
         let mut commits = Vec::new();

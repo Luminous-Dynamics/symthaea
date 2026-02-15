@@ -291,9 +291,8 @@ impl ContextualWeights {
         let domain_profile = self.domain_profiles.get(&domain);
 
         let name = format!("{action_type:?}_{domain:?}");
-        let description = format!(
-            "Combined profile for {action_type:?} action in {domain:?} domain"
-        );
+        let description =
+            format!("Combined profile for {action_type:?} action in {domain:?} domain");
 
         let mut combined = HarmonyWeightProfile::new(&name, &description);
 

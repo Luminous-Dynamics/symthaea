@@ -329,9 +329,7 @@ impl FlakeContext {
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "none".to_string());
 
-        format!(
-            "Flake: {path} | {pkg_count} packages | {svc_count} services enabled"
-        )
+        format!("Flake: {path} | {pkg_count} packages | {svc_count} services enabled")
     }
 }
 

@@ -189,15 +189,12 @@ impl MultiScaleScorer {
 
     /// Get phoneme basis
     fn get_basis(&self, phoneme: &str) -> HV16 {
-        self.phoneme_basis
-            .get(phoneme)
-            .copied()
-            .unwrap_or_else(|| {
-                self.phoneme_basis
-                    .get("UNK")
-                    .copied()
-                    .unwrap_or_else(HV16::zero)
-            })
+        self.phoneme_basis.get(phoneme).copied().unwrap_or_else(|| {
+            self.phoneme_basis
+                .get("UNK")
+                .copied()
+                .unwrap_or_else(HV16::zero)
+        })
     }
 
     /// Get articulatory features

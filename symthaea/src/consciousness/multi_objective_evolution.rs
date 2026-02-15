@@ -302,11 +302,7 @@ impl MultiObjectiveEvolution {
     fn find_highest_complexity(&self) -> PrimitiveWithProfile {
         self.population
             .iter()
-            .max_by(|a, b| {
-                a.profile
-                    .complexity
-                    .total_cmp(&b.profile.complexity)
-            })
+            .max_by(|a, b| a.profile.complexity.total_cmp(&b.profile.complexity))
             .expect("population must not be empty when finding highest complexity")
             .clone()
     }

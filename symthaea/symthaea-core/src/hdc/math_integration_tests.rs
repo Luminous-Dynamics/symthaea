@@ -52,13 +52,18 @@ mod tests {
         // (GRADIENT, WAVE, etc. depend on Tier 2 which loads before derived)
 
         // Report derivation chain resolution stats
-        let resolved_count = diagnostics.iter().filter(|(_, resolved, _)| *resolved).count();
+        let resolved_count = diagnostics
+            .iter()
+            .filter(|(_, resolved, _)| *resolved)
+            .count();
         let total = diagnostics.len();
         if total > 0 {
             let resolved_ratio = resolved_count as f64 / total as f64;
             eprintln!(
                 "Derivation chain resolution: {}/{} = {:.1}%",
-                resolved_count, total, resolved_ratio * 100.0
+                resolved_count,
+                total,
+                resolved_ratio * 100.0
             );
         }
     }

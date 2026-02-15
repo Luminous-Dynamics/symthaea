@@ -173,9 +173,7 @@ impl MathDiscovery {
                     let total_phi = a_bc.phi + ab_ac.phi;
                     proofs.push((
                         AbstractProof {
-                            theorem: format!(
-                                "{a} × ({b} + {c}) = {a} × {b} + {a} × {c}"
-                            ),
+                            theorem: format!("{a} × ({b} + {c}) = {a} × {b} + {a} × {c}"),
                             base_cases: vec!["a × (b + 0) = a × b = a × b + a × 0".to_string()],
                             inductive_step: format!(
                                 "{} × {} = {} = {} + {} = {} × {} + {} × {}",

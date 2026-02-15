@@ -493,9 +493,7 @@ impl EconomicEngine {
         println!("\n");
         println!("┌────────────────────────────────────────────────────────────────────┐");
         println!("│              ECONOMIC VIABILITY ANALYSIS                           │");
-        println!(
-            "│              {name}                                            │"
-        );
+        println!("│              {name}                                            │");
         println!("├────────────────────────────────────────────────────────────────────┤");
         println!("│                                                                    │");
         println!("│  LCOE BREAKDOWN                                                    │");

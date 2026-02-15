@@ -518,7 +518,12 @@ impl HebbianEngine {
         // Weaken losers
         for (id, sim) in candidates.iter().skip(self.config.competitive_k) {
             self.ensure_synapse(id, target);
-            let synapse = self.synapses.get_mut(*id).expect("ensure_synapse guarantees id entry exists").get_mut(target).expect("ensure_synapse guarantees target entry exists");
+            let synapse = self
+                .synapses
+                .get_mut(*id)
+                .expect("ensure_synapse guarantees id entry exists")
+                .get_mut(target)
+                .expect("ensure_synapse guarantees target entry exists");
 
             // Anti-Hebbian for losers
             let delta = -self.config.learning_rate * sim * 0.5;

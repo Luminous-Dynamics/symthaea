@@ -189,8 +189,7 @@ impl PeanoPhysicsBridge {
 
         let coherence = if let Some((num, den)) = exact_value {
             let exact_result_value = num as f64 / den as f64;
-            let exact_encoding =
-                BinaryHV::random(seed_from_name(&format!("EXACT_{num}_{den}")));
+            let exact_encoding = BinaryHV::random(seed_from_name(&format!("EXACT_{num}_{den}")));
 
             // Measure coherence as similarity between exact and approximate encodings
             let similarity = exact_encoding.similarity(&approx_encoding);

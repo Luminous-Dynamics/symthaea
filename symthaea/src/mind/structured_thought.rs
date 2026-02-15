@@ -562,9 +562,7 @@ impl StructuredThought {
                     prompt.push_str(&format!("DATA_NUMERIC: {value}{unit_str}\n"));
                 }
                 StructuredData::Code { language, content } => {
-                    prompt.push_str(&format!(
-                        "DATA_CODE ({language}):\n```\n{content}\n```\n"
-                    ));
+                    prompt.push_str(&format!("DATA_CODE ({language}):\n```\n{content}\n```\n"));
                 }
                 StructuredData::None => {}
             }

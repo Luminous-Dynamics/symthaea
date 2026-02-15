@@ -124,10 +124,7 @@ fn bench_similarity(c: &mut Criterion) {
             &(&query, &candidates),
             |b, (q, cands)| {
                 b.iter(|| {
-                    let best = cands
-                        .iter()
-                        .map(|c| q.similarity(c))
-                        .fold(0.0f32, f32::max);
+                    let best = cands.iter().map(|c| q.similarity(c)).fold(0.0f32, f32::max);
                     black_box(best)
                 })
             },
