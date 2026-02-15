@@ -1,0 +1,18 @@
+[package]
+name = "symthaea-causal-reasoning"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Causal reasoning for Symthaea: Pearl's do-calculus, counterfactual reasoning, and causal emergence"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-core = { path = "../../symthaea-core" }
+
+[dev-dependencies]
+proptest = "1.4"
+
+[features]
+default = ["counterfactual"]
+counterfactual = []
