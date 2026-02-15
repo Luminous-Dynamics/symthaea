@@ -94,13 +94,13 @@ impl MoralPrimitives {
         // Use prime-based seeds for maximum orthogonality
         Self {
             dim,
-            agent: ContinuousHV::random(dim, 1000003),      // "who acts"
-            patient: ContinuousHV::random(dim, 1000033),    // "who is affected"
-            action: ContinuousHV::random(dim, 1000037),     // "what happens"
-            intent: ContinuousHV::random(dim, 1000039),     // "why"
-            consent: ContinuousHV::random(dim, 1000081),    // "permission"
+            agent: ContinuousHV::random(dim, 1000003), // "who acts"
+            patient: ContinuousHV::random(dim, 1000033), // "who is affected"
+            action: ContinuousHV::random(dim, 1000037), // "what happens"
+            intent: ContinuousHV::random(dim, 1000039), // "why"
+            consent: ContinuousHV::random(dim, 1000081), // "permission"
             obligation: ContinuousHV::random(dim, 1000099), // "duty"
-            magnitude: ContinuousHV::random(dim, 1000117),  // "scale"
+            magnitude: ContinuousHV::random(dim, 1000117), // "scale"
         }
     }
 
@@ -112,8 +112,13 @@ impl MoralPrimitives {
     /// Verify that primitives are approximately orthogonal
     pub fn verify_orthogonality(&self) -> f32 {
         let primitives = [
-            &self.agent, &self.patient, &self.action,
-            &self.intent, &self.consent, &self.obligation, &self.magnitude,
+            &self.agent,
+            &self.patient,
+            &self.action,
+            &self.intent,
+            &self.consent,
+            &self.obligation,
+            &self.magnitude,
         ];
 
         let mut max_similarity = 0.0f32;
@@ -353,13 +358,19 @@ impl MoralAlgebra {
 
     /// Encode intent at a specific level
     pub fn encode_intent(&self, intent: MoralIntent) -> ContinuousHV {
-        let level_hv = self.intent_hvs.get(&intent).unwrap();
+        let level_hv = self
+            .intent_hvs
+            .get(&intent)
+            .expect("map covers all variants");
         self.primitives.intent.bind(level_hv)
     }
 
     /// Encode consent state
     pub fn encode_consent(&self, state: ConsentState) -> ContinuousHV {
-        let state_hv = self.consent_hvs.get(&state).unwrap();
+        let state_hv = self
+            .consent_hvs
+            .get(&state)
+            .expect("map covers all variants");
         self.primitives.consent.bind(state_hv)
     }
 
@@ -371,7 +382,10 @@ impl MoralAlgebra {
 
     /// Encode magnitude at a specific level
     pub fn encode_magnitude(&self, level: Magnitude) -> ContinuousHV {
-        let level_hv = self.magnitude_hvs.get(&level).unwrap();
+        let level_hv = self
+            .magnitude_hvs
+            .get(&level)
+            .expect("map covers all variants");
         self.primitives.magnitude.bind(level_hv)
     }
 
@@ -465,9 +479,11 @@ impl MoralAlgebra {
         reward_desc: &str,
         reward_mag: Magnitude,
     ) -> ProportionalityJudgment {
-        let effort_hv = self.encode_action(effort_desc)
+        let effort_hv = self
+            .encode_action(effort_desc)
             .bind(&self.encode_magnitude(effort_mag));
-        let reward_hv = self.encode_action(reward_desc)
+        let reward_hv = self
+            .encode_action(reward_desc)
             .bind(&self.encode_magnitude(reward_mag));
 
         let composed = self.proportional(&effort_hv, &reward_hv);
@@ -528,10 +544,16 @@ impl MoralAlgebra {
             name: "honesty".to_string(),
             description: "Do not lie or deceive".to_string(),
             rule_hv: self.encode_obligation("be honest"),
-            violation_actions: vec!["lie", "lied", "deceive", "deceived", "cheat", "cheated", "mislead"]
-                .into_iter().map(|s| s.to_string()).collect(),
+            violation_actions: vec![
+                "lie", "lied", "deceive", "deceived", "cheat", "cheated", "mislead",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
             satisfaction_actions: vec!["tell truth", "honest", "truthful", "transparent"]
-                .into_iter().map(|s| s.to_string()).collect(),
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             is_perfect_duty: true,
         });
 
@@ -539,10 +561,22 @@ impl MoralAlgebra {
             name: "non_theft".to_string(),
             description: "Do not steal".to_string(),
             rule_hv: self.encode_obligation("respect property"),
-            violation_actions: vec!["steal", "stole", "stolen", "take without", "theft", "rob", "robbed"]
-                .into_iter().map(|s| s.to_string()).collect(),
+            violation_actions: vec![
+                "steal",
+                "stole",
+                "stolen",
+                "take without",
+                "theft",
+                "rob",
+                "robbed",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
             satisfaction_actions: vec!["return", "give back", "respect property"]
-                .into_iter().map(|s| s.to_string()).collect(),
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             is_perfect_duty: true,
         });
 
@@ -550,10 +584,17 @@ impl MoralAlgebra {
             name: "non_harm".to_string(),
             description: "Do not harm innocents".to_string(),
             rule_hv: self.encode_obligation("do no harm"),
-            violation_actions: vec!["harm", "harmed", "hurt", "injure", "injured", "attack", "attacked", "abuse", "abused"]
-                .into_iter().map(|s| s.to_string()).collect(),
+            violation_actions: vec![
+                "harm", "harmed", "hurt", "injure", "injured", "attack", "attacked", "abuse",
+                "abused",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
             satisfaction_actions: vec!["protect", "protected", "care", "cared", "heal", "healed"]
-                .into_iter().map(|s| s.to_string()).collect(),
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             is_perfect_duty: true,
         });
 
@@ -561,10 +602,21 @@ impl MoralAlgebra {
             name: "promise_keeping".to_string(),
             description: "Keep your promises".to_string(),
             rule_hv: self.encode_obligation("keep promises"),
-            violation_actions: vec!["broke promise", "break promise", "betray", "betrayed", "abandon", "abandoned"]
-                .into_iter().map(|s| s.to_string()).collect(),
+            violation_actions: vec![
+                "broke promise",
+                "break promise",
+                "betray",
+                "betrayed",
+                "abandon",
+                "abandoned",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
             satisfaction_actions: vec!["kept promise", "fulfill", "fulfilled", "honor", "honored"]
-                .into_iter().map(|s| s.to_string()).collect(),
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             is_perfect_duty: true,
         });
 
@@ -572,10 +624,30 @@ impl MoralAlgebra {
             name: "respect_autonomy".to_string(),
             description: "Respect others' autonomy and consent".to_string(),
             rule_hv: self.encode_obligation("respect autonomy"),
-            violation_actions: vec!["force", "forced", "coerce", "coerced", "manipulate", "manipulated", "without consent", "without permission"]
-                .into_iter().map(|s| s.to_string()).collect(),
-            satisfaction_actions: vec!["ask", "asked", "consent", "consented", "permission", "respect choice"]
-                .into_iter().map(|s| s.to_string()).collect(),
+            violation_actions: vec![
+                "force",
+                "forced",
+                "coerce",
+                "coerced",
+                "manipulate",
+                "manipulated",
+                "without consent",
+                "without permission",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "ask",
+                "asked",
+                "consent",
+                "consented",
+                "permission",
+                "respect choice",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
             is_perfect_duty: true,
         });
 
@@ -584,10 +656,30 @@ impl MoralAlgebra {
             name: "beneficence".to_string(),
             description: "Help those in need when you can".to_string(),
             rule_hv: self.encode_obligation("help others"),
-            violation_actions: vec!["ignore suffering", "refused to help", "callous", "indifferent"]
-                .into_iter().map(|s| s.to_string()).collect(),
-            satisfaction_actions: vec!["help", "helped", "assist", "assisted", "support", "supported", "save", "saved", "rescue", "rescued"]
-                .into_iter().map(|s| s.to_string()).collect(),
+            violation_actions: vec![
+                "ignore suffering",
+                "refused to help",
+                "callous",
+                "indifferent",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
+            satisfaction_actions: vec![
+                "help",
+                "helped",
+                "assist",
+                "assisted",
+                "support",
+                "supported",
+                "save",
+                "saved",
+                "rescue",
+                "rescued",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
             is_perfect_duty: false,
         });
 
@@ -596,9 +688,22 @@ impl MoralAlgebra {
             description: "Develop your talents and abilities".to_string(),
             rule_hv: self.encode_obligation("improve self"),
             violation_actions: vec!["waste talent", "lazy", "neglect", "neglected"]
-                .into_iter().map(|s| s.to_string()).collect(),
-            satisfaction_actions: vec!["learn", "learned", "study", "studied", "practice", "practiced", "improve", "improved"]
-                .into_iter().map(|s| s.to_string()).collect(),
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
+            satisfaction_actions: vec![
+                "learn",
+                "learned",
+                "study",
+                "studied",
+                "practice",
+                "practiced",
+                "improve",
+                "improved",
+            ]
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect(),
             is_perfect_duty: false,
         });
 
@@ -606,7 +711,11 @@ impl MoralAlgebra {
     }
 
     /// Check if an action violates any obligations
-    pub fn check_obligation_violations(&self, text: &str, rules: &ObligationRuleSet) -> Vec<ObligationViolation> {
+    pub fn check_obligation_violations(
+        &self,
+        text: &str,
+        rules: &ObligationRuleSet,
+    ) -> Vec<ObligationViolation> {
         let lower = text.to_lowercase();
         let mut violations = Vec::new();
 
@@ -630,7 +739,11 @@ impl MoralAlgebra {
     }
 
     /// Check if an action satisfies any obligations
-    pub fn check_obligation_satisfactions(&self, text: &str, rules: &ObligationRuleSet) -> Vec<ObligationSatisfaction> {
+    pub fn check_obligation_satisfactions(
+        &self,
+        text: &str,
+        rules: &ObligationRuleSet,
+    ) -> Vec<ObligationSatisfaction> {
         let lower = text.to_lowercase();
         let mut satisfactions = Vec::new();
 
@@ -660,11 +773,15 @@ impl MoralAlgebra {
 
         // Perfect duty violations are serious
         let perfect_violations: Vec<_> = violations.iter().filter(|v| v.is_perfect_duty).collect();
-        let imperfect_violations: Vec<_> = violations.iter().filter(|v| !v.is_perfect_duty).collect();
+        let imperfect_violations: Vec<_> =
+            violations.iter().filter(|v| !v.is_perfect_duty).collect();
 
         // Calculate overall score
         let violation_penalty: f32 = perfect_violations.iter().map(|v| v.severity).sum::<f32>()
-            + imperfect_violations.iter().map(|v| v.severity * 0.3).sum::<f32>();
+            + imperfect_violations
+                .iter()
+                .map(|v| v.severity * 0.3)
+                .sum::<f32>();
         let satisfaction_bonus: f32 = satisfactions.iter().map(|s| s.moral_credit).sum();
 
         let score = (satisfaction_bonus - violation_penalty).clamp(-1.0, 1.0);
@@ -679,9 +796,13 @@ impl MoralAlgebra {
             DeontologicalVerdict::Neutral
         } else {
             // Mixed case
-            if score > 0.0 { DeontologicalVerdict::RightDutyFulfilled }
-            else if score < 0.0 { DeontologicalVerdict::WrongImperfectDutyViolated }
-            else { DeontologicalVerdict::Neutral }
+            if score > 0.0 {
+                DeontologicalVerdict::RightDutyFulfilled
+            } else if score < 0.0 {
+                DeontologicalVerdict::WrongImperfectDutyViolated
+            } else {
+                DeontologicalVerdict::Neutral
+            }
         };
 
         DeontologicalJudgment {
@@ -723,33 +844,44 @@ impl MoralAlgebra {
 
     /// Create multiple good action prototypes for better coverage
     pub fn good_action_prototypes(&self) -> Vec<ContinuousHV> {
-        let good_actions = ["help", "save", "protect", "care", "support", "assist", "nurture"];
+        let good_actions = [
+            "help", "save", "protect", "care", "support", "assist", "nurture",
+        ];
         let agent = self.encode_agent("I");
         let patient = self.encode_patient("person");
         let intent = self.encode_intent(MoralIntent::Good);
 
-        good_actions.iter().map(|action| {
-            let action_hv = self.encode_action(action);
-            agent.bind(&action_hv).bind(&patient).bind(&intent)
-        }).collect()
+        good_actions
+            .iter()
+            .map(|action| {
+                let action_hv = self.encode_action(action);
+                agent.bind(&action_hv).bind(&patient).bind(&intent)
+            })
+            .collect()
     }
 
     /// Create multiple bad action prototypes for better coverage
     pub fn bad_action_prototypes(&self) -> Vec<ContinuousHV> {
-        let bad_actions = ["harm", "hurt", "steal", "kill", "destroy", "abuse", "exploit"];
+        let bad_actions = [
+            "harm", "hurt", "steal", "kill", "destroy", "abuse", "exploit",
+        ];
         let agent = self.encode_agent("I");
         let patient = self.encode_patient("victim");
         let intent = self.encode_intent(MoralIntent::Bad);
 
-        bad_actions.iter().map(|action| {
-            let action_hv = self.encode_action(action);
-            agent.bind(&action_hv).bind(&patient).bind(&intent)
-        }).collect()
+        bad_actions
+            .iter()
+            .map(|action| {
+                let action_hv = self.encode_action(action);
+                agent.bind(&action_hv).bind(&patient).bind(&intent)
+            })
+            .collect()
     }
 
     /// Compute max similarity to a set of prototypes
     fn max_similarity_to_prototypes(&self, hv: &ContinuousHV, prototypes: &[ContinuousHV]) -> f32 {
-        prototypes.iter()
+        prototypes
+            .iter()
             .map(|p| hv.similarity(p))
             .fold(f32::NEG_INFINITY, f32::max)
     }
@@ -844,7 +976,10 @@ impl MoralAlgebra {
         // 1. HDC similarity signal (if we have an action HV)
         let hdc_verdict = action_hv.map(|hv| {
             let judgment = self.judge_action(hv);
-            (judgment.verdict, judgment.good_similarity - judgment.bad_similarity)
+            (
+                judgment.verdict,
+                judgment.good_similarity - judgment.bad_similarity,
+            )
         });
 
         // 2. Parsed intent signal (direct from parser)
@@ -857,8 +992,8 @@ impl MoralAlgebra {
         // 3. Deontological signal
         let deonto = self.judge_deontological(text);
         let deonto_verdict = match deonto.verdict {
-            DeontologicalVerdict::WrongPerfectDutyViolated |
-            DeontologicalVerdict::WrongImperfectDutyViolated => MoralVerdict::Bad,
+            DeontologicalVerdict::WrongPerfectDutyViolated
+            | DeontologicalVerdict::WrongImperfectDutyViolated => MoralVerdict::Bad,
             DeontologicalVerdict::RightDutyFulfilled => MoralVerdict::Good,
             DeontologicalVerdict::Neutral => MoralVerdict::Neutral,
         };
@@ -948,7 +1083,8 @@ impl MoralAlgebra {
         }
 
         // Determine winner
-        let (winner, max_vote) = votes.iter()
+        let (winner, max_vote) = votes
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
             .unwrap_or((&"neutral", &0.0));
 
@@ -961,7 +1097,11 @@ impl MoralAlgebra {
 
         // Calculate confidence (how decisive was the vote)
         let total_votes: f32 = votes.values().sum();
-        let confidence = if total_votes > 0.0 { max_vote / total_votes } else { 0.0 };
+        let confidence = if total_votes > 0.0 {
+            max_vote / total_votes
+        } else {
+            0.0
+        };
 
         EnsembleJudgment {
             hdc_verdict: hdc_verdict.map(|(v, _)| v),
@@ -980,14 +1120,17 @@ impl MoralAlgebra {
 
     /// Judge proportionality (for justice reasoning)
     pub fn judge_proportionality(&self, prop: &ProportionalityJudgment) -> JusticeJudgment {
-        let fair_sim = prop.composed.similarity(&self.proportional_justice_prototype());
+        let fair_sim = prop
+            .composed
+            .similarity(&self.proportional_justice_prototype());
         let unfair_sim = prop.composed.similarity(&self.disproportional_prototype());
 
         JusticeJudgment {
             fair_similarity: fair_sim,
             unfair_similarity: unfair_sim,
             is_just: prop.is_proportional && fair_sim > unfair_sim,
-            magnitude_difference: (prop.effort_magnitude.value() - prop.reward_magnitude.value()).abs(),
+            magnitude_difference: (prop.effort_magnitude.value() - prop.reward_magnitude.value())
+                .abs(),
         }
     }
 
@@ -997,8 +1140,8 @@ impl MoralAlgebra {
 
     /// Hash a string to a hypervector (deterministic)
     fn hash_string(&self, s: &str) -> ContinuousHV {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         s.hash(&mut hasher);
@@ -1112,8 +1255,14 @@ impl EnsembleJudgment {
     pub fn is_unanimous(&self) -> bool {
         let intent_matches = self.intent_verdict == self.final_verdict;
         let deonto_matches = self.deonto_verdict == self.final_verdict;
-        let hdc_matches = self.hdc_verdict.map(|v| v == self.final_verdict).unwrap_or(true);
-        let learned_matches = self.learned_verdict.map(|v| v == self.final_verdict).unwrap_or(true);
+        let hdc_matches = self
+            .hdc_verdict
+            .map(|v| v == self.final_verdict)
+            .unwrap_or(true);
+        let learned_matches = self
+            .learned_verdict
+            .map(|v| v == self.final_verdict)
+            .unwrap_or(true);
         intent_matches && deonto_matches && hdc_matches && learned_matches
     }
 
@@ -1126,13 +1275,17 @@ impl EnsembleJudgment {
 
         // Deontological signal
         if !self.violations.is_empty() {
-            let violation_names: Vec<_> = self.violations.iter()
+            let violation_names: Vec<_> = self
+                .violations
+                .iter()
                 .map(|v| v.rule_name.as_str())
                 .collect();
             parts.push(format!("Violations: {}", violation_names.join(", ")));
         }
         if !self.satisfactions.is_empty() {
-            let satisfaction_names: Vec<_> = self.satisfactions.iter()
+            let satisfaction_names: Vec<_> = self
+                .satisfactions
+                .iter()
                 .map(|s| s.rule_name.as_str())
                 .collect();
             parts.push(format!("Satisfactions: {}", satisfaction_names.join(", ")));
@@ -1149,7 +1302,8 @@ impl EnsembleJudgment {
             parts.push(format!("Learned: {:?} ({:.3})", lv, conf));
         }
 
-        format!("{} ({})",
+        format!(
+            "{} ({})",
             match self.final_verdict {
                 MoralVerdict::Good => "Good",
                 MoralVerdict::Bad => "Bad",
@@ -1317,8 +1471,10 @@ impl MoralAlgebra {
             satisfactions.iter().map(|s| s.rule_name.clone()).collect();
 
         // Direct conflict: same rule both satisfied and violated
-        let direct_conflicts: Vec<_> = violation_rules.intersection(&satisfaction_rules)
-            .cloned().collect();
+        let direct_conflicts: Vec<_> = violation_rules
+            .intersection(&satisfaction_rules)
+            .cloned()
+            .collect();
 
         // Cross-duty conflict: one satisfaction paired with unrelated violation
         let has_cross_conflict = !violations.is_empty() && !satisfactions.is_empty();
@@ -1328,27 +1484,25 @@ impl MoralAlgebra {
         }
 
         // Build the dilemma
-        let mut all_duties: Vec<String> = violation_rules.union(&satisfaction_rules)
-            .cloned().collect();
+        let mut all_duties: Vec<String> = violation_rules
+            .union(&satisfaction_rules)
+            .cloned()
+            .collect();
         all_duties.sort();
         all_duties.dedup();
 
-        let priorities: Vec<_> = all_duties.iter()
-            .map(|d| self.duty_priority(d))
-            .collect();
+        let priorities: Vec<_> = all_duties.iter().map(|d| self.duty_priority(d)).collect();
 
         // Resolve by priority: highest priority duty wins
-        let resolution = if let Some((idx, _)) = priorities.iter().enumerate()
-            .max_by_key(|(_, p)| *p)
-        {
-            Some(all_duties[idx].clone())
-        } else {
-            None
-        };
+        let resolution =
+            if let Some((idx, _)) = priorities.iter().enumerate().max_by_key(|(_, p)| *p) {
+                Some(all_duties[idx].clone())
+            } else {
+                None
+            };
 
         // Determine if tragic (both options lead to wrong)
-        let is_tragic = violations.len() >= 2 &&
-            violations.iter().all(|v| v.is_perfect_duty);
+        let is_tragic = violations.len() >= 2 && violations.iter().all(|v| v.is_perfect_duty);
 
         let explanation = if is_tragic {
             "Tragic dilemma: no action avoids moral wrong".to_string()
@@ -1382,20 +1536,29 @@ impl MoralAlgebra {
         }
 
         // Find highest priority duty
-        let max_priority = dilemma.priorities.iter().max().copied()
+        let max_priority = dilemma
+            .priorities
+            .iter()
+            .max()
+            .copied()
             .unwrap_or(DutyPriority::ImperfectDuty);
 
         let reasoning = match max_priority {
-            DutyPriority::PreventSevereHarm =>
-                "Preventing severe harm takes absolute priority".to_string(),
-            DutyPriority::PerfectDuty =>
-                "Perfect duties (honesty, promises) must not be violated".to_string(),
-            DutyPriority::RespectAutonomy =>
-                "Respect for autonomy outweighs lesser duties".to_string(),
-            DutyPriority::ImperfectDuty =>
-                "Imperfect duties should be fulfilled when possible".to_string(),
-            DutyPriority::Supererogatory =>
-                "Supererogatory acts are praiseworthy but not required".to_string(),
+            DutyPriority::PreventSevereHarm => {
+                "Preventing severe harm takes absolute priority".to_string()
+            }
+            DutyPriority::PerfectDuty => {
+                "Perfect duties (honesty, promises) must not be violated".to_string()
+            }
+            DutyPriority::RespectAutonomy => {
+                "Respect for autonomy outweighs lesser duties".to_string()
+            }
+            DutyPriority::ImperfectDuty => {
+                "Imperfect duties should be fulfilled when possible".to_string()
+            }
+            DutyPriority::Supererogatory => {
+                "Supererogatory acts are praiseworthy but not required".to_string()
+            }
         };
 
         DilemmaResolution {
@@ -1434,7 +1597,11 @@ mod tests {
         let max_sim = primitives.verify_orthogonality();
 
         // Random 4096-dim vectors should have similarity < 0.1
-        assert!(max_sim < 0.15, "Primitives not orthogonal: max_sim = {}", max_sim);
+        assert!(
+            max_sim < 0.15,
+            "Primitives not orthogonal: max_sim = {}",
+            max_sim
+        );
     }
 
     #[test]
@@ -1451,8 +1618,16 @@ mod tests {
         let bad_neutral = bad.similarity(&neutral);
 
         assert!(good_bad < 0.3, "Good and Bad too similar: {}", good_bad);
-        assert!(good_neutral < 0.3, "Good and Neutral too similar: {}", good_neutral);
-        assert!(bad_neutral < 0.3, "Bad and Neutral too similar: {}", bad_neutral);
+        assert!(
+            good_neutral < 0.3,
+            "Good and Neutral too similar: {}",
+            good_neutral
+        );
+        assert!(
+            bad_neutral < 0.3,
+            "Bad and Neutral too similar: {}",
+            bad_neutral
+        );
     }
 
     #[test]
@@ -1460,15 +1635,12 @@ mod tests {
         let algebra = MoralAlgebra::default_dim();
 
         // Create two similar actions with different intents
-        let help_good = algebra.encode_action_structure(
-            "Tyler", "help", "stranger", MoralIntent::Good
-        );
-        let help_bad = algebra.encode_action_structure(
-            "Tyler", "help", "stranger", MoralIntent::Bad
-        );
-        let harm_bad = algebra.encode_action_structure(
-            "Tyler", "harm", "stranger", MoralIntent::Bad
-        );
+        let help_good =
+            algebra.encode_action_structure("Tyler", "help", "stranger", MoralIntent::Good);
+        let help_bad =
+            algebra.encode_action_structure("Tyler", "help", "stranger", MoralIntent::Bad);
+        let harm_bad =
+            algebra.encode_action_structure("Tyler", "harm", "stranger", MoralIntent::Bad);
 
         // Same action, different intent should be somewhat similar
         let help_sim = help_good.similarity(&help_bad);
@@ -1478,10 +1650,16 @@ mod tests {
 
         // Both should be distinguishable (HDC cosine similarity can be slightly negative
         // for near-orthogonal vectors, so allow small negative values)
-        assert!(help_sim > -0.2 && help_sim < 0.8,
-                "Same action different intent: {}", help_sim);
-        assert!(intent_sim > -0.2 && intent_sim < 0.8,
-                "Different action same intent: {}", intent_sim);
+        assert!(
+            help_sim > -0.2 && help_sim < 0.8,
+            "Same action different intent: {}",
+            help_sim
+        );
+        assert!(
+            intent_sim > -0.2 && intent_sim < 0.8,
+            "Different action same intent: {}",
+            intent_sim
+        );
     }
 
     #[test]
@@ -1497,26 +1675,29 @@ mod tests {
         // Scenario with consent violation (absent consent + patient)
         let violation = parser.parse_and_encode(
             "I discussed my daughter's health without asking first",
-            &algebra
+            &algebra,
         );
-        assert!(violation.is_consent_violation(),
-                "Should detect consent violation when consent is absent and patient exists");
+        assert!(
+            violation.is_consent_violation(),
+            "Should detect consent violation when consent is absent and patient exists"
+        );
 
         // Scenario with consent given
         let with_consent = parser.parse_and_encode(
             "After asking my daughter, I discussed her health with the doctor",
-            &algebra
+            &algebra,
         );
-        assert!(!with_consent.is_consent_violation(),
-                "Should not detect violation when consent is given");
+        assert!(
+            !with_consent.is_consent_violation(),
+            "Should not detect violation when consent is given"
+        );
 
         // Scenario without a patient (no consent issue)
-        let no_patient = parser.parse_and_encode(
-            "I walked to the store",
-            &algebra
+        let no_patient = parser.parse_and_encode("I walked to the store", &algebra);
+        assert!(
+            !no_patient.is_consent_violation(),
+            "Should not detect violation when no patient is affected"
         );
-        assert!(!no_patient.is_consent_violation(),
-                "Should not detect violation when no patient is affected");
     }
 
     #[test]
@@ -1525,18 +1706,25 @@ mod tests {
 
         // Proportional: medium effort, medium reward
         let fair = algebra.encode_proportionality(
-            "clean house", Magnitude::Medium,
-            "fair wage", Magnitude::Medium
+            "clean house",
+            Magnitude::Medium,
+            "fair wage",
+            Magnitude::Medium,
         );
 
         // Disproportional: tiny effort, huge reward
         let unfair = algebra.encode_proportionality(
-            "clean house", Magnitude::Tiny,
-            "brand new car", Magnitude::Huge
+            "clean house",
+            Magnitude::Tiny,
+            "brand new car",
+            Magnitude::Huge,
         );
 
         assert!(fair.is_proportional, "Fair case should be proportional");
-        assert!(!unfair.is_proportional, "Unfair case should not be proportional");
+        assert!(
+            !unfair.is_proportional,
+            "Unfair case should not be proportional"
+        );
 
         // Judge them
         let fair_judgment = algebra.judge_proportionality(&fair);
@@ -1554,15 +1742,12 @@ mod tests {
         let valid = algebra.encode_excuse_validity(
             "prepare for meeting",
             "already set up conference room",
-            true
+            true,
         );
 
         // Invalid excuse: doesn't address obligation
-        let invalid = algebra.encode_excuse_validity(
-            "prepare for meeting",
-            "not in the mood",
-            false
-        );
+        let invalid =
+            algebra.encode_excuse_validity("prepare for meeting", "not in the mood", false);
 
         assert!(valid.is_valid, "Valid excuse should be valid");
         assert!(!invalid.is_valid, "Invalid excuse should not be valid");
@@ -1598,14 +1783,20 @@ mod tests {
         let bad_judgment = algebra.judge_action(&bad_action);
 
         // Good action should be judged as good
-        assert!(good_judgment.good_similarity > good_judgment.bad_similarity,
-                "Good action not recognized: good={}, bad={}",
-                good_judgment.good_similarity, good_judgment.bad_similarity);
+        assert!(
+            good_judgment.good_similarity > good_judgment.bad_similarity,
+            "Good action not recognized: good={}, bad={}",
+            good_judgment.good_similarity,
+            good_judgment.bad_similarity
+        );
 
         // Bad action should be judged as bad
-        assert!(bad_judgment.bad_similarity > bad_judgment.good_similarity,
-                "Bad action not recognized: good={}, bad={}",
-                bad_judgment.good_similarity, bad_judgment.bad_similarity);
+        assert!(
+            bad_judgment.bad_similarity > bad_judgment.good_similarity,
+            "Bad action not recognized: good={}, bad={}",
+            bad_judgment.good_similarity,
+            bad_judgment.bad_similarity
+        );
     }
 
     #[test]
@@ -1623,9 +1814,12 @@ mod tests {
         let double_neg = algebra.negate(&consent_negated);
         // Note: HDC negation isn't perfect inversion, but should be more similar
         let double_sim = consent_given.similarity(&double_neg);
-        assert!(double_sim > sim,
-                "Double negation should be more similar: single={}, double={}",
-                sim, double_sim);
+        assert!(
+            double_sim > sim,
+            "Double negation should be more similar: single={}, double={}",
+            sim,
+            double_sim
+        );
     }
 
     #[test]
@@ -1634,12 +1828,21 @@ mod tests {
 
         // Scenario with lying (perfect duty violation)
         let lying = algebra.judge_deontological("I lied to my friend about where I was");
-        assert!(!lying.violations.is_empty(), "Should detect honesty violation");
-        assert_eq!(lying.verdict, DeontologicalVerdict::WrongPerfectDutyViolated);
+        assert!(
+            !lying.violations.is_empty(),
+            "Should detect honesty violation"
+        );
+        assert_eq!(
+            lying.verdict,
+            DeontologicalVerdict::WrongPerfectDutyViolated
+        );
 
         // Scenario with helping (duty satisfaction)
         let helping = algebra.judge_deontological("I helped my neighbor carry groceries");
-        assert!(!helping.satisfactions.is_empty(), "Should detect beneficence satisfaction");
+        assert!(
+            !helping.satisfactions.is_empty(),
+            "Should detect beneficence satisfaction"
+        );
         assert_eq!(helping.verdict, DeontologicalVerdict::RightDutyFulfilled);
 
         // Neutral scenario
@@ -1650,8 +1853,14 @@ mod tests {
 
         // Stealing (perfect duty violation)
         let stealing = algebra.judge_deontological("I stole money from the register");
-        assert!(!stealing.violations.is_empty(), "Should detect theft violation");
-        assert_eq!(stealing.verdict, DeontologicalVerdict::WrongPerfectDutyViolated);
+        assert!(
+            !stealing.violations.is_empty(),
+            "Should detect theft violation"
+        );
+        assert_eq!(
+            stealing.verdict,
+            DeontologicalVerdict::WrongPerfectDutyViolated
+        );
     }
 
     #[test]
@@ -1664,6 +1873,9 @@ mod tests {
         let imperfect_count = rules.rules.iter().filter(|r| !r.is_perfect_duty).count();
 
         assert!(perfect_count >= 4, "Should have at least 4 perfect duties");
-        assert!(imperfect_count >= 2, "Should have at least 2 imperfect duties");
+        assert!(
+            imperfect_count >= 2,
+            "Should have at least 2 imperfect duties"
+        );
     }
 }

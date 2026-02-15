@@ -21,19 +21,13 @@ fn main() -> anyhow::Result<()> {
             for input in session.inputs.iter() {
                 println!(
                     "  {} : {:?} (type: {:?})",
-                    input.name,
-                    input.input_type,
-                    input.input_type
+                    input.name, input.input_type, input.input_type
                 );
             }
 
             println!("OUTPUTS:");
             for output in session.outputs.iter() {
-                println!(
-                    "  {} : {:?}",
-                    output.name,
-                    output.output_type
-                );
+                println!("  {} : {:?}", output.name, output.output_type);
             }
             println!();
         } else {

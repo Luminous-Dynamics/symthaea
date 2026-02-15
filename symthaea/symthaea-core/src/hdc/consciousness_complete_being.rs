@@ -38,15 +38,15 @@
 
 #![allow(dead_code)]
 
+use super::adaptive_topology::CognitiveMode;
 use super::binary_hv::BinaryHV;
 use super::consciousness_advanced_cognition::{
-    AdvancedCognitionEngine, TheoryOfMindEngine, MotorImagerySystem,
+    AdvancedCognitionEngine, MotorImagerySystem, TheoryOfMindEngine,
 };
 use super::consciousness_metacognition::MetacognitionEngine;
-use super::adaptive_topology::CognitiveMode;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::{SystemTime, UNIX_EPOCH};
-use serde::{Serialize, Deserialize};
 
 // =============================================================================
 // 1. SENSORIMOTOR GROUNDING - Perception-Action Loop
@@ -178,10 +178,9 @@ impl SensorimotorGrounding {
 
         for command in self.motor_repertoire.values() {
             let similarity = goal.similarity(&command.encoding);
-            if similarity > threshold
-                && (best_action.is_none() || similarity > best_action.unwrap().0) {
-                    best_action = Some((similarity, command));
-                }
+            if similarity > threshold && best_action.is_none_or(|(s, _)| similarity > s) {
+                best_action = Some((similarity, command));
+            }
         }
 
         best_action.map(|(_, cmd)| cmd.clone())
@@ -245,12 +244,13 @@ impl SensorimotorGrounding {
     pub fn action_perception_cycle(&mut self, goal: &BinaryHV) -> ActionPerceptionResult {
         let affordances = self.detect_affordances();
         let action = self.select_action(goal);
-        let predictions = action.as_ref()
+        let predictions = action
+            .as_ref()
             .map(|a| self.predict_consequences(a))
             .unwrap_or_default();
 
-        let error = self.prediction_errors.iter().sum::<f64>()
-            / self.prediction_errors.len().max(1) as f64;
+        let error =
+            self.prediction_errors.iter().sum::<f64>() / self.prediction_errors.len().max(1) as f64;
 
         ActionPerceptionResult {
             selected_action: action,
@@ -444,7 +444,11 @@ impl DevelopmentalTracker {
         };
 
         if let Some(next) = next_stage {
-            let threshold = self.transition_thresholds.get(&next).copied().unwrap_or(f64::MAX);
+            let threshold = self
+                .transition_thresholds
+                .get(&next)
+                .copied()
+                .unwrap_or(f64::MAX);
             let total_experience: f64 = self.experience_points.values().sum();
 
             if total_experience >= threshold {
@@ -490,12 +494,20 @@ impl DevelopmentalTracker {
         };
 
         if let Some(next) = next_stage {
-            let threshold = self.transition_thresholds.get(&next).copied().unwrap_or(f64::MAX);
-            let current_threshold = self.transition_thresholds.get(&self.current_stage)
-                .copied().unwrap_or(0.0);
+            let threshold = self
+                .transition_thresholds
+                .get(&next)
+                .copied()
+                .unwrap_or(f64::MAX);
+            let current_threshold = self
+                .transition_thresholds
+                .get(&self.current_stage)
+                .copied()
+                .unwrap_or(0.0);
             let total_experience: f64 = self.experience_points.values().sum();
 
-            ((total_experience - current_threshold) / (threshold - current_threshold)).clamp(0.0, 1.0)
+            ((total_experience - current_threshold) / (threshold - current_threshold))
+                .clamp(0.0, 1.0)
         } else {
             1.0 // Already at max stage
         }
@@ -628,7 +640,11 @@ impl SocialConsciousness {
     }
 
     /// Model another agent's mental state
-    pub fn model_agent_mind(&mut self, agent_id: &str, observed_behavior: &BinaryHV) -> Option<AgentMentalState> {
+    pub fn model_agent_mind(
+        &mut self,
+        agent_id: &str,
+        observed_behavior: &BinaryHV,
+    ) -> Option<AgentMentalState> {
         let agent = self.agents.get_mut(agent_id)?;
 
         // Use ToM engine to infer mental states
@@ -701,7 +717,8 @@ impl SocialConsciousness {
 
     /// Check if behavior violates norms
     pub fn check_norm_violation(&self, behavior: &BinaryHV) -> Vec<(String, f64)> {
-        self.norms.iter()
+        self.norms
+            .iter()
             .map(|norm| {
                 let violation = 1.0 - behavior.similarity(&norm.encoding) as f64;
                 (norm.name.clone(), violation * norm.importance)
@@ -717,7 +734,8 @@ impl SocialConsciousness {
 
     /// Get social relationship summary
     pub fn relationship_summary(&self, agent_id: &str) -> Option<(f64, f64)> {
-        self.agents.get(agent_id)
+        self.agents
+            .get(agent_id)
             .map(|a| (a.relationship_valence, a.trust_level))
     }
 }
@@ -819,63 +837,51 @@ impl IntrospectionAPI {
             .unwrap_or(0);
 
         let (query_str, answer, confidence, evidence) = match query {
-            IntrospectionQuery::CurrentEmotion => {
-                (
-                    "What am I feeling?".to_string(),
-                    self.emotional_description.clone(),
-                    0.8,
-                    Vec::new(),
-                )
-            }
-            IntrospectionQuery::CurrentFocus => {
-                (
-                    "What am I thinking about?".to_string(),
-                    "Processing current inputs".to_string(),
-                    0.7,
-                    Vec::new(),
-                )
-            }
-            IntrospectionQuery::ActionExplanation(action) => {
-                (
-                    "Why did I do that?".to_string(),
-                    "Action was selected to achieve current goals".to_string(),
-                    0.6,
-                    vec![action],
-                )
-            }
-            IntrospectionQuery::BeliefQuery(topic) => {
-                (
-                    "What do I believe about this?".to_string(),
-                    "Belief encoded in semantic memory".to_string(),
-                    0.7,
-                    vec![topic],
-                )
-            }
-            IntrospectionQuery::Counterfactual(scenario) => {
-                (
-                    "What would happen if?".to_string(),
-                    "Counterfactual simulation result".to_string(),
-                    0.5,
-                    vec![scenario],
-                )
-            }
-            IntrospectionQuery::ConsciousnessLevel => {
-                (
-                    "How conscious am I?".to_string(),
-                    format!("Current consciousness level: {:.2}, Phi: {:.3}",
-                        self.current_phi, self.current_phi),
-                    0.9,
-                    Vec::new(),
-                )
-            }
-            IntrospectionQuery::ActiveGoals => {
-                (
-                    "What are my current goals?".to_string(),
-                    "Homeostatic drives: curiosity, competence, social".to_string(),
-                    0.8,
-                    Vec::new(),
-                )
-            }
+            IntrospectionQuery::CurrentEmotion => (
+                "What am I feeling?".to_string(),
+                self.emotional_description.clone(),
+                0.8,
+                Vec::new(),
+            ),
+            IntrospectionQuery::CurrentFocus => (
+                "What am I thinking about?".to_string(),
+                "Processing current inputs".to_string(),
+                0.7,
+                Vec::new(),
+            ),
+            IntrospectionQuery::ActionExplanation(action) => (
+                "Why did I do that?".to_string(),
+                "Action was selected to achieve current goals".to_string(),
+                0.6,
+                vec![action],
+            ),
+            IntrospectionQuery::BeliefQuery(topic) => (
+                "What do I believe about this?".to_string(),
+                "Belief encoded in semantic memory".to_string(),
+                0.7,
+                vec![topic],
+            ),
+            IntrospectionQuery::Counterfactual(scenario) => (
+                "What would happen if?".to_string(),
+                "Counterfactual simulation result".to_string(),
+                0.5,
+                vec![scenario],
+            ),
+            IntrospectionQuery::ConsciousnessLevel => (
+                "How conscious am I?".to_string(),
+                format!(
+                    "Current consciousness level: {:.2}, Phi: {:.3}",
+                    self.current_phi, self.current_phi
+                ),
+                0.9,
+                Vec::new(),
+            ),
+            IntrospectionQuery::ActiveGoals => (
+                "What are my current goals?".to_string(),
+                "Homeostatic drives: curiosity, competence, social".to_string(),
+                0.8,
+                Vec::new(),
+            ),
             IntrospectionQuery::FullStateSnapshot => {
                 let snapshot = self.get_state_snapshot();
                 (
@@ -892,7 +898,10 @@ impl IntrospectionAPI {
                 )
             }
             IntrospectionQuery::AgentBeliefQuery(agent_id) => {
-                let belief = self.social.agents.get(&agent_id)
+                let belief = self
+                    .social
+                    .agents
+                    .get(&agent_id)
                     .map(|a| format!("Agent {} trust: {:.2}", agent_id, a.trust_level))
                     .unwrap_or_else(|| format!("Unknown agent: {}", agent_id));
                 (
@@ -1008,7 +1017,11 @@ impl CompleteConsciousBeing {
     }
 
     /// Run a complete consciousness cycle
-    pub fn consciousness_cycle(&mut self, sensory_inputs: Vec<SensoryInput>, goal: &BinaryHV) -> ConsciousnessSnapshot {
+    pub fn consciousness_cycle(
+        &mut self,
+        sensory_inputs: Vec<SensoryInput>,
+        goal: &BinaryHV,
+    ) -> ConsciousnessSnapshot {
         self.cycle_count += 1;
 
         // 1. Process sensory inputs
@@ -1020,9 +1033,11 @@ impl CompleteConsciousBeing {
         let ap_result = self.sensorimotor.action_perception_cycle(goal);
 
         // 3. Update developmental experience
-        self.development.process_experience(DevelopmentalCapability::BasicAttention, 1.0);
+        self.development
+            .process_experience(DevelopmentalCapability::BasicAttention, 1.0);
         if self.development.stage() >= DevelopmentalStage::PreOperational {
-            self.development.process_experience(DevelopmentalCapability::BasicTheoryOfMind, 0.5);
+            self.development
+                .process_experience(DevelopmentalCapability::BasicTheoryOfMind, 0.5);
         }
 
         // 4. Update consciousness level based on integration

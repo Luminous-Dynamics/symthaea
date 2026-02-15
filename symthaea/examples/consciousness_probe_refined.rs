@@ -12,9 +12,7 @@ use std::time::Instant;
 use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{
-    ConsciousnessProbeV2, ConceptCorpus, ProbeConfig,
-};
+use symthaea::perception::{ConceptCorpus, ConsciousnessProbeV2, ProbeConfig};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::TopologyConfig;
@@ -66,20 +64,26 @@ fn run_experiment() -> Result<()> {
     };
 
     println!("  Pure qualia concepts: {}", qualia_corpus.len());
-    println!("  Pure computation concepts: {}\n", computation_corpus.len());
+    println!(
+        "  Pure computation concepts: {}\n",
+        computation_corpus.len()
+    );
 
     // Initialize probe
     println!("Loading BGE-M3 model and probe weights...");
     let load_start = Instant::now();
     let mut probe = ConsciousnessProbeV2::load_with_probe(probe_path)?;
-    println!("  Model loaded in {:.2}s\n", load_start.elapsed().as_secs_f64());
+    println!(
+        "  Model loaded in {:.2}s\n",
+        load_start.elapsed().as_secs_f64()
+    );
 
     // More sensitive topology config for refined analysis
     let config = ProbeConfig {
         topology_config: TopologyConfig {
-            min_persistence: 0.05,  // Lower threshold to catch subtle features
+            min_persistence: 0.05, // Lower threshold to catch subtle features
             max_scale: 1.0,
-            num_scales: 20,  // More scales for finer resolution
+            num_scales: 20, // More scales for finer resolution
             detect_cycles: true,
             detect_voids: true,
         },
@@ -97,16 +101,20 @@ fn run_experiment() -> Result<()> {
     println!("Probing pure qualia concepts...");
     let q_start = Instant::now();
     let qualia_results = probe.probe_corpus_texts(&qualia_corpus)?;
-    println!("  Completed in {:.2}s ({} concepts)\n",
-             q_start.elapsed().as_secs_f64(),
-             qualia_results.len());
+    println!(
+        "  Completed in {:.2}s ({} concepts)\n",
+        q_start.elapsed().as_secs_f64(),
+        qualia_results.len()
+    );
 
     println!("Probing pure computation concepts...");
     let c_start = Instant::now();
     let computation_results = probe.probe_corpus_texts(&computation_corpus)?;
-    println!("  Completed in {:.2}s ({} concepts)\n",
-             c_start.elapsed().as_secs_f64(),
-             computation_results.len());
+    println!(
+        "  Completed in {:.2}s ({} concepts)\n",
+        c_start.elapsed().as_secs_f64(),
+        computation_results.len()
+    );
 
     // Compare
     println!("================================================================");
@@ -116,23 +124,43 @@ fn run_experiment() -> Result<()> {
     let comparison = probe.compare_classes(&qualia_results, &computation_results);
 
     println!("Pure Qualia (n={}):", comparison.phenomenal_stats.n);
-    println!("  Mean Unity Score: {:.4} (+/- {:.4})",
-             comparison.phenomenal_stats.mean_unity,
-             comparison.phenomenal_stats.std_unity);
-    println!("  Mean beta_0 (components): {:.2}", comparison.phenomenal_stats.mean_beta_0);
-    println!("  Mean beta_1 (cycles): {:.2}\n", comparison.phenomenal_stats.mean_beta_1);
+    println!(
+        "  Mean Unity Score: {:.4} (+/- {:.4})",
+        comparison.phenomenal_stats.mean_unity, comparison.phenomenal_stats.std_unity
+    );
+    println!(
+        "  Mean beta_0 (components): {:.2}",
+        comparison.phenomenal_stats.mean_beta_0
+    );
+    println!(
+        "  Mean beta_1 (cycles): {:.2}\n",
+        comparison.phenomenal_stats.mean_beta_1
+    );
 
     println!("Pure Computation (n={}):", comparison.functional_stats.n);
-    println!("  Mean Unity Score: {:.4} (+/- {:.4})",
-             comparison.functional_stats.mean_unity,
-             comparison.functional_stats.std_unity);
-    println!("  Mean beta_0 (components): {:.2}", comparison.functional_stats.mean_beta_0);
-    println!("  Mean beta_1 (cycles): {:.2}\n", comparison.functional_stats.mean_beta_1);
+    println!(
+        "  Mean Unity Score: {:.4} (+/- {:.4})",
+        comparison.functional_stats.mean_unity, comparison.functional_stats.std_unity
+    );
+    println!(
+        "  Mean beta_0 (components): {:.2}",
+        comparison.functional_stats.mean_beta_0
+    );
+    println!(
+        "  Mean beta_1 (cycles): {:.2}\n",
+        comparison.functional_stats.mean_beta_1
+    );
 
     println!("Statistical Tests:");
-    println!("  Observed Difference: {:.4}", comparison.observed_difference);
+    println!(
+        "  Observed Difference: {:.4}",
+        comparison.observed_difference
+    );
     println!("  Cohen's d: {:.4}", comparison.cohens_d);
-    println!("  p-value: {:.4} (n={} permutations)", comparison.p_value, comparison.n_permutations);
+    println!(
+        "  p-value: {:.4} (n={} permutations)",
+        comparison.p_value, comparison.n_permutations
+    );
     println!("  Significant (p < 0.05): {}\n", comparison.is_significant);
 
     // Effect size interpretation
@@ -162,7 +190,11 @@ fn run_experiment() -> Result<()> {
         println!("RESULT: NOT SIGNIFICANT");
         println!("Refined test also shows no clear difference.");
     }
-    println!("\nEffect size: {} (|d| = {:.2})", effect_size, comparison.cohens_d.abs());
+    println!(
+        "\nEffect size: {} (|d| = {:.2})",
+        effect_size,
+        comparison.cohens_d.abs()
+    );
 
     // Show all individual results for detailed analysis
     println!("\n================================================================");
@@ -171,18 +203,22 @@ fn run_experiment() -> Result<()> {
 
     println!("All Qualia Results:");
     for r in &qualia_results {
-        println!("  [{:.4}] {} - \"{}\"",
-                 r.unity_score,
-                 r.concept.subcategory,
-                 truncate(&r.concept.text, 50));
+        println!(
+            "  [{:.4}] {} - \"{}\"",
+            r.unity_score,
+            r.concept.subcategory,
+            truncate(&r.concept.text, 50)
+        );
     }
 
     println!("\nAll Computation Results:");
     for r in &computation_results {
-        println!("  [{:.4}] {} - \"{}\"",
-                 r.unity_score,
-                 r.concept.subcategory,
-                 truncate(&r.concept.text, 50));
+        println!(
+            "  [{:.4}] {} - \"{}\"",
+            r.unity_score,
+            r.concept.subcategory,
+            truncate(&r.concept.text, 50)
+        );
     }
 
     println!("\n================================================================");

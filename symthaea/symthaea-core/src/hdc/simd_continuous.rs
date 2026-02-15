@@ -167,13 +167,13 @@ unsafe fn dot_product_avx2_fma(a: &[f32], b: &[f32]) -> f32 {
     // Horizontal sum within AVX register
     // sum0 = [a0, a1, a2, a3, a4, a5, a6, a7]
     let hi = _mm256_extractf128_ps(sum0, 1); // [a4, a5, a6, a7]
-    let lo = _mm256_castps256_ps128(sum0);    // [a0, a1, a2, a3]
-    let sum128 = _mm_add_ps(lo, hi);          // [a0+a4, a1+a5, a2+a6, a3+a7]
+    let lo = _mm256_castps256_ps128(sum0); // [a0, a1, a2, a3]
+    let sum128 = _mm_add_ps(lo, hi); // [a0+a4, a1+a5, a2+a6, a3+a7]
 
     // Shuffle and add pairs
-    let shuf = _mm_movehdup_ps(sum128);       // [a1+a5, a1+a5, a3+a7, a3+a7]
-    let sums = _mm_add_ps(sum128, shuf);      // [a0+a1+a4+a5, ...]
-    let shuf2 = _mm_movehl_ps(sums, sums);    // [a2+a3+a6+a7, ...]
+    let shuf = _mm_movehdup_ps(sum128); // [a1+a5, a1+a5, a3+a7, a3+a7]
+    let sums = _mm_add_ps(sum128, shuf); // [a0+a1+a4+a5, ...]
+    let shuf2 = _mm_movehl_ps(sums, sums); // [a2+a3+a6+a7, ...]
     let result = _mm_add_ss(sums, shuf2);
 
     let mut total = _mm_cvtss_f32(result);
@@ -332,10 +332,7 @@ unsafe fn dot_product_sse41(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(feature = "simd")]
 #[inline]
 fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
-    a.iter()
-        .zip(b.iter())
-        .map(|(&x, &y)| x * y)
-        .sum()
+    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
 }
 
 // =============================================================================
@@ -490,7 +487,11 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
         return Vec::new();
     }
 
-    assert_eq!(hvs.len(), weights.len(), "Number of HVs must match number of weights");
+    assert_eq!(
+        hvs.len(),
+        weights.len(),
+        "Number of HVs must match number of weights"
+    );
 
     let dim = hvs[0].dim();
     for hv in hvs.iter() {
@@ -498,7 +499,11 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
     }
 
     let weight_sum: f32 = weights.iter().sum();
-    let inv_weight_sum = if weight_sum.abs() > 1e-10 { 1.0 / weight_sum } else { 0.0 };
+    let inv_weight_sum = if weight_sum.abs() > 1e-10 {
+        1.0 / weight_sum
+    } else {
+        0.0
+    };
 
     let mut result = vec![0.0f32; dim];
 
@@ -527,7 +532,12 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 #[target_feature(enable = "avx2", enable = "fma")]
 #[inline]
-unsafe fn bundle_avx2_fma(hvs: &[&[f32]], weights: &[f32], result: &mut [f32], inv_weight_sum: f32) {
+unsafe fn bundle_avx2_fma(
+    hvs: &[&[f32]],
+    weights: &[f32],
+    result: &mut [f32],
+    inv_weight_sum: f32,
+) {
     let dim = result.len();
     let chunks = dim / 8;
     let remainder = dim % 8;
@@ -789,20 +799,14 @@ fn similarity_scalar_optimized(a: &[f32], b: &[f32]) -> f32 {
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn dot_product_simd(a: &[f32], b: &[f32]) -> f32 {
-    a.iter()
-        .zip(b.iter())
-        .map(|(&x, &y)| x * y)
-        .sum()
+    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).sum()
 }
 
 /// Non-SIMD bind (for builds without simd feature)
 #[cfg(not(feature = "simd"))]
 #[inline]
 pub fn bind_simd(a: &[f32], b: &[f32]) -> Vec<f32> {
-    a.iter()
-        .zip(b.iter())
-        .map(|(&x, &y)| x * y)
-        .collect()
+    a.iter().zip(b.iter()).map(|(&x, &y)| x * y).collect()
 }
 
 /// Non-SIMD bundle (for builds without simd feature)
@@ -815,7 +819,11 @@ pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {
 
     let dim = hvs[0].len();
     let weight_sum: f32 = weights.iter().sum();
-    let inv_weight_sum = if weight_sum.abs() > 1e-10 { 1.0 / weight_sum } else { 0.0 };
+    let inv_weight_sum = if weight_sum.abs() > 1e-10 {
+        1.0 / weight_sum
+    } else {
+        0.0
+    };
 
     let mut result = vec![0.0f32; dim];
     for i in 0..dim {
@@ -917,12 +925,14 @@ mod tests {
 
     fn random_vec(dim: usize, seed: u64) -> Vec<f32> {
         let mut state = seed ^ 0x9E3779B97F4A7C15; // avoid xorshift64 fixed-point at 0
-        (0..dim).map(|_| {
-            state ^= state << 13;
-            state ^= state >> 7;
-            state ^= state << 17;
-            (state as f32 / u64::MAX as f32) * 2.0 - 1.0
-        }).collect()
+        (0..dim)
+            .map(|_| {
+                state ^= state << 13;
+                state ^= state >> 7;
+                state ^= state << 17;
+                (state as f32 / u64::MAX as f32) * 2.0 - 1.0
+            })
+            .collect()
     }
 
     fn scalar_dot_product(a: &[f32], b: &[f32]) -> f32 {
@@ -940,9 +950,13 @@ mod tests {
         let scalar_result = scalar_dot_product(&a, &b);
 
         let relative_error = ((simd_result - scalar_result) / scalar_result.abs().max(1e-10)).abs();
-        assert!(relative_error < EPSILON,
-                "Dot product mismatch: SIMD={}, Scalar={}, Error={}",
-                simd_result, scalar_result, relative_error);
+        assert!(
+            relative_error < EPSILON,
+            "Dot product mismatch: SIMD={}, Scalar={}, Error={}",
+            simd_result,
+            scalar_result,
+            relative_error
+        );
     }
 
     #[test]
@@ -953,7 +967,11 @@ mod tests {
         let expected: f32 = a.iter().map(|&x| x * x).sum();
 
         let relative_error = ((result - expected) / expected.abs().max(1e-10)).abs();
-        assert!(relative_error < EPSILON, "Self dot product error: {}", relative_error);
+        assert!(
+            relative_error < EPSILON,
+            "Self dot product error: {}",
+            relative_error
+        );
     }
 
     #[test]
@@ -962,7 +980,11 @@ mod tests {
         let zero = vec![0.0f32; HDC_DIM];
 
         let result = dot_product_simd(&a, &zero);
-        assert!(result.abs() < 1e-6, "Dot with zero should be 0, got {}", result);
+        assert!(
+            result.abs() < 1e-6,
+            "Dot with zero should be 0, got {}",
+            result
+        );
     }
 
     #[test]
@@ -974,7 +996,11 @@ mod tests {
         b[1] = 1.0;
 
         let result = dot_product_simd(&a, &b);
-        assert!(result.abs() < EPSILON, "Orthogonal dot product should be 0, got {}", result);
+        assert!(
+            result.abs() < EPSILON,
+            "Orthogonal dot product should be 0, got {}",
+            result
+        );
     }
 
     #[test]
@@ -983,7 +1009,11 @@ mod tests {
         a[0] = 1.0;
 
         let result = dot_product_simd(&a, &a);
-        assert!((result - 1.0).abs() < EPSILON, "Parallel unit dot should be 1.0, got {}", result);
+        assert!(
+            (result - 1.0).abs() < EPSILON,
+            "Parallel unit dot should be 1.0, got {}",
+            result
+        );
     }
 
     #[test]
@@ -1003,8 +1033,13 @@ mod tests {
         let scalar_result: Vec<f32> = a.iter().zip(b.iter()).map(|(&x, &y)| x * y).collect();
 
         for i in 0..HDC_DIM {
-            assert!((simd_result[i] - scalar_result[i]).abs() < EPSILON,
-                    "Bind mismatch at index {}: {} vs {}", i, simd_result[i], scalar_result[i]);
+            assert!(
+                (simd_result[i] - scalar_result[i]).abs() < EPSILON,
+                "Bind mismatch at index {}: {} vs {}",
+                i,
+                simd_result[i],
+                scalar_result[i]
+            );
         }
     }
 
@@ -1015,8 +1050,12 @@ mod tests {
 
         let result = bind_simd(&a, &ones);
         for i in 0..HDC_DIM {
-            assert!((result[i] - a[i]).abs() < EPSILON,
-                "Multiply by 1 should preserve: {} vs {}", result[i], a[i]);
+            assert!(
+                (result[i] - a[i]).abs() < EPSILON,
+                "Multiply by 1 should preserve: {} vs {}",
+                result[i],
+                a[i]
+            );
         }
     }
 
@@ -1027,7 +1066,11 @@ mod tests {
 
         let result = bind_simd(&a, &zero);
         for &val in &result {
-            assert!(val.abs() < EPSILON, "Multiply by 0 should be 0, got {}", val);
+            assert!(
+                val.abs() < EPSILON,
+                "Multiply by 0 should be 0, got {}",
+                val
+            );
         }
     }
 
@@ -1040,8 +1083,10 @@ mod tests {
         let ba = bind_simd(&b, &a);
 
         for i in 0..100 {
-            assert!((ab[i] - ba[i]).abs() < EPSILON,
-                "Elementwise multiplication should be commutative");
+            assert!(
+                (ab[i] - ba[i]).abs() < EPSILON,
+                "Elementwise multiplication should be commutative"
+            );
         }
     }
 
@@ -1064,8 +1109,13 @@ mod tests {
         }
 
         for i in 0..HDC_DIM {
-            assert!((simd_result[i] - expected[i]).abs() < EPSILON,
-                    "Bundle mismatch at index {}: {} vs {}", i, simd_result[i], expected[i]);
+            assert!(
+                (simd_result[i] - expected[i]).abs() < EPSILON,
+                "Bundle mismatch at index {}: {} vs {}",
+                i,
+                simd_result[i],
+                expected[i]
+            );
         }
     }
 
@@ -1087,8 +1137,11 @@ mod tests {
         }
 
         for i in 0..HDC_DIM {
-            assert!((simd_result[i] - expected[i]).abs() < EPSILON,
-                    "Weighted bundle mismatch at index {}", i);
+            assert!(
+                (simd_result[i] - expected[i]).abs() < EPSILON,
+                "Weighted bundle mismatch at index {}",
+                i
+            );
         }
     }
 
@@ -1100,8 +1153,10 @@ mod tests {
 
         let result = bundle_simd(&refs, &weights);
         for i in 0..100 {
-            assert!((result[i] - v[i]).abs() < EPSILON,
-                "Single vector bundle should return that vector");
+            assert!(
+                (result[i] - v[i]).abs() < EPSILON,
+                "Single vector bundle should return that vector"
+            );
         }
     }
 
@@ -1125,8 +1180,11 @@ mod tests {
         for i in 0..100 {
             max_diff = max_diff.max((result[i] - vecs[1][i]).abs());
         }
-        assert!(max_diff < 0.01,
-            "Dominant weight should make result close to that vector, max_diff={}", max_diff);
+        assert!(
+            max_diff < 0.01,
+            "Dominant weight should make result close to that vector, max_diff={}",
+            max_diff
+        );
     }
 
     // ===== Similarity =====
@@ -1136,7 +1194,11 @@ mod tests {
         let a = random_vec(HDC_DIM, 42);
 
         let sim = similarity_simd(&a, &a);
-        assert!((sim - 1.0).abs() < EPSILON, "Self-similarity should be 1.0, got {}", sim);
+        assert!(
+            (sim - 1.0).abs() < EPSILON,
+            "Self-similarity should be 1.0, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1145,7 +1207,11 @@ mod tests {
         let b = random_vec(HDC_DIM, 43);
 
         let sim = similarity_simd(&a, &b);
-        assert!(sim.abs() < 0.1, "Random vectors should be nearly orthogonal, got {}", sim);
+        assert!(
+            sim.abs() < 0.1,
+            "Random vectors should be nearly orthogonal, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1154,8 +1220,11 @@ mod tests {
         let neg_a: Vec<f32> = a.iter().map(|&x| -x).collect();
 
         let sim = similarity_simd(&a, &neg_a);
-        assert!((sim - (-1.0)).abs() < EPSILON,
-            "Negated vector should have similarity -1.0, got {}", sim);
+        assert!(
+            (sim - (-1.0)).abs() < EPSILON,
+            "Negated vector should have similarity -1.0, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1164,8 +1233,11 @@ mod tests {
             let a = random_vec(100, seed);
             let b = random_vec(100, seed + 1000);
             let sim = similarity_simd(&a, &b);
-            assert!(sim >= -1.0 && sim <= 1.0,
-                "Similarity should be in [-1, 1], got {}", sim);
+            assert!(
+                sim >= -1.0 && sim <= 1.0,
+                "Similarity should be in [-1, 1], got {}",
+                sim
+            );
         }
     }
 
@@ -1175,7 +1247,11 @@ mod tests {
         let zero = vec![0.0f32; 100];
 
         let sim = similarity_simd(&a, &zero);
-        assert_eq!(sim, 0.0, "Similarity with zero vector should be 0, got {}", sim);
+        assert_eq!(
+            sim, 0.0,
+            "Similarity with zero vector should be 0, got {}",
+            sim
+        );
     }
 
     // ===== Norm =====
@@ -1188,7 +1264,12 @@ mod tests {
         let scalar_norm: f32 = a.iter().map(|&x| x * x).sum::<f32>().sqrt();
 
         let relative_error = ((simd_norm - scalar_norm) / scalar_norm.abs().max(1e-10)).abs();
-        assert!(relative_error < EPSILON, "Norm mismatch: {} vs {}", simd_norm, scalar_norm);
+        assert!(
+            relative_error < EPSILON,
+            "Norm mismatch: {} vs {}",
+            simd_norm,
+            scalar_norm
+        );
     }
 
     #[test]
@@ -1203,7 +1284,11 @@ mod tests {
         let mut unit = vec![0.0f32; 100];
         unit[0] = 1.0;
         let norm = norm_simd(&unit);
-        assert!((norm - 1.0).abs() < EPSILON, "Norm of unit vector should be 1.0, got {}", norm);
+        assert!(
+            (norm - 1.0).abs() < EPSILON,
+            "Norm of unit vector should be 1.0, got {}",
+            norm
+        );
     }
 
     // ===== Small/non-aligned vectors =====
@@ -1218,8 +1303,12 @@ mod tests {
             let scalar_dot = scalar_dot_product(&a, &b);
 
             let relative_error = ((simd_dot - scalar_dot) / scalar_dot.abs().max(1e-10)).abs();
-            assert!(relative_error < EPSILON,
-                    "Size {} dot product error: {}", size, relative_error);
+            assert!(
+                relative_error < EPSILON,
+                "Size {} dot product error: {}",
+                size,
+                relative_error
+            );
         }
     }
 
@@ -1233,8 +1322,12 @@ mod tests {
             assert_eq!(result.len(), size, "Bind should preserve dimension");
 
             for i in 0..size {
-                assert!((result[i] - a[i] * b[i]).abs() < EPSILON,
-                    "Bind mismatch at size={}, index={}", size, i);
+                assert!(
+                    (result[i] - a[i] * b[i]).abs() < EPSILON,
+                    "Bind mismatch at size={}, index={}",
+                    size,
+                    i
+                );
             }
         }
     }
@@ -1244,8 +1337,12 @@ mod tests {
         for size in [2, 5, 10, 50] {
             let a = random_vec(size, 42);
             let sim = similarity_simd(&a, &a);
-            assert!((sim - 1.0).abs() < 0.01,
-                "Self-similarity at size={} should be ~1.0, got {}", size, sim);
+            assert!(
+                (sim - 1.0).abs() < 0.01,
+                "Self-similarity at size={} should be ~1.0, got {}",
+                size,
+                sim
+            );
         }
     }
 

@@ -159,6 +159,34 @@ pub fn get_my_circles(_: ()) -> ExternResult<Vec<Record>> {
 }
 
 // =============================================================================
+// UPDATE FUNCTIONS
+// =============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateCreditCircleInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: CreditCircle,
+}
+
+/// Update a credit circle entry (general-purpose update replacing the whole entry)
+#[hdk_extern]
+pub fn update_circle(input: UpdateCreditCircleInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, EntryTypes::CreditCircle(input.updated_entry))
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateCreditLineInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: CreditLine,
+}
+
+/// Update a credit line entry (general-purpose update replacing the whole entry)
+#[hdk_extern]
+pub fn update_credit_line(input: UpdateCreditLineInput) -> ExternResult<ActionHash> {
+    update_entry(input.original_action_hash, EntryTypes::CreditLine(input.updated_entry))
+}
+
+// =============================================================================
 // MEMBERSHIP
 // =============================================================================
 
@@ -682,4 +710,585 @@ fn all_circles_anchor() -> ExternResult<EntryHash> {
         "circles_anchor:all_circles".as_bytes().to_vec(),
     ));
     hash_entry(Entry::App(AppEntryBytes(anchor_bytes)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xAA; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xBB; 36])
+    }
+
+    fn fake_agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xCC; 36])
+    }
+
+    // ── Input struct serde roundtrip tests ─────────────────────────────
+
+    #[test]
+    fn create_circle_input_serde_roundtrip() {
+        let input = CreateCircleInput {
+            name: "Community Circle".to_string(),
+            description: "A circle for our neighborhood".to_string(),
+            currency_name: "CommCoin".to_string(),
+            currency_symbol: "CC".to_string(),
+            default_credit_limit: 1000,
+            max_credit_limit: 5000,
+            transaction_fee_percent: 1.5,
+            demurrage_rate_percent: 0.5,
+            geographic_scope: Some("Downtown".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Community Circle");
+        assert_eq!(decoded.currency_name, "CommCoin");
+        assert_eq!(decoded.currency_symbol, "CC");
+        assert_eq!(decoded.default_credit_limit, 1000);
+        assert_eq!(decoded.max_credit_limit, 5000);
+        assert_eq!(decoded.transaction_fee_percent, 1.5);
+        assert_eq!(decoded.demurrage_rate_percent, 0.5);
+        assert_eq!(decoded.geographic_scope, Some("Downtown".to_string()));
+    }
+
+    #[test]
+    fn create_circle_input_no_geographic_scope() {
+        let input = CreateCircleInput {
+            name: "Global Circle".to_string(),
+            description: "Worldwide".to_string(),
+            currency_name: "Globe".to_string(),
+            currency_symbol: "GL".to_string(),
+            default_credit_limit: 500,
+            max_credit_limit: 2000,
+            transaction_fee_percent: 0.0,
+            demurrage_rate_percent: 0.0,
+            geographic_scope: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.geographic_scope, None);
+        assert_eq!(decoded.transaction_fee_percent, 0.0);
+    }
+
+    #[test]
+    fn create_circle_input_empty_strings() {
+        let input = CreateCircleInput {
+            name: String::new(),
+            description: String::new(),
+            currency_name: String::new(),
+            currency_symbol: String::new(),
+            default_credit_limit: 0,
+            max_credit_limit: 0,
+            transaction_fee_percent: 0.0,
+            demurrage_rate_percent: 0.0,
+            geographic_scope: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateCircleInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.name.is_empty());
+        assert!(decoded.currency_name.is_empty());
+    }
+
+    #[test]
+    fn create_circle_input_unicode_fields() {
+        let input = CreateCircleInput {
+            name: "\u{1F30D} Global \u{1F91D}".to_string(),
+            description: "\u{4E92}\u{52A9}".to_string(),
+            currency_name: "\u{00A5}en".to_string(),
+            currency_symbol: "\u{00A5}".to_string(),
+            default_credit_limit: 100,
+            max_credit_limit: 1000,
+            transaction_fee_percent: 0.0,
+            demurrage_rate_percent: 0.0,
+            geographic_scope: Some("\u{6771}\u{4EAC}".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateCircleInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.name.contains('\u{1F30D}'));
+        assert_eq!(decoded.currency_symbol, "\u{00A5}");
+    }
+
+    #[test]
+    fn transfer_input_serde_roundtrip() {
+        let input = TransferInput {
+            circle_hash: fake_hash(),
+            to: fake_agent(),
+            amount: 42,
+            memo: "For gardening help".to_string(),
+            transaction_type: TransactionType::Payment,
+            related_exchange_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, 42);
+        assert_eq!(decoded.memo, "For gardening help");
+        assert_eq!(decoded.related_exchange_hash, None);
+    }
+
+    #[test]
+    fn transfer_input_with_related_exchange_hash() {
+        let related = ActionHash::from_raw_36(vec![0xEE; 36]);
+        let input = TransferInput {
+            circle_hash: fake_hash(),
+            to: fake_agent(),
+            amount: 100,
+            memo: "exchange".to_string(),
+            transaction_type: TransactionType::Payment,
+            related_exchange_hash: Some(related.clone()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.related_exchange_hash, Some(related));
+    }
+
+    #[test]
+    fn transfer_input_zero_amount() {
+        let input = TransferInput {
+            circle_hash: fake_hash(),
+            to: fake_agent(),
+            amount: 0,
+            memo: String::new(),
+            transaction_type: TransactionType::Adjustment,
+            related_exchange_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, 0);
+        assert!(decoded.memo.is_empty());
+    }
+
+    #[test]
+    fn transfer_input_negative_amount() {
+        let input = TransferInput {
+            circle_hash: fake_hash(),
+            to: fake_agent(),
+            amount: -500,
+            memo: "refund".to_string(),
+            transaction_type: TransactionType::Adjustment,
+            related_exchange_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, -500);
+    }
+
+    #[test]
+    fn transfer_input_all_transaction_types() {
+        let types = vec![
+            TransactionType::Payment,
+            TransactionType::Repayment,
+            TransactionType::Gift,
+            TransactionType::Clearing,
+            TransactionType::Fee,
+            TransactionType::Demurrage,
+            TransactionType::Adjustment,
+        ];
+        for tx_type in types {
+            let input = TransferInput {
+                circle_hash: fake_hash(),
+                to: fake_agent(),
+                amount: 10,
+                memo: "test".to_string(),
+                transaction_type: tx_type.clone(),
+                related_exchange_hash: None,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: TransferInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.transaction_type, tx_type);
+        }
+    }
+
+    #[test]
+    fn adjust_credit_limit_input_serde_roundtrip() {
+        let input = AdjustCreditLimitInput {
+            circle_hash: fake_hash(),
+            member: fake_agent_2(),
+            new_limit: 3000,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AdjustCreditLimitInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_limit, 3000);
+    }
+
+    #[test]
+    fn adjust_credit_limit_input_zero_limit() {
+        let input = AdjustCreditLimitInput {
+            circle_hash: fake_hash(),
+            member: fake_agent(),
+            new_limit: 0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AdjustCreditLimitInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_limit, 0);
+    }
+
+    #[test]
+    fn adjust_credit_limit_input_max_i64() {
+        let input = AdjustCreditLimitInput {
+            circle_hash: fake_hash(),
+            member: fake_agent(),
+            new_limit: i64::MAX,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AdjustCreditLimitInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.new_limit, i64::MAX);
+    }
+
+    #[test]
+    fn clearing_input_serde_roundtrip() {
+        let input = ClearingInput {
+            circle_hash: fake_hash(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ClearingInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.circle_hash, fake_hash());
+    }
+
+    #[test]
+    fn join_circle_input_serde_roundtrip() {
+        let circle_hash = ActionHash::from_raw_36(vec![0xDD; 36]);
+        let input = JoinCircleInput {
+            circle_hash: circle_hash.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: JoinCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.circle_hash, circle_hash);
+    }
+
+    // ── Integrity entry struct serde roundtrip tests ───────────────────
+
+    #[test]
+    fn credit_circle_serde_roundtrip() {
+        let circle = CreditCircle {
+            id: "circle-001".to_string(),
+            name: "Test Circle".to_string(),
+            description: "A test".to_string(),
+            currency_name: "TestCoin".to_string(),
+            currency_symbol: "TC".to_string(),
+            default_credit_limit: 1000,
+            max_credit_limit: 5000,
+            transaction_fee_percent: 1.0,
+            demurrage_rate_percent: 0.5,
+            geographic_scope: Some("Local".to_string()),
+            founders: vec![fake_agent()],
+            rules_hash: None,
+            created_at: Timestamp::from_micros(0),
+            active: true,
+        };
+        let json = serde_json::to_string(&circle).unwrap();
+        let decoded: CreditCircle = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "circle-001");
+        assert_eq!(decoded.founders.len(), 1);
+        assert!(decoded.active);
+        assert!(decoded.rules_hash.is_none());
+    }
+
+    #[test]
+    fn credit_line_serde_roundtrip() {
+        let line = CreditLine {
+            circle_hash: fake_hash(),
+            member: fake_agent(),
+            credit_limit: 1000,
+            balance: -250,
+            total_credit_extended: 500,
+            total_credit_received: 750,
+            joined_at: Timestamp::from_micros(0),
+            status: CreditLineStatus::Active,
+            last_activity: Timestamp::from_micros(100),
+        };
+        let json = serde_json::to_string(&line).unwrap();
+        let decoded: CreditLine = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.credit_limit, 1000);
+        assert_eq!(decoded.balance, -250);
+        assert_eq!(decoded.total_credit_extended, 500);
+        assert_eq!(decoded.status, CreditLineStatus::Active);
+    }
+
+    #[test]
+    fn balance_serde_roundtrip() {
+        let balance = Balance {
+            member: fake_agent(),
+            circle_hash: fake_hash(),
+            balance: 42,
+            credit_available: 958,
+            as_of: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&balance).unwrap();
+        let decoded: Balance = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance, 42);
+        assert_eq!(decoded.credit_available, 958);
+    }
+
+    #[test]
+    fn balance_negative_balance_serde() {
+        let balance = Balance {
+            member: fake_agent(),
+            circle_hash: fake_hash(),
+            balance: -500,
+            credit_available: 500,
+            as_of: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&balance).unwrap();
+        let decoded: Balance = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance, -500);
+    }
+
+    // ── Integrity enum serde roundtrip tests ──────────────────────────
+
+    #[test]
+    fn transaction_type_all_variants_serde() {
+        let variants = vec![
+            TransactionType::Payment,
+            TransactionType::Repayment,
+            TransactionType::Gift,
+            TransactionType::Clearing,
+            TransactionType::Fee,
+            TransactionType::Demurrage,
+            TransactionType::Adjustment,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: TransactionType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn credit_line_status_all_variants_serde() {
+        let variants = vec![
+            CreditLineStatus::Active,
+            CreditLineStatus::Frozen,
+            CreditLineStatus::Suspended,
+            CreditLineStatus::Closed,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: CreditLineStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    // ── Clone / equality tests ────────────────────────────────────────
+
+    #[test]
+    fn transaction_type_clone_eq() {
+        let tt = TransactionType::Clearing;
+        let cloned = tt.clone();
+        assert_eq!(tt, cloned);
+    }
+
+    #[test]
+    fn credit_line_status_clone_eq() {
+        let status = CreditLineStatus::Frozen;
+        let cloned = status.clone();
+        assert_eq!(status, cloned);
+    }
+
+    // ── Edge case tests ───────────────────────────────────────────────
+
+    #[test]
+    fn create_circle_input_extreme_fee_values() {
+        let input = CreateCircleInput {
+            name: "Edge".to_string(),
+            description: String::new(),
+            currency_name: "E".to_string(),
+            currency_symbol: "E".to_string(),
+            default_credit_limit: i64::MAX,
+            max_credit_limit: i64::MAX,
+            transaction_fee_percent: f64::MAX,
+            demurrage_rate_percent: f64::MIN_POSITIVE,
+            geographic_scope: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.default_credit_limit, i64::MAX);
+        assert_eq!(decoded.transaction_fee_percent, f64::MAX);
+    }
+
+    #[test]
+    fn transfer_input_i64_max_amount() {
+        let input = TransferInput {
+            circle_hash: fake_hash(),
+            to: fake_agent(),
+            amount: i64::MAX,
+            memo: "max".to_string(),
+            transaction_type: TransactionType::Payment,
+            related_exchange_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, i64::MAX);
+    }
+
+    #[test]
+    fn transfer_input_i64_min_amount() {
+        let input = TransferInput {
+            circle_hash: fake_hash(),
+            to: fake_agent(),
+            amount: i64::MIN,
+            memo: "min".to_string(),
+            transaction_type: TransactionType::Adjustment,
+            related_exchange_hash: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: TransferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, i64::MIN);
+    }
+
+    // ── UpdateCreditCircleInput tests ────────────────────────────────
+
+    #[test]
+    fn update_credit_circle_input_struct_construction() {
+        let input = UpdateCreditCircleInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: CreditCircle {
+                id: "circle-updated".to_string(),
+                name: "Updated Circle".to_string(),
+                description: "Updated description".to_string(),
+                currency_name: "NewCoin".to_string(),
+                currency_symbol: "NC".to_string(),
+                default_credit_limit: 2000,
+                max_credit_limit: 10000,
+                transaction_fee_percent: 2.0,
+                demurrage_rate_percent: 1.0,
+                geographic_scope: Some("Uptown".to_string()),
+                founders: vec![fake_agent()],
+                rules_hash: None,
+                created_at: Timestamp::from_micros(0),
+                active: true,
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.name, "Updated Circle");
+        assert_eq!(input.updated_entry.default_credit_limit, 2000);
+    }
+
+    #[test]
+    fn update_credit_circle_input_serde_roundtrip() {
+        let input = UpdateCreditCircleInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: CreditCircle {
+                id: "circle-serde".to_string(),
+                name: "Serde Circle".to_string(),
+                description: "Testing serde".to_string(),
+                currency_name: "TestCoin".to_string(),
+                currency_symbol: "TC".to_string(),
+                default_credit_limit: 500,
+                max_credit_limit: 5000,
+                transaction_fee_percent: 0.0,
+                demurrage_rate_percent: 0.0,
+                geographic_scope: None,
+                founders: vec![fake_agent(), fake_agent_2()],
+                rules_hash: Some(ActionHash::from_raw_36(vec![0xDD; 36])),
+                created_at: Timestamp::from_micros(100),
+                active: false,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateCreditCircleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.id, "circle-serde");
+        assert!(!decoded.updated_entry.active);
+        assert!(decoded.updated_entry.rules_hash.is_some());
+        assert_eq!(decoded.updated_entry.founders.len(), 2);
+    }
+
+    #[test]
+    fn update_credit_circle_input_clone_is_equal() {
+        let input = UpdateCreditCircleInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: CreditCircle {
+                id: "circle-clone".to_string(),
+                name: "Clone Test".to_string(),
+                description: "Cloning".to_string(),
+                currency_name: "C".to_string(),
+                currency_symbol: "C".to_string(),
+                default_credit_limit: 100,
+                max_credit_limit: 1000,
+                transaction_fee_percent: 0.5,
+                demurrage_rate_percent: 0.1,
+                geographic_scope: None,
+                founders: vec![fake_agent()],
+                rules_hash: None,
+                created_at: Timestamp::from_micros(0),
+                active: true,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.id, input.updated_entry.id);
+        assert_eq!(cloned.updated_entry.name, input.updated_entry.name);
+    }
+
+    // ── UpdateCreditLineInput tests ─────────────────────────────────
+
+    #[test]
+    fn update_credit_line_input_struct_construction() {
+        let input = UpdateCreditLineInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: CreditLine {
+                circle_hash: fake_hash(),
+                member: fake_agent(),
+                credit_limit: 2000,
+                balance: 500,
+                total_credit_extended: 1000,
+                total_credit_received: 1500,
+                joined_at: Timestamp::from_micros(0),
+                status: CreditLineStatus::Active,
+                last_activity: Timestamp::from_micros(200),
+            },
+        };
+        assert_eq!(input.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(input.updated_entry.credit_limit, 2000);
+        assert_eq!(input.updated_entry.balance, 500);
+    }
+
+    #[test]
+    fn update_credit_line_input_serde_roundtrip() {
+        let input = UpdateCreditLineInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcc; 36]),
+            updated_entry: CreditLine {
+                circle_hash: fake_hash(),
+                member: fake_agent_2(),
+                credit_limit: 3000,
+                balance: -1000,
+                total_credit_extended: 2000,
+                total_credit_received: 1000,
+                joined_at: Timestamp::from_micros(50),
+                status: CreditLineStatus::Frozen,
+                last_activity: Timestamp::from_micros(300),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateCreditLineInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, input.original_action_hash);
+        assert_eq!(decoded.updated_entry.balance, -1000);
+        assert_eq!(decoded.updated_entry.status, CreditLineStatus::Frozen);
+    }
+
+    #[test]
+    fn update_credit_line_input_clone_is_equal() {
+        let input = UpdateCreditLineInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0x22; 36]),
+            updated_entry: CreditLine {
+                circle_hash: fake_hash(),
+                member: fake_agent(),
+                credit_limit: 500,
+                balance: 0,
+                total_credit_extended: 0,
+                total_credit_received: 0,
+                joined_at: Timestamp::from_micros(0),
+                status: CreditLineStatus::Suspended,
+                last_activity: Timestamp::from_micros(0),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.credit_limit, input.updated_entry.credit_limit);
+        assert_eq!(cloned.updated_entry.status, input.updated_entry.status);
+    }
 }

@@ -6,10 +6,10 @@
 //! - Cosine similarity of zero vectors
 //! - HV operations on mismatched dimensions
 
-use symthaea::phi_engine::PhiEngine;
-use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::tiered_phi::{TieredPhi, ApproximationTier};
 use symthaea::hdc::binary_hv::BinaryHV;
+use symthaea::hdc::tiered_phi::{ApproximationTier, TieredPhi};
+use symthaea::hdc::unified_hv::ContinuousHV;
+use symthaea::phi_engine::PhiEngine;
 
 // =============================================================================
 // PHI WITH EDGE-CASE INPUTS
@@ -39,7 +39,10 @@ fn test_phi_engine_two_identical_nodes() {
     let hv = ContinuousHV::random(512, 42);
     let nodes = vec![hv.clone(), hv];
     let result = engine.compute(&nodes);
-    assert!(result.phi.is_finite(), "Two identical nodes should give finite Phi");
+    assert!(
+        result.phi.is_finite(),
+        "Two identical nodes should give finite Phi"
+    );
     assert!(result.phi >= 0.0, "Phi should be non-negative");
 }
 
@@ -75,8 +78,17 @@ fn test_tiered_phi_all_tiers_handle_two_components() {
     ] {
         let mut calc = TieredPhi::new(tier);
         let phi = calc.compute(&components);
-        assert!(phi.is_finite(), "Tier {:?} returned non-finite for 2 components", tier);
-        assert!(phi >= 0.0 && phi <= 1.0, "Tier {:?} returned out-of-range: {}", tier, phi);
+        assert!(
+            phi.is_finite(),
+            "Tier {:?} returned non-finite for 2 components",
+            tier
+        );
+        assert!(
+            (0.0..=1.0).contains(&phi),
+            "Tier {:?} returned out-of-range: {}",
+            tier,
+            phi
+        );
     }
 }
 
@@ -125,7 +137,7 @@ fn test_cosine_similarity_range() {
     let b = ContinuousHV::random(512, 2);
     let sim = a.similarity(&b);
     assert!(
-        sim >= -1.0 && sim <= 1.0,
+        (-1.0..=1.0).contains(&sim),
         "Cosine similarity must be in [-1, 1] (got {})",
         sim
     );
@@ -143,17 +155,22 @@ fn test_hv16_bundle_empty() {
     // Result should be a valid BinaryHV (zero vector or default)
     // Verify it has the expected dimensionality by checking similarity with itself
     let self_sim = result.similarity(&result);
-    assert!(self_sim >= 0.0 && self_sim <= 1.0,
-        "Empty bundle result should have valid self-similarity");
+    assert!(
+        (0.0..=1.0).contains(&self_sim),
+        "Empty bundle result should have valid self-similarity"
+    );
 }
 
 #[test]
 fn test_hv16_bundle_single() {
     let hv = BinaryHV::random(42);
-    let bundled = BinaryHV::bundle(&[hv.clone()]);
+    let bundled = BinaryHV::bundle(&[hv]);
     // Bundle of single element should be similar to itself
     let sim = hv.similarity(&bundled);
-    assert!(sim > 0.9, "Bundle of single HV should be very similar to original");
+    assert!(
+        sim > 0.9,
+        "Bundle of single HV should be very similar to original"
+    );
 }
 
 #[test]

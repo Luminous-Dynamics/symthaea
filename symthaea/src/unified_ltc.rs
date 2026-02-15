@@ -62,11 +62,7 @@ pub enum LearningAlgorithm {
         weight_decay: f32,
     },
     /// RMSprop optimizer
-    RMSprop {
-        lr: f32,
-        rho: f32,
-        epsilon: f32,
-    },
+    RMSprop { lr: f32, rho: f32, epsilon: f32 },
 }
 
 impl Default for LearningAlgorithm {
@@ -82,8 +78,7 @@ impl Default for LearningAlgorithm {
 }
 
 /// Connectivity mode for network weights
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub enum Connectivity {
     /// Fully connected (all-to-all)
     #[default]
@@ -96,10 +91,8 @@ pub enum Connectivity {
     },
 }
 
-
 /// Activation function for neurons
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum Activation {
     #[default]
     Tanh,
@@ -109,7 +102,6 @@ pub enum Activation {
     Identity,
 }
 
-
 impl Activation {
     /// Apply activation to scalar
     #[inline]
@@ -118,7 +110,13 @@ impl Activation {
             Activation::Tanh => x.tanh(),
             Activation::Sigmoid => 1.0 / (1.0 + (-x).exp()),
             Activation::Softplus => (1.0 + x.exp()).ln(),
-            Activation::LeakyRelu => if x > 0.0 { x } else { 0.01 * x },
+            Activation::LeakyRelu => {
+                if x > 0.0 {
+                    x
+                } else {
+                    0.01 * x
+                }
+            }
             Activation::Identity => x,
         }
     }
@@ -136,23 +134,26 @@ impl Activation {
                 s * (1.0 - s)
             }
             Activation::Softplus => 1.0 / (1.0 + (-x).exp()),
-            Activation::LeakyRelu => if x > 0.0 { 1.0 } else { 0.01 },
+            Activation::LeakyRelu => {
+                if x > 0.0 {
+                    1.0
+                } else {
+                    0.01
+                }
+            }
             Activation::Identity => 1.0,
         }
     }
 
     /// Apply activation to HDC vector
     pub fn apply_hdc(&self, hv: &ContinuousHV) -> ContinuousHV {
-        let values: Vec<f32> = hv.values.iter()
-            .map(|&x| self.apply_scalar(x))
-            .collect();
+        let values: Vec<f32> = hv.values.iter().map(|&x| self.apply_scalar(x)).collect();
         ContinuousHV::from_vec(values)
     }
 }
 
 /// State type for unified LTC
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 pub enum StateType {
     /// Scalar state per neuron (traditional LTC)
     #[default]
@@ -161,10 +162,8 @@ pub enum StateType {
     HDC { dimension: usize },
 }
 
-
 /// Integration method for ODE solving
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Default)]
 pub enum IntegrationMethod {
     /// First-order Euler (fast, O(dt) error)
     #[default]
@@ -172,7 +171,6 @@ pub enum IntegrationMethod {
     /// Fourth-order Runge-Kutta (accurate, O(dt^4) error)
     RK4,
 }
-
 
 /// Unified LTC configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -248,7 +246,12 @@ impl UnifiedLTCConfig {
     }
 
     /// Create sparse scalar configuration
-    pub fn scalar_sparse(num_neurons: usize, input_dim: usize, output_dim: usize, sparsity: f32) -> Self {
+    pub fn scalar_sparse(
+        num_neurons: usize,
+        input_dim: usize,
+        output_dim: usize,
+        sparsity: f32,
+    ) -> Self {
         let mut config = Self::scalar(num_neurons, input_dim, output_dim);
         let mask_row_len = num_neurons.div_ceil(64);
         config.connectivity = Connectivity::Sparse {
@@ -360,30 +363,28 @@ impl UnifiedLTC {
         let output_dim = config.output_dim;
 
         // Initialize based on state type
-        let (scalar_states, hdc_states, hdc_weights, hdc_input_masks, hdc_weight_momentum, hdc_weight_velocity) =
-            match &config.state_type {
-                StateType::Scalar => {
-                    (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![])
-                }
-                StateType::HDC { dimension } => {
-                    let states: Vec<_> = (0..n)
-                        .map(|_| ContinuousHV::zero(*dimension))
-                        .collect();
-                    let weights: Vec<_> = (0..n)
-                        .map(|i| ContinuousHV::random(*dimension, i as u64))
-                        .collect();
-                    let masks: Vec<_> = (0..n)
-                        .map(|i| ContinuousHV::random(*dimension, (i + 1000) as u64))
-                        .collect();
-                    let momentum: Vec<_> = (0..n)
-                        .map(|_| ContinuousHV::zero(*dimension))
-                        .collect();
-                    let velocity: Vec<_> = (0..n)
-                        .map(|_| ContinuousHV::zero(*dimension))
-                        .collect();
-                    (vec![], states, weights, masks, momentum, velocity)
-                }
-            };
+        let (
+            scalar_states,
+            hdc_states,
+            hdc_weights,
+            hdc_input_masks,
+            hdc_weight_momentum,
+            hdc_weight_velocity,
+        ) = match &config.state_type {
+            StateType::Scalar => (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![]),
+            StateType::HDC { dimension } => {
+                let states: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let weights: Vec<_> = (0..n)
+                    .map(|i| ContinuousHV::random(*dimension, i as u64))
+                    .collect();
+                let masks: Vec<_> = (0..n)
+                    .map(|i| ContinuousHV::random(*dimension, (i + 1000) as u64))
+                    .collect();
+                let momentum: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let velocity: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                (vec![], states, weights, masks, momentum, velocity)
+            }
+        };
 
         // Initialize time constants
         let tau: Vec<f32> = (0..n)
@@ -393,12 +394,14 @@ impl UnifiedLTC {
         // Initialize weights based on connectivity
         let (w_rec, mask) = match &config.connectivity {
             Connectivity::Dense => {
-                let w: Vec<f32> = (0..n * n)
-                    .map(|_| rng.gen_range(-0.1..0.1))
-                    .collect();
+                let w: Vec<f32> = (0..n * n).map(|_| rng.gen_range(-0.1..0.1)).collect();
                 (w, None)
             }
-            Connectivity::Sparse { sparsity, mask_row_len, .. } => {
+            Connectivity::Sparse {
+                sparsity,
+                mask_row_len,
+                ..
+            } => {
                 let mut w = vec![0.0f32; n * n];
                 let mut m = vec![0u64; n * *mask_row_len];
 
@@ -439,9 +442,7 @@ impl UnifiedLTC {
             .map(|_| rng.gen_range(-0.1..0.1))
             .collect();
 
-        let bias: Vec<f32> = (0..n)
-            .map(|_| rng.gen_range(-0.1..0.1))
-            .collect();
+        let bias: Vec<f32> = (0..n).map(|_| rng.gen_range(-0.1..0.1)).collect();
 
         // Initialize optimizer state
         let m_w_rec = vec![0.0f32; n * n];
@@ -486,21 +487,33 @@ impl UnifiedLTC {
         let input_dim = config.input_dim;
         let output_dim = config.output_dim;
 
-        let (scalar_states, hdc_states, hdc_weights, hdc_input_masks, hdc_weight_momentum, hdc_weight_velocity) =
-            match &config.state_type {
-                StateType::Scalar => (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![]),
-                StateType::HDC { dimension } => {
-                    let states: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
-                    let weights: Vec<_> = (0..n).map(|i| genesis.hv(&format!("{label}::hdc_weight::{i}"), *dimension)).collect();
-                    let masks: Vec<_> = (0..n).map(|i| genesis.hv(&format!("{label}::hdc_mask::{i}"), *dimension)).collect();
-                    let momentum: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
-                    let velocity: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
-                    (vec![], states, weights, masks, momentum, velocity)
-                }
-            };
+        let (
+            scalar_states,
+            hdc_states,
+            hdc_weights,
+            hdc_input_masks,
+            hdc_weight_momentum,
+            hdc_weight_velocity,
+        ) = match &config.state_type {
+            StateType::Scalar => (vec![0.0f32; n], vec![], vec![], vec![], vec![], vec![]),
+            StateType::HDC { dimension } => {
+                let states: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let weights: Vec<_> = (0..n)
+                    .map(|i| genesis.hv(&format!("{label}::hdc_weight::{i}"), *dimension))
+                    .collect();
+                let masks: Vec<_> = (0..n)
+                    .map(|i| genesis.hv(&format!("{label}::hdc_mask::{i}"), *dimension))
+                    .collect();
+                let momentum: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                let velocity: Vec<_> = (0..n).map(|_| ContinuousHV::zero(*dimension)).collect();
+                (vec![], states, weights, masks, momentum, velocity)
+            }
+        };
 
         let mut rng = genesis.domain(&format!("{label}::tau"));
-        let tau: Vec<f32> = (0..n).map(|_| rng.gen_range(config.tau_min..config.tau_max)).collect();
+        let tau: Vec<f32> = (0..n)
+            .map(|_| rng.gen_range(config.tau_min..config.tau_max))
+            .collect();
 
         let mut w_rng = genesis.domain(&format!("{label}::w_rec"));
         let (w_rec, mask) = match &config.connectivity {
@@ -508,7 +521,11 @@ impl UnifiedLTC {
                 let w: Vec<f32> = (0..n * n).map(|_| w_rng.gen_range(-0.1..0.1)).collect();
                 (w, None)
             }
-            Connectivity::Sparse { sparsity, mask_row_len, .. } => {
+            Connectivity::Sparse {
+                sparsity,
+                mask_row_len,
+                ..
+            } => {
                 let mut w = vec![0.0f32; n * n];
                 let mut m = vec![0u64; n * *mask_row_len];
                 for i in 0..n {
@@ -539,8 +556,12 @@ impl UnifiedLTC {
         };
 
         let mut io_rng = genesis.domain(&format!("{label}::io_weights"));
-        let w_in: Vec<f32> = (0..n * input_dim).map(|_| io_rng.gen_range(-0.1..0.1)).collect();
-        let w_out: Vec<f32> = (0..output_dim * n).map(|_| io_rng.gen_range(-0.1..0.1)).collect();
+        let w_in: Vec<f32> = (0..n * input_dim)
+            .map(|_| io_rng.gen_range(-0.1..0.1))
+            .collect();
+        let w_out: Vec<f32> = (0..output_dim * n)
+            .map(|_| io_rng.gen_range(-0.1..0.1))
+            .collect();
         let bias: Vec<f32> = (0..n).map(|_| io_rng.gen_range(-0.1..0.1)).collect();
 
         let mut new_config = config;
@@ -548,12 +569,24 @@ impl UnifiedLTC {
 
         Ok(Self {
             config: new_config,
-            scalar_states, tau, w_rec, w_in, w_out, bias,
-            hdc_states, hdc_weights, hdc_input_masks,
-            m_w_rec: vec![0.0f32; n * n], v_w_rec: vec![0.0f32; n * n],
-            m_tau: vec![0.0f32; n], v_tau: vec![0.0f32; n],
-            hdc_weight_momentum, hdc_weight_velocity,
-            step: 0, total_time: 0.0, update_count: 0,
+            scalar_states,
+            tau,
+            w_rec,
+            w_in,
+            w_out,
+            bias,
+            hdc_states,
+            hdc_weights,
+            hdc_input_masks,
+            m_w_rec: vec![0.0f32; n * n],
+            v_w_rec: vec![0.0f32; n * n],
+            m_tau: vec![0.0f32; n],
+            v_tau: vec![0.0f32; n],
+            hdc_weight_momentum,
+            hdc_weight_velocity,
+            step: 0,
+            total_time: 0.0,
+            update_count: 0,
         })
     }
 
@@ -562,7 +595,9 @@ impl UnifiedLTC {
     fn mask_get(&self, i: usize, j: usize) -> bool {
         match &self.config.connectivity {
             Connectivity::Dense => true,
-            Connectivity::Sparse { mask, mask_row_len, .. } => {
+            Connectivity::Sparse {
+                mask, mask_row_len, ..
+            } => {
                 let idx = i * mask_row_len + j / 64;
                 (mask[idx] & (1u64 << (j % 64))) != 0
             }
@@ -651,8 +686,13 @@ impl UnifiedLTC {
         hidden_states: &[Vec<f32>],
         output_grad: &[f32],
     ) -> Result<f32> {
-        let LearningAlgorithm::BPTT { lr_weights, lr_tau, lr_bias, grad_clip, l2_reg } =
-            self.config.learning
+        let LearningAlgorithm::BPTT {
+            lr_weights,
+            lr_tau,
+            lr_bias,
+            grad_clip,
+            l2_reg,
+        } = self.config.learning
         else {
             anyhow::bail!("backward() requires BPTT learning algorithm");
         };
@@ -663,7 +703,9 @@ impl UnifiedLTC {
         let dt = self.config.dt;
 
         // Gradient for output weights
-        let final_state = hidden_states.last().unwrap();
+        let final_state = hidden_states.last().ok_or_else(|| {
+            anyhow::anyhow!("hidden_states is empty; cannot compute output gradient")
+        })?;
         let mut grad_w_out = vec![0.0f32; output_dim * n];
         for i in 0..output_dim {
             for j in 0..n {
@@ -688,7 +730,11 @@ impl UnifiedLTC {
         // BPTT through time
         for t in (0..self.config.num_steps).rev() {
             let state = &hidden_states[t];
-            let prev_state = if t > 0 { &hidden_states[t - 1] } else { &vec![0.0f32; n] };
+            let prev_state = if t > 0 {
+                &hidden_states[t - 1]
+            } else {
+                &vec![0.0f32; n]
+            };
 
             for i in 0..n {
                 // Compute z at this timestep
@@ -891,7 +937,12 @@ impl UnifiedLTC {
         self.update_count += 1;
     }
 
-    fn compute_hdc_derivative(&self, i: usize, input: &ContinuousHV, state: &ContinuousHV) -> ContinuousHV {
+    fn compute_hdc_derivative(
+        &self,
+        i: usize,
+        input: &ContinuousHV,
+        state: &ContinuousHV,
+    ) -> ContinuousHV {
         let weight = &self.hdc_weights[i];
         let input_mask = &self.hdc_input_masks[i];
 
@@ -918,7 +969,8 @@ impl UnifiedLTC {
             let correlation = input.bind(&self.hdc_states[i]);
 
             // Apply with momentum
-            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i].scale(momentum)
+            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i]
+                .scale(momentum)
                 .add(&correlation.scale(lr));
 
             self.hdc_weights[i] = self.hdc_weights[i].add(&self.hdc_weight_momentum[i]);
@@ -933,9 +985,13 @@ impl UnifiedLTC {
     /// Adam weight update (HDC mode)
     pub fn adam_update(&mut self, input: &ContinuousHV) {
         let (lr, beta1, beta2, epsilon, weight_decay) = match self.config.learning {
-            LearningAlgorithm::Adam { lr, beta1, beta2, epsilon, weight_decay } => {
-                (lr, beta1, beta2, epsilon, weight_decay)
-            }
+            LearningAlgorithm::Adam {
+                lr,
+                beta1,
+                beta2,
+                epsilon,
+                weight_decay,
+            } => (lr, beta1, beta2, epsilon, weight_decay),
             _ => return,
         };
 
@@ -947,12 +1003,14 @@ impl UnifiedLTC {
             let gradient = input.bind(&self.hdc_states[i]);
 
             // Update biased first moment
-            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i].scale(beta1)
+            self.hdc_weight_momentum[i] = self.hdc_weight_momentum[i]
+                .scale(beta1)
                 .add(&gradient.scale(1.0 - beta1));
 
             // Update biased second moment
             let gradient_squared = gradient.hadamard_product(&gradient);
-            self.hdc_weight_velocity[i] = self.hdc_weight_velocity[i].scale(beta2)
+            self.hdc_weight_velocity[i] = self.hdc_weight_velocity[i]
+                .scale(beta2)
                 .add(&gradient_squared.scale(1.0 - beta2));
 
             // Bias correction
@@ -965,7 +1023,8 @@ impl UnifiedLTC {
             let update = m_hat.hadamard_product(&v_sqrt_inv).scale(lr);
 
             // Weight decay
-            self.hdc_weights[i] = self.hdc_weights[i].scale(1.0 - weight_decay * lr)
+            self.hdc_weights[i] = self.hdc_weights[i]
+                .scale(1.0 - weight_decay * lr)
                 .add(&update);
 
             if self.hdc_weights[i].norm() > 2.0 {
@@ -996,7 +1055,11 @@ impl UnifiedLTC {
         let modulation = vitality.clamp(0.1, 2.0);
 
         match &mut self.config.learning {
-            LearningAlgorithm::BPTT { lr_weights, lr_bias, .. } => {
+            LearningAlgorithm::BPTT {
+                lr_weights,
+                lr_bias,
+                ..
+            } => {
                 *lr_weights *= modulation;
                 *lr_bias *= modulation;
             }
@@ -1047,7 +1110,8 @@ impl UnifiedLTC {
             let mut prediction = vec![0.0f32; self.config.output_dim];
             for i in 0..self.config.output_dim {
                 for j in 0..self.config.num_neurons {
-                    prediction[i] += self.w_out[i * self.config.num_neurons + j] * self.scalar_states[j];
+                    prediction[i] +=
+                        self.w_out[i * self.config.num_neurons + j] * self.scalar_states[j];
                 }
             }
             prediction
@@ -1110,7 +1174,11 @@ mod tests {
         ltc.reset();
         let loss2 = ltc.train_step(&input, &target).unwrap();
 
-        // Loss should generally decrease
+        // Both losses should be finite and non-negative
+        assert!(loss1.is_finite(), "Loss 1 should be finite");
+        assert!(loss2.is_finite(), "Loss 2 should be finite");
+        assert!(loss1 >= 0.0, "Loss 1 should be non-negative");
+        assert!(loss2 >= 0.0, "Loss 2 should be non-negative");
         println!("Loss 1: {}, Loss 2: {}", loss1, loss2);
     }
 
@@ -1150,7 +1218,10 @@ mod tests {
     #[test]
     fn test_hdc_hebbian_learning() {
         let mut config = UnifiedLTCConfig::hdc(512);
-        config.learning = LearningAlgorithm::Hebbian { lr: 0.01, momentum: 0.9 };
+        config.learning = LearningAlgorithm::Hebbian {
+            lr: 0.01,
+            momentum: 0.9,
+        };
         let mut ltc = UnifiedLTC::new(config).unwrap();
 
         let input = ContinuousHV::random(512, 123);
@@ -1190,5 +1261,384 @@ mod tests {
         let restored = UnifiedLTC::deserialize(&data).unwrap();
 
         assert_eq!(ltc.config.num_neurons, restored.config.num_neurons);
+    }
+
+    // ====================================================================
+    // Additional tests for thorough coverage
+    // ====================================================================
+
+    #[test]
+    fn test_default_construction() {
+        let ltc = UnifiedLTC::default();
+        let cfg = ltc.config();
+        assert_eq!(cfg.num_neurons, 256);
+        assert_eq!(cfg.input_dim, 64);
+        assert_eq!(cfg.output_dim, 32);
+        assert!(matches!(cfg.state_type, StateType::Scalar));
+        assert_eq!(ltc.scalar_states().len(), 256);
+        assert_eq!(ltc.total_time(), 0.0);
+    }
+
+    #[test]
+    fn test_config_scalar_defaults() {
+        let cfg = UnifiedLTCConfig::scalar(128, 32, 16);
+        assert_eq!(cfg.num_neurons, 128);
+        assert_eq!(cfg.input_dim, 32);
+        assert_eq!(cfg.output_dim, 16);
+        assert!(matches!(cfg.state_type, StateType::Scalar));
+        assert!(matches!(cfg.learning, LearningAlgorithm::BPTT { .. }));
+        assert!(matches!(cfg.connectivity, Connectivity::Dense));
+    }
+
+    #[test]
+    fn test_config_hdc_defaults() {
+        let cfg = UnifiedLTCConfig::hdc(2048);
+        assert_eq!(cfg.num_neurons, 1);
+        assert_eq!(cfg.input_dim, 2048);
+        assert_eq!(cfg.output_dim, 2048);
+        assert!(matches!(cfg.state_type, StateType::HDC { dimension: 2048 }));
+        assert!(matches!(cfg.learning, LearningAlgorithm::Adam { .. }));
+    }
+
+    #[test]
+    fn test_config_hdc_network_defaults() {
+        let cfg = UnifiedLTCConfig::hdc_network(4, 512);
+        assert_eq!(cfg.num_neurons, 4);
+        assert_eq!(cfg.input_dim, 512);
+        assert!(matches!(cfg.learning, LearningAlgorithm::Hebbian { .. }));
+    }
+
+    #[test]
+    fn test_forward_input_dimension_mismatch() {
+        let config = UnifiedLTCConfig::scalar(16, 8, 4);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        // Provide wrong-sized input
+        let wrong_input = vec![1.0f32; 5];
+        let result = ltc.forward(&wrong_input);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("dimension mismatch"));
+    }
+
+    #[test]
+    fn test_forward_on_hdc_mode_fails() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![0.0f32; 256];
+        let result = ltc.forward(&input);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("scalar mode"));
+    }
+
+    #[test]
+    fn test_backward_requires_bptt() {
+        let mut config = UnifiedLTCConfig::scalar(16, 8, 4);
+        config.learning = LearningAlgorithm::None;
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let hidden_states = vec![vec![0.0f32; 16]];
+        let output_grad = vec![0.0f32; 4];
+        let input = vec![0.0f32; 8];
+        let result = ltc.backward(&input, &hidden_states, &output_grad);
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("BPTT"));
+    }
+
+    #[test]
+    fn test_forward_output_finiteness() {
+        let mut config = UnifiedLTCConfig::scalar(16, 8, 4);
+        config.num_steps = 50;
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![1.0f32; 8];
+        let (output, _states) = ltc.forward(&input).unwrap();
+
+        for (i, val) in output.iter().enumerate() {
+            assert!(val.is_finite(), "output[{}] = {} is not finite", i, val);
+        }
+    }
+
+    #[test]
+    fn test_forward_states_dimension_preserved() {
+        let mut config = UnifiedLTCConfig::scalar(20, 10, 5);
+        config.num_steps = 30;
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![0.3f32; 10];
+        let (output, states) = ltc.forward(&input).unwrap();
+
+        assert_eq!(output.len(), 5, "output dim must match output_dim");
+        assert_eq!(states.len(), 30, "num hidden states must match num_steps");
+        for (t, state) in states.iter().enumerate() {
+            assert_eq!(
+                state.len(),
+                20,
+                "hidden state at t={} has wrong dimension",
+                t
+            );
+        }
+    }
+
+    #[test]
+    fn test_hdc_evolve_zero_dt() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let initial_states: Vec<_> = ltc.hdc_states().to_vec();
+        let input = ContinuousHV::random(256, 99);
+
+        // Evolving with dt=0 should not change state
+        ltc.evolve(0.0, &input);
+
+        for (i, (orig, after)) in initial_states
+            .iter()
+            .zip(ltc.hdc_states().iter())
+            .enumerate()
+        {
+            assert_eq!(
+                orig.values, after.values,
+                "HDC state[{}] changed with dt=0",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_hdc_evolve_state_bounded() {
+        let config = UnifiedLTCConfig::hdc(512);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = ContinuousHV::random(512, 7);
+
+        // Evolve with a large dt many times to stress-test bounding
+        for _ in 0..500 {
+            ltc.evolve(0.5, &input);
+        }
+
+        for (i, state) in ltc.hdc_states().iter().enumerate() {
+            let norm = state.norm();
+            assert!(norm <= 5.5, "HDC state[{}] norm={} exceeds bound", i, norm);
+            for (j, v) in state.values.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "HDC state[{}].values[{}] = {} is not finite",
+                    i,
+                    j,
+                    v
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_hdc_rk4_evolve_finite() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = ContinuousHV::random(256, 55);
+
+        for _ in 0..50 {
+            ltc.evolve_rk4(0.01, &input);
+        }
+
+        assert!(ltc.total_time() > 0.0);
+        for (i, state) in ltc.hdc_states().iter().enumerate() {
+            for (j, v) in state.values.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "RK4 state[{}].values[{}] = {} is not finite",
+                    i,
+                    j,
+                    v
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_hdc_adam_update() {
+        let config = UnifiedLTCConfig::hdc(256);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = ContinuousHV::random(256, 42);
+
+        let weights_before: Vec<_> = ltc.hdc_weights.iter().map(|w| w.values.clone()).collect();
+
+        ltc.evolve(0.01, &input);
+        ltc.adam_update(&input);
+
+        // Weights must have changed
+        let mut any_changed = false;
+        for (before, after) in weights_before.iter().zip(ltc.hdc_weights.iter()) {
+            if before != &after.values {
+                any_changed = true;
+                break;
+            }
+        }
+        assert!(any_changed, "Adam update should modify weights");
+
+        // All weight values must be finite
+        for (i, w) in ltc.hdc_weights.iter().enumerate() {
+            for (j, v) in w.values.iter().enumerate() {
+                assert!(
+                    v.is_finite(),
+                    "hdc_weights[{}].values[{}] = {} not finite after Adam",
+                    i,
+                    j,
+                    v
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_reset_clears_state() {
+        let config = UnifiedLTCConfig::scalar(16, 8, 4);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![1.0f32; 8];
+        let _ = ltc.forward(&input).unwrap();
+
+        assert!(ltc.total_time() > 0.0);
+        assert!(ltc.scalar_states().iter().any(|&s| s != 0.0));
+
+        ltc.reset();
+
+        assert_eq!(ltc.total_time(), 0.0);
+        for &s in ltc.scalar_states() {
+            assert_eq!(s, 0.0, "scalar state should be zero after reset");
+        }
+    }
+
+    #[test]
+    fn test_predict_next_hdv_scalar_mode() {
+        let config = UnifiedLTCConfig::scalar(16, 8, 4);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        // Before any forward pass, prediction should still produce correct dim
+        let pred = ltc.predict_next_hdv();
+        assert_eq!(pred.len(), 4);
+        for v in &pred {
+            assert!(v.is_finite());
+        }
+
+        // After forward pass, prediction may differ
+        let input = vec![0.5f32; 8];
+        let _ = ltc.forward(&input).unwrap();
+        let pred_after = ltc.predict_next_hdv();
+        assert_eq!(pred_after.len(), 4);
+        for v in &pred_after {
+            assert!(v.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_predict_next_hdv_hdc_mode() {
+        let config = UnifiedLTCConfig::hdc(128);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let pred = ltc.predict_next_hdv();
+        assert_eq!(pred.len(), 128);
+
+        let input = ContinuousHV::random(128, 10);
+        ltc.evolve(0.01, &input);
+        let pred_after = ltc.predict_next_hdv();
+        assert_eq!(pred_after.len(), 128);
+    }
+
+    #[test]
+    fn test_activation_functions_edge_values() {
+        // Softplus overflows f32 for large x (e^100 > f32::MAX), so we test
+        // it separately with a smaller range. All other activations are bounded
+        // or linear and handle large inputs fine.
+        let bounded_activations = [
+            Activation::Tanh,
+            Activation::Sigmoid,
+            Activation::LeakyRelu,
+            Activation::Identity,
+        ];
+
+        let edge_values = [0.0f32, 1.0, -1.0, 100.0, -100.0, f32::MIN_POSITIVE];
+
+        for act in &bounded_activations {
+            for &x in &edge_values {
+                let y = act.apply_scalar(x);
+                assert!(
+                    y.is_finite(),
+                    "{:?}.apply_scalar({}) = {} is not finite",
+                    act,
+                    x,
+                    y
+                );
+                let dy = act.derivative_scalar(x);
+                assert!(
+                    dy.is_finite(),
+                    "{:?}.derivative_scalar({}) = {} is not finite",
+                    act,
+                    x,
+                    dy
+                );
+            }
+        }
+
+        // Softplus with values in the representable range
+        let softplus_values = [0.0f32, 1.0, -1.0, 10.0, -10.0, f32::MIN_POSITIVE];
+        for &x in &softplus_values {
+            let y = Activation::Softplus.apply_scalar(x);
+            assert!(
+                y.is_finite(),
+                "Softplus.apply_scalar({}) = {} is not finite",
+                x,
+                y
+            );
+            assert!(y >= 0.0, "Softplus output must be non-negative, got {}", y);
+            let dy = Activation::Softplus.derivative_scalar(x);
+            assert!(
+                dy.is_finite(),
+                "Softplus.derivative_scalar({}) = {} is not finite",
+                x,
+                dy
+            );
+        }
+    }
+
+    #[test]
+    fn test_neuromodulation_high_vitality_no_sluggishness() {
+        let config = UnifiedLTCConfig::scalar(8, 4, 2);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let tau_before: Vec<_> = ltc.tau.clone();
+
+        // High vitality (> threshold) should NOT increase tau
+        ltc.apply_neuromodulation(1.5);
+
+        // sluggishness = 1 + (1-1.5)*2 = 0.0 which is < 1.5, so tau unchanged
+        for (orig, new_val) in tau_before.iter().zip(ltc.tau.iter()) {
+            assert!(
+                (*new_val - *orig).abs() < 1e-6,
+                "tau should not increase with high vitality"
+            );
+        }
+    }
+
+    #[test]
+    fn test_sparse_forward_pass_finite() {
+        let config = UnifiedLTCConfig::scalar_sparse(32, 8, 4, 0.2);
+        let mut ltc = UnifiedLTC::new(config).unwrap();
+
+        let input = vec![0.5f32; 8];
+        let (output, states) = ltc.forward(&input).unwrap();
+
+        assert_eq!(output.len(), 4);
+        for val in &output {
+            assert!(val.is_finite());
+        }
+        for state in &states {
+            assert_eq!(state.len(), 32);
+        }
     }
 }

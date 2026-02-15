@@ -24,13 +24,12 @@
 //! cargo run --example embodied_consciousness_learning --release
 //! ```
 
-use symthaea::school::{
-    School, SchoolConfig, CoherenceBridgedSchool,
-    Curriculum, CurriculumType, LearningObjective, Difficulty, Domain,
-    CoherenceLearningConfig,
-};
 use symthaea::physiology::coherence::CoherenceField;
 use symthaea::physiology::endocrine::HormoneState;
+use symthaea::school::{
+    CoherenceBridgedSchool, CoherenceLearningConfig, Curriculum, CurriculumType, Difficulty,
+    Domain, LearningObjective, School, SchoolConfig,
+};
 
 fn main() {
     println!("╔════════════════════════════════════════════════════════════════════════════════╗");
@@ -52,9 +51,9 @@ fn main() {
     // Custom config to highlight the three layers
     let config = CoherenceLearningConfig {
         // Layer 1: Bidirectional Φ-Coherence Feedback
-        phi_to_coherence_factor: 2.0,      // Φ gain of 0.01 → +0.02 coherence
-        max_phi_coherence_boost: 0.10,     // Cap at 10% coherence boost per session
-        phi_loss_coherence_penalty: 1.5,   // Φ loss hurts coherence 1.5x
+        phi_to_coherence_factor: 2.0, // Φ gain of 0.01 → +0.02 coherence
+        max_phi_coherence_boost: 0.10, // Cap at 10% coherence boost per session
+        phi_loss_coherence_penalty: 1.5, // Φ loss hurts coherence 1.5x
 
         // Layer 2: Hormone-Learning Integration
         cortisol_impairment_threshold: 0.7, // High stress impairs learning
@@ -68,13 +67,25 @@ fn main() {
 
     // Add curriculum
     let curriculum = Curriculum::builtin(CurriculumType::NixOS);
-    bridged.add_curriculum(curriculum).expect("Failed to add curriculum");
+    bridged
+        .add_curriculum(curriculum)
+        .expect("Failed to add curriculum");
 
     println!("═══ Initial State ═══");
     println!("  Coherence: {:.0}%", bridged.coherence_level() * 100.0);
     println!("  Φ (consciousness): {:.4}", bridged.current_phi());
-    println!("  Autopoietic closure: {:.2}", bridged.autopoietic().closure());
-    println!("  Self-sustaining: {}", if bridged.is_self_sustaining() { "✓" } else { "Not yet" });
+    println!(
+        "  Autopoietic closure: {:.2}",
+        bridged.autopoietic().closure()
+    );
+    println!(
+        "  Self-sustaining: {}",
+        if bridged.is_self_sustaining() {
+            "✓"
+        } else {
+            "Not yet"
+        }
+    );
     println!();
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -93,7 +104,10 @@ fn main() {
     bridged.coherence_mut().coherence = 0.80;
     bridged.coherence_mut().relational_resonance = 0.85;
 
-    println!("Starting coherence: {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "Starting coherence: {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
     println!();
 
     // Learn a sequence to demonstrate the virtuous cycle
@@ -116,13 +130,18 @@ fn main() {
     let mut virtuous_count = 0;
 
     for (i, obj) in objectives.iter().enumerate() {
-        let result = bridged.learn_with_coherence(obj, true).expect("Learning failed");
+        let result = bridged
+            .learn_with_coherence(obj, true)
+            .expect("Learning failed");
 
         println!("  {}. {} | {}", i + 1, obj.name, result.describe());
 
         // Show Layer 1 effects
         if result.phi_coherence_boost > 0.001 {
-            println!("     ↳ Φ→Coherence boost: +{:.2}%", result.phi_coherence_boost * 100.0);
+            println!(
+                "     ↳ Φ→Coherence boost: +{:.2}%",
+                result.phi_coherence_boost * 100.0
+            );
         }
         if result.virtuous_cycle_active {
             println!("     ✨ VIRTUOUS CYCLE ACTIVE!");
@@ -132,8 +151,14 @@ fn main() {
     }
 
     println!("  Virtuous cycles triggered: {}", virtuous_count);
-    println!("  Total virtuous cycles: {}", bridged.virtuous_cycle_count());
-    println!("  Final coherence: {:.0}%", bridged.coherence_level() * 100.0);
+    println!(
+        "  Total virtuous cycles: {}",
+        bridged.virtuous_cycle_count()
+    );
+    println!(
+        "  Final coherence: {:.0}%",
+        bridged.coherence_level() * 100.0
+    );
     println!();
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -161,9 +186,9 @@ fn main() {
 
     println!("═══ 2a: Learning Under High Stress (Cortisol = 0.9) ═══");
     let high_stress = HormoneState {
-        cortisol: 0.9,  // Very high stress
-        dopamine: 0.3,  // Normal dopamine
-        oxytocin: 0.3,  // Low connection
+        cortisol: 0.9, // Very high stress
+        dopamine: 0.3, // Normal dopamine
+        oxytocin: 0.3, // Low connection
         norepinephrine: 0.6,
         serotonin: 0.5,
     };
@@ -188,9 +213,9 @@ fn main() {
 
     println!("═══ 2b: Learning in Optimal State (Dopamine=0.9, Oxytocin=0.8) ═══");
     let optimal_state = HormoneState {
-        cortisol: 0.2,  // Low stress
-        dopamine: 0.9,  // High reward
-        oxytocin: 0.8,  // High connection
+        cortisol: 0.2, // Low stress
+        dopamine: 0.9, // High reward
+        oxytocin: 0.8, // High connection
         norepinephrine: 0.6,
         serotonin: 0.7,
     };
@@ -202,9 +227,18 @@ fn main() {
     match &optimal_result {
         Ok(r) => {
             println!("  Result: {}", r.describe());
-            println!("  Hormone Φ modifier: {:.2}x (dopamine boost!)", r.hormone_phi_modifier);
-            println!("  Hormone coherence modifier: {:.2}x (oxytocin boost!)", r.hormone_coherence_modifier);
-            println!("  Φ-coherence boost: +{:.2}%", r.phi_coherence_boost * 100.0);
+            println!(
+                "  Hormone Φ modifier: {:.2}x (dopamine boost!)",
+                r.hormone_phi_modifier
+            );
+            println!(
+                "  Hormone coherence modifier: {:.2}x (oxytocin boost!)",
+                r.hormone_coherence_modifier
+            );
+            println!(
+                "  Φ-coherence boost: +{:.2}%",
+                r.phi_coherence_boost * 100.0
+            );
         }
         Err(e) => println!("  Failed: {}", e),
     }
@@ -214,10 +248,20 @@ fn main() {
 
     println!("═══ Hormone Effect Comparison ═══");
     if let (Ok(stressed), Ok(optimal)) = (stressed_result, optimal_result) {
-        println!("  Stressed Φ modifier: {:.2}x", stressed.hormone_phi_modifier);
-        println!("  Optimal Φ modifier:  {:.2}x", optimal.hormone_phi_modifier);
-        let improvement = (optimal.hormone_phi_modifier / stressed.hormone_phi_modifier - 1.0) * 100.0;
-        println!("  Improvement: +{:.0}% Φ gain in optimal state!", improvement);
+        println!(
+            "  Stressed Φ modifier: {:.2}x",
+            stressed.hormone_phi_modifier
+        );
+        println!(
+            "  Optimal Φ modifier:  {:.2}x",
+            optimal.hormone_phi_modifier
+        );
+        let improvement =
+            (optimal.hormone_phi_modifier / stressed.hormone_phi_modifier - 1.0) * 100.0;
+        println!(
+            "  Improvement: +{:.0}% Φ gain in optimal state!",
+            improvement
+        );
     }
     println!();
 
@@ -257,17 +301,19 @@ fn main() {
             .with_domain(Domain::NixOS)
             .build();
 
-        let result = bridged.learn_with_coherence(&obj, true).expect("Learning failed");
+        let result = bridged
+            .learn_with_coherence(&obj, true)
+            .expect("Learning failed");
 
         // Get current autopoietic state
         let closure = bridged.operational_closure();
         let metrics = bridged.self_production_metrics();
 
         println!("  Learned: {}", name);
-        println!("    Closure: {:.2} | Cycles: {} | Errors: {}",
-                 closure.closure_level,
-                 metrics.production_cycles,
-                 metrics.prediction_errors);
+        println!(
+            "    Closure: {:.2} | Cycles: {} | Errors: {}",
+            closure.closure_level, metrics.production_cycles, metrics.prediction_errors
+        );
 
         if result.virtuous_cycle_active {
             println!("    ✨ Virtuous cycle active!");
@@ -283,15 +329,45 @@ fn main() {
     println!("  Production cycles: {}", final_metrics.production_cycles);
     println!("  Prediction errors: {}", final_metrics.prediction_errors);
     println!("  Coherence mean: {:.2}", final_metrics.coherence_mean);
-    println!("  Coherence stability: {:.2}", final_metrics.coherence_stability);
+    println!(
+        "  Coherence stability: {:.2}",
+        final_metrics.coherence_stability
+    );
     println!();
     println!("  Operational Closure: {:.2}", closure.closure_level);
-    println!("  Boundary Intact: {}", if closure.boundary_intact { "✓" } else { "✗" });
-    println!("  Self-Producing: {}", if closure.self_producing { "✓" } else { "Not yet" });
-    println!("  Autonomous: {}", if closure.autonomous { "✓" } else { "Not yet" });
+    println!(
+        "  Boundary Intact: {}",
+        if closure.boundary_intact {
+            "✓"
+        } else {
+            "✗"
+        }
+    );
+    println!(
+        "  Self-Producing: {}",
+        if closure.self_producing {
+            "✓"
+        } else {
+            "Not yet"
+        }
+    );
+    println!(
+        "  Autonomous: {}",
+        if closure.autonomous { "✓" } else { "Not yet" }
+    );
     println!();
-    println!("  Is Self-Sustaining: {}", if bridged.is_self_sustaining() { "✓ YES!" } else { "Not yet" });
-    println!("  Total Virtuous Cycles: {}", bridged.virtuous_cycle_count());
+    println!(
+        "  Is Self-Sustaining: {}",
+        if bridged.is_self_sustaining() {
+            "✓ YES!"
+        } else {
+            "Not yet"
+        }
+    );
+    println!(
+        "  Total Virtuous Cycles: {}",
+        bridged.virtuous_cycle_count()
+    );
     println!();
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -307,23 +383,44 @@ fn main() {
     println!();
     println!("  School Stats:");
     println!("    Total learned: {}", stats.school_stats.total_learned);
-    println!("    Mastered: {}/{}", stats.school_stats.mastered_objectives, stats.school_stats.total_objectives);
-    println!("    Hallucination rate: {:.1}%", stats.school_stats.hallucination_rate * 100.0);
+    println!(
+        "    Mastered: {}/{}",
+        stats.school_stats.mastered_objectives, stats.school_stats.total_objectives
+    );
+    println!(
+        "    Hallucination rate: {:.1}%",
+        stats.school_stats.hallucination_rate * 100.0
+    );
     println!();
     println!("  Coherence Stats:");
-    println!("    Current coherence: {:.0}%", stats.coherence_stats.coherence * 100.0);
-    println!("    Relational resonance: {:.0}%", stats.coherence_stats.relational_resonance * 100.0);
+    println!(
+        "    Current coherence: {:.0}%",
+        stats.coherence_stats.coherence * 100.0
+    );
+    println!(
+        "    Relational resonance: {:.0}%",
+        stats.coherence_stats.relational_resonance * 100.0
+    );
     println!("    Operations: {}", stats.coherence_stats.operations_count);
-    println!("    Gratitude received: {}", stats.coherence_stats.gratitude_count);
+    println!(
+        "    Gratitude received: {}",
+        stats.coherence_stats.gratitude_count
+    );
     println!();
     println!("  Integration Stats:");
     println!("    Successful learnings: {}", stats.successful_learnings);
     println!("    Coherence-blocked: {}", stats.coherence_blocked_count);
     println!();
     println!("  Three-Layer Stats:");
-    println!("    Layer 1 - Virtuous cycles: {}", stats.virtuous_cycle_count);
+    println!(
+        "    Layer 1 - Virtuous cycles: {}",
+        stats.virtuous_cycle_count
+    );
     println!("    Layer 2 - (hormone effects shown per-learning)");
-    println!("    Layer 3 - Self-sustaining: {}", stats.is_self_sustaining);
+    println!(
+        "    Layer 3 - Self-sustaining: {}",
+        stats.is_self_sustaining
+    );
     println!("    Layer 3 - Closure level: {:.2}", stats.closure_level);
     println!();
 

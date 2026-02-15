@@ -33,32 +33,41 @@
 //!    Nix Expression                   Widget States
 //! ```
 
-pub mod widget_mapper;
-pub mod hdc_translator;
 pub mod constraint_validator;
+pub mod hdc_translator;
+pub mod widget_mapper;
 pub mod widgets;
 
-pub use widget_mapper::{
-    WidgetMapper, WidgetBinding, WidgetId, WidgetValue,
-    NixPath, ValueTransformer, MappingResult,
+pub use constraint_validator::{
+    Constraint, ConstraintKind, ConstraintValidator, Suggestion, ValidationError, ValidationResult,
 };
 pub use hdc_translator::{
-    HdcTranslator, SemanticBinding, TranslationResult,
-    SemanticRole, SemanticConfidence,
+    HdcTranslator, SemanticBinding, SemanticConfidence, SemanticRole, TranslationResult,
 };
-pub use constraint_validator::{
-    ConstraintValidator, Constraint, ConstraintKind,
-    ValidationResult, ValidationError, Suggestion,
+pub use widget_mapper::{
+    MappingResult, NixPath, ValueTransformer, WidgetBinding, WidgetId, WidgetMapper, WidgetValue,
 };
 pub use widgets::{
-    // C1: NixOS Module Browser
-    ModuleBrowser, NixOption, ModuleCategory,
+    DashboardStats,
+    DiffHunk,
+    DiffLine,
+    DiffStats,
+    DiffType,
+    Generation,
+    GenerationChanges,
     // C2: Generation Timeline
-    GenerationTimeline, Generation, GenerationChanges,
+    GenerationTimeline,
     // C3: Live Config Diff
-    LiveConfigDiff, DiffHunk, DiffLine, DiffType, DiffStats,
+    LiveConfigDiff,
+    // C1: NixOS Module Browser
+    ModuleBrowser,
+    ModuleCategory,
+    NixOption,
+    ServiceAction,
     // C4: Service Status Dashboard
-    ServiceDashboard, SystemdUnit, UnitState, ServiceAction, DashboardStats,
+    ServiceDashboard,
+    SystemdUnit,
+    UnitState,
 };
 
 use std::collections::HashMap;
@@ -148,8 +157,7 @@ impl ConfigCategory {
 }
 
 /// Synchronization state between GUI and Nix
-#[derive(Debug, Clone)]
-#[derive(Default)]
+#[derive(Debug, Clone, Default)]
 pub struct SyncState {
     /// Current widget states (widget_id -> value)
     pub widget_states: HashMap<WidgetId, WidgetValue>,
@@ -166,7 +174,6 @@ pub struct SyncState {
     /// Whether Nix config is dirty (needs rebuild)
     pub nix_dirty: bool,
 }
-
 
 /// A pending change to be applied
 #[derive(Debug, Clone)]
@@ -235,7 +242,9 @@ impl GuiBridge {
         new_value: WidgetValue,
     ) -> MappingResult {
         // Find binding for this widget
-        let binding = self.bindings.iter()
+        let binding = self
+            .bindings
+            .iter()
             .find(|b| b.widget_id == widget_id)
             .cloned();
 
@@ -244,13 +253,12 @@ impl GuiBridge {
             let nix_expr = self.mapper.widget_to_nix(&binding, &new_value);
 
             // Validate the change
-            let validation = self.validator.validate_change(
-                &binding.nix_path,
-                &nix_expr,
-            );
+            let validation = self.validator.validate_change(&binding.nix_path, &nix_expr);
 
             // Update state
-            self.state.widget_states.insert(widget_id.clone(), new_value.clone());
+            self.state
+                .widget_states
+                .insert(widget_id.clone(), new_value.clone());
 
             if validation.is_valid {
                 // Add to pending changes
@@ -269,7 +277,9 @@ impl GuiBridge {
                     confidence: validation.confidence,
                 }
             } else {
-                self.state.validation_errors.extend(validation.errors.clone());
+                self.state
+                    .validation_errors
+                    .extend(validation.errors.clone());
 
                 MappingResult::ValidationFailed {
                     errors: validation.errors,
@@ -290,17 +300,14 @@ impl GuiBridge {
 
         for (nix_path, nix_value) in parsed_values {
             // Find binding for this path
-            if let Some(binding) = self.bindings.iter()
-                .find(|b| b.nix_path == nix_path)
-            {
+            if let Some(binding) = self.bindings.iter().find(|b| b.nix_path == nix_path) {
                 // Transform Nix value to widget value
                 let widget_value = self.mapper.nix_to_widget(binding, &nix_value);
 
                 // Update state
-                self.state.widget_states.insert(
-                    binding.widget_id.clone(),
-                    widget_value.clone(),
-                );
+                self.state
+                    .widget_states
+                    .insert(binding.widget_id.clone(), widget_value.clone());
 
                 updates.push(WidgetUpdate {
                     widget_id: binding.widget_id.clone(),
@@ -321,9 +328,7 @@ impl GuiBridge {
         for change in &self.state.pending_changes {
             diff.push_str(&format!(
                 "# Widget: {:?}\n{} = {};\n\n",
-                change.widget_id,
-                change.nix_path.0,
-                change.nix_expr
+                change.widget_id, change.nix_path.0, change.nix_expr
             ));
         }
 
@@ -343,7 +348,8 @@ impl GuiBridge {
 
     /// Get all bindings for a category
     pub fn bindings_for_category(&self, category: ConfigCategory) -> Vec<&WidgetBinding> {
-        self.bindings.iter()
+        self.bindings
+            .iter()
             .filter(|b| ConfigCategory::from_path(&b.nix_path.0) == category)
             .collect()
     }

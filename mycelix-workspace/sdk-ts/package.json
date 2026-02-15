@@ -1,0 +1,232 @@
+{
+  "name": "@mycelix/sdk",
+  "version": "0.6.0",
+  "description": "Mycelix SDK - TypeScript bindings for MATL, Epistemic, Bridge, and Holochain Client",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mycelix": "./dist/cli/index.js",
+    "@mycelix/sdk": "./dist/cli/index.js",
+    "mycelix-storage": "./dist/storage/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./matl": {
+      "types": "./dist/matl/index.d.ts",
+      "import": "./dist/matl/index.js"
+    },
+    "./epistemic": {
+      "types": "./dist/epistemic/index.d.ts",
+      "import": "./dist/epistemic/index.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge/index.d.ts",
+      "import": "./dist/bridge/index.js"
+    },
+    "./client": {
+      "types": "./dist/client/index.d.ts",
+      "import": "./dist/client/index.js"
+    },
+    "./fl": {
+      "types": "./dist/fl/index.d.ts",
+      "import": "./dist/fl/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "import": "./dist/errors.js"
+    },
+    "./security": {
+      "types": "./dist/security/index.d.ts",
+      "import": "./dist/security/index.js"
+    },
+    "./config": {
+      "types": "./dist/config/index.d.ts",
+      "import": "./dist/config/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "import": "./dist/utils/index.js"
+    },
+    "./integrations/mail": {
+      "types": "./dist/integrations/mail/index.d.ts",
+      "import": "./dist/integrations/mail/index.js"
+    },
+    "./integrations/marketplace": {
+      "types": "./dist/integrations/marketplace/index.d.ts",
+      "import": "./dist/integrations/marketplace/index.js"
+    },
+    "./integrations/edunet": {
+      "types": "./dist/integrations/edunet/index.d.ts",
+      "import": "./dist/integrations/edunet/index.js"
+    },
+    "./integrations/supplychain": {
+      "types": "./dist/integrations/supplychain/index.d.ts",
+      "import": "./dist/integrations/supplychain/index.js"
+    },
+    "./integrations/identity": {
+      "types": "./dist/integrations/identity/index.d.ts",
+      "import": "./dist/integrations/identity/index.js"
+    },
+    "./integrations/finance": {
+      "types": "./dist/integrations/finance/index.d.ts",
+      "import": "./dist/integrations/finance/index.js"
+    },
+    "./integrations/governance": {
+      "types": "./dist/integrations/governance/index.d.ts",
+      "import": "./dist/integrations/governance/index.js"
+    },
+    "./integrations/property": {
+      "types": "./dist/integrations/property/index.d.ts",
+      "import": "./dist/integrations/property/index.js"
+    },
+    "./integrations/energy": {
+      "types": "./dist/integrations/energy/index.d.ts",
+      "import": "./dist/integrations/energy/index.js"
+    },
+    "./integrations/media": {
+      "types": "./dist/integrations/media/index.d.ts",
+      "import": "./dist/integrations/media/index.js"
+    },
+    "./integrations/justice": {
+      "types": "./dist/integrations/justice/index.d.ts",
+      "import": "./dist/integrations/justice/index.js"
+    },
+    "./integrations/knowledge": {
+      "types": "./dist/integrations/knowledge/index.d.ts",
+      "import": "./dist/integrations/knowledge/index.js"
+    },
+    "./validation": {
+      "types": "./dist/validation/index.d.ts",
+      "import": "./dist/validation/index.js"
+    },
+    "./signals": {
+      "types": "./dist/signals/index.d.ts",
+      "import": "./dist/signals/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli/index.d.ts",
+      "import": "./dist/cli/index.js"
+    },
+    "./storage": {
+      "types": "./dist/storage/index.d.ts",
+      "import": "./dist/storage/index.js"
+    },
+    "./generated": {
+      "types": "./dist/generated/index.d.ts",
+      "import": "./dist/generated/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./react": {
+      "types": "./dist/frameworks/react/index.d.ts",
+      "import": "./dist/frameworks/react/index.js"
+    },
+    "./svelte": {
+      "types": "./dist/frameworks/svelte/index.d.ts",
+      "import": "./dist/frameworks/svelte/index.js"
+    },
+    "./vue": {
+      "types": "./dist/frameworks/vue/index.d.ts",
+      "import": "./dist/frameworks/vue/index.js"
+    },
+    "./frameworks": {
+      "types": "./dist/frameworks/index.d.ts",
+      "import": "./dist/frameworks/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run --exclude 'tests/conductor/**'",
+    "test:watch": "vitest --exclude 'tests/conductor/**'",
+    "test:coverage": "vitest run --coverage --exclude 'tests/conductor/**'",
+    "test:conductor": "CONDUCTOR_AVAILABLE=true vitest run tests/conductor/",
+    "test:all": "vitest run",
+    "bench": "vitest bench benchmarks/",
+    "lint": "eslint src/",
+    "format": "prettier --write src/",
+    "prepublishOnly": "npm run build && npm test",
+    "clean": "rm -rf dist docs coverage",
+    "typecheck": "tsc --noEmit",
+    "docs": "typedoc",
+    "docs:serve": "typedoc && cd docs && python3 -m http.server 8080",
+    "size": "npm run build && du -sh dist/ && find dist -name '*.js' | xargs wc -c | tail -1",
+    "generate:types": "npx ts-node --esm scripts/generate-types.ts",
+    "generate:types:full": "cd ../sdk && ./scripts/generate-types.sh && cd ../sdk-ts && npm run generate:types"
+  },
+  "keywords": [
+    "mycelix",
+    "holochain",
+    "trust",
+    "byzantine",
+    "federated-learning",
+    "epistemic",
+    "decentralized",
+    "p2p",
+    "reputation",
+    "consensus"
+  ],
+  "author": "Luminous Dynamics <dev@luminousdynamics.org>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Luminous-Dynamics/mycelix.git",
+    "directory": "sdk-ts"
+  },
+  "bugs": {
+    "url": "https://github.com/Luminous-Dynamics/mycelix/issues"
+  },
+  "homepage": "https://github.com/Luminous-Dynamics/mycelix#readme",
+  "dependencies": {
+    "@holochain/client": "^0.20.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@opentelemetry/api": "^1.9.0",
+    "@types/node": "^20.19.30",
+    "@types/react": "^18.3.27",
+    "@vitest/coverage-v8": "^4.0.18",
+    "eslint": "^8.57.1",
+    "fast-check": "^4.5.3",
+    "graphql": "^16.12.0",
+    "prettier": "^3.8.1",
+    "ts-node": "^10.9.2",
+    "typedoc": "^0.28.16",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
+  },
+  "peerDependencies": {
+    "@holochain/client": "^0.20.0",
+    "react": "^18.0.0 || ^19.0.0",
+    "svelte": "^4.0.0 || ^5.0.0",
+    "vue": "^3.3.0"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    },
+    "svelte": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

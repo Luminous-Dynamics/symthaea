@@ -172,8 +172,8 @@ impl AgentInfo {
         let violation_penalty = (self.violation_count as f64 * 0.1).min(0.5);
         let interaction_bonus = (self.interaction_count as f64 / 1000.0).min(0.2);
 
-        self.reputation_score = (0.5 + vouch_bonus + interaction_bonus - violation_penalty)
-            .clamp(0.0, 1.0);
+        self.reputation_score =
+            (0.5 + vouch_bonus + interaction_bonus - violation_penalty).clamp(0.0, 1.0);
     }
 
     /// Record a new Φ reading
@@ -373,7 +373,10 @@ impl HolochainCortex {
 
     /// Create a new Holochain Cortex client with custom cache capacity
     pub fn with_cache_capacity(config: HolochainConfig, cache_capacity: usize) -> Self {
-        let capacity = NonZeroUsize::new(cache_capacity).unwrap_or(NonZeroUsize::new(1).unwrap());
+        let capacity = NonZeroUsize::new(cache_capacity).unwrap_or(
+            // SAFETY: 1 is always non-zero
+            NonZeroUsize::new(1).expect("1 is non-zero"),
+        );
         Self {
             config,
             local_agent: None,
@@ -403,7 +406,10 @@ impl HolochainCortex {
                     return Ok(());
                 }
                 Err(e) => {
-                    tracing::warn!("Real Holochain connection failed, falling back to mock: {}", e);
+                    tracing::warn!(
+                        "Real Holochain connection failed, falling back to mock: {}",
+                        e
+                    );
                     self.connected = true;
                     return Ok(());
                 }
@@ -429,9 +435,8 @@ impl HolochainCortex {
         use std::str::FromStr;
 
         // Validate the conductor URL
-        let _url = url::Url::from_str(&self.config.conductor_url).map_err(|e| {
-            CortexError::ConnectionError(format!("Invalid conductor URL: {}", e))
-        })?;
+        let _url = url::Url::from_str(&self.config.conductor_url)
+            .map_err(|e| CortexError::ConnectionError(format!("Invalid conductor URL: {}", e)))?;
 
         // Real WebSocket connection via holochain_client is in symthaea-mycelix-bridge.
         // Here we validate config and fall back to mock mode with caching.
@@ -601,7 +606,9 @@ impl HolochainCortex {
 
     /// Vouch for another agent
     pub fn vouch_for(&mut self, agent_key: &AgentPubKey) -> Result<(), CortexError> {
-        let local = self.local_agent.as_ref()
+        let local = self
+            .local_agent
+            .as_ref()
             .ok_or(CortexError::NoLocalAgent)?
             .clone();
 
@@ -787,7 +794,9 @@ mod tests {
         let peer_key = AgentPubKey::test_key(2);
 
         cortex.set_local_agent(local_key.clone());
-        cortex.agent_cache.put(peer_key.clone(), AgentInfo::new(peer_key.clone()));
+        cortex
+            .agent_cache
+            .put(peer_key.clone(), AgentInfo::new(peer_key.clone()));
 
         let initial_rep = cortex.agent_cache.get(&peer_key).unwrap().reputation_score;
         cortex.vouch_for(&peer_key).unwrap();
@@ -801,7 +810,9 @@ mod tests {
         let mut cortex = HolochainCortex::default();
 
         let key = AgentPubKey::test_key(1);
-        cortex.agent_cache.put(key.clone(), AgentInfo::new(key.clone()));
+        cortex
+            .agent_cache
+            .put(key.clone(), AgentInfo::new(key.clone()));
 
         let initial_rep = cortex.agent_cache.get(&key).unwrap().reputation_score;
         cortex.record_violation(&key, "test violation");
@@ -819,7 +830,9 @@ mod tests {
         // Add 3 agents (fills cache)
         for i in 0..3 {
             let key = AgentPubKey::test_key(i);
-            cortex.agent_cache.put(key, AgentInfo::new(AgentPubKey::test_key(i)));
+            cortex
+                .agent_cache
+                .put(key, AgentInfo::new(AgentPubKey::test_key(i)));
         }
         assert_eq!(cortex.agent_cache.len(), 3);
 

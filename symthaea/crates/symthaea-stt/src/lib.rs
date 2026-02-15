@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 //! Symthaea Speech-to-Text Library
 //!
 //! A neuromorphic speech recognition system built on:
@@ -50,83 +52,87 @@
 // TODO: Add comprehensive documentation before 1.0 release
 #![allow(missing_docs)]
 #![allow(rustdoc::missing_crate_level_docs)]
+#![allow(rustdoc::broken_intra_doc_links)]
+#![allow(rustdoc::invalid_html_tags)]
+#![allow(rustdoc::bare_urls)]
 
-pub mod hdc;
-pub mod ltc;
-pub mod phoneme;
-pub mod lexicon;
-pub mod bootstrap;
-pub mod audio;
-pub mod discovery;
 pub mod adaptation;
-pub mod streaming;
-pub mod batch;
-pub mod eval;
-pub mod lm;
-pub mod models;
-pub mod whale;
-pub mod linguistic;
+pub mod alignment_loader;
 pub mod articulatory;
 pub mod articulatory_cfc;
-pub mod holographic_scorer;
-pub mod cetacean_scorer;
+pub mod audio;
+pub mod batch;
+pub mod bootstrap;
 pub mod cetacean_classifier;
+pub mod cetacean_scorer;
+pub mod crystal_reservoir;
+pub mod discovery;
+pub mod dtw_align;
+pub mod eval;
+pub mod hdc;
 pub mod hierarchical_scorer;
-pub mod multiscale_scorer;
+pub mod holographic_scorer;
+pub mod lexicon;
+pub mod linguistic;
 pub mod liquid;
 pub mod liquid_hdc;
 pub mod liquid_projection;
-pub mod crystal_reservoir;
+pub mod lm;
+pub mod ltc;
+pub mod models;
+pub mod multiscale_scorer;
+pub mod phoneme;
 pub mod rls;
+pub mod streaming;
 pub mod temporal_grammar;
 pub mod unified_grammar;
-pub mod dtw_align;
-pub mod alignment_loader;
+pub mod whale;
 
 // Physiological signal processing (Project Hypnos / Consciousness Sensing)
 pub mod edf_loader;
 pub mod sleep_sentinel;
 
 // Re-exports for convenience
-pub use hdc::{HV16, bundle, weighted_bundle, HDC_DIM, CORE_HDC_DIM, EXPANSION_FACTOR};
-pub use ltc::{LtcCell, LtcConfig, TauSmoother};
-pub use phoneme::{PhonemeDecoder, PhonemeResonator, PhonemeInventory, TemporalDecoder, TemporalConfig};
-pub use lexicon::{CmuDictionary, TextToPhonemes};
-pub use bootstrap::{
-    BootstrapPipeline, BootstrapConfig, TrainedPrototypes,
-    AdaptivePrototype, AdaptivePrototypeSet, AdaptiveStats,
+pub use adaptation::{AdaptationEngine, SpeakerDiarizer, SpeakerProfile};
+pub use alignment_loader::{
+    id_to_audio_path, load_alignments, PhonemeSegment, UtteranceAlignment, WordSegment,
 };
-pub use audio::{AudioFrontend, AudioProjector, AudioConfig};
-pub use linguistic::{PhonemeClasses, PhonotacticConstraints, PhonemeFeatures};
 pub use articulatory::{
-    ArticulatoryMapper, ArticulatoryFeatures, ArticulatoryHDC, ArticulatoryResonator,
-    AcousticArticulatoryDetector, Voicing, Manner, Place, VowelHeight,
+    AcousticArticulatoryDetector, ArticulatoryFeatures, ArticulatoryHDC, ArticulatoryMapper,
+    ArticulatoryResonator, Manner, Place, Voicing, VowelHeight,
 };
-pub use discovery::{DiscoveryPipeline, DiscoveryConfig, DiscoveryResult, OnlineClusterer};
-pub use adaptation::{SpeakerProfile, AdaptationEngine, SpeakerDiarizer};
-pub use streaming::{StreamProcessor, StreamSession, StreamConfig};
-pub use batch::{BatchProcessor, BatchTrainer, BatchDiscovery, BatchConfig, BatchStats};
-pub use eval::{
-    phoneme_error_rate, word_error_rate, character_error_rate,
-    EvalResult, Alignment, ConfusionMatrix, EvaluationReport,
-};
-pub use lm::{
-    NgramLM, BeamDecoder, BeamConfig, Hypothesis,
-    PhonemeToWordDecoder, CombinedDecoder,
-};
-pub use models::{ModelPackage, ModelMetadata, ModelRegistry, ModelInfo};
-pub use edf_loader::{EdfFile, EdfSignal, EdfHeader, SleepStage};
-pub use sleep_sentinel::{ConsciousnessSentinel, ConsciousnessState, BandPowers};
-pub use dtw_align::{DtwAligner, DtwTrainer, DtwAlignment, AlignedSegment};
-pub use alignment_loader::{load_alignments, PhonemeSegment, UtteranceAlignment, WordSegment, id_to_audio_path};
-pub use liquid_projection::{
-    LiquidProjection, LiquidProjectionConfig, PhonemeTargets, RidgeAccumulator,
-    DirectClassifier, DirectClassifierConfig, DirectAccumulator, RandomProjection, RFActivation,
+pub use audio::{AudioConfig, AudioFrontend, AudioProjector};
+pub use batch::{BatchConfig, BatchDiscovery, BatchProcessor, BatchStats, BatchTrainer};
+pub use bootstrap::{
+    AdaptivePrototype, AdaptivePrototypeSet, AdaptiveStats, BootstrapConfig, BootstrapPipeline,
+    TrainedPrototypes,
 };
 pub use crystal_reservoir::{
-    GaborFilter, CrystalReservoir, CrystalActivation, OnlinePrototypeClassifier,
+    CrystalActivation, CrystalReservoir, GaborFilter, OnlinePrototypeClassifier,
 };
-pub use rls::{RlsClassifier, FastRlsClassifier};
+pub use discovery::{DiscoveryConfig, DiscoveryPipeline, DiscoveryResult, OnlineClusterer};
+pub use dtw_align::{AlignedSegment, DtwAligner, DtwAlignment, DtwTrainer};
+pub use edf_loader::{EdfFile, EdfHeader, EdfSignal, SleepStage};
+pub use eval::{
+    character_error_rate, phoneme_error_rate, word_error_rate, Alignment, ConfusionMatrix,
+    EvalResult, EvaluationReport,
+};
+pub use hdc::{bundle, weighted_bundle, CORE_HDC_DIM, EXPANSION_FACTOR, HDC_DIM, HV16};
+pub use lexicon::{CmuDictionary, TextToPhonemes};
+pub use linguistic::{PhonemeClasses, PhonemeFeatures, PhonotacticConstraints};
+pub use liquid_projection::{
+    DirectAccumulator, DirectClassifier, DirectClassifierConfig, LiquidProjection,
+    LiquidProjectionConfig, PhonemeTargets, RFActivation, RandomProjection, RidgeAccumulator,
+};
+pub use lm::{BeamConfig, BeamDecoder, CombinedDecoder, Hypothesis, NgramLM, PhonemeToWordDecoder};
+pub use ltc::{LtcCell, LtcConfig, TauSmoother};
+pub use models::{ModelInfo, ModelMetadata, ModelPackage, ModelRegistry};
+pub use phoneme::{
+    PhonemeDecoder, PhonemeInventory, PhonemeResonator, TemporalConfig, TemporalDecoder,
+};
+pub use rls::{FastRlsClassifier, RlsClassifier};
+pub use sleep_sentinel::{BandPowers, ConsciousnessSentinel, ConsciousnessState};
+pub use streaming::{StreamConfig, StreamProcessor, StreamSession};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

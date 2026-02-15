@@ -13,12 +13,11 @@ use anyhow::Result;
 use std::time::Instant;
 
 // Core modules (always available)
-use symthaea::perception::{
-    ConsciousPerception, ConsciousPerceptionConfig, PerceptionResult,
-    SemanticVision, MultiModalIntegrator, VisualCortex,
-    SIGLIP_EMBEDDING_DIM,
-};
 use symthaea::hdc::HDC_DIMENSION;
+use symthaea::perception::{
+    ConsciousPerception, ConsciousPerceptionConfig, MultiModalIntegrator, PerceptionResult,
+    SemanticVision, VisualCortex, SIGLIP_EMBEDDING_DIM,
+};
 
 fn main() -> Result<()> {
     // Initialize tracing for logging
@@ -85,11 +84,17 @@ fn test_visual_cortex() -> Result<()> {
 
     let elapsed = start.elapsed();
 
-    println!("  ✓ Image dimensions: {}x{}", features.dimensions.0, features.dimensions.1);
+    println!(
+        "  ✓ Image dimensions: {}x{}",
+        features.dimensions.0, features.dimensions.1
+    );
     println!("  ✓ Brightness: {:.3}", features.brightness);
     println!("  ✓ Color variance: {:.3}", features.color_variance);
     println!("  ✓ Edge density: {:.3}", features.edge_density);
-    println!("  ✓ Dominant colors: {} detected", features.dominant_colors.len());
+    println!(
+        "  ✓ Dominant colors: {} detected",
+        features.dominant_colors.len()
+    );
     println!("  ⏱ Processing time: {:?}", elapsed);
     println!("  ✅ Visual Cortex: PASSED");
 
@@ -110,8 +115,15 @@ fn test_multimodal_integrator() -> Result<()> {
     let elapsed = start.elapsed();
 
     println!("  ✓ Input text: \"{}\"", test_text);
-    println!("  ✓ HDC dimension: {} (expected: {})", hdc_vector.dim(), HDC_DIMENSION);
-    println!("  ✓ Vector non-zero: {}", hdc_vector.bits.iter().any(|&b| b));
+    println!(
+        "  ✓ HDC dimension: {} (expected: {})",
+        hdc_vector.dim(),
+        HDC_DIMENSION
+    );
+    println!(
+        "  ✓ Vector non-zero: {}",
+        hdc_vector.bits.iter().any(|&b| b)
+    );
     println!("  ⏱ Projection time: {:?}", elapsed);
 
     // Test semantic similarity
@@ -119,13 +131,18 @@ fn test_multimodal_integrator() -> Result<()> {
     let hdc_similar = integrator.project_text(similar_text)?;
 
     // Calculate Hamming similarity (via bit comparison)
-    let matching_bits = hdc_vector.bits.iter()
+    let matching_bits = hdc_vector
+        .bits
+        .iter()
         .zip(hdc_similar.bits.iter())
         .filter(|(&a, &b)| a == b)
         .count();
     let similarity = matching_bits as f32 / hdc_vector.dim() as f32;
 
-    println!("  ✓ Semantic similarity to similar text: {:.1}%", similarity * 100.0);
+    println!(
+        "  ✓ Semantic similarity to similar text: {:.1}%",
+        similarity * 100.0
+    );
     println!("  ✅ Multi-Modal Integrator: PASSED");
 
     Ok(())
@@ -149,7 +166,11 @@ fn test_semantic_vision() -> Result<()> {
 
     let elapsed = start.elapsed();
 
-    println!("  ✓ Embedding dimension: {} (expected: {})", embedding.vector.len(), SIGLIP_EMBEDDING_DIM);
+    println!(
+        "  ✓ Embedding dimension: {} (expected: {})",
+        embedding.vector.len(),
+        SIGLIP_EMBEDDING_DIM
+    );
     println!("  ✓ Image hash: 0x{:016x}", embedding.image_hash);
     println!("  ✓ Using ONNX: {}", vision.is_using_onnx());
 
@@ -195,12 +216,15 @@ fn test_conscious_perception() -> Result<()> {
 
     // Test text perception
     let text_result = perception.perceive_text(
-        "NixOS uses a declarative configuration model that enables reproducible system builds."
+        "NixOS uses a declarative configuration model that enables reproducible system builds.",
     )?;
 
     println!("\n  Text perception:");
     println!("    ✓ Modality: {:?}", text_result.modality);
-    println!("    ✓ HDC encoding: {} dimensions", text_result.hdc_encoding.dim());
+    println!(
+        "    ✓ HDC encoding: {} dimensions",
+        text_result.hdc_encoding.dim()
+    );
     println!("    ✓ Confidence: {:.1}%", text_result.confidence * 100.0);
     println!("    ✓ Φ: {:.4}", text_result.phi);
 
@@ -220,8 +244,8 @@ fn test_conscious_perception() -> Result<()> {
 fn test_voice_output() -> Result<()> {
     #[cfg(feature = "voice-tts")]
     {
-        use symthaea::voice::{VoiceOutput, VoiceOutputConfig};
         use symthaea::physiology::larynx::LarynxActor;
+        use symthaea::voice::{VoiceOutput, VoiceOutputConfig};
 
         let start = Instant::now();
 
@@ -239,7 +263,10 @@ fn test_voice_output() -> Result<()> {
                         println!("  ✓ Synthesized: \"{}\"", test_text);
                         println!("  ✓ Audio samples: {}", audio.samples.len());
                         println!("  ✓ Sample rate: {} Hz", audio.sample_rate);
-                        println!("  ✓ Duration: {:.2}s", audio.samples.len() as f32 / audio.sample_rate as f32);
+                        println!(
+                            "  ✓ Duration: {:.2}s",
+                            audio.samples.len() as f32 / audio.sample_rate as f32
+                        );
                         println!("  ⏱ Synthesis time: {:?}", elapsed);
                         println!("  ✅ Voice Output: PASSED");
                     }
@@ -299,15 +326,20 @@ fn create_gradient_test_image(width: u32, height: u32) -> image::DynamicImage {
 fn print_perception_result(result: &PerceptionResult) {
     println!("\n  Image perception:");
     println!("    ✓ Modality: {:?}", result.modality);
-    println!("    ✓ HDC encoding: {} dimensions", result.hdc_encoding.dim());
+    println!(
+        "    ✓ HDC encoding: {} dimensions",
+        result.hdc_encoding.dim()
+    );
     println!("    ✓ Confidence: {:.1}%", result.confidence * 100.0);
     println!("    ✓ Processing time: {}ms", result.processing_time_ms);
     println!("    ✓ Φ: {:.4}", result.phi);
     println!("    ✓ Used fallback: {}", result.used_fallback);
 
     if let Some(ref features) = result.visual_features {
-        println!("    ✓ Visual features: brightness={:.2}, edges={:.2}",
-            features.brightness, features.edge_density);
+        println!(
+            "    ✓ Visual features: brightness={:.2}, edges={:.2}",
+            features.brightness, features.edge_density
+        );
     }
 
     if let Some(ref embedding) = result.image_embedding {
@@ -315,12 +347,18 @@ fn print_perception_result(result: &PerceptionResult) {
     }
 
     if let Some(ref caption) = result.caption {
-        println!("    ✓ Caption: \"{}\"", &caption.text[..caption.text.len().min(60)]);
+        println!(
+            "    ✓ Caption: \"{}\"",
+            &caption.text[..caption.text.len().min(60)]
+        );
     }
 
     if !result.warnings.is_empty() {
         println!("    ⚠ Warnings: {}", result.warnings.join(", "));
     }
 
-    println!("    ✓ Capabilities used: {}", result.capabilities_used.join(", "));
+    println!(
+        "    ✓ Capabilities used: {}",
+        result.capabilities_used.join(", ")
+    );
 }

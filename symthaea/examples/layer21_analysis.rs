@@ -13,11 +13,11 @@
 //! cargo run --example layer21_analysis --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -42,7 +42,11 @@ fn run_analysis() -> Result<()> {
     let phenomenal = load_corpus("data/consciousness_probe/phenomenal_concepts_expanded.json")?;
     let functional = load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
 
-    println!("Loaded {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Loaded {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -68,7 +72,9 @@ fn run_analysis() -> Result<()> {
 
     println!("Processing phenomenal concepts...");
     for (i, concept) in phenomenal.iter().enumerate() {
-        if i % 25 == 0 { print!("  {}/{}\r", i, phenomenal.len()); }
+        if i % 25 == 0 {
+            print!("  {}/{}\r", i, phenomenal.len());
+        }
         let acts = extractor.extract_layers(concept, &layers)?;
         for (j, act) in acts.into_iter().enumerate() {
             phen_activations[j].push(act.activation);
@@ -78,7 +84,9 @@ fn run_analysis() -> Result<()> {
 
     println!("Processing functional concepts...");
     for (i, concept) in functional.iter().enumerate() {
-        if i % 25 == 0 { print!("  {}/{}\r", i, functional.len()); }
+        if i % 25 == 0 {
+            print!("  {}/{}\r", i, functional.len());
+        }
         let acts = extractor.extract_layers(concept, &layers)?;
         for (j, act) in acts.into_iter().enumerate() {
             func_activations[j].push(act.activation);
@@ -98,11 +106,16 @@ fn run_analysis() -> Result<()> {
         let phen_stats = compute_activation_stats(&phen_activations[i]);
         let func_stats = compute_activation_stats(&func_activations[i]);
 
-        println!("{:5} │ {:+9.4} │ {:+9.4} │ {:8.4} │ {:8.4} │ {:11.2}% │ {:10.2}%",
-                 layer,
-                 phen_stats.mean, func_stats.mean,
-                 phen_stats.variance, func_stats.variance,
-                 phen_stats.sparsity * 100.0, func_stats.sparsity * 100.0);
+        println!(
+            "{:5} │ {:+9.4} │ {:+9.4} │ {:8.4} │ {:8.4} │ {:11.2}% │ {:10.2}%",
+            layer,
+            phen_stats.mean,
+            func_stats.mean,
+            phen_stats.variance,
+            func_stats.variance,
+            phen_stats.sparsity * 100.0,
+            func_stats.sparsity * 100.0
+        );
     }
 
     // Analysis 2: Activation Norm Changes
@@ -118,8 +131,10 @@ fn run_analysis() -> Result<()> {
         let func_norm = mean_l2_norm(&func_activations[i]);
         let ratio = phen_norm / func_norm;
 
-        println!("{:5} │ {:12.4} │ {:12.4} │ {:10.4}",
-                 layer, phen_norm, func_norm, ratio);
+        println!(
+            "{:5} │ {:12.4} │ {:12.4} │ {:10.4}",
+            layer, phen_norm, func_norm, ratio
+        );
     }
 
     // Analysis 3: Inter-layer Correlation
@@ -129,14 +144,32 @@ fn run_analysis() -> Result<()> {
 
     println!("How much do representations change between adjacent layers?");
     println!("\nPhenomenal concepts:");
-    println!("  Layer 20→21: {:.4}", inter_layer_similarity(&phen_activations[2], &phen_activations[3]));
-    println!("  Layer 21→22: {:.4}", inter_layer_similarity(&phen_activations[3], &phen_activations[4]));
-    println!("  Layer 22→23: {:.4}", inter_layer_similarity(&phen_activations[4], &phen_activations[5]));
+    println!(
+        "  Layer 20→21: {:.4}",
+        inter_layer_similarity(&phen_activations[2], &phen_activations[3])
+    );
+    println!(
+        "  Layer 21→22: {:.4}",
+        inter_layer_similarity(&phen_activations[3], &phen_activations[4])
+    );
+    println!(
+        "  Layer 22→23: {:.4}",
+        inter_layer_similarity(&phen_activations[4], &phen_activations[5])
+    );
 
     println!("\nFunctional concepts:");
-    println!("  Layer 20→21: {:.4}", inter_layer_similarity(&func_activations[2], &func_activations[3]));
-    println!("  Layer 21→22: {:.4}", inter_layer_similarity(&func_activations[3], &func_activations[4]));
-    println!("  Layer 22→23: {:.4}", inter_layer_similarity(&func_activations[4], &func_activations[5]));
+    println!(
+        "  Layer 20→21: {:.4}",
+        inter_layer_similarity(&func_activations[2], &func_activations[3])
+    );
+    println!(
+        "  Layer 21→22: {:.4}",
+        inter_layer_similarity(&func_activations[3], &func_activations[4])
+    );
+    println!(
+        "  Layer 22→23: {:.4}",
+        inter_layer_similarity(&func_activations[4], &func_activations[5])
+    );
 
     // Analysis 4: Class Separability
     println!("\n================================================================");
@@ -152,7 +185,13 @@ fn run_analysis() -> Result<()> {
 
     for (i, layer) in layers.iter().enumerate() {
         let fisher = fisher_discriminant_ratio(&phen_activations[i], &func_activations[i]);
-        let interp = if fisher > 0.5 { "Good" } else if fisher > 0.2 { "Moderate" } else { "Poor" };
+        let interp = if fisher > 0.5 {
+            "Good"
+        } else if fisher > 0.2 {
+            "Moderate"
+        } else {
+            "Poor"
+        };
 
         if fisher > best_fisher {
             best_fisher = fisher;
@@ -162,7 +201,10 @@ fn run_analysis() -> Result<()> {
         println!("{:5} │ {:12.4} │ {}", layer, fisher, interp);
     }
 
-    println!("\n  → Best separability at Layer {} (Fisher = {:.4})", best_layer, best_fisher);
+    println!(
+        "\n  → Best separability at Layer {} (Fisher = {:.4})",
+        best_layer, best_fisher
+    );
 
     // Analysis 5: Dimensionality Analysis (effective rank)
     println!("\n================================================================");
@@ -177,8 +219,13 @@ fn run_analysis() -> Result<()> {
         let phen_pr = participation_ratio(&phen_activations[i]);
         let func_pr = participation_ratio(&func_activations[i]);
 
-        println!("{:5} │ {:7.1} │ {:7.1} │ {:+9.1}",
-                 layer, phen_pr, func_pr, phen_pr - func_pr);
+        println!(
+            "{:5} │ {:7.1} │ {:7.1} │ {:+9.1}",
+            layer,
+            phen_pr,
+            func_pr,
+            phen_pr - func_pr
+        );
     }
 
     // Summary
@@ -192,7 +239,10 @@ fn run_analysis() -> Result<()> {
     println!("   Layer 21 may preserve more information before final compression.\n");
 
     println!("2. CLASS SEPARABILITY:");
-    println!("   Layer {} shows best phenomenal/functional discrimination.", best_layer);
+    println!(
+        "   Layer {} shows best phenomenal/functional discrimination.",
+        best_layer
+    );
     println!("   Fisher ratio: {:.4}\n", best_fisher);
 
     println!("3. TASK-SPECIFIC COMPRESSION:");
@@ -243,12 +293,17 @@ fn compute_activation_stats(activations: &[Vec<f32>]) -> ActivationStats {
     let sparse_count = all_values.iter().filter(|&&x| x.abs() < 0.01).count();
     let sparsity = sparse_count as f64 / n;
 
-    ActivationStats { mean, variance, sparsity }
+    ActivationStats {
+        mean,
+        variance,
+        sparsity,
+    }
 }
 
 #[cfg(feature = "neural-bridge")]
 fn mean_l2_norm(activations: &[Vec<f32>]) -> f64 {
-    let norms: Vec<f64> = activations.iter()
+    let norms: Vec<f64> = activations
+        .iter()
         .map(|act| act.iter().map(|&x| (x as f64).powi(2)).sum::<f64>().sqrt())
         .collect();
     norms.iter().sum::<f64>() / norms.len() as f64
@@ -266,10 +321,18 @@ fn inter_layer_similarity(layer_a: &[Vec<f32>], layer_b: &[Vec<f32>]) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    let dot: f64 = a.iter().zip(b.iter()).map(|(&x, &y)| (x as f64) * (y as f64)).sum();
+    let dot: f64 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(&x, &y)| (x as f64) * (y as f64))
+        .sum();
     let norm_a: f64 = a.iter().map(|&x| (x as f64).powi(2)).sum::<f64>().sqrt();
     let norm_b: f64 = b.iter().map(|&x| (x as f64).powi(2)).sum::<f64>().sqrt();
-    if norm_a > 0.0 && norm_b > 0.0 { dot / (norm_a * norm_b) } else { 0.0 }
+    if norm_a > 0.0 && norm_b > 0.0 {
+        dot / (norm_a * norm_b)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(feature = "neural-bridge")]
@@ -287,8 +350,10 @@ fn fisher_discriminant_ratio(class_a: &[Vec<f32>], class_b: &[Vec<f32>]) -> f64 
         let mean_a = a_values.iter().sum::<f64>() / a_values.len() as f64;
         let mean_b = b_values.iter().sum::<f64>() / b_values.len() as f64;
 
-        let var_a = a_values.iter().map(|x| (x - mean_a).powi(2)).sum::<f64>() / a_values.len() as f64;
-        let var_b = b_values.iter().map(|x| (x - mean_b).powi(2)).sum::<f64>() / b_values.len() as f64;
+        let var_a =
+            a_values.iter().map(|x| (x - mean_a).powi(2)).sum::<f64>() / a_values.len() as f64;
+        let var_b =
+            b_values.iter().map(|x| (x - mean_b).powi(2)).sum::<f64>() / b_values.len() as f64;
 
         if var_a + var_b > 1e-10 {
             total_fisher += (mean_a - mean_b).powi(2) / (var_a + var_b);

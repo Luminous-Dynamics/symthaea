@@ -30,12 +30,12 @@
 //! ```
 
 use super::world_model::{
-    ConsciousnessWorldModel, ConsciousnessAction, ConsciousnessTransition,
-    LatentConsciousnessState, WorldModelConfig, ActionType,
+    ActionType, ConsciousnessAction, ConsciousnessTransition, ConsciousnessWorldModel,
+    LatentConsciousnessState, WorldModelConfig,
 };
-use crate::soul::{WeaverActor, ConceptDiscovery};
 use crate::dynamics::CrystalizedConcept;
-use tracing::{info, debug};
+use crate::soul::{ConceptDiscovery, WeaverActor};
+use tracing::{debug, info};
 
 /// Dream Mode configuration
 #[derive(Debug, Clone)]
@@ -124,9 +124,7 @@ impl DreamMode {
         world_model.dream(self.config.steps_per_cycle);
 
         // Check for crystallized concepts
-        let new_concepts: Vec<CrystalizedConcept> = world_model
-            .pending_concepts
-            .clone();
+        let new_concepts: Vec<CrystalizedConcept> = world_model.pending_concepts.clone();
 
         // Record discoveries in Weaver if provided
         if let Some(w) = weaver {
@@ -167,10 +165,7 @@ impl DreamMode {
     ///
     /// This is the primary entry point for Dream Mode. It runs multiple
     /// dream cycles, allowing for deep consolidation and concept emergence.
-    pub fn batch_dream(
-        &mut self,
-        world_model: &mut ConsciousnessWorldModel,
-    ) -> DreamResults {
+    pub fn batch_dream(&mut self, world_model: &mut ConsciousnessWorldModel) -> DreamResults {
         info!(
             batch_cycles = self.config.batch_cycles,
             "Beginning batch dream session"
@@ -246,14 +241,21 @@ impl DreamMode {
 
         // All possible action types for exploration
         const ACTION_TYPES: [ActionType; 8] = [
-            ActionType::Attend, ActionType::Integrate, ActionType::Generate,
-            ActionType::Recall, ActionType::Store, ActionType::Evaluate,
-            ActionType::Transform, ActionType::Rest,
+            ActionType::Attend,
+            ActionType::Integrate,
+            ActionType::Generate,
+            ActionType::Recall,
+            ActionType::Store,
+            ActionType::Evaluate,
+            ActionType::Transform,
+            ActionType::Rest,
         ];
 
         for _ in 0..self.config.steps_per_cycle {
             // Generate exploratory action using simple LCG PRNG
-            self.action_rng_state = self.action_rng_state.wrapping_mul(6364136223846793005)
+            self.action_rng_state = self
+                .action_rng_state
+                .wrapping_mul(6364136223846793005)
                 .wrapping_add(1442695040888963407);
             let action_idx = (self.action_rng_state >> 32) as usize % ACTION_TYPES.len();
             let action = ConsciousnessAction::new("dream_explore", ACTION_TYPES[action_idx]);
@@ -266,7 +268,7 @@ impl DreamMode {
                 action,
                 to_state: next_state.clone(),
                 reward: next_state.phi - current_state.phi,
-                timestamp: 0, // Dream transitions use 0 timestamp
+                timestamp: 0,  // Dream transitions use 0 timestamp
                 surprise: 0.0, // No surprise in dream mode
             };
 

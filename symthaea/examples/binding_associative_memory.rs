@@ -21,13 +21,15 @@ use anyhow::Result;
 use symthaea::perception::bge_m3::BgeM3;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
     {
         println!("This example requires the 'neural-bridge' feature.");
-        println!("Run with: cargo run --example binding_associative_memory --features neural-bridge");
+        println!(
+            "Run with: cargo run --example binding_associative_memory --features neural-bridge"
+        );
         return Ok(());
     }
 
@@ -102,8 +104,14 @@ fn run_experiment() -> Result<()> {
         let mut bundle_sims = Vec::new();
 
         // Add correct attribute
-        bind_sims.push((correct_attr.to_string(), hv_similarity(&correct_bind, &correct_bind)));
-        bundle_sims.push((correct_attr.to_string(), hv_similarity(&correct_bundle, &correct_bundle)));
+        bind_sims.push((
+            correct_attr.to_string(),
+            hv_similarity(&correct_bind, &correct_bind),
+        ));
+        bundle_sims.push((
+            correct_attr.to_string(),
+            hv_similarity(&correct_bundle, &correct_bundle),
+        ));
 
         // Add distractors
         for distractor in distractors {
@@ -114,22 +122,40 @@ fn run_experiment() -> Result<()> {
             let dist_bundle = BinaryHV::bundle(&[obj_hv, dist_hv]);
 
             // Similarity to the QUERY (correct binding/bundle)
-            bind_sims.push((distractor.to_string(), hv_similarity(&correct_bind, &dist_bind)));
-            bundle_sims.push((distractor.to_string(), hv_similarity(&correct_bundle, &dist_bundle)));
+            bind_sims.push((
+                distractor.to_string(),
+                hv_similarity(&correct_bind, &dist_bind),
+            ));
+            bundle_sims.push((
+                distractor.to_string(),
+                hv_similarity(&correct_bundle, &dist_bundle),
+            ));
         }
 
         // Find best match for binding
-        let bind_best = bind_sims.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
-        let bundle_best = bundle_sims.iter().max_by(|a, b| a.1.partial_cmp(&b.1).unwrap()).unwrap();
+        let bind_best = bind_sims
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap();
+        let bundle_best = bundle_sims
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .unwrap();
 
         // Compute margin (difference between correct and best distractor)
         let bind_correct_sim = bind_sims[0].1;
-        let bind_best_distractor = bind_sims[1..].iter().map(|x| x.1).fold(f64::NEG_INFINITY, f64::max);
+        let bind_best_distractor = bind_sims[1..]
+            .iter()
+            .map(|x| x.1)
+            .fold(f64::NEG_INFINITY, f64::max);
         let bind_margin = bind_correct_sim - bind_best_distractor;
         bind_margins.push(bind_margin);
 
         let bundle_correct_sim = bundle_sims[0].1;
-        let bundle_best_distractor = bundle_sims[1..].iter().map(|x| x.1).fold(f64::NEG_INFINITY, f64::max);
+        let bundle_best_distractor = bundle_sims[1..]
+            .iter()
+            .map(|x| x.1)
+            .fold(f64::NEG_INFINITY, f64::max);
         let bundle_margin = bundle_correct_sim - bundle_best_distractor;
         bundle_margins.push(bundle_margin);
 
@@ -143,12 +169,30 @@ fn run_experiment() -> Result<()> {
     }
 
     println!("Retrieval Accuracy:");
-    println!("  Binding: {}/{} ({:.1}%)", bind_correct, total, 100.0 * bind_correct as f64 / total as f64);
-    println!("  Bundling: {}/{} ({:.1}%)\n", bundle_correct, total, 100.0 * bundle_correct as f64 / total as f64);
+    println!(
+        "  Binding: {}/{} ({:.1}%)",
+        bind_correct,
+        total,
+        100.0 * bind_correct as f64 / total as f64
+    );
+    println!(
+        "  Bundling: {}/{} ({:.1}%)\n",
+        bundle_correct,
+        total,
+        100.0 * bundle_correct as f64 / total as f64
+    );
 
     println!("Margin (correct - best distractor):");
-    println!("  Binding: {:.4} (std: {:.4})", mean(&bind_margins), std_dev(&bind_margins));
-    println!("  Bundling: {:.4} (std: {:.4})\n", mean(&bundle_margins), std_dev(&bundle_margins));
+    println!(
+        "  Binding: {:.4} (std: {:.4})",
+        mean(&bind_margins),
+        std_dev(&bind_margins)
+    );
+    println!(
+        "  Bundling: {:.4} (std: {:.4})\n",
+        mean(&bundle_margins),
+        std_dev(&bundle_margins)
+    );
 
     println!("================================================================");
     println!("   TEST 2: DISAMBIGUATION");
@@ -207,11 +251,21 @@ fn run_experiment() -> Result<()> {
         let bundle_sim_correct = hv_similarity(&correct_bundle, &query_hv);
         let bundle_sim_competing = hv_similarity(&competing_bundle, &query_hv);
 
-        let bind_winner = if bind_sim_correct > bind_sim_competing { "✓" } else { "✗" };
-        let bundle_winner = if bundle_sim_correct > bundle_sim_competing { "✓" } else { "✗" };
+        let bind_winner = if bind_sim_correct > bind_sim_competing {
+            "✓"
+        } else {
+            "✗"
+        };
+        let bundle_winner = if bundle_sim_correct > bundle_sim_competing {
+            "✓"
+        } else {
+            "✗"
+        };
 
-        println!("{:9} | {:7} | {:7} | {:9} | {:5} | {:6}",
-                 query, object, correct, competing, bind_winner, bundle_winner);
+        println!(
+            "{:9} | {:7} | {:7} | {:9} | {:5} | {:6}",
+            query, object, correct, competing, bind_winner, bundle_winner
+        );
 
         if bind_sim_correct > bind_sim_competing {
             bind_disambig_correct += 1;
@@ -223,10 +277,18 @@ fn run_experiment() -> Result<()> {
     }
 
     println!("\nDisambiguation Accuracy:");
-    println!("  Binding: {}/{} ({:.1}%)", bind_disambig_correct, disambig_total,
-             100.0 * bind_disambig_correct as f64 / disambig_total as f64);
-    println!("  Bundling: {}/{} ({:.1}%)\n", bundle_disambig_correct, disambig_total,
-             100.0 * bundle_disambig_correct as f64 / disambig_total as f64);
+    println!(
+        "  Binding: {}/{} ({:.1}%)",
+        bind_disambig_correct,
+        disambig_total,
+        100.0 * bind_disambig_correct as f64 / disambig_total as f64
+    );
+    println!(
+        "  Bundling: {}/{} ({:.1}%)\n",
+        bundle_disambig_correct,
+        disambig_total,
+        100.0 * bundle_disambig_correct as f64 / disambig_total as f64
+    );
 
     println!("================================================================");
     println!("   TEST 3: ANALOGY COMPLETION");
@@ -248,10 +310,9 @@ fn run_experiment() -> Result<()> {
     ];
 
     let candidates = vec![
-        "banana", "ice", "snail", "ant", "lemon",
-        "night", "whisper", "pillow", "mountain", "grass",
-        "apple", "fire", "cheetah", "elephant", "honey",
-        "sun", "thunder", "stone", "ocean", "sky",
+        "banana", "ice", "snail", "ant", "lemon", "night", "whisper", "pillow", "mountain",
+        "grass", "apple", "fire", "cheetah", "elephant", "honey", "sun", "thunder", "stone",
+        "ocean", "sky",
     ];
 
     let mut bind_analogy_correct = 0;
@@ -301,11 +362,21 @@ fn run_experiment() -> Result<()> {
             }
         }
 
-        let bind_mark = if bind_best.0 == *expected_d { "✓" } else { "" };
-        let bundle_mark = if bundle_best.0 == *expected_d { "✓" } else { "" };
+        let bind_mark = if bind_best.0 == *expected_d {
+            "✓"
+        } else {
+            ""
+        };
+        let bundle_mark = if bundle_best.0 == *expected_d {
+            "✓"
+        } else {
+            ""
+        };
 
-        println!("{}:{} :: {}:?         | {:8} | {:8}{} | {:8}{}",
-                 a, b, c, expected_d, bind_best.0, bind_mark, bundle_best.0, bundle_mark);
+        println!(
+            "{}:{} :: {}:?         | {:8} | {:8}{} | {:8}{}",
+            a, b, c, expected_d, bind_best.0, bind_mark, bundle_best.0, bundle_mark
+        );
 
         if bind_best.0 == *expected_d {
             bind_analogy_correct += 1;
@@ -317,10 +388,18 @@ fn run_experiment() -> Result<()> {
     }
 
     println!("\nAnalogy Completion Accuracy:");
-    println!("  Binding: {}/{} ({:.1}%)", bind_analogy_correct, analogy_total,
-             100.0 * bind_analogy_correct as f64 / analogy_total as f64);
-    println!("  Bundling: {}/{} ({:.1}%)\n", bundle_analogy_correct, analogy_total,
-             100.0 * bundle_analogy_correct as f64 / analogy_total as f64);
+    println!(
+        "  Binding: {}/{} ({:.1}%)",
+        bind_analogy_correct,
+        analogy_total,
+        100.0 * bind_analogy_correct as f64 / analogy_total as f64
+    );
+    println!(
+        "  Bundling: {}/{} ({:.1}%)\n",
+        bundle_analogy_correct,
+        analogy_total,
+        100.0 * bundle_analogy_correct as f64 / analogy_total as f64
+    );
 
     println!("================================================================");
     println!("   SUMMARY");
@@ -328,18 +407,42 @@ fn run_experiment() -> Result<()> {
 
     println!("                          | Binding | Bundling | Winner");
     println!("--------------------------|---------|----------|--------");
-    println!("Associative Retrieval     | {:5.1}%  | {:6.1}%  | {}",
-             100.0 * bind_correct as f64 / total as f64,
-             100.0 * bundle_correct as f64 / total as f64,
-             if bind_correct > bundle_correct { "Binding" } else if bundle_correct > bind_correct { "Bundling" } else { "Tie" });
-    println!("Disambiguation            | {:5.1}%  | {:6.1}%  | {}",
-             100.0 * bind_disambig_correct as f64 / disambig_total as f64,
-             100.0 * bundle_disambig_correct as f64 / disambig_total as f64,
-             if bind_disambig_correct > bundle_disambig_correct { "Binding" } else if bundle_disambig_correct > bind_disambig_correct { "Bundling" } else { "Tie" });
-    println!("Analogy Completion        | {:5.1}%  | {:6.1}%  | {}",
-             100.0 * bind_analogy_correct as f64 / analogy_total as f64,
-             100.0 * bundle_analogy_correct as f64 / analogy_total as f64,
-             if bind_analogy_correct > bundle_analogy_correct { "Binding" } else if bundle_analogy_correct > bind_analogy_correct { "Bundling" } else { "Tie" });
+    println!(
+        "Associative Retrieval     | {:5.1}%  | {:6.1}%  | {}",
+        100.0 * bind_correct as f64 / total as f64,
+        100.0 * bundle_correct as f64 / total as f64,
+        if bind_correct > bundle_correct {
+            "Binding"
+        } else if bundle_correct > bind_correct {
+            "Bundling"
+        } else {
+            "Tie"
+        }
+    );
+    println!(
+        "Disambiguation            | {:5.1}%  | {:6.1}%  | {}",
+        100.0 * bind_disambig_correct as f64 / disambig_total as f64,
+        100.0 * bundle_disambig_correct as f64 / disambig_total as f64,
+        if bind_disambig_correct > bundle_disambig_correct {
+            "Binding"
+        } else if bundle_disambig_correct > bind_disambig_correct {
+            "Bundling"
+        } else {
+            "Tie"
+        }
+    );
+    println!(
+        "Analogy Completion        | {:5.1}%  | {:6.1}%  | {}",
+        100.0 * bind_analogy_correct as f64 / analogy_total as f64,
+        100.0 * bundle_analogy_correct as f64 / analogy_total as f64,
+        if bind_analogy_correct > bundle_analogy_correct {
+            "Binding"
+        } else if bundle_analogy_correct > bind_analogy_correct {
+            "Bundling"
+        } else {
+            "Tie"
+        }
+    );
 
     println!("\n================================================================");
     println!("   EXPERIMENT COMPLETE");
@@ -371,13 +474,17 @@ fn hv_similarity(a: &BinaryHV, b: &BinaryHV) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     variance.sqrt()

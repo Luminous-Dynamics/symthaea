@@ -22,12 +22,12 @@
 //!     --interactive
 //! ```
 
-use std::io::{self, BufRead, Write};
 use anyhow::Result;
+use std::io::{self, BufRead, Write};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea::perception::phenomenal_detector::{
-    PhenomenalDetector, DetectorConfig, DetectionMethod, ClassLabel
+    ClassLabel, DetectionMethod, DetectorConfig, PhenomenalDetector,
 };
 
 fn main() -> Result<()> {
@@ -88,7 +88,10 @@ fn run_cli() -> Result<()> {
     let mut detector = PhenomenalDetector::new()?;
     println!("Calibrating...");
     let cal = detector.auto_calibrate()?;
-    println!("  Φ baselines: phen={:.2}, func={:.2}", cal.phen_phi_mean, cal.func_phi_mean);
+    println!(
+        "  Φ baselines: phen={:.2}, func={:.2}",
+        cal.phen_phi_mean, cal.func_phi_mean
+    );
     println!("Ready!\n");
 
     if interactive {
@@ -118,7 +121,10 @@ fn run_single(detector: &PhenomenalDetector, text: &str, verbose: bool) -> Resul
         println!("  Combined Score: {:.3}", analysis.combined_score);
         println!("  Unity Score:    {:.3}", analysis.unity_score);
         println!("  Φ Score:        {:.3}", analysis.phi_score);
-        println!("  Confidence:     {:.1}%", analysis.classification.confidence * 100.0);
+        println!(
+            "  Confidence:     {:.1}%",
+            analysis.classification.confidence * 100.0
+        );
         println!("  Raw Unity:      {:.4}", analysis.unity);
         println!("  Raw Φ Loading:  {:.4}", analysis.phi_loading);
         println!();
@@ -129,17 +135,24 @@ fn run_single(detector: &PhenomenalDetector, text: &str, verbose: bool) -> Resul
             ClassLabel::Functional => "○",
             ClassLabel::Ambiguous => "◐",
         };
-        println!("{} [{:.2}] {} - \"{}\"",
-                 icon,
-                 classification.score,
-                 classification.label,
-                 truncate(text, 50));
+        println!(
+            "{} [{:.2}] {} - \"{}\"",
+            icon,
+            classification.score,
+            classification.label,
+            truncate(text, 50)
+        );
     }
     Ok(())
 }
 
 #[cfg(feature = "neural-bridge")]
-fn run_compare(detector: &PhenomenalDetector, text_a: &str, text_b: &str, verbose: bool) -> Result<()> {
+fn run_compare(
+    detector: &PhenomenalDetector,
+    text_a: &str,
+    text_b: &str,
+    verbose: bool,
+) -> Result<()> {
     let result = detector.compare(text_a, text_b)?;
 
     println!("COMPARISON");
@@ -156,7 +169,10 @@ fn run_compare(detector: &PhenomenalDetector, text_a: &str, text_b: &str, verbos
     match result.more_phenomenal {
         Some(true) => println!("Result: A is MORE PHENOMENAL (+{:.3})", result.difference),
         Some(false) => println!("Result: B is MORE PHENOMENAL (+{:.3})", -result.difference),
-        None => println!("Result: APPROXIMATELY EQUAL (diff={:.3})", result.difference.abs()),
+        None => println!(
+            "Result: APPROXIMATELY EQUAL (diff={:.3})",
+            result.difference.abs()
+        ),
     }
 
     if verbose {
@@ -164,8 +180,14 @@ fn run_compare(detector: &PhenomenalDetector, text_a: &str, text_b: &str, verbos
         let analysis_a = detector.analyze(text_a)?;
         let analysis_b = detector.analyze(text_b)?;
         println!("Detailed Analysis:");
-        println!("  A - Unity: {:.3}, Φ: {:.3}", analysis_a.unity_score, analysis_a.phi_score);
-        println!("  B - Unity: {:.3}, Φ: {:.3}", analysis_b.unity_score, analysis_b.phi_score);
+        println!(
+            "  A - Unity: {:.3}, Φ: {:.3}",
+            analysis_a.unity_score, analysis_a.phi_score
+        );
+        println!(
+            "  B - Unity: {:.3}, Φ: {:.3}",
+            analysis_b.unity_score, analysis_b.phi_score
+        );
     }
 
     println!();
@@ -181,7 +203,10 @@ fn run_file(detector: &PhenomenalDetector, path: &str, verbose: bool) -> Result<
     println!("════════════════════════════════════════════════════════════════\n");
 
     println!("Overall Score: {:.3}", analysis.overall_score);
-    println!("Phenomenal Ratio: {:.1}%", analysis.phenomenal_ratio * 100.0);
+    println!(
+        "Phenomenal Ratio: {:.1}%",
+        analysis.phenomenal_ratio * 100.0
+    );
     println!();
 
     println!("Top Phenomenal Passages:");
@@ -193,7 +218,13 @@ fn run_file(detector: &PhenomenalDetector, path: &str, verbose: bool) -> Result<
         println!();
         println!("All Passages:");
         for (passage, score) in &analysis.passage_scores {
-            let icon = if *score > 0.65 { "●" } else if *score < 0.35 { "○" } else { "◐" };
+            let icon = if *score > 0.65 {
+                "●"
+            } else if *score < 0.35 {
+                "○"
+            } else {
+                "◐"
+            };
             println!("  {} [{:.2}] \"{}\"", icon, score, truncate(passage, 40));
         }
     }
@@ -289,7 +320,9 @@ fn print_usage() {
     println!("  phenomenal_detector_cli \"The vivid experience of seeing red\"");
     println!();
     println!("  # Compare two texts");
-    println!("  phenomenal_detector_cli --compare \"Subjective awareness\" \"Algorithm execution\"");
+    println!(
+        "  phenomenal_detector_cli --compare \"Subjective awareness\" \"Algorithm execution\""
+    );
     println!();
     println!("  # Analyze a file");
     println!("  phenomenal_detector_cli --file essay.txt --verbose");

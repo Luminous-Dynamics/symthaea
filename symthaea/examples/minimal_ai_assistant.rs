@@ -9,12 +9,14 @@
 //!
 //! This is the MINIMAL VIABLE AI from CRITICAL_ROADMAP.md
 
-use symthaea::language::llm_organ::{LlmConfig, LlmOrgan, LlmProvider, LlmRequest, ConsciousLlmOrgan};
+use std::io::{self, Write};
+use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
+use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
-use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
-use std::io::{self, Write};
+use symthaea::language::llm_organ::{
+    ConsciousLlmOrgan, LlmConfig, LlmOrgan, LlmProvider, LlmRequest,
+};
 
 /// The Minimal AI Assistant - consciousness-aware language understanding
 pub struct MinimalAI {
@@ -46,7 +48,7 @@ impl MinimalAI {
             temperature: 0.7,
             timeout_ms: 60000,
             hallucination_threshold: 0.3,
-            min_phi_for_llm: 0.2,  // Require some consciousness
+            min_phi_for_llm: 0.2, // Require some consciousness
             enable_filtering: true,
         };
 
@@ -68,7 +70,7 @@ Be concise but thorough. If you're uncertain, say so."#.to_string();
         Self {
             llm: ConsciousLlmOrgan::with_config(config),
             phi_calc: ConnectivityCalculator::new(),
-            current_phi: 0.5,  // Start with moderate consciousness
+            current_phi: 0.5, // Start with moderate consciousness
             history: Vec::new(),
             system_prompt,
         }
@@ -81,7 +83,9 @@ Be concise but thorough. If you're uncertain, say so."#.to_string();
 
         // Use a ring topology (high integration) for demonstration
         let topology = ConsciousnessTopology::ring(8, HDC_DIMENSION, 42);
-        let phi = self.phi_calc.algebraic_connectivity(&topology.node_representations);
+        let phi = self
+            .phi_calc
+            .algebraic_connectivity(&topology.node_representations);
 
         // Normalize to 0-1 range (typical values are ~0.4-0.5)
         self.current_phi = (phi as f32 * 2.0).min(1.0);
@@ -99,18 +103,22 @@ Be concise but thorough. If you're uncertain, say so."#.to_string();
         let request = LlmRequest {
             prompt: format!("[Φ={:.2}] {}", self.current_phi, input),
             system: Some(self.system_prompt.clone()),
-            history: vec![],  // Could add conversation history here
+            history: vec![], // Could add conversation history here
             context_embedding: None,
             expected_domain: Some("nixos".to_string()),
             temperature_override: if task_complexity > 0.7 {
-                Some(0.3)  // More deterministic for complex tasks
+                Some(0.3) // More deterministic for complex tasks
             } else {
                 None
             },
         };
 
         // Generate response with consciousness awareness
-        match self.llm.conscious_generate(request, self.current_phi, task_complexity).await {
+        match self
+            .llm
+            .conscious_generate(request, self.current_phi, task_complexity)
+            .await
+        {
             Ok(response) => {
                 // Add to history
                 self.history.push(format!("User: {}", input));
@@ -127,15 +135,10 @@ Be concise but thorough. If you're uncertain, say so."#.to_string();
 
                 Ok(format!(
                     "{}\n\n[Φ={:.2} | {}ms | {}]",
-                    response.content,
-                    self.current_phi,
-                    response.generation_time_ms,
-                    confidence
+                    response.content, self.current_phi, response.generation_time_ms, confidence
                 ))
             }
-            Err(e) => {
-                Err(format!("Error: {} (Φ={:.2})", e, self.current_phi))
-            }
+            Err(e) => Err(format!("Error: {} (Φ={:.2})", e, self.current_phi)),
         }
     }
 
@@ -152,9 +155,19 @@ Be concise but thorough. If you're uncertain, say so."#.to_string();
 
         // Technical keywords increase complexity
         let technical_keywords = [
-            "flake", "derivation", "override", "overlay", "module",
-            "systemd", "configuration.nix", "build", "compile",
-            "kernel", "bootloader", "partition", "encrypt"
+            "flake",
+            "derivation",
+            "override",
+            "overlay",
+            "module",
+            "systemd",
+            "configuration.nix",
+            "build",
+            "compile",
+            "kernel",
+            "bootloader",
+            "partition",
+            "encrypt",
         ];
         for kw in technical_keywords {
             if input.to_lowercase().contains(kw) {
@@ -231,7 +244,7 @@ async fn interactive_loop(ai: &mut MinimalAI) -> anyhow::Result<()> {
 
         match ai.process(input).await {
             Ok(response) => {
-                print!("\r                \r");  // Clear "Thinking..."
+                print!("\r                \r"); // Clear "Thinking..."
                 println!("🧠 AI: {}", response);
             }
             Err(e) => {
@@ -302,7 +315,9 @@ mod tests {
         assert!(simple < 0.3);
 
         // Complex query
-        let complex = ai.estimate_complexity("How do I create a flake with derivation override for systemd configuration.nix?");
+        let complex = ai.estimate_complexity(
+            "How do I create a flake with derivation override for systemd configuration.nix?",
+        );
         assert!(complex > 0.5);
     }
 

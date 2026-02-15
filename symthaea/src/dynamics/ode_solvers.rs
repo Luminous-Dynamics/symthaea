@@ -199,12 +199,7 @@ impl OdeSolverEngine {
     /// # Panics
     ///
     /// Panics if `y0.len() != self.dim` or if `t_span.1 <= t_span.0`.
-    pub fn solve(
-        &self,
-        system: &dyn OdeSystem,
-        y0: &[f64],
-        t_span: (f64, f64),
-    ) -> OdeResult {
+    pub fn solve(&self, system: &dyn OdeSystem, y0: &[f64], t_span: (f64, f64)) -> OdeResult {
         assert_eq!(y0.len(), self.dim, "Initial state dimension mismatch");
         assert!(
             t_span.1 > t_span.0,
@@ -230,14 +225,7 @@ impl OdeSolverEngine {
     /// This is the simplest possible integration method. It is first-order
     /// accurate and conditionally stable. Use it only for rough estimates
     /// or as the baseline in LTC forward passes where h is already small.
-    fn step_euler(
-        &self,
-        system: &dyn OdeSystem,
-        t: f64,
-        y: &[f64],
-        h: f64,
-        y_out: &mut [f64],
-    ) {
+    fn step_euler(&self, system: &dyn OdeSystem, t: f64, y: &[f64], h: f64, y_out: &mut [f64]) {
         let mut dydt = vec![0.0; self.dim];
         system.evaluate(t, y, &mut dydt);
         for i in 0..self.dim {
@@ -245,12 +233,7 @@ impl OdeSolverEngine {
         }
     }
 
-    fn solve_euler(
-        &self,
-        system: &dyn OdeSystem,
-        y0: &[f64],
-        t_span: (f64, f64),
-    ) -> OdeResult {
+    fn solve_euler(&self, system: &dyn OdeSystem, y0: &[f64], t_span: (f64, f64)) -> OdeResult {
         let h = self.config.dt;
         let mut t = t_span.0;
         let mut y = y0.to_vec();
@@ -293,14 +276,7 @@ impl OdeSolverEngine {
     /// Fourth-order accurate: the local truncation error is O(h^5), giving
     /// O(h^4) global error. Four function evaluations per step. This is the
     /// workhorse method for smooth, non-stiff neural dynamics.
-    fn step_rk4(
-        &self,
-        system: &dyn OdeSystem,
-        t: f64,
-        y: &[f64],
-        h: f64,
-        y_out: &mut [f64],
-    ) {
+    fn step_rk4(&self, system: &dyn OdeSystem, t: f64, y: &[f64], h: f64, y_out: &mut [f64]) {
         let n = self.dim;
         let mut k1 = vec![0.0; n];
         let mut k2 = vec![0.0; n];
@@ -335,12 +311,7 @@ impl OdeSolverEngine {
         }
     }
 
-    fn solve_rk4(
-        &self,
-        system: &dyn OdeSystem,
-        y0: &[f64],
-        t_span: (f64, f64),
-    ) -> OdeResult {
+    fn solve_rk4(&self, system: &dyn OdeSystem, y0: &[f64], t_span: (f64, f64)) -> OdeResult {
         let h = self.config.dt;
         let mut t = t_span.0;
         let mut y = y0.to_vec();
@@ -494,15 +465,15 @@ impl OdeSolverEngine {
 
         // Stage 6
         for i in 0..n {
-            tmp[i] = y[i]
-                + h * (A61 * k1[i] + A62 * k2[i] + A63 * k3[i] + A64 * k4[i] + A65 * k5[i]);
+            tmp[i] =
+                y[i] + h * (A61 * k1[i] + A62 * k2[i] + A63 * k3[i] + A64 * k4[i] + A65 * k5[i]);
         }
         system.evaluate(t + h, &tmp, &mut k6);
 
         // 5th order solution (propagated value)
         for i in 0..n {
-            y5_out[i] = y[i]
-                + h * (B51 * k1[i] + B53 * k3[i] + B54 * k4[i] + B55 * k5[i] + B56 * k6[i]);
+            y5_out[i] =
+                y[i] + h * (B51 * k1[i] + B53 * k3[i] + B54 * k4[i] + B55 * k5[i] + B56 * k6[i]);
         }
 
         // Stage 7 (FSAL: this becomes k1 of the next step)

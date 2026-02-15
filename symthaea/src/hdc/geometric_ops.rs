@@ -954,7 +954,7 @@ mod tests {
 
     #[test]
     fn test_exp_then_log_roundtrip() {
-        let base = normalize(&vec![1.0, 0.0, 0.0, 0.0, 0.0]);
+        let base = normalize(&[1.0, 0.0, 0.0, 0.0, 0.0]);
         // Create a tangent vector at base (must be orthogonal to base)
         let tangent_raw = vec![0.0, 0.3, 0.0, 0.0, 0.0];
         // It is already orthogonal to base=(1,0,0,0,0) since component 0 is 0
@@ -972,15 +972,15 @@ mod tests {
 
     #[test]
     fn test_log_then_exp_roundtrip() {
-        let base = normalize(&vec![1.0, 0.0, 0.0, 0.0]);
-        let point = normalize(&vec![0.6, 0.8, 0.0, 0.0]);
+        let base = normalize(&[1.0, 0.0, 0.0, 0.0]);
+        let point = normalize(&[0.6, 0.8, 0.0, 0.0]);
 
         let tangent = HypersphereOps::log_map(&base, &point);
         let recovered = HypersphereOps::exp_map(&base, &tangent);
 
         assert_vec_approx(
             &recovered,
-            &normalize(&vec![0.6, 0.8, 0.0, 0.0]),
+            &normalize(&[0.6, 0.8, 0.0, 0.0]),
             1e-10,
             "Exp(Log(q)) should recover the original point q",
         );
@@ -988,8 +988,8 @@ mod tests {
 
     #[test]
     fn test_log_map_norm_equals_geodesic_distance() {
-        let p = normalize(&vec![1.0, 0.0, 0.0, 0.0]);
-        let q = normalize(&vec![0.6, 0.8, 0.0, 0.0]);
+        let p = normalize(&[1.0, 0.0, 0.0, 0.0]);
+        let q = normalize(&[0.6, 0.8, 0.0, 0.0]);
 
         let tangent = HypersphereOps::log_map(&p, &q);
         let tangent_norm = norm(&tangent);
@@ -1009,7 +1009,7 @@ mod tests {
 
     #[test]
     fn test_frechet_mean_single_point() {
-        let point = normalize(&vec![0.5, 0.5, 0.5, 0.5]);
+        let point = normalize(&[0.5, 0.5, 0.5, 0.5]);
         let config = FrechetMeanConfig::default();
         let mean = HypersphereOps::frechet_mean(&[point.clone()], &config);
 
@@ -1026,12 +1026,12 @@ mod tests {
         // Create a tight cluster around (1, 0, 0, 0) with small perturbations
         let center = vec![1.0, 0.0, 0.0, 0.0];
         let perturbations = vec![
-            normalize(&vec![1.0, 0.05, 0.0, 0.0]),
-            normalize(&vec![1.0, -0.05, 0.0, 0.0]),
-            normalize(&vec![1.0, 0.0, 0.05, 0.0]),
-            normalize(&vec![1.0, 0.0, -0.05, 0.0]),
-            normalize(&vec![1.0, 0.0, 0.0, 0.05]),
-            normalize(&vec![1.0, 0.0, 0.0, -0.05]),
+            normalize(&[1.0, 0.05, 0.0, 0.0]),
+            normalize(&[1.0, -0.05, 0.0, 0.0]),
+            normalize(&[1.0, 0.0, 0.05, 0.0]),
+            normalize(&[1.0, 0.0, -0.05, 0.0]),
+            normalize(&[1.0, 0.0, 0.0, 0.05]),
+            normalize(&[1.0, 0.0, 0.0, -0.05]),
         ];
 
         let config = FrechetMeanConfig {
@@ -1053,8 +1053,8 @@ mod tests {
 
     #[test]
     fn test_frechet_mean_of_two_points_is_midpoint() {
-        let u = normalize(&vec![1.0, 0.0, 0.0]);
-        let v = normalize(&vec![0.0, 1.0, 0.0]);
+        let u = normalize(&[1.0, 0.0, 0.0]);
+        let v = normalize(&[0.0, 1.0, 0.0]);
 
         let config = FrechetMeanConfig {
             max_iterations: 500,
@@ -1080,7 +1080,7 @@ mod tests {
     #[test]
     fn test_riemannian_gradient_tangent_to_sphere() {
         // The Riemannian gradient should be orthogonal to the point on the sphere
-        let point = normalize(&vec![0.5, 0.5, 0.5, 0.5]);
+        let point = normalize(&[0.5, 0.5, 0.5, 0.5]);
         let ambient_grad = vec![1.0, -2.0, 3.0, -0.5];
 
         let riem_grad = HypersphereOps::riemannian_gradient(&ambient_grad, &point);
@@ -1098,7 +1098,7 @@ mod tests {
     fn test_riemannian_gradient_of_radial_function_is_zero() {
         // If the ambient gradient is purely radial (parallel to the point),
         // the Riemannian gradient should be zero.
-        let point = normalize(&vec![3.0, 4.0, 0.0]);
+        let point = normalize(&[3.0, 4.0, 0.0]);
         let radial_grad: Vec<f64> = point.iter().map(|&x| 2.5 * x).collect();
 
         let riem_grad = HypersphereOps::riemannian_gradient(&radial_grad, &point);
@@ -1116,7 +1116,7 @@ mod tests {
     fn test_riemannian_gradient_preserves_tangential_component() {
         // If the ambient gradient is already tangent to the sphere at the point,
         // the Riemannian gradient should equal the ambient gradient.
-        let point = normalize(&vec![1.0, 0.0, 0.0, 0.0]);
+        let point = normalize(&[1.0, 0.0, 0.0, 0.0]);
         // Tangent to sphere at (1,0,0,0): any vector with first component = 0
         let tangent_grad = vec![0.0, 1.5, -0.7, 0.3];
 
@@ -1136,8 +1136,8 @@ mod tests {
 
     #[test]
     fn test_parallel_transport_preserves_norm() {
-        let from = normalize(&vec![1.0, 0.0, 0.0, 0.0, 0.0]);
-        let to = normalize(&vec![0.0, 1.0, 0.0, 0.0, 0.0]);
+        let from = normalize(&[1.0, 0.0, 0.0, 0.0, 0.0]);
+        let to = normalize(&[0.0, 1.0, 0.0, 0.0, 0.0]);
         // A tangent vector at `from`: must be orthogonal to from, so component 0 = 0
         let vector = vec![0.0, 0.0, 0.5, 0.3, 0.0];
 
@@ -1155,7 +1155,7 @@ mod tests {
 
     #[test]
     fn test_parallel_transport_same_point_identity() {
-        let p = normalize(&vec![0.6, 0.8, 0.0]);
+        let p = normalize(&[0.6, 0.8, 0.0]);
         let v = vec![0.0, 0.0, 1.0]; // tangent at p (approximately)
 
         let transported = HypersphereOps::parallel_transport(&p, &p, &v);
@@ -1177,7 +1177,7 @@ mod tests {
         // Create points that vary only along one direction on the sphere.
         // Start from e_0 = (1, 0, 0, 0, 0) and perturb along e_1.
         let dim = 5;
-        let base = unit_vec(dim, 0);
+        let _base = unit_vec(dim, 0);
 
         let points: Vec<Vec<f64>> = (-5..=5)
             .map(|i| {

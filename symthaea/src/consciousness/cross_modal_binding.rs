@@ -3,11 +3,11 @@
 //! Provides mechanisms for binding information across different modalities
 //! (vision, audio, text, etc.) into unified conscious representations.
 
+use crate::hdc::primitive_system::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use symthaea_core::hdc::ContinuousHV;
 use symthaea_core::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::PrimitiveSystem;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Types of sensory modalities
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -358,7 +358,12 @@ pub struct ModalRepresentation {
 
 impl ModalRepresentation {
     /// Create a new modal representation
-    pub fn new(modality: Modality, hv: ContinuousHV, confidence: f32, source: impl Into<String>) -> Self {
+    pub fn new(
+        modality: Modality,
+        hv: ContinuousHV,
+        confidence: f32,
+        source: impl Into<String>,
+    ) -> Self {
         Self {
             modality,
             hv,
@@ -550,9 +555,11 @@ impl CrossModalBinder {
         let total_weight: f32 = weighted_hvs.iter().map(|(_, w)| w).sum();
         let avg_weight = total_weight / weighted_hvs.len() as f32;
 
-        let weight_variance: f32 = weighted_hvs.iter()
+        let weight_variance: f32 = weighted_hvs
+            .iter()
             .map(|(_, w)| (w - avg_weight).powi(2))
-            .sum::<f32>() / weighted_hvs.len() as f32;
+            .sum::<f32>()
+            / weighted_hvs.len() as f32;
 
         // Lower variance = higher coherence
         1.0 / (1.0 + weight_variance.sqrt())
@@ -560,9 +567,9 @@ impl CrossModalBinder {
 
     /// Query current binding against a probe
     pub fn query(&self, probe: &ContinuousHV) -> Option<f32> {
-        self.current_binding.as_ref().map(|binding| {
-            binding.similarity(probe)
-        })
+        self.current_binding
+            .as_ref()
+            .map(|binding| binding.similarity(probe))
     }
 
     /// Unbind a specific modality from current binding
@@ -633,7 +640,9 @@ impl CrossModalBinder {
     /// Measures how much information is integrated across modalities by computing
     /// average pairwise similarity of modal representations in the bound space.
     pub fn cross_modal_phi(&self) -> f64 {
-        let modality_hvs: Vec<&ContinuousHV> = self.representations.values()
+        let modality_hvs: Vec<&ContinuousHV> = self
+            .representations
+            .values()
             .filter_map(|reps| reps.last().map(|r| &r.hv))
             .collect();
 
@@ -651,7 +660,11 @@ impl CrossModalBinder {
             }
         }
 
-        if count > 0 { total_sim / count as f64 } else { 0.0 }
+        if count > 0 {
+            total_sim / count as f64
+        } else {
+            0.0
+        }
     }
 }
 
@@ -698,7 +711,12 @@ impl ModalityPrimitiveGrounding {
         match modality {
             // Visual: seeing things
             Modality::Visual => (
-                vec!["SEE".into(), "THING".into(), "BECAUSE".into(), "LOOK".into()],
+                vec![
+                    "SEE".into(),
+                    "THING".into(),
+                    "BECAUSE".into(),
+                    "LOOK".into(),
+                ],
                 true,
                 false,
             ),
@@ -722,7 +740,12 @@ impl ModalityPrimitiveGrounding {
             ),
             // Somatosensory: touch and physical sensation
             Modality::Somatosensory => (
-                vec!["FEEL".into(), "TOUCH".into(), "BODY".into(), "SOMETHING".into()],
+                vec![
+                    "FEEL".into(),
+                    "TOUCH".into(),
+                    "BODY".into(),
+                    "SOMETHING".into(),
+                ],
                 true,
                 true,
             ),
@@ -752,13 +775,23 @@ impl ModalityPrimitiveGrounding {
             ),
             // Interoceptive: internal body states
             Modality::Interoceptive => (
-                vec!["FEEL".into(), "INSIDE".into(), "BODY".into(), "SOMETHING".into()],
+                vec![
+                    "FEEL".into(),
+                    "INSIDE".into(),
+                    "BODY".into(),
+                    "SOMETHING".into(),
+                ],
                 true,
                 true,
             ),
             // Abstract: conceptual thinking
             Modality::Abstract => (
-                vec!["THINK".into(), "SOMETHING".into(), "NOT".into(), "SEE".into()],
+                vec![
+                    "THINK".into(),
+                    "SOMETHING".into(),
+                    "NOT".into(),
+                    "SEE".into(),
+                ],
                 false,
                 false,
             ),
@@ -795,18 +828,19 @@ impl ConvergenceLevelPrimitiveGrounding {
     fn nsm_mapping(level: ConvergenceLevel) -> (Vec<String>, u8) {
         match level {
             // Primary: single modality only
-            ConvergenceLevel::Primary => (
-                vec!["ONE".into(), "KIND".into(), "ONLY".into()],
-                1,
-            ),
+            ConvergenceLevel::Primary => (vec!["ONE".into(), "KIND".into(), "ONLY".into()], 1),
             // Secondary: two modalities combined
-            ConvergenceLevel::Secondary => (
-                vec!["TWO".into(), "KIND".into(), "TOGETHER".into()],
-                2,
-            ),
+            ConvergenceLevel::Secondary => {
+                (vec!["TWO".into(), "KIND".into(), "TOGETHER".into()], 2)
+            }
             // Tertiary: three modalities combined
             ConvergenceLevel::Tertiary => (
-                vec!["SOME".into(), "KIND".into(), "TOGETHER".into(), "MORE".into()],
+                vec![
+                    "SOME".into(),
+                    "KIND".into(),
+                    "TOGETHER".into(),
+                    "MORE".into(),
+                ],
                 3,
             ),
             // Amodal: all modalities unified
@@ -835,13 +869,24 @@ impl CrossModalNSMGrounding {
 
         // Ground all modalities
         for modality in &[
-            Modality::Visual, Modality::Auditory, Modality::Textual,
-            Modality::Linguistic, Modality::Proprioceptive, Modality::Somatosensory,
-            Modality::Motor, Modality::Temporal, Modality::Spatial,
-            Modality::Affective, Modality::Emotional, Modality::Interoceptive,
+            Modality::Visual,
+            Modality::Auditory,
+            Modality::Textual,
+            Modality::Linguistic,
+            Modality::Proprioceptive,
+            Modality::Somatosensory,
+            Modality::Motor,
+            Modality::Temporal,
+            Modality::Spatial,
+            Modality::Affective,
+            Modality::Emotional,
+            Modality::Interoceptive,
             Modality::Abstract,
         ] {
-            modalities.insert(*modality, ModalityPrimitiveGrounding::new(*modality, system));
+            modalities.insert(
+                *modality,
+                ModalityPrimitiveGrounding::new(*modality, system),
+            );
         }
 
         // Ground all convergence levels
@@ -851,15 +896,23 @@ impl CrossModalNSMGrounding {
             ConvergenceLevel::Tertiary,
             ConvergenceLevel::Amodal,
         ] {
-            convergence_levels.insert(*level, ConvergenceLevelPrimitiveGrounding::new(*level, system));
+            convergence_levels.insert(
+                *level,
+                ConvergenceLevelPrimitiveGrounding::new(*level, system),
+            );
         }
 
-        Self { modalities, convergence_levels }
+        Self {
+            modalities,
+            convergence_levels,
+        }
     }
 
     /// Query modalities by semantic similarity
     pub fn query_modalities(&self, query: &BinaryHV, threshold: f32) -> Vec<(&Modality, f32)> {
-        let mut results: Vec<_> = self.modalities.iter()
+        let mut results: Vec<_> = self
+            .modalities
+            .iter()
             .map(|(m, g)| (m, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -869,7 +922,9 @@ impl CrossModalNSMGrounding {
 
     /// Query convergence levels by semantic similarity
     pub fn query_levels(&self, query: &BinaryHV, threshold: f32) -> Vec<(&ConvergenceLevel, f32)> {
-        let mut results: Vec<_> = self.convergence_levels.iter()
+        let mut results: Vec<_> = self
+            .convergence_levels
+            .iter()
             .map(|(l, g)| (l, g.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -879,7 +934,8 @@ impl CrossModalNSMGrounding {
 
     /// Get sensory modalities
     pub fn sensory_modalities(&self) -> Vec<&Modality> {
-        self.modalities.iter()
+        self.modalities
+            .iter()
             .filter(|(_, g)| g.is_sensory)
             .map(|(m, _)| m)
             .collect()
@@ -887,7 +943,8 @@ impl CrossModalNSMGrounding {
 
     /// Get embodied modalities (involving body awareness)
     pub fn embodied_modalities(&self) -> Vec<&Modality> {
-        self.modalities.iter()
+        self.modalities
+            .iter()
             .filter(|(_, g)| g.is_embodied)
             .map(|(m, _)| m)
             .collect()
@@ -905,7 +962,9 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
                 p.encoding
             } else {
                 // Fallback: deterministic random for unknown primitives
-                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                let seed = name
+                    .bytes()
+                    .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                 BinaryHV::random(seed)
             }
         })
@@ -951,13 +1010,13 @@ mod tests {
             Modality::Visual,
             ContinuousHV::random(512, 42),
             0.9,
-            "camera"
+            "camera",
         );
         let audio = ModalRepresentation::new(
             Modality::Auditory,
             ContinuousHV::random(512, 42),
             0.8,
-            "microphone"
+            "microphone",
         );
 
         binder.add_representation(visual);
@@ -1006,7 +1065,7 @@ mod tests {
         let mut channel = ModalityChannel::new(Modality::Auditory);
         let features = BinaryHV::random(42);
 
-        channel.update(features.clone());
+        channel.update(features);
 
         assert_eq!(channel.temporal_buffer.len(), 1);
         assert_eq!(channel.features, features);
@@ -1026,7 +1085,7 @@ mod tests {
 
         // Should have valid coherence
         let coherence = channel.temporal_coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]
@@ -1037,7 +1096,10 @@ mod tests {
         let secondary = ConvergenceZone::new(1, vec![Modality::Visual, Modality::Auditory]);
         assert_eq!(secondary.level, ConvergenceLevel::Secondary);
 
-        let tertiary = ConvergenceZone::new(2, vec![Modality::Visual, Modality::Auditory, Modality::Linguistic]);
+        let tertiary = ConvergenceZone::new(
+            2,
+            vec![Modality::Visual, Modality::Auditory, Modality::Linguistic],
+        );
         assert_eq!(tertiary.level, ConvergenceLevel::Tertiary);
 
         let amodal = ConvergenceZone::new(3, Modality::sensory());

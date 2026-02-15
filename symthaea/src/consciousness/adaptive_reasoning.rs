@@ -17,7 +17,7 @@
 //!
 //! ## The RL Framework
 //!
-//! ```ignore
+//! ```text
 //! State: Current reasoning chain context
 //!   - Current answer HV
 //!   - Φ gradient history
@@ -44,19 +44,55 @@
 use crate::consciousness::primitive_reasoning::{
     PrimitiveReasoner, ReasonerConfig, ReasoningChain, TransformationType,
 };
-use crate::hdc::primitive_system::{Primitive, PrimitiveTier};
 use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::primitive_system::{Primitive, PrimitiveTier};
 
 /// Get a standard set of primitives for adaptive reasoning
 fn get_standard_primitives() -> Vec<Primitive> {
     // Create basic primitives for reasoning operations
     vec![
-        Primitive::base("identity", PrimitiveTier::NSM, "logic", BinaryHV::random(100), "x -> x"),
-        Primitive::base("transform", PrimitiveTier::NSM, "logic", BinaryHV::random(101), "x -> f(x)"),
-        Primitive::base("compose", PrimitiveTier::Mathematical, "logic", BinaryHV::random(102), "(f,g) -> f∘g"),
-        Primitive::base("abstract", PrimitiveTier::Physical, "logic", BinaryHV::random(103), "x -> [x]"),
-        Primitive::base("ground", PrimitiveTier::Physical, "logic", BinaryHV::random(104), "[x] -> x"),
-        Primitive::base("resonate", PrimitiveTier::Mathematical, "logic", BinaryHV::random(105), "(x,y) -> x⊕y"),
+        Primitive::base(
+            "identity",
+            PrimitiveTier::NSM,
+            "logic",
+            BinaryHV::random(100),
+            "x -> x",
+        ),
+        Primitive::base(
+            "transform",
+            PrimitiveTier::NSM,
+            "logic",
+            BinaryHV::random(101),
+            "x -> f(x)",
+        ),
+        Primitive::base(
+            "compose",
+            PrimitiveTier::Mathematical,
+            "logic",
+            BinaryHV::random(102),
+            "(f,g) -> f∘g",
+        ),
+        Primitive::base(
+            "abstract",
+            PrimitiveTier::Physical,
+            "logic",
+            BinaryHV::random(103),
+            "x -> [x]",
+        ),
+        Primitive::base(
+            "ground",
+            PrimitiveTier::Physical,
+            "logic",
+            BinaryHV::random(104),
+            "[x] -> x",
+        ),
+        Primitive::base(
+            "resonate",
+            PrimitiveTier::Mathematical,
+            "logic",
+            BinaryHV::random(105),
+            "(x,y) -> x⊕y",
+        ),
     ]
 }
 use anyhow::Result;
@@ -87,7 +123,8 @@ impl ReasoningState {
 
         // Estimate phi gradient from executions (phi_gradient field doesn't exist on ReasoningChain)
         // Use execution-level phi contributions instead
-        let phi_gradient: Vec<f64> = chain.executions
+        let phi_gradient: Vec<f64> = chain
+            .executions
             .iter()
             .rev()
             .take(3)
@@ -284,7 +321,8 @@ impl QLearningAgent {
 
         // Sample random batch
         let mut rng = rand::thread_rng();
-        let batch: Vec<_> = self.replay_buffer
+        let batch: Vec<_> = self
+            .replay_buffer
             .choose_multiple(&mut rng, batch_size)
             .cloned()
             .collect();
@@ -320,7 +358,8 @@ impl QLearningAgent {
     /// Find maximum Q-value for next state (over all actions)
     fn max_q_next_state(&self, next_state_hash: u64) -> f64 {
         // Get all Q-values for this state
-        let q_values: Vec<f64> = self.q_table
+        let q_values: Vec<f64> = self
+            .q_table
             .iter()
             .filter(|((s, _), _)| *s == next_state_hash)
             .map(|(_, &q)| q)
@@ -382,7 +421,11 @@ impl AdaptiveReasoner {
     }
 
     /// Reason with RL-guided primitive selection
-    pub fn reason_adaptive(&mut self, question: BinaryHV, max_steps: usize) -> Result<ReasoningChain> {
+    pub fn reason_adaptive(
+        &mut self,
+        question: BinaryHV,
+        max_steps: usize,
+    ) -> Result<ReasoningChain> {
         let mut chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question);
 
         // Get available primitives from standard tier set
@@ -431,9 +474,10 @@ impl AdaptiveReasoner {
                 self.agent.select_action(&current_state, &available_actions)
             } else {
                 // Fallback to first available action (simple greedy)
-                available_actions.first().cloned().unwrap_or_else(|| {
-                    (primitives[0].clone(), TransformationType::Bind)
-                })
+                available_actions
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| (primitives[0].clone(), TransformationType::Bind))
             };
 
             // Execute primitive
@@ -441,12 +485,21 @@ impl AdaptiveReasoner {
 
             // Update for next iteration
             prev_state = Some(current_state);
-            prev_action = Some(ReasoningAction::new(&selected_primitive, selected_transformation));
+            prev_action = Some(ReasoningAction::new(
+                &selected_primitive,
+                selected_transformation,
+            ));
             prev_phi = chain.total_phi;
 
             // Check convergence using execution phi contributions
             if chain.executions.len() > 2 {
-                let recent: Vec<f64> = chain.executions.iter().rev().take(3).map(|e| e.phi_contribution).collect();
+                let recent: Vec<f64> = chain
+                    .executions
+                    .iter()
+                    .rev()
+                    .take(3)
+                    .map(|e| e.phi_contribution)
+                    .collect();
                 if recent.iter().all(|&x| x < 0.001) {
                     break;
                 }
@@ -486,7 +539,6 @@ impl AdaptiveReasoner {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -514,7 +566,7 @@ mod tests {
         let mut agent = QLearningAgent::new(0.1, 0.9, 0.3);
 
         let question = BinaryHV::random(42);
-        let chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question.clone());
+        let chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(question);
 
         let state = ReasoningState::from_chain(&chain);
         let next_state = ReasoningState::from_chain(&chain);

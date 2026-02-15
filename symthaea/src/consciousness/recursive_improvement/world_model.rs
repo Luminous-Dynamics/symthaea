@@ -9,10 +9,10 @@
 //! - **ConsciousnessTransition**: A transition between states caused by an action
 //! - **ConsciousnessWorldModel**: Learns and predicts consciousness dynamics
 
+use crate::dynamics::CrystalizedConcept;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
-use crate::dynamics::CrystalizedConcept;
 
 /// Simple pseudo-random float generator for dream mode
 fn rand_float() -> f64 {
@@ -381,8 +381,10 @@ impl ConsciousnessWorldModel {
         // Simulate internal consciousness processing
         for _ in 0..steps {
             // Random walk in consciousness space for exploration
-            self.current_state.phi = (self.current_state.phi + 0.01 * (rand_float() - 0.5)).clamp(0.0, 1.0);
-            self.current_state.integration = (self.current_state.integration + 0.01 * (rand_float() - 0.5)).clamp(0.0, 1.0);
+            self.current_state.phi =
+                (self.current_state.phi + 0.01 * (rand_float() - 0.5)).clamp(0.0, 1.0);
+            self.current_state.integration =
+                (self.current_state.integration + 0.01 * (rand_float() - 0.5)).clamp(0.0, 1.0);
 
             // Check for crystallization opportunities
             if self.current_state.phi > 0.7 && rand_float() > 0.95 {
@@ -448,7 +450,8 @@ impl ConsciousnessWorldModel {
         let action_type = transition.action.action_type;
         let delta = transition.delta();
 
-        let params = self.transition_model
+        let params = self
+            .transition_model
             .entry(action_type)
             .or_insert_with(TransitionParams::default);
 
@@ -456,11 +459,17 @@ impl ConsciousnessWorldModel {
         params.count += 1;
         let n = params.count as f64;
 
-        let deltas = [delta.delta_phi, delta.delta_integration, delta.delta_coherence, delta.delta_attention];
+        let deltas = [
+            delta.delta_phi,
+            delta.delta_integration,
+            delta.delta_coherence,
+            delta.delta_attention,
+        ];
         for i in 0..4 {
             let old_mean = params.mean_delta[i];
             params.mean_delta[i] = old_mean + (deltas[i] - old_mean) / n;
-            params.variance[i] = params.variance[i] + (deltas[i] - old_mean) * (deltas[i] - params.mean_delta[i]);
+            params.variance[i] =
+                params.variance[i] + (deltas[i] - old_mean) * (deltas[i] - params.mean_delta[i]);
         }
 
         // Store transition
@@ -473,11 +482,16 @@ impl ConsciousnessWorldModel {
     }
 
     /// Predict the next state given an action
-    pub fn predict(&mut self, state: &LatentConsciousnessState, action: &ConsciousnessAction) -> LatentConsciousnessState {
+    pub fn predict(
+        &mut self,
+        state: &LatentConsciousnessState,
+        action: &ConsciousnessAction,
+    ) -> LatentConsciousnessState {
         self.stats.total_predictions += 1;
 
         // Get learned parameters for this action type
-        let params = self.transition_model
+        let params = self
+            .transition_model
             .get(&action.action_type)
             .cloned()
             .unwrap_or_default();
@@ -492,7 +506,11 @@ impl ConsciousnessWorldModel {
     }
 
     /// Simulate a sequence of actions
-    pub fn simulate(&mut self, start: &LatentConsciousnessState, actions: &[ConsciousnessAction]) -> Vec<LatentConsciousnessState> {
+    pub fn simulate(
+        &mut self,
+        start: &LatentConsciousnessState,
+        actions: &[ConsciousnessAction],
+    ) -> Vec<LatentConsciousnessState> {
         let mut states = Vec::with_capacity(actions.len() + 1);
         let mut current = start.clone();
         states.push(current.clone());
@@ -577,7 +595,11 @@ mod tests {
         let to = LatentConsciousnessState::from_observables(0.6, 0.5, 0.5, 0.7);
         let action = ConsciousnessAction::new("focus", ActionType::Attend);
 
-        model.observe_transition(ConsciousnessTransition::new(from.clone(), to, action.clone()));
+        model.observe_transition(ConsciousnessTransition::new(
+            from.clone(),
+            to,
+            action.clone(),
+        ));
 
         // Predict
         let predicted = model.predict(&from, &action);

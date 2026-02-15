@@ -1,14 +1,13 @@
 //! API state management
 
+use crate::api::models::*;
 use std::collections::HashMap;
 use std::sync::RwLock;
-use uuid::Uuid;
-use crate::api::models::*;
 use symthaea_core::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
+use uuid::Uuid;
 
 /// Application state shared across all handlers
 pub struct AppState {
@@ -94,12 +93,36 @@ impl AppState {
         let base_seed = 42;
 
         let topology_specs: Vec<(&str, &str, Box<dyn Fn(u64) -> ConsciousnessTopology>)> = vec![
-            ("ring", "uniform", Box::new(move |s| ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, s))),
-            ("star", "original", Box::new(move |s| ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, s))),
-            ("random", "baseline", Box::new(move |s| ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, s))),
-            ("hypercube_3d", "tier3", Box::new(move |s| ConsciousnessTopology::hypercube(3, HDC_DIMENSION, s))),
-            ("hypercube_4d", "tier3", Box::new(move |s| ConsciousnessTopology::hypercube(4, HDC_DIMENSION, s))),
-            ("torus", "tier1", Box::new(move |s| ConsciousnessTopology::torus_square(3, HDC_DIMENSION, s))),
+            (
+                "ring",
+                "uniform",
+                Box::new(move |s| ConsciousnessTopology::ring(n_nodes, HDC_DIMENSION, s)),
+            ),
+            (
+                "star",
+                "original",
+                Box::new(move |s| ConsciousnessTopology::star(n_nodes, HDC_DIMENSION, s)),
+            ),
+            (
+                "random",
+                "baseline",
+                Box::new(move |s| ConsciousnessTopology::random(n_nodes, HDC_DIMENSION, s)),
+            ),
+            (
+                "hypercube_3d",
+                "tier3",
+                Box::new(move |s| ConsciousnessTopology::hypercube(3, HDC_DIMENSION, s)),
+            ),
+            (
+                "hypercube_4d",
+                "tier3",
+                Box::new(move |s| ConsciousnessTopology::hypercube(4, HDC_DIMENSION, s)),
+            ),
+            (
+                "torus",
+                "tier1",
+                Box::new(move |s| ConsciousnessTopology::torus_square(3, HDC_DIMENSION, s)),
+            ),
         ];
 
         for (name, category, generator) in topology_specs {
@@ -115,7 +138,8 @@ impl AppState {
                 let variance: f32 = connectivities
                     .iter()
                     .map(|p| (p - mean).powi(2))
-                    .sum::<f32>() / (n_samples - 1) as f32;
+                    .sum::<f32>()
+                    / (n_samples - 1) as f32;
                 variance.sqrt()
             } else {
                 0.0
@@ -138,11 +162,15 @@ impl AppState {
 
     /// Get leaderboard entries (sorted by Φ)
     pub fn get_leaderboard(&self, limit: usize, offset: usize) -> Vec<LeaderboardEntry> {
-        let results: Vec<EvaluationResult> = self.results.read().unwrap()
+        let results: Vec<EvaluationResult> = self
+            .results
+            .read()
+            .expect("results RwLock poisoned")
             .values()
             .cloned()
             .collect();
-        let mut entries: Vec<_> = results.iter()
+        let mut entries: Vec<_> = results
+            .iter()
             .filter(|r| r.status == SubmissionStatus::Completed)
             .map(|r| LeaderboardEntry {
                 rank: 0, // Will be set after sorting
@@ -171,7 +199,11 @@ impl AppState {
         }
 
         // Sort by Φ descending
-        entries.sort_by(|a, b| b.phi.partial_cmp(&a.phi).unwrap_or(std::cmp::Ordering::Equal));
+        entries.sort_by(|a, b| {
+            b.phi
+                .partial_cmp(&a.phi)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Set ranks
         for (i, entry) in entries.iter_mut().enumerate() {
@@ -184,9 +216,15 @@ impl AppState {
 
     /// Get topology rankings
     pub fn get_topology_rankings(&self) -> Vec<TopologyRankingEntry> {
-        let random_phi = self.baselines.get("random").map(|b| b.mean_phi).unwrap_or(0.4358);
+        let random_phi = self
+            .baselines
+            .get("random")
+            .map(|b| b.mean_phi)
+            .unwrap_or(0.4358);
 
-        let mut rankings: Vec<_> = self.baselines.values()
+        let mut rankings: Vec<_> = self
+            .baselines
+            .values()
             .map(|b| {
                 let percent_diff = (b.mean_phi - random_phi) / random_phi * 100.0;
                 TopologyRankingEntry {
@@ -205,7 +243,11 @@ impl AppState {
             })
             .collect();
 
-        rankings.sort_by(|a, b| b.mean_phi.partial_cmp(&a.mean_phi).unwrap_or(std::cmp::Ordering::Equal));
+        rankings.sort_by(|a, b| {
+            b.mean_phi
+                .partial_cmp(&a.mean_phi)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         for (i, entry) in rankings.iter_mut().enumerate() {
             entry.rank = (i + 1) as u32;

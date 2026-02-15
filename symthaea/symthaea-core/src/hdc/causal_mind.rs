@@ -55,9 +55,7 @@
 use super::binary_hv::BinaryHV;
 use super::causal_encoder::CausalSpace;
 use super::grounded_understanding::{
-    CausalRoleMarkers as TextCausalMarkers,
-    CausalRelation as TextCausalRelation,
-    LexicalGrounding,
+    CausalRelation as TextCausalRelation, CausalRoleMarkers as TextCausalMarkers, LexicalGrounding,
 };
 use std::collections::HashMap;
 
@@ -85,9 +83,9 @@ pub struct CausalRoleMarkers {
     /// X INTERVENE (do(X))
     pub intervene: BinaryHV,
     /// Causal strength markers
-    pub strength_high: BinaryHV,    // > 0.7
-    pub strength_medium: BinaryHV,  // 0.3-0.7
-    pub strength_low: BinaryHV,     // < 0.3
+    pub strength_high: BinaryHV, // > 0.7
+    pub strength_medium: BinaryHV, // 0.3-0.7
+    pub strength_low: BinaryHV,    // < 0.3
 }
 
 impl CausalRoleMarkers {
@@ -165,7 +163,13 @@ impl CausalConcept {
     }
 
     /// Add a cause and update the causal hypervector
-    pub fn add_cause(&mut self, cause_name: String, cause_hv: &BinaryHV, strength: f64, markers: &CausalRoleMarkers) {
+    pub fn add_cause(
+        &mut self,
+        cause_name: String,
+        cause_hv: &BinaryHV,
+        strength: f64,
+        markers: &CausalRoleMarkers,
+    ) {
         self.causes.push((cause_name, strength));
         let strength_marker = markers.strength_marker(strength);
         let cause_signature = cause_hv.bind(&markers.caused_by).bind(strength_marker);
@@ -173,7 +177,13 @@ impl CausalConcept {
     }
 
     /// Add an effect and update the causal hypervector
-    pub fn add_effect(&mut self, effect_name: String, effect_hv: &BinaryHV, strength: f64, markers: &CausalRoleMarkers) {
+    pub fn add_effect(
+        &mut self,
+        effect_name: String,
+        effect_hv: &BinaryHV,
+        strength: f64,
+        markers: &CausalRoleMarkers,
+    ) {
         self.effects.push((effect_name, strength));
         let strength_marker = markers.strength_marker(strength);
         let effect_signature = effect_hv.bind(&markers.causes).bind(strength_marker);
@@ -222,7 +232,9 @@ impl CausalMind {
         }
 
         // Create new concept with deterministic seed from name
-        let seed = name.bytes().fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
+        let seed = name
+            .bytes()
+            .fold(42u64, |acc, b| acc.wrapping_add(b as u64).wrapping_mul(31));
         let semantic = BinaryHV::random(seed);
         let concept = CausalConcept::new(semantic, name.to_string());
         self.concepts.insert(name.to_string(), concept);
@@ -235,7 +247,8 @@ impl CausalMind {
         let effect_hv = self.get_or_create_concept(effect);
 
         // Add to causal space
-        self.causal_space.add_causal_link(cause_hv, effect_hv, strength);
+        self.causal_space
+            .add_causal_link(cause_hv, effect_hv, strength);
 
         // Update concepts' causal structure
         if let Some(cause_concept) = self.concepts.get_mut(cause) {
@@ -305,13 +318,17 @@ impl CausalMind {
 
         let causes = self.causal_space.query_causes(concept_hv, 5);
 
-        causes.iter().map(|r| {
-            CausalExplanation {
-                explanation: format!("{} was caused by factor with strength {:.2}", concept, r.strength),
+        causes
+            .iter()
+            .map(|r| CausalExplanation {
+                explanation: format!(
+                    "{} was caused by factor with strength {:.2}",
+                    concept, r.strength
+                ),
                 strength: r.strength,
                 confidence: r.similarity as f64,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Query: "What if X happens?" (predict effects)
@@ -323,13 +340,17 @@ impl CausalMind {
 
         let effects = self.causal_space.query_effects(concept_hv, 5);
 
-        effects.iter().map(|r| {
-            CausalPrediction {
-                prediction: format!("If {} occurs, effect with strength {:.2}", concept, r.strength),
+        effects
+            .iter()
+            .map(|r| CausalPrediction {
+                prediction: format!(
+                    "If {} occurs, effect with strength {:.2}",
+                    concept, r.strength
+                ),
                 probability: r.strength,
                 confidence: r.similarity as f64,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Interventional query: do(X) - what happens if we force X?
@@ -339,15 +360,21 @@ impl CausalMind {
             None => return Vec::new(),
         };
 
-        let effects = self.causal_space.query_intervention(concept_hv, 5, min_strength);
+        let effects = self
+            .causal_space
+            .query_intervention(concept_hv, 5, min_strength);
 
-        effects.iter().map(|r| {
-            CausalPrediction {
-                prediction: format!("Intervening on {} causes effect with strength {:.2}", concept, r.strength),
+        effects
+            .iter()
+            .map(|r| CausalPrediction {
+                prediction: format!(
+                    "Intervening on {} causes effect with strength {:.2}",
+                    concept, r.strength
+                ),
                 probability: r.strength,
                 confidence: r.similarity as f64,
-            }
-        }).collect()
+            })
+            .collect()
     }
 
     /// Update Phi (integrated information)
@@ -357,9 +384,8 @@ impl CausalMind {
 
         if n_concepts > 0.0 {
             let connectivity = n_links / (n_concepts * n_concepts).max(1.0);
-            let avg_confidence: f64 = self.concepts.values()
-                .map(|c| c.confidence)
-                .sum::<f64>() / n_concepts.max(1.0);
+            let avg_confidence: f64 =
+                self.concepts.values().map(|c| c.confidence).sum::<f64>() / n_concepts.max(1.0);
 
             self.phi = connectivity * avg_confidence;
         }
@@ -487,7 +513,9 @@ impl CausalMind {
         let mut concepts = Vec::new();
 
         for word in words {
-            let clean = word.trim_matches(|c: char| !c.is_alphanumeric()).to_lowercase();
+            let clean = word
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_lowercase();
             if clean.len() < 2 {
                 continue;
             }
@@ -703,7 +731,9 @@ impl LearnedCausalDiscovery {
 
     fn regression_error(&self, x: &[f64], y: &[f64]) -> f64 {
         let n = x.len() as f64;
-        if n < 2.0 { return 0.0; }
+        if n < 2.0 {
+            return 0.0;
+        }
 
         let mean_x: f64 = x.iter().sum::<f64>() / n;
         let mean_y: f64 = y.iter().sum::<f64>() / n;
@@ -732,28 +762,34 @@ impl LearnedCausalDiscovery {
 
     fn igci_score(&self, x: &[f64], y: &[f64]) -> f64 {
         let n = x.len();
-        if n < 10 { return 0.0; }
+        if n < 10 {
+            return 0.0;
+        }
 
         let mut pairs: Vec<(f64, f64)> = x.iter().zip(y.iter()).map(|(&a, &b)| (a, b)).collect();
         pairs.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
 
         let mut slopes = Vec::with_capacity(n - 1);
         for i in 1..pairs.len() {
-            let dx = pairs[i].0 - pairs[i-1].0;
-            let dy = pairs[i].1 - pairs[i-1].1;
+            let dx = pairs[i].0 - pairs[i - 1].0;
+            let dy = pairs[i].1 - pairs[i - 1].1;
             if dx.abs() > 1e-10 {
                 slopes.push((dy / dx).abs().ln().clamp(-10.0, 10.0));
             }
         }
 
-        if slopes.is_empty() { return 0.0; }
+        if slopes.is_empty() {
+            return 0.0;
+        }
         let mean_slope: f64 = slopes.iter().sum::<f64>() / slopes.len() as f64;
         mean_slope.tanh()
     }
 
     fn anm_score(&self, x: &[f64], y: &[f64]) -> f64 {
         let n = x.len() as f64;
-        if n < 2.0 { return 0.0; }
+        if n < 2.0 {
+            return 0.0;
+        }
 
         let mean_x: f64 = x.iter().sum::<f64>() / n;
         let mean_y: f64 = y.iter().sum::<f64>() / n;
@@ -770,7 +806,9 @@ impl LearnedCausalDiscovery {
         let slope = if var_x > 1e-10 { cov / var_x } else { 0.0 };
         let intercept = mean_y - slope * mean_x;
 
-        let residuals: Vec<f64> = x.iter().zip(y.iter())
+        let residuals: Vec<f64> = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| yi - (slope * xi + intercept))
             .collect();
 
@@ -795,7 +833,9 @@ impl LearnedCausalDiscovery {
 
     fn higher_order_score(&self, x: &[f64], y: &[f64]) -> f64 {
         let n = x.len() as f64;
-        if n < 2.0 { return 0.0; }
+        if n < 2.0 {
+            return 0.0;
+        }
 
         let mean_x: f64 = x.iter().sum::<f64>() / n;
         let mean_y: f64 = y.iter().sum::<f64>() / n;
@@ -806,8 +846,16 @@ impl LearnedCausalDiscovery {
         let std_x = var_x.sqrt().max(1e-10);
         let std_y = var_y.sqrt().max(1e-10);
 
-        let skew_x: f64 = x.iter().map(|&v| ((v - mean_x) / std_x).powi(3)).sum::<f64>() / n;
-        let skew_y: f64 = y.iter().map(|&v| ((v - mean_y) / std_y).powi(3)).sum::<f64>() / n;
+        let skew_x: f64 = x
+            .iter()
+            .map(|&v| ((v - mean_x) / std_x).powi(3))
+            .sum::<f64>()
+            / n;
+        let skew_y: f64 = y
+            .iter()
+            .map(|&v| ((v - mean_y) / std_y).powi(3))
+            .sum::<f64>()
+            / n;
 
         (skew_x.abs() - skew_y.abs()).tanh()
     }
@@ -945,12 +993,31 @@ mod tests {
 
         // Create synthetic data: Y = 2X + noise
         let x: Vec<f64> = (0..100).map(|i| i as f64 / 10.0).collect();
-        let y: Vec<f64> = x.iter().enumerate().map(|(i, &xi)| {
-            2.0 * xi + (i as f64 * 0.1).sin() * 0.1
-        }).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .enumerate()
+            .map(|(i, &xi)| 2.0 * xi + (i as f64 * 0.1).sin() * 0.1)
+            .collect();
 
         let result = discovery.discover(&x, &y);
-        println!("P(X→Y): {:.3}, Confidence: {:.3}", result.p_forward, result.confidence);
+        println!(
+            "P(X→Y): {:.3}, Confidence: {:.3}",
+            result.p_forward, result.confidence
+        );
+
+        // Probabilities should be finite and in [0, 1]
+        assert!(result.p_forward.is_finite(), "P(X→Y) should be finite");
+        assert!(
+            result.p_forward >= 0.0 && result.p_forward <= 1.0,
+            "P(X→Y) should be in [0, 1], got {}",
+            result.p_forward
+        );
+        assert!(result.confidence.is_finite(), "Confidence should be finite");
+        assert!(
+            result.confidence >= 0.0 && result.confidence <= 1.0,
+            "Confidence should be in [0, 1], got {}",
+            result.confidence
+        );
     }
 
     #[test]

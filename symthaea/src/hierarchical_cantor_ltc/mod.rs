@@ -31,8 +31,9 @@
 //! Level 7:       (leaf nodes, τ ≈ 0.46ms)
 //! ```
 
-use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+use std::collections::VecDeque;
 use std::f32::consts::E;
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // =============================================================================
 // CONFIGURATION
@@ -60,8 +61,8 @@ impl Default for CantorLtcConfig {
         Self {
             dimension: HDC_DIMENSION,
             max_depth: 7,
-            tau_ratio: 1.0 / 3.0,  // Cantor ternary ratio
-            base_tau: 1000.0,      // 1 second at root
+            tau_ratio: 1.0 / 3.0, // Cantor ternary ratio
+            base_tau: 1000.0,     // 1 second at root
             learning_rate: 0.01,
             measure_phi: true,
         }
@@ -76,7 +77,7 @@ impl CantorLtcConfig {
 
     /// Total number of nodes (2^(depth+1) - 1)
     pub fn total_nodes(&self) -> usize {
-        (1 << (self.max_depth + 1)) - 1  // 255 for depth 7
+        (1 << (self.max_depth + 1)) - 1 // 255 for depth 7
     }
 }
 
@@ -105,7 +106,7 @@ pub struct CantorLtcNode {
     /// Children (left, right) - None for leaf nodes
     pub children: Option<(Box<CantorLtcNode>, Box<CantorLtcNode>)>,
     /// State history for BPTT (backpropagation through time)
-    pub history: Vec<ContinuousHV>,
+    pub history: VecDeque<ContinuousHV>,
     /// Local integrated information (Φ)
     pub local_phi: f64,
     /// Weight vector for HDC binding (learned)
@@ -127,7 +128,7 @@ impl CantorLtcNode {
             level,
             index,
             children: None,
-            history: Vec::with_capacity(100),
+            history: VecDeque::with_capacity(100),
             local_phi: 0.0,
             weight: ContinuousHV::random(dim, seed + 10000),
             bias: ContinuousHV::random(dim, seed + 20000).scale(0.1),
@@ -158,9 +159,9 @@ impl CantorLtcNode {
     /// ```
     fn step_single(&mut self, dt: f32, parent_state: Option<&ContinuousHV>) {
         // Save history for BPTT
-        self.history.push(self.state.clone());
+        self.history.push_back(self.state.clone());
         if self.history.len() > 100 {
-            self.history.remove(0);
+            self.history.pop_front();
         }
 
         // Compute pre-activation: W ⊗ x
@@ -177,20 +178,22 @@ impl CantorLtcNode {
         };
 
         // Add bias and compute full pre-activation
-        let pre_activation = ContinuousHV::bundle_owned(&[
-            weighted_state,
-            parent_contribution,
-            self.bias.clone(),
-        ]);
+        let pre_activation =
+            ContinuousHV::bundle_owned(&[weighted_state, parent_contribution, self.bias.clone()]);
 
         // Apply sigmoid activation
-        let activated: Vec<f32> = pre_activation.values.iter()
+        let activated: Vec<f32> = pre_activation
+            .values
+            .iter()
             .map(|&x| 1.0 / (1.0 + E.powf(-x)))
             .collect();
         let target = ContinuousHV { values: activated };
 
         // LTC dynamics: dx/dt = (-x + target) / τ
-        let dx: Vec<f32> = self.state.values.iter()
+        let dx: Vec<f32> = self
+            .state
+            .values
+            .iter()
             .zip(target.values.iter())
             .map(|(&x, &t)| (-x + t) / self.tau)
             .collect();
@@ -411,10 +414,7 @@ impl HierarchicalCantorLtcNetwork {
     /// Step the network with external input (inject at root)
     pub fn step_with_input(&mut self, dt: f32, input: &ContinuousHV) {
         // Blend input with root state before stepping
-        self.root.state = ContinuousHV::bundle_owned(&[
-            self.root.state.clone(),
-            input.clone(),
-        ]);
+        self.root.state = ContinuousHV::bundle_owned(&[self.root.state.clone(), input.clone()]);
         self.step(dt);
     }
 
@@ -494,7 +494,12 @@ impl HierarchicalCantorLtcNetwork {
         results
     }
 
-    fn query_recursive(&self, node: &CantorLtcNode, query: &ContinuousHV, results: &mut Vec<(usize, usize, f32)>) {
+    fn query_recursive(
+        &self,
+        node: &CantorLtcNode,
+        query: &ContinuousHV,
+        results: &mut Vec<(usize, usize, f32)>,
+    ) {
         let similarity = node.state.similarity(query);
         results.push((node.level, node.index, similarity));
 
@@ -532,22 +537,68 @@ pub struct NetworkSummary {
 
 impl std::fmt::Display for NetworkSummary {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "╔══════════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║       Hierarchical Cantor-LTC Network Summary                ║")?;
-        writeln!(f, "╠══════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║  Total Nodes:      {:>6}                                    ║", self.total_nodes)?;
-        writeln!(f, "║  Max Depth:        {:>6}                                    ║", self.max_depth)?;
-        writeln!(f, "║  Root τ:           {:>6.2} ms                                ║", self.base_tau)?;
-        writeln!(f, "║  Leaf τ:           {:>6.2} ms                                ║", self.leaf_tau)?;
-        writeln!(f, "║  Simulation Time:  {:>6.2} ms                                ║", self.simulation_time)?;
-        writeln!(f, "║  Global Φ:         {:>6.4}                                  ║", self.global_phi)?;
-        writeln!(f, "╠══════════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║  Per-Level Φ:                                                ║")?;
+        writeln!(
+            f,
+            "╔══════════════════════════════════════════════════════════════╗"
+        )?;
+        writeln!(
+            f,
+            "║       Hierarchical Cantor-LTC Network Summary                ║"
+        )?;
+        writeln!(
+            f,
+            "╠══════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║  Total Nodes:      {:>6}                                    ║",
+            self.total_nodes
+        )?;
+        writeln!(
+            f,
+            "║  Max Depth:        {:>6}                                    ║",
+            self.max_depth
+        )?;
+        writeln!(
+            f,
+            "║  Root τ:           {:>6.2} ms                                ║",
+            self.base_tau
+        )?;
+        writeln!(
+            f,
+            "║  Leaf τ:           {:>6.2} ms                                ║",
+            self.leaf_tau
+        )?;
+        writeln!(
+            f,
+            "║  Simulation Time:  {:>6.2} ms                                ║",
+            self.simulation_time
+        )?;
+        writeln!(
+            f,
+            "║  Global Φ:         {:>6.4}                                  ║",
+            self.global_phi
+        )?;
+        writeln!(
+            f,
+            "╠══════════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║  Per-Level Φ:                                                ║"
+        )?;
         for (level, phi) in self.level_phi.iter().enumerate() {
             let tau = self.base_tau * (1.0_f32 / 3.0).powi(level as i32);
-            writeln!(f, "║    Level {}: Φ = {:.4} (τ = {:>7.2} ms)                    ║", level, phi, tau)?;
+            writeln!(
+                f,
+                "║    Level {}: Φ = {:.4} (τ = {:>7.2} ms)                    ║",
+                level, phi, tau
+            )?;
         }
-        writeln!(f, "╚══════════════════════════════════════════════════════════════╝")
+        writeln!(
+            f,
+            "╚══════════════════════════════════════════════════════════════╝"
+        )
     }
 }
 
@@ -572,20 +623,20 @@ mod tests {
     #[test]
     fn test_node_count() {
         let config = CantorLtcConfig::default();
-        assert_eq!(config.total_nodes(), 255);  // 2^8 - 1
+        assert_eq!(config.total_nodes(), 255); // 2^8 - 1
     }
 
     #[test]
     fn test_tree_creation() {
         let config = CantorLtcConfig {
-            max_depth: 3,  // Small tree for testing
+            max_depth: 3, // Small tree for testing
             ..Default::default()
         };
         let tree = CantorLtcNode::create_tree(0, 0, &config);
 
         assert_eq!(tree.level, 0);
         assert!(tree.children.is_some());
-        assert_eq!(tree.count_nodes(), 15);  // 2^4 - 1
+        assert_eq!(tree.count_nodes(), 15); // 2^4 - 1
     }
 
     #[test]

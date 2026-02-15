@@ -22,9 +22,7 @@ fn bench_temporal_encode(c: &mut Criterion) {
     let mut group = c.benchmark_group("temporal_holographic_encode");
     group.sample_size(10);
     // temporal_holographic module not yet implemented - skipping
-    group.bench_function("placeholder", |b| {
-        b.iter(|| black_box(0u64))
-    });
+    group.bench_function("placeholder", |b| b.iter(|| black_box(0u64)));
     group.finish();
 }
 
@@ -41,32 +39,26 @@ fn bench_continuous_hv_ops(c: &mut Criterion) {
     let hv2 = ContinuousHV::random(HDC_DIMENSION, 2);
 
     // Bind (used in temporal binding: content * time_vector)
-    group.bench_function("bind", |b| {
-        b.iter(|| black_box(hv1.bind(&hv2)))
-    });
+    group.bench_function("bind", |b| b.iter(|| black_box(hv1.bind(&hv2))));
 
     // Similarity (used in recall operations)
-    group.bench_function("similarity", |b| {
-        b.iter(|| black_box(hv1.similarity(&hv2)))
-    });
+    group.bench_function("similarity", |b| b.iter(|| black_box(hv1.similarity(&hv2))));
 
     // Bundle (used in holographic compression)
     for n in [2, 5, 10] {
-        let hvs: Vec<ContinuousHV> = (0..n).map(|i| ContinuousHV::random(HDC_DIMENSION, i)).collect();
-        group.bench_with_input(
-            BenchmarkId::new("bundle", n),
-            &hvs,
-            |b, hvs| b.iter(|| {
+        let hvs: Vec<ContinuousHV> = (0..n)
+            .map(|i| ContinuousHV::random(HDC_DIMENSION, i))
+            .collect();
+        group.bench_with_input(BenchmarkId::new("bundle", n), &hvs, |b, hvs| {
+            b.iter(|| {
                 let refs: Vec<&ContinuousHV> = hvs.iter().collect();
                 black_box(ContinuousHV::bundle(&refs))
-            }),
-        );
+            })
+        });
     }
 
     // Normalize (used after bundling)
-    group.bench_function("normalize", |b| {
-        b.iter(|| black_box(hv1.normalize()))
-    });
+    group.bench_function("normalize", |b| b.iter(|| black_box(hv1.normalize())));
 
     group.finish();
 }
@@ -75,7 +67,7 @@ fn bench_continuous_hv_ops(c: &mut Criterion) {
 // HIPPOCAMPUS TOP-K RECALL OPTIMIZATION
 // =============================================================================
 
-use symthaea::memory::hippocampus::{HippocampusActor, RecallQuery, EmotionalValence};
+use symthaea::memory::hippocampus::{EmotionalValence, HippocampusActor, RecallQuery};
 
 /// Benchmark hippocampus recall with optimized top-k selection
 /// Tests the O(n) select_nth_unstable optimization vs full O(n log n) sort
@@ -96,11 +88,10 @@ fn bench_hippocampus_recall_topk(c: &mut Criterion) {
                 for j in 0..128 {
                     emb[j] = ((i * 17 + j * 31) % 100) as f32 / 100.0;
                 }
-                hippo.encode(
-                    format!("Memory {}", i),
-                    emb,
-                    EmotionalValence::Neutral
-                ).await.unwrap();
+                hippo
+                    .encode(format!("Memory {}", i), emb, EmotionalValence::Neutral)
+                    .await
+                    .unwrap();
             }
         });
 
@@ -116,7 +107,8 @@ fn bench_hippocampus_recall_topk(c: &mut Criterion) {
                 |b, (hippo, query_emb, k)| {
                     // Need to clone hippo for each iteration since recall is &mut self
                     b.iter(|| {
-                        let query = RecallQuery::from_embedding((*query_emb).clone()).with_top_k(*k);
+                        let query =
+                            RecallQuery::from_embedding((*query_emb).clone()).with_top_k(*k);
                         rt.block_on(async {
                             // Note: We need to work around the mutable borrow
                             // In a real benchmark, we'd restructure the API

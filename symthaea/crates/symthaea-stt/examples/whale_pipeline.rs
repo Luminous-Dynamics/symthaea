@@ -4,9 +4,9 @@
 //!
 //! This demonstrates the full Cetacean Scorer system on real whale recordings.
 
-use symthaea_stt::cetacean_classifier::{CetaceanClassifier, CetaceanConfig, collapse_to_segments};
-use symthaea_stt::cetacean_scorer::{CetaceanScorer, CetaceanUnit, CetaceanManner, CetaceanPlace};
 use std::path::Path;
+use symthaea_stt::cetacean_classifier::{collapse_to_segments, CetaceanClassifier, CetaceanConfig};
+use symthaea_stt::cetacean_scorer::{CetaceanManner, CetaceanPlace, CetaceanScorer, CetaceanUnit};
 
 fn main() -> std::io::Result<()> {
     println!("======================================================================");
@@ -20,7 +20,8 @@ fn main() -> std::io::Result<()> {
     let files: Vec<_> = std::fs::read_dir(whale_dir)?
         .filter_map(|e| e.ok())
         .filter(|e| {
-            e.path().extension()
+            e.path()
+                .extension()
                 .map(|ext| ext == "wav")
                 .unwrap_or(false)
         })
@@ -97,9 +98,7 @@ fn main() -> std::io::Result<()> {
                 println!("    Flat:      {:4}", place_counts[2]);
 
                 // Extract CAU sequence for scoring
-                let sequence: Vec<CetaceanUnit> = segments.iter()
-                    .map(|(_, _, u)| *u)
-                    .collect();
+                let sequence: Vec<CetaceanUnit> = segments.iter().map(|(_, _, u)| *u).collect();
 
                 if !sequence.is_empty() {
                     // Score the sequence
@@ -109,7 +108,9 @@ fn main() -> std::io::Result<()> {
                     // Show first few CAUs
                     print!("\n  Sequence preview: ");
                     for (i, u) in sequence.iter().take(10).enumerate() {
-                        if i > 0 { print!(" → "); }
+                        if i > 0 {
+                            print!(" → ");
+                        }
                         print!("{}", u);
                     }
                     if sequence.len() > 10 {
@@ -135,7 +136,10 @@ fn main() -> std::io::Result<()> {
         println!("======================================================================");
         println!();
 
-        println!("Training HDC grammar on {} sequences...", all_sequences.len());
+        println!(
+            "Training HDC grammar on {} sequences...",
+            all_sequences.len()
+        );
 
         for seq in &all_sequences {
             scorer.train_sequence(seq);

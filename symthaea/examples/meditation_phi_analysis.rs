@@ -21,8 +21,7 @@ use std::path::{Path, PathBuf};
 
 use symthaea::hdc::{
     consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
-    HDC_DIMENSION,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
 
 /// Meditation state categories
@@ -89,7 +88,7 @@ struct AggregateStats {
 /// Analyze a single subject's meditation session
 fn analyze_subject(
     subject_dir: &Path,
-    calc: &RealPhiCalculator,
+    calc: &ConnectivityCalculator,
     dim: usize,
 ) -> Option<SubjectResults> {
     let subject_id = subject_dir.file_name()?.to_str()?;
@@ -142,13 +141,11 @@ fn analyze_subject(
 fn parse_meditation_events(content: &str) -> Vec<(f64, f64, String)> {
     let mut events = Vec::new();
 
-    for line in content.lines().skip(1) { // Skip header
+    for line in content.lines().skip(1) {
+        // Skip header
         let parts: Vec<&str> = line.split('\t').collect();
         if parts.len() >= 3 {
-            if let (Ok(onset), Ok(duration)) = (
-                parts[0].parse::<f64>(),
-                parts[1].parse::<f64>(),
-            ) {
+            if let (Ok(onset), Ok(duration)) = (parts[0].parse::<f64>(), parts[1].parse::<f64>()) {
                 let event_type = parts.get(2).unwrap_or(&"unknown").to_string();
                 events.push((onset, duration, event_type));
             }
@@ -173,26 +170,20 @@ fn compute_aggregate_stats(results: &[SubjectResults]) -> AggregateStats {
         };
     }
 
-    let baseline_sum: f64 = results.iter()
-        .filter_map(|r| r.baseline_phi)
-        .sum();
-    let meditation_sum: f64 = results.iter()
-        .filter_map(|r| r.meditation_phi)
-        .sum();
-    let post_sum: f64 = results.iter()
-        .filter_map(|r| r.post_phi)
-        .sum();
+    let baseline_sum: f64 = results.iter().filter_map(|r| r.baseline_phi).sum();
+    let meditation_sum: f64 = results.iter().filter_map(|r| r.meditation_phi).sum();
+    let post_sum: f64 = results.iter().filter_map(|r| r.post_phi).sum();
 
-    let increases: Vec<f64> = results.iter()
-        .filter_map(|r| r.phi_increase)
-        .collect();
+    let increases: Vec<f64> = results.iter().filter_map(|r| r.phi_increase).collect();
 
     let increase_sum: f64 = increases.iter().sum();
     let mean_increase = increase_sum / increases.len().max(1) as f64;
 
-    let variance: f64 = increases.iter()
+    let variance: f64 = increases
+        .iter()
         .map(|x| (x - mean_increase).powi(2))
-        .sum::<f64>() / increases.len().max(1) as f64;
+        .sum::<f64>()
+        / increases.len().max(1) as f64;
 
     let positive_count = increases.iter().filter(|&&x| x > 0.0).count();
 
@@ -225,7 +216,7 @@ fn main() {
         println!();
     }
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
     let dim = HDC_DIMENSION;
 
     // Collect all subject directories
@@ -234,12 +225,18 @@ fn main() {
             .unwrap()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().is_dir())
-            .filter(|e| e.file_name().to_str().map_or(false, |s| s.starts_with("sub-")))
+            .filter(|e| {
+                e.file_name()
+                    .to_str()
+                    .map_or(false, |s| s.starts_with("sub-"))
+            })
             .map(|e| e.path())
             .collect()
     } else {
         // Simulate 10 subjects for demonstration
-        (1..=10).map(|i| PathBuf::from(format!("simulated/sub-{:03}", i))).collect()
+        (1..=10)
+            .map(|i| PathBuf::from(format!("simulated/sub-{:03}", i)))
+            .collect()
     };
 
     println!("📊 Analyzing {} subjects...", subject_dirs.len());
@@ -249,7 +246,8 @@ fn main() {
 
     for (i, subject_dir) in subject_dirs.iter().enumerate() {
         let default_id = format!("sub-{:03}", i + 1);
-        let subject_id = subject_dir.file_name()
+        let subject_id = subject_dir
+            .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(&default_id);
 
@@ -267,7 +265,8 @@ fn main() {
         results.post_phi = Some(calc.compute(&post_topo.node_representations));
         results.compute_increase();
 
-        println!("  {} │ Baseline: {:.4} │ Meditation: {:.4} │ Δ: {:+.4}",
+        println!(
+            "  {} │ Baseline: {:.4} │ Meditation: {:.4} │ Δ: {:+.4}",
             subject_id,
             results.baseline_phi.unwrap_or(0.0),
             results.meditation_phi.unwrap_or(0.0),
@@ -294,7 +293,8 @@ fn main() {
     println!();
     println!("  Mean Φ Increase:        {:+.4}", stats.mean_phi_increase);
     println!("  Std Dev:                {:.4}", stats.std_phi_increase);
-    println!("  Positive Increase:      {}/{} ({:.1}%)",
+    println!(
+        "  Positive Increase:      {}/{} ({:.1}%)",
         stats.positive_increase_count,
         stats.n_subjects,
         100.0 * stats.positive_increase_count as f64 / stats.n_subjects as f64
@@ -307,14 +307,17 @@ fn main() {
     println!("📋 HYPOTHESIS EVALUATION");
     println!("───────────────────────────────────────────────────────────────────────");
 
-    if stats.mean_phi_increase > 0.0 &&
-       stats.positive_increase_count as f64 / stats.n_subjects as f64 > 0.6 {
+    if stats.mean_phi_increase > 0.0
+        && stats.positive_increase_count as f64 / stats.n_subjects as f64 > 0.6
+    {
         println!("  ✅ SUPPORTED: Meditation increases Φ relative to baseline");
         println!();
         println!("  Evidence:");
         println!("    • Mean Φ increase: {:+.4}", stats.mean_phi_increase);
-        println!("    • {:.1}% of subjects showed increased Φ during meditation",
-            100.0 * stats.positive_increase_count as f64 / stats.n_subjects as f64);
+        println!(
+            "    • {:.1}% of subjects showed increased Φ during meditation",
+            100.0 * stats.positive_increase_count as f64 / stats.n_subjects as f64
+        );
         println!();
         println!("  Interpretation:");
         println!("    Meditation appears to increase information integration across");

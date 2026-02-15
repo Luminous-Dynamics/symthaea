@@ -18,13 +18,14 @@
 //! GeneratedCode (verified)
 //! ```
 
-
 use symthaea_core::hdc::ContinuousHV;
 
-use super::code_intent::{CodeIntent, CodeSpec, CodeTarget, CodeChange};
+use super::code_intent::{CodeChange, CodeIntent, CodeSpec, CodeTarget};
 use super::code_parser::EntityKind;
-use super::emitters::{CodeEmitter, RustEmitter, PythonEmitter, NixEmitter};
-use crate::consciousness::code_primitives::{CodePrimitiveExecutor, CodeOperation, CodeExecutionResult};
+use super::emitters::{CodeEmitter, NixEmitter, PythonEmitter, RustEmitter};
+use crate::consciousness::code_primitives::{
+    CodeExecutionResult, CodeOperation, CodePrimitiveExecutor,
+};
 use crate::dynamics::cfc_code_sequencer::{CfCCodeSequencer, CodePlanStep};
 use crate::hdc::code_algebra::CodeAlgebra;
 use crate::hdc::code_encoder::CodeHDEncoder;
@@ -210,7 +211,11 @@ impl CodeGenerator {
             intent_similarity,
             notes: Vec::new(),
             phi_score: primitive_result.phi,
-            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
+            primitives_used: primitive_result
+                .primitives
+                .iter()
+                .map(|p| p.primitive.name.clone())
+                .collect(),
         }
     }
 
@@ -229,13 +234,17 @@ impl CodeGenerator {
         for change in changes {
             match change {
                 CodeChange::AddParameter { name, param_type } => {
-                    modifications.push(format!("// TODO: Add parameter `{}: {}`", name, param_type));
+                    modifications
+                        .push(format!("// TODO: Add parameter `{}: {}`", name, param_type));
                 }
                 CodeChange::ChangeReturnType { new_type } => {
                     modifications.push(format!("// TODO: Change return type to `{}`", new_type));
                 }
                 CodeChange::Rename { new_name } => {
-                    modifications.push(format!("// TODO: Rename `{}` to `{}`", target.name, new_name));
+                    modifications.push(format!(
+                        "// TODO: Rename `{}` to `{}`",
+                        target.name, new_name
+                    ));
                 }
                 CodeChange::AddDocumentation { content } => {
                     modifications.push(format!("/// {}", content));
@@ -256,13 +265,20 @@ impl CodeGenerator {
 
         GeneratedCode {
             source: modifications.join("\n"),
-            language: target.language.clone().unwrap_or_else(|| "rust".to_string()),
+            language: target
+                .language
+                .clone()
+                .unwrap_or_else(|| "rust".to_string()),
             plan_steps: Vec::new(),
             epistemic_status: EpistemicStatus::Probable,
             intent_similarity: 0.5,
             notes,
             phi_score: primitive_result.phi,
-            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
+            primitives_used: primitive_result
+                .primitives
+                .iter()
+                .map(|p| p.primitive.name.clone())
+                .collect(),
         }
     }
 
@@ -299,13 +315,20 @@ impl CodeGenerator {
 
         GeneratedCode {
             source: explanation,
-            language: target.language.clone().unwrap_or_else(|| "rust".to_string()),
+            language: target
+                .language
+                .clone()
+                .unwrap_or_else(|| "rust".to_string()),
             plan_steps: Vec::new(),
             epistemic_status: EpistemicStatus::Probable,
             intent_similarity: 0.7,
             notes: vec!["Explanation skeleton — full translation requires LLM organ".to_string()],
             phi_score: primitive_result.phi,
-            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
+            primitives_used: primitive_result
+                .primitives
+                .iter()
+                .map(|p| p.primitive.name.clone())
+                .collect(),
         }
     }
 
@@ -344,7 +367,11 @@ impl CodeGenerator {
             intent_similarity: 0.6,
             notes: Vec::new(),
             phi_score: primitive_result.phi,
-            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
+            primitives_used: primitive_result
+                .primitives
+                .iter()
+                .map(|p| p.primitive.name.clone())
+                .collect(),
         }
     }
 
@@ -358,7 +385,10 @@ impl CodeGenerator {
     ) -> GeneratedCode {
         let suggestion = match strategy {
             super::code_intent::RefactorStrategy::ExtractFunction { name } => {
-                format!("// Refactor: Extract function `{}` from `{}`", name, target.name)
+                format!(
+                    "// Refactor: Extract function `{}` from `{}`",
+                    name, target.name
+                )
             }
             super::code_intent::RefactorStrategy::InlineFunction => {
                 format!("// Refactor: Inline `{}` at call sites", target.name)
@@ -367,25 +397,41 @@ impl CodeGenerator {
                 format!("// Refactor: Rename `{}` → `{}`", target.name, new_name)
             }
             super::code_intent::RefactorStrategy::ExtractTrait { name } => {
-                format!("// Refactor: Extract trait `{}` from `{}`", name, target.name)
+                format!(
+                    "// Refactor: Extract trait `{}` from `{}`",
+                    name, target.name
+                )
             }
             super::code_intent::RefactorStrategy::SplitFunction => {
-                format!("// Refactor: Split `{}` into smaller functions", target.name)
+                format!(
+                    "// Refactor: Split `{}` into smaller functions",
+                    target.name
+                )
             }
             super::code_intent::RefactorStrategy::ConvertPattern { from, to } => {
-                format!("// Refactor: Convert `{}` pattern from `{}` to `{}`", target.name, from, to)
+                format!(
+                    "// Refactor: Convert `{}` pattern from `{}` to `{}`",
+                    target.name, from, to
+                )
             }
         };
 
         GeneratedCode {
             source: suggestion,
-            language: target.language.clone().unwrap_or_else(|| "rust".to_string()),
+            language: target
+                .language
+                .clone()
+                .unwrap_or_else(|| "rust".to_string()),
             plan_steps: Vec::new(),
             epistemic_status: EpistemicStatus::Uncertain,
             intent_similarity: 0.5,
             notes: vec!["Refactoring skeleton — needs verification".to_string()],
             phi_score: primitive_result.phi,
-            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
+            primitives_used: primitive_result
+                .primitives
+                .iter()
+                .map(|p| p.primitive.name.clone())
+                .collect(),
         }
     }
 
@@ -397,9 +443,7 @@ impl CodeGenerator {
         _context: &CodeContext,
         primitive_result: &CodeExecutionResult,
     ) -> GeneratedCode {
-        let mut analysis = vec![
-            format!("// Debug analysis for `{}`", target.name),
-        ];
+        let mut analysis = vec![format!("// Debug analysis for `{}`", target.name)];
 
         for symptom in symptoms {
             analysis.push(format!("// Symptom: {}", symptom));
@@ -409,13 +453,20 @@ impl CodeGenerator {
 
         GeneratedCode {
             source: analysis.join("\n"),
-            language: target.language.clone().unwrap_or_else(|| "rust".to_string()),
+            language: target
+                .language
+                .clone()
+                .unwrap_or_else(|| "rust".to_string()),
             plan_steps: Vec::new(),
             epistemic_status: EpistemicStatus::Uncertain,
             intent_similarity: 0.4,
             notes: vec!["Debug skeleton — requires LLM organ for full analysis".to_string()],
             phi_score: primitive_result.phi,
-            primitives_used: primitive_result.primitives.iter().map(|p| p.primitive.name.clone()).collect(),
+            primitives_used: primitive_result
+                .primitives
+                .iter()
+                .map(|p| p.primitive.name.clone())
+                .collect(),
         }
     }
 
@@ -438,7 +489,11 @@ impl CodeGenerator {
     }
 
     /// Find similar patterns from context
-    fn find_similar_context(&self, intent_hv: &ContinuousHV, context: &CodeContext) -> Vec<ContinuousHV> {
+    fn find_similar_context(
+        &self,
+        intent_hv: &ContinuousHV,
+        context: &CodeContext,
+    ) -> Vec<ContinuousHV> {
         let mut results = Vec::new();
 
         // Add context HVs directly
@@ -478,7 +533,7 @@ impl CodeGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::language::code_intent::{CodeSpec, CodeTarget, CodeIntentCategory};
+    use crate::language::code_intent::{CodeIntentCategory, CodeSpec, CodeTarget};
 
     #[test]
     fn test_create_generator() {

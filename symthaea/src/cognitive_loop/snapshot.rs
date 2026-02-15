@@ -3,13 +3,13 @@
 //! Provides a single point of observation for the entire cognitive state,
 //! making it easy to monitor, log, or expose via API.
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-use crate::consciousness::consciousness_unification::{UnifiedEmotion, EmotionalPattern};
-use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 use super::drives::SelfAssessment;
 use super::routing::CognitiveDepth;
 use super::ActionHint;
+use crate::consciousness::consciousness_unification::{EmotionalPattern, UnifiedEmotion};
+use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 
 // ============================================================================
 // CONSCIOUSNESS SNAPSHOT - Unified Dashboard
@@ -22,7 +22,6 @@ use super::ActionHint;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsciousnessSnapshot {
     // ===== Core Metrics =====
-
     /// Timestamp of this snapshot (cycle count)
     pub cycle: usize,
 
@@ -37,7 +36,6 @@ pub struct ConsciousnessSnapshot {
     pub pattern_confidence: f32,
 
     // ===== Prediction & Learning =====
-
     /// Current prediction error
     pub prediction_error: f32,
 
@@ -54,7 +52,6 @@ pub struct ConsciousnessSnapshot {
     pub learning_effectiveness: f32,
 
     // ===== Flow State =====
-
     /// Whether currently in flow state
     pub in_flow: bool,
 
@@ -68,7 +65,6 @@ pub struct ConsciousnessSnapshot {
     pub flow_learning_boost: f32,
 
     // ===== Curiosity & Exploration =====
-
     /// Boredom level (0.0 to 1.0)
     pub boredom: f32,
 
@@ -85,7 +81,6 @@ pub struct ConsciousnessSnapshot {
     pub novelty_bonus: f32,
 
     // ===== Emotional State =====
-
     /// Emotional valence (-1.0 to 1.0)
     pub emotional_valence: f32,
 
@@ -99,7 +94,6 @@ pub struct ConsciousnessSnapshot {
     pub emotion_nudge: Option<ConsciousnessPattern>,
 
     // ===== Self-Reflection =====
-
     /// Self-assessment from meta-learning
     pub self_assessment: SelfAssessment,
 
@@ -113,7 +107,6 @@ pub struct ConsciousnessSnapshot {
     pub next_reflection_in: u32,
 
     // ===== Adaptive Behavior =====
-
     /// Recommended action
     pub action_hint: ActionHint,
 
@@ -127,7 +120,6 @@ pub struct ConsciousnessSnapshot {
     pub learning_paused: bool,
 
     // ===== Adapted Thresholds =====
-
     /// Adapted flow error threshold
     pub flow_threshold: f32,
 
@@ -138,7 +130,6 @@ pub struct ConsciousnessSnapshot {
     pub trust_threshold: f32,
 
     // ===== Temporal Coherence =====
-
     /// Temporal coherence from CfC
     pub temporal_coherence: f32,
 
@@ -151,7 +142,6 @@ pub struct ConsciousnessSnapshot {
     // ═══════════════════════════════════════════════════════════════════════════
     // MEGA-UNIFIED ARCHITECTURE FIELDS
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Current cognitive depth (Reflex/Cortical/DeepThought)
     pub cognitive_depth: CognitiveDepth,
 
@@ -179,7 +169,6 @@ pub struct ConsciousnessSnapshot {
     // ═══════════════════════════════════════════════════════════════════════════
     // TEMPORAL ENCODING FIELDS
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Snapshot creation timestamp (monotonic, for relative time)
     pub snapshot_timestamp_nanos: u64,
 
@@ -196,7 +185,6 @@ pub struct ConsciousnessSnapshot {
     pub avg_flow_duration_secs: f32,
 
     // ===== FEP Active Inference =====
-
     /// FEP variational free energy
     pub fep_free_energy: f64,
 
@@ -247,7 +235,9 @@ impl ConsciousnessSnapshot {
     pub fn needs_attention(&self) -> bool {
         matches!(
             self.self_assessment,
-            SelfAssessment::Struggling | SelfAssessment::Stagnating | SelfAssessment::NeedsCalibration
+            SelfAssessment::Struggling
+                | SelfAssessment::Stagnating
+                | SelfAssessment::NeedsCalibration
         )
     }
 

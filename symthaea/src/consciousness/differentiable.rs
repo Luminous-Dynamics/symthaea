@@ -61,12 +61,18 @@ impl DualNumber {
 
     /// Create a constant (derivative = 0)
     pub fn constant(value: f64) -> Self {
-        Self { value, derivative: 0.0 }
+        Self {
+            value,
+            derivative: 0.0,
+        }
     }
 
     /// Create a variable (derivative = 1)
     pub fn variable(value: f64) -> Self {
-        Self { value, derivative: 1.0 }
+        Self {
+            value,
+            derivative: 1.0,
+        }
     }
 
     /// Addition: (a + εa') + (b + εb') = (a+b) + ε(a'+b')
@@ -156,9 +162,15 @@ impl DualNumber {
     /// Clamp value (gradient flows through if in range)
     pub fn clamp(self, min: f64, max: f64) -> Self {
         if self.value < min {
-            Self { value: min, derivative: 0.0 }
+            Self {
+                value: min,
+                derivative: 0.0,
+            }
         } else if self.value > max {
-            Self { value: max, derivative: 0.0 }
+            Self {
+                value: max,
+                derivative: 0.0,
+            }
         } else {
             self
         }
@@ -253,16 +265,15 @@ impl ConsciousnessGradient {
 
     /// Compute gradient magnitude
     pub fn compute_magnitude(&mut self) {
-        self.magnitude = (
-            self.integration.powi(2) +
-            self.binding.powi(2) +
-            self.workspace.powi(2) +
-            self.attention.powi(2) +
-            self.recursion.powi(2) +
-            self.efficacy.powi(2) +
-            self.knowledge.powi(2) +
-            self.substrate.powi(2)
-        ).sqrt();
+        self.magnitude = (self.integration.powi(2)
+            + self.binding.powi(2)
+            + self.workspace.powi(2)
+            + self.attention.powi(2)
+            + self.recursion.powi(2)
+            + self.efficacy.powi(2)
+            + self.knowledge.powi(2)
+            + self.substrate.powi(2))
+        .sqrt();
     }
 
     /// Get gradient for a core component
@@ -290,7 +301,8 @@ impl ConsciousnessGradient {
             (CoreComponent::Knowledge, self.knowledge),
         ];
 
-        components.into_iter()
+        components
+            .into_iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
             .unwrap()
     }
@@ -426,34 +438,19 @@ impl DifferentiableConsciousness {
         );
 
         // ∂C/∂W
-        gradient.workspace = self.compute_gradient_wrt(
-            state,
-            |vals| vals[2],
-        );
+        gradient.workspace = self.compute_gradient_wrt(state, |vals| vals[2]);
 
         // ∂C/∂A
-        gradient.attention = self.compute_gradient_wrt(
-            state,
-            |vals| vals[3],
-        );
+        gradient.attention = self.compute_gradient_wrt(state, |vals| vals[3]);
 
         // ∂C/∂R
-        gradient.recursion = self.compute_gradient_wrt(
-            state,
-            |vals| vals[4],
-        );
+        gradient.recursion = self.compute_gradient_wrt(state, |vals| vals[4]);
 
         // ∂C/∂E
-        gradient.efficacy = self.compute_gradient_wrt(
-            state,
-            |vals| vals[5],
-        );
+        gradient.efficacy = self.compute_gradient_wrt(state, |vals| vals[5]);
 
         // ∂C/∂K
-        gradient.knowledge = self.compute_gradient_wrt(
-            state,
-            |vals| vals[6],
-        );
+        gradient.knowledge = self.compute_gradient_wrt(state, |vals| vals[6]);
 
         // ∂C/∂S
         gradient.substrate = self.compute_gradient_wrt_substrate(state);
@@ -474,7 +471,9 @@ impl DifferentiableConsciousness {
         let knowledge = state.get_core(CoreComponent::Knowledge);
 
         // Soft minimum of core values
-        let core_min = self.soft_min_value(&[phi, binding, workspace, attention, recursion, efficacy, knowledge]);
+        let core_min = self.soft_min_value(&[
+            phi, binding, workspace, attention, recursion, efficacy, knowledge,
+        ]);
 
         // Sigmoid gating
         let k = self.config.k;
@@ -556,13 +555,16 @@ impl DifferentiableConsciousness {
 
         // Create dual numbers with the selected variable having derivative = 1
         let selected_val = select_var(&values);
-        let dual_values: Vec<DualNumber> = values.iter().map(|&v| {
-            if (v - selected_val).abs() < 1e-10 {
-                DualNumber::variable(v)  // This is our variable
-            } else {
-                DualNumber::constant(v)  // Others are constants
-            }
-        }).collect();
+        let dual_values: Vec<DualNumber> = values
+            .iter()
+            .map(|&v| {
+                if (v - selected_val).abs() < 1e-10 {
+                    DualNumber::variable(v) // This is our variable
+                } else {
+                    DualNumber::constant(v) // Others are constants
+                }
+            })
+            .collect();
 
         // Soft minimum
         let core_min = self.soft_min_dual(&dual_values);
@@ -597,9 +599,8 @@ impl DifferentiableConsciousness {
             state.get_core(CoreComponent::Knowledge),
         ];
 
-        let dual_values: Vec<DualNumber> = values.iter()
-            .map(|&v| DualNumber::constant(v))
-            .collect();
+        let dual_values: Vec<DualNumber> =
+            values.iter().map(|&v| DualNumber::constant(v)).collect();
 
         let core_min = self.soft_min_dual(&dual_values);
         let core_term = self.sigmoid_dual(core_min);
@@ -623,13 +624,18 @@ impl DifferentiableConsciousness {
     /// Suggest improvement direction based on gradients
     ///
     /// Returns the component that would most increase consciousness if improved
-    pub fn suggest_improvement(&self, state: &ConsciousnessStateV2) -> (CoreComponent, f64, String) {
+    pub fn suggest_improvement(
+        &self,
+        state: &ConsciousnessStateV2,
+    ) -> (CoreComponent, f64, String) {
         let (_c, gradient) = self.forward(state);
 
         let (component, grad_value) = gradient.highest_impact_component();
 
         let suggestion = match component {
-            CoreComponent::Integration => "Increase integrated information (Φ) by adding cross-connections",
+            CoreComponent::Integration => {
+                "Increase integrated information (Φ) by adding cross-connections"
+            }
             CoreComponent::Binding => "Improve temporal binding through gamma synchronization",
             CoreComponent::Workspace => "Expand global workspace capacity and broadcasting",
             CoreComponent::Attention => "Enhance attention schema precision weighting",
@@ -693,14 +699,20 @@ impl ConsciousnessOptimizer {
         // Apply momentum
         let effective_gradient = if let Some(ref prev) = self.prev_gradient {
             ConsciousnessGradient {
-                integration: self.momentum * prev.integration + (1.0 - self.momentum) * gradient.integration,
+                integration: self.momentum * prev.integration
+                    + (1.0 - self.momentum) * gradient.integration,
                 binding: self.momentum * prev.binding + (1.0 - self.momentum) * gradient.binding,
-                workspace: self.momentum * prev.workspace + (1.0 - self.momentum) * gradient.workspace,
-                attention: self.momentum * prev.attention + (1.0 - self.momentum) * gradient.attention,
-                recursion: self.momentum * prev.recursion + (1.0 - self.momentum) * gradient.recursion,
+                workspace: self.momentum * prev.workspace
+                    + (1.0 - self.momentum) * gradient.workspace,
+                attention: self.momentum * prev.attention
+                    + (1.0 - self.momentum) * gradient.attention,
+                recursion: self.momentum * prev.recursion
+                    + (1.0 - self.momentum) * gradient.recursion,
                 efficacy: self.momentum * prev.efficacy + (1.0 - self.momentum) * gradient.efficacy,
-                knowledge: self.momentum * prev.knowledge + (1.0 - self.momentum) * gradient.knowledge,
-                substrate: self.momentum * prev.substrate + (1.0 - self.momentum) * gradient.substrate,
+                knowledge: self.momentum * prev.knowledge
+                    + (1.0 - self.momentum) * gradient.knowledge,
+                substrate: self.momentum * prev.substrate
+                    + (1.0 - self.momentum) * gradient.substrate,
                 extended: HashMap::new(),
                 magnitude: 0.0,
             }
@@ -712,19 +724,44 @@ impl ConsciousnessOptimizer {
 
         // Compute deltas
         let mut deltas = HashMap::new();
-        deltas.insert(CoreComponent::Integration, self.learning_rate * effective_gradient.integration);
-        deltas.insert(CoreComponent::Binding, self.learning_rate * effective_gradient.binding);
-        deltas.insert(CoreComponent::Workspace, self.learning_rate * effective_gradient.workspace);
-        deltas.insert(CoreComponent::Attention, self.learning_rate * effective_gradient.attention);
-        deltas.insert(CoreComponent::Recursion, self.learning_rate * effective_gradient.recursion);
-        deltas.insert(CoreComponent::Efficacy, self.learning_rate * effective_gradient.efficacy);
-        deltas.insert(CoreComponent::Knowledge, self.learning_rate * effective_gradient.knowledge);
+        deltas.insert(
+            CoreComponent::Integration,
+            self.learning_rate * effective_gradient.integration,
+        );
+        deltas.insert(
+            CoreComponent::Binding,
+            self.learning_rate * effective_gradient.binding,
+        );
+        deltas.insert(
+            CoreComponent::Workspace,
+            self.learning_rate * effective_gradient.workspace,
+        );
+        deltas.insert(
+            CoreComponent::Attention,
+            self.learning_rate * effective_gradient.attention,
+        );
+        deltas.insert(
+            CoreComponent::Recursion,
+            self.learning_rate * effective_gradient.recursion,
+        );
+        deltas.insert(
+            CoreComponent::Efficacy,
+            self.learning_rate * effective_gradient.efficacy,
+        );
+        deltas.insert(
+            CoreComponent::Knowledge,
+            self.learning_rate * effective_gradient.knowledge,
+        );
 
         deltas
     }
 
     /// Apply deltas to a mutable state
-    pub fn apply_step(&self, state: &mut ConsciousnessStateV2, deltas: &HashMap<CoreComponent, f64>) {
+    pub fn apply_step(
+        &self,
+        state: &mut ConsciousnessStateV2,
+        deltas: &HashMap<CoreComponent, f64>,
+    ) {
         for (component, delta) in deltas {
             let current = state.get_core(*component);
             let new_value = (current + delta).clamp(0.0, 1.0);
@@ -806,7 +843,10 @@ mod tests {
         assert!(c <= 1.0, "Consciousness should be at most 1.0");
 
         // Gradients should exist
-        assert!(gradient.magnitude > 0.0, "Gradient magnitude should be positive");
+        assert!(
+            gradient.magnitude > 0.0,
+            "Gradient magnitude should be positive"
+        );
     }
 
     #[test]
@@ -822,15 +862,24 @@ mod tests {
         let (c1, gradient1) = dc.forward(&state);
 
         // All gradients should be positive (increasing any component should help)
-        assert!(gradient1.integration > 0.0, "Integration gradient should be positive");
-        assert!(gradient1.binding > 0.0, "Binding gradient should be positive");
+        assert!(
+            gradient1.integration > 0.0,
+            "Integration gradient should be positive"
+        );
+        assert!(
+            gradient1.binding > 0.0,
+            "Binding gradient should be positive"
+        );
 
         // Increase one component
         state.set_core(CoreComponent::Integration, 0.8);
         let (c2, _) = dc.forward(&state);
 
         // Consciousness should increase
-        assert!(c2 > c1, "Consciousness should increase when a component increases");
+        assert!(
+            c2 > c1,
+            "Consciousness should increase when a component increases"
+        );
     }
 
     #[test]
@@ -854,7 +903,10 @@ mod tests {
         let final_c = optimizer.dc.compute_value(&state);
 
         // Consciousness should increase
-        assert!(final_c > initial_c, "Optimization should increase consciousness");
+        assert!(
+            final_c > initial_c,
+            "Optimization should increase consciousness"
+        );
     }
 
     #[test]

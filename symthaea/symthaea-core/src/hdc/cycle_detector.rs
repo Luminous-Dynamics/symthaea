@@ -25,9 +25,9 @@
 //! }
 //! ```
 
-use std::collections::VecDeque;
 use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::HDC_DIMENSION;
+use std::collections::VecDeque;
 
 /// Cycle detection and phase encoding for periodic patterns
 #[derive(Debug, Clone)]
@@ -91,9 +91,7 @@ impl CycleDetector {
 
         // Pre-compute period indicator vectors
         let period_vectors: Vec<ContinuousHV> = (0..=max_period)
-            .map(|period| {
-                ContinuousHV::random(HDC_DIMENSION, (period as u64) * 77777 + 12345)
-            })
+            .map(|period| ContinuousHV::random(HDC_DIMENSION, (period as u64) * 77777 + 12345))
             .collect();
 
         Self {
@@ -168,7 +166,7 @@ impl CycleDetector {
 
         // Periodically re-detect period (every max_period observations)
         if self.total_observations >= self.warmup_period
-           && self.total_observations.is_multiple_of(self.max_period)
+            && self.total_observations.is_multiple_of(self.max_period)
         {
             self.detect_period();
         }
@@ -180,7 +178,9 @@ impl CycleDetector {
             return;
         }
 
-        let history: Vec<f32> = self.history.iter()
+        let history: Vec<f32> = self
+            .history
+            .iter()
             .map(|&b| if b { 1.0 } else { -1.0 })
             .collect();
 
@@ -435,11 +435,15 @@ impl CycleAwareLtcRecognizer {
         let (final_pred, final_conf) = match cycle_prediction {
             Some((cycle_pred, cycle_conf)) if cycle_conf > 0.3 => {
                 // Weighted combination
-                let cincinnati_vote = if cincinnati_pred { cincinnati_conf } else { -cincinnati_conf };
+                let cincinnati_vote = if cincinnati_pred {
+                    cincinnati_conf
+                } else {
+                    -cincinnati_conf
+                };
                 let cycle_vote = if cycle_pred { cycle_conf } else { -cycle_conf };
 
-                let combined_vote = cincinnati_vote * (1.0 - self.cycle_weight)
-                                  + cycle_vote * self.cycle_weight;
+                let combined_vote =
+                    cincinnati_vote * (1.0 - self.cycle_weight) + cycle_vote * self.cycle_weight;
 
                 let pred = combined_vote > 0.0;
                 let conf = combined_vote.abs().min(1.0);
@@ -459,7 +463,11 @@ impl CycleAwareLtcRecognizer {
 
         // Track accuracy
         if self.total > 0 {
-            let was_correct = self.predictions.back().map(|&p| p == observation).unwrap_or(false);
+            let was_correct = self
+                .predictions
+                .back()
+                .map(|&p| p == observation)
+                .unwrap_or(false);
             if was_correct {
                 self.correct += 1;
             }
@@ -471,9 +479,11 @@ impl CycleAwareLtcRecognizer {
             // Update prediction errors for budding
             let node_count = self.engine.node_count();
             for node_id in 0..node_count {
-                let expected = self.create_bit_hv(self.predictions.back().copied().unwrap_or(false));
+                let expected =
+                    self.create_bit_hv(self.predictions.back().copied().unwrap_or(false));
                 let actual = self.create_bit_hv(observation);
-                self.engine.update_prediction_error(node_id, &expected, &actual);
+                self.engine
+                    .update_prediction_error(node_id, &expected, &actual);
             }
         }
 
@@ -516,7 +526,9 @@ impl CycleAwareLtcRecognizer {
             }
         }
 
-        ContinuousHV { values: result_values }
+        ContinuousHV {
+            values: result_values,
+        }
     }
 
     /// Create bit HV for prediction error tracking
@@ -527,13 +539,21 @@ impl CycleAwareLtcRecognizer {
 
     /// Get overall accuracy
     pub fn accuracy(&self) -> f32 {
-        if self.total <= 1 { 0.5 } else { self.correct as f32 / (self.total - 1) as f32 }
+        if self.total <= 1 {
+            0.5
+        } else {
+            self.correct as f32 / (self.total - 1) as f32
+        }
     }
 
     /// Get recent accuracy
     pub fn recent_accuracy(&self) -> f32 {
-        if self.recent_correct.is_empty() { 0.5 }
-        else { self.recent_correct.iter().filter(|&&c| c).count() as f32 / self.recent_correct.len() as f32 }
+        if self.recent_correct.is_empty() {
+            0.5
+        } else {
+            self.recent_correct.iter().filter(|&&c| c).count() as f32
+                / self.recent_correct.len() as f32
+        }
     }
 
     /// Get node count
@@ -570,11 +590,17 @@ mod tests {
         }
 
         let state = detector.state();
-        println!("Detected period: {}, confidence: {:.2}", state.detected_period, state.confidence);
+        println!(
+            "Detected period: {}, confidence: {:.2}",
+            state.detected_period, state.confidence
+        );
 
         // Should detect period 4 with high confidence
-        assert!(state.detected_period == 4 || state.detected_period == 2,
-                "Should detect period 4 or its harmonic 2, got {}", state.detected_period);
+        assert!(
+            state.detected_period == 4 || state.detected_period == 2,
+            "Should detect period 4 or its harmonic 2, got {}",
+            state.detected_period
+        );
         assert!(state.confidence > 0.5, "Confidence should be > 0.5");
     }
 
@@ -584,15 +610,25 @@ mod tests {
 
         // Feed a period-8 pattern: 11110000 11110000...
         for cycle in 0..15 {
-            for _ in 0..4 { detector.observe(true); }
-            for _ in 0..4 { detector.observe(false); }
+            for _ in 0..4 {
+                detector.observe(true);
+            }
+            for _ in 0..4 {
+                detector.observe(false);
+            }
         }
 
         let state = detector.state();
-        println!("Detected period: {}, confidence: {:.2}", state.detected_period, state.confidence);
+        println!(
+            "Detected period: {}, confidence: {:.2}",
+            state.detected_period, state.confidence
+        );
 
-        assert!(state.detected_period == 8 || state.detected_period == 4,
-                "Should detect period 8 or harmonic, got {}", state.detected_period);
+        assert!(
+            state.detected_period == 8 || state.detected_period == 4,
+            "Should detect period 8 or harmonic, got {}",
+            state.detected_period
+        );
     }
 
     #[test]
@@ -611,10 +647,16 @@ mod tests {
         }
 
         let state = detector.state();
-        println!("Random: detected period: {}, confidence: {:.2}", state.detected_period, state.confidence);
+        println!(
+            "Random: detected period: {}, confidence: {:.2}",
+            state.detected_period, state.confidence
+        );
 
         // Confidence should be low for random data
-        assert!(state.confidence < 0.5, "Random data should have low confidence");
+        assert!(
+            state.confidence < 0.5,
+            "Random data should have low confidence"
+        );
     }
 
     #[test]
@@ -630,9 +672,15 @@ mod tests {
         let sim_02 = phase0.similarity(phase2);
         let sim_12 = phase1.similarity(phase2);
 
-        println!("Phase similarities: 0-1={:.3}, 0-2={:.3}, 1-2={:.3}", sim_01, sim_02, sim_12);
+        println!(
+            "Phase similarities: 0-1={:.3}, 0-2={:.3}, 1-2={:.3}",
+            sim_01, sim_02, sim_12
+        );
 
         // Adjacent phases should have some similarity (circular), opposite less
-        assert!(sim_01.abs() < 0.8, "Adjacent phases should not be identical");
+        assert!(
+            sim_01.abs() < 0.8,
+            "Adjacent phases should not be identical"
+        );
     }
 }

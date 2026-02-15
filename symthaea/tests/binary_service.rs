@@ -7,16 +7,20 @@
 
 #![cfg(feature = "service")]
 
+use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::time::Duration;
-use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Get the path to the built binary
 fn binary_path() -> PathBuf {
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push("target");
-    path.push(if cfg!(debug_assertions) { "debug" } else { "release" });
+    path.push(if cfg!(debug_assertions) {
+        "debug"
+    } else {
+        "release"
+    });
     path.push("symthaea");
     path
 }
@@ -51,12 +55,18 @@ mod cli_tests {
         assert!(output.status.success(), "Help command should succeed");
 
         // Should contain expected help text
-        assert!(stdout.contains("symthaea") || stdout.contains("Symthaea"),
-            "Help should mention symthaea");
-        assert!(stdout.contains("--socket") || stdout.contains("socket"),
-            "Help should mention socket option");
-        assert!(stdout.contains("--tcp") || stdout.contains("tcp"),
-            "Help should mention tcp option");
+        assert!(
+            stdout.contains("symthaea") || stdout.contains("Symthaea"),
+            "Help should mention symthaea"
+        );
+        assert!(
+            stdout.contains("--socket") || stdout.contains("socket"),
+            "Help should mention socket option"
+        );
+        assert!(
+            stdout.contains("--tcp") || stdout.contains("tcp"),
+            "Help should mention tcp option"
+        );
     }
 
     #[test]
@@ -74,8 +84,11 @@ mod cli_tests {
         assert!(output.status.success(), "Version command should succeed");
 
         // Should contain version number
-        assert!(stdout.contains("0.") || stdout.contains("symthaea"),
-            "Version output should contain version info: {}", stdout);
+        assert!(
+            stdout.contains("0.") || stdout.contains("symthaea"),
+            "Version output should contain version info: {}",
+            stdout
+        );
     }
 
     #[test]
@@ -92,8 +105,13 @@ mod cli_tests {
 
         // Stderr should contain error message
         let stderr = String::from_utf8_lossy(&output.stderr);
-        assert!(stderr.contains("error") || stderr.contains("invalid") || stderr.contains("unrecognized"),
-            "Should show error for invalid argument: {}", stderr);
+        assert!(
+            stderr.contains("error")
+                || stderr.contains("invalid")
+                || stderr.contains("unrecognized"),
+            "Should show error for invalid argument: {}",
+            stderr
+        );
     }
 
     #[test]
@@ -102,7 +120,7 @@ mod cli_tests {
 
         // Providing neither socket nor tcp should still work (uses defaults or fails gracefully)
         let output = Command::new(binary_path())
-            .arg("--help")  // Just test help works
+            .arg("--help") // Just test help works
             .output()
             .expect("Failed to execute binary");
 
@@ -126,7 +144,7 @@ mod startup_tests {
             .arg("--socket")
             .arg(&socket_path)
             .arg("--loop-interval")
-            .arg("100")  // Fast loop for testing
+            .arg("100") // Fast loop for testing
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -151,7 +169,10 @@ mod startup_tests {
                 }
                 // It's OK if it exits quickly due to missing dependencies
                 // The point is it started and processed arguments correctly
-                eprintln!("[Info] Service exited with status: {:?}, stderr: {}", status, stderr);
+                eprintln!(
+                    "[Info] Service exited with status: {:?}, stderr: {}",
+                    status, stderr
+                );
             }
             Err(e) => {
                 panic!("Error checking process status: {}", e);
@@ -184,7 +205,7 @@ mod startup_tests {
         // Try to connect (may fail if service isn't fully up, but that's OK)
         let connect_result = std::net::TcpStream::connect_timeout(
             &addr.parse().unwrap(),
-            Duration::from_millis(200)
+            Duration::from_millis(200),
         );
 
         // Clean up

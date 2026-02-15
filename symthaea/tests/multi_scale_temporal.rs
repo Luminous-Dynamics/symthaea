@@ -12,8 +12,8 @@ use symthaea::dynamics::world_model::{HierarchicalCfCWorldModel, WorldModelConfi
 use symthaea_core::genesis::GenesisSeed;
 
 const DIM: usize = 16;
-const FAST_PERIOD: usize = 4;   // ticks
-const SLOW_PERIOD: usize = 40;  // ticks
+const FAST_PERIOD: usize = 4; // ticks
+const SLOW_PERIOD: usize = 40; // ticks
 const TOTAL_TICKS: usize = 120;
 const DT: f32 = 0.1;
 
@@ -69,10 +69,12 @@ fn multi_scale_prediction_error_decreases_over_time() {
 
     // Split into first quarter and last quarter.
     let quarter = TOTAL_TICKS / 4;
-    let first_q_avg: f32 =
-        errors_by_tick[..quarter].iter().copied().sum::<f32>() / quarter as f32;
-    let last_q_avg: f32 =
-        errors_by_tick[TOTAL_TICKS - quarter..].iter().copied().sum::<f32>() / quarter as f32;
+    let first_q_avg: f32 = errors_by_tick[..quarter].iter().copied().sum::<f32>() / quarter as f32;
+    let last_q_avg: f32 = errors_by_tick[TOTAL_TICKS - quarter..]
+        .iter()
+        .copied()
+        .sum::<f32>()
+        / quarter as f32;
 
     println!("First quarter avg RMS error: {:.6}", first_q_avg);
     println!("Last  quarter avg RMS error: {:.6}", last_q_avg);
@@ -150,23 +152,43 @@ fn per_layer_timescale_sensitivity() {
     layer1_fast_err /= measure_ticks as f32;
     layer1_slow_err /= measure_ticks as f32;
 
-    println!("Layer 0 (fast ts=1.0): fast_err={:.4}, slow_err={:.4}", layer0_fast_err, layer0_slow_err);
-    println!("Layer 1 (slow ts=8.0): fast_err={:.4}, slow_err={:.4}", layer1_fast_err, layer1_slow_err);
+    println!(
+        "Layer 0 (fast ts=1.0): fast_err={:.4}, slow_err={:.4}",
+        layer0_fast_err, layer0_slow_err
+    );
+    println!(
+        "Layer 1 (slow ts=8.0): fast_err={:.4}, slow_err={:.4}",
+        layer1_fast_err, layer1_slow_err
+    );
 
     // Verify the layers produce different error profiles.
     // The fast layer should have a different ratio of fast/slow error compared to the slow layer.
     // Specifically: the slow layer's ratio (slow_err / fast_err) should be lower than
     // the fast layer's ratio, because the slow layer's dynamics are better suited
     // to slow signals.
-    let layer0_ratio = if layer0_fast_err > 1e-9 { layer0_slow_err / layer0_fast_err } else { 1.0 };
-    let layer1_ratio = if layer1_fast_err > 1e-9 { layer1_slow_err / layer1_fast_err } else { 1.0 };
+    let layer0_ratio = if layer0_fast_err > 1e-9 {
+        layer0_slow_err / layer0_fast_err
+    } else {
+        1.0
+    };
+    let layer1_ratio = if layer1_fast_err > 1e-9 {
+        layer1_slow_err / layer1_fast_err
+    } else {
+        1.0
+    };
 
     println!("Layer 0 slow/fast ratio: {:.4}", layer0_ratio);
     println!("Layer 1 slow/fast ratio: {:.4}", layer1_ratio);
 
     // At minimum, verify the model runs without panics and produces finite values.
-    assert!(layer0_fast_err.is_finite(), "Layer 0 fast error is not finite");
-    assert!(layer1_slow_err.is_finite(), "Layer 1 slow error is not finite");
+    assert!(
+        layer0_fast_err.is_finite(),
+        "Layer 0 fast error is not finite"
+    );
+    assert!(
+        layer1_slow_err.is_finite(),
+        "Layer 1 slow error is not finite"
+    );
 
     // The two layers should not produce identical outputs (they have different time scales).
     let ratio_diff = (layer0_ratio - layer1_ratio).abs();

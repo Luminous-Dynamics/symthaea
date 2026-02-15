@@ -53,7 +53,11 @@ fn test_bind_is_self_inverse() {
     let a = BinaryHV::random(100);
     let result = a.bind(&a);
 
-    assert_eq!(result, BinaryHV::zero(), "A bind A should equal zero vector");
+    assert_eq!(
+        result,
+        BinaryHV::zero(),
+        "A bind A should equal zero vector"
+    );
 }
 
 #[test]
@@ -248,7 +252,11 @@ fn test_bundle_single_is_identity() {
 fn test_bundle_empty_is_zero() {
     let bundled = BinaryHV::bundle(&[]);
 
-    assert_eq!(bundled, BinaryHV::zero(), "Bundle of empty should be zero vector");
+    assert_eq!(
+        bundled,
+        BinaryHV::zero(),
+        "Bundle of empty should be zero vector"
+    );
 }
 
 // ============================================================================
@@ -382,12 +390,20 @@ fn test_from_bits_creates_valid_vector() {
     // Create from all zeros
     let zero_bits = vec![0u64; 256];
     let from_zeros = BinaryHV::from_bits(&zero_bits);
-    assert_eq!(from_zeros, BinaryHV::zero(), "From zero bits should equal zero vector");
+    assert_eq!(
+        from_zeros,
+        BinaryHV::zero(),
+        "From zero bits should equal zero vector"
+    );
 
     // Create from all ones
     let one_bits = vec![u64::MAX; 256];
     let from_ones = BinaryHV::from_bits(&one_bits);
-    assert_eq!(from_ones, BinaryHV::ones(), "From one bits should equal ones vector");
+    assert_eq!(
+        from_ones,
+        BinaryHV::ones(),
+        "From one bits should equal ones vector"
+    );
 }
 
 // ============================================================================
@@ -426,7 +442,7 @@ fn test_sequence_encoding_pattern() {
 #[test]
 fn test_clone_is_equal() {
     let original = BinaryHV::random(2200);
-    let cloned = original.clone();
+    let cloned = original;
 
     assert_eq!(original, cloned, "Clone should equal original");
 }

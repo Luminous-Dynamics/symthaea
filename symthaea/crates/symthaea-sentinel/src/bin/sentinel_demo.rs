@@ -24,19 +24,26 @@ struct HV {
 
 impl HV {
     fn zero() -> Self {
-        Self { values: vec![0.0; HDC_DIM] }
+        Self {
+            values: vec![0.0; HDC_DIM],
+        }
     }
 
     fn random() -> Self {
         use rand::Rng;
         let mut rng = rand::thread_rng();
         Self {
-            values: (0..HDC_DIM).map(|_| rng.gen_range(-1.0..1.0)).collect()
+            values: (0..HDC_DIM).map(|_| rng.gen_range(-1.0..1.0)).collect(),
         }
     }
 
     fn similarity(&self, other: &HV) -> f32 {
-        let dot: f32 = self.values.iter().zip(&other.values).map(|(a, b)| a * b).sum();
+        let dot: f32 = self
+            .values
+            .iter()
+            .zip(&other.values)
+            .map(|(a, b)| a * b)
+            .sum();
         let mag_a: f32 = self.values.iter().map(|x| x * x).sum::<f32>().sqrt();
         let mag_b: f32 = other.values.iter().map(|x| x * x).sum::<f32>().sqrt();
         if mag_a > 1e-6 && mag_b > 1e-6 {
@@ -48,13 +55,18 @@ impl HV {
 
     fn add(&self, other: &HV) -> HV {
         HV {
-            values: self.values.iter().zip(&other.values).map(|(a, b)| a + b).collect()
+            values: self
+                .values
+                .iter()
+                .zip(&other.values)
+                .map(|(a, b)| a + b)
+                .collect(),
         }
     }
 
     fn scale(&self, s: f32) -> HV {
         HV {
-            values: self.values.iter().map(|v| v * s).collect()
+            values: self.values.iter().map(|v| v * s).collect(),
         }
     }
 }
@@ -65,9 +77,9 @@ impl HV {
 
 struct LtcNode {
     state: HV,
-    tau: f32,        // Time constant in ms
-    weight: HV,      // Input weight vector
-    bias: HV,        // Bias vector
+    tau: f32,   // Time constant in ms
+    weight: HV, // Input weight vector
+    bias: HV,   // Bias vector
 }
 
 impl LtcNode {
@@ -90,15 +102,15 @@ impl LtcNode {
 
         let decay = (-dt / self.tau).exp();
         for i in 0..HDC_DIM {
-            self.state.values[i] = self.state.values[i] * decay +
-                activation.values[i] * (1.0 - decay);
+            self.state.values[i] =
+                self.state.values[i] * decay + activation.values[i] * (1.0 - decay);
         }
     }
 }
 
 struct HierarchicalLtc {
-    nodes: Vec<LtcNode>,  // 5 levels with different τ
-    phi: f64,             // Integrated information estimate
+    nodes: Vec<LtcNode>, // 5 levels with different τ
+    phi: f64,            // Integrated information estimate
 }
 
 impl HierarchicalLtc {
@@ -118,13 +130,25 @@ impl HierarchicalLtc {
         }
 
         // Compute simple Φ estimate (state variance across levels)
-        let mean: Vec<f32> = (0..HDC_DIM).map(|i| {
-            self.nodes.iter().map(|n| n.state.values[i]).sum::<f32>() / self.nodes.len() as f32
-        }).collect();
+        let mean: Vec<f32> = (0..HDC_DIM)
+            .map(|i| {
+                self.nodes.iter().map(|n| n.state.values[i]).sum::<f32>() / self.nodes.len() as f32
+            })
+            .collect();
 
-        let var: f32 = self.nodes.iter().map(|n| {
-            n.state.values.iter().zip(&mean).map(|(s, m)| (s - m).powi(2)).sum::<f32>()
-        }).sum::<f32>() / (self.nodes.len() * HDC_DIM) as f32;
+        let var: f32 = self
+            .nodes
+            .iter()
+            .map(|n| {
+                n.state
+                    .values
+                    .iter()
+                    .zip(&mean)
+                    .map(|(s, m)| (s - m).powi(2))
+                    .sum::<f32>()
+            })
+            .sum::<f32>()
+            / (self.nodes.len() * HDC_DIM) as f32;
 
         self.phi = var as f64;
     }
@@ -166,7 +190,9 @@ impl RhythmPattern {
     }
 
     fn finalize(&mut self) {
-        if self.trajectory.is_empty() { return; }
+        if self.trajectory.is_empty() {
+            return;
+        }
 
         // Compute mean
         let mut sum = HV::zero();
@@ -178,7 +204,9 @@ impl RhythmPattern {
         // Compute frequency signature (simple DFT at target frequencies)
         let fps = 30.0;
         let freqs = [0.5, 1.0, 2.0, 4.0];
-        let signal: Vec<f32> = self.trajectory.iter()
+        let signal: Vec<f32> = self
+            .trajectory
+            .iter()
             .map(|s| s.values.iter().take(100).sum())
             .collect();
 
@@ -212,9 +240,13 @@ impl RhythmPattern {
         let self_sum: f32 = self.freq_signature.iter().sum::<f32>().max(1e-6);
         let other_sum: f32 = other.freq_signature.iter().sum::<f32>().max(1e-6);
 
-        let freq_sim: f32 = self.freq_signature.iter().zip(&other.freq_signature)
+        let freq_sim: f32 = self
+            .freq_signature
+            .iter()
+            .zip(&other.freq_signature)
             .map(|(a, b)| (a / self_sum) * (b / other_sum))
-            .sum::<f32>().sqrt();
+            .sum::<f32>()
+            .sqrt();
 
         // Weighted combination
         0.4 * mean_sim + 0.6 * freq_sim
@@ -275,7 +307,8 @@ impl RhythmDetector {
             sims.insert(*key, sim);
         }
 
-        let (best_pattern, best_sim) = sims.iter()
+        let (best_pattern, best_sim) = sims
+            .iter()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(k, v)| (k.to_string(), *v))
             .unwrap_or(("None".to_string(), 0.0));
@@ -293,7 +326,8 @@ impl RhythmDetector {
 
     fn start_learning(&mut self, key: char) {
         self.learning_mode = Some(key);
-        self.patterns.insert(key, RhythmPattern::new(&key.to_string()));
+        self.patterns
+            .insert(key, RhythmPattern::new(&key.to_string()));
         self.ltc.reset();
         self.current_trajectory.clear();
     }
@@ -333,15 +367,24 @@ fn generate_brightness(pattern: MockPattern, frame: u64, fps: f32) -> f32 {
         MockPattern::Blink { bpm } => {
             let frames_per_beat = (fps * 60.0) / bpm as f32;
             let pos = (frame as f32 % frames_per_beat) / frames_per_beat;
-            if pos < 0.5 { 1.0 } else { 0.2 }
+            if pos < 0.5 {
+                1.0
+            } else {
+                0.2
+            }
         }
         MockPattern::Heartbeat { bpm } => {
             let frames_per_beat = (fps * 60.0) / bpm as f32;
             let pos = (frame as f32 % frames_per_beat) / frames_per_beat;
-            if pos < 0.08 { 1.0 }
-            else if pos < 0.15 { 0.3 }
-            else if pos < 0.22 { 0.8 }
-            else { 0.2 }
+            if pos < 0.08 {
+                1.0
+            } else if pos < 0.15 {
+                0.3
+            } else if pos < 0.22 {
+                0.8
+            } else {
+                0.2
+            }
         }
         MockPattern::Polyrhythm { bpm_a, bpm_b } => {
             let fpb_a = (fps * 60.0) / bpm_a as f32;
@@ -377,15 +420,41 @@ struct PatternDef {
 
 fn main() -> Result<()> {
     let patterns = vec![
-        PatternDef { key: 'A', name: "60 BPM", desc: "1 beat/sec", pattern: MockPattern::Blink { bpm: 60 } },
-        PatternDef { key: 'B', name: "120 BPM", desc: "2 beats/sec", pattern: MockPattern::Blink { bpm: 120 } },
-        PatternDef { key: 'C', name: "Heartbeat", desc: "LUB-dub", pattern: MockPattern::Heartbeat { bpm: 72 } },
-        PatternDef { key: 'D', name: "Polyrhythm", desc: "3:2 cross", pattern: MockPattern::Polyrhythm { bpm_a: 90, bpm_b: 60 } },
+        PatternDef {
+            key: 'A',
+            name: "60 BPM",
+            desc: "1 beat/sec",
+            pattern: MockPattern::Blink { bpm: 60 },
+        },
+        PatternDef {
+            key: 'B',
+            name: "120 BPM",
+            desc: "2 beats/sec",
+            pattern: MockPattern::Blink { bpm: 120 },
+        },
+        PatternDef {
+            key: 'C',
+            name: "Heartbeat",
+            desc: "LUB-dub",
+            pattern: MockPattern::Heartbeat { bpm: 72 },
+        },
+        PatternDef {
+            key: 'D',
+            name: "Polyrhythm",
+            desc: "3:2 cross",
+            pattern: MockPattern::Polyrhythm {
+                bpm_a: 90,
+                bpm_b: 60,
+            },
+        },
     ];
 
     let running = Arc::new(AtomicBool::new(true));
     let r = running.clone();
-    ctrlc::set_handler(move || { r.store(false, Ordering::Relaxed); }).ok();
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::Relaxed);
+    })
+    .ok();
 
     let mut detector = RhythmDetector::new();
     let fps = 30.0;
@@ -396,7 +465,10 @@ fn main() -> Result<()> {
     println!("║  \"Transformers spatialize time. Symthaea LIVES in time.\"      ║");
     println!("╠═══════════════════════════════════════════════════════════════╣");
     for p in &patterns {
-        println!("║  [{}] {:12} - {:20}                   ║", p.key, p.name, p.desc);
+        println!(
+            "║  [{}] {:12} - {:20}                   ║",
+            p.key, p.name, p.desc
+        );
     }
     println!("╠═══════════════════════════════════════════════════════════════╣");
     println!("║  [X] Detect  [S] Summary  [R] Reset  [Q] Quit                 ║");
@@ -427,8 +499,13 @@ fn main() -> Result<()> {
 
                     let progress = start.elapsed().as_secs_f32() / 3.0;
                     let bar = (progress * 30.0) as usize;
-                    print!("\r  [{}{}] {:.0}%  Φ={:.4}",
-                        "█".repeat(bar), "░".repeat(30 - bar), progress * 100.0, phi);
+                    print!(
+                        "\r  [{}{}] {:.0}%  Φ={:.4}",
+                        "█".repeat(bar),
+                        "░".repeat(30 - bar),
+                        progress * 100.0,
+                        phi
+                    );
                     io::stdout().flush()?;
 
                     frame += 1;
@@ -447,7 +524,8 @@ fn main() -> Result<()> {
                 println!("\n  Detection mode (Ctrl+C to stop)...\n");
                 running.store(true, Ordering::Relaxed);
 
-                let learned: Vec<_> = patterns.iter()
+                let learned: Vec<_> = patterns
+                    .iter()
                     .filter(|p| detector.patterns.contains_key(&p.key))
                     .collect();
 
@@ -472,13 +550,28 @@ fn main() -> Result<()> {
                     for k in keys {
                         let s = sims[k];
                         let bar = (s * 10.0) as usize;
-                        let color = if detected == k.to_string() { "\x1b[32m" } else { "\x1b[90m" };
-                        sim_str.push_str(&format!("{}: {}[{}{}]\x1b[0m {:.2}  ",
-                            k, color, "█".repeat(bar.min(10)), "░".repeat(10 - bar.min(10)), s));
+                        let color = if detected == k.to_string() {
+                            "\x1b[32m"
+                        } else {
+                            "\x1b[90m"
+                        };
+                        sim_str.push_str(&format!(
+                            "{}: {}[{}{}]\x1b[0m {:.2}  ",
+                            k,
+                            color,
+                            "█".repeat(bar.min(10)),
+                            "░".repeat(10 - bar.min(10)),
+                            s
+                        ));
                     }
 
-                    print!("\r  {} │ Detected: {} ({:.0}%)  Φ={:.4}   ",
-                        sim_str, detected, conf * 100.0, phi);
+                    print!(
+                        "\r  {} │ Detected: {} ({:.0}%)  Φ={:.4}   ",
+                        sim_str,
+                        detected,
+                        conf * 100.0,
+                        phi
+                    );
                     io::stdout().flush()?;
 
                     frame += 1;
@@ -489,11 +582,19 @@ fn main() -> Result<()> {
             Some('S') => {
                 println!("\n  HierarchicalLTC: 5 levels (τ = 500ms → 30ms)");
                 println!("  HDC dimension: {}", HDC_DIM);
-                println!("  Learned patterns: {:?}", detector.patterns.keys().collect::<Vec<_>>());
+                println!(
+                    "  Learned patterns: {:?}",
+                    detector.patterns.keys().collect::<Vec<_>>()
+                );
                 for (k, p) in &detector.patterns {
-                    println!("    {} - freq sig: [{:.3}, {:.3}, {:.3}, {:.3}]",
-                        k, p.freq_signature[0], p.freq_signature[1],
-                        p.freq_signature[2], p.freq_signature[3]);
+                    println!(
+                        "    {} - freq sig: [{:.3}, {:.3}, {:.3}, {:.3}]",
+                        k,
+                        p.freq_signature[0],
+                        p.freq_signature[1],
+                        p.freq_signature[2],
+                        p.freq_signature[3]
+                    );
                 }
                 println!();
             }

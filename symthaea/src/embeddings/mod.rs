@@ -39,14 +39,14 @@
 
 pub mod qwen3;
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
+use anyhow::Result;
 use rand::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use serde::{Deserialize, Serialize};
-use anyhow::Result;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // Re-export qwen3 types at module level
-pub use qwen3::{Qwen3Embedder, Qwen3Config, QWEN3_FULL_DIMENSION};
+pub use qwen3::{Qwen3Config, Qwen3Embedder, QWEN3_FULL_DIMENSION};
 
 /// Standard Qwen3 embedding dimension (1024D)
 pub const QWEN3_DIMENSION: usize = 1024;
@@ -220,9 +220,8 @@ impl HdcBridge {
             }
             NormalizationMode::Batch => {
                 let mean: f32 = input.iter().sum::<f32>() / input.len() as f32;
-                let variance: f32 = input.iter()
-                    .map(|x| (x - mean).powi(2))
-                    .sum::<f32>() / input.len() as f32;
+                let variance: f32 =
+                    input.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / input.len() as f32;
                 let std = (variance + 1e-6).sqrt();
                 input.iter().map(|x| (x - mean) / std).collect()
             }
@@ -427,7 +426,11 @@ mod tests {
 
         // Similarity should be high (above 0.9)
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.9, "Similar embeddings should project to similar HVs, got {}", sim);
+        assert!(
+            sim > 0.9,
+            "Similar embeddings should project to similar HVs, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -435,15 +438,23 @@ mod tests {
         let bridge = HdcBridge::new();
 
         // Create two very different embeddings
-        let emb1: Vec<f32> = (0..QWEN3_DIMENSION).map(|i| (i as f32 * 0.01).sin()).collect();
-        let emb2: Vec<f32> = (0..QWEN3_DIMENSION).map(|i| (i as f32 * 0.01).cos()).collect();
+        let emb1: Vec<f32> = (0..QWEN3_DIMENSION)
+            .map(|i| (i as f32 * 0.01).sin())
+            .collect();
+        let emb2: Vec<f32> = (0..QWEN3_DIMENSION)
+            .map(|i| (i as f32 * 0.01).cos())
+            .collect();
 
         let hv1 = bridge.project(&emb1);
         let hv2 = bridge.project(&emb2);
 
         // Similarity should be lower (different embeddings)
         let sim = hv1.similarity(&hv2);
-        assert!(sim < 0.9, "Different embeddings should have lower similarity, got {}", sim);
+        assert!(
+            sim < 0.9,
+            "Different embeddings should have lower similarity, got {}",
+            sim
+        );
     }
 
     #[test]

@@ -22,9 +22,9 @@
 //! - Temperature: 2.725 K
 //! - Fluctuations: δT/T ~ 10⁻⁵
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// Hubble constant (km/s/Mpc)
@@ -39,17 +39,17 @@ pub const T_CMB: f64 = 2.725;
 /// Cosmological era
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CosmologicalEra {
-    Planck,          // t < 10⁻⁴³ s
-    GrandUnification,// 10⁻⁴³ to 10⁻³⁶ s
-    Inflation,       // 10⁻³⁶ to 10⁻³² s
-    Electroweak,     // 10⁻³² to 10⁻¹² s
-    QuarkHadron,     // 10⁻¹² to 10⁻⁶ s
-    Nucleosynthesis, // 1 s to 3 min
-    Recombination,   // 380,000 yr
-    DarkAges,        // 380,000 to 400 Myr
-    Reionization,    // 400 Myr to 1 Gyr
-    GalaxyFormation, // 1 to 10 Gyr
-    Present,         // 13.8 Gyr
+    Planck,           // t < 10⁻⁴³ s
+    GrandUnification, // 10⁻⁴³ to 10⁻³⁶ s
+    Inflation,        // 10⁻³⁶ to 10⁻³² s
+    Electroweak,      // 10⁻³² to 10⁻¹² s
+    QuarkHadron,      // 10⁻¹² to 10⁻⁶ s
+    Nucleosynthesis,  // 1 s to 3 min
+    Recombination,    // 380,000 yr
+    DarkAges,         // 380,000 to 400 Myr
+    Reionization,     // 400 Myr to 1 Gyr
+    GalaxyFormation,  // 1 to 10 Gyr
+    Present,          // 13.8 Gyr
 }
 
 impl CosmologicalEra {
@@ -73,11 +73,11 @@ impl CosmologicalEra {
 /// Dark matter candidate
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DarkMatterCandidate {
-    WIMP,              // Weakly interacting massive particle
-    Axion,             // Light pseudoscalar
-    SterileNeutrino,   // Sterile neutrino
+    WIMP,            // Weakly interacting massive particle
+    Axion,           // Light pseudoscalar
+    SterileNeutrino, // Sterile neutrino
     PrimordialBlackHole,
-    MACHO,             // Massive compact halo object
+    MACHO, // Massive compact halo object
 }
 
 impl DarkMatterCandidate {
@@ -95,9 +95,9 @@ impl DarkMatterCandidate {
 /// Dark energy model
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum DarkEnergyModel {
-    CosmologicalConstant,  // Λ, w = -1
-    Quintessence,          // Scalar field, w > -1
-    PhantomEnergy,         // w < -1
+    CosmologicalConstant, // Λ, w = -1
+    Quintessence,         // Scalar field, w > -1
+    PhantomEnergy,        // w < -1
 }
 
 impl DarkEnergyModel {
@@ -274,9 +274,7 @@ impl CosmologyEncoder {
 
     /// Create CMB
     pub fn create_cmb(&self) -> CMB {
-        let vector = self.cmb
-            .bind(&self.recombination)
-            .bind(&self.anisotropy);
+        let vector = self.cmb.bind(&self.recombination).bind(&self.anisotropy);
 
         CMB {
             temperature_k: T_CMB,
@@ -288,7 +286,8 @@ impl CosmologyEncoder {
 
     /// Create standard ΛCDM parameters (Planck 2018)
     pub fn lcdm_parameters(&self) -> CosmologicalParameters {
-        let vector = self.universe
+        let vector = self
+            .universe
             .bind(&self.dark_energy)
             .bind(&self.dark_matter)
             .bind(&self.flat);
@@ -298,7 +297,7 @@ impl CosmologyEncoder {
             omega_m: 0.315,
             omega_lambda: 0.685,
             omega_b: 0.049,
-            omega_k: 0.0,  // Flat
+            omega_k: 0.0, // Flat
             n_s: 0.965,
             sigma_8: 0.811,
             vector,
@@ -314,26 +313,30 @@ impl CosmologyEncoder {
     pub fn age_gyr(&self, h0: f64, omega_m: f64, omega_lambda: f64) -> f64 {
         // Approximate formula for flat ΛCDM
         let h = h0 / 100.0;
-        (2.0 / 3.0) * (1.0 / omega_lambda.sqrt()) *
-            ((omega_lambda / omega_m).sqrt()).asinh() / (h * 100.0) * 977.8
+        (2.0 / 3.0) * (1.0 / omega_lambda.sqrt()) * ((omega_lambda / omega_m).sqrt()).asinh()
+            / (h * 100.0)
+            * 977.8
     }
 
     /// Encode an era
     pub fn encode_era(&self, era: CosmologicalEra, genesis: &GenesisSeed) -> ContinuousHV {
-        genesis.hv(era.domain(), PHYSICS_DIM)
+        genesis
+            .hv(era.domain(), PHYSICS_DIM)
             .bind(&self.universe)
             .bind(&self.big_bang)
     }
 
     /// Inflation: exponential expansion
     pub fn inflation_expansion(&self) -> ContinuousHV {
-        self.inflation
-            .bind(&self.expansion)
-            .scale(60.0)  // ~60 e-folds
+        self.inflation.bind(&self.expansion).scale(60.0) // ~60 e-folds
     }
 
     /// Dark matter vector
-    pub fn dark_matter_candidate(&self, candidate: DarkMatterCandidate, genesis: &GenesisSeed) -> ContinuousHV {
+    pub fn dark_matter_candidate(
+        &self,
+        candidate: DarkMatterCandidate,
+        genesis: &GenesisSeed,
+    ) -> ContinuousHV {
         let candidate_vec = genesis.hv(candidate.domain(), PHYSICS_DIM);
         self.dark_matter.bind(&candidate_vec)
     }
@@ -341,13 +344,16 @@ impl CosmologyEncoder {
     /// Dark energy with equation of state
     pub fn dark_energy_model(&self, model: DarkEnergyModel, genesis: &GenesisSeed) -> ContinuousHV {
         let model_vec = genesis.hv(model.domain(), PHYSICS_DIM);
-        self.dark_energy
-            .bind(&model_vec)
-            .scale(model.w() as f32)
+        self.dark_energy.bind(&model_vec).scale(model.w() as f32)
     }
 
     /// Cosmic structure at given scale
-    pub fn cosmic_structure(&self, structure: CosmicStructure, size_mpc: f64, genesis: &GenesisSeed) -> ContinuousHV {
+    pub fn cosmic_structure(
+        &self,
+        structure: CosmicStructure,
+        size_mpc: f64,
+        genesis: &GenesisSeed,
+    ) -> ContinuousHV {
         let structure_vec = genesis.hv(structure.domain(), PHYSICS_DIM);
         self.cosmic_web
             .bind(&structure_vec)

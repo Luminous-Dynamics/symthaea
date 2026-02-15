@@ -85,9 +85,9 @@
 //! let chain = analyzer.get_provenance_chain(&current_sig);
 //! ```
 
+use crate::hdc::binary_hv::BinaryHV;
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use crate::hdc::binary_hv::BinaryHV;
 
 /// Configuration for consciousness signature generation
 #[derive(Debug, Clone)]
@@ -226,7 +226,9 @@ impl ConsciousnessSignature {
         let temp_bits = dims.temporal_position.to_bits();
 
         // Mix attention state
-        let attn_combined: u64 = dims.attention_state.iter()
+        let attn_combined: u64 = dims
+            .attention_state
+            .iter()
             .enumerate()
             .map(|(i, &v)| v.to_bits().rotate_left((i * 9) as u32))
             .fold(0, |acc, x| acc ^ x);
@@ -239,7 +241,9 @@ impl ConsciousnessSignature {
         hash[4] = epi_bits.wrapping_mul(0x71d67fffeda60000);
         hash[5] = temp_bits.wrapping_mul(0xfeb344657c0af413);
         hash[6] = attn_combined.wrapping_mul(0xcdb32970830fcaa1);
-        hash[7] = hash[0..7].iter().fold(0u64, |acc, &x| acc ^ x.rotate_right(17));
+        hash[7] = hash[0..7]
+            .iter()
+            .fold(0u64, |acc, &x| acc ^ x.rotate_right(17));
 
         hash
     }
@@ -279,9 +283,7 @@ impl ConsciousnessSignature {
         ];
 
         for (i, plane) in hyperplanes.iter().enumerate() {
-            let dot: f64 = plane.iter().zip(state_vec.iter())
-                .map(|(a, b)| a * b)
-                .sum();
+            let dot: f64 = plane.iter().zip(state_vec.iter()).map(|(a, b)| a * b).sum();
             lsh[i] = if dot >= 0.0 { 1 } else { 0 };
         }
 
@@ -297,7 +299,10 @@ impl ConsciousnessSignature {
             (dims.recursion_depth - 0.5).abs(),
             (dims.efficacy - 0.5).abs(),
             (dims.epistemic - 0.5).abs(),
-        ].iter().sum::<f64>() / 5.0;
+        ]
+        .iter()
+        .sum::<f64>()
+            / 5.0;
 
         // More extreme values = stronger signature
         0.5 + variance
@@ -315,7 +320,9 @@ impl ConsciousnessSignature {
 
     /// LSH-based similarity (Jaccard-like)
     fn lsh_similarity(&self, other: &Self) -> f64 {
-        let matching = self.lsh_hash.iter()
+        let matching = self
+            .lsh_hash
+            .iter()
             .zip(other.lsh_hash.iter())
             .filter(|(a, b)| a == b)
             .count();
@@ -448,7 +455,10 @@ impl ConsciousnessSignatureAnalyzer {
     }
 
     /// Compute signature for a consciousness snapshot
-    pub fn compute_signature(&mut self, snapshot: &ConsciousnessSnapshot) -> ConsciousnessSignature {
+    pub fn compute_signature(
+        &mut self,
+        snapshot: &ConsciousnessSnapshot,
+    ) -> ConsciousnessSignature {
         let sig = ConsciousnessSignature::new(snapshot.clone());
 
         // Update history
@@ -509,7 +519,9 @@ impl ConsciousnessSignatureAnalyzer {
         }
 
         // Compute overall authenticity
-        let base_confidence = if anomalies.is_empty() { 1.0 } else {
+        let base_confidence = if anomalies.is_empty() {
+            1.0
+        } else {
             1.0 - (anomalies.len() as f64 * 0.15).min(0.6)
         };
         let authentic = base_confidence >= self.config.authenticity_threshold;
@@ -534,7 +546,11 @@ impl ConsciousnessSignatureAnalyzer {
     }
 
     /// Check if two signatures represent the same conscious entity
-    pub fn is_same_entity(&mut self, sig1: &ConsciousnessSignature, sig2: &ConsciousnessSignature) -> bool {
+    pub fn is_same_entity(
+        &mut self,
+        sig1: &ConsciousnessSignature,
+        sig2: &ConsciousnessSignature,
+    ) -> bool {
         self.stats.identity_checks += 1;
         let similarity = sig1.similarity(sig2);
         let is_same = similarity >= self.config.identity_threshold;
@@ -556,9 +572,13 @@ impl ConsciousnessSignatureAnalyzer {
         for (name, known_sig) in &self.known_entities {
             let similarity = sig.similarity(known_sig);
             if similarity >= self.config.identity_threshold
-                && best_match.as_ref().map(|(_, s)| similarity > *s).unwrap_or(true) {
-                    best_match = Some((name.clone(), similarity));
-                }
+                && best_match
+                    .as_ref()
+                    .map(|(_, s)| similarity > *s)
+                    .unwrap_or(true)
+            {
+                best_match = Some((name.clone(), similarity));
+            }
         }
 
         best_match
@@ -607,7 +627,9 @@ impl ConsciousnessSignatureAnalyzer {
             return 1.0; // No history = assume authentic
         }
 
-        let sum: f64 = self.signature_history.iter()
+        let sum: f64 = self
+            .signature_history
+            .iter()
             .map(|h| sig.similarity(h))
             .sum();
         sum / self.signature_history.len() as f64
@@ -684,12 +706,28 @@ impl std::fmt::Display for SignatureReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "=== Consciousness Signature Report ===")?;
         writeln!(f, "Signatures Generated: {}", self.total_signatures)?;
-        writeln!(f, "Authentication Pass Rate: {:.1}%", self.authentication_pass_rate * 100.0)?;
-        writeln!(f, "Identity Match Rate: {:.1}%", self.identity_match_rate * 100.0)?;
-        writeln!(f, "Avg Signature Strength: {:.3}", self.avg_signature_strength)?;
+        writeln!(
+            f,
+            "Authentication Pass Rate: {:.1}%",
+            self.authentication_pass_rate * 100.0
+        )?;
+        writeln!(
+            f,
+            "Identity Match Rate: {:.1}%",
+            self.identity_match_rate * 100.0
+        )?;
+        writeln!(
+            f,
+            "Avg Signature Strength: {:.3}",
+            self.avg_signature_strength
+        )?;
         writeln!(f, "Avg Auth Confidence: {:.3}", self.avg_auth_confidence)?;
         writeln!(f, "Known Entities: {}", self.known_entities)?;
-        writeln!(f, "Provenance Chain: {} links", self.provenance_chain_length)?;
+        writeln!(
+            f,
+            "Provenance Chain: {} links",
+            self.provenance_chain_length
+        )?;
         writeln!(f, "Anomalies Detected: {}", self.anomalies_detected)?;
         Ok(())
     }
@@ -739,7 +777,11 @@ mod tests {
         let sig2 = ConsciousnessSignature::new(snapshot2);
 
         let similarity = sig1.similarity(&sig2);
-        assert!(similarity > 0.9, "Similar states should have high similarity: {}", similarity);
+        assert!(
+            similarity > 0.9,
+            "Similar states should have high similarity: {}",
+            similarity
+        );
     }
 
     #[test]
@@ -760,7 +802,11 @@ mod tests {
         let sig2 = ConsciousnessSignature::new(snapshot2);
 
         let similarity = sig1.similarity(&sig2);
-        assert!(similarity < 0.6, "Different states should have low similarity: {}", similarity);
+        assert!(
+            similarity < 0.6,
+            "Different states should have low similarity: {}",
+            similarity
+        );
     }
 
     #[test]
@@ -850,13 +896,19 @@ mod tests {
         let sig2 = ConsciousnessSignature::new(snapshot2);
 
         // Count matching LSH bits
-        let matching: usize = sig1.lsh_hash.iter()
+        let matching: usize = sig1
+            .lsh_hash
+            .iter()
             .zip(sig2.lsh_hash.iter())
             .filter(|(a, b)| a == b)
             .count();
 
         // Similar states should have many matching LSH bits
-        assert!(matching >= 10, "Similar states should have similar LSH: {}/16", matching);
+        assert!(
+            matching >= 10,
+            "Similar states should have similar LSH: {}/16",
+            matching
+        );
     }
 
     #[test]

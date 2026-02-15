@@ -7,7 +7,7 @@
 //! - `HierarchicalLtc`: Multi-timescale LTC network
 //! - `TemporalWindow`: Rolling buffer for context-aware encoding
 
-use crate::hdc::{HV, HDC_DIM};
+use crate::hdc::{HDC_DIM, HV};
 
 /// Number of frames in the temporal window
 pub const TEMPORAL_WINDOW_SIZE: usize = 5;
@@ -86,7 +86,8 @@ impl CfcCell {
     }
 
     pub fn get_velocity(&self) -> Vec<f32> {
-        self.state.iter()
+        self.state
+            .iter()
             .zip(&self.prev_state)
             .map(|(curr, prev)| curr - prev)
             .collect()
@@ -135,7 +136,8 @@ impl HierarchicalCfc {
 
     /// Create with custom timescales
     pub fn with_taus(dim: usize, taus: &[f32]) -> Self {
-        let cells: Vec<CfcCell> = taus.iter()
+        let cells: Vec<CfcCell> = taus
+            .iter()
             .enumerate()
             .map(|(i, &tau)| CfcCell::new(dim, tau, 7000 + i as u64))
             .collect();
@@ -160,9 +162,12 @@ impl HierarchicalCfc {
             let mut total_var = 0.0f64;
             for i in 0..dim {
                 let mean: f32 = self.cells.iter().map(|c| c.state[i]).sum::<f32>() / n_cells as f32;
-                let var: f32 = self.cells.iter()
+                let var: f32 = self
+                    .cells
+                    .iter()
                     .map(|c| (c.state[i] - mean).powi(2))
-                    .sum::<f32>() / n_cells as f32;
+                    .sum::<f32>()
+                    / n_cells as f32;
                 total_var += var as f64;
             }
             self.phi = total_var / dim as f64;
@@ -216,8 +221,12 @@ impl TemporalWindow {
     }
 
     pub fn push(&mut self, features: &[f32]) {
-        assert!(features.len() <= self.feature_dim,
-            "Feature dimension {} exceeds window dimension {}", features.len(), self.feature_dim);
+        assert!(
+            features.len() <= self.feature_dim,
+            "Feature dimension {} exceeds window dimension {}",
+            features.len(),
+            self.feature_dim
+        );
 
         self.buffer[self.write_pos][..features.len()].copy_from_slice(features);
 
@@ -341,7 +350,8 @@ impl LtcNode {
 
         let decay = (-dt / self.tau).exp();
         for i in 0..HDC_DIM {
-            self.state.values[i] = self.state.values[i] * decay + activation.values[i] * (1.0 - decay);
+            self.state.values[i] =
+                self.state.values[i] * decay + activation.values[i] * (1.0 - decay);
         }
     }
 
@@ -383,7 +393,9 @@ impl HierarchicalLtc {
             LtcPreset::SlowWhale => [2000.0, 800.0, 300.0, 150.0, 80.0],
         };
         Self {
-            nodes: taus.iter().enumerate()
+            nodes: taus
+                .iter()
+                .enumerate()
                 .map(|(i, &tau)| LtcNode::new(tau, 5000 + i as u64))
                 .collect(),
             phi: 0.0,
@@ -394,7 +406,9 @@ impl HierarchicalLtc {
     #[allow(dead_code)]
     pub fn with_taus(taus: &[f32]) -> Self {
         Self {
-            nodes: taus.iter().enumerate()
+            nodes: taus
+                .iter()
+                .enumerate()
                 .map(|(i, &tau)| LtcNode::new(tau, 5000 + i as u64))
                 .collect(),
             phi: 0.0,
@@ -408,13 +422,25 @@ impl HierarchicalLtc {
         }
 
         // Compute Phi estimate
-        let mean: Vec<f32> = (0..HDC_DIM).map(|i| {
-            self.nodes.iter().map(|n| n.state.values[i]).sum::<f32>() / self.nodes.len() as f32
-        }).collect();
+        let mean: Vec<f32> = (0..HDC_DIM)
+            .map(|i| {
+                self.nodes.iter().map(|n| n.state.values[i]).sum::<f32>() / self.nodes.len() as f32
+            })
+            .collect();
 
-        let var: f32 = self.nodes.iter().map(|n| {
-            n.state.values.iter().zip(&mean).map(|(s, m)| (s - m).powi(2)).sum::<f32>()
-        }).sum::<f32>() / (self.nodes.len() * HDC_DIM) as f32;
+        let var: f32 = self
+            .nodes
+            .iter()
+            .map(|n| {
+                n.state
+                    .values
+                    .iter()
+                    .zip(&mean)
+                    .map(|(s, m)| (s - m).powi(2))
+                    .sum::<f32>()
+            })
+            .sum::<f32>()
+            / (self.nodes.len() * HDC_DIM) as f32;
 
         self.phi = var as f64;
     }

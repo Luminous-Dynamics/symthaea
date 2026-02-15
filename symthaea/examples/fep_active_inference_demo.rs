@@ -19,8 +19,8 @@
 
 use symthaea::consciousness::fep_active_inference::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, CognitiveLoopFEPBridge,
-    Observation, HiddenState, GenerativeModel, FreeEnergyCalculator,
-    PrecisionEstimator, ExpectedFreeEnergyComputer,
+    ExpectedFreeEnergyComputer, FreeEnergyCalculator, GenerativeModel, HiddenState, Observation,
+    PrecisionEstimator,
 };
 
 fn main() {
@@ -106,15 +106,28 @@ fn demo_generative_model() {
 
     // Predict observation
     let predicted_obs = model.predict_observation(&state);
-    println!("Predicted observation: {:?}", predicted_obs.iter().map(|x| format!("{:.3}", x)).collect::<Vec<_>>());
+    println!(
+        "Predicted observation: {:?}",
+        predicted_obs
+            .iter()
+            .map(|x| format!("{:.3}", x))
+            .collect::<Vec<_>>()
+    );
 
     // Predict next state under different actions
     println!();
     println!("State transitions under different actions:");
     for action in 0..model.num_actions {
         let next_state = model.predict_next_state(&state, action);
-        println!("  Action {}: state -> {:?}", action,
-            next_state.mean.iter().map(|x| format!("{:.3}", x)).collect::<Vec<_>>());
+        println!(
+            "  Action {}: state -> {:?}",
+            action,
+            next_state
+                .mean
+                .iter()
+                .map(|x| format!("{:.3}", x))
+                .collect::<Vec<_>>()
+        );
     }
     println!();
 }
@@ -177,8 +190,14 @@ fn demo_precision_weighting() {
     for i in 0..5 {
         precision.update_from_error(0.8, i);
     }
-    println!("  Sensory:  {:.3} (increased - trust observations)", precision.sensory_precision);
-    println!("  Prior:    {:.3} (decreased - distrust predictions)", precision.prior_precision);
+    println!(
+        "  Sensory:  {:.3} (increased - trust observations)",
+        precision.sensory_precision
+    );
+    println!(
+        "  Prior:    {:.3} (decreased - distrust predictions)",
+        precision.prior_precision
+    );
     println!();
 
     // Simulate low prediction errors (should trust predictions more)
@@ -187,7 +206,10 @@ fn demo_precision_weighting() {
         precision.update_from_error(0.1, i);
     }
     println!("  Sensory:  {:.3}", precision.sensory_precision);
-    println!("  Prior:    {:.3} (increased - trust predictions)", precision.prior_precision);
+    println!(
+        "  Prior:    {:.3} (increased - trust predictions)",
+        precision.prior_precision
+    );
     println!("  Stability: {:.3}", precision.stability());
     println!();
 }
@@ -212,9 +234,14 @@ fn demo_perception_action_loop() {
     // Simulate 10 cycles of perception and action
     println!("Running 10 perception-action cycles:");
     println!();
-    println!("{:^6} {:^10} {:^10} {:^10} {:^8} {:^12}",
-        "Cycle", "Phi", "FreeEnergy", "PredError", "Action", "Exploratory");
-    println!("{:-<6} {:-<10} {:-<10} {:-<10} {:-<8} {:-<12}", "", "", "", "", "", "");
+    println!(
+        "{:^6} {:^10} {:^10} {:^10} {:^8} {:^12}",
+        "Cycle", "Phi", "FreeEnergy", "PredError", "Action", "Exploratory"
+    );
+    println!(
+        "{:-<6} {:-<10} {:-<10} {:-<10} {:-<8} {:-<12}",
+        "", "", "", "", "", ""
+    );
 
     for cycle in 0..10 {
         // Generate observation (simulating consciousness state)
@@ -223,7 +250,8 @@ fn demo_perception_action_loop() {
         let coherence = 0.5 + 0.3 * (cycle as f64 * 0.4).sin().abs();
         let attention = 0.6 + 0.2 * (cycle as f64 * 0.2).cos().abs();
 
-        let observation = Observation::from_consciousness_state(phi, integration, coherence, attention);
+        let observation =
+            Observation::from_consciousness_state(phi, integration, coherence, attention);
 
         // Perception step
         let perception = agent.perceive(&observation);
@@ -231,7 +259,8 @@ fn demo_perception_action_loop() {
         // Action selection step
         let action = agent.select_action();
 
-        println!("{:^6} {:^10.3} {:^10.4} {:^10.4} {:^8} {:^12}",
+        println!(
+            "{:^6} {:^10.3} {:^10.4} {:^10.4} {:^8} {:^12}",
             cycle,
             phi,
             perception.free_energy.total,
@@ -271,9 +300,14 @@ fn demo_cognitive_loop_integration() {
 
     println!("Processing different consciousness states:");
     println!();
-    println!("{:^12} {:^12} {:^12} {:^14} {:^10} {:^10}",
-        "State", "FreeEnergy", "PrecWtdErr", "LearningMod", "ShouldLrn", "Surprised");
-    println!("{:-<12} {:-<12} {:-<12} {:-<14} {:-<10} {:-<10}", "", "", "", "", "", "");
+    println!(
+        "{:^12} {:^12} {:^12} {:^14} {:^10} {:^10}",
+        "State", "FreeEnergy", "PrecWtdErr", "LearningMod", "ShouldLrn", "Surprised"
+    );
+    println!(
+        "{:-<12} {:-<12} {:-<12} {:-<14} {:-<10} {:-<10}",
+        "", "", "", "", "", ""
+    );
 
     let states = [
         (0.3, 0.3, 0.3, 0.3, "Low"),
@@ -284,7 +318,8 @@ fn demo_cognitive_loop_integration() {
 
     for (phi, int, coh, att, label) in states {
         let result = bridge.process(phi, int, coh, att);
-        println!("{:^12} {:^12.4} {:^12.4} {:^14.3} {:^10} {:^10}",
+        println!(
+            "{:^12} {:^12.4} {:^12.4} {:^14.3} {:^10} {:^10}",
             label,
             result.free_energy,
             result.precision_weighted_error,
@@ -314,14 +349,20 @@ fn demo_goal_directed_behavior() {
     // Start from low phi
     let result1 = bridge.process(0.3, 0.5, 0.5, 0.5);
     println!("  Current state: phi=0.3 (far from goal)");
-    println!("  Pragmatic value: {:.4} (high motivation to act)", result1.pragmatic_value);
+    println!(
+        "  Pragmatic value: {:.4} (high motivation to act)",
+        result1.pragmatic_value
+    );
     println!("  Recommended action: {}", result1.recommended_action);
     println!();
 
     // Start from high phi
     let result2 = bridge.process(0.85, 0.5, 0.5, 0.5);
     println!("  Current state: phi=0.85 (close to goal)");
-    println!("  Pragmatic value: {:.4} (low motivation - near goal)", result2.pragmatic_value);
+    println!(
+        "  Pragmatic value: {:.4} (low motivation - near goal)",
+        result2.pragmatic_value
+    );
     println!("  Recommended action: {}", result2.recommended_action);
     println!();
 
@@ -372,9 +413,12 @@ fn demo_exploration_exploitation() {
         }
     }
 
-    println!("  Exploration rate: {}/{} = {:.1}%",
-        exploration_count, total_cycles,
-        100.0 * exploration_count as f64 / total_cycles as f64);
+    println!(
+        "  Exploration rate: {}/{} = {:.1}%",
+        exploration_count,
+        total_cycles,
+        100.0 * exploration_count as f64 / total_cycles as f64
+    );
     println!();
 
     // Reset and use low epistemic weight
@@ -394,9 +438,12 @@ fn demo_exploration_exploitation() {
         }
     }
 
-    println!("  Exploration rate: {}/{} = {:.1}%",
-        exploration_count, total_cycles,
-        100.0 * exploration_count as f64 / total_cycles as f64);
+    println!(
+        "  Exploration rate: {}/{} = {:.1}%",
+        exploration_count,
+        total_cycles,
+        100.0 * exploration_count as f64 / total_cycles as f64
+    );
     println!();
 
     println!("The epistemic/pragmatic balance enables adaptive behavior:");

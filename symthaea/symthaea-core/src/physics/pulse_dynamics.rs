@@ -24,10 +24,10 @@
 //! - **Slower pulses**: More healing time, lower average power
 //! - **Duty cycle**: On-time / period, affects both power and healing
 
+use super::radiation_damage::FusionReaction;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::radiation_damage::FusionReaction;
 
 /// Operating mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -130,7 +130,7 @@ pub struct DamageModel {
 impl DamageModel {
     /// Create damage model for given material and conditions
     pub fn new(
-        neutron_flux: f64,        // n/cm²/s
+        neutron_flux: f64,          // n/cm²/s
         material_healing_rate: f64, // DPA/s healed at rest
         critical_dpa: f64,
     ) -> Self {
@@ -194,8 +194,8 @@ impl DamageModel {
             self.critical_dpa / self.damage_rate
         } else {
             // Time to reach critical with pulsed operation
-            let net_rate = self.damage_rate * pulse.duty_cycle
-                - self.healing_rate * (1.0 - pulse.duty_cycle);
+            let net_rate =
+                self.damage_rate * pulse.duty_cycle - self.healing_rate * (1.0 - pulse.duty_cycle);
             if net_rate <= 0.0 {
                 f64::INFINITY
             } else {
@@ -232,9 +232,9 @@ impl ThermalCycling {
     /// Analyze thermal cycling for given pulse profile
     pub fn analyze(
         pulse: &PulseProfile,
-        t_hot: f64,       // Max temperature (K)
-        t_cold: f64,      // Min temperature (K)
-        thermal_tau: f64, // Thermal time constant (s)
+        t_hot: f64,         // Max temperature (K)
+        t_cold: f64,        // Min temperature (K)
+        thermal_tau: f64,   // Thermal time constant (s)
         fatigue_coeff: f64, // Material fatigue coefficient
     ) -> Self {
         let delta_t = t_hot - t_cold;
@@ -313,9 +313,9 @@ impl PulseDynamics {
         &self,
         target_power_kw: f64,
         reaction: FusionReaction,
-        healing_rate: f64,    // DPA/s healing
+        healing_rate: f64, // DPA/s healing
         critical_dpa: f64,
-        thermal_tau: f64,     // Thermal time constant (s)
+        thermal_tau: f64, // Thermal time constant (s)
     ) -> PulseOptimization {
         // Estimate neutron flux from power
         let energy_per_fusion = reaction.total_energy_mev() * super::constants::MEV_TO_J;
@@ -328,13 +328,13 @@ impl PulseDynamics {
         // Try different pulse configurations
         let configs = [
             // (pulse_s, period_s)
-            (0.001, 0.01),    // 10% duty, fast
-            (0.01, 0.1),      // 10% duty, medium
-            (0.1, 1.0),       // 10% duty, slow
-            (0.1, 0.5),       // 20% duty
-            (0.1, 0.2),       // 50% duty
-            (1.0, 2.0),       // 50% duty, slow
-            (1.0, 10.0),      // 10% duty, very slow
+            (0.001, 0.01), // 10% duty, fast
+            (0.01, 0.1),   // 10% duty, medium
+            (0.1, 1.0),    // 10% duty, slow
+            (0.1, 0.5),    // 20% duty
+            (0.1, 0.2),    // 50% duty
+            (1.0, 2.0),    // 50% duty, slow
+            (1.0, 10.0),   // 10% duty, very slow
         ];
 
         for (pulse_s, period_s) in configs {
@@ -359,10 +359,10 @@ impl PulseDynamics {
             // Analyze thermal cycling
             let thermal = ThermalCycling::analyze(
                 &profile,
-                600.0,  // T_hot estimate
-                350.0,  // T_cold estimate
+                600.0, // T_hot estimate
+                350.0, // T_cold estimate
                 thermal_tau,
-                1e8,    // Fatigue coefficient
+                1e8, // Fatigue coefficient
             );
 
             // Score this configuration
@@ -382,7 +382,8 @@ impl PulseDynamics {
 
                 let mut recommendations = Vec::new();
                 if sustainable {
-                    recommendations.push("Sustainable operation - indefinite lifetime possible".to_string());
+                    recommendations
+                        .push("Sustainable operation - indefinite lifetime possible".to_string());
                 } else {
                     recommendations.push(format!(
                         "Finite lifetime: {:.1} years - schedule maintenance",
@@ -390,10 +391,13 @@ impl PulseDynamics {
                     ));
                 }
                 if thermal.fatigue_safety < 5.0 {
-                    recommendations.push("Warning: Low fatigue margin - consider slower cycling".to_string());
+                    recommendations
+                        .push("Warning: Low fatigue margin - consider slower cycling".to_string());
                 }
                 if duty < 0.2 {
-                    recommendations.push("Low duty cycle - consider higher healing rate materials".to_string());
+                    recommendations.push(
+                        "Low duty cycle - consider higher healing rate materials".to_string(),
+                    );
                 }
 
                 best_result = Some(PulseOptimization {
@@ -428,12 +432,7 @@ impl PulseDynamics {
     }
 
     /// Calculate minimum rest time for sustainable operation
-    pub fn min_rest_time(
-        &self,
-        pulse_duration_s: f64,
-        damage_rate: f64,
-        healing_rate: f64,
-    ) -> f64 {
+    pub fn min_rest_time(&self, pulse_duration_s: f64, damage_rate: f64, healing_rate: f64) -> f64 {
         // For sustainability: damage * pulse_time <= healing * rest_time
         // rest_time >= damage * pulse_time / healing
         damage_rate * pulse_duration_s / healing_rate
@@ -498,11 +497,11 @@ mod tests {
         let dynamics = setup();
 
         let result = dynamics.optimize(
-            5.0,              // 5 kW target
+            5.0, // 5 kW target
             FusionReaction::DD,
-            1e-7,             // Healing rate
-            100.0,            // Critical DPA
-            0.5,              // Thermal time constant
+            1e-7,  // Healing rate
+            100.0, // Critical DPA
+            0.5,   // Thermal time constant
         );
 
         assert!(result.score > 0.0);

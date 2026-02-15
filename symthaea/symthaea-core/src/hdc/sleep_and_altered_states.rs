@@ -81,32 +81,32 @@ impl SleepStage {
     pub fn consciousness_level(&self) -> f64 {
         match self {
             SleepStage::Wake => 1.0,
-            SleepStage::N1 => 0.7,   // Drowsy, drifting thoughts
-            SleepStage::N2 => 0.3,   // Light unconscious
-            SleepStage::N3 => 0.1,   // Deep unconscious
-            SleepStage::REM => 0.6,  // Dreaming (altered consciousness)
+            SleepStage::N1 => 0.7,  // Drowsy, drifting thoughts
+            SleepStage::N2 => 0.3,  // Light unconscious
+            SleepStage::N3 => 0.1,  // Deep unconscious
+            SleepStage::REM => 0.6, // Dreaming (altered consciousness)
         }
     }
 
     /// Get typical duration in minutes (for 8-hour sleep)
     pub fn typical_duration_minutes(&self) -> f64 {
         match self {
-            SleepStage::Wake => 0.0,    // Awakenings brief
-            SleepStage::N1 => 25.0,     // ~5% of 480 min
-            SleepStage::N2 => 216.0,    // ~45%
-            SleepStage::N3 => 120.0,    // ~25%
-            SleepStage::REM => 120.0,   // ~25%
+            SleepStage::Wake => 0.0,  // Awakenings brief
+            SleepStage::N1 => 25.0,   // ~5% of 480 min
+            SleepStage::N2 => 216.0,  // ~45%
+            SleepStage::N3 => 120.0,  // ~25%
+            SleepStage::REM => 120.0, // ~25%
         }
     }
 
     /// Dominant EEG frequency band (Hz)
     pub fn dominant_frequency(&self) -> f64 {
         match self {
-            SleepStage::Wake => 10.0,   // Alpha waves (8-13 Hz)
-            SleepStage::N1 => 5.5,      // Theta waves (4-7 Hz)
-            SleepStage::N2 => 6.0,      // Theta + spindles
-            SleepStage::N3 => 1.0,      // Delta waves (0.5-2 Hz)
-            SleepStage::REM => 20.0,    // Beta-like (desynchronized)
+            SleepStage::Wake => 10.0, // Alpha waves (8-13 Hz)
+            SleepStage::N1 => 5.5,    // Theta waves (4-7 Hz)
+            SleepStage::N2 => 6.0,    // Theta + spindles
+            SleepStage::N3 => 1.0,    // Delta waves (0.5-2 Hz)
+            SleepStage::REM => 20.0,  // Beta-like (desynchronized)
         }
     }
 }
@@ -153,11 +153,11 @@ impl ComponentModulation {
     /// N1 (drowsiness): Attention wavers, workspace dims
     pub fn n1() -> Self {
         Self {
-            attention_gain: 0.5,        // Attention lapses
-            binding_strength: 0.8,      // Still coherent
-            workspace_capacity: 0.6,    // Reduced capacity
-            hot_probability: 0.4,       // Occasional awareness
-            prediction_precision: 0.7,  // Predictions weaken
+            attention_gain: 0.5,       // Attention lapses
+            binding_strength: 0.8,     // Still coherent
+            workspace_capacity: 0.6,   // Reduced capacity
+            hot_probability: 0.4,      // Occasional awareness
+            prediction_precision: 0.7, // Predictions weaken
             phi_level: 0.7,
         }
     }
@@ -165,10 +165,10 @@ impl ComponentModulation {
     /// N2 (light sleep): Attention gone, workspace minimal
     pub fn n2() -> Self {
         Self {
-            attention_gain: 0.2,        // Mostly absent
-            binding_strength: 0.5,      // Weak binding
-            workspace_capacity: 0.2,    // Nearly collapsed
-            hot_probability: 0.1,       // Rare awareness
+            attention_gain: 0.2,     // Mostly absent
+            binding_strength: 0.5,   // Weak binding
+            workspace_capacity: 0.2, // Nearly collapsed
+            hot_probability: 0.1,    // Rare awareness
             prediction_precision: 0.4,
             phi_level: 0.3,
         }
@@ -177,12 +177,12 @@ impl ComponentModulation {
     /// N3 (deep sleep): All components severely suppressed
     pub fn n3() -> Self {
         Self {
-            attention_gain: 0.0,        // Completely absent
-            binding_strength: 0.2,      // Minimal binding
-            workspace_capacity: 0.0,    // Collapsed
-            hot_probability: 0.0,       // No awareness
+            attention_gain: 0.0,     // Completely absent
+            binding_strength: 0.2,   // Minimal binding
+            workspace_capacity: 0.0, // Collapsed
+            hot_probability: 0.0,    // No awareness
             prediction_precision: 0.2,
-            phi_level: 0.1,             // Minimal integration
+            phi_level: 0.1, // Minimal integration
         }
     }
 
@@ -193,23 +193,23 @@ impl ComponentModulation {
     /// - HOT absent (non-lucid) or present (lucid)
     pub fn rem_nonlucid() -> Self {
         Self {
-            attention_gain: 0.3,        // Weak, bottom-up driven
-            binding_strength: 0.4,      // Bizarre binding (flying cats!)
-            workspace_capacity: 0.7,    // Active workspace (vivid dreams)
-            hot_probability: 0.1,       // Usually no meta-awareness
-            prediction_precision: 0.3,  // Poor prediction (bizarre accepted)
-            phi_level: 0.6,             // Moderate integration
+            attention_gain: 0.3,       // Weak, bottom-up driven
+            binding_strength: 0.4,     // Bizarre binding (flying cats!)
+            workspace_capacity: 0.7,   // Active workspace (vivid dreams)
+            hot_probability: 0.1,      // Usually no meta-awareness
+            prediction_precision: 0.3, // Poor prediction (bizarre accepted)
+            phi_level: 0.6,            // Moderate integration
         }
     }
 
     /// REM lucid: Like REM but with restored frontal activity
     pub fn rem_lucid() -> Self {
         Self {
-            attention_gain: 0.6,        // Restored attention!
-            binding_strength: 0.4,      // Still bizarre (can't fully control)
-            workspace_capacity: 0.8,    // Full workspace
-            hot_probability: 0.9,       // "I'm dreaming!" meta-awareness
-            prediction_precision: 0.5,  // Better but not normal
+            attention_gain: 0.6,       // Restored attention!
+            binding_strength: 0.4,     // Still bizarre (can't fully control)
+            workspace_capacity: 0.8,   // Full workspace
+            hot_probability: 0.9,      // "I'm dreaming!" meta-awareness
+            prediction_precision: 0.5, // Better but not normal
             phi_level: 0.7,
         }
     }
@@ -218,11 +218,11 @@ impl ComponentModulation {
     pub fn anesthesia_propofol() -> Self {
         Self {
             attention_gain: 0.0,
-            binding_strength: 0.0,      // Binding destroyed
+            binding_strength: 0.0, // Binding destroyed
             workspace_capacity: 0.0,
             hot_probability: 0.0,
             prediction_precision: 0.1,
-            phi_level: 0.05,            // Very low Φ
+            phi_level: 0.05, // Very low Φ
         }
     }
 
@@ -230,11 +230,11 @@ impl ComponentModulation {
     pub fn anesthesia_ketamine() -> Self {
         Self {
             attention_gain: 0.3,
-            binding_strength: 0.5,      // Binding intact
-            workspace_capacity: 0.0,    // Workspace destroyed
+            binding_strength: 0.5,   // Binding intact
+            workspace_capacity: 0.0, // Workspace destroyed
             hot_probability: 0.0,
             prediction_precision: 0.2,
-            phi_level: 0.3,             // Moderate Φ (explains dissociation)
+            phi_level: 0.3, // Moderate Φ (explains dissociation)
         }
     }
 
@@ -242,8 +242,8 @@ impl ComponentModulation {
     pub fn vegetative_state() -> Self {
         Self {
             attention_gain: 0.0,
-            binding_strength: 0.3,      // Some binding
-            workspace_capacity: 0.0,    // No global workspace
+            binding_strength: 0.3,   // Some binding
+            workspace_capacity: 0.0, // No global workspace
             hot_probability: 0.0,
             prediction_precision: 0.2,
             phi_level: 0.2,
@@ -255,8 +255,8 @@ impl ComponentModulation {
         Self {
             attention_gain: 0.2,
             binding_strength: 0.4,
-            workspace_capacity: 0.3,    // Fluctuating workspace
-            hot_probability: 0.2,       // Occasional awareness
+            workspace_capacity: 0.3, // Fluctuating workspace
+            hot_probability: 0.2,    // Occasional awareness
             prediction_precision: 0.3,
             phi_level: 0.4,
         }
@@ -282,7 +282,7 @@ impl ComponentModulation {
         // Strong meta-awareness (HOT > 0.7) compensates for weak binding
         // This explains lucid dreaming: conscious despite bizarre binding
         let hot_boost = if self.hot_probability > 0.7 {
-            self.hot_probability * 0.3  // Up to +0.3 probability
+            self.hot_probability * 0.3 // Up to +0.3 probability
         } else {
             0.0
         };
@@ -423,7 +423,6 @@ pub enum AlteredState {
     /// Pathological
     VegetativeState,
     MinimallyConscious,
-
     // Could add later:
     // Meditation (various jhanas)
     // Psychedelics (LSD, psilocybin)
@@ -571,10 +570,16 @@ impl SleepAndAlteredStates {
 
         match self.current_state {
             AlteredState::Wake => {
-                format!("Full waking consciousness (p={:.2}). All systems active.", prob)
+                format!(
+                    "Full waking consciousness (p={:.2}). All systems active.",
+                    prob
+                )
             }
             AlteredState::SleepN1 => {
-                format!("Drowsiness (p={:.2}). Attention lapses, workspace dims, drifting thoughts.", prob)
+                format!(
+                    "Drowsiness (p={:.2}). Attention lapses, workspace dims, drifting thoughts.",
+                    prob
+                )
             }
             AlteredState::SleepN2 | AlteredState::SleepN3 => {
                 format!("Unconscious sleep (p={:.2}). Workspace collapsed, no attention, minimal binding.", prob)
@@ -583,10 +588,16 @@ impl SleepAndAlteredStates {
                 format!("Non-lucid dreaming (p={:.2}). Vivid workspace but bizarre binding, no meta-awareness.", prob)
             }
             AlteredState::DreamLucid => {
-                format!("Lucid dreaming (p={:.2}). Restored attention and HOT: 'I know I'm dreaming!'", prob)
+                format!(
+                    "Lucid dreaming (p={:.2}). Restored attention and HOT: 'I know I'm dreaming!'",
+                    prob
+                )
             }
             AlteredState::AnesthesiaPropofol => {
-                format!("Propofol anesthesia (p={:.2}). Binding destroyed, workspace collapsed.", prob)
+                format!(
+                    "Propofol anesthesia (p={:.2}). Binding destroyed, workspace collapsed.",
+                    prob
+                )
             }
             AlteredState::AnesthesiaKetamine => {
                 format!("Ketamine anesthesia (p={:.2}). Dissociative: binding intact but workspace destroyed.", prob)
@@ -800,7 +811,7 @@ impl DreamGenerator {
         Self {
             concept_seeds,
             emotional_bias: 0.0,
-            binding_strength: 0.4,  // Default REM binding strength
+            binding_strength: 0.4, // Default REM binding strength
             seed,
         }
     }
@@ -868,7 +879,13 @@ impl DreamGenerator {
     }
 
     /// Generate a description for the fragment
-    fn generate_description(&self, concept1: &str, concept2: &str, bizarreness: f64, seed: u64) -> String {
+    fn generate_description(
+        &self,
+        concept1: &str,
+        concept2: &str,
+        bizarreness: f64,
+        seed: u64,
+    ) -> String {
         let templates_normal = [
             "A {c1} near a {c2}",
             "Sensing {c1} while experiencing {c2}",
@@ -884,7 +901,11 @@ impl DreamGenerator {
             "The color of {c1} tastes like {c2}",
         ];
 
-        let templates = if bizarreness > 0.5 { &templates_bizarre[..] } else { &templates_normal[..] };
+        let templates = if bizarreness > 0.5 {
+            &templates_bizarre[..]
+        } else {
+            &templates_normal[..]
+        };
         let template = templates[(seed as usize) % templates.len()];
 
         template.replace("{c1}", concept1).replace("{c2}", concept2)
@@ -943,7 +964,9 @@ impl DreamGenerator {
         let mut nightmare = self.generate_dream(duration_minutes, false);
 
         // Add nightmare-specific themes
-        nightmare.themes.insert(0, "A sense of pursuit or threat".to_string());
+        nightmare
+            .themes
+            .insert(0, "A sense of pursuit or threat".to_string());
 
         // Reset for normal dreams
         self.set_emotional_bias(0.0);
@@ -1004,7 +1027,11 @@ impl SleepAndAlteredStates {
     }
 
     /// Generate nightmare if in negative emotional state during REM
-    pub fn generate_nightmare_if_stressed(&self, stress_level: f64, seed: u64) -> Option<DreamScenario> {
+    pub fn generate_nightmare_if_stressed(
+        &self,
+        stress_level: f64,
+        seed: u64,
+    ) -> Option<DreamScenario> {
         if stress_level > 0.6 && matches!(self.current_state, AlteredState::DreamNonLucid) {
             let mut generator = DreamGenerator::new(seed);
             Some(generator.generate_nightmare(self.time_in_state.min(30.0)))
@@ -1060,7 +1087,9 @@ mod tests {
         assert_eq!(cycle.stages.len(), 4);
 
         // First cycle has lots of N3
-        let n3_duration = cycle.stages.iter()
+        let n3_duration = cycle
+            .stages
+            .iter()
             .find(|(stage, _)| *stage == SleepStage::N3)
             .map(|(_, duration)| *duration)
             .unwrap();

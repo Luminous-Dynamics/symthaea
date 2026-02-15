@@ -18,9 +18,12 @@
 //! This ensures Sophia remains conscious and responsive even when
 //! some perceptual capabilities are degraded.
 
-use std::sync::{Arc, RwLock, atomic::{AtomicBool, AtomicU64, Ordering}};
-use std::time::{Duration, Instant};
 use std::collections::HashMap;
+use std::sync::{
+    atomic::{AtomicBool, AtomicU64, Ordering},
+    Arc, RwLock,
+};
+use std::time::{Duration, Instant};
 
 // ============================================================================
 // AVAILABILITY TRACKING
@@ -92,7 +95,7 @@ impl Default for PerceptionCapabilities {
             image_embedding: Availability::Stub,
             image_captioning: Availability::Stub,
             ocr: Availability::Stub,
-            code_analysis: Availability::Full,  // Always available
+            code_analysis: Availability::Full,   // Always available
             visual_features: Availability::Full, // Always available
             multi_modal: Availability::Full,     // Always available
             last_update: Instant::now(),
@@ -162,13 +165,16 @@ impl PerceptionCapabilities {
             self.multi_modal,
         ];
 
-        let score: f32 = caps.iter().map(|c| match c {
-            Availability::Full => 1.0,
-            Availability::Degraded => 0.7,
-            Availability::Stub => 0.5,
-            Availability::Loading => 0.3,
-            Availability::Unavailable => 0.0,
-        }).sum();
+        let score: f32 = caps
+            .iter()
+            .map(|c| match c {
+                Availability::Full => 1.0,
+                Availability::Degraded => 0.7,
+                Availability::Stub => 0.5,
+                Availability::Loading => 0.3,
+                Availability::Unavailable => 0.0,
+            })
+            .sum();
 
         score / caps.len() as f32
     }
@@ -183,7 +189,10 @@ impl PerceptionCapabilities {
             self.code_analysis,
             self.visual_features,
             self.multi_modal,
-        ].iter().filter(|c| c.is_full()).count()
+        ]
+        .iter()
+        .filter(|c| c.is_full())
+        .count()
     }
 
     /// Get human-readable summary
@@ -462,24 +471,31 @@ impl Default for CaptionTemplates {
     fn default() -> Self {
         Self {
             brightness: vec![
-                "very dark", "dark", "dimly lit", "moderately lit",
-                "well lit", "bright", "very bright"
+                "very dark",
+                "dark",
+                "dimly lit",
+                "moderately lit",
+                "well lit",
+                "bright",
+                "very bright",
             ],
             color_dominant: vec![
-                "predominantly red", "predominantly orange", "predominantly yellow",
-                "predominantly green", "predominantly cyan", "predominantly blue",
-                "predominantly purple", "predominantly pink", "predominantly white",
-                "predominantly black", "predominantly gray", "colorful"
+                "predominantly red",
+                "predominantly orange",
+                "predominantly yellow",
+                "predominantly green",
+                "predominantly cyan",
+                "predominantly blue",
+                "predominantly purple",
+                "predominantly pink",
+                "predominantly white",
+                "predominantly black",
+                "predominantly gray",
+                "colorful",
             ],
-            contrast: vec![
-                "low contrast", "moderate contrast", "high contrast"
-            ],
-            edges: vec![
-                "soft/blurry", "moderate detail", "sharp/detailed"
-            ],
-            composition: vec![
-                "simple composition", "moderate complexity", "complex/busy"
-            ],
+            contrast: vec!["low contrast", "moderate contrast", "high contrast"],
+            edges: vec!["soft/blurry", "moderate detail", "sharp/detailed"],
+            composition: vec!["simple composition", "moderate complexity", "complex/busy"],
         }
     }
 }
@@ -495,18 +511,20 @@ impl CaptionFallback {
     /// This is used when Moondream or other VLMs are unavailable.
     pub fn generate_caption(
         &self,
-        brightness: f32,      // 0.0-1.0
-        dominant_hue: f32,    // 0.0-360.0
-        saturation: f32,      // 0.0-1.0
-        contrast: f32,        // 0.0-1.0
-        edge_density: f32,    // 0.0-1.0
-        aspect_ratio: f32,    // width/height
+        brightness: f32,   // 0.0-1.0
+        dominant_hue: f32, // 0.0-360.0
+        saturation: f32,   // 0.0-1.0
+        contrast: f32,     // 0.0-1.0
+        edge_density: f32, // 0.0-1.0
+        aspect_ratio: f32, // width/height
     ) -> String {
         let mut parts = Vec::new();
 
         // Brightness description
         let brightness_idx = (brightness * 6.0).round() as usize;
-        let brightness_desc = self.templates.brightness
+        let brightness_desc = self
+            .templates
+            .brightness
             .get(brightness_idx.min(6))
             .unwrap_or(&"moderately lit");
         parts.push(format!("A {} image", brightness_desc));
@@ -570,7 +588,12 @@ impl CaptionFallback {
         aspect_ratio: f32,
     ) -> (String, f32) {
         let caption = self.generate_caption(
-            brightness, dominant_hue, saturation, contrast, edge_density, aspect_ratio
+            brightness,
+            dominant_hue,
+            saturation,
+            contrast,
+            edge_density,
+            aspect_ratio,
         );
 
         // Confidence based on how distinctive the features are
@@ -578,7 +601,8 @@ impl CaptionFallback {
             (brightness - 0.5).abs() * 2.0 +  // Extreme brightness is more certain
             saturation +                       // Saturated colors are clearer
             contrast +                         // High contrast is easier to describe
-            edge_density                       // More edges = more detail to describe
+            edge_density
+            // More edges = more detail to describe
         ) / 4.0;
 
         let confidence = 0.3 + (feature_distinctiveness * 0.4); // Range: 0.3-0.7
@@ -680,14 +704,14 @@ impl BackgroundLoader {
 
     /// Start tracking a model load
     pub fn start_loading(&self, model: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write().unwrap_or_else(|e| e.into_inner());
         statuses.insert(model.to_string(), LoadingStatus::new(model));
         self.active.store(true, Ordering::SeqCst);
     }
 
     /// Update loading progress
     pub fn update_progress(&self, model: &str, progress: f32, message: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write().unwrap_or_else(|e| e.into_inner());
         if let Some(status) = statuses.get_mut(model) {
             status.update(progress, message);
         }
@@ -695,7 +719,7 @@ impl BackgroundLoader {
 
     /// Mark model as loaded
     pub fn complete_loading(&self, model: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write().unwrap_or_else(|e| e.into_inner());
         if let Some(status) = statuses.get_mut(model) {
             status.complete();
             self.loaded_count.fetch_add(1, Ordering::SeqCst);
@@ -704,7 +728,7 @@ impl BackgroundLoader {
 
     /// Mark model as failed
     pub fn fail_loading(&self, model: &str, error: &str) {
-        let mut statuses = self.statuses.write().unwrap();
+        let mut statuses = self.statuses.write().unwrap_or_else(|e| e.into_inner());
         if let Some(status) = statuses.get_mut(model) {
             status.fail(error);
         }
@@ -712,19 +736,19 @@ impl BackgroundLoader {
 
     /// Get current loading status for a model
     pub fn get_status(&self, model: &str) -> Option<LoadingStatus> {
-        let statuses = self.statuses.read().unwrap();
+        let statuses = self.statuses.read().unwrap_or_else(|e| e.into_inner());
         statuses.get(model).cloned()
     }
 
     /// Get all loading statuses
     pub fn all_statuses(&self) -> Vec<LoadingStatus> {
-        let statuses = self.statuses.read().unwrap();
+        let statuses = self.statuses.read().unwrap_or_else(|e| e.into_inner());
         statuses.values().cloned().collect()
     }
 
     /// Check if any models are still loading
     pub fn is_loading(&self) -> bool {
-        let statuses = self.statuses.read().unwrap();
+        let statuses = self.statuses.read().unwrap_or_else(|e| e.into_inner());
         statuses.values().any(|s| !s.complete)
     }
 
@@ -735,20 +759,19 @@ impl BackgroundLoader {
 
     /// Get loading summary
     pub fn summary(&self) -> String {
-        let statuses = self.statuses.read().unwrap();
-        let loading: Vec<_> = statuses.values()
-            .filter(|s| !s.complete)
-            .collect();
-        let complete: Vec<_> = statuses.values()
+        let statuses = self.statuses.read().unwrap_or_else(|e| e.into_inner());
+        let loading: Vec<_> = statuses.values().filter(|s| !s.complete).collect();
+        let complete: Vec<_> = statuses
+            .values()
             .filter(|s| s.complete && s.error.is_none())
             .collect();
-        let failed: Vec<_> = statuses.values()
-            .filter(|s| s.error.is_some())
-            .collect();
+        let failed: Vec<_> = statuses.values().filter(|s| s.error.is_some()).collect();
 
         format!(
             "Models: {} loading, {} complete, {} failed",
-            loading.len(), complete.len(), failed.len()
+            loading.len(),
+            complete.len(),
+            failed.len()
         )
     }
 }
@@ -795,7 +818,7 @@ impl ResilienceManager {
 
     /// Update a capability's availability
     pub fn set_capability(&self, capability: &str, availability: Availability) {
-        let mut caps = self.capabilities.write().unwrap();
+        let mut caps = self.capabilities.write().unwrap_or_else(|e| e.into_inner());
         match capability {
             "text_embedding" => caps.text_embedding = availability,
             "image_embedding" => caps.image_embedding = availability,
@@ -811,12 +834,15 @@ impl ResilienceManager {
 
     /// Get current capabilities snapshot
     pub fn capabilities(&self) -> PerceptionCapabilities {
-        self.capabilities.read().unwrap().clone()
+        self.capabilities
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone()
     }
 
     /// Check if a specific capability is usable
     pub fn is_usable(&self, capability: &str) -> bool {
-        let caps = self.capabilities.read().unwrap();
+        let caps = self.capabilities.read().unwrap_or_else(|e| e.into_inner());
         match capability {
             "text_embedding" => caps.text_embedding.is_usable(),
             "image_embedding" => caps.image_embedding.is_usable(),
@@ -831,10 +857,13 @@ impl ResilienceManager {
 
     /// Check coherence and record result
     pub fn check_coherence(&self, coherence: f32) -> bool {
-        let mut gate = self.coherence_gate.write().unwrap();
+        let mut gate = self
+            .coherence_gate
+            .write()
+            .unwrap_or_else(|e| e.into_inner());
         let passed = gate.check(coherence);
         if !passed {
-            let mut stats = self.stats.write().unwrap();
+            let mut stats = self.stats.write().unwrap_or_else(|e| e.into_inner());
             stats.record_coherence_rejection();
         }
         passed
@@ -842,13 +871,13 @@ impl ResilienceManager {
 
     /// Record a successful inference
     pub fn record_success(&self, duration: Duration) {
-        let mut stats = self.stats.write().unwrap();
+        let mut stats = self.stats.write().unwrap_or_else(|e| e.into_inner());
         stats.record_success(duration);
     }
 
     /// Record a fallback
     pub fn record_fallback(&self, reason: &str) {
-        let mut stats = self.stats.write().unwrap();
+        let mut stats = self.stats.write().unwrap_or_else(|e| e.into_inner());
         stats.record_fallback(reason);
     }
 
@@ -863,13 +892,18 @@ impl ResilienceManager {
         aspect_ratio: f32,
     ) -> (String, f32) {
         self.caption_fallback.generate_with_confidence(
-            brightness, dominant_hue, saturation, contrast, edge_density, aspect_ratio
+            brightness,
+            dominant_hue,
+            saturation,
+            contrast,
+            edge_density,
+            aspect_ratio,
         )
     }
 
     /// Get current stats
     pub fn stats(&self) -> ResilienceStats {
-        self.stats.read().unwrap().clone()
+        self.stats.read().unwrap_or_else(|e| e.into_inner()).clone()
     }
 
     /// Get full status report
@@ -921,11 +955,17 @@ mod tests {
         // Default starts with stubs (0.5 each) and 3 full (1.0 each)
         // (3 * 0.5 + 4 * 1.0) / 7 ≈ 0.78
         let health = default.health();
-        assert!(health > 0.5 && health < 1.0,
-                "Default health should be between 0.5 and 1.0, got {}", health);
+        assert!(
+            health > 0.5 && health < 1.0,
+            "Default health should be between 0.5 and 1.0, got {}",
+            health
+        );
 
         let full = PerceptionCapabilities::full();
-        assert!((full.health() - 1.0).abs() < 0.01, "Full capabilities should have 1.0 health");
+        assert!(
+            (full.health() - 1.0).abs() < 0.01,
+            "Full capabilities should have 1.0 health"
+        );
     }
 
     #[test]
@@ -946,12 +986,12 @@ mod tests {
 
         // Test bright, saturated red image
         let caption = fallback.generate_caption(
-            0.8,   // bright
-            0.0,   // red hue
-            0.7,   // saturated
-            0.6,   // moderate contrast
-            0.3,   // moderate edges
-            1.0,   // square
+            0.8, // bright
+            0.0, // red hue
+            0.7, // saturated
+            0.6, // moderate contrast
+            0.3, // moderate edges
+            1.0, // square
         );
 
         assert!(caption.contains("bright"), "Should mention brightness");
@@ -968,8 +1008,10 @@ mod tests {
         );
 
         assert!(caption.contains("dark"), "Should mention darkness");
-        assert!(caption.contains("panoramic") || caption.contains("wide"),
-                "Should mention wide format");
+        assert!(
+            caption.contains("panoramic") || caption.contains("wide"),
+            "Should mention wide format"
+        );
     }
 
     #[test]

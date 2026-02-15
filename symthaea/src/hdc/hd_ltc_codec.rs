@@ -34,11 +34,11 @@
 //!
 //! This enables the LTC to "think" in HDC semantics and express through them.
 
+use crate::learnable_ltc::LearnableLTC;
+use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::HDC_DIMENSION;
-use crate::learnable_ltc::LearnableLTC;
-use serde::{Serialize, Deserialize};
-use std::collections::VecDeque;
 
 /// Default number of LTC neurons for the codec
 const DEFAULT_LTC_NEURONS: usize = 1024;
@@ -295,7 +295,9 @@ impl HDLTCCodec {
         // Update stats
         self.stats.avg_reconstruction_error =
             self.stats.avg_reconstruction_error * 0.99 + error * 0.01;
-        if error < self.stats.best_reconstruction_error || self.stats.best_reconstruction_error == 0.0 {
+        if error < self.stats.best_reconstruction_error
+            || self.stats.best_reconstruction_error == 0.0
+        {
             self.stats.best_reconstruction_error = error;
         }
 
@@ -424,7 +426,10 @@ impl HDLTCCodec {
         // Softmax
         let max_score = scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
         let exp_sum: f32 = scores.iter().map(|s| (s - max_score).exp()).sum();
-        let weights: Vec<f32> = scores.iter().map(|s| (s - max_score).exp() / exp_sum).collect();
+        let weights: Vec<f32> = scores
+            .iter()
+            .map(|s| (s - max_score).exp() / exp_sum)
+            .collect();
 
         // Weighted sum
         let mut attended = vec![0.0f32; n];
@@ -483,7 +488,10 @@ pub struct IntegratedLTCCodec {
 
 impl IntegratedLTCCodec {
     /// Create with built-in LTC
-    pub fn with_ltc(config: HDLTCCodecConfig, ltc_config: crate::learnable_ltc::LearnableLTCConfig) -> anyhow::Result<Self> {
+    pub fn with_ltc(
+        config: HDLTCCodecConfig,
+        ltc_config: crate::learnable_ltc::LearnableLTCConfig,
+    ) -> anyhow::Result<Self> {
         let ltc = LearnableLTC::new(ltc_config)?;
         Ok(Self {
             codec: HDLTCCodec::new(config),
@@ -561,8 +569,15 @@ mod tests {
 
         let (recovered, error) = codec.round_trip(&hv);
 
+        // Round-trip error should be finite
+        assert!(error.is_finite(), "Round-trip error should be finite");
+        assert!(error >= 0.0, "Round-trip error should be non-negative");
+
+        // Recovered vector should have the same dimensionality
+        let similarity = hv.similarity(&recovered);
+        assert!(similarity.is_finite(), "Similarity should be finite");
         println!("Round-trip error: {:.4}", error);
-        println!("Similarity: {:.4}", hv.similarity(&recovered));
+        println!("Similarity: {:.4}", similarity);
     }
 
     #[test]
@@ -576,7 +591,11 @@ mod tests {
         let loss1 = codec.train_step(&hv, &target);
         let loss2 = codec.train_step(&hv, &target);
 
-        // Loss should decrease
+        // Both losses should be finite and non-negative
+        assert!(loss1.is_finite(), "Loss 1 should be finite");
+        assert!(loss2.is_finite(), "Loss 2 should be finite");
+        assert!(loss1 >= 0.0, "Loss 1 should be non-negative");
+        assert!(loss2 >= 0.0, "Loss 2 should be non-negative");
         println!("Loss 1: {:.4}, Loss 2: {:.4}", loss1, loss2);
     }
 
@@ -615,7 +634,7 @@ mod semantic_preservation_tests {
             // Create B similar to A by flipping only ~20% of bits
             let flip_hv = BinaryHV::random(100);
             // Bundle A with a random HV to get something similar but not identical
-            BinaryHV::bundle(&[hv_a.clone(), flip_hv])
+            BinaryHV::bundle(&[hv_a, flip_hv])
         };
         let hv_c = BinaryHV::random(9999); // Unrelated to A
 
@@ -654,13 +673,25 @@ mod semantic_preservation_tests {
         let sim_ac_decoded = decoded_a.similarity(&decoded_c);
 
         // Round-trip will lose information, but should preserve some structure
-        println!("Original: AB={:.3}, AC={:.3}", sim_ab_original, sim_ac_original);
+        println!(
+            "Original: AB={:.3}, AC={:.3}",
+            sim_ab_original, sim_ac_original
+        );
         println!("LTC: AB={:.3}, AC={:.3}", ltc_sim_ab, ltc_sim_ac);
-        println!("Decoded: AB={:.3}, AC={:.3}", sim_ab_decoded, sim_ac_decoded);
+        println!(
+            "Decoded: AB={:.3}, AC={:.3}",
+            sim_ab_decoded, sim_ac_decoded
+        );
 
         // The codec exists and produces output - basic sanity
-        assert!(decoded_a.popcount() > 0, "Decoded A should not be all zeros");
-        assert!(decoded_b.popcount() > 0, "Decoded B should not be all zeros");
+        assert!(
+            decoded_a.popcount() > 0,
+            "Decoded A should not be all zeros"
+        );
+        assert!(
+            decoded_b.popcount() > 0,
+            "Decoded B should not be all zeros"
+        );
     }
 
     fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {

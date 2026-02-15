@@ -13,11 +13,11 @@
 //!
 //! MessagePack-encoded `PersistentState` struct.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
 use std::io::{BufWriter, Write};
 use std::path::{Path, PathBuf};
-use chrono::{DateTime, Utc};
 
 // ============================================================================
 // D2: Audit Logging

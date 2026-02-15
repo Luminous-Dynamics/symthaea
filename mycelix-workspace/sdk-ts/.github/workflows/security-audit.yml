@@ -1,0 +1,233 @@
+# Security Audit Workflow
+# Comprehensive security scanning for dependencies, licenses, and vulnerabilities
+
+name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/security-audit.yml'
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Daily vulnerability scan at 6:00 AM UTC
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  pull-requests: write
+
+jobs:
+  # ==========================================================================
+  # NPM AUDIT - Check for known vulnerabilities
+  # ==========================================================================
+  npm-audit:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        id: audit
+        continue-on-error: true
+        run: |
+          npm audit --json > audit-results.json 2>&1 || true
+
+          # Parse results
+          CRITICAL=$(jq '.metadata.vulnerabilities.critical // 0' audit-results.json)
+          HIGH=$(jq '.metadata.vulnerabilities.high // 0' audit-results.json)
+          MODERATE=$(jq '.metadata.vulnerabilities.moderate // 0' audit-results.json)
+          LOW=$(jq '.metadata.vulnerabilities.low // 0' audit-results.json)
+
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "moderate=$MODERATE" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+
+          # Fail on critical or high vulnerabilities
+          if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
+            echo "status=failed" >> $GITHUB_OUTPUT
+          else
+            echo "status=passed" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Generate audit report
+        run: |
+          echo "## 🔒 NPM Security Audit Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
+          echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🔴 Critical | ${{ steps.audit.outputs.critical }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟠 High | ${{ steps.audit.outputs.high }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟡 Moderate | ${{ steps.audit.outputs.moderate }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🟢 Low | ${{ steps.audit.outputs.low }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.audit.outputs.status }}" = "failed" ]; then
+            echo "❌ **Action Required:** Critical or high severity vulnerabilities found!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Run \`npm audit\` locally and fix vulnerabilities before merging." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No critical or high severity vulnerabilities found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload audit results
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-results
+          path: audit-results.json
+          retention-days: 30
+
+      - name: Fail on critical vulnerabilities
+        if: steps.audit.outputs.status == 'failed'
+        run: |
+          echo "::error::Critical or high severity vulnerabilities detected. See npm audit results."
+          exit 1
+
+  # ==========================================================================
+  # LICENSE COMPLIANCE - Check for problematic licenses
+  # ==========================================================================
+  license-check:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install license-checker
+        run: npm install -g license-checker
+
+      - name: Check licenses
+        id: licenses
+        run: |
+          # Generate license report
+          license-checker --json --production > licenses.json
+
+          # Check for problematic licenses
+          FORBIDDEN_LICENSES="GPL-3.0|AGPL|SSPL|BSL"
+
+          if jq -r 'to_entries[] | .value.licenses' licenses.json | grep -qE "$FORBIDDEN_LICENSES"; then
+            echo "status=warning" >> $GITHUB_OUTPUT
+            echo "## ⚠️ License Compliance Warning" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Found dependencies with potentially problematic licenses:" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r 'to_entries[] | select(.value.licenses | test("GPL-3.0|AGPL|SSPL|BSL")) | "- \(.key): \(.value.licenses)"' licenses.json >> $GITHUB_STEP_SUMMARY || true
+          else
+            echo "status=passed" >> $GITHUB_OUTPUT
+            echo "## ✅ License Compliance Check Passed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "All production dependencies have compatible licenses." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Generate license summary
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### License Distribution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          jq -r '[.[] | .licenses] | group_by(.) | map({license: .[0], count: length}) | sort_by(-.count) | .[] | "- \(.license): \(.count)"' licenses.json >> $GITHUB_STEP_SUMMARY || echo "Unable to generate summary" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: licenses.json
+          retention-days: 30
+
+  # ==========================================================================
+  # SBOM GENERATION - Software Bill of Materials
+  # ==========================================================================
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate CycloneDX SBOM
+        run: |
+          npx @cyclonedx/cyclonedx-npm --output-format json --output-file sbom.json
+          npx @cyclonedx/cyclonedx-npm --output-format xml --output-file sbom.xml
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: |
+            sbom.json
+            sbom.xml
+          retention-days: 90
+
+      - name: SBOM Summary
+        run: |
+          COMPONENT_COUNT=$(jq '.components | length' sbom.json)
+          echo "## 📦 Software Bill of Materials Generated" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Total Components:** $COMPONENT_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "- **Format:** CycloneDX 1.5" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifacts:** \`sbom.json\`, \`sbom.xml\`" >> $GITHUB_STEP_SUMMARY
+
+  # ==========================================================================
+  # DEPENDENCY REVIEW - For PRs only
+  # ==========================================================================
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0, AGPL-3.0
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, 0BSD
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## 📋 Dependency Review Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "New dependencies have been reviewed for:" >> $GITHUB_STEP_SUMMARY
+          echo "- Known vulnerabilities (severity ≥ high)" >> $GITHUB_STEP_SUMMARY
+          echo "- License compatibility" >> $GITHUB_STEP_SUMMARY

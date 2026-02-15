@@ -14,9 +14,9 @@
 //!
 //! ## Key Concepts
 //!
-//! - **Partition Function**: Z = Σ exp(-βE_i)
-//! - **Boltzmann Distribution**: P_i = exp(-βE_i)/Z
-//! - **Equipartition**: <E> = ½kT per quadratic degree
+//! - **Partition Function**: `Z = Σ exp(-βE_i)`
+//! - **Boltzmann Distribution**: `P_i = exp(-βE_i)/Z`
+//! - **Equipartition**: `<E> = ½kT` per quadratic degree
 //!
 //! ## Models
 //!
@@ -24,19 +24,19 @@
 //! - **Ising Model**: Interacting spins
 //! - **Lattice Models**: Discrete statistical systems
 
+use super::constants::K_BOLTZMANN;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::K_BOLTZMANN;
 use serde::{Deserialize, Serialize};
 
 /// Ensemble type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Ensemble {
-    Microcanonical,  // NVE
-    Canonical,       // NVT
-    GrandCanonical,  // μVT
-    Isothermal,      // NPT
+    Microcanonical, // NVE
+    Canonical,      // NVT
+    GrandCanonical, // μVT
+    Isothermal,     // NPT
 }
 
 impl Ensemble {
@@ -105,8 +105,8 @@ pub struct StatMechEncoder {
     pub fluctuation: ContinuousHV,
 
     // Free energies
-    pub helmholtz: ContinuousHV,   // F = E - TS
-    pub gibbs: ContinuousHV,       // G = H - TS = F + PV
+    pub helmholtz: ContinuousHV,       // F = E - TS
+    pub gibbs: ContinuousHV,           // G = H - TS = F + PV
     pub grand_potential: ContinuousHV, // Ω = F - μN
 
     // Ensembles
@@ -199,7 +199,7 @@ impl StatMechEncoder {
             .bind(&self.canonical)
     }
 
-    /// Boltzmann distribution: P_i = exp(-βE_i)/Z
+    /// Boltzmann distribution: `P_i = exp(-βE_i)/Z`
     pub fn boltzmann_distribution(&self) -> ContinuousHV {
         self.boltzmann
             .bind(&self.probability)
@@ -253,7 +253,8 @@ impl StatMechEncoder {
         // ln Z = N ln(V/λ³) + const, where λ = thermal wavelength
         let log_z = (n as f64) * (volume_m3.ln() + 1.5 * temp_k.ln());
 
-        let vector = self.ideal_gas
+        let vector = self
+            .ideal_gas
             .bind(&self.canonical)
             .bind(&self.partition_function)
             .scale(log_z as f32);
@@ -269,7 +270,7 @@ impl StatMechEncoder {
         }
     }
 
-    /// Equipartition theorem: <E> = ½kT per quadratic DOF
+    /// Equipartition theorem: `<E> = ½kT` per quadratic DOF
     pub fn equipartition(&self, dof: u32) -> ContinuousHV {
         let equipart = self.genesis.hv("theorem::equipartition", PHYSICS_DIM);
         equipart
@@ -302,7 +303,8 @@ impl StatMechEncoder {
             4.5 * j // Approximate for 3D
         };
 
-        let vector = self.ising
+        let vector = self
+            .ising
             .bind(&self.lattice)
             .bind(&self.order_parameter)
             .scale(j as f32);
@@ -346,9 +348,7 @@ impl StatMechEncoder {
             1000.0 // Near Tc, correlation length diverges
         };
 
-        self.correlation_length
-            .bind(&ising.vector)
-            .scale(xi as f32)
+        self.correlation_length.bind(&ising.vector).scale(xi as f32)
     }
 
     // ============================================================

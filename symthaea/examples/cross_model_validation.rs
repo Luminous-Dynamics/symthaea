@@ -11,11 +11,11 @@
 //! cargo run --example cross_model_validation --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -50,7 +50,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(30).collect();
     let functional: Vec<_> = functional.into_iter().take(30).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     let topology_config = TopologyConfig {
         min_persistence: 0.1,
@@ -95,23 +99,43 @@ fn run_experiment() -> Result<()> {
     println!("──────────────┼────────────┼────────────┼────────────┼────────┼────────");
 
     // Find best layer for each model
-    let bge_best = bge_results.iter()
-        .max_by(|a, b| (a.phen_mean - a.func_mean).partial_cmp(&(b.phen_mean - b.func_mean)).unwrap())
+    let bge_best = bge_results
+        .iter()
+        .max_by(|a, b| {
+            (a.phen_mean - a.func_mean)
+                .partial_cmp(&(b.phen_mean - b.func_mean))
+                .unwrap()
+        })
         .unwrap();
 
-    let xlm_best = xlm_results.iter()
-        .max_by(|a, b| (a.phen_mean - a.func_mean).partial_cmp(&(b.phen_mean - b.func_mean)).unwrap())
+    let xlm_best = xlm_results
+        .iter()
+        .max_by(|a, b| {
+            (a.phen_mean - a.func_mean)
+                .partial_cmp(&(b.phen_mean - b.func_mean))
+                .unwrap()
+        })
         .unwrap();
 
-    println!("BGE-M3        │ {:10} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:.4}{}",
-             bge_best.layer, bge_best.phen_mean, bge_best.func_mean,
-             bge_best.phen_mean - bge_best.func_mean,
-             bge_best.p_value, if bge_best.p_value < 0.05 { "*" } else { "" });
+    println!(
+        "BGE-M3        │ {:10} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:.4}{}",
+        bge_best.layer,
+        bge_best.phen_mean,
+        bge_best.func_mean,
+        bge_best.phen_mean - bge_best.func_mean,
+        bge_best.p_value,
+        if bge_best.p_value < 0.05 { "*" } else { "" }
+    );
 
-    println!("XLM-RoBERTa   │ {:10} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:.4}{}",
-             xlm_best.layer, xlm_best.phen_mean, xlm_best.func_mean,
-             xlm_best.phen_mean - xlm_best.func_mean,
-             xlm_best.p_value, if xlm_best.p_value < 0.05 { "*" } else { "" });
+    println!(
+        "XLM-RoBERTa   │ {:10} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:.4}{}",
+        xlm_best.layer,
+        xlm_best.phen_mean,
+        xlm_best.func_mean,
+        xlm_best.phen_mean - xlm_best.func_mean,
+        xlm_best.p_value,
+        if xlm_best.p_value < 0.05 { "*" } else { "" }
+    );
 
     // Interpretation
     println!("\n================================================================");
@@ -130,9 +154,19 @@ fn run_experiment() -> Result<()> {
     } else if bge_effect > 0.0 && xlm_effect > 0.0 {
         println!("◐ CONSISTENT DIRECTION, VARIABLE SIGNIFICANCE");
         println!("  Both show phenomenal > functional in late layers");
-        println!("  BGE-M3: {} | XLM-RoBERTa: {}",
-                 if bge_sig { "significant" } else { "not significant" },
-                 if xlm_sig { "significant" } else { "not significant" });
+        println!(
+            "  BGE-M3: {} | XLM-RoBERTa: {}",
+            if bge_sig {
+                "significant"
+            } else {
+                "not significant"
+            },
+            if xlm_sig {
+                "significant"
+            } else {
+                "not significant"
+            }
+        );
     } else if bge_effect > 0.0 && xlm_effect <= 0.0 {
         println!("○ EFFECT MAY BE MODEL-SPECIFIC");
         println!("  BGE-M3 shows phenomenal advantage");
@@ -145,10 +179,16 @@ fn run_experiment() -> Result<()> {
     // Layer depth analysis
     println!("\n----------------------------------------------------------------");
     println!("Layer Depth Analysis:");
-    println!("  BGE-M3 best layer: {} / 24 ({:.0}% depth)",
-             bge_best.layer, (bge_best.layer as f64 / 24.0) * 100.0);
-    println!("  XLM-RoBERTa best layer: {} / 12 ({:.0}% depth)",
-             xlm_best.layer, (xlm_best.layer as f64 / 12.0) * 100.0);
+    println!(
+        "  BGE-M3 best layer: {} / 24 ({:.0}% depth)",
+        bge_best.layer,
+        (bge_best.layer as f64 / 24.0) * 100.0
+    );
+    println!(
+        "  XLM-RoBERTa best layer: {} / 12 ({:.0}% depth)",
+        xlm_best.layer,
+        (xlm_best.layer as f64 / 12.0) * 100.0
+    );
 
     let bge_depth = bge_best.layer as f64 / 24.0;
     let xlm_depth = xlm_best.layer as f64 / 12.0;
@@ -195,12 +235,15 @@ fn test_model(
             println!("  Failed to load model: {}", e);
             println!("  Skipping this model...\n");
             // Return empty results
-            return Ok(layers.iter().map(|&l| LayerResult {
-                layer: l,
-                phen_mean: 0.0,
-                func_mean: 0.0,
-                p_value: 1.0,
-            }).collect());
+            return Ok(layers
+                .iter()
+                .map(|&l| LayerResult {
+                    layer: l,
+                    phen_mean: 0.0,
+                    func_mean: 0.0,
+                    p_value: 1.0,
+                })
+                .collect());
         }
     };
     println!("  Loaded in {:.2}s\n", load_start.elapsed().as_secs_f64());
@@ -213,7 +256,9 @@ fn test_model(
         // Extract phenomenal
         let mut phen_unity = Vec::new();
         for (i, concept) in phenomenal.iter().enumerate() {
-            if i % 10 == 0 { print!("  Phen {}/{}\\r", i, phenomenal.len()); }
+            if i % 10 == 0 {
+                print!("  Phen {}/{}\\r", i, phenomenal.len());
+            }
             match extractor.extract_layers(concept, &[layer]) {
                 Ok(acts) => {
                     let hv = activation_to_hv16(&acts[0].activation);
@@ -226,7 +271,9 @@ fn test_model(
         // Extract functional
         let mut func_unity = Vec::new();
         for (i, concept) in functional.iter().enumerate() {
-            if i % 10 == 0 { print!("  Func {}/{}\\r", i, functional.len()); }
+            if i % 10 == 0 {
+                print!("  Func {}/{}\\r", i, functional.len());
+            }
             match extractor.extract_layers(concept, &[layer]) {
                 Ok(acts) => {
                     let hv = activation_to_hv16(&acts[0].activation);
@@ -246,9 +293,15 @@ fn test_model(
         let func_mean = mean(&func_unity);
         let p_value = permutation_test(&phen_unity, &func_unity, 5000);
 
-        println!("  Layer {}: Phen={:.4}, Func={:.4}, Diff={:+.4}, p={:.4}{}",
-                 layer, phen_mean, func_mean, phen_mean - func_mean,
-                 p_value, if p_value < 0.05 { "*" } else { "" });
+        println!(
+            "  Layer {}: Phen={:.4}, Func={:.4}, Diff={:+.4}, p={:.4}{}",
+            layer,
+            phen_mean,
+            func_mean,
+            phen_mean - func_mean,
+            p_value,
+            if p_value < 0.05 { "*" } else { "" }
+        );
 
         results.push(LayerResult {
             layer,
@@ -313,7 +366,9 @@ fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 

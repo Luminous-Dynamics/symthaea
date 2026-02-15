@@ -85,22 +85,43 @@ fn main() -> Result<()> {
 
     // Load or create pairs
     let pairs = load_or_create_pairs("data/binding_study/concept_pairs.json")?;
-    let n_unified = pairs.iter().filter(|p| p.pair_type == PairType::Unified).count();
-    let n_separate = pairs.iter().filter(|p| p.pair_type == PairType::Separate).count();
+    let n_unified = pairs
+        .iter()
+        .filter(|p| p.pair_type == PairType::Unified)
+        .count();
+    let n_separate = pairs
+        .iter()
+        .filter(|p| p.pair_type == PairType::Separate)
+        .count();
 
-    println!("Pairs: {} unified, {} separate, {} total\n", n_unified, n_separate, pairs.len());
+    println!(
+        "Pairs: {} unified, {} separate, {} total\n",
+        n_unified,
+        n_separate,
+        pairs.len()
+    );
 
     // Run experiment
-    let results: Vec<ComparisonResult> = pairs.iter().enumerate().map(|(i, pair)| {
-        if verbose && (i + 1) % 20 == 0 {
-            println!("  Processing {}/{}...", i + 1, pairs.len());
-        }
-        compare_operations(pair)
-    }).collect();
+    let results: Vec<ComparisonResult> = pairs
+        .iter()
+        .enumerate()
+        .map(|(i, pair)| {
+            if verbose && (i + 1) % 20 == 0 {
+                println!("  Processing {}/{}...", i + 1, pairs.len());
+            }
+            compare_operations(pair)
+        })
+        .collect();
 
     // Compute cell means
-    let unified: Vec<_> = results.iter().filter(|r| r.pair_type == PairType::Unified).collect();
-    let separate: Vec<_> = results.iter().filter(|r| r.pair_type == PairType::Separate).collect();
+    let unified: Vec<_> = results
+        .iter()
+        .filter(|r| r.pair_type == PairType::Unified)
+        .collect();
+    let separate: Vec<_> = results
+        .iter()
+        .filter(|r| r.pair_type == PairType::Separate)
+        .collect();
 
     let bind_unified = mean(unified.iter().map(|r| r.bind_unity));
     let bundle_unified = mean(unified.iter().map(|r| r.bundle_unity));
@@ -111,9 +132,19 @@ fn main() -> Result<()> {
     println!("================================================================");
     println!("   CELL MEANS (Unity Score)");
     println!("================================================================\n");
-    println!("                 Unified (n={})    Separate (n={})", unified.len(), separate.len());
-    println!("  Bind:          {:.4}              {:.4}", bind_unified, bind_separate);
-    println!("  Bundle:        {:.4}              {:.4}\n", bundle_unified, bundle_separate);
+    println!(
+        "                 Unified (n={})    Separate (n={})",
+        unified.len(),
+        separate.len()
+    );
+    println!(
+        "  Bind:          {:.4}              {:.4}",
+        bind_unified, bind_separate
+    );
+    println!(
+        "  Bundle:        {:.4}              {:.4}\n",
+        bundle_unified, bundle_separate
+    );
 
     // Main effects
     let main_op = ((bind_unified + bind_separate) - (bundle_unified + bundle_separate)) / 2.0;
@@ -138,8 +169,10 @@ fn main() -> Result<()> {
     println!("Interaction: {:+.4}", interaction);
 
     // Effect sizes
-    let all_unity: Vec<f64> = results.iter()
-        .flat_map(|r| vec![r.bind_unity, r.bundle_unity]).collect();
+    let all_unity: Vec<f64> = results
+        .iter()
+        .flat_map(|r| vec![r.bind_unity, r.bundle_unity])
+        .collect();
     let pooled_std = std_dev(&all_unity).max(0.001);
 
     let d_unified = adv_unified / pooled_std;
@@ -156,7 +189,11 @@ fn main() -> Result<()> {
     let p_value = permutation_test_interaction(&unified, &separate, n_perm);
 
     println!("\nStatistical Test (permutation, n={}):", n_perm);
-    println!("  Interaction p-value: {:.4} {}", p_value, if p_value < 0.05 { "*" } else { "" });
+    println!(
+        "  Interaction p-value: {:.4} {}",
+        p_value,
+        if p_value < 0.05 { "*" } else { "" }
+    );
 
     // Interpretation
     println!("\n================================================================");
@@ -183,7 +220,12 @@ fn main() -> Result<()> {
 
         println!("Top 5 by binding advantage:");
         for r in sorted.iter().take(5) {
-            println!("  {} ({}): adv={:+.4}", r.pair_id, r.pair_type.as_str(), r.unity_advantage);
+            println!(
+                "  {} ({}): adv={:+.4}",
+                r.pair_id,
+                r.pair_type.as_str(),
+                r.unity_advantage
+            );
         }
     }
 
@@ -284,7 +326,11 @@ fn analyze_topology(hv: &BinaryHV) -> f64 {
 }
 
 /// Permutation test for interaction effect
-fn permutation_test_interaction(unified: &[&ComparisonResult], separate: &[&ComparisonResult], n_perm: usize) -> f64 {
+fn permutation_test_interaction(
+    unified: &[&ComparisonResult],
+    separate: &[&ComparisonResult],
+    n_perm: usize,
+) -> f64 {
     let unified_advs: Vec<f64> = unified.iter().map(|r| r.unity_advantage).collect();
     let separate_advs: Vec<f64> = separate.iter().map(|r| r.unity_advantage).collect();
     let observed = mean(unified_advs.iter().copied()) - mean(separate_advs.iter().copied());
@@ -300,7 +346,9 @@ fn permutation_test_interaction(unified: &[&ComparisonResult], separate: &[&Comp
             combined.swap(i, (rng as usize) % (i + 1));
         }
         let perm = mean(combined[..n_u].iter().copied()) - mean(combined[n_u..].iter().copied());
-        if perm.abs() >= observed.abs() { more_extreme += 1; }
+        if perm.abs() >= observed.abs() {
+            more_extreme += 1;
+        }
     }
 
     more_extreme as f64 / n_perm as f64
@@ -308,11 +356,17 @@ fn permutation_test_interaction(unified: &[&ComparisonResult], separate: &[&Comp
 
 fn mean<I: Iterator<Item = f64>>(iter: I) -> f64 {
     let v: Vec<f64> = iter.collect();
-    if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 }
+    if v.is_empty() {
+        0.0
+    } else {
+        v.iter().sum::<f64>() / v.len() as f64
+    }
 }
 
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = values.iter().sum::<f64>() / values.len() as f64;
     (values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64).sqrt()
 }

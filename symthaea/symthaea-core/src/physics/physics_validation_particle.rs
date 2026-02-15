@@ -2,13 +2,13 @@
 //!
 //! Extracted from physics_numerical_validation.rs for manageability.
 
-use super::physics_test_helpers::{assert_relative_eq, particle_physics_setup};
-use super::standard_model::{QuarkFlavor, LeptonFlavor, GaugeBoson, PHYSICS_DIM};
+use super::antimatter::{Antimatter, BaryogenesisConcepts};
+use super::constants::ALPHA;
 use super::hadrons::{Baryon, Meson};
 use super::nuclear::EnergyScale;
-use super::antimatter::{Antimatter, BaryogenesisConcepts};
-use super::qft::{QEDEncoder, QCDEncoder, ElectroweakEncoder, DivergenceType};
-use super::constants::ALPHA;
+use super::physics_test_helpers::{assert_relative_eq, particle_physics_setup};
+use super::qft::{DivergenceType, ElectroweakEncoder, QCDEncoder, QEDEncoder};
+use super::standard_model::{GaugeBoson, LeptonFlavor, QuarkFlavor, PHYSICS_DIM};
 use crate::genesis::GenesisSeed;
 
 // =========================================================================
@@ -25,8 +25,16 @@ fn sm_up_type_quark_charges() {
 #[test]
 fn sm_down_type_quark_charges() {
     assert_eq!(QuarkFlavor::Down.charge_thirds(), -1, "Down charge_thirds");
-    assert_eq!(QuarkFlavor::Strange.charge_thirds(), -1, "Strange charge_thirds");
-    assert_eq!(QuarkFlavor::Bottom.charge_thirds(), -1, "Bottom charge_thirds");
+    assert_eq!(
+        QuarkFlavor::Strange.charge_thirds(),
+        -1,
+        "Strange charge_thirds"
+    );
+    assert_eq!(
+        QuarkFlavor::Bottom.charge_thirds(),
+        -1,
+        "Bottom charge_thirds"
+    );
 }
 
 #[test]
@@ -41,22 +49,42 @@ fn sm_quark_mass_down() {
 
 #[test]
 fn sm_quark_mass_charm() {
-    assert_relative_eq(QuarkFlavor::Charm.mass_mev() as f64, 1280.0, 1e-6, "Charm mass");
+    assert_relative_eq(
+        QuarkFlavor::Charm.mass_mev() as f64,
+        1280.0,
+        1e-6,
+        "Charm mass",
+    );
 }
 
 #[test]
 fn sm_quark_mass_strange() {
-    assert_relative_eq(QuarkFlavor::Strange.mass_mev() as f64, 96.0, 1e-6, "Strange mass");
+    assert_relative_eq(
+        QuarkFlavor::Strange.mass_mev() as f64,
+        96.0,
+        1e-6,
+        "Strange mass",
+    );
 }
 
 #[test]
 fn sm_quark_mass_top() {
-    assert_relative_eq(QuarkFlavor::Top.mass_mev() as f64, 173100.0, 1e-6, "Top mass");
+    assert_relative_eq(
+        QuarkFlavor::Top.mass_mev() as f64,
+        173100.0,
+        1e-6,
+        "Top mass",
+    );
 }
 
 #[test]
 fn sm_quark_mass_bottom() {
-    assert_relative_eq(QuarkFlavor::Bottom.mass_mev() as f64, 4180.0, 1e-6, "Bottom mass");
+    assert_relative_eq(
+        QuarkFlavor::Bottom.mass_mev() as f64,
+        4180.0,
+        1e-6,
+        "Bottom mass",
+    );
 }
 
 #[test]
@@ -85,22 +113,57 @@ fn sm_neutrino_charges_zero() {
 
 #[test]
 fn sm_lepton_masses() {
-    assert_relative_eq(LeptonFlavor::Electron.mass_mev() as f64, 0.511, 1e-6, "Electron mass");
-    assert_relative_eq(LeptonFlavor::Muon.mass_mev() as f64, 105.66, 1e-6, "Muon mass");
-    assert_relative_eq(LeptonFlavor::Tau.mass_mev() as f64, 1776.86, 1e-6, "Tau mass");
+    assert_relative_eq(
+        LeptonFlavor::Electron.mass_mev() as f64,
+        0.511,
+        1e-6,
+        "Electron mass",
+    );
+    assert_relative_eq(
+        LeptonFlavor::Muon.mass_mev() as f64,
+        105.66,
+        1e-6,
+        "Muon mass",
+    );
+    assert_relative_eq(
+        LeptonFlavor::Tau.mass_mev() as f64,
+        1776.86,
+        1e-6,
+        "Tau mass",
+    );
 }
 
 #[test]
 fn sm_massless_bosons() {
-    assert_relative_eq(GaugeBoson::Photon.mass_gev() as f64, 0.0, 1e-15, "Photon mass");
-    assert_relative_eq(GaugeBoson::Gluon.mass_gev() as f64, 0.0, 1e-15, "Gluon mass");
-    assert_relative_eq(GaugeBoson::Graviton.mass_gev() as f64, 0.0, 1e-15, "Graviton mass");
+    assert_relative_eq(
+        GaugeBoson::Photon.mass_gev() as f64,
+        0.0,
+        1e-15,
+        "Photon mass",
+    );
+    assert_relative_eq(
+        GaugeBoson::Gluon.mass_gev() as f64,
+        0.0,
+        1e-15,
+        "Gluon mass",
+    );
+    assert_relative_eq(
+        GaugeBoson::Graviton.mass_gev() as f64,
+        0.0,
+        1e-15,
+        "Graviton mass",
+    );
 }
 
 #[test]
 fn sm_w_z_boson_masses() {
     assert_relative_eq(GaugeBoson::WPlus.mass_gev() as f64, 80.379, 1e-6, "W+ mass");
-    assert_relative_eq(GaugeBoson::WMinus.mass_gev() as f64, 80.379, 1e-6, "W- mass");
+    assert_relative_eq(
+        GaugeBoson::WMinus.mass_gev() as f64,
+        80.379,
+        1e-6,
+        "W- mass",
+    );
     assert_relative_eq(GaugeBoson::Z.mass_gev() as f64, 91.1876, 1e-6, "Z mass");
 }
 
@@ -145,17 +208,32 @@ fn hadron_omega_charge() {
 
 #[test]
 fn hadron_proton_mass() {
-    assert_relative_eq(Baryon::Proton.mass_mev() as f64, 938.272, 1e-6, "Proton mass");
+    assert_relative_eq(
+        Baryon::Proton.mass_mev() as f64,
+        938.272,
+        1e-6,
+        "Proton mass",
+    );
 }
 
 #[test]
 fn hadron_neutron_mass() {
-    assert_relative_eq(Baryon::Neutron.mass_mev() as f64, 939.565, 1e-6, "Neutron mass");
+    assert_relative_eq(
+        Baryon::Neutron.mass_mev() as f64,
+        939.565,
+        1e-6,
+        "Neutron mass",
+    );
 }
 
 #[test]
 fn hadron_delta_mass() {
-    assert_relative_eq(Baryon::DeltaPlusPlus.mass_mev() as f64, 1232.0, 1e-6, "Δ++ mass");
+    assert_relative_eq(
+        Baryon::DeltaPlusPlus.mass_mev() as f64,
+        1232.0,
+        1e-6,
+        "Δ++ mass",
+    );
 }
 
 #[test]
@@ -208,7 +286,9 @@ fn nuclear_h2_binding() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     assert_relative_eq(
         nuclear.binding_energy_per_nucleon(2) as f64,
-        1.11, 1e-3, "H-2 binding energy per nucleon",
+        1.11,
+        1e-3,
+        "H-2 binding energy per nucleon",
     );
 }
 
@@ -217,7 +297,9 @@ fn nuclear_he4_binding() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     assert_relative_eq(
         nuclear.binding_energy_per_nucleon(4) as f64,
-        7.07, 1e-3, "He-4 binding energy per nucleon",
+        7.07,
+        1e-3,
+        "He-4 binding energy per nucleon",
     );
 }
 
@@ -226,7 +308,9 @@ fn nuclear_fe56_binding() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     assert_relative_eq(
         nuclear.binding_energy_per_nucleon(56) as f64,
-        8.79, 1e-3, "Fe-56 binding energy per nucleon",
+        8.79,
+        1e-3,
+        "Fe-56 binding energy per nucleon",
     );
 }
 
@@ -235,7 +319,9 @@ fn nuclear_u238_binding() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     assert_relative_eq(
         nuclear.binding_energy_per_nucleon(238) as f64,
-        7.57, 1e-3, "U-238 binding energy per nucleon",
+        7.57,
+        1e-3,
+        "U-238 binding energy per nucleon",
     );
 }
 
@@ -267,25 +353,39 @@ fn nuclear_u235_fission_exothermic() {
 fn nuclear_iron_peak_no_fusion() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     let q = nuclear.fusion_q_value(56, 56, 112);
-    assert!(q <= 0.0, "Iron-iron fusion should not be exothermic, got Q={q}");
+    assert!(
+        q <= 0.0,
+        "Iron-iron fusion should not be exothermic, got Q={q}"
+    );
 }
 
 #[test]
 fn nuclear_chemical_ev() {
-    assert_relative_eq(EnergyScale::Chemical.typical_ev(), 1.0, 1e-10, "Chemical scale");
+    assert_relative_eq(
+        EnergyScale::Chemical.typical_ev(),
+        1.0,
+        1e-10,
+        "Chemical scale",
+    );
 }
 
 #[test]
 fn nuclear_scale_1mev() {
     assert_relative_eq(
-        EnergyScale::Nuclear.typical_ev(), 1_000_000.0, 1e-10, "Nuclear scale",
+        EnergyScale::Nuclear.typical_ev(),
+        1_000_000.0,
+        1e-10,
+        "Nuclear scale",
     );
 }
 
 #[test]
 fn nuclear_density_ratio() {
     assert_relative_eq(
-        EnergyScale::Nuclear.density_ratio(), 1_000_000.0, 1e-10, "Nuclear density ratio",
+        EnergyScale::Nuclear.density_ratio(),
+        1_000_000.0,
+        1e-10,
+        "Nuclear density ratio",
     );
 }
 
@@ -293,21 +393,36 @@ fn nuclear_density_ratio() {
 fn nuclear_ta180m_excitation() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     let isomer = nuclear.get_isomer(73, 180).expect("Ta-180m should exist");
-    assert_relative_eq(isomer.excitation_kev as f64, 77.0, 1e-6, "Ta-180m excitation");
+    assert_relative_eq(
+        isomer.excitation_kev as f64,
+        77.0,
+        1e-6,
+        "Ta-180m excitation",
+    );
 }
 
 #[test]
 fn nuclear_hf178m2_excitation() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     let isomer = nuclear.get_isomer(72, 178).expect("Hf-178m2 should exist");
-    assert_relative_eq(isomer.excitation_kev as f64, 2446.0, 1e-6, "Hf-178m2 excitation");
+    assert_relative_eq(
+        isomer.excitation_kev as f64,
+        2446.0,
+        1e-6,
+        "Hf-178m2 excitation",
+    );
 }
 
 #[test]
 fn nuclear_tc99m_excitation() {
     let (_, _, _, _, nuclear, _) = particle_physics_setup();
     let isomer = nuclear.get_isomer(43, 99).expect("Tc-99m should exist");
-    assert_relative_eq(isomer.excitation_kev as f64, 140.5, 1e-6, "Tc-99m excitation");
+    assert_relative_eq(
+        isomer.excitation_kev as f64,
+        140.5,
+        1e-6,
+        "Tc-99m excitation",
+    );
 }
 
 // =========================================================================
@@ -335,7 +450,12 @@ fn qed_bhabha_amplitude_alpha() {
     let (genesis, model, _, _, _, _) = particle_physics_setup();
     let qed = QEDEncoder::from_genesis(&genesis, &model);
     let bhabha = qed.bhabha_scattering();
-    assert_relative_eq(bhabha.amplitude_estimate, ALPHA, 1e-6, "Bhabha amplitude ≈ α");
+    assert_relative_eq(
+        bhabha.amplitude_estimate,
+        ALPHA,
+        1e-6,
+        "Bhabha amplitude ≈ α",
+    );
 }
 
 #[test]
@@ -343,7 +463,11 @@ fn qed_compton_four_external() {
     let (genesis, model, _, _, _, _) = particle_physics_setup();
     let qed = QEDEncoder::from_genesis(&genesis, &model);
     let compton = qed.compton_scattering();
-    assert_eq!(compton.external_legs.len(), 4, "Compton has 4 external legs");
+    assert_eq!(
+        compton.external_legs.len(),
+        4,
+        "Compton has 4 external legs"
+    );
 }
 
 #[test]
@@ -384,7 +508,10 @@ fn qed_self_energy_has_counterterm() {
     let (genesis, model, _, _, _, _) = particle_physics_setup();
     let qed = QEDEncoder::from_genesis(&genesis, &model);
     let se = qed.electron_self_energy();
-    assert!(se.counterterm.is_some(), "Electron self-energy should have a counterterm");
+    assert!(
+        se.counterterm.is_some(),
+        "Electron self-energy should have a counterterm"
+    );
 }
 
 // =========================================================================
@@ -556,14 +683,20 @@ fn am_antihelium4_composition() {
 fn am_compose_antiatom_positrons() {
     let (_, _, _, _, _, antimatter) = particle_physics_setup();
     let antiatom = antimatter.compose_antiatom(3, 4);
-    assert_eq!(antiatom.positrons, 3, "Antiatom with Z=3 should have 3 positrons");
+    assert_eq!(
+        antiatom.positrons, 3,
+        "Antiatom with Z=3 should have 3 positrons"
+    );
 }
 
 #[test]
 fn am_positron_orthogonal_electron() {
     let (_, model, _, _, _, antimatter) = particle_physics_setup();
     let sim = model.electron.similarity(&antimatter.positron).abs();
-    assert!(sim < 0.3, "Positron and electron should be near-orthogonal, got {sim}");
+    assert!(
+        sim < 0.3,
+        "Positron and electron should be near-orthogonal, got {sim}"
+    );
 }
 
 #[test]
@@ -579,13 +712,20 @@ fn am_sakharov_conditions_nonzero() {
     let concepts = BaryogenesisConcepts::from_genesis(&genesis);
     let sakharov = concepts.encode_sakharov();
     let norm = sakharov.norm();
-    assert!(norm > 0.0, "Sakharov conditions vector should be nonzero, norm = {norm}");
+    assert!(
+        norm > 0.0,
+        "Sakharov conditions vector should be nonzero, norm = {norm}"
+    );
 }
 
 #[test]
 fn am_antiproton_dim() {
     let (_, _, _, _, _, antimatter) = particle_physics_setup();
-    assert_eq!(antimatter.antiproton.dim(), PHYSICS_DIM, "Antiproton dim = PHYSICS_DIM");
+    assert_eq!(
+        antimatter.antiproton.dim(),
+        PHYSICS_DIM,
+        "Antiproton dim = PHYSICS_DIM"
+    );
 }
 
 // =========================================================================
@@ -629,8 +769,14 @@ fn cross_energy_hierarchy_scales() {
     let chemical = EnergyScale::Chemical.typical_ev();
     let isomeric = EnergyScale::Isomeric.typical_ev();
     let nuclear = EnergyScale::Nuclear.typical_ev();
-    assert!(nuclear > isomeric, "Nuclear > Isomeric: {nuclear} > {isomeric}");
-    assert!(isomeric > chemical, "Isomeric > Chemical: {isomeric} > {chemical}");
+    assert!(
+        nuclear > isomeric,
+        "Nuclear > Isomeric: {nuclear} > {isomeric}"
+    );
+    assert!(
+        isomeric > chemical,
+        "Isomeric > Chemical: {isomeric} > {chemical}"
+    );
 }
 
 #[test]

@@ -4,8 +4,8 @@
 //! and querying verified claims from web research. It tracks epistemic
 //! provenance and confidence scores.
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Unique identifier for a node in the knowledge graph
 pub type NodeId = u64;
@@ -216,7 +216,10 @@ impl KnowledgeGraph {
             source,
         };
 
-        self.outgoing_edges.entry(from).or_default().push(edge.clone());
+        self.outgoing_edges
+            .entry(from)
+            .or_default()
+            .push(edge.clone());
         self.incoming_edges.entry(to).or_default().push(edge);
     }
 
@@ -232,12 +235,16 @@ impl KnowledgeGraph {
 
     /// Get outgoing edges from a node
     pub fn outgoing_edges(&self, node_id: NodeId) -> &[KnowledgeEdge] {
-        self.outgoing_edges.get(&node_id).map_or(&[], |v| v.as_slice())
+        self.outgoing_edges
+            .get(&node_id)
+            .map_or(&[], |v| v.as_slice())
     }
 
     /// Get incoming edges to a node
     pub fn incoming_edges(&self, node_id: NodeId) -> &[KnowledgeEdge] {
-        self.incoming_edges.get(&node_id).map_or(&[], |v| v.as_slice())
+        self.incoming_edges
+            .get(&node_id)
+            .map_or(&[], |v| v.as_slice())
     }
 
     /// Update node confidence
@@ -267,7 +274,9 @@ impl KnowledgeGraph {
         let mut high_confidence = 0;
 
         for node in self.nodes.values() {
-            *nodes_by_type.entry(format!("{:?}", node.node_type)).or_insert(0) += 1;
+            *nodes_by_type
+                .entry(format!("{:?}", node.node_type))
+                .or_insert(0) += 1;
             total_confidence += node.confidence;
             if node.confidence > 0.7 {
                 high_confidence += 1;
@@ -309,15 +318,26 @@ impl KnowledgeGraph {
         };
 
         // Measure 2: Average confidence
-        let avg_confidence: f64 = self.nodes.values().map(|n| n.confidence as f64).sum::<f64>() / n;
+        let avg_confidence: f64 = self
+            .nodes
+            .values()
+            .map(|n| n.confidence as f64)
+            .sum::<f64>()
+            / n;
 
         // Measure 3: Type diversity (entropy-like)
         let stats = self.stats();
         let type_diversity = if stats.nodes_by_type.len() > 1 {
-            let entropy: f64 = stats.nodes_by_type.values()
+            let entropy: f64 = stats
+                .nodes_by_type
+                .values()
                 .map(|&count| {
                     let p = count as f64 / n;
-                    if p > 0.0 { -p * p.ln() } else { 0.0 }
+                    if p > 0.0 {
+                        -p * p.ln()
+                    } else {
+                        0.0
+                    }
                 })
                 .sum();
             entropy / (stats.nodes_by_type.len() as f64).ln()
@@ -372,13 +392,40 @@ mod tests {
         assert_eq!(graph.calculate_phi(), 0.0);
 
         // Add some connected nodes
-        let n1 = graph.add_node_with_config("A", NodeType::Claim, 0.8, KnowledgeSource::External("test".into()));
-        let n2 = graph.add_node_with_config("B", NodeType::Claim, 0.9, KnowledgeSource::External("test".into()));
-        let n3 = graph.add_node_with_config("C", NodeType::Source, 0.7, KnowledgeSource::External("test".into()));
+        let n1 = graph.add_node_with_config(
+            "A",
+            NodeType::Claim,
+            0.8,
+            KnowledgeSource::External("test".into()),
+        );
+        let n2 = graph.add_node_with_config(
+            "B",
+            NodeType::Claim,
+            0.9,
+            KnowledgeSource::External("test".into()),
+        );
+        let n3 = graph.add_node_with_config(
+            "C",
+            NodeType::Source,
+            0.7,
+            KnowledgeSource::External("test".into()),
+        );
 
         graph.add_edge_with_meta(n1, EdgeType::Supports, n2, 0.8, KnowledgeSource::Internal);
-        graph.add_edge_with_meta(n2, EdgeType::SourcedFrom, n3, 0.9, KnowledgeSource::Internal);
-        graph.add_edge_with_meta(n1, EdgeType::SourcedFrom, n3, 0.7, KnowledgeSource::Internal);
+        graph.add_edge_with_meta(
+            n2,
+            EdgeType::SourcedFrom,
+            n3,
+            0.9,
+            KnowledgeSource::Internal,
+        );
+        graph.add_edge_with_meta(
+            n1,
+            EdgeType::SourcedFrom,
+            n3,
+            0.7,
+            KnowledgeSource::Internal,
+        );
 
         let phi = graph.calculate_phi();
         assert!(phi > 0.0, "Connected graph should have positive phi");

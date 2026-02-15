@@ -4,9 +4,9 @@
 //! interfaces for NixOS management, backed by the cognitive core.
 
 pub mod commands;
-pub mod interactive;
 pub mod completions;
+pub mod interactive;
 
 pub use commands::{Cli, Command, OutputFormat};
-pub use interactive::{ConsciousRepl, ConsciousnessQuadrant, process_oneshot};
 pub use completions::generate_completions;
+pub use interactive::{process_oneshot, ConsciousRepl, ConsciousnessQuadrant};

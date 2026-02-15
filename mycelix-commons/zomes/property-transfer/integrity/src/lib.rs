@@ -186,3 +186,788 @@ fn validate_update_escrow(
     }
     Ok(ValidateCallbackResult::Valid)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hdi::prelude::*;
+
+    // ========================================================================
+    // Factory Functions
+    // ========================================================================
+
+    fn create_test_timestamp() -> Timestamp {
+        Timestamp::from_micros(1_000_000)
+    }
+
+    fn create_test_transfer(from_did: &str, to_did: &str) -> Transfer {
+        Transfer {
+            id: "transfer-001".to_string(),
+            property_id: "property-123".to_string(),
+            from_did: from_did.to_string(),
+            to_did: to_did.to_string(),
+            transfer_type: TransferType::Sale,
+            price: Some(250_000.0),
+            currency: Some("USD".to_string()),
+            conditions: vec![],
+            status: TransferStatus::Initiated,
+            initiated: create_test_timestamp(),
+            completed: None,
+        }
+    }
+
+    fn create_test_transfer_with_conditions() -> Transfer {
+        Transfer {
+            id: "transfer-002".to_string(),
+            property_id: "property-456".to_string(),
+            from_did: "did:key:seller123".to_string(),
+            to_did: "did:key:buyer456".to_string(),
+            transfer_type: TransferType::Sale,
+            price: Some(500_000.0),
+            currency: Some("EUR".to_string()),
+            conditions: vec![
+                TransferCondition {
+                    condition_type: ConditionType::PaymentReceived,
+                    description: "Full payment received".to_string(),
+                    satisfied: false,
+                    verified_by: None,
+                },
+                TransferCondition {
+                    condition_type: ConditionType::InspectionComplete,
+                    description: "Home inspection completed".to_string(),
+                    satisfied: false,
+                    verified_by: Some("did:key:inspector789".to_string()),
+                },
+            ],
+            status: TransferStatus::ConditionsPending,
+            initiated: create_test_timestamp(),
+            completed: None,
+        }
+    }
+
+    fn create_test_escrow(amount: f64) -> Escrow {
+        Escrow {
+            id: "escrow-001".to_string(),
+            transfer_id: "transfer-001".to_string(),
+            escrow_agent_did: Some("did:key:agent123".to_string()),
+            amount,
+            currency: "USD".to_string(),
+            funded: false,
+            release_conditions: vec!["Payment verified".to_string()],
+            created: create_test_timestamp(),
+            released: None,
+        }
+    }
+
+    fn create_test_entry_creation_action() -> EntryCreationAction {
+        EntryCreationAction::Create(Create {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: create_test_timestamp(),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public,
+            }),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: Default::default(),
+        })
+    }
+
+    fn create_test_update_action() -> Update {
+        Update {
+            author: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            timestamp: create_test_timestamp(),
+            action_seq: 1,
+            prev_action: ActionHash::from_raw_36(vec![0u8; 36]),
+            entry_type: EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public,
+            }),
+            entry_hash: EntryHash::from_raw_36(vec![0u8; 36]),
+            original_action_address: ActionHash::from_raw_36(vec![0u8; 36]),
+            original_entry_address: EntryHash::from_raw_36(vec![0u8; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    // ========================================================================
+    // Transfer DID Validation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_valid_dids() {
+        let transfer = create_test_transfer("did:key:seller123", "did:key:buyer456");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_transfer_valid_did_web() {
+        let transfer = create_test_transfer("did:web:example.com", "did:web:buyer.com");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_transfer_valid_did_pkh() {
+        let transfer = create_test_transfer("did:pkh:eth:0x123", "did:pkh:btc:bc1abc");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_transfer_invalid_from_did_empty() {
+        let transfer = create_test_transfer("", "did:key:buyer456");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Seller must be a valid DID"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_invalid_from_did_no_prefix() {
+        let transfer = create_test_transfer("key:seller123", "did:key:buyer456");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Seller must be a valid DID"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_invalid_from_did_plain_string() {
+        let transfer = create_test_transfer("seller123", "did:key:buyer456");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Seller must be a valid DID"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_invalid_to_did_empty() {
+        let transfer = create_test_transfer("did:key:seller123", "");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Buyer must be a valid DID"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_invalid_to_did_no_prefix() {
+        let transfer = create_test_transfer("did:key:seller123", "key:buyer456");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Buyer must be a valid DID"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_invalid_to_did_plain_string() {
+        let transfer = create_test_transfer("did:key:seller123", "buyer456");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Buyer must be a valid DID"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_invalid_both_dids_missing_prefix() {
+        let transfer = create_test_transfer("seller123", "buyer456");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Seller must be a valid DID"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    // ========================================================================
+    // Self-Transfer Prevention Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_self_transfer_same_did() {
+        let transfer = create_test_transfer("did:key:same123", "did:key:same123");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Cannot transfer to yourself"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_self_transfer_different_methods() {
+        // Even different DID methods with same identifier should be caught
+        let transfer = create_test_transfer("did:key:abc123", "did:key:abc123");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Cannot transfer to yourself"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_not_self_transfer_similar_dids() {
+        // Similar but different DIDs should be allowed
+        let transfer = create_test_transfer("did:key:abc123", "did:key:abc124");
+        let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // ========================================================================
+    // Transfer Update Validation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_update_always_valid() {
+        let transfer = create_test_transfer("did:key:seller123", "did:key:buyer456");
+        let result = validate_update_transfer(create_test_update_action(), transfer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_transfer_update_invalid_dids_allowed() {
+        // Update validation doesn't check DIDs
+        let transfer = create_test_transfer("invalid", "also-invalid");
+        let result = validate_update_transfer(create_test_update_action(), transfer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_transfer_update_self_transfer_allowed() {
+        // Update validation doesn't check self-transfer
+        let transfer = create_test_transfer("did:key:same", "did:key:same");
+        let result = validate_update_transfer(create_test_update_action(), transfer);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    // ========================================================================
+    // Escrow Amount Validation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_escrow_valid_amount_large() {
+        let escrow = create_test_escrow(500_000.0);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_escrow_valid_amount_small() {
+        let escrow = create_test_escrow(0.01);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_escrow_valid_amount_one_cent() {
+        let escrow = create_test_escrow(0.01);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_escrow_valid_amount_fractional() {
+        let escrow = create_test_escrow(123.45);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_escrow_invalid_amount_zero() {
+        let escrow = create_test_escrow(0.0);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Escrow amount must be positive"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_escrow_invalid_amount_negative() {
+        let escrow = create_test_escrow(-1.0);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Escrow amount must be positive"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_escrow_invalid_amount_large_negative() {
+        let escrow = create_test_escrow(-1_000_000.0);
+        let result = validate_create_escrow(create_test_entry_creation_action(), escrow);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Escrow amount must be positive"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    // ========================================================================
+    // Escrow Update Validation Tests
+    // ========================================================================
+
+    #[test]
+    fn test_escrow_update_valid_amount() {
+        let escrow = create_test_escrow(250_000.0);
+        let result = validate_update_escrow(create_test_update_action(), escrow);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_escrow_update_invalid_amount_zero() {
+        let escrow = create_test_escrow(0.0);
+        let result = validate_update_escrow(create_test_update_action(), escrow);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Escrow amount must be positive"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    #[test]
+    fn test_escrow_update_invalid_amount_negative() {
+        let escrow = create_test_escrow(-100.0);
+        let result = validate_update_escrow(create_test_update_action(), escrow);
+        assert!(result.is_ok());
+        match result.unwrap() {
+            ValidateCallbackResult::Invalid(msg) => {
+                assert!(msg.contains("Escrow amount must be positive"));
+            }
+            _ => panic!("Expected invalid result"),
+        }
+    }
+
+    // ========================================================================
+    // TransferType Serde Roundtrip Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_type_sale_serde() {
+        let transfer_type = TransferType::Sale;
+        let serialized = serde_json::to_string(&transfer_type).unwrap();
+        let deserialized: TransferType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transfer_type, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_type_gift_serde() {
+        let transfer_type = TransferType::Gift;
+        let serialized = serde_json::to_string(&transfer_type).unwrap();
+        let deserialized: TransferType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transfer_type, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_type_inheritance_serde() {
+        let transfer_type = TransferType::Inheritance;
+        let serialized = serde_json::to_string(&transfer_type).unwrap();
+        let deserialized: TransferType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transfer_type, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_type_court_order_serde() {
+        let transfer_type = TransferType::CourtOrder;
+        let serialized = serde_json::to_string(&transfer_type).unwrap();
+        let deserialized: TransferType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transfer_type, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_type_exchange_serde() {
+        let transfer_type = TransferType::Exchange;
+        let serialized = serde_json::to_string(&transfer_type).unwrap();
+        let deserialized: TransferType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transfer_type, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_type_other_serde() {
+        let transfer_type = TransferType::Other;
+        let serialized = serde_json::to_string(&transfer_type).unwrap();
+        let deserialized: TransferType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transfer_type, deserialized);
+    }
+
+    // ========================================================================
+    // ConditionType Serde Roundtrip Tests
+    // ========================================================================
+
+    #[test]
+    fn test_condition_type_payment_received_serde() {
+        let condition_type = ConditionType::PaymentReceived;
+        let serialized = serde_json::to_string(&condition_type).unwrap();
+        let deserialized: ConditionType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(condition_type, deserialized);
+    }
+
+    #[test]
+    fn test_condition_type_inspection_complete_serde() {
+        let condition_type = ConditionType::InspectionComplete;
+        let serialized = serde_json::to_string(&condition_type).unwrap();
+        let deserialized: ConditionType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(condition_type, deserialized);
+    }
+
+    #[test]
+    fn test_condition_type_title_clear_serde() {
+        let condition_type = ConditionType::TitleClear;
+        let serialized = serde_json::to_string(&condition_type).unwrap();
+        let deserialized: ConditionType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(condition_type, deserialized);
+    }
+
+    #[test]
+    fn test_condition_type_documents_signed_serde() {
+        let condition_type = ConditionType::DocumentsSigned;
+        let serialized = serde_json::to_string(&condition_type).unwrap();
+        let deserialized: ConditionType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(condition_type, deserialized);
+    }
+
+    #[test]
+    fn test_condition_type_taxes_paid_serde() {
+        let condition_type = ConditionType::TaxesPaid;
+        let serialized = serde_json::to_string(&condition_type).unwrap();
+        let deserialized: ConditionType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(condition_type, deserialized);
+    }
+
+    #[test]
+    fn test_condition_type_custom_serde() {
+        let condition_type = ConditionType::Custom("Environmental clearance".to_string());
+        let serialized = serde_json::to_string(&condition_type).unwrap();
+        let deserialized: ConditionType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(condition_type, deserialized);
+    }
+
+    // ========================================================================
+    // TransferStatus Serde Roundtrip Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_status_initiated_serde() {
+        let status = TransferStatus::Initiated;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: TransferStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_status_awaiting_acceptance_serde() {
+        let status = TransferStatus::AwaitingAcceptance;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: TransferStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_status_in_escrow_serde() {
+        let status = TransferStatus::InEscrow;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: TransferStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_status_conditions_pending_serde() {
+        let status = TransferStatus::ConditionsPending;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: TransferStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_status_completed_serde() {
+        let status = TransferStatus::Completed;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: TransferStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_status_cancelled_serde() {
+        let status = TransferStatus::Cancelled;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: TransferStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_transfer_status_disputed_serde() {
+        let status = TransferStatus::Disputed;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: TransferStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    // ========================================================================
+    // Optional Fields Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_with_none_price() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.price = None;
+        assert!(transfer.price.is_none());
+    }
+
+    #[test]
+    fn test_transfer_with_none_currency() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.currency = None;
+        assert!(transfer.currency.is_none());
+    }
+
+    #[test]
+    fn test_transfer_with_none_completed() {
+        let transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        assert!(transfer.completed.is_none());
+    }
+
+    #[test]
+    fn test_transfer_with_some_completed() {
+        let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        transfer.completed = Some(Timestamp::from_micros(2_000_000));
+        assert!(transfer.completed.is_some());
+    }
+
+    #[test]
+    fn test_escrow_with_none_agent_did() {
+        let mut escrow = create_test_escrow(100_000.0);
+        escrow.escrow_agent_did = None;
+        assert!(escrow.escrow_agent_did.is_none());
+    }
+
+    #[test]
+    fn test_escrow_with_some_agent_did() {
+        let escrow = create_test_escrow(100_000.0);
+        assert!(escrow.escrow_agent_did.is_some());
+    }
+
+    #[test]
+    fn test_escrow_with_none_released() {
+        let escrow = create_test_escrow(100_000.0);
+        assert!(escrow.released.is_none());
+    }
+
+    #[test]
+    fn test_escrow_with_some_released() {
+        let mut escrow = create_test_escrow(100_000.0);
+        escrow.released = Some(Timestamp::from_micros(3_000_000));
+        assert!(escrow.released.is_some());
+    }
+
+    // ========================================================================
+    // TransferCondition Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_condition_creation() {
+        let condition = TransferCondition {
+            condition_type: ConditionType::PaymentReceived,
+            description: "Payment in full".to_string(),
+            satisfied: true,
+            verified_by: Some("did:key:verifier".to_string()),
+        };
+        assert_eq!(condition.condition_type, ConditionType::PaymentReceived);
+        assert!(condition.satisfied);
+        assert!(condition.verified_by.is_some());
+    }
+
+    #[test]
+    fn test_transfer_condition_with_none_verifier() {
+        let condition = TransferCondition {
+            condition_type: ConditionType::TitleClear,
+            description: "Title search pending".to_string(),
+            satisfied: false,
+            verified_by: None,
+        };
+        assert!(!condition.satisfied);
+        assert!(condition.verified_by.is_none());
+    }
+
+    #[test]
+    fn test_transfer_with_multiple_conditions() {
+        let transfer = create_test_transfer_with_conditions();
+        assert_eq!(transfer.conditions.len(), 2);
+        assert_eq!(transfer.conditions[0].condition_type, ConditionType::PaymentReceived);
+        assert_eq!(transfer.conditions[1].condition_type, ConditionType::InspectionComplete);
+    }
+
+    #[test]
+    fn test_transfer_with_empty_conditions() {
+        let transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+        assert_eq!(transfer.conditions.len(), 0);
+    }
+
+    // ========================================================================
+    // Edge Cases and Integration Tests
+    // ========================================================================
+
+    #[test]
+    fn test_transfer_all_types() {
+        let types = vec![
+            TransferType::Sale,
+            TransferType::Gift,
+            TransferType::Inheritance,
+            TransferType::CourtOrder,
+            TransferType::Exchange,
+            TransferType::Other,
+        ];
+
+        for transfer_type in types {
+            let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+            transfer.transfer_type = transfer_type.clone();
+            let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_transfer_all_statuses() {
+        let statuses = vec![
+            TransferStatus::Initiated,
+            TransferStatus::AwaitingAcceptance,
+            TransferStatus::InEscrow,
+            TransferStatus::ConditionsPending,
+            TransferStatus::Completed,
+            TransferStatus::Cancelled,
+            TransferStatus::Disputed,
+        ];
+
+        for status in statuses {
+            let mut transfer = create_test_transfer("did:key:seller", "did:key:buyer");
+            transfer.status = status.clone();
+            let result = validate_create_transfer(create_test_entry_creation_action(), transfer);
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), ValidateCallbackResult::Valid);
+        }
+    }
+
+    #[test]
+    fn test_escrow_with_multiple_release_conditions() {
+        let mut escrow = create_test_escrow(500_000.0);
+        escrow.release_conditions = vec![
+            "Payment verified".to_string(),
+            "Title clear".to_string(),
+            "Documents signed".to_string(),
+        ];
+        assert_eq!(escrow.release_conditions.len(), 3);
+    }
+
+    #[test]
+    fn test_escrow_with_empty_release_conditions() {
+        let mut escrow = create_test_escrow(100_000.0);
+        escrow.release_conditions = vec![];
+        assert_eq!(escrow.release_conditions.len(), 0);
+    }
+
+    #[test]
+    fn test_escrow_funded_flag() {
+        let mut escrow = create_test_escrow(250_000.0);
+        assert!(!escrow.funded);
+        escrow.funded = true;
+        assert!(escrow.funded);
+    }
+
+    #[test]
+    fn test_anchor_creation() {
+        let anchor = Anchor("property-transfers".to_string());
+        assert_eq!(anchor.0, "property-transfers");
+    }
+
+    #[test]
+    fn test_transfer_condition_custom_type() {
+        let condition = TransferCondition {
+            condition_type: ConditionType::Custom("HOA approval".to_string()),
+            description: "Homeowners association must approve".to_string(),
+            satisfied: false,
+            verified_by: None,
+        };
+        match condition.condition_type {
+            ConditionType::Custom(ref s) => assert_eq!(s, "HOA approval"),
+            _ => panic!("Expected Custom condition type"),
+        }
+    }
+
+    #[test]
+    fn test_transfer_serde_roundtrip() {
+        let transfer = create_test_transfer_with_conditions();
+        let serialized = serde_json::to_string(&transfer).unwrap();
+        let deserialized: Transfer = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(transfer.id, deserialized.id);
+        assert_eq!(transfer.from_did, deserialized.from_did);
+        assert_eq!(transfer.to_did, deserialized.to_did);
+        assert_eq!(transfer.conditions.len(), deserialized.conditions.len());
+    }
+
+    #[test]
+    fn test_escrow_serde_roundtrip() {
+        let escrow = create_test_escrow(123_456.78);
+        let serialized = serde_json::to_string(&escrow).unwrap();
+        let deserialized: Escrow = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(escrow.id, deserialized.id);
+        assert_eq!(escrow.amount, deserialized.amount);
+        assert_eq!(escrow.currency, deserialized.currency);
+    }
+}

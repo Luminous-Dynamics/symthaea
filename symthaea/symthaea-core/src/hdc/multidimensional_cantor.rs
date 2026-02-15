@@ -698,9 +698,22 @@ mod tests {
         let causal = dust.causal();
         let temporal = dust.temporal();
 
-        println!("Semantic vs Causal: {:.4}", semantic.similarity(&causal));
-        println!("Semantic vs Temporal: {:.4}", semantic.similarity(&temporal));
-        println!("Causal vs Temporal: {:.4}", causal.similarity(&temporal));
+        // All dimensions should produce vectors of equal length
+        assert_eq!(semantic.len(), causal.len(), "Semantic and causal should have same dimension");
+        assert_eq!(semantic.len(), temporal.len(), "Semantic and temporal should have same dimension");
+
+        let sim_sc = semantic.similarity(&causal);
+        let sim_st = semantic.similarity(&temporal);
+        let sim_ct = causal.similarity(&temporal);
+
+        // Similarities should be valid (in [0, 1])
+        assert!(sim_sc >= 0.0 && sim_sc <= 1.0, "Similarity should be in [0,1], got {}", sim_sc);
+        assert!(sim_st >= 0.0 && sim_st <= 1.0, "Similarity should be in [0,1], got {}", sim_st);
+        assert!(sim_ct >= 0.0 && sim_ct <= 1.0, "Similarity should be in [0,1], got {}", sim_ct);
+
+        println!("Semantic vs Causal: {:.4}", sim_sc);
+        println!("Semantic vs Temporal: {:.4}", sim_st);
+        println!("Causal vs Temporal: {:.4}", sim_ct);
     }
 
     #[test]
@@ -726,8 +739,14 @@ mod tests {
         let b = Cantor4D_HV::new(base_b, 3);
 
         let gradient = a.consciousness_gradient_similarity(&b);
+        assert!(!gradient.is_empty(), "Gradient should produce at least one data point");
+
         println!("Consciousness gradient similarity:");
         for (w, sim) in &gradient {
+            assert!(w.is_finite(), "Weight should be finite");
+            assert!(*w >= 0.0 && *w <= 1.0, "Weight should be in [0,1], got {}", w);
+            assert!(sim.is_finite(), "Similarity should be finite");
+            assert!(*sim >= 0.0 && *sim <= 1.0, "Similarity should be in [0,1], got {}", sim);
             println!("  W={:.2}: {:.4}", w, sim);
         }
     }
@@ -742,8 +761,16 @@ mod tests {
         let equator = spherical.at_spherical(1.0, PI / 2.0, 0.0);
         let pole = spherical.at_spherical(1.0, 0.0, 0.0);
 
-        println!("Origin vs Equator: {:.4}", origin.similarity(&equator));
-        println!("Origin vs Pole: {:.4}", origin.similarity(&pole));
-        println!("Equator vs Pole: {:.4}", equator.similarity(&pole));
+        let sim_oe = origin.similarity(&equator);
+        let sim_op = origin.similarity(&pole);
+        let sim_ep = equator.similarity(&pole);
+
+        assert!(sim_oe >= 0.0 && sim_oe <= 1.0, "Similarity should be in [0,1], got {}", sim_oe);
+        assert!(sim_op >= 0.0 && sim_op <= 1.0, "Similarity should be in [0,1], got {}", sim_op);
+        assert!(sim_ep >= 0.0 && sim_ep <= 1.0, "Similarity should be in [0,1], got {}", sim_ep);
+
+        println!("Origin vs Equator: {:.4}", sim_oe);
+        println!("Origin vs Pole: {:.4}", sim_op);
+        println!("Equator vs Pole: {:.4}", sim_ep);
     }
 }

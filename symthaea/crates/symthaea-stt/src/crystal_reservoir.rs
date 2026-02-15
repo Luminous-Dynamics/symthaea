@@ -88,7 +88,7 @@ pub struct CrystalReservoir {
 #[derive(Clone, Copy, Debug)]
 pub enum CrystalActivation {
     ReLU,
-    HalfWaveRect,  // max(0, x) - biologically plausible
+    HalfWaveRect, // max(0, x) - biologically plausible
     Sigmoid,
 }
 
@@ -100,12 +100,7 @@ impl CrystalReservoir {
     /// * `context_frames` - Temporal context (e.g., 7 or 11)
     /// * `feature_dim` - Features per frame (e.g., 120 for mel+delta+deltadelta)
     /// * `n_mels` - Number of mel bins (e.g., 40)
-    pub fn new(
-        n_filters: usize,
-        context_frames: usize,
-        feature_dim: usize,
-        n_mels: usize,
-    ) -> Self {
+    pub fn new(n_filters: usize, context_frames: usize, feature_dim: usize, n_mels: usize) -> Self {
         let filters = generate_gabor_bank(n_filters, context_frames, feature_dim, n_mels);
 
         Self {
@@ -165,9 +160,7 @@ fn generate_gabor_bank(
 
     // Center frequencies: tile across the mel spectrum
     // More filters in the speech-critical F1/F2 range (bins 5-25)
-    let freq_centers: Vec<f32> = (0..n_mels)
-        .map(|i| i as f32)
-        .collect();
+    let freq_centers: Vec<f32> = (0..n_mels).map(|i| i as f32).collect();
 
     // Spectral bandwidths: narrow (2 bins) to wide (8 bins)
     let spectral_sigmas = [2.0, 4.0, 6.0, 8.0];
@@ -226,9 +219,10 @@ fn generate_gabor_bank(
     while filters.len() < n_filters {
         // Add random perturbations of existing filters for diversity
         let base_idx = filters.len() % filters.len().max(1);
-        let mut new_filter = filters.get(base_idx).cloned().unwrap_or_else(|| {
-            vec![0.0; context_frames * feature_dim]
-        });
+        let mut new_filter = filters
+            .get(base_idx)
+            .cloned()
+            .unwrap_or_else(|| vec![0.0; context_frames * feature_dim]);
 
         // Small random perturbation for diversity
         use std::collections::hash_map::DefaultHasher;
@@ -415,7 +409,11 @@ mod tests {
 
         // Check normalization
         let energy: f32 = patch.iter().map(|x| x * x).sum();
-        assert!((energy - 1.0).abs() < 0.01, "Energy should be ~1.0, got {}", energy);
+        assert!(
+            (energy - 1.0).abs() < 0.01,
+            "Energy should be ~1.0, got {}",
+            energy
+        );
     }
 
     #[test]

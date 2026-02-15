@@ -13,30 +13,53 @@
 //! - `Unidentified`: we cannot identify the causal effect (with reason)
 //! - `AssumptionRequired`: we can identify IF an assumption holds
 
+pub mod composer;
 pub mod hdc_surgery;
 pub mod identification;
 pub mod semantic_roles;
-pub mod composer;
 
 // Re-export key types
 pub use identification::{
-    CausalQueryOutcome, CausalEstimand, IdentificationMethod,
-    UnidentifiedReason, CausalAssumption, CausalDAG, CausalQuery,
-    CounterfactualReasoner, CausalReferenceHarness, HarnessResult,
-    // Effect estimation
-    ObservationalData, EffectEstimator, RobustEstimate, SensitivityAnalysis,
+    CausalAssumption,
+    CausalDAG,
+    CausalEstimand,
+    CausalExpression,
     // Shpitser-Pearl ID Algorithm
-    CausalGraphWithLatents, CausalExpression, IDAlgorithm,
-    // Causal Discovery
-    PCAlgorithm, PCResult, Skeleton, CPDAG,
-    // Mediation Analysis
-    MediationAnalysis, MediationResult, MediationIdentification,
+    CausalGraphWithLatents,
+    CausalQuery,
+    CausalQueryOutcome,
+    CausalReferenceHarness,
+    CounterfactualReasoner,
+    EffectEstimator,
+    GrangerResult,
+    HarnessResult,
+    IDAlgorithm,
     // Instrumental Variables
-    IVEstimator, IVValidity, IVResult,
+    IVEstimator,
+    IVResult,
+    IVValidity,
+    IdentificationMethod,
+    // Mediation Analysis
+    MediationAnalysis,
+    MediationIdentification,
+    MediationResult,
+    // Effect estimation
+    ObservationalData,
+    // Causal Discovery
+    PCAlgorithm,
+    PCResult,
+    RobustEstimate,
+    SensitivityAnalysis,
+    Skeleton,
     // Time-Series Causal Discovery
-    TimeSeriesCausalDiscovery, TimeSeriesData, GrangerResult, TimeSeriesCausalGraph,
+    TimeSeriesCausalDiscovery,
+    TimeSeriesCausalGraph,
+    TimeSeriesData,
     // Transportability
-    TransportabilityAnalyzer, TransportabilityResult,
+    TransportabilityAnalyzer,
+    TransportabilityResult,
+    UnidentifiedReason,
+    CPDAG,
 };
 
 // Note: IdentificationMethod now includes:
@@ -45,6 +68,6 @@ pub use identification::{
 // - FrontdoorCriterion (special case of Rule 1)
 // - Rule2ActionObservation (Pearl's Rule 2)
 // - Rule3ActionDeletion (Pearl's Rule 3)
-pub use hdc_surgery::GraphSurgery;
-pub use semantic_roles::{SemanticRole, RoleSubstitution};
 pub use composer::CounterfactualComposer;
+pub use hdc_surgery::GraphSurgery;
+pub use semantic_roles::{RoleSubstitution, SemanticRole};

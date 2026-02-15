@@ -18,19 +18,14 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use super::types::instant_now;
 use super::architectural_graph::ArchitecturalCausalGraph;
-use super::safe_experiment::{
-    ExperimentConfig, ExperimentStatus,
-    SafeExperiment, SystemSnapshot,
-};
-use super::improvement_generator::{
-    GeneratorConfig, ImprovementGenerator, ImprovementOutcome,
-};
 use super::core::Bottleneck;
+use super::improvement_generator::{GeneratorConfig, ImprovementGenerator, ImprovementOutcome};
+use super::safe_experiment::{ExperimentConfig, ExperimentStatus, SafeExperiment, SystemSnapshot};
+use super::types::instant_now;
 
 // Import from core for now (PerformanceMonitor, MonitorConfig, ComponentId still in core.rs)
-use super::core::{PerformanceMonitor, MonitorConfig, ComponentId};
+use super::core::{ComponentId, MonitorConfig, PerformanceMonitor};
 
 /// RecursiveOptimizer: Coordinates the Complete Self-Improvement Loop
 ///
@@ -174,11 +169,9 @@ impl RecursiveOptimizer {
         // Step 3: Generate improvements
         // Convert to Vec of references for generate_improvements
         let bottleneck_refs: Vec<&Bottleneck> = bottlenecks.iter().collect();
-        let improvements = self.generator.generate_improvements(
-            &bottleneck_refs,
-            &causal_chains,
-            starting_phi,
-        );
+        let improvements =
+            self.generator
+                .generate_improvements(&bottleneck_refs, &causal_chains, starting_phi);
 
         // Step 4: Create experiments for each improvement
         let mut improvements_tried = 0;
@@ -300,12 +293,8 @@ impl RecursiveOptimizer {
     pub fn record_latency(&mut self, operation: &str, duration: Duration, component: ComponentId) {
         let start = Instant::now() - duration;
         self.monitor.record_latency(operation.to_string(), start);
-        self.causal_graph.update_component_performance(
-            component,
-            None,
-            Some(duration),
-            None,
-        );
+        self.causal_graph
+            .update_component_performance(component, None, Some(duration), None);
     }
 
     /// Get optimizer statistics
@@ -352,12 +341,18 @@ impl RecursiveOptimizer {
             self.stats.successful_cycles,
             if self.stats.total_cycles > 0 {
                 self.stats.successful_cycles as f64 / self.stats.total_cycles as f64 * 100.0
-            } else { 0.0 },
+            } else {
+                0.0
+            },
             self.stats.total_phi_gained,
             self.stats.current_phi,
             self.generator.get_stats().success_rate * 100.0,
             self.active_experiments.len(),
-            if self.stats.paused { "PAUSED" } else { "ACTIVE" },
+            if self.stats.paused {
+                "PAUSED"
+            } else {
+                "ACTIVE"
+            },
         )
     }
 }

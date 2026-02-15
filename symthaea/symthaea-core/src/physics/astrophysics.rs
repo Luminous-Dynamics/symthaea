@@ -22,12 +22,12 @@
 //! - **Neutron stars**: Neutron degenerate matter (~10^57 neutrons)
 //! - **Black holes**: Spacetime singularity (no hair theorem: mass, spin, charge)
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::periodic_table::PeriodicTable;
 use super::hadrons::Hadrons;
 use super::nuclear::NuclearPhysics;
+use super::periodic_table::PeriodicTable;
+use super::standard_model::PHYSICS_DIM;
+use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Stellar spectral class (Harvard classification)
@@ -210,7 +210,9 @@ impl StellarEncoder {
     /// connecting stellar evolution to nuclear fusion processes.
     pub fn from_nuclear(nuclear: &NuclearPhysics, genesis: &GenesisSeed) -> Self {
         // Main sequence is powered by nuclear fusion
-        let main_sequence = nuclear.nuclear_energy.bind(&genesis.hv("stellar::main_sequence", PHYSICS_DIM));
+        let main_sequence = nuclear
+            .nuclear_energy
+            .bind(&genesis.hv("stellar::main_sequence", PHYSICS_DIM));
 
         // White dwarf: electron degeneracy, sub-nuclear energy scale
         let white_dwarf = ContinuousHV::bundle(&[
@@ -219,10 +221,14 @@ impl StellarEncoder {
         ]);
 
         // Neutron star: nuclear degeneracy
-        let neutron_star = nuclear.nuclear_energy.bind(&genesis.hv("stellar::neutron_star", PHYSICS_DIM));
+        let neutron_star = nuclear
+            .nuclear_energy
+            .bind(&genesis.hv("stellar::neutron_star", PHYSICS_DIM));
 
         // Black hole: relativistic energy scale
-        let black_hole = nuclear.relativistic_energy.bind(&genesis.hv("stellar::black_hole", PHYSICS_DIM));
+        let black_hole = nuclear
+            .relativistic_energy
+            .bind(&genesis.hv("stellar::black_hole", PHYSICS_DIM));
 
         Self {
             class_o: genesis.hv(SpectralClass::O.domain_label(), PHYSICS_DIM),
@@ -303,7 +309,13 @@ impl StellarEncoder {
 
         // Bundle all properties
         let vector = ContinuousHV::weighted_bundle(
-            &[spec_vec, lum_vec, &mass_scaled, &radius_scaled, &temp_scaled],
+            &[
+                spec_vec,
+                lum_vec,
+                &mass_scaled,
+                &radius_scaled,
+                &temp_scaled,
+            ],
             &[1.0, 1.0, 0.5, 0.5, 0.5],
         );
 
@@ -321,7 +333,15 @@ impl StellarEncoder {
 
     /// The Sun: G2V star
     pub fn sun(&self) -> Star {
-        self.encode_star("Sun", SpectralClass::G, LuminosityClass::V, 1.0, 1.0, 5778.0, 4.6)
+        self.encode_star(
+            "Sun",
+            SpectralClass::G,
+            LuminosityClass::V,
+            1.0,
+            1.0,
+            5778.0,
+            4.6,
+        )
     }
 }
 
@@ -345,8 +365,14 @@ pub struct NucleosynthesisProcess {
 impl StellarEncoder {
     /// Proton-proton chain: 4H → He + 2e⁺ + 2ν + 26.7 MeV
     pub fn pp_chain(&self, table: &PeriodicTable) -> NucleosynthesisProcess {
-        let h = table.element(1).map(|e| e.vector.clone()).unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let he = table.element(2).map(|e| e.vector.clone()).unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
+        let h = table
+            .element(1)
+            .map(|e| e.vector.clone())
+            .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
+        let he = table
+            .element(2)
+            .map(|e| e.vector.clone())
+            .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
 
         let vector = h.scale(4.0).bind(&he);
 
@@ -362,9 +388,18 @@ impl StellarEncoder {
 
     /// CNO cycle: 4H → He (catalyzed by C, N, O)
     pub fn cno_cycle(&self, table: &PeriodicTable) -> NucleosynthesisProcess {
-        let h = table.element(1).map(|e| e.vector.clone()).unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let he = table.element(2).map(|e| e.vector.clone()).unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let c = table.element(6).map(|e| e.vector.clone()).unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
+        let h = table
+            .element(1)
+            .map(|e| e.vector.clone())
+            .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
+        let he = table
+            .element(2)
+            .map(|e| e.vector.clone())
+            .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
+        let c = table
+            .element(6)
+            .map(|e| e.vector.clone())
+            .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
 
         // Catalyzed process: C acts as catalyst
         let vector = h.scale(4.0).bind(&he).bind(&c);
@@ -381,8 +416,14 @@ impl StellarEncoder {
 
     /// Triple-alpha process: 3He → C + 7.27 MeV
     pub fn triple_alpha(&self, table: &PeriodicTable) -> NucleosynthesisProcess {
-        let he = table.element(2).map(|e| e.vector.clone()).unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
-        let c = table.element(6).map(|e| e.vector.clone()).unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
+        let he = table
+            .element(2)
+            .map(|e| e.vector.clone())
+            .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
+        let c = table
+            .element(6)
+            .map(|e| e.vector.clone())
+            .unwrap_or_else(|| ContinuousHV::zero(PHYSICS_DIM));
 
         let vector = he.scale(3.0).bind(&c);
 
@@ -451,7 +492,7 @@ impl StellarEncoder {
             name: name.to_string(),
             mass_solar,
             radius_km,
-            period_ms: 1.0,  // Default millisecond pulsar
+            period_ms: 1.0, // Default millisecond pulsar
             magnetic_field_gauss: 1e12,
             is_pulsar: true,
             vector: degeneracy,
@@ -490,7 +531,8 @@ impl StellarEncoder {
         let t_hawking = 6.17e-8 / mass_solar;
 
         // Vector: mass-scaled black hole concept + spin
-        let vector = self.black_hole
+        let vector = self
+            .black_hole
             .scale(mass_solar.ln() as f32 + 1.0)
             .bind(&self.spin_vector.scale(spin as f32));
 
@@ -608,12 +650,13 @@ impl CosmologicalEncoder {
     ) -> Galaxy {
         let type_vec = self.galaxy_type_vector(morphology);
         let dm_vec = self.dark_matter.scale(dark_matter_fraction as f32);
-        let bary_vec = self.baryonic_matter.scale((1.0 - dark_matter_fraction) as f32);
+        let bary_vec = self
+            .baryonic_matter
+            .scale((1.0 - dark_matter_fraction) as f32);
 
-        let vector = ContinuousHV::weighted_bundle(
-            &[type_vec, &dm_vec, &bary_vec],
-            &[1.0, 0.5, 0.5],
-        ).scale(mass_solar.log10() as f32 / 12.0);
+        let vector =
+            ContinuousHV::weighted_bundle(&[type_vec, &dm_vec, &bary_vec], &[1.0, 0.5, 0.5])
+                .scale(mass_solar.log10() as f32 / 12.0);
 
         Galaxy {
             name: name.to_string(),
@@ -630,9 +673,9 @@ impl CosmologicalEncoder {
         self.encode_galaxy(
             "Milky Way",
             GalaxyType::Spiral,
-            1.5e12,  // 1.5 trillion solar masses (including dark matter)
-            2e11,    // 200 billion stars
-            0.84,    // ~84% dark matter
+            1.5e12, // 1.5 trillion solar masses (including dark matter)
+            2e11,   // 200 billion stars
+            0.84,   // ~84% dark matter
         )
     }
 
@@ -648,7 +691,9 @@ impl CosmologicalEncoder {
         if redshift > 1100.0 {
             self.big_bang.scale(z_scaled)
         } else if redshift > 6.0 {
-            self.recombination.scale(z_scaled).bind(&self.cosmic_microwave_background)
+            self.recombination
+                .scale(z_scaled)
+                .bind(&self.cosmic_microwave_background)
         } else {
             self.reionization.scale(z_scaled)
         }
@@ -693,16 +738,39 @@ mod tests {
 
         // Similar stars should have similar vectors
         let sun = encoder.sun();
-        let alpha_cen = encoder.encode_star("Alpha Centauri A", SpectralClass::G, LuminosityClass::V, 1.1, 1.2, 5790.0, 5.3);
+        let alpha_cen = encoder.encode_star(
+            "Alpha Centauri A",
+            SpectralClass::G,
+            LuminosityClass::V,
+            1.1,
+            1.2,
+            5790.0,
+            5.3,
+        );
 
         // Both G2V stars should be similar
         let sim = sun.vector.similarity(&alpha_cen.vector);
-        assert!(sim > 0.8, "Similar stars should have similar vectors: {}", sim);
+        assert!(
+            sim > 0.8,
+            "Similar stars should have similar vectors: {}",
+            sim
+        );
 
         // O star should be different
-        let hot_star = encoder.encode_star("Hot Star", SpectralClass::O, LuminosityClass::V, 30.0, 10.0, 40000.0, 0.001);
+        let hot_star = encoder.encode_star(
+            "Hot Star",
+            SpectralClass::O,
+            LuminosityClass::V,
+            30.0,
+            10.0,
+            40000.0,
+            0.001,
+        );
         let sim_hot = sun.vector.similarity(&hot_star.vector);
-        assert!(sim_hot < sim, "Different spectral classes should be less similar");
+        assert!(
+            sim_hot < sim,
+            "Different spectral classes should be less similar"
+        );
     }
 
     #[test]
@@ -742,7 +810,7 @@ mod tests {
         let stellar_bh = encoder.stellar_black_hole(10.0);
         assert!((stellar_bh.schwarzschild_radius_km - 29.5).abs() < 0.1);
 
-        let smbh = encoder.supermassive_black_hole(4e6);  // Sgr A*
+        let smbh = encoder.supermassive_black_hole(4e6); // Sgr A*
         assert!(smbh.schwarzschild_radius_km > 1e7);
 
         // Hawking temperature: stellar BH should be hotter than SMBH

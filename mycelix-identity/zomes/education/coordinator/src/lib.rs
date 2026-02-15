@@ -52,6 +52,15 @@ pub struct CreateAcademicCredentialOutput {
 pub fn create_academic_credential(
     input: CreateAcademicCredentialInput,
 ) -> ExternResult<CreateAcademicCredentialOutput> {
+    // Verify caller is the issuing institution
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer.id != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the issuing institution can create academic credentials".into()
+        )));
+    }
+
     // Generate credential ID
     let credential_id = generate_credential_id(&input.issuer.id, &input.subject.id)?;
 

@@ -35,8 +35,8 @@ use crate::consciousness::pac::PacTracker;
 use crate::experience::signals::PrincipledSignals;
 
 use super::{
-    BrierScoreTracker, CalibrationQuality, CausalAttribution, MagiLoopState,
-    PredictionDomain, WorldGroundedSelfModel, WorldPrediction,
+    BrierScoreTracker, CalibrationQuality, CausalAttribution, MagiLoopState, PredictionDomain,
+    WorldGroundedSelfModel, WorldPrediction,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -152,14 +152,13 @@ impl ActiveInferenceBridge {
         // Brier score is [0, 1] where 0 is perfect, 1 is worst
         // Map to prediction_error signal
         let avg_brier = calibration_summary.global_brier;
-        let prediction_error = (avg_brier as f32 * self.config.prediction_error_weight)
-            .clamp(0.0, 1.0);
+        let prediction_error =
+            (avg_brier as f32 * self.config.prediction_error_weight).clamp(0.0, 1.0);
 
         // 2. UNCERTAINTY: From ECE (Expected Calibration Error)
         // High ECE = high systematic miscalibration = high uncertainty
         let ece = calibration_summary.global_ece;
-        let uncertainty = (ece as f32 * 2.0 * self.config.uncertainty_weight)
-            .clamp(0.0, 1.0);
+        let uncertainty = (ece as f32 * 2.0 * self.config.uncertainty_weight).clamp(0.0, 1.0);
 
         // 3. CONFIDENCE: Inverse of uncertainty, weighted by data quality
         let data_quality = match loop_state.calibration_quality {
@@ -169,8 +168,8 @@ impl ActiveInferenceBridge {
             CalibrationQuality::Good => 0.8,
             CalibrationQuality::Excellent => 0.95,
         };
-        let confidence = ((1.0 - uncertainty) * data_quality * self.config.confidence_weight)
-            .clamp(0.0, 1.0);
+        let confidence =
+            ((1.0 - uncertainty) * data_quality * self.config.confidence_weight).clamp(0.0, 1.0);
 
         // 4. COHERENCE: From attribution quality (how well can we explain errors?)
         // If we have attributions with testable predictions, coherence is higher
@@ -206,12 +205,11 @@ impl ActiveInferenceBridge {
             return 0.5; // Neutral
         }
 
-        let attribution_ratio = loop_state.attributions_generated as f32
-            / loop_state.predictions_resolved as f32;
+        let attribution_ratio =
+            loop_state.attributions_generated as f32 / loop_state.predictions_resolved as f32;
 
         // Good coherence: we explain most of our errors
-        (attribution_ratio.clamp(0.0, 1.0) * 0.5 + 0.3)
-            .clamp(0.0, 1.0)
+        (attribution_ratio.clamp(0.0, 1.0) * 0.5 + 0.3).clamp(0.0, 1.0)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -279,7 +277,9 @@ impl ActiveInferenceBridge {
     /// - 0.0 = No coupling (predictions don't inform outcomes)
     /// - 1.0 = Perfect coupling (confidence perfectly predicts success)
     pub fn modulation_index(&self) -> Option<f64> {
-        self.pac_tracker.as_ref().map(|p| p.compute_modulation_index())
+        self.pac_tracker
+            .as_ref()
+            .map(|p| p.compute_modulation_index())
     }
 
     /// Get the current coupling quality assessment

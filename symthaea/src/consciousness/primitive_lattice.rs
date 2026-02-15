@@ -935,7 +935,7 @@ mod tests {
                 primitive_id: i as u64,
                 tier: match i {
                     0 => 0,
-                    1 | 2 | 3 => 1,
+                    1..=3 => 1,
                     _ => 2,
                 },
                 name: format!("m3_{}", i),

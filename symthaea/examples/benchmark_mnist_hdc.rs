@@ -32,8 +32,8 @@ use std::io::Read;
 use std::path::Path;
 use std::time::Instant;
 
+use symthaea::hdc::learned_encoding::{AdaptiveQuantizer, SpatialContextEncoder};
 use symthaea::hdc::unified_hv::ContinuousHV;
-use symthaea::hdc::learned_encoding::{SpatialContextEncoder, AdaptiveQuantizer};
 
 const DATA_DIR: &str = "data/benchmarks/mnist";
 
@@ -92,7 +92,10 @@ struct HdcMnistClassifier {
 
 impl HdcMnistClassifier {
     fn new(dim: usize, n_levels: usize) -> Self {
-        println!("  Initializing HDC classifier: dim={}, levels={}", dim, n_levels);
+        println!(
+            "  Initializing HDC classifier: dim={}, levels={}",
+            dim, n_levels
+        );
         let t = Instant::now();
 
         // Generate level HVs using progressive random-flip encoding
@@ -114,7 +117,9 @@ impl HdcMnistClassifier {
 
             // Flip flips_per_level dimensions by negating them
             for _f in 0..flips_per_level {
-                flip_seed = flip_seed.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+                flip_seed = flip_seed
+                    .wrapping_mul(6364136223846793005)
+                    .wrapping_add(1442695040888963407);
                 let idx = (flip_seed >> 33) as usize % dim;
                 new_values[idx] = -new_values[idx];
             }
@@ -185,12 +190,7 @@ impl HdcMnistClassifier {
             if (i + 1) % 10000 == 0 {
                 let elapsed = t.elapsed().as_secs_f64();
                 let rate = (i + 1) as f64 / elapsed;
-                println!(
-                    "  Training: {}/{} ({:.0} samples/sec)",
-                    i + 1,
-                    n,
-                    rate
-                );
+                println!("  Training: {}/{} ({:.0} samples/sec)", i + 1, n, rate);
             }
         }
 
@@ -207,7 +207,8 @@ impl HdcMnistClassifier {
                         *v /= norm;
                     }
                 }
-                self.class_prototypes[class] = Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                self.class_prototypes[class] =
+                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
             }
         }
 
@@ -218,10 +219,7 @@ impl HdcMnistClassifier {
             elapsed,
             n as f64 / elapsed
         );
-        println!(
-            "  Class distribution: {:?}",
-            self.class_counts
-        );
+        println!("  Class distribution: {:?}", self.class_counts);
     }
 
     /// Retrain prototypes using ISOLET-proven direct prototype modification.
@@ -322,8 +320,11 @@ impl HdcMnistClassifier {
         for i in 1..vectors.len() {
             for j in 0..i {
                 // Compute projection coefficient: <v_i, v_j> / <v_j, v_j>
-                let dot: f32 = vectors[i].iter().zip(vectors[j].iter())
-                    .map(|(&a, &b)| a * b).sum();
+                let dot: f32 = vectors[i]
+                    .iter()
+                    .zip(vectors[j].iter())
+                    .map(|(&a, &b)| a * b)
+                    .sum();
                 let norm_sq: f32 = vectors[j].iter().map(|x| x * x).sum();
                 if norm_sq > 1e-10 {
                     let coeff = dot / norm_sq * strength;
@@ -349,20 +350,26 @@ impl HdcMnistClassifier {
         let mut avg_sim = 0.0f32;
         let mut count = 0;
         for i in 0..n_classes {
-            for j in (i+1)..n_classes {
-                if let (Some(ref a), Some(ref b)) = (&self.class_prototypes[i], &self.class_prototypes[j]) {
+            for j in (i + 1)..n_classes {
+                if let (Some(ref a), Some(ref b)) =
+                    (&self.class_prototypes[i], &self.class_prototypes[j])
+                {
                     let sim = a.similarity(b);
                     avg_sim += sim;
                     count += 1;
-                    if sim > max_sim { max_sim = sim; }
+                    if sim > max_sim {
+                        max_sim = sim;
+                    }
                 }
             }
         }
         if count > 0 {
             avg_sim /= count as f32;
         }
-        println!("  Orthogonalization (strength={:.1}): avg inter-class sim={:.4}, max={:.4}",
-            strength, avg_sim, max_sim);
+        println!(
+            "  Orthogonalization (strength={:.1}): avg inter-class sim={:.4}, max={:.4}",
+            strength, avg_sim, max_sim
+        );
     }
 
     /// Classify a single image
@@ -447,7 +454,10 @@ struct EnhancedMnistClassifier {
 
 impl EnhancedMnistClassifier {
     fn new(dim: usize, n_levels: usize, training_images: &[Vec<u8>]) -> Self {
-        println!("  Initializing Enhanced HDC classifier: dim={}, levels={}", dim, n_levels);
+        println!(
+            "  Initializing Enhanced HDC classifier: dim={}, levels={}",
+            dim, n_levels
+        );
         let t = Instant::now();
 
         // Collect all pixel values normalized to [0,1] for adaptive quantization
@@ -456,23 +466,34 @@ impl EnhancedMnistClassifier {
         for (i, img) in training_images.iter().enumerate() {
             if i % 10 == 0 {
                 for &p in img.iter() {
-                    if p > 0 { // Skip zero pixels (background)
+                    if p > 0 {
+                        // Skip zero pixels (background)
                         all_values.push(p as f32 / 255.0);
                     }
                 }
             }
         }
         let quantizer = AdaptiveQuantizer::from_data(&all_values, n_levels);
-        println!("  Adaptive quantizer: {} levels from {} non-zero pixel samples",
-            n_levels, all_values.len());
+        println!(
+            "  Adaptive quantizer: {} levels from {} non-zero pixel samples",
+            n_levels,
+            all_values.len()
+        );
 
         // Interpolated level HVs: smooth gradient between two random endpoints
         let base = ContinuousHV::random(dim, 42);
         let end = ContinuousHV::random(dim, 43);
         let level_hvs: Vec<ContinuousHV> = (0..n_levels)
             .map(|l| {
-                let alpha = if n_levels <= 1 { 0.0 } else { l as f32 / (n_levels - 1) as f32 };
-                let values: Vec<f32> = base.values.iter().zip(end.values.iter())
+                let alpha = if n_levels <= 1 {
+                    0.0
+                } else {
+                    l as f32 / (n_levels - 1) as f32
+                };
+                let values: Vec<f32> = base
+                    .values
+                    .iter()
+                    .zip(end.values.iter())
                     .map(|(&a, &b)| a * (1.0 - alpha) + b * alpha)
                     .collect();
                 ContinuousHV::from_vec(values)
@@ -544,22 +565,39 @@ impl EnhancedMnistClassifier {
 
             if (i + 1) % 10000 == 0 {
                 let elapsed = t.elapsed().as_secs_f64();
-                println!("  Training: {}/{} ({:.0} samples/sec)", i + 1, n, (i + 1) as f64 / elapsed);
+                println!(
+                    "  Training: {}/{} ({:.0} samples/sec)",
+                    i + 1,
+                    n,
+                    (i + 1) as f64 / elapsed
+                );
             }
         }
 
         for class in 0..10 {
             if self.class_counts[class] > 0 {
-                let norm: f32 = accumulators[class].iter().map(|x| x * x).sum::<f32>().sqrt();
+                let norm: f32 = accumulators[class]
+                    .iter()
+                    .map(|x| x * x)
+                    .sum::<f32>()
+                    .sqrt();
                 if norm > 0.0 {
-                    for v in &mut accumulators[class] { *v /= norm; }
+                    for v in &mut accumulators[class] {
+                        *v /= norm;
+                    }
                 }
-                self.class_prototypes[class] = Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                self.class_prototypes[class] =
+                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
             }
         }
 
         let elapsed = t.elapsed().as_secs_f64();
-        println!("  Training complete: {} samples in {:.1}s ({:.0}/s)", n, elapsed, n as f64 / elapsed);
+        println!(
+            "  Training complete: {} samples in {:.1}s ({:.0}/s)",
+            n,
+            elapsed,
+            n as f64 / elapsed
+        );
     }
 
     fn retrain(&mut self, images: &[Vec<u8>], labels: &[u8], lr: f32, iterations: usize) {
@@ -599,8 +637,14 @@ impl EnhancedMnistClassifier {
             }
 
             let accuracy = 1.0 - corrections as f64 / images.len() as f64;
-            println!("  Retrain iter {}/{}: {} corrections, train acc = {:.2}% ({:.1}s)",
-                iter + 1, iterations, corrections, accuracy * 100.0, t.elapsed().as_secs_f64());
+            println!(
+                "  Retrain iter {}/{}: {} corrections, train acc = {:.2}% ({:.1}s)",
+                iter + 1,
+                iterations,
+                corrections,
+                accuracy * 100.0,
+                t.elapsed().as_secs_f64()
+            );
 
             if corrections < images.len() / 200 {
                 println!("  Early stopping: corrections < 0.5% of training set");
@@ -612,7 +656,11 @@ impl EnhancedMnistClassifier {
         for proto in &mut self.class_prototypes {
             if let Some(ref mut p) = proto {
                 let norm: f32 = p.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-                if norm > 0.0 { for v in &mut p.values { *v /= norm; } }
+                if norm > 0.0 {
+                    for v in &mut p.values {
+                        *v /= norm;
+                    }
+                }
             }
         }
     }
@@ -627,11 +675,17 @@ impl EnhancedMnistClassifier {
                 indices.push(i);
             }
         }
-        if vectors.len() < 2 { return; }
+        if vectors.len() < 2 {
+            return;
+        }
 
         for i in 1..vectors.len() {
             for j in 0..i {
-                let dot: f32 = vectors[i].iter().zip(vectors[j].iter()).map(|(&a, &b)| a * b).sum();
+                let dot: f32 = vectors[i]
+                    .iter()
+                    .zip(vectors[j].iter())
+                    .map(|(&a, &b)| a * b)
+                    .sum();
                 let norm_sq: f32 = vectors[j].iter().map(|x| x * x).sum();
                 if norm_sq > 1e-10 {
                     let coeff = dot / norm_sq * strength;
@@ -655,18 +709,26 @@ impl EnhancedMnistClassifier {
         let mut avg_sim = 0.0f32;
         let mut count = 0;
         for i in 0..n_classes {
-            for j in (i+1)..n_classes {
-                if let (Some(ref a), Some(ref b)) = (&self.class_prototypes[i], &self.class_prototypes[j]) {
+            for j in (i + 1)..n_classes {
+                if let (Some(ref a), Some(ref b)) =
+                    (&self.class_prototypes[i], &self.class_prototypes[j])
+                {
                     let sim = a.similarity(b);
                     avg_sim += sim;
                     count += 1;
-                    if sim > max_sim { max_sim = sim; }
+                    if sim > max_sim {
+                        max_sim = sim;
+                    }
                 }
             }
         }
-        if count > 0 { avg_sim /= count as f32; }
-        println!("  Orthogonalization (strength={:.1}): avg inter-class sim={:.4}, max={:.4}",
-            strength, avg_sim, max_sim);
+        if count > 0 {
+            avg_sim /= count as f32;
+        }
+        println!(
+            "  Orthogonalization (strength={:.1}): avg inter-class sim={:.4}, max={:.4}",
+            strength, avg_sim, max_sim
+        );
     }
 
     fn classify(&self, pixels: &[u8]) -> (usize, f32) {
@@ -708,8 +770,11 @@ impl EnhancedMnistClassifier {
             accuracy: correct as f64 / n as f64,
             correct,
             total: n,
-            per_class_accuracy: per_class_correct.iter().zip(per_class_total.iter())
-                .map(|(&c, &t)| if t > 0 { c as f64 / t as f64 } else { 0.0 }).collect(),
+            per_class_accuracy: per_class_correct
+                .iter()
+                .zip(per_class_total.iter())
+                .map(|(&c, &t)| if t > 0 { c as f64 / t as f64 } else { 0.0 })
+                .collect(),
             confusion,
             inference_time_ms: t.elapsed().as_secs_f64() * 1000.0 / n as f64,
         }
@@ -786,9 +851,16 @@ fn main() {
 
         let total_time = total_start.elapsed().as_secs_f64();
 
-        println!("\n  Overall Accuracy: {:.2}% ({}/{})",
-            result.accuracy * 100.0, result.correct, result.total);
-        println!("  Avg inference time: {:.3}ms per sample", result.inference_time_ms);
+        println!(
+            "\n  Overall Accuracy: {:.2}% ({}/{})",
+            result.accuracy * 100.0,
+            result.correct,
+            result.total
+        );
+        println!(
+            "  Avg inference time: {:.3}ms per sample",
+            result.inference_time_ms
+        );
         println!("  Total time: {:.1}s", total_time);
 
         println!("\n  Per-class accuracy:");
@@ -834,9 +906,16 @@ fn main() {
 
         let total_time = total_start.elapsed().as_secs_f64();
 
-        println!("\n  Overall Accuracy: {:.2}% ({}/{})",
-            result.accuracy * 100.0, result.correct, result.total);
-        println!("  Avg inference time: {:.3}ms per sample", result.inference_time_ms);
+        println!(
+            "\n  Overall Accuracy: {:.2}% ({}/{})",
+            result.accuracy * 100.0,
+            result.correct,
+            result.total
+        );
+        println!(
+            "  Avg inference time: {:.3}ms per sample",
+            result.inference_time_ms
+        );
         println!("  Total time: {:.1}s", total_time);
 
         println!("\n  Per-class accuracy:");
@@ -852,13 +931,18 @@ fn main() {
     println!("╔═══════════════════════════════════════════════════════════════════════╗");
     println!("║                         RESULTS SUMMARY                             ║");
     println!("╠═══════════════════════════════════════════════════════════════════════╣");
-    println!("║ {:35} │ {:>8} │ {:>10} ║", "Configuration", "Accuracy", "Infer/ms");
+    println!(
+        "║ {:35} │ {:>8} │ {:>10} ║",
+        "Configuration", "Accuracy", "Infer/ms"
+    );
     println!("╟─────────────────────────────────────┼──────────┼────────────╢");
 
     for (_dim, _levels, _retrain, _gs, label, result) in results.iter() {
         println!(
             "║ {:35} │ {:>7.2}% │ {:>9.3} ║",
-            label, result.accuracy * 100.0, result.inference_time_ms
+            label,
+            result.accuracy * 100.0,
+            result.inference_time_ms
         );
     }
     println!("╚═══════════════════════════════════════════════════════════════════════╝\n");
@@ -879,11 +963,7 @@ fn main() {
     ];
 
     for (name, pass) in &checks {
-        println!(
-            "  {}: {}",
-            name,
-            if *pass { "PASS" } else { "FAIL" }
-        );
+        println!("  {}: {}", name, if *pass { "PASS" } else { "FAIL" });
     }
 
     println!("\nBest accuracy: {:.2}%", best_accuracy * 100.0);

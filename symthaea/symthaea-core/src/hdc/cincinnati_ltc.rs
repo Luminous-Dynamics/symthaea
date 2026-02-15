@@ -34,9 +34,9 @@
 //! - [`PoGMetrics`]: Proof of Grounding - physical world metrics
 //! - [`CincinnatiLtcEngine`]: Unified integration of all components
 
-use std::f32::consts::PI;
 use rand::Rng;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::f32::consts::PI;
 
 use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::HDC_DIMENSION;
@@ -94,7 +94,7 @@ impl CincinnatiEstimator {
     /// Create a new Cincinnati Estimator
     pub fn new() -> Self {
         Self {
-            model: vec![false],  // Start with single bit
+            model: vec![false], // Start with single bit
             observations: 0,
             correct_predictions: 0,
             seed: 42,
@@ -209,7 +209,7 @@ impl CincinnatiEstimator {
         let len = self.model.len() as f32;
 
         for (i, &bit) in self.model.iter().enumerate() {
-            let weight = (i as f32 + 1.0) / len;  // Higher weight for recent bits
+            let weight = (i as f32 + 1.0) / len; // Higher weight for recent bits
             delta += if bit { weight } else { -weight };
         }
 
@@ -296,7 +296,7 @@ impl LateralBinder {
                 let j = (k + d - i) % d;
                 sum += a.values[i] * b.values[j];
             }
-            result[k] = sum / (d as f32).sqrt();  // Normalize
+            result[k] = sum / (d as f32).sqrt(); // Normalize
         }
 
         ContinuousHV::from_values(result)
@@ -423,16 +423,16 @@ impl PredictiveBudding {
     /// Create new predictive budding system
     pub fn new(initial_nodes: usize) -> Self {
         Self {
-            theta_bud: 0.7,      // High error threshold for budding
-            theta_prune: 0.1,   // Low error threshold for pruning
-            alpha: 0.7,          // Time constant inheritance
-            sustain_steps: 10,   // Sustained for 10 steps
+            theta_bud: 0.7,    // High error threshold for budding
+            theta_prune: 0.1,  // Low error threshold for pruning
+            alpha: 0.7,        // Time constant inheritance
+            sustain_steps: 10, // Sustained for 10 steps
             errors: vec![0.0; initial_nodes],
             above_threshold: vec![0; initial_nodes],
             below_threshold: vec![0; initial_nodes],
             parent_map: vec![None; initial_nodes],
             tau_values: vec![1.0; initial_nodes],
-            max_nodes: initial_nodes * 4,  // Allow 4x expansion
+            max_nodes: initial_nodes * 4, // Allow 4x expansion
             next_id: initial_nodes,
         }
     }
@@ -464,8 +464,7 @@ impl PredictiveBudding {
             return false;
         }
 
-        self.above_threshold[node_id] >= self.sustain_steps
-            && self.next_id < self.max_nodes
+        self.above_threshold[node_id] >= self.sustain_steps && self.next_id < self.max_nodes
     }
 
     /// Check if node should be pruned
@@ -475,12 +474,20 @@ impl PredictiveBudding {
         }
 
         // Only prune if this is a child (has a parent)
-        self.parent_map.get(node_id).map(|p| p.is_some()).unwrap_or(false)
+        self.parent_map
+            .get(node_id)
+            .map(|p| p.is_some())
+            .unwrap_or(false)
             && self.below_threshold[node_id] >= self.sustain_steps
     }
 
     /// Create a budding event for spawning a new node
-    pub fn create_budding_event(&mut self, parent_id: usize, timestamp: f64, state: &ContinuousHV) -> Option<BuddingEvent> {
+    pub fn create_budding_event(
+        &mut self,
+        parent_id: usize,
+        timestamp: f64,
+        state: &ContinuousHV,
+    ) -> Option<BuddingEvent> {
         if !self.should_bud(parent_id) {
             return None;
         }
@@ -642,29 +649,30 @@ impl PoGMetrics {
 
         // Storage: log-normalized
         let storage_norm = ((self.storage_bytes as f64 + 1.0).ln() / 30.0) as f32;
-        for i in region_size..2*region_size {
+        for i in region_size..2 * region_size {
             let j = i - region_size;
             values[i] = (storage_norm * (j as f32 / region_size as f32 * 2.0 * PI).cos()).tanh();
         }
 
         // Bandwidth: log-normalized
         let bw_norm = ((self.bandwidth_bps + 1.0).ln() / 20.0) as f32;
-        for i in 2*region_size..3*region_size {
-            let j = i - 2*region_size;
+        for i in 2 * region_size..3 * region_size {
+            let j = i - 2 * region_size;
             values[i] = (bw_norm * (j as f32 / region_size as f32 * 3.0 * PI).sin()).tanh();
         }
 
         // Latency: inverse normalized (lower is better)
         let latency_norm = 1.0 / (1.0 + self.latency_ms / 100.0);
-        for i in 3*region_size..4*region_size {
-            let j = i - 3*region_size;
+        for i in 3 * region_size..4 * region_size {
+            let j = i - 3 * region_size;
             values[i] = latency_norm * (j as f32 / region_size as f32 * 2.0 * PI).cos();
         }
 
         // Accuracy: direct
-        for i in 4*region_size..HDC_DIMENSION {
-            let j = i - 4*region_size;
-            values[i] = (self.accuracy * 2.0 - 1.0) * (j as f32 / (HDC_DIMENSION - 4*region_size) as f32 * PI).sin();
+        for i in 4 * region_size..HDC_DIMENSION {
+            let j = i - 4 * region_size;
+            values[i] = (self.accuracy * 2.0 - 1.0)
+                * (j as f32 / (HDC_DIMENSION - 4 * region_size) as f32 * PI).sin();
         }
 
         ContinuousHV::from_values(values)
@@ -682,7 +690,8 @@ impl PoGMetrics {
         let accuracy_score = self.accuracy;
 
         // Weighted combination
-        (energy_score * 0.2 + storage_score * 0.2 + latency_score * 0.2 + accuracy_score * 0.4).clamp(0.0, 1.0)
+        (energy_score * 0.2 + storage_score * 0.2 + latency_score * 0.2 + accuracy_score * 0.4)
+            .clamp(0.0, 1.0)
     }
 }
 
@@ -796,7 +805,11 @@ impl CincinnatiLtcEngine {
     }
 
     /// Check for budding events and process them
-    pub fn process_budding(&mut self, node_states: &[ContinuousHV], timestamp: f64) -> Vec<BuddingEvent> {
+    pub fn process_budding(
+        &mut self,
+        node_states: &[ContinuousHV],
+        timestamp: f64,
+    ) -> Vec<BuddingEvent> {
         let mut events = Vec::new();
 
         for (id, state) in node_states.iter().enumerate() {
@@ -809,7 +822,12 @@ impl CincinnatiLtcEngine {
     }
 
     /// Update prediction error for a node
-    pub fn update_prediction_error(&mut self, node_id: usize, predicted: &ContinuousHV, actual: &ContinuousHV) {
+    pub fn update_prediction_error(
+        &mut self,
+        node_id: usize,
+        predicted: &ContinuousHV,
+        actual: &ContinuousHV,
+    ) {
         let error = 1.0 - predicted.similarity(actual).abs();
         self.budding.update_error(node_id, error);
         self.pog.update_accuracy(error < 0.3);
@@ -912,7 +930,7 @@ mod tests {
 
     #[test]
     fn test_lateral_convolution() {
-        let binder = LateralBinder::new(128);  // Small dim for testing
+        let binder = LateralBinder::new(128); // Small dim for testing
 
         let a = ContinuousHV::random(128, 42);
         let b = ContinuousHV::random(128, 123);
@@ -935,7 +953,7 @@ mod tests {
 
         // Simulate high prediction error
         for _ in 0..15 {
-            budding.update_error(0, 0.9);  // High error
+            budding.update_error(0, 0.9); // High error
         }
 
         assert!(budding.should_bud(0));
@@ -947,7 +965,7 @@ mod tests {
         assert!(event.is_some());
         let event = event.unwrap();
         assert_eq!(event.parent_id, 0);
-        assert!(event.initial_tau < 1.0);  // Inherited and reduced
+        assert!(event.initial_tau < 1.0); // Inherited and reduced
     }
 
     #[test]
@@ -980,7 +998,7 @@ mod tests {
 
         // Run several steps
         for i in 0..20 {
-            let obs = i % 3 == 0;  // Observation pattern
+            let obs = i % 3 == 0; // Observation pattern
             let result = engine.step(obs, &input);
 
             // Result should be valid
@@ -1025,9 +1043,23 @@ mod tests {
             engine.pog.update_energy(1.0, t as f64);
         }
 
+        // All 50 outputs should be finite-valued
+        assert_eq!(outputs.len(), 50);
+        for (i, output) in outputs.iter().enumerate() {
+            for v in &output.values {
+                assert!(v.is_finite(), "Output {} should have finite values", i);
+            }
+        }
+
         // Check budding
         let events = engine.process_budding(&inputs, 50.0);
         println!("Budding events: {}", events.len());
         println!("Final node count: {}", engine.node_count());
+
+        // Node count should be at least the initial 5
+        assert!(
+            engine.node_count() >= 5,
+            "Node count should be at least initial count"
+        );
     }
 }

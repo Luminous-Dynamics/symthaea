@@ -99,11 +99,11 @@
 //! | Reality check | <1μs | Simple comparison |
 //! | Full learn cycle | ~1ms | Including Φ measurement |
 
-mod objective;
-mod curriculum;
-mod reality_check;
 mod assessment;
+mod curriculum;
 mod curriculum_loader;
+mod objective;
+mod reality_check;
 
 // Lookahead needs CfCNetwork API alignment (cfg-gated)
 #[cfg(feature = "school_lookahead")]
@@ -113,17 +113,17 @@ mod lookahead;
 #[cfg(feature = "physiology_module")]
 mod coherence_bridge;
 
-pub use objective::{LearningObjective, ObjectiveBuilder, Difficulty, Domain};
-pub use curriculum::{Curriculum, CurriculumType, CurriculumBuilder};
-pub use reality_check::{RealityChecker, RealityCheckResult, CorrectionStrategy};
 pub use assessment::{
-    AssessmentTracker, ObjectiveProgress, CurriculumProgress,
-    MasteryLevel, AssessmentStats, MasteryDistribution,
+    AssessmentStats, AssessmentTracker, CurriculumProgress, MasteryDistribution, MasteryLevel,
+    ObjectiveProgress,
 };
-pub use curriculum_loader::{CurriculumLoader, CurriculumSpec, ObjectiveSpec, LoadError};
+pub use curriculum::{Curriculum, CurriculumBuilder, CurriculumType};
+pub use curriculum_loader::{CurriculumLoader, CurriculumSpec, LoadError, ObjectiveSpec};
+pub use objective::{Difficulty, Domain, LearningObjective, ObjectiveBuilder};
+pub use reality_check::{CorrectionStrategy, RealityCheckResult, RealityChecker};
 
 #[cfg(feature = "school_lookahead")]
-pub use lookahead::{LookaheadEngine, LookaheadResult, LearningRecommendation};
+pub use lookahead::{LearningRecommendation, LookaheadEngine, LookaheadResult};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // STUB IMPLEMENTATIONS (when school_lookahead feature is disabled)
@@ -133,13 +133,13 @@ pub use lookahead::{LookaheadEngine, LookaheadResult, LearningRecommendation};
 // functionality. They provide minimal implementations that return neutral/safe values.
 
 #[cfg(not(feature = "school_lookahead"))]
-pub use self::lookahead_stub::{LookaheadEngine, LookaheadResult, LearningRecommendation};
+pub use self::lookahead_stub::{LearningRecommendation, LookaheadEngine, LookaheadResult};
 
 #[cfg(not(feature = "school_lookahead"))]
 mod lookahead_stub {
+    use super::LearningObjective;
     use anyhow::Result;
     use symthaea_core::hdc::unified_hv::ContinuousHV;
-    use super::LearningObjective;
 
     /// Stub LearningRecommendation for when lookahead is disabled
     #[derive(Debug, Clone)]
@@ -210,8 +210,8 @@ mod lookahead_stub {
 
 #[cfg(feature = "physiology_module")]
 pub use coherence_bridge::{
-    CoherenceBridgedSchool, CoherenceLearningConfig, CoherenceLearningResult,
-    LearningCoherencePrediction, CoherenceRecommendation, CoherenceBridgedStats,
+    CoherenceBridgedSchool, CoherenceBridgedStats, CoherenceLearningConfig,
+    CoherenceLearningResult, CoherenceRecommendation, LearningCoherencePrediction,
 };
 
 use anyhow::Result;
@@ -338,10 +338,8 @@ impl School {
             config.min_phi_gain,
         )?;
 
-        let reality_checker = RealityChecker::new(
-            config.hallucination_threshold,
-            config.adaptation_rate,
-        );
+        let reality_checker =
+            RealityChecker::new(config.hallucination_threshold, config.adaptation_rate);
 
         let assessment = AssessmentTracker::default();
 
@@ -376,7 +374,8 @@ impl School {
 
     /// Get all available objectives across all curricula
     pub fn all_objectives(&self) -> Vec<&LearningObjective> {
-        self.curricula.values()
+        self.curricula
+            .values()
             .flat_map(|c| c.objectives.iter())
             .collect()
     }
@@ -392,7 +391,9 @@ impl School {
 
     /// Check if prerequisites are met for an objective
     fn prerequisites_met(&self, objective: &LearningObjective) -> bool {
-        objective.prerequisites.iter()
+        objective
+            .prerequisites
+            .iter()
             .all(|prereq| self.assessment.is_mastered(prereq))
     }
 
@@ -435,7 +436,8 @@ impl School {
                 predicted_phi_gain: lookahead_result.predicted_phi_gain,
                 confidence: lookahead_result.confidence,
                 reasoning: lookahead_result.recommendation.clone(),
-                alternatives: evaluated.iter()
+                alternatives: evaluated
+                    .iter()
                     .skip(1)
                     .take(3)
                     .map(|(obj, _)| (*obj).clone())
@@ -456,7 +458,9 @@ impl School {
     /// 5. Updates assessment tracking
     pub fn learn(&mut self, objective: &LearningObjective) -> Result<LearningResult> {
         // 1. Predict
-        let prediction = self.lookahead.evaluate(objective, &self.consciousness_state)?;
+        let prediction = self
+            .lookahead
+            .evaluate(objective, &self.consciousness_state)?;
         let predicted_gain = prediction.predicted_phi_gain;
 
         // 2. Pre-learning Φ
@@ -475,18 +479,13 @@ impl School {
         let actual_gain = post_phi - pre_phi;
 
         // 5. Reality check
-        let check_result = self.reality_checker.check(
-            predicted_gain,
-            actual_gain,
-            &mut self.lookahead,
-        )?;
+        let check_result =
+            self.reality_checker
+                .check(predicted_gain, actual_gain, &mut self.lookahead)?;
 
         // 6. Update assessment
-        self.assessment.record_learning(
-            &objective.id,
-            actual_gain,
-            check_result.is_hallucination,
-        );
+        self.assessment
+            .record_learning(&objective.id, actual_gain, check_result.is_hallucination);
 
         self.total_learned += 1;
 
@@ -654,7 +653,7 @@ mod tests {
         let curriculum = Curriculum::new("test", "Test Curriculum")
             .with_objective(
                 LearningObjective::new("obj1", "Test Objective 1")
-                    .with_difficulty(Difficulty::Beginner)
+                    .with_difficulty(Difficulty::Beginner),
             )
             .build();
 
@@ -669,12 +668,10 @@ mod tests {
 
         let curriculum = Curriculum::new("test", "Test")
             .with_objective(
-                LearningObjective::new("obj1", "Easy")
-                    .with_difficulty(Difficulty::Beginner)
+                LearningObjective::new("obj1", "Easy").with_difficulty(Difficulty::Beginner),
             )
             .with_objective(
-                LearningObjective::new("obj2", "Hard")
-                    .with_difficulty(Difficulty::Expert)
+                LearningObjective::new("obj2", "Hard").with_difficulty(Difficulty::Expert),
             )
             .build();
 
@@ -690,8 +687,7 @@ mod tests {
 
         let curriculum = Curriculum::new("test", "Test")
             .with_objective(
-                LearningObjective::new("obj1", "Test")
-                    .with_difficulty(Difficulty::Beginner)
+                LearningObjective::new("obj1", "Test").with_difficulty(Difficulty::Beginner),
             )
             .build();
 

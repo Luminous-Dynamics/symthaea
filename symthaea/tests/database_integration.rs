@@ -6,7 +6,7 @@
 mod common;
 
 use common::prelude::*;
-use symthaea::databases::{ConsciousnessDatabase, DbResult, MemoryRecord, MemoryType, SqliteMemory};
+use symthaea::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType, SqliteMemory};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 
 // ============================================================================
@@ -49,7 +49,11 @@ async fn test_store_and_retrieve_memory() {
 
     let retrieved = retrieved.unwrap();
     assert_eq!(retrieved.id, "test-1", "ID should match");
-    assert_eq!(retrieved.memory_type, MemoryType::Episodic, "Type should match");
+    assert_eq!(
+        retrieved.memory_type,
+        MemoryType::Episodic,
+        "Type should match"
+    );
 }
 
 #[tokio::test]
@@ -76,7 +80,10 @@ async fn test_get_nonexistent_memory() {
 
     let result = db.get("nonexistent-id").await;
     assert!(result.is_ok(), "Query should succeed");
-    assert!(result.unwrap().is_none(), "Should return None for missing ID");
+    assert!(
+        result.unwrap().is_none(),
+        "Should return None for missing ID"
+    );
 }
 
 #[tokio::test]
@@ -110,12 +117,20 @@ async fn test_update_memory_via_store() {
     // Update by storing with same ID (INSERT OR REPLACE behavior)
     record.valence = 0.9;
     record.content = "Updated content".to_string();
-    db.store(record.clone()).await.expect("Should update memory via store");
+    db.store(record.clone())
+        .await
+        .expect("Should update memory via store");
 
     // Verify update
     let retrieved = db.get("to-update").await.unwrap().unwrap();
-    assert!((retrieved.valence - 0.9).abs() < 0.01, "Valence should be updated");
-    assert_eq!(retrieved.content, "Updated content", "Content should be updated");
+    assert!(
+        (retrieved.valence - 0.9).abs() < 0.01,
+        "Valence should be updated"
+    );
+    assert_eq!(
+        retrieved.content, "Updated content",
+        "Content should be updated"
+    );
 }
 
 // ============================================================================
@@ -150,8 +165,14 @@ async fn test_similarity_search_exact_match() {
 
     let results = results.unwrap();
     assert!(!results.is_empty(), "Should find at least one result");
-    assert!(results[0].similarity > 0.99, "Exact match should have ~1.0 similarity");
-    assert_eq!(results[0].record.id, "exact-match", "Should find the right record");
+    assert!(
+        results[0].similarity > 0.99,
+        "Exact match should have ~1.0 similarity"
+    );
+    assert_eq!(
+        results[0].record.id, "exact-match",
+        "Should find the right record"
+    );
 }
 
 #[tokio::test]
@@ -190,7 +211,10 @@ async fn test_similarity_search_ordering() {
     let results = db.search_similar(&query, 5).await.unwrap();
 
     assert_eq!(results.len(), 5, "Should return all 5 memories");
-    assert_eq!(results[0].record.id, "similarity-0", "Most similar should be first");
+    assert_eq!(
+        results[0].record.id, "similarity-0",
+        "Most similar should be first"
+    );
 
     // Verify descending similarity order
     for i in 1..results.len() {
@@ -207,7 +231,8 @@ async fn test_similarity_search_limit() {
 
     // Store 10 memories
     for i in 0..10 {
-        let record = create_test_memory(&format!("limit-test-{}", i), 500 + i, MemoryType::Semantic);
+        let record =
+            create_test_memory(&format!("limit-test-{}", i), 500 + i, MemoryType::Semantic);
         db.store(record).await.expect("Should store memory");
     }
 
@@ -248,7 +273,11 @@ async fn test_count_memories() {
 
     // Delete one
     db.delete("ep-1").await.unwrap();
-    assert_eq!(db.count().await.unwrap(), 3, "Should have 3 memories after delete");
+    assert_eq!(
+        db.count().await.unwrap(),
+        3,
+        "Should have 3 memories after delete"
+    );
 }
 
 #[tokio::test]
@@ -277,7 +306,10 @@ async fn test_persistence_across_connections() {
     {
         let db = SqliteMemory::new(&db_path).expect("Should reopen database");
         let retrieved = db.get("persistent-1").await.unwrap();
-        assert!(retrieved.is_some(), "Memory should persist across connections");
+        assert!(
+            retrieved.is_some(),
+            "Memory should persist across connections"
+        );
     }
 }
 
@@ -373,4 +405,87 @@ async fn test_concurrent_reads() {
         assert!(result.is_ok(), "Read {} should succeed", i);
         assert!(result.unwrap().is_some(), "Memory {} should exist", i);
     }
+}
+
+// ============================================================================
+// LIST ALL TESTS
+// ============================================================================
+
+#[tokio::test]
+async fn test_sqlite_list_all() {
+    let db = SqliteMemory::in_memory().expect("Should create database");
+
+    let batch = create_memory_batch("list-all", 200, 50, MemoryType::Semantic);
+    for record in &batch {
+        db.store(record.clone()).await.expect("Should store memory");
+    }
+
+    let all = db.list_all().await.expect("list_all should succeed");
+    assert_eq!(all.len(), 50, "Should return all 50 records");
+
+    // Verify ascending timestamp order
+    for i in 1..all.len() {
+        assert!(
+            all[i].timestamp_ms >= all[i - 1].timestamp_ms,
+            "list_all should return records in ascending timestamp order"
+        );
+    }
+}
+
+// ============================================================================
+// DEFAULT CONFIG TESTS
+// ============================================================================
+
+#[tokio::test]
+async fn test_default_config_creates_sqlite() {
+    use symthaea::databases::{create_database, DatabaseConfig};
+
+    let db = create_database(&DatabaseConfig::default())
+        .await
+        .expect("Default config should create a database");
+
+    assert!(db.health_check().await.unwrap(), "Health check should pass");
+    assert_eq!(
+        db.count().await.unwrap(),
+        0,
+        "Fresh database should be empty"
+    );
+}
+
+// ============================================================================
+// SEARCH SIMILAR FILTERED (SQLITE — IGNORES FILTER)
+// ============================================================================
+
+#[tokio::test]
+async fn test_sqlite_search_similar_filtered_ignores_filter() {
+    let db = SqliteMemory::in_memory().expect("Should create database");
+
+    // Store episodic and semantic records
+    for i in 0..5 {
+        db.store(create_test_memory(
+            &format!("ep-filter-{}", i),
+            100 + i,
+            MemoryType::Episodic,
+        ))
+        .await
+        .unwrap();
+        db.store(create_test_memory(
+            &format!("sem-filter-{}", i),
+            200 + i,
+            MemoryType::Semantic,
+        ))
+        .await
+        .unwrap();
+    }
+
+    let query = BinaryHV::random(150);
+    // SQLite's default search_similar_filtered returns same as search_similar
+    // (filter is a no-op for SQLite — documented behavior)
+    let results = db
+        .search_similar_filtered(&query, 5, "memory_type = 'episodic'")
+        .await
+        .expect("Filtered search should succeed");
+
+    assert_eq!(results.len(), 5, "Should return 5 results");
+    // SQLite ignores the filter — results may include both types
 }

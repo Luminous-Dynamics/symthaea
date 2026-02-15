@@ -17,6 +17,7 @@
 //! 8. **TUI** — Terminal UI with consciousness visualization
 
 #![allow(deprecated)]
+#![allow(rustdoc::broken_intra_doc_links)]
 
 /// Local trait and type definitions for symthaea-nix.
 ///
@@ -55,7 +56,7 @@ pub mod cli;
 pub mod tui;
 
 // Re-export key types at crate root
-pub use parser::nix_parser::{NixParser, NixConfig, NixOption, NixValue};
+pub use action::executor::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};
 pub use parser::nix_code_parser::NixCodeParser;
-pub use action::executor::{NixOSCommand, NixOSExecutor, ExecutionResult, SafetyLevel};
+pub use parser::nix_parser::{NixConfig, NixOption, NixParser, NixValue};
 pub use plugin::domain_plugin::NixOsPlugin;

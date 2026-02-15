@@ -5,13 +5,13 @@
 //!
 //! Run with: cargo run --example hdc_simd_benchmark --release
 
-use symthaea::hdc::binary_hv::BinaryHV;
-use symthaea::hdc::simd_ops::{bind_simd, matching_bits_simd, hamming_distance_simd, invert_simd};
-use symthaea::hdc::HDC_DIMENSION;
-use std::time::{Instant, Duration};
-use std::hint::black_box;
 use std::fs;
+use std::hint::black_box;
 use std::path::Path;
+use std::time::{Duration, Instant};
+use symthaea::hdc::binary_hv::BinaryHV;
+use symthaea::hdc::simd_ops::{bind_simd, hamming_distance_simd, invert_simd, matching_bits_simd};
+use symthaea::hdc::HDC_DIMENSION;
 
 /// Benchmark result for a single operation
 #[derive(Debug, Clone)]
@@ -30,7 +30,11 @@ fn main() {
     println!("╚════════════════════════════════════════════════════════════════════╝");
     println!();
     println!("Configuration:");
-    println!("  HDC Dimension: {} bits ({} bytes)", HDC_DIMENSION, HDC_DIMENSION / 8);
+    println!(
+        "  HDC Dimension: {} bits ({} bytes)",
+        HDC_DIMENSION,
+        HDC_DIMENSION / 8
+    );
     println!("  SIMD Features: AVX2 (256-bit), SSE4.1 (128-bit), POPCNT");
     println!();
 
@@ -67,20 +71,26 @@ fn benchmark_core_operations() -> Vec<BenchResult> {
     let simd_bind = benchmark_op(iterations, || {
         black_box(bind_simd(black_box(&a.0), black_box(&b.0)))
     });
-    let scalar_bind = benchmark_op(iterations, || {
-        black_box(a.bind_scalar(black_box(&b)))
-    });
-    results.push(make_result("Bind (XOR)", simd_bind, scalar_bind, iterations));
+    let scalar_bind = benchmark_op(iterations, || black_box(a.bind_scalar(black_box(&b))));
+    results.push(make_result(
+        "Bind (XOR)",
+        simd_bind,
+        scalar_bind,
+        iterations,
+    ));
 
     // 2. SIMILARITY (Matching Bits / POPCNT) Operation
     println!("Benchmarking SIMILARITY (POPCNT)...");
     let simd_sim = benchmark_op(iterations, || {
         black_box(matching_bits_simd(black_box(&a.0), black_box(&b.0)))
     });
-    let scalar_sim = benchmark_op(iterations, || {
-        black_box(a.similarity_scalar(black_box(&b)))
-    });
-    results.push(make_result("Similarity (POPCNT)", simd_sim, scalar_sim, iterations));
+    let scalar_sim = benchmark_op(iterations, || black_box(a.similarity_scalar(black_box(&b))));
+    results.push(make_result(
+        "Similarity (POPCNT)",
+        simd_sim,
+        scalar_sim,
+        iterations,
+    ));
 
     // 3. HAMMING DISTANCE Operation
     println!("Benchmarking HAMMING DISTANCE...");
@@ -90,17 +100,23 @@ fn benchmark_core_operations() -> Vec<BenchResult> {
     let scalar_ham = benchmark_op(iterations, || {
         black_box(a.hamming_distance_scalar(black_box(&b)))
     });
-    results.push(make_result("Hamming Distance", simd_ham, scalar_ham, iterations));
+    results.push(make_result(
+        "Hamming Distance",
+        simd_ham,
+        scalar_ham,
+        iterations,
+    ));
 
     // 4. INVERT (NOT) Operation
     println!("Benchmarking INVERT (NOT)...");
-    let simd_inv = benchmark_op(iterations, || {
-        black_box(invert_simd(black_box(&a.0)))
-    });
-    let scalar_inv = benchmark_op(iterations, || {
-        black_box(a.invert_scalar())
-    });
-    results.push(make_result("Invert (NOT)", simd_inv, scalar_inv, iterations));
+    let simd_inv = benchmark_op(iterations, || black_box(invert_simd(black_box(&a.0))));
+    let scalar_inv = benchmark_op(iterations, || black_box(a.invert_scalar()));
+    results.push(make_result(
+        "Invert (NOT)",
+        simd_inv,
+        scalar_inv,
+        iterations,
+    ));
 
     // 5. BUNDLE (Majority Vote) - Multiple vectors
     println!("Benchmarking BUNDLE (3 vectors)...");
@@ -108,15 +124,18 @@ fn benchmark_core_operations() -> Vec<BenchResult> {
     let vectors = vec![a.clone(), b.clone(), c.clone()];
     let bundle_iterations = iterations / 10; // Fewer iterations for more expensive op
 
-    let simd_bundle = benchmark_op(bundle_iterations, || {
-        black_box(BinaryHV::bundle(&vectors))
-    });
+    let simd_bundle = benchmark_op(bundle_iterations, || black_box(BinaryHV::bundle(&vectors)));
     // Bundle uses SIMD internally, compare against repeated bind
     let scalar_bundle = benchmark_op(bundle_iterations, || {
         let ab = a.bind_scalar(&b);
         black_box(ab.bind_scalar(&c))
     });
-    results.push(make_result("Bundle (3 vec)", simd_bundle, scalar_bundle, bundle_iterations));
+    results.push(make_result(
+        "Bundle (3 vec)",
+        simd_bundle,
+        scalar_bundle,
+        bundle_iterations,
+    ));
 
     println!();
     results
@@ -133,7 +152,12 @@ where
     start.elapsed()
 }
 
-fn make_result(name: &str, simd_time: Duration, scalar_time: Duration, iterations: u128) -> BenchResult {
+fn make_result(
+    name: &str,
+    simd_time: Duration,
+    scalar_time: Duration,
+    iterations: u128,
+) -> BenchResult {
     let simd_ns = simd_time.as_nanos() / iterations;
     let scalar_ns = scalar_time.as_nanos() / iterations;
     let speedup = scalar_ns as f64 / simd_ns.max(1) as f64;
@@ -153,16 +177,22 @@ fn print_results_table(results: &[BenchResult]) {
     println!("RESULTS: SIMD vs SCALAR PERFORMANCE");
     println!("═══════════════════════════════════════════════════════════════════════\n");
 
-    println!("{:20} | {:>10} | {:>10} | {:>8} | {:>12}",
-             "Operation", "SIMD (ns)", "Scalar (ns)", "Speedup", "Throughput");
-    println!("{:-<20}-+-{:-<10}-+-{:-<10}-+-{:-<8}-+-{:-<12}",
-             "", "", "", "", "");
+    println!(
+        "{:20} | {:>10} | {:>10} | {:>8} | {:>12}",
+        "Operation", "SIMD (ns)", "Scalar (ns)", "Speedup", "Throughput"
+    );
+    println!(
+        "{:-<20}-+-{:-<10}-+-{:-<10}-+-{:-<8}-+-{:-<12}",
+        "", "", "", "", ""
+    );
 
     for r in results {
         let speedup_str = format!("{:.2}x", r.speedup);
         let throughput_str = format!("{:.2} Mop/s", r.throughput_mops);
-        println!("{:20} | {:>10} | {:>10} | {:>8} | {:>12}",
-                 r.operation, r.simd_ns, r.scalar_ns, speedup_str, throughput_str);
+        println!(
+            "{:20} | {:>10} | {:>10} | {:>8} | {:>12}",
+            r.operation, r.simd_ns, r.scalar_ns, speedup_str, throughput_str
+        );
     }
     println!();
 }
@@ -192,17 +222,25 @@ fn benchmark_text_encoding() {
 
     // Count items (simple JSON parsing)
     let item_count = content.matches("\"sentence\"").count();
-    println!("  Data loaded: {} items from Winogrande dataset", item_count);
+    println!(
+        "  Data loaded: {} items from Winogrande dataset",
+        item_count
+    );
 
     // Simulate text encoding benchmark
     let n_samples = 1000.min(item_count);
     let chars_per_sample = 100; // Average characters per sentence
 
-    println!("  Encoding {} text samples ({} chars each)...", n_samples, chars_per_sample);
+    println!(
+        "  Encoding {} text samples ({} chars each)...",
+        n_samples, chars_per_sample
+    );
 
     // Create character-level encoding vectors (item memory)
     let char_memory: Vec<BinaryHV> = (0..256u64).map(|i| BinaryHV::random(i * 12345)).collect();
-    let pos_memory: Vec<BinaryHV> = (0..chars_per_sample as u64).map(|i| BinaryHV::random(i * 67890 + 1000)).collect();
+    let pos_memory: Vec<BinaryHV> = (0..chars_per_sample as u64)
+        .map(|i| BinaryHV::random(i * 67890 + 1000))
+        .collect();
 
     // Benchmark encoding using SIMD bind
     let start = Instant::now();
@@ -234,7 +272,10 @@ fn benchmark_text_encoding() {
     println!();
 
     // Benchmark similarity search
-    println!("  Searching {} encoded vectors for nearest neighbor...", encoded_samples.len());
+    println!(
+        "  Searching {} encoded vectors for nearest neighbor...",
+        encoded_samples.len()
+    );
 
     let query = &encoded_samples[0];
     let start = Instant::now();
@@ -251,8 +292,14 @@ fn benchmark_text_encoding() {
     let search_time = start.elapsed();
 
     println!("    Search time:     {:?}", search_time);
-    println!("    Best match idx:  {} (similarity: {:.4})", best_idx, best_sim);
-    println!("    Comparisons/sec: {:.2}M", (encoded_samples.len() - 1) as f64 / search_time.as_secs_f64() / 1_000_000.0);
+    println!(
+        "    Best match idx:  {} (similarity: {:.4})",
+        best_idx, best_sim
+    );
+    println!(
+        "    Comparisons/sec: {:.2}M",
+        (encoded_samples.len() - 1) as f64 / search_time.as_secs_f64() / 1_000_000.0
+    );
     println!();
 }
 
@@ -320,26 +367,47 @@ fn print_summary(results: &[BenchResult]) {
     let slowest_op = results.iter().max_by_key(|r| r.simd_ns).unwrap();
 
     println!("SIMD Optimization Results:");
-    println!("  Average Speedup:    {:.2}x faster than scalar", avg_speedup);
+    println!(
+        "  Average Speedup:    {:.2}x faster than scalar",
+        avg_speedup
+    );
     println!("  Maximum Speedup:    {:.2}x (best case)", max_speedup);
     println!("  Minimum Speedup:    {:.2}x (worst case)", min_speedup);
     println!();
-    println!("  Fastest Operation:  {} ({} ns/op)", fastest_op.operation, fastest_op.simd_ns);
-    println!("  Slowest Operation:  {} ({} ns/op)", slowest_op.operation, slowest_op.simd_ns);
+    println!(
+        "  Fastest Operation:  {} ({} ns/op)",
+        fastest_op.operation, fastest_op.simd_ns
+    );
+    println!(
+        "  Slowest Operation:  {} ({} ns/op)",
+        slowest_op.operation, slowest_op.simd_ns
+    );
     println!();
     println!("Hardware Utilization:");
-    println!("  Vector Width:       {} bits (HDC dimension)", HDC_DIMENSION);
+    println!(
+        "  Vector Width:       {} bits (HDC dimension)",
+        HDC_DIMENSION
+    );
     println!("  AVX2 Registers:     256 bits (64 ops per vector)");
     println!("  Effective Parallelism: {}x", HDC_DIMENSION / 256);
     println!();
 
     // Overall assessment
     if avg_speedup >= 1.5 {
-        println!("✅ SIMD optimization providing significant speedup ({:.1}x average)", avg_speedup);
+        println!(
+            "✅ SIMD optimization providing significant speedup ({:.1}x average)",
+            avg_speedup
+        );
     } else if avg_speedup >= 1.0 {
-        println!("⚠️  SIMD optimization providing modest speedup ({:.1}x average)", avg_speedup);
+        println!(
+            "⚠️  SIMD optimization providing modest speedup ({:.1}x average)",
+            avg_speedup
+        );
     } else {
-        println!("❌ SIMD optimization not providing expected speedup ({:.1}x average)", avg_speedup);
+        println!(
+            "❌ SIMD optimization not providing expected speedup ({:.1}x average)",
+            avg_speedup
+        );
     }
     println!();
 }

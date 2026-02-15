@@ -44,17 +44,18 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
 ### Mycelix Cluster Architecture
-8 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
+10 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
 
 | Cluster | Path | Domains | Zomes |
 |---------|------|---------|-------|
-| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water | 29 (28 domain + 1 bridge) |
+| **mycelix-commons** | `mycelix-commons/` | property, housing, care, mutualaid, water, food, transport | 35 (34 domain + 1 bridge) |
 | **mycelix-civic** | `mycelix-civic/` | justice, emergency, media | 16 (15 domain + 1 bridge) |
 
-- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator types)
-- **SDK TS clients**: `mycelix-workspace/sdk-ts/src/integrations/{commons,civic}/`
+- **Shared types**: `crates/mycelix-bridge-entry-types/` (DHT entries), `crates/mycelix-bridge-common/` (coordinator dispatch + cross-cluster)
+- **Cross-cluster bridge**: Commons↔Civic via `CallTargetCell::OtherRole` (unified hApp: `mycelix-workspace/happs/mycelix-unified-happ.yaml`)
+- **SDK TS clients**: `mycelix-workspace/sdk-ts/src/integrations/{commons,civic}/` (includes cross-cluster methods)
 - **Build**: `just build-commons` / `just build-civic` (or `cargo build --release --target wasm32-unknown-unknown`)
-- **Tests**: 26 SDK TS cluster tests + per-zome unit tests
+- **Tests**: 33 SDK TS cluster tests + 285 Rust unit tests (127 commons + 144 civic + 14 bridge-common)
 
 ---
 

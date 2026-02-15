@@ -22,8 +22,8 @@ use std::io::Read;
 use std::path::Path;
 use std::time::Instant;
 
-use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::learned_encoding::AdaptiveQuantizer;
+use symthaea::hdc::unified_hv::ContinuousHV;
 
 const DATA_DIR: &str = "data/benchmarks/mnist";
 
@@ -191,7 +191,10 @@ impl LearnedMnistClassifier {
 
         // Optionally compute Fisher discriminant feature weights
         let feature_weights = if use_fisher_weights {
-            Some(compute_discriminative_weights(training_images, training_labels))
+            Some(compute_discriminative_weights(
+                training_images,
+                training_labels,
+            ))
         } else {
             println!("  Feature weights: uniform (disabled)");
             None
@@ -571,11 +574,9 @@ impl PatchHdcMnistClassifier {
                         let row = start_row + dr;
                         let col = start_col + dc;
                         let pixel = pixels[row * 28 + col];
-                        let level =
-                            ((pixel as f32 / level_size) as usize).min(self.n_levels - 1);
+                        let level = ((pixel as f32 / level_size) as usize).min(self.n_levels - 1);
 
-                        let bound = self.local_position_hvs[local_idx]
-                            .bind(&self.level_hvs[level]);
+                        let bound = self.local_position_hvs[local_idx].bind(&self.level_hvs[level]);
                         for (acc, &v) in patch_acc.iter_mut().zip(bound.values.iter()) {
                             *acc += v;
                         }
@@ -584,8 +585,7 @@ impl PatchHdcMnistClassifier {
                 }
 
                 // Normalize patch HV
-                let patch_norm: f32 =
-                    patch_acc.iter().map(|x| x * x).sum::<f32>().sqrt();
+                let patch_norm: f32 = patch_acc.iter().map(|x| x * x).sum::<f32>().sqrt();
                 if patch_norm > 0.0 {
                     for v in &mut patch_acc {
                         *v /= patch_norm;
@@ -630,7 +630,9 @@ impl PatchHdcMnistClassifier {
                 let elapsed = t.elapsed().as_secs_f64();
                 println!(
                     "  Training: {}/{} ({:.0} samples/sec)",
-                    i + 1, n, (i + 1) as f64 / elapsed
+                    i + 1,
+                    n,
+                    (i + 1) as f64 / elapsed
                 );
             }
         }
@@ -654,7 +656,9 @@ impl PatchHdcMnistClassifier {
 
         println!(
             "  Training complete: {} samples in {:.1}s ({:.0}/s)",
-            n, t.elapsed().as_secs_f64(), n as f64 / t.elapsed().as_secs_f64()
+            n,
+            t.elapsed().as_secs_f64(),
+            n as f64 / t.elapsed().as_secs_f64()
         );
     }
 
@@ -697,7 +701,11 @@ impl PatchHdcMnistClassifier {
             let accuracy = 1.0 - corrections as f64 / images.len() as f64;
             println!(
                 "  Retrain iter {}/{}: {} corrections, train acc = {:.2}% ({:.1}s)",
-                iter + 1, iterations, corrections, accuracy * 100.0, t.elapsed().as_secs_f64()
+                iter + 1,
+                iterations,
+                corrections,
+                accuracy * 100.0,
+                t.elapsed().as_secs_f64()
             );
 
             if corrections < images.len() / 200 {
@@ -805,9 +813,8 @@ fn main() {
     println!("Configuration: Pixel-level baseline (4K/32L/5i)");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     let total_start = Instant::now();
-    let mut baseline = LearnedMnistClassifier::new(
-        4096, 32, &train_images, &train_labels, false, false,
-    );
+    let mut baseline =
+        LearnedMnistClassifier::new(4096, 32, &train_images, &train_labels, false, false);
     println!("\nTraining...");
     baseline.train(&train_images, &train_labels);
     println!("\nRetraining (lr=0.1, 5 iters)...");
@@ -815,8 +822,12 @@ fn main() {
     println!("\nTesting...");
     let baseline_result = baseline.test(&test_images, &test_labels);
     let baseline_time = total_start.elapsed().as_secs_f64();
-    println!("\n  Overall Accuracy: {:.2}% ({}/{})",
-        baseline_result.accuracy * 100.0, baseline_result.correct, baseline_result.total);
+    println!(
+        "\n  Overall Accuracy: {:.2}% ({}/{})",
+        baseline_result.accuracy * 100.0,
+        baseline_result.correct,
+        baseline_result.total
+    );
     println!("  Total time: {:.1}s\n", baseline_time);
 
     let mut results: Vec<(&str, TestResult)> = Vec::new();
@@ -826,15 +837,15 @@ fn main() {
     // (dim, levels, patch_size, stride, retrain_iters, label)
     let patch_configs: Vec<(usize, usize, usize, usize, usize, &str)> = vec![
         // Small patches, dense overlap — captures fine strokes
-        (4096,  32, 5, 1, 5,  "Patch 5x5/s1 (4K/32L/5i)"),
+        (4096, 32, 5, 1, 5, "Patch 5x5/s1 (4K/32L/5i)"),
         // Larger patches — captures thicker features
-        (4096,  32, 7, 2, 5,  "Patch 7x7/s2 (4K/32L/5i)"),
+        (4096, 32, 7, 2, 5, "Patch 7x7/s2 (4K/32L/5i)"),
         // Higher dim with small patches
-        (8192,  32, 5, 2, 5,  "Patch 5x5/s2 (8K/32L/5i)"),
+        (8192, 32, 5, 2, 5, "Patch 5x5/s2 (8K/32L/5i)"),
         // More retrain iterations
-        (4096,  32, 5, 1, 10, "Patch 5x5/s1 (4K/32L/10i)"),
+        (4096, 32, 5, 1, 10, "Patch 5x5/s1 (4K/32L/10i)"),
         // High capacity
-        (8192,  32, 5, 1, 10, "Patch 5x5/s1 (8K/32L/10i)"),
+        (8192, 32, 5, 1, 10, "Patch 5x5/s1 (8K/32L/10i)"),
     ];
 
     for (dim, levels, patch_size, stride, retrain_iters, label) in &patch_configs {
@@ -844,9 +855,7 @@ fn main() {
 
         let total_start = Instant::now();
 
-        let mut classifier = PatchHdcMnistClassifier::new(
-            *dim, *levels, *patch_size, *stride,
-        );
+        let mut classifier = PatchHdcMnistClassifier::new(*dim, *levels, *patch_size, *stride);
 
         println!("\nTraining...");
         classifier.train(&train_images, &train_labels);
@@ -863,7 +872,9 @@ fn main() {
 
         println!(
             "\n  Overall Accuracy: {:.2}% ({}/{})",
-            result.accuracy * 100.0, result.correct, result.total
+            result.accuracy * 100.0,
+            result.correct,
+            result.total
         );
         println!(
             "  Avg inference time: {:.3}ms per sample",
@@ -913,11 +924,7 @@ fn main() {
         ("Accuracy > 92% (target)", best_accuracy > 0.92),
     ];
     for (name, pass) in &checks {
-        println!(
-            "  {}: {}",
-            name,
-            if *pass { "PASS" } else { "FAIL" }
-        );
+        println!("  {}: {}", name, if *pass { "PASS" } else { "FAIL" });
     }
     println!("\nBest accuracy: {:.2}%", best_accuracy * 100.0);
 

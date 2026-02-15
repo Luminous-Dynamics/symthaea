@@ -83,8 +83,9 @@ impl RustParser {
                 }
             }
             "unsafe_block" => {
-                let entity = CodeEntity::new(EntityKind::UnsafeBlock, "unsafe", Span::from_node(node))
-                    .with_source(node_text(node, source).to_string());
+                let entity =
+                    CodeEntity::new(EntityKind::UnsafeBlock, "unsafe", Span::from_node(node))
+                        .with_source(node_text(node, source).to_string());
                 entities.push(entity);
             }
             _ => {}
@@ -164,7 +165,8 @@ impl RustParser {
                             EntityKind::Variable,
                             node_text(&field_name, source),
                             Span::from_node(&field),
-                        ).with_source(node_text(&field, source).to_string());
+                        )
+                        .with_source(node_text(&field, source).to_string());
                         entity = entity.with_child(field_entity);
                     }
                 }
@@ -197,7 +199,8 @@ impl RustParser {
                             EntityKind::Variable,
                             node_text(&vname, source),
                             Span::from_node(&variant),
-                        ).with_source(node_text(&variant, source).to_string());
+                        )
+                        .with_source(node_text(&variant, source).to_string());
                         entity = entity.with_child(v_entity);
                     }
                 }
@@ -245,12 +248,14 @@ impl RustParser {
         source: &str,
         relations: &mut Vec<CodeRelation>,
     ) -> Option<CodeEntity> {
-        let type_name = node.child_by_field_name("type")
+        let type_name = node
+            .child_by_field_name("type")
             .map(|n| node_text(&n, source).to_string())
             .unwrap_or_else(|| "unknown".to_string());
 
         // Check if this is a trait impl
-        let trait_name = node.child_by_field_name("trait")
+        let trait_name = node
+            .child_by_field_name("trait")
             .map(|n| node_text(&n, source).to_string());
 
         let kind = if trait_name.is_some() {
@@ -308,10 +313,7 @@ impl RustParser {
             .trim()
             .to_string();
 
-        Some(
-            CodeEntity::new(EntityKind::Import, &path, Span::from_node(node))
-                .with_source(text)
-        )
+        Some(CodeEntity::new(EntityKind::Import, &path, Span::from_node(node)).with_source(text))
     }
 
     fn parse_mod(&self, node: &tree_sitter::Node, source: &str) -> Option<CodeEntity> {
@@ -330,7 +332,7 @@ impl RustParser {
         let name = self.find_child_text(node, "name", source)?;
         Some(
             CodeEntity::new(EntityKind::Macro, &name, Span::from_node(node))
-                .with_source(node_text(node, source).to_string())
+                .with_source(node_text(node, source).to_string()),
         )
     }
 
@@ -338,7 +340,7 @@ impl RustParser {
         let name = self.find_child_text(node, "name", source)?;
         Some(
             CodeEntity::new(EntityKind::TypeAlias, &name, Span::from_node(node))
-                .with_source(node_text(node, source).to_string())
+                .with_source(node_text(node, source).to_string()),
         )
     }
 
@@ -346,18 +348,27 @@ impl RustParser {
         let name = self.find_child_text(node, "name", source)?;
         Some(
             CodeEntity::new(EntityKind::Constant, &name, Span::from_node(node))
-                .with_source(node_text(node, source).to_string())
+                .with_source(node_text(node, source).to_string()),
         )
     }
 
     // Helpers
 
-    fn find_child_text(&self, node: &tree_sitter::Node, field: &str, source: &str) -> Option<String> {
+    fn find_child_text(
+        &self,
+        node: &tree_sitter::Node,
+        field: &str,
+        source: &str,
+    ) -> Option<String> {
         node.child_by_field_name(field)
             .map(|n| node_text(&n, source).to_string())
     }
 
-    fn find_child_kind<'a>(&self, node: &tree_sitter::Node<'a>, kind: &str) -> Option<tree_sitter::Node<'a>> {
+    fn find_child_kind<'a>(
+        &self,
+        node: &tree_sitter::Node<'a>,
+        kind: &str,
+    ) -> Option<tree_sitter::Node<'a>> {
         let mut cursor = node.walk();
         let children: Vec<_> = node.children(&mut cursor).collect();
         children.into_iter().find(|c| c.kind() == kind)
@@ -376,11 +387,14 @@ impl CodeParser for RustParser {
     }
 
     fn parse(&mut self, source: &str) -> Result<ParsedCode, CodeDiagnostic> {
-        let tree = self.parser.parse(source, None).ok_or_else(|| CodeDiagnostic {
-            severity: DiagnosticSeverity::Error,
-            message: "Failed to parse Rust source".to_string(),
-            span: None,
-        })?;
+        let tree = self
+            .parser
+            .parse(source, None)
+            .ok_or_else(|| CodeDiagnostic {
+                severity: DiagnosticSeverity::Error,
+                message: "Failed to parse Rust source".to_string(),
+                span: None,
+            })?;
 
         let root = tree.root_node();
 
@@ -409,7 +423,9 @@ impl CodeParser for RustParser {
         let mut diags = Vec::new();
 
         // Check for unsafe blocks
-        let unsafe_count = parsed.all_entities().iter()
+        let unsafe_count = parsed
+            .all_entities()
+            .iter()
             .filter(|e| e.kind == EntityKind::UnsafeBlock)
             .count();
         if unsafe_count > 0 {
@@ -446,7 +462,9 @@ impl CodeParser for RustParser {
 // Primitive-Aware Parsing Extension
 // ═══════════════════════════════════════════════════════════════════════════════
 
-use crate::consciousness::code_primitives::{CodePrimitiveExecutor, CodeOperation, CodeExecutionResult};
+use crate::consciousness::code_primitives::{
+    CodeExecutionResult, CodeOperation, CodePrimitiveExecutor,
+};
 
 /// Extended parsing result with primitive analysis
 #[derive(Debug)]
@@ -463,7 +481,11 @@ impl RustParser {
     /// Parse with primitive awareness
     ///
     /// Uses Code tier primitives to guide parsing and provide integration metrics.
-    pub fn parse_with_primitives(&mut self, source: &str, dim: usize) -> Result<PrimitiveAwareParsed, CodeDiagnostic> {
+    pub fn parse_with_primitives(
+        &mut self,
+        source: &str,
+        dim: usize,
+    ) -> Result<PrimitiveAwareParsed, CodeDiagnostic> {
         // Execute Parse primitives first
         let executor = CodePrimitiveExecutor::new(dim);
         let primitive_result = executor.execute(CodeOperation::Parse);
@@ -490,7 +512,11 @@ impl RustParser {
     /// Parse and analyze with cross-tier composition
     ///
     /// Uses Code + Consciousness primitives for understanding code purpose.
-    pub fn parse_with_consciousness(&mut self, source: &str, dim: usize) -> Result<PrimitiveAwareParsed, CodeDiagnostic> {
+    pub fn parse_with_consciousness(
+        &mut self,
+        source: &str,
+        dim: usize,
+    ) -> Result<PrimitiveAwareParsed, CodeDiagnostic> {
         let executor = CodePrimitiveExecutor::new(dim);
 
         // Cross-tier: Code + Consciousness
@@ -511,15 +537,20 @@ impl RustParser {
         // Convert CrossTierResult to CodeExecutionResult
         let primitive_result = CodeExecutionResult {
             success: true,
-            primitives: cross_result.code_primitives.iter()
-                .map(|p| crate::consciousness::primitive_reasoning::PrimitiveExecution {
-                    primitive: p.clone(),
-                    input: symthaea_core::hdc::BinaryHV::zero(),
-                    output: symthaea_core::hdc::BinaryHV::zero(),
-                    transformation: crate::consciousness::primitive_reasoning::TransformationType::Bind,
-                    phi_contribution: cross_result.combined_phi as f64,
-                    timestamp: 0.0,
-                })
+            primitives: cross_result
+                .code_primitives
+                .iter()
+                .map(
+                    |p| crate::consciousness::primitive_reasoning::PrimitiveExecution {
+                        primitive: p.clone(),
+                        input: symthaea_core::hdc::BinaryHV::zero(),
+                        output: symthaea_core::hdc::BinaryHV::zero(),
+                        transformation:
+                            crate::consciousness::primitive_reasoning::TransformationType::Bind,
+                        phi_contribution: cross_result.combined_phi as f64,
+                        timestamp: 0.0,
+                    },
+                )
                 .collect(),
             result_hv: cross_result.composed_hv.clone(),
             phi: cross_result.combined_phi,
@@ -587,7 +618,9 @@ impl Point {
         assert_eq!(structs[0].name, "Point");
         assert_eq!(structs[0].children.len(), 2); // x, y fields
 
-        let impls: Vec<&CodeEntity> = result.entities.iter()
+        let impls: Vec<&CodeEntity> = result
+            .entities
+            .iter()
             .filter(|e| e.kind == EntityKind::TraitImpl)
             .collect();
         assert_eq!(impls.len(), 1);

@@ -15,25 +15,31 @@ async fn test_symthaea_with_neural_bridge() {
     // Check probe weights exist
     let weights_path = Path::new("models/neural_bridge/probe_weights_bge_m3.npy");
     if !weights_path.exists() {
-        eprintln!("Skipping test: probe weights not found at {:?}", weights_path);
+        eprintln!(
+            "Skipping test: probe weights not found at {:?}",
+            weights_path
+        );
         return;
     }
 
     println!("Creating Symthaea with Neural Bridge v2...");
-    let mut symthaea = Symthaea::new(512, 64).await
+    let mut symthaea = Symthaea::new(512, 64)
+        .await
         .expect("Failed to create Symthaea");
 
     // Check neural bridge is active
     let has_bridge = symthaea.has_neural_bridge();
     println!("Neural Bridge active: {}", has_bridge);
-    
+
     if !has_bridge {
         eprintln!("Warning: Neural Bridge not loaded, test will use hash-based encoding");
     }
 
     // Process a query through the full pipeline
     println!("\nProcessing query through consciousness pipeline...");
-    let response = symthaea.process("What is justice?").await
+    let response = symthaea
+        .process("What is justice?")
+        .await
         .expect("Processing failed");
 
     println!("Response:");
@@ -59,8 +65,8 @@ async fn test_symthaea_with_neural_bridge() {
 #[tokio::test]
 #[ignore = "Downloads 2.2GB model - run explicitly with --ignored"]
 async fn test_symthaea_cache_effectiveness() {
-    use symthaea::Symthaea;
     use std::time::Instant;
+    use symthaea::Symthaea;
 
     let weights_path = Path::new("models/neural_bridge/probe_weights_bge_m3.npy");
     if !weights_path.exists() {
@@ -68,7 +74,8 @@ async fn test_symthaea_cache_effectiveness() {
         return;
     }
 
-    let mut symthaea = Symthaea::new(512, 64).await
+    let mut symthaea = Symthaea::new(512, 64)
+        .await
         .expect("Failed to create Symthaea");
 
     if !symthaea.has_neural_bridge() {

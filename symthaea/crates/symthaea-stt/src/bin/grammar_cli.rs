@@ -11,8 +11,8 @@
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
-use symthaea_stt::unified_grammar::UnifiedGrammar;
 use symthaea_stt::temporal_grammar::TemporalEvent;
+use symthaea_stt::unified_grammar::UnifiedGrammar;
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -126,8 +126,12 @@ fn cmd_train(args: &[String]) {
 
         if (epoch + 1) % 10 == 0 {
             let stats = grammar.stats();
-            println!("  Epoch {}: {} clusters, {:.1}% density",
-                     epoch + 1, stats.num_clusters, stats.avg_cluster_density * 100.0);
+            println!(
+                "  Epoch {}: {} clusters, {:.1}% density",
+                epoch + 1,
+                stats.num_clusters,
+                stats.avg_cluster_density * 100.0
+            );
         }
     }
 
@@ -219,7 +223,10 @@ fn cmd_score(args: &[String]) {
     }
 
     println!();
-    println!("Average score: {:+.4}", total_score / sequences.len() as f32);
+    println!(
+        "Average score: {:+.4}",
+        total_score / sequences.len() as f32
+    );
 }
 
 fn cmd_info(args: &[String]) {
@@ -265,7 +272,10 @@ fn cmd_info(args: &[String]) {
     println!("  Clusters:         {}", stats.num_clusters);
     println!("  Active Clusters:  {}", stats.active_clusters);
     println!("  Global Density:   {:.2}%", stats.global_density * 100.0);
-    println!("  Cluster Density:  {:.2}%", stats.avg_cluster_density * 100.0);
+    println!(
+        "  Cluster Density:  {:.2}%",
+        stats.avg_cluster_density * 100.0
+    );
     println!("  Training Count:   {}", stats.training_count);
     println!("  Sparsity:         {:.0}%", stats.sparsity * 100.0);
 }
@@ -281,10 +291,10 @@ fn cmd_demo(_args: &[String]) {
 
     // Built-in training examples
     let training_sentences = vec![
-        vec!["DH", "AH", "K", "AE", "T", "S", "AE", "T"],      // the cat sat
-        vec!["DH", "AH", "D", "AO", "G", "R", "AE", "N"],      // the dog ran
-        vec!["DH", "AH", "B", "AE", "T", "HH", "AE", "T"],     // the bat hat
-        vec!["B", "IH", "G", "P", "IH", "G", "D", "IH", "G"],  // big pig dig
+        vec!["DH", "AH", "K", "AE", "T", "S", "AE", "T"], // the cat sat
+        vec!["DH", "AH", "D", "AO", "G", "R", "AE", "N"], // the dog ran
+        vec!["DH", "AH", "B", "AE", "T", "HH", "AE", "T"], // the bat hat
+        vec!["B", "IH", "G", "P", "IH", "G", "D", "IH", "G"], // big pig dig
         vec!["F", "IH", "SH", "D", "IH", "SH", "W", "IH", "SH"], // fish dish wish
     ];
 
@@ -299,14 +309,23 @@ fn cmd_demo(_args: &[String]) {
 
     let stats = grammar.stats();
     println!();
-    println!("Training complete: {} clusters, {:.1}% density",
-             stats.num_clusters, stats.avg_cluster_density * 100.0);
+    println!(
+        "Training complete: {} clusters, {:.1}% density",
+        stats.num_clusters,
+        stats.avg_cluster_density * 100.0
+    );
     println!();
 
     // Test examples
     let test_cases = vec![
-        (vec!["DH", "AH", "K", "AE", "T", "S", "AE", "T"], "trained (the cat sat)"),
-        (vec!["DH", "AH", "P", "AE", "T", "M", "AE", "T"], "similar (the pat mat)"),
+        (
+            vec!["DH", "AH", "K", "AE", "T", "S", "AE", "T"],
+            "trained (the cat sat)",
+        ),
+        (
+            vec!["DH", "AH", "P", "AE", "T", "M", "AE", "T"],
+            "similar (the pat mat)",
+        ),
         (vec!["S", "T", "R", "IY", "T"], "consonant cluster (street)"),
         (vec!["T", "L", "IY", "T"], "invalid onset (tleet)"),
     ];
@@ -342,10 +361,7 @@ fn load_phoneme_sequences(path: &PathBuf) -> Vec<Vec<String>> {
             continue;
         }
 
-        let phonemes: Vec<String> = line
-            .split_whitespace()
-            .map(|s| s.to_uppercase())
-            .collect();
+        let phonemes: Vec<String> = line.split_whitespace().map(|s| s.to_uppercase()).collect();
 
         if phonemes.len() >= 2 {
             sequences.push(phonemes);
@@ -382,8 +398,14 @@ fn estimate_phoneme_duration(phoneme: &str) -> f32 {
     // Rough estimates based on phoneme class
     match phoneme {
         // Vowels - longer
-        p if p.starts_with('A') || p.starts_with('E') || p.starts_with('I') ||
-             p.starts_with('O') || p.starts_with('U') => 0.10,
+        p if p.starts_with('A')
+            || p.starts_with('E')
+            || p.starts_with('I')
+            || p.starts_with('O')
+            || p.starts_with('U') =>
+        {
+            0.10
+        }
         // Fricatives - medium
         "S" | "Z" | "SH" | "ZH" | "F" | "V" | "TH" | "DH" => 0.08,
         // Stops - short
@@ -399,8 +421,14 @@ fn estimate_phoneme_intensity(phoneme: &str) -> f32 {
     // Rough intensity estimates
     match phoneme {
         // Vowels - high energy
-        p if p.starts_with('A') || p.starts_with('E') || p.starts_with('I') ||
-             p.starts_with('O') || p.starts_with('U') => 0.8,
+        p if p.starts_with('A')
+            || p.starts_with('E')
+            || p.starts_with('I')
+            || p.starts_with('O')
+            || p.starts_with('U') =>
+        {
+            0.8
+        }
         // Voiced consonants - medium
         "B" | "D" | "G" | "V" | "Z" | "DH" | "ZH" | "M" | "N" | "NG" => 0.6,
         // Voiceless consonants - lower

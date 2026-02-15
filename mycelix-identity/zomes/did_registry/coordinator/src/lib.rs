@@ -7,6 +7,16 @@ use hdk::prelude::*;
 use did_registry_integrity::*;
 use mycelix_crypto::{AlgorithmId, TaggedPublicKey, CryptoError};
 
+/// API version for cross-zome compatibility detection.
+/// Increment when making breaking changes to extern signatures or types.
+const API_VERSION: u16 = 1;
+
+/// Returns the API version of this coordinator zome.
+#[hdk_extern]
+pub fn get_api_version(_: ()) -> ExternResult<u16> {
+    Ok(API_VERSION)
+}
+
 /// Validate a multibase-encoded public key and return its detected algorithm.
 ///
 /// Per the W3C DID specification and multibase encoding:
@@ -77,22 +87,80 @@ fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult
             Ok(())
         }
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            // MFA zome not accessible - log but don't fail DID creation
-            // This allows DID creation even if MFA zome is not installed
-            debug!("MFA zome unauthorized - DID created without MFA state");
+            // MFA zome not accessible - warn and continue DID creation.
+            // This allows DID creation even if MFA zome is not installed,
+            // but the warning ensures operators notice MFA is missing.
+            warn!("MFA zome unauthorized - DID created WITHOUT MFA state (MFA enrollment will be required separately)");
             Ok(())
         }
         ZomeCallResponse::NetworkError(err) => {
-            // Network error - log but don't fail DID creation
-            debug!("MFA zome network error: {} - DID created without MFA state", err);
+            warn!("MFA zome network error: {} - DID created WITHOUT MFA state", err);
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            debug!("MFA zome countersigning error: {} - DID created without MFA state", err);
+            warn!("MFA zome countersigning error: {} - DID created WITHOUT MFA state", err);
             Ok(())
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            debug!("MFA zome authentication failed - DID created without MFA state");
+            warn!("MFA zome authentication failed - DID created WITHOUT MFA state");
+            Ok(())
+        }
+    }
+}
+
+/// Notify bridge of DID creation for ecosystem-wide awareness
+fn notify_bridge_of_did_event(did: &str, event_type: &str, payload: &str) -> ExternResult<()> {
+    #[derive(Serialize, Deserialize, Debug)]
+    struct BroadcastEventInput {
+        event_type: String,
+        subject: String,
+        payload: String,
+        source_happ: String,
+    }
+
+    let input = BroadcastEventInput {
+        event_type: event_type.to_string(),
+        subject: did.to_string(),
+        payload: payload.to_string(),
+        source_happ: "mycelix-identity".to_string(),
+    };
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("identity_bridge"),
+        FunctionName::new("broadcast_event"),
+        None,
+        input,
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(_) => Ok(()),
+        ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
+            warn!(
+                "Bridge notification unauthorized: zome={:?} fn={:?} event={} did={}",
+                zome, fn_name, event_type, did
+            );
+            Ok(())
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            warn!(
+                "Bridge notification network error: {} event={} did={}",
+                err, event_type, did
+            );
+            Ok(())
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            warn!(
+                "Bridge notification countersigning error: {} event={} did={}",
+                err, event_type, did
+            );
+            Ok(())
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            warn!(
+                "Bridge notification auth failed: event={} did={}",
+                event_type, did
+            );
             Ok(())
         }
     }
@@ -103,6 +171,13 @@ fn auto_create_mfa_state(did: &str, agent_pub_key: &AgentPubKey) -> ExternResult
 pub fn create_did() -> ExternResult<Record> {
     let agent_info = agent_info()?;
     let agent_pub_key = agent_info.agent_initial_pubkey;
+
+    // Rate limit: 1 DID per agent (idempotency guard)
+    if get_did_document(agent_pub_key.clone())?.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Agent already has a DID document. Use update_did_document to modify it.".into()
+        )));
+    }
 
     // Generate DID identifier
     let did_id = format!("did:mycelix:{}", agent_pub_key);
@@ -144,6 +219,15 @@ pub fn create_did() -> ExternResult<Record> {
     // Errors are logged but don't fail DID creation (MFA is optional)
     if let Err(e) = auto_create_mfa_state(&did_id, &agent_pub_key) {
         debug!("Failed to auto-create MFA state: {:?}", e);
+    }
+
+    // Broadcast DidCreated event to bridge for ecosystem-wide awareness
+    let payload = serde_json::json!({
+        "did": did_id,
+        "event": "did_created",
+    }).to_string();
+    if let Err(e) = notify_bridge_of_did_event(&did_id, "DidCreated", &payload) {
+        debug!("Failed to notify bridge of DID creation: {:?}", e);
     }
 
     let record = get(action_hash.clone(), GetOptions::default())?
@@ -281,6 +365,23 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
                 )));
             }
         }
+
+        // Cross-validate: key_agreement fragment IDs must reference verification
+        // methods that exist in the (potentially updated) verification method list.
+        let effective_methods = input
+            .verification_method
+            .as_ref()
+            .unwrap_or(&current_did.verification_method);
+        let method_ids: std::collections::HashSet<&str> =
+            effective_methods.iter().map(|m| m.id.as_str()).collect();
+        for ka_ref in ka {
+            if !method_ids.contains(ka_ref.as_str()) {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "Key agreement '{}' references a verification method that does not exist in the document",
+                    ka_ref
+                ))));
+            }
+        }
     }
 
     // Build updated document
@@ -303,15 +404,34 @@ pub fn update_did_document(input: UpdateDidInput) -> ExternResult<Record> {
         &EntryTypes::DidDocument(updated_did),
     )?;
 
-    // Create a new AgentToDid link pointing to the updated record.
-    // get_did_document picks the latest link by timestamp, so the
-    // new link will be preferred over the original from create_did.
+    // Delete stale AgentToDid links to prevent DHT bloat.
+    // Without cleanup, every update_did_document call adds another link,
+    // and get_did_document must scan them all to find the latest.
+    let existing_links = get_links(
+        LinkQuery::try_new(agent_pub_key.clone(), LinkTypes::AgentToDid)?,
+        GetStrategy::default(),
+    )?;
+    for link in existing_links {
+        delete_link(link.create_link_hash, GetOptions::default())?;
+    }
+
+    // Create a single AgentToDid link pointing to the updated record.
     create_link(
         agent_pub_key,
         action_hash.clone(),
         LinkTypes::AgentToDid,
         (),
     )?;
+
+    // Broadcast DidUpdated event (covers key rotation, service changes, etc.)
+    let payload = serde_json::json!({
+        "did": current_did.id,
+        "version": current_did.version + 1,
+        "event": "did_updated",
+    }).to_string();
+    if let Err(e) = notify_bridge_of_did_event(&current_did.id, "DidUpdated", &payload) {
+        debug!("Failed to notify bridge of DID update: {:?}", e);
+    }
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -352,10 +472,25 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid DID entry".into())))?;
 
-    // Check if already deactivated
+    // Idempotent: if already deactivated, return the existing deactivation record
     if !is_did_active(current_did.id.clone())? {
+        // Find and return the existing deactivation record
+        let deactivation_links = get_links(
+            LinkQuery::try_new(agent_pub_key.clone(), LinkTypes::DidToDeactivation)?,
+            GetStrategy::default(),
+        )?;
+        if let Some(link) = deactivation_links.into_iter().max_by_key(|l| l.timestamp) {
+            let existing_hash = ActionHash::try_from(link.target).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest("Invalid deactivation link target".into()))
+            })?;
+            return get(existing_hash, GetOptions::default())?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Deactivation record not found".into()
+                )));
+        }
+        // Fallback: links gone but DID is inactive (shouldn't happen)
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "DID is already deactivated".into()
+            "DID is deactivated but deactivation record is missing".into()
         )));
     }
 
@@ -378,10 +513,11 @@ pub fn deactivate_did(reason: String) -> ExternResult<Record> {
         (),
     )?;
 
-    // Cascade: revoke all credentials issued by this DID
-    if let Err(e) = cascade_revoke_credentials_for_did(&current_did.id, &reason, now) {
-        warn!("Failed to cascade-revoke credentials for deactivated DID: {:?}", e);
-    }
+    // Cascade: revoke all credentials issued by this DID.
+    // The DID deactivation entry is already committed above, so even if cascade
+    // revocation fails, the DID itself is deactivated. We propagate the error so
+    // the caller knows credentials may still be active and can retry.
+    cascade_revoke_credentials_for_did(&current_did.id, &reason, now)?;
 
     // Notify bridge of deactivation for ecosystem-wide awareness
     if let Err(e) = notify_bridge_of_deactivation(&current_did.id, &reason, now) {
@@ -457,15 +593,39 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
 
     let credential_ids: Vec<String> = match response {
         ZomeCallResponse::Ok(result) => {
-            // Returns Vec<Record>, extract credential IDs from each
-            let records: Vec<Record> = result.decode().unwrap_or_default();
+            let records: Vec<Record> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Cascade revocation: failed to decode credential list for DID {}: {}",
+                    did, e
+                )))
+            })?;
             records.iter().filter_map(|r| {
                 r.action().entry_hash().map(|h| h.to_string())
             }).collect()
         }
-        _ => {
-            debug!("Could not query credentials for DID cascade revocation");
-            return Ok(());
+        ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: unauthorized to query credentials (zome={:?} fn={:?}) for DID {}",
+                zome, fn_name, did
+            ))));
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: network error querying credentials for DID {}: {}",
+                did, err
+            ))));
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: countersigning error for DID {}: {}",
+                did, err
+            ))));
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade revocation failed: authentication failed querying credentials for DID {}",
+                did
+            ))));
         }
     };
 
@@ -495,9 +655,29 @@ fn cascade_revoke_credentials_for_did(did: &str, reason: &str, _deactivated_at: 
             debug!("Successfully cascade-revoked credentials for deactivated DID: {}", did);
             Ok(())
         }
-        _ => {
-            warn!("Failed to cascade-revoke credentials for DID: {}", did);
-            Ok(())
+        ZomeCallResponse::Unauthorized(_, _, zome, fn_name) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation unauthorized: zome={:?} fn={:?} did={}",
+                zome, fn_name, did
+            ))))
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation network error: {} did={}",
+                err, did
+            ))))
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation countersigning error: {} did={}",
+                err, did
+            ))))
+        }
+        ZomeCallResponse::AuthenticationFailed(_, _) => {
+            Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cascade batch revocation auth failed: did={}",
+                did
+            ))))
         }
     }
 }
@@ -1151,7 +1331,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase).unwrap();
+        let alg = validate_multibase_key(&multibase)
+            .expect("Ed25519 multicodec key should validate");
         assert_eq!(alg, AlgorithmId::Ed25519);
     }
 
@@ -1163,7 +1344,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase).unwrap();
+        let alg = validate_multibase_key(&multibase)
+            .expect("Raw 32-byte key should validate as legacy Ed25519");
         assert_eq!(alg, AlgorithmId::Ed25519);
     }
 
@@ -1177,7 +1359,8 @@ mod tests {
             .into_string();
         let multibase = format!("z{}", encoded);
 
-        let alg = validate_multibase_key(&multibase).unwrap();
+        let alg = validate_multibase_key(&multibase)
+            .expect("ML-DSA-65 multicodec key should validate");
         assert_eq!(alg, AlgorithmId::MlDsa65);
     }
 

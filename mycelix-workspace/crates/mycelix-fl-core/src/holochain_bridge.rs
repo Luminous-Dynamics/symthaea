@@ -222,10 +222,7 @@ impl ZomeNodeReputation {
     }
 
     /// Batch-create reputation snapshots from a reputation map.
-    pub fn batch_from_reputations(
-        reputations: &HashMap<String, f32>,
-        timestamp: u64,
-    ) -> Vec<Self> {
+    pub fn batch_from_reputations(reputations: &HashMap<String, f32>, timestamp: u64) -> Vec<Self> {
         reputations
             .iter()
             .map(|(pid, &rep)| Self {
@@ -308,7 +305,10 @@ mod tests {
 
         let different_grads = vec![0.1, 0.2, 0.3, 0.4, 0.6];
         let hash3 = compute_gradient_hash(&different_grads);
-        assert_ne!(hash1, hash3, "Different gradients should produce different hashes");
+        assert_ne!(
+            hash1, hash3,
+            "Different gradients should produce different hashes"
+        );
     }
 
     #[test]
@@ -390,10 +390,7 @@ mod tests {
         let byz_record = ZomeByzantineRecord {
             participant_id: "b0".into(),
             round: 1,
-            detection_signals: vec![
-                ("magnitude".into(), 0.9),
-                ("direction".into(), 0.7),
-            ],
+            detection_signals: vec![("magnitude".into(), 0.9), ("direction".into(), 0.7)],
             excluded: true,
             confidence: 0.85,
         };

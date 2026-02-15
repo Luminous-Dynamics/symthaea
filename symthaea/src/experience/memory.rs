@@ -9,8 +9,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use super::signals::PrincipledSignals;
 use super::kosmic_state::KosmicSnapshot;
+use super::signals::PrincipledSignals;
 
 /// An episodic memory - a recorded experience
 ///
@@ -144,7 +144,10 @@ impl EpisodicMemory {
 
     /// Check if outcome was successful
     pub fn was_successful(&self) -> bool {
-        self.outcome.as_ref().map(|o| o.task_completion).unwrap_or(false)
+        self.outcome
+            .as_ref()
+            .map(|o| o.task_completion)
+            .unwrap_or(false)
     }
 
     /// Compute learning value (how valuable for learning)
@@ -289,7 +292,8 @@ impl HdvSummary {
         let std = variance.sqrt();
 
         // Find top 10 by absolute value
-        let mut indexed: Vec<(usize, f32)> = hdv.iter().enumerate().map(|(i, &v)| (i, v.abs())).collect();
+        let mut indexed: Vec<(usize, f32)> =
+            hdv.iter().enumerate().map(|(i, &v)| (i, v.abs())).collect();
         indexed.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         let top_indices: Vec<usize> = indexed.iter().take(10).map(|(i, _)| *i).collect();
@@ -429,8 +433,7 @@ impl UserEpistemicMirror {
 }
 
 /// Explanation depth preference
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ExplanationDepth {
     Brief,
     #[default]
@@ -439,10 +442,8 @@ pub enum ExplanationDepth {
     Expert,
 }
 
-
 /// Communication style preference
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum CommunicationStyle {
     Technical,
     #[default]
@@ -450,7 +451,6 @@ pub enum CommunicationStyle {
     Casual,
     Formal,
 }
-
 
 /// Harmonic resonance - which harmonies resonate with a user
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -528,8 +528,8 @@ mod tests {
 
     #[test]
     fn test_episodic_memory_with_outcome() {
-        let mem = EpisodicMemory::new("test-002", "test")
-            .with_outcome(ExperienceOutcome::success());
+        let mem =
+            EpisodicMemory::new("test-002", "test").with_outcome(ExperienceOutcome::success());
         assert!(mem.was_successful());
     }
 

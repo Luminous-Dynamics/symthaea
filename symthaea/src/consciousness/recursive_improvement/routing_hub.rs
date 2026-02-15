@@ -20,18 +20,18 @@
 //! - Cross-router information sharing
 //! - Performance tracking across all strategies
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;
-use serde::{Serialize, Deserialize};
 
-use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 use crate::consciousness::primitive_reasoning::{AdaptivePrimitiveSelector, TaskType};
+use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
 
-use super::world_model::LatentConsciousnessState;
 use super::routers::{
-    ConsciousnessRouter, RouterType,
-    DirectRouter, PhiMaximizingRouter, ExploratoryRouter, ConsolidatingRouter,
+    ConsciousnessRouter, ConsolidatingRouter, DirectRouter, ExploratoryRouter, PhiMaximizingRouter,
+    RouterType,
 };
+use super::world_model::LatentConsciousnessState;
 
 // Stub types for routers that don't exist yet
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -50,7 +50,9 @@ pub struct CausalValidatedConfig {
 
 impl Default for CausalValidatedConfig {
     fn default() -> Self {
-        Self { confidence_threshold: 0.7 }
+        Self {
+            confidence_threshold: 0.7,
+        }
     }
 }
 
@@ -61,7 +63,9 @@ pub struct GeometricRouterConfig {
 
 impl Default for GeometricRouterConfig {
     fn default() -> Self {
-        Self { curvature_scale: 1.0 }
+        Self {
+            curvature_scale: 1.0,
+        }
     }
 }
 
@@ -72,7 +76,9 @@ pub struct TopologicalRouterConfig {
 
 impl Default for TopologicalRouterConfig {
     fn default() -> Self {
-        Self { topology_threshold: 0.5 }
+        Self {
+            topology_threshold: 0.5,
+        }
     }
 }
 
@@ -83,7 +89,9 @@ pub struct QuantumRouterConfig {
 
 impl Default for QuantumRouterConfig {
     fn default() -> Self {
-        Self { decoherence_rate: 0.1 }
+        Self {
+            decoherence_rate: 0.1,
+        }
     }
 }
 
@@ -94,7 +102,9 @@ pub struct ActiveInferenceConfig {
 
 impl Default for ActiveInferenceConfig {
     fn default() -> Self {
-        Self { free_energy_threshold: 1.0 }
+        Self {
+            free_energy_threshold: 1.0,
+        }
     }
 }
 
@@ -432,7 +442,8 @@ impl PrimitiveRoutingContext {
         }
 
         // Compute tier distribution
-        let tier_distribution: HashMap<PrimitiveTier, f64> = tier_counts.iter()
+        let tier_distribution: HashMap<PrimitiveTier, f64> = tier_counts
+            .iter()
             .map(|(tier, (count, _))| {
                 let proportion = if total_uses > 0 {
                     *count as f64 / total_uses as f64
@@ -444,7 +455,8 @@ impl PrimitiveRoutingContext {
             .collect();
 
         // Find dominant tier
-        let dominant_tier = tier_distribution.iter()
+        let dominant_tier = tier_distribution
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(t, _)| *t)
             .unwrap_or(PrimitiveTier::Physical);
@@ -470,7 +482,9 @@ impl PrimitiveRoutingContext {
         let recommended_router = match dominant_tier {
             PrimitiveTier::Mathematical | PrimitiveTier::Physical => Some(RouterType::Causal),
             PrimitiveTier::Geometric => Some(RouterType::Geometric),
-            PrimitiveTier::Strategic | PrimitiveTier::MetaCognitive => Some(RouterType::ActiveInference),
+            PrimitiveTier::Strategic | PrimitiveTier::MetaCognitive => {
+                Some(RouterType::ActiveInference)
+            }
             PrimitiveTier::Compositional => Some(RouterType::Topological),
             PrimitiveTier::Consciousness => Some(RouterType::Quantum),
             _ => None,
@@ -540,7 +554,9 @@ impl ConsciousnessRoutingHub {
         Self {
             causal_router: CausalValidatedRouter::new(CausalValidatedConfig::default()),
             geometric_router: InformationGeometricRouter::new(GeometricRouterConfig::default()),
-            topological_router: TopologicalConsciousnessRouter::new(TopologicalRouterConfig::default()),
+            topological_router: TopologicalConsciousnessRouter::new(
+                TopologicalRouterConfig::default(),
+            ),
             quantum_router: QuantumCoherenceRouter::new(QuantumRouterConfig::default()),
             active_inference_router: ActiveInferenceRouter::new(ActiveInferenceConfig::default()),
             config,
@@ -559,8 +575,8 @@ impl ConsciousnessRoutingHub {
         genesis: &symthaea_core::genesis::GenesisSeed,
         label: &str,
     ) -> Self {
-        use rand::SeedableRng;
         use rand::Rng;
+        use rand::SeedableRng;
         let mut shake = genesis.domain(&format!("{label}::routing_hub"));
         let seed: u64 = shake.gen();
         let mut hub = Self::new(config);
@@ -591,7 +607,9 @@ impl ConsciousnessRoutingHub {
     /// Returns the router that primitive usage patterns suggest would
     /// perform best for the current task.
     pub fn primitive_recommended_router(&self) -> Option<RouterType> {
-        self.primitive_context.as_ref().and_then(|ctx| ctx.recommended_router)
+        self.primitive_context
+            .as_ref()
+            .and_then(|ctx| ctx.recommended_router)
     }
 
     /// Observe a new consciousness state
@@ -636,7 +654,11 @@ impl ConsciousnessRoutingHub {
     }
 
     /// Route using a single specific router
-    fn route_single(&mut self, router_type: RouterType, target: &LatentConsciousnessState) -> UnifiedRoutingDecision {
+    fn route_single(
+        &mut self,
+        router_type: RouterType,
+        target: &LatentConsciousnessState,
+    ) -> UnifiedRoutingDecision {
         let (strategy, confidence) = match router_type {
             RouterType::Causal => {
                 let validated = self.causal_router.route_validated(target);
@@ -649,7 +671,11 @@ impl ConsciousnessRoutingHub {
             RouterType::Topological => {
                 let decision = self.topological_router.route(target);
                 // Topological uses complexity score inversely
-                let conf = if decision.transition_detected { 0.5 } else { 0.8 };
+                let conf = if decision.transition_detected {
+                    0.5
+                } else {
+                    0.8
+                };
                 (decision.strategy, conf)
             }
             RouterType::Quantum => {
@@ -693,14 +719,27 @@ impl ConsciousnessRoutingHub {
         let best_router = RouterType::all()
             .into_iter()
             .max_by(|a, b| {
-                let perf_a = self.performance.get(a).map(|p| p.recent_average()).unwrap_or(0.5);
-                let perf_b = self.performance.get(b).map(|p| p.recent_average()).unwrap_or(0.5);
-                perf_a.partial_cmp(&perf_b).unwrap_or(std::cmp::Ordering::Equal)
+                let perf_a = self
+                    .performance
+                    .get(a)
+                    .map(|p| p.recent_average())
+                    .unwrap_or(0.5);
+                let perf_b = self
+                    .performance
+                    .get(b)
+                    .map(|p| p.recent_average())
+                    .unwrap_or(0.5);
+                perf_a
+                    .partial_cmp(&perf_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .unwrap_or(RouterType::ActiveInference);
 
         let mut decision = self.route_single(best_router, target);
-        decision.reasoning = format!("Adaptive selection: {} (best recent performance)", best_router.name());
+        decision.reasoning = format!(
+            "Adaptive selection: {} (best recent performance)",
+            best_router.name()
+        );
         decision
     }
 
@@ -713,10 +752,30 @@ impl ConsciousnessRoutingHub {
         let ai_dec = self.active_inference_router.route(target);
 
         let decisions: Vec<(RouterType, RoutingStrategy, f64)> = vec![
-            (RouterType::Geometric, geo_dec.strategy, cost_to_confidence(geo_dec.routing_cost)),
-            (RouterType::Topological, topo_dec.strategy, if topo_dec.transition_detected { 0.5 } else { 0.8 }),
-            (RouterType::Quantum, quantum_dec.strategy, quantum_dec.probability),
-            (RouterType::ActiveInference, ai_dec.strategy, ai_dec.confidence),
+            (
+                RouterType::Geometric,
+                geo_dec.strategy,
+                cost_to_confidence(geo_dec.routing_cost),
+            ),
+            (
+                RouterType::Topological,
+                topo_dec.strategy,
+                if topo_dec.transition_detected {
+                    0.5
+                } else {
+                    0.8
+                },
+            ),
+            (
+                RouterType::Quantum,
+                quantum_dec.strategy,
+                quantum_dec.probability,
+            ),
+            (
+                RouterType::ActiveInference,
+                ai_dec.strategy,
+                ai_dec.confidence,
+            ),
         ];
 
         // Weight by performance and confidence
@@ -724,7 +783,11 @@ impl ConsciousnessRoutingHub {
         let mut total_weight = 0.0;
 
         for (rt, strategy, confidence) in &decisions {
-            let perf = self.performance.get(rt).map(|p| p.success_rate()).unwrap_or(0.5);
+            let perf = self
+                .performance
+                .get(rt)
+                .map(|p| p.success_rate())
+                .unwrap_or(0.5);
             let weight = confidence * perf;
             *strategy_votes.entry(*strategy).or_insert(0.0) += weight;
             total_weight += weight;
@@ -747,7 +810,11 @@ impl ConsciousnessRoutingHub {
             .iter()
             .filter(|(_, s, _)| *s == winning_strategy)
             .map(|(rt, _, c)| {
-                let perf = self.performance.get(rt).map(|p| p.success_rate()).unwrap_or(0.5);
+                let perf = self
+                    .performance
+                    .get(rt)
+                    .map(|p| p.success_rate())
+                    .unwrap_or(0.5);
                 c * perf
             })
             .collect();
@@ -763,8 +830,18 @@ impl ConsciousnessRoutingHub {
             confidence,
             contributors,
             weights,
-            reasoning: format!("Ensemble voting: {} routers agreed", decisions.iter().filter(|(_, s, _)| *s == winning_strategy).count()),
-            alternatives: decisions.iter().filter(|(_, s, _)| *s != winning_strategy).map(|(_, s, c)| (*s, *c)).collect(),
+            reasoning: format!(
+                "Ensemble voting: {} routers agreed",
+                decisions
+                    .iter()
+                    .filter(|(_, s, _)| *s == winning_strategy)
+                    .count()
+            ),
+            alternatives: decisions
+                .iter()
+                .filter(|(_, s, _)| *s != winning_strategy)
+                .map(|(_, s, c)| (*s, *c))
+                .collect(),
             latency_us: 0,
         }
     }
@@ -806,12 +883,20 @@ impl ConsciousnessRoutingHub {
 
         // Level 3: Topological
         let topo_decision = self.topological_router.route(target);
-        let topo_confidence = if topo_decision.transition_detected { 0.5 } else { 0.8 };
+        let topo_confidence = if topo_decision.transition_detected {
+            0.5
+        } else {
+            0.8
+        };
         if topo_confidence >= threshold {
             return UnifiedRoutingDecision {
                 strategy: topo_decision.strategy,
                 confidence: topo_confidence,
-                contributors: vec![RouterType::Causal, RouterType::Geometric, RouterType::Topological],
+                contributors: vec![
+                    RouterType::Causal,
+                    RouterType::Geometric,
+                    RouterType::Topological,
+                ],
                 weights: vec![0.2, 0.3, 0.5],
                 reasoning: "Hierarchical: Topological sufficient".to_string(),
                 alternatives: Vec::new(),
@@ -826,7 +911,12 @@ impl ConsciousnessRoutingHub {
             return UnifiedRoutingDecision {
                 strategy: quantum_decision.strategy,
                 confidence: quantum_confidence,
-                contributors: vec![RouterType::Causal, RouterType::Geometric, RouterType::Topological, RouterType::Quantum],
+                contributors: vec![
+                    RouterType::Causal,
+                    RouterType::Geometric,
+                    RouterType::Topological,
+                    RouterType::Quantum,
+                ],
                 weights: vec![0.1, 0.2, 0.3, 0.4],
                 reasoning: "Hierarchical: Quantum sufficient".to_string(),
                 alternatives: Vec::new(),
@@ -852,7 +942,10 @@ impl ConsciousnessRoutingHub {
     }
 
     /// Quantum ensemble: superpose router outputs using amplitude-like weighting
-    fn route_quantum_ensemble(&mut self, target: &LatentConsciousnessState) -> UnifiedRoutingDecision {
+    fn route_quantum_ensemble(
+        &mut self,
+        target: &LatentConsciousnessState,
+    ) -> UnifiedRoutingDecision {
         // Get decisions from each router
         let geo_decision = self.geometric_router.route(target);
         let topo_decision = self.topological_router.route(target);
@@ -861,14 +954,23 @@ impl ConsciousnessRoutingHub {
 
         // Extract confidences
         let geo_conf = cost_to_confidence(geo_decision.routing_cost);
-        let topo_conf = if topo_decision.transition_detected { 0.5 } else { 0.8 };
+        let topo_conf = if topo_decision.transition_detected {
+            0.5
+        } else {
+            0.8
+        };
         let quantum_conf = quantum_decision.probability;
         let ai_conf = ai_decision.confidence;
 
         // Compute phase-weighted amplitudes (simulate interference)
         let phases = [0.0, PI / 4.0, PI / 2.0, 3.0 * PI / 4.0];
         let confs = [geo_conf, topo_conf, quantum_conf, ai_conf];
-        let strategies = [geo_decision.strategy, topo_decision.strategy, quantum_decision.strategy, ai_decision.strategy];
+        let strategies = [
+            geo_decision.strategy,
+            topo_decision.strategy,
+            quantum_decision.strategy,
+            ai_decision.strategy,
+        ];
 
         // Group by strategy and compute interference
         let mut strategy_amplitudes: HashMap<RoutingStrategy, (f64, f64)> = HashMap::new();
@@ -876,13 +978,16 @@ impl ConsciousnessRoutingHub {
             let amplitude = confs[i].sqrt();
             let real = amplitude * phases[i].cos();
             let imag = amplitude * phases[i].sin();
-            let entry = strategy_amplitudes.entry(strategies[i]).or_insert((0.0, 0.0));
+            let entry = strategy_amplitudes
+                .entry(strategies[i])
+                .or_insert((0.0, 0.0));
             entry.0 += real;
             entry.1 += imag;
         }
 
         // Calculate probabilities
-        let total_prob: f64 = strategy_amplitudes.values()
+        let total_prob: f64 = strategy_amplitudes
+            .values()
             .map(|(r, i)| r * r + i * i)
             .sum();
 
@@ -892,7 +997,8 @@ impl ConsciousnessRoutingHub {
             .collect();
         strategy_probs.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let (winning_strategy, winning_prob) = strategy_probs.first()
+        let (winning_strategy, winning_prob) = strategy_probs
+            .first()
             .copied()
             .unwrap_or((RoutingStrategy::StandardProcessing, 0.5));
 
@@ -904,11 +1010,30 @@ impl ConsciousnessRoutingHub {
 
         // Determine contributors
         let contributors: Vec<RouterType> = vec![
-            if geo_decision.strategy == winning_strategy { Some(RouterType::Geometric) } else { None },
-            if topo_decision.strategy == winning_strategy { Some(RouterType::Topological) } else { None },
-            if quantum_decision.strategy == winning_strategy { Some(RouterType::Quantum) } else { None },
-            if ai_decision.strategy == winning_strategy { Some(RouterType::ActiveInference) } else { None },
-        ].into_iter().flatten().collect();
+            if geo_decision.strategy == winning_strategy {
+                Some(RouterType::Geometric)
+            } else {
+                None
+            },
+            if topo_decision.strategy == winning_strategy {
+                Some(RouterType::Topological)
+            } else {
+                None
+            },
+            if quantum_decision.strategy == winning_strategy {
+                Some(RouterType::Quantum)
+            } else {
+                None
+            },
+            if ai_decision.strategy == winning_strategy {
+                Some(RouterType::ActiveInference)
+            } else {
+                None
+            },
+        ]
+        .into_iter()
+        .flatten()
+        .collect();
 
         UnifiedRoutingDecision {
             strategy: winning_strategy,

@@ -118,22 +118,23 @@
 pub use symthaea_core::hdc::{
     // Binary hypervectors
     binary_hv::BinaryHV,
-    // Unified hypervector types
-    unified_hv::{ContinuousHV, HV, HDC_DIMENSION},
-    // Real-valued hypervectors
-    // RealHV alias available via real_hv module
-    // LTC neuron count constants
-    LTC_NEURONS,
     // Primitive system
-    primitive_system::{PrimitiveSystem, Primitive, PrimitiveTier},
-    // Tiered Phi calculation
-    TieredPhi,
-    // Native similarity with PackedBipolar
-    PackedBipolar, NativeSimilarityIndex,
+    primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier},
+    // Unified hypervector types
+    unified_hv::{ContinuousHV, HDC_DIMENSION, HV},
     // Causal types
     CausalDirection,
     // HDC context for arena-based operations
     HdcContext,
+    NativeSimilarityIndex,
+    // Native similarity with PackedBipolar
+    PackedBipolar,
+    // Tiered Phi calculation
+    TieredPhi,
+    // Real-valued hypervectors
+    // RealHV alias available via real_hv module
+    // LTC neuron count constants
+    LTC_NEURONS,
 };
 
 // Re-export native_similarity module for tests
@@ -146,15 +147,12 @@ pub use symthaea_core::hdc::sensorimotor_contingencies;
 pub const HDC_DIM: usize = symthaea_core::hdc::unified_hv::HDC_DIMENSION;
 
 // Phi engine types from symthaea-core
-pub use symthaea_core::phi_engine::{
-    PhiEngine, PhiMethod, PhiResult, PhiCalculator,
-};
+pub use symthaea_core::phi_engine::{PhiCalculator, PhiEngine, PhiMethod, PhiResult};
 
 // Observability types from symthaea-core
 pub use symthaea_core::observability::{
-    SharedObserver, Observer, NoOpObserver, no_op_observer,
-    PhiComponents, PhiMeasurementEvent,
-    MetricsCollector, MetricsSnapshot, DataPoint, metrics_collector,
+    metrics_collector, no_op_observer, DataPoint, MetricsCollector, MetricsSnapshot, NoOpObserver,
+    Observer, PhiComponents, PhiMeasurementEvent, SharedObserver,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -162,104 +160,103 @@ pub use symthaea_core::observability::{
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Re-export entire modules for compatibility
-pub use symthaea_core::hdc::hebbian;
 pub use symthaea_core::hdc::adaptive_topology;
-pub use symthaea_core::hdc::sleep_and_altered_states;
 pub use symthaea_core::hdc::causal_mind;
-pub use symthaea_core::hdc::cross_modal_binding;
-pub use symthaea_core::hdc::unified_cognitive_core;
 pub use symthaea_core::hdc::collective_consciousness;
+pub use symthaea_core::hdc::cross_modal_binding;
 pub use symthaea_core::hdc::grounded_understanding;
+pub use symthaea_core::hdc::hebbian;
 pub use symthaea_core::hdc::predictive_coding;
+pub use symthaea_core::hdc::sleep_and_altered_states;
+pub use symthaea_core::hdc::unified_cognitive_core;
 // simd_hv16 removed — all methods absorbed into BinaryHV
 pub use symthaea_core::hdc::binary_hv;
-pub use symthaea_core::hdc::unified_hv;
-pub use symthaea_core::hdc::real_hv;
-pub use symthaea_core::hdc::primitive_system;
-pub use symthaea_core::hdc::simd_ops;
+pub use symthaea_core::hdc::cincinnati_advanced;
+pub use symthaea_core::hdc::cincinnati_enhanced;
+pub use symthaea_core::hdc::cincinnati_ltc;
+pub use symthaea_core::hdc::cincinnati_network;
 pub use symthaea_core::hdc::consciousness_integration;
 pub use symthaea_core::hdc::consciousness_topology_generators;
-pub use symthaea_core::hdc::spectral_connectivity;
-pub use symthaea_core::hdc::phi_resonant;
 pub use symthaea_core::hdc::global_workspace;
-pub use symthaea_core::hdc::meta_consciousness;
-pub use symthaea_core::hdc::relational_consciousness;
-pub use symthaea_core::hdc::text_encoder;
-pub use symthaea_core::hdc::semantic_encoder;
-pub use symthaea_core::hdc::semantic_decoder;
-pub use symthaea_core::hdc::reservoir;
-pub use symthaea_core::hdc::cincinnati_ltc;
-pub use symthaea_core::hdc::cincinnati_enhanced;
-pub use symthaea_core::hdc::cincinnati_advanced;
-pub use symthaea_core::hdc::cincinnati_network;
 pub use symthaea_core::hdc::gwt_cincinnati_integration;
+pub use symthaea_core::hdc::meta_consciousness;
+pub use symthaea_core::hdc::phi_resonant;
+pub use symthaea_core::hdc::primitive_system;
+pub use symthaea_core::hdc::real_hv;
+pub use symthaea_core::hdc::relational_consciousness;
+pub use symthaea_core::hdc::reservoir;
+pub use symthaea_core::hdc::semantic_decoder;
+pub use symthaea_core::hdc::semantic_encoder;
+pub use symthaea_core::hdc::simd_ops;
+pub use symthaea_core::hdc::spectral_connectivity;
+pub use symthaea_core::hdc::text_encoder;
+pub use symthaea_core::hdc::unified_hv;
 pub use symthaea_core::hdc::universal_semantics;
 // tiered_phi is canonicalized in symthaea-core (single source of truth)
-pub use symthaea_core::hdc::tiered_phi;
-pub use symthaea_core::hdc::arithmetic_engine;
-pub use symthaea_core::hdc::consciousness_persistence as core_consciousness_persistence;
-pub use symthaea_core::hdc::conscious_learning as core_conscious_learning;
 pub use symthaea_core::hdc::adaptive_learning_signals as core_adaptive_learning;
-pub use symthaea_core::hdc::unified_understanding as core_unified_understanding;
-pub use symthaea_core::hdc::full_stack_consciousness as core_full_stack;
-pub use symthaea_core::hdc::unified_conscious_being as core_unified_being;
-pub use symthaea_core::hdc::ecosystem_bridge as core_ecosystem_bridge;
-pub use symthaea_core::hdc::predictive_encoder as core_predictive_encoder;
-pub use symthaea_core::hdc::emotional_depth as core_emotional_depth;
-pub use symthaea_core::hdc::cross_modal_attention_router as core_attention_router;
-pub use symthaea_core::hdc::consciousness_streaming as core_streaming;
-pub use symthaea_core::hdc::consciousness_metacognition as core_metacognition;
-pub use symthaea_core::hdc::counterfactual_dreams as core_counterfactual;
-pub use symthaea_core::hdc::self_improvement_integration as core_self_improvement;
+pub use symthaea_core::hdc::arithmetic_engine;
+pub use symthaea_core::hdc::conscious_learning as core_conscious_learning;
 pub use symthaea_core::hdc::consciousness_advanced_cognition as core_advanced_cognition;
 pub use symthaea_core::hdc::consciousness_complete_being as core_complete_being;
 pub use symthaea_core::hdc::consciousness_cross_integration as core_cross_integration;
 pub use symthaea_core::hdc::consciousness_feedback_dynamics as core_feedback_dynamics;
-pub use symthaea_core::hdc::integrated_information;
-pub use symthaea_core::hdc::consciousness_perf;
-pub use symthaea_core::hdc::consciousness_verifier;
-pub use symthaea_core::hdc::semantic_bridge;
-pub use symthaea_core::hdc::phi_feedback;
-pub use symthaea_core::hdc::consciousness_subsystem;
+pub use symthaea_core::hdc::consciousness_metacognition as core_metacognition;
 pub use symthaea_core::hdc::consciousness_metacognitive;
-pub use symthaea_core::hdc::consciousness_self_awareness;
+pub use symthaea_core::hdc::consciousness_perf;
+pub use symthaea_core::hdc::consciousness_persistence as core_consciousness_persistence;
 pub use symthaea_core::hdc::consciousness_phi_optimization;
+pub use symthaea_core::hdc::consciousness_self_awareness;
+pub use symthaea_core::hdc::consciousness_streaming as core_streaming;
+pub use symthaea_core::hdc::consciousness_subsystem;
+pub use symthaea_core::hdc::consciousness_verifier;
+pub use symthaea_core::hdc::counterfactual_dreams as core_counterfactual;
+pub use symthaea_core::hdc::cross_modal_attention_router as core_attention_router;
+pub use symthaea_core::hdc::ecosystem_bridge as core_ecosystem_bridge;
+pub use symthaea_core::hdc::emotional_depth as core_emotional_depth;
+pub use symthaea_core::hdc::full_stack_consciousness as core_full_stack;
+pub use symthaea_core::hdc::integrated_information;
+pub use symthaea_core::hdc::phi_feedback;
+pub use symthaea_core::hdc::predictive_encoder as core_predictive_encoder;
+pub use symthaea_core::hdc::self_improvement_integration as core_self_improvement;
+pub use symthaea_core::hdc::semantic_bridge;
+pub use symthaea_core::hdc::tiered_phi;
+pub use symthaea_core::hdc::unified_conscious_being as core_unified_being;
+pub use symthaea_core::hdc::unified_understanding as core_unified_understanding;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RE-EXPORTS FROM SYMTHAEA-CORE - Mathematics
 // ═══════════════════════════════════════════════════════════════════════════════
 
-pub use symthaea_core::hdc::integer;
-pub use symthaea_core::hdc::rational;
 pub use symthaea_core::hdc::algebraic_structures;
 pub use symthaea_core::hdc::calculus;
-pub use symthaea_core::hdc::real_arithmetic;
+pub use symthaea_core::hdc::complex;
+pub use symthaea_core::hdc::foundations;
+pub use symthaea_core::hdc::integer;
+pub use symthaea_core::hdc::math_bridge;
 pub use symthaea_core::hdc::number_theory;
 pub use symthaea_core::hdc::numeric_tower;
-pub use symthaea_core::hdc::complex;
-pub use symthaea_core::hdc::math_bridge;
-pub use symthaea_core::hdc::foundations;
 pub use symthaea_core::hdc::phi_guided_math;
 pub use symthaea_core::hdc::phi_guided_search;
+pub use symthaea_core::hdc::rational;
+pub use symthaea_core::hdc::real_arithmetic;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RE-EXPORTS FROM SYMTHAEA-CORE - Performance & Similarity Search
 // ═══════════════════════════════════════════════════════════════════════════════
 
+pub use symthaea_core::hdc::dynamical_system;
 pub use symthaea_core::hdc::incremental_hv;
-pub use symthaea_core::hdc::parallel_hv;
+pub use symthaea_core::hdc::lsh_index;
 pub use symthaea_core::hdc::lsh_simhash;
 pub use symthaea_core::hdc::lsh_similarity;
-pub use symthaea_core::hdc::lsh_index;
-pub use symthaea_core::hdc::dynamical_system;
+pub use symthaea_core::hdc::parallel_hv;
 
 pub use symthaea_core::hdc::hdc_ltc_unified as core_hdc_ltc_unified;
 
 // Re-export unified HDC-LTC types (revolutionary closed-form dynamics)
 pub use symthaea_core::hdc::hdc_ltc_unified::{
-    HdcLtcUnifiedNeuron, HdcLtcUnifiedNetwork,
-    UnifiedConfig, UnifiedNetworkConfig,
-    UnifiedActivation, UnifiedNeuronStats, UnifiedNetworkStats,
+    HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
+    UnifiedNetworkConfig, UnifiedNetworkStats, UnifiedNeuronStats,
 };
 
 // Re-export from causal_mind
@@ -273,10 +270,12 @@ pub use symthaea_core::hdc::universal_semantics::SemanticPrime;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Re-exports from symthaea-core consciousness modules
-pub use symthaea_core::hdc::consciousness_topology_generators::{ConsciousnessTopology, TopologyType};
-pub use symthaea_core::hdc::relational_consciousness::RelationalConsciousness;
-pub use symthaea_core::hdc::meta_consciousness::MetaConsciousness;
+pub use symthaea_core::hdc::consciousness_topology_generators::{
+    ConsciousnessTopology, TopologyType,
+};
 pub use symthaea_core::hdc::global_workspace::GlobalWorkspace;
+pub use symthaea_core::hdc::meta_consciousness::MetaConsciousness;
+pub use symthaea_core::hdc::relational_consciousness::RelationalConsciousness;
 pub use symthaea_core::hdc::text_encoder::{TextEncoder, TextEncoderConfig};
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -384,7 +383,20 @@ pub mod moral_text_encoder;
 pub mod moral_prototypes;
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// LOCAL MODULES - Narrative Reasoning
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Compositional narrative reasoning in hyperdimensional space.
+///
+/// Primitives (protagonist, setting, conflict, ...) and operators (causes,
+/// transforms_into, escalates, ...) compose into scene-level hypervectors
+/// that can be compared for coherence and fed into `StoryArcDynamics`.
+pub mod narrative_algebra;
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // LOCAL MODULES - Testing
 // ═══════════════════════════════════════════════════════════════════════════════
 #[cfg(test)]
 pub mod proptest_hdc;
+#[cfg(test)]
+mod proptest_moral_algebra;

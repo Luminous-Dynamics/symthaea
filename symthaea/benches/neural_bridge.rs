@@ -4,7 +4,7 @@
 
 #![cfg(feature = "neural-bridge")]
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::path::Path;
 
 /// Benchmark uncached encoding (full BGE-M3 + probe pipeline).
@@ -38,17 +38,13 @@ fn bench_encode_uncached(c: &mut Criterion) {
     for text in &texts {
         // Clear cache before each benchmark to measure uncached performance
         bridge.clear_cache();
-        
-        group.bench_with_input(
-            BenchmarkId::new("uncached", text.len()),
-            text,
-            |b, text| {
-                b.iter(|| {
-                    bridge.clear_cache(); // Ensure uncached
-                    bridge.encode_to_hdc(black_box(*text)).unwrap()
-                })
-            },
-        );
+
+        group.bench_with_input(BenchmarkId::new("uncached", text.len()), text, |b, text| {
+            b.iter(|| {
+                bridge.clear_cache(); // Ensure uncached
+                bridge.encode_to_hdc(black_box(*text)).unwrap()
+            })
+        });
     }
 
     group.finish();

@@ -3,8 +3,8 @@
 //! Maps between GUI widget values and NixOS configuration expressions.
 //! Supports various widget types and value transformers.
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
 use std::collections::HashMap;
+use symthaea_core::hdc::binary_hv::BinaryHV;
 
 /// Unique widget identifier
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -86,13 +86,15 @@ impl WidgetValue {
                 format!("[ {} ]", items.join(" "))
             }
             Self::StringList(items) => {
-                let quoted: Vec<String> = items.iter()
+                let quoted: Vec<String> = items
+                    .iter()
                     .map(|s| format!("\"{}\"", s.replace('\"', "\\\"")))
                     .collect();
                 format!("[ {} ]", quoted.join(" "))
             }
             Self::Map(map) => {
-                let entries: Vec<String> = map.iter()
+                let entries: Vec<String> = map
+                    .iter()
                     .map(|(k, v)| format!("{} = \"{}\";", k, v.replace('\"', "\\\"")))
                     .collect();
                 format!("{{ {} }}", entries.join(" "))
@@ -106,34 +108,29 @@ impl WidgetValue {
         let trimmed = nix_expr.trim();
 
         match expected_type {
-            WidgetValueType::Bool => {
-                match trimmed {
-                    "true" => Some(Self::Bool(true)),
-                    "false" => Some(Self::Bool(false)),
-                    _ => None,
-                }
-            }
+            WidgetValueType::Bool => match trimmed {
+                "true" => Some(Self::Bool(true)),
+                "false" => Some(Self::Bool(false)),
+                _ => None,
+            },
             WidgetValueType::String => {
                 if trimmed.starts_with('"') && trimmed.ends_with('"') {
-                    let inner = &trimmed[1..trimmed.len()-1];
+                    let inner = &trimmed[1..trimmed.len() - 1];
                     Some(Self::String(inner.replace("\\\"", "\"")))
                 } else {
                     Some(Self::String(trimmed.to_string()))
                 }
             }
-            WidgetValueType::Int => {
-                trimmed.parse::<i64>().ok().map(Self::Int)
-            }
-            WidgetValueType::Float => {
-                trimmed.parse::<f64>().ok().map(Self::Float)
-            }
+            WidgetValueType::Int => trimmed.parse::<i64>().ok().map(Self::Int),
+            WidgetValueType::Float => trimmed.parse::<f64>().ok().map(Self::Float),
             WidgetValueType::StringList => {
                 if trimmed.starts_with('[') && trimmed.ends_with(']') {
-                    let inner = &trimmed[1..trimmed.len()-1];
-                    let items: Vec<String> = inner.split_whitespace()
+                    let inner = &trimmed[1..trimmed.len() - 1];
+                    let items: Vec<String> = inner
+                        .split_whitespace()
                         .filter_map(|s| {
                             if s.starts_with('"') && s.ends_with('"') {
-                                Some(s[1..s.len()-1].to_string())
+                                Some(s[1..s.len() - 1].to_string())
                             } else {
                                 Some(s.to_string())
                             }
@@ -190,47 +187,39 @@ impl ValueTransformer {
         match self {
             Self::Identity => value.to_nix(),
 
-            Self::ServiceEnable => {
-                match value {
-                    WidgetValue::Bool(b) => if *b { "true" } else { "false" }.to_string(),
-                    _ => "false".to_string(),
-                }
-            }
+            Self::ServiceEnable => match value {
+                WidgetValue::Bool(b) => if *b { "true" } else { "false" }.to_string(),
+                _ => "false".to_string(),
+            },
 
-            Self::PackageList => {
-                match value {
-                    WidgetValue::StringList(packages) => {
-                        let with_pkgs: Vec<String> = packages.iter()
-                            .map(|p| {
-                                if p.starts_with("pkgs.") {
-                                    p.clone()
-                                } else {
-                                    format!("pkgs.{}", p)
-                                }
-                            })
-                            .collect();
-                        format!("with pkgs; [ {} ]", with_pkgs.join(" "))
-                    }
-                    WidgetValue::Selection(idx) if *idx < options.len() => {
-                        format!("pkgs.{}", options[*idx])
-                    }
-                    _ => "[ ]".to_string(),
+            Self::PackageList => match value {
+                WidgetValue::StringList(packages) => {
+                    let with_pkgs: Vec<String> = packages
+                        .iter()
+                        .map(|p| {
+                            if p.starts_with("pkgs.") {
+                                p.clone()
+                            } else {
+                                format!("pkgs.{}", p)
+                            }
+                        })
+                        .collect();
+                    format!("with pkgs; [ {} ]", with_pkgs.join(" "))
                 }
-            }
+                WidgetValue::Selection(idx) if *idx < options.len() => {
+                    format!("pkgs.{}", options[*idx])
+                }
+                _ => "[ ]".to_string(),
+            },
 
-            Self::Port => {
-                match value {
-                    WidgetValue::Int(port) if *port >= 1 && *port <= 65535 => {
-                        port.to_string()
-                    }
-                    WidgetValue::String(s) => {
-                        s.parse::<u16>()
-                            .map(|p| p.to_string())
-                            .unwrap_or_else(|_| "80".to_string())
-                    }
-                    _ => "80".to_string(),
-                }
-            }
+            Self::Port => match value {
+                WidgetValue::Int(port) if *port >= 1 && *port <= 65535 => port.to_string(),
+                WidgetValue::String(s) => s
+                    .parse::<u16>()
+                    .map(|p| p.to_string())
+                    .unwrap_or_else(|_| "80".to_string()),
+                _ => "80".to_string(),
+            },
 
             Self::FilePath => {
                 match value {
@@ -264,26 +253,22 @@ impl ValueTransformer {
                 } else if let Ok(i) = trimmed.parse::<i64>() {
                     WidgetValue::Int(i)
                 } else if trimmed.starts_with('"') && trimmed.ends_with('"') {
-                    WidgetValue::String(trimmed[1..trimmed.len()-1].to_string())
+                    WidgetValue::String(trimmed[1..trimmed.len() - 1].to_string())
                 } else {
                     WidgetValue::String(trimmed.to_string())
                 }
             }
 
-            Self::ServiceEnable => {
-                WidgetValue::Bool(trimmed == "true")
-            }
+            Self::ServiceEnable => WidgetValue::Bool(trimmed == "true"),
 
             Self::PackageList => {
                 // Parse "with pkgs; [ ... ]" or "[ pkgs.foo pkgs.bar ]"
-                let cleaned = trimmed
-                    .replace("with pkgs;", "")
-                    .trim()
-                    .to_string();
+                let cleaned = trimmed.replace("with pkgs;", "").trim().to_string();
 
                 if cleaned.starts_with('[') && cleaned.ends_with(']') {
-                    let inner = &cleaned[1..cleaned.len()-1];
-                    let packages: Vec<String> = inner.split_whitespace()
+                    let inner = &cleaned[1..cleaned.len() - 1];
+                    let packages: Vec<String> = inner
+                        .split_whitespace()
                         .map(|s| s.replace("pkgs.", "").to_string())
                         .collect();
                     WidgetValue::StringList(packages)
@@ -292,23 +277,20 @@ impl ValueTransformer {
                 }
             }
 
-            Self::Port => {
-                trimmed.parse::<i64>()
-                    .map(WidgetValue::Int)
-                    .unwrap_or(WidgetValue::Int(80))
-            }
+            Self::Port => trimmed
+                .parse::<i64>()
+                .map(WidgetValue::Int)
+                .unwrap_or(WidgetValue::Int(80)),
 
             Self::FilePath => {
                 if trimmed.starts_with('"') && trimmed.ends_with('"') {
-                    WidgetValue::String(trimmed[1..trimmed.len()-1].to_string())
+                    WidgetValue::String(trimmed[1..trimmed.len() - 1].to_string())
                 } else {
                     WidgetValue::String(trimmed.to_string())
                 }
             }
 
-            Self::Custom(_) => {
-                WidgetValue::String(trimmed.to_string())
-            }
+            Self::Custom(_) => WidgetValue::String(trimmed.to_string()),
         }
     }
 }
@@ -349,7 +331,10 @@ pub struct WidgetBinding {
 
 impl WidgetBinding {
     /// Create a new binding builder
-    pub fn builder(widget_id: impl Into<String>, nix_path: impl Into<String>) -> WidgetBindingBuilder {
+    pub fn builder(
+        widget_id: impl Into<String>,
+        nix_path: impl Into<String>,
+    ) -> WidgetBindingBuilder {
         WidgetBindingBuilder::new(widget_id, nix_path)
     }
 }
@@ -440,10 +425,7 @@ impl WidgetBindingBuilder {
 #[derive(Debug, Clone)]
 pub enum MappingResult {
     /// Successfully mapped
-    Success {
-        nix_expr: String,
-        confidence: f64,
-    },
+    Success { nix_expr: String, confidence: f64 },
 
     /// Validation failed
     ValidationFailed {
@@ -452,9 +434,7 @@ pub enum MappingResult {
     },
 
     /// Unknown widget ID
-    UnknownWidget {
-        widget_id: WidgetId,
-    },
+    UnknownWidget { widget_id: WidgetId },
 }
 
 /// Widget mapper for bidirectional translation
@@ -507,11 +487,11 @@ impl WidgetMapper {
             // Match "path.to.option = value;"
             if let Some(eq_pos) = trimmed.find('=') {
                 let path = trimmed[..eq_pos].trim();
-                let value_part = trimmed[eq_pos+1..].trim();
+                let value_part = trimmed[eq_pos + 1..].trim();
 
                 // Remove trailing semicolon
                 let value = if value_part.ends_with(';') {
-                    &value_part[..value_part.len()-1]
+                    &value_part[..value_part.len() - 1]
                 } else {
                     value_part
                 };
@@ -528,7 +508,8 @@ impl WidgetMapper {
     /// Infer value type from path leaf
     pub fn infer_type(&self, path: &NixPath) -> WidgetValueType {
         let leaf = path.leaf();
-        self.type_hints.get(leaf)
+        self.type_hints
+            .get(leaf)
             .copied()
             .unwrap_or(WidgetValueType::String)
     }
@@ -548,7 +529,10 @@ mod tests {
     fn test_widget_value_to_nix() {
         assert_eq!(WidgetValue::Bool(true).to_nix(), "true");
         assert_eq!(WidgetValue::Bool(false).to_nix(), "false");
-        assert_eq!(WidgetValue::String("hello".to_string()).to_nix(), "\"hello\"");
+        assert_eq!(
+            WidgetValue::String("hello".to_string()).to_nix(),
+            "\"hello\""
+        );
         assert_eq!(WidgetValue::Int(8080).to_nix(), "8080");
 
         let list = WidgetValue::StringList(vec!["foo".to_string(), "bar".to_string()]);
@@ -582,25 +566,16 @@ mod tests {
     fn test_transformer_service_enable() {
         let transformer = ValueTransformer::ServiceEnable;
 
-        assert_eq!(
-            transformer.to_nix(&WidgetValue::Bool(true), &[]),
-            "true"
-        );
+        assert_eq!(transformer.to_nix(&WidgetValue::Bool(true), &[]), "true");
 
-        assert_eq!(
-            transformer.from_nix("true", &[]),
-            WidgetValue::Bool(true)
-        );
+        assert_eq!(transformer.from_nix("true", &[]), WidgetValue::Bool(true));
     }
 
     #[test]
     fn test_transformer_package_list() {
         let transformer = ValueTransformer::PackageList;
 
-        let packages = WidgetValue::StringList(vec![
-            "firefox".to_string(),
-            "git".to_string(),
-        ]);
+        let packages = WidgetValue::StringList(vec!["firefox".to_string(), "git".to_string()]);
 
         let nix_expr = transformer.to_nix(&packages, &[]);
         assert!(nix_expr.contains("pkgs.firefox"));

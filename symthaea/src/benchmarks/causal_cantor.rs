@@ -26,9 +26,11 @@
 //!                            Direction decoder + Φ confidence
 //! ```
 
-use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
-use crate::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig, CantorLtcNode};
 use super::{CausalDirection, CausalDiscoveryResult};
+use crate::hierarchical_cantor_ltc::{
+    CantorLtcConfig, CantorLtcNode, HierarchicalCantorLtcNetwork,
+};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // =============================================================================
 // CAUSAL FEATURE ENCODER
@@ -107,8 +109,17 @@ impl CausalFeatureEncoder {
         let x_mean = x.iter().sum::<f64>() / n;
         let x_var = x.iter().map(|v| (v - x_mean).powi(2)).sum::<f64>() / n;
         let x_std = x_var.sqrt().max(1e-10);
-        let x_skew = x.iter().map(|v| ((v - x_mean) / x_std).powi(3)).sum::<f64>() / n;
-        let x_kurt = x.iter().map(|v| ((v - x_mean) / x_std).powi(4)).sum::<f64>() / n - 3.0;
+        let x_skew = x
+            .iter()
+            .map(|v| ((v - x_mean) / x_std).powi(3))
+            .sum::<f64>()
+            / n;
+        let x_kurt = x
+            .iter()
+            .map(|v| ((v - x_mean) / x_std).powi(4))
+            .sum::<f64>()
+            / n
+            - 3.0;
 
         features.push(x_mean as f32);
         features.push(x_var as f32);
@@ -131,8 +142,17 @@ impl CausalFeatureEncoder {
         let y_mean = y.iter().sum::<f64>() / n;
         let y_var = y.iter().map(|v| (v - y_mean).powi(2)).sum::<f64>() / n;
         let y_std = y_var.sqrt().max(1e-10);
-        let y_skew = y.iter().map(|v| ((v - y_mean) / y_std).powi(3)).sum::<f64>() / n;
-        let y_kurt = y.iter().map(|v| ((v - y_mean) / y_std).powi(4)).sum::<f64>() / n - 3.0;
+        let y_skew = y
+            .iter()
+            .map(|v| ((v - y_mean) / y_std).powi(3))
+            .sum::<f64>()
+            / n;
+        let y_kurt = y
+            .iter()
+            .map(|v| ((v - y_mean) / y_std).powi(4))
+            .sum::<f64>()
+            / n
+            - 3.0;
 
         features.push(y_mean as f32);
         features.push(y_var as f32);
@@ -147,10 +167,23 @@ impl CausalFeatureEncoder {
 
         // Residual statistics
         let res_mean_xy: f64 = residuals_xy.iter().sum::<f64>() / n;
-        let res_var_xy: f64 = residuals_xy.iter().map(|r| (r - res_mean_xy).powi(2)).sum::<f64>() / n;
+        let res_var_xy: f64 = residuals_xy
+            .iter()
+            .map(|r| (r - res_mean_xy).powi(2))
+            .sum::<f64>()
+            / n;
         let res_std_xy = res_var_xy.sqrt().max(1e-10);
-        let res_skew_xy: f64 = residuals_xy.iter().map(|r| ((r - res_mean_xy) / res_std_xy).powi(3)).sum::<f64>() / n;
-        let res_kurt_xy: f64 = residuals_xy.iter().map(|r| ((r - res_mean_xy) / res_std_xy).powi(4)).sum::<f64>() / n - 3.0;
+        let res_skew_xy: f64 = residuals_xy
+            .iter()
+            .map(|r| ((r - res_mean_xy) / res_std_xy).powi(3))
+            .sum::<f64>()
+            / n;
+        let res_kurt_xy: f64 = residuals_xy
+            .iter()
+            .map(|r| ((r - res_mean_xy) / res_std_xy).powi(4))
+            .sum::<f64>()
+            / n
+            - 3.0;
 
         features.push(res_mean_xy as f32);
         features.push(res_var_xy as f32);
@@ -169,10 +202,23 @@ impl CausalFeatureEncoder {
         features.push(error_yx as f32);
 
         let res_mean_yx: f64 = residuals_yx.iter().sum::<f64>() / n;
-        let res_var_yx: f64 = residuals_yx.iter().map(|r| (r - res_mean_yx).powi(2)).sum::<f64>() / n;
+        let res_var_yx: f64 = residuals_yx
+            .iter()
+            .map(|r| (r - res_mean_yx).powi(2))
+            .sum::<f64>()
+            / n;
         let res_std_yx = res_var_yx.sqrt().max(1e-10);
-        let res_skew_yx: f64 = residuals_yx.iter().map(|r| ((r - res_mean_yx) / res_std_yx).powi(3)).sum::<f64>() / n;
-        let res_kurt_yx: f64 = residuals_yx.iter().map(|r| ((r - res_mean_yx) / res_std_yx).powi(4)).sum::<f64>() / n - 3.0;
+        let res_skew_yx: f64 = residuals_yx
+            .iter()
+            .map(|r| ((r - res_mean_yx) / res_std_yx).powi(3))
+            .sum::<f64>()
+            / n;
+        let res_kurt_yx: f64 = residuals_yx
+            .iter()
+            .map(|r| ((r - res_mean_yx) / res_std_yx).powi(4))
+            .sum::<f64>()
+            / n
+            - 3.0;
 
         features.push(res_mean_yx as f32);
         features.push(res_var_yx as f32);
@@ -207,16 +253,16 @@ impl CausalFeatureEncoder {
         features.push(((res_var_xy - res_var_yx) / (res_var_xy + res_var_yx).max(1e-10)) as f32);
 
         // === Meta features (14 features to reach 64) ===
-        features.push(n as f32);                                    // Sample size
-        features.push((n as f32).ln());                             // Log sample size
-        features.push(self.correlation(x, y) as f32);               // Raw correlation
-        features.push(self.correlation(x, y).abs() as f32);         // Abs correlation
+        features.push(n as f32); // Sample size
+        features.push((n as f32).ln()); // Log sample size
+        features.push(self.correlation(x, y) as f32); // Raw correlation
+        features.push(self.correlation(x, y).abs() as f32); // Abs correlation
         features.push((1.0 - self.correlation(x, y).abs()) as f32); // Independence proxy
 
         // Linearity measure (how linear is the relationship?)
         let linearity = r2_xy.max(r2_yx);
         features.push(linearity as f32);
-        features.push((1.0 - linearity) as f32);  // Non-linearity
+        features.push((1.0 - linearity) as f32); // Non-linearity
 
         // Noise level estimates
         features.push(((1.0 - r2_xy) * y_var) as f32);
@@ -231,7 +277,13 @@ impl CausalFeatureEncoder {
         features.push(anm_signal);
         features.push(lingam_signal);
         features.push((reci_signal + anm_signal + lingam_signal) / 3.0);
-        features.push(if reci_signal == anm_signal && anm_signal == lingam_signal { 1.0 } else { 0.0 });
+        features.push(
+            if reci_signal == anm_signal && anm_signal == lingam_signal {
+                1.0
+            } else {
+                0.0
+            },
+        );
 
         // Ensure exactly 64 features
         while features.len() < 64 {
@@ -283,7 +335,11 @@ impl CausalFeatureEncoder {
         let ss_tot: f64 = y.iter().map(|yi| (yi - y_mean).powi(2)).sum();
         let ss_res: f64 = residuals.iter().map(|r| r.powi(2)).sum();
 
-        let r2 = if ss_tot > 1e-10 { 1.0 - ss_res / ss_tot } else { 0.0 };
+        let r2 = if ss_tot > 1e-10 {
+            1.0 - ss_res / ss_tot
+        } else {
+            0.0
+        };
         let mse = ss_res / n;
 
         (residuals, r2.max(0.0).min(1.0), mse)
@@ -372,7 +428,11 @@ impl CausalFeatureEncoder {
     /// Encode with direction hint (for creating direction-specific representations)
     pub fn encode_with_direction(&self, x: &[f64], y: &[f64], forward: bool) -> ContinuousHV {
         let features = self.extract_features(x, y);
-        let proj = if forward { &self.projection_forward } else { &self.projection_backward };
+        let proj = if forward {
+            &self.projection_forward
+        } else {
+            &self.projection_backward
+        };
 
         let mut hv_values = vec![0.0f32; self.dim];
 
@@ -438,9 +498,9 @@ impl CausalCantorNetwork {
     pub fn new() -> Self {
         let config = CantorLtcConfig {
             dimension: HDC_DIMENSION,
-            max_depth: 5,  // Reduced depth for causal task (faster)
+            max_depth: 5, // Reduced depth for causal task (faster)
             tau_ratio: 1.0 / 3.0,
-            base_tau: 100.0,  // 100ms at root
+            base_tau: 100.0, // 100ms at root
             learning_rate: 0.01,
             measure_phi: true,
         };
@@ -609,7 +669,7 @@ impl CausalCantorNetwork {
         let asymmetry = error_xy - error_yx;
         let total = (error_xy + error_yx).max(1e-10);
 
-        -asymmetry / total  // Negative because lower error = more likely cause
+        -asymmetry / total // Negative because lower error = more likely cause
     }
 
     /// Reset network state for fresh integration
@@ -661,9 +721,7 @@ pub fn discover_by_cantor(x: &[f64], y: &[f64]) -> CausalDiscoveryResult {
 }
 
 /// Create a trained CausalCantorNetwork from labeled data
-pub fn train_causal_cantor(
-    pairs: &[(Vec<f64>, Vec<f64>, CausalDirection)]
-) -> CausalCantorNetwork {
+pub fn train_causal_cantor(pairs: &[(Vec<f64>, Vec<f64>, CausalDirection)]) -> CausalCantorNetwork {
     let mut network = CausalCantorNetwork::new();
     network.train(pairs);
     network
@@ -677,7 +735,8 @@ pub fn discover_by_cantor_cv(
     exclude_idx: usize,
 ) -> CausalDiscoveryResult {
     // Train on all pairs except the excluded one
-    let training_pairs: Vec<_> = all_pairs.iter()
+    let training_pairs: Vec<_> = all_pairs
+        .iter()
         .enumerate()
         .filter(|(i, _)| *i != exclude_idx)
         .map(|(_, p)| p.clone())
@@ -708,7 +767,10 @@ mod tests {
 
         // Simple linear relationship with noise
         let x: Vec<f64> = (0..100).map(|i| i as f64).collect();
-        let y: Vec<f64> = x.iter().map(|xi| 2.0 * xi + 1.0 + (xi * 0.1).sin()).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .map(|xi| 2.0 * xi + 1.0 + (xi * 0.1).sin())
+            .collect();
 
         let hv = encoder.encode(&x, &y);
         assert_eq!(hv.values.len(), 1024);
@@ -730,14 +792,19 @@ mod tests {
 
         // Clear X → Y relationship
         let x: Vec<f64> = (0..100).map(|i| i as f64 / 10.0).collect();
-        let y: Vec<f64> = x.iter().map(|xi| xi.powi(2) + 0.1 * (xi * 10.0).sin()).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .map(|xi| xi.powi(2) + 0.1 * (xi * 10.0).sin())
+            .collect();
 
         let result = network.discover(&x, &y);
 
         // Should have some confidence
         assert!(result.confidence >= 0.0);
-        println!("Linear test: direction={:?}, confidence={:.3}, p_forward={:.3}",
-                 result.direction, result.confidence, result.p_forward);
+        println!(
+            "Linear test: direction={:?}, confidence={:.3}, p_forward={:.3}",
+            result.direction, result.confidence, result.p_forward
+        );
     }
 
     #[test]

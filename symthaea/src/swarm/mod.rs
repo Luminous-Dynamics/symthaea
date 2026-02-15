@@ -64,73 +64,66 @@
 //! let peer_state = channel.recv_tensor().await?;
 //! ```
 
+mod checkpoint;
 mod config;
 mod error;
-mod types;
-mod hyperfeel;
-mod holochain;
-mod service;
 pub mod federated_cfc;
 mod federated_network;
-mod checkpoint;
+mod holochain;
 #[cfg(feature = "mycelix")]
 pub mod hybrid_bft;
+mod hyperfeel;
+mod service;
+mod types;
 
 // Iroh and handshake modules compile always (with stub implementations when feature disabled)
-mod iroh;
 mod handshake;
+mod iroh;
 
 // Re-exports
-pub use config::{SwarmConfig, PeerConfig, BootstrapConfig, MYCELIX_BOOTSTRAP_NODES};
+pub use config::{BootstrapConfig, PeerConfig, SwarmConfig, MYCELIX_BOOTSTRAP_NODES};
 pub use error::{SwarmError, SwarmResult};
 pub use types::{
-    SwarmMessage, ConsciousnessVector, TensorPayload, TensorType,
-    PeerInfo, ConnectionTicket, TrustLevel, ConnectionState, AffectiveSync,
+    AffectiveSync, ConnectionState, ConnectionTicket, ConsciousnessVector, PeerInfo, SwarmMessage,
+    TensorPayload, TensorType, TrustLevel,
 };
 
 // Hyperfeel - synthetic mirror neurons
 pub use hyperfeel::{
-    Hyperfeel, HyperfeelConfig, HyperfeelStats,
-    AffectiveState, EmotionLabel, SwarmCoherence,
-    SwarmHealth, SwarmStatus, PeerAffect,
+    AffectiveState, EmotionLabel, Hyperfeel, HyperfeelConfig, HyperfeelStats, PeerAffect,
+    SwarmCoherence, SwarmHealth, SwarmStatus,
 };
 
 // Holochain Cortex - trust and identity
 pub use holochain::{
-    HolochainCortex, HolochainConfig, CortexStats, CortexError,
-    AgentPubKey, AgentInfo, SignedChallenge, TrustVerificationResult,
+    AgentInfo, AgentPubKey, CortexError, CortexStats, HolochainConfig, HolochainCortex,
+    SignedChallenge, TrustVerificationResult,
 };
 
 // Iroh types (stub when feature disabled, real when enabled)
-pub use iroh::{IrohNode, IrohChannel, TensorStream, StreamConfig};
+pub use iroh::{IrohChannel, IrohNode, StreamConfig, TensorStream};
 
 // Handshake types
-pub use handshake::{HybridHandshake, HandshakeResult, HandshakeError, SwarmMessageExt};
+pub use handshake::{HandshakeError, HandshakeResult, HybridHandshake, SwarmMessageExt};
 
 // Network Service - high-level swarm integration
-pub use service::{NetworkService, ServiceStats, PeerEvent, SwarmBridge, CollectiveConsciousness};
+pub use service::{CollectiveConsciousness, NetworkService, PeerEvent, ServiceStats, SwarmBridge};
 
 // Federated CfC Learning - trust-weighted gradient aggregation
-pub use federated_cfc::{
-    FederatedAggregator, GradientMessage, DifferentialPrivacyConfig,
-};
+pub use federated_cfc::{DifferentialPrivacyConfig, FederatedAggregator, GradientMessage};
 
 // Federated Network Communication - channel and TCP backends
 pub use federated_network::{
-    FederatedNetworkConfig, FederatedMessage, FederatedNode, NodeAddress,
-    NetworkBackend, NetworkResult, NetworkError,
-    LocalChannelBackend, TcpBackend,
-    FederatedCoordinator, CoordinatorStats, CoordinatorEvent,
-    create_test_network,
+    create_test_network, CoordinatorEvent, CoordinatorStats, FederatedCoordinator,
+    FederatedMessage, FederatedNetworkConfig, FederatedNode, LocalChannelBackend, NetworkBackend,
+    NetworkError, NetworkResult, NodeAddress, TcpBackend,
 };
 
 // Federated Learning Checkpointing - fault-tolerant distributed training
 pub use checkpoint::{
-    FederatedCheckpoint, CheckpointedConfig, NodeState, BufferedGradient,
-    IncrementalCheckpoint, NodeCheckpoint,
-    CheckpointConfig, CheckpointManager,
-    RecoveryResult, NodeRejoinRequest, NodeRejoinResponse,
-    recover_coordinator, process_node_rejoin,
+    process_node_rejoin, recover_coordinator, BufferedGradient, CheckpointConfig,
+    CheckpointManager, CheckpointedConfig, FederatedCheckpoint, IncrementalCheckpoint,
+    NodeCheckpoint, NodeRejoinRequest, NodeRejoinResponse, NodeState, RecoveryResult,
 };
 
 // ============================================================================

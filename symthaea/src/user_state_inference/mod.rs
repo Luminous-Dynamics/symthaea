@@ -35,8 +35,7 @@ use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 /// Kind of context the user is operating in
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ContextKind {
     /// Exploring or learning about the system
     Exploration,
@@ -79,57 +78,78 @@ impl ContextKind {
         let text_lower = text.to_lowercase();
 
         // Troubleshooting patterns
-        if text_lower.contains("error") || text_lower.contains("fail")
-            || text_lower.contains("broken") || text_lower.contains("not working")
-            || text_lower.contains("fix") || text_lower.contains("debug")
+        if text_lower.contains("error")
+            || text_lower.contains("fail")
+            || text_lower.contains("broken")
+            || text_lower.contains("not working")
+            || text_lower.contains("fix")
+            || text_lower.contains("debug")
         {
             return ContextKind::Troubleshooting;
         }
 
         // Help patterns
-        if text_lower.contains("help") || text_lower.contains("how do i")
-            || text_lower.contains("how to") || text_lower.contains("what is")
-            || text_lower.contains("explain") || text_lower.contains("documentation")
+        if text_lower.contains("help")
+            || text_lower.contains("how do i")
+            || text_lower.contains("how to")
+            || text_lower.contains("what is")
+            || text_lower.contains("explain")
+            || text_lower.contains("documentation")
         {
             return ContextKind::Help;
         }
 
         // Configuration patterns
-        if text_lower.contains("config") || text_lower.contains("setting")
-            || text_lower.contains("option") || text_lower.contains("preference")
-            || text_lower.contains("customize") || text_lower.contains("configure")
+        if text_lower.contains("config")
+            || text_lower.contains("setting")
+            || text_lower.contains("option")
+            || text_lower.contains("preference")
+            || text_lower.contains("customize")
+            || text_lower.contains("configure")
         {
             return ContextKind::Configuration;
         }
 
         // Development patterns
-        if text_lower.contains("code") || text_lower.contains("function")
-            || text_lower.contains("implement") || text_lower.contains("program")
-            || text_lower.contains("develop") || text_lower.contains("build")
+        if text_lower.contains("code")
+            || text_lower.contains("function")
+            || text_lower.contains("implement")
+            || text_lower.contains("program")
+            || text_lower.contains("develop")
+            || text_lower.contains("build")
         {
             return ContextKind::Development;
         }
 
         // Task patterns
-        if text_lower.contains("install") || text_lower.contains("remove")
-            || text_lower.contains("update") || text_lower.contains("run")
-            || text_lower.contains("start") || text_lower.contains("stop")
+        if text_lower.contains("install")
+            || text_lower.contains("remove")
+            || text_lower.contains("update")
+            || text_lower.contains("run")
+            || text_lower.contains("start")
+            || text_lower.contains("stop")
         {
             return ContextKind::Task;
         }
 
         // Exploration patterns
-        if text_lower.contains("search") || text_lower.contains("find")
-            || text_lower.contains("list") || text_lower.contains("show")
-            || text_lower.contains("available") || text_lower.contains("options")
+        if text_lower.contains("search")
+            || text_lower.contains("find")
+            || text_lower.contains("list")
+            || text_lower.contains("show")
+            || text_lower.contains("available")
+            || text_lower.contains("options")
         {
             return ContextKind::Exploration;
         }
 
         // Maintenance patterns
-        if text_lower.contains("clean") || text_lower.contains("garbage")
-            || text_lower.contains("optimize") || text_lower.contains("maintenance")
-            || text_lower.contains("backup") || text_lower.contains("restore")
+        if text_lower.contains("clean")
+            || text_lower.contains("garbage")
+            || text_lower.contains("optimize")
+            || text_lower.contains("maintenance")
+            || text_lower.contains("backup")
+            || text_lower.contains("restore")
         {
             return ContextKind::Maintenance;
         }
@@ -160,10 +180,8 @@ impl ContextKind {
     }
 }
 
-
 /// User experience level
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ExperienceLevel {
     /// New to the system, needs guidance
     #[default]
@@ -173,7 +191,6 @@ pub enum ExperienceLevel {
     /// Experienced user, prefers efficiency
     Expert,
 }
-
 
 /// Inferred cognitive load
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
@@ -275,8 +292,10 @@ impl UserState {
 
     /// Check if user needs help
     pub fn needs_help(&self) -> bool {
-        self.frustration > 0.5 || self.confidence < 0.3 ||
-            self.context == ContextKind::Help || self.context == ContextKind::Troubleshooting
+        self.frustration > 0.5
+            || self.confidence < 0.3
+            || self.context == ContextKind::Help
+            || self.context == ContextKind::Troubleshooting
     }
 
     /// Check if user is in flow state
@@ -402,24 +421,20 @@ impl UserStateInference {
 
         // Update frustration based on errors
         if had_error {
-            self.current_state.frustration =
-                (self.current_state.frustration + 0.2).min(1.0);
+            self.current_state.frustration = (self.current_state.frustration + 0.2).min(1.0);
         } else {
             // Decay frustration on success
-            self.current_state.frustration =
-                (self.current_state.frustration - 0.1).max(0.0);
+            self.current_state.frustration = (self.current_state.frustration - 0.1).max(0.0);
         }
 
         // Update confidence based on context
         match context {
             ContextKind::Help | ContextKind::Troubleshooting => {
-                self.current_state.confidence =
-                    (self.current_state.confidence - 0.1).max(0.0);
+                self.current_state.confidence = (self.current_state.confidence - 0.1).max(0.0);
             }
             ContextKind::Task | ContextKind::Development => {
                 if !had_error {
-                    self.current_state.confidence =
-                        (self.current_state.confidence + 0.05).min(1.0);
+                    self.current_state.confidence = (self.current_state.confidence + 0.05).min(1.0);
                 }
             }
             _ => {}
@@ -458,12 +473,14 @@ impl UserStateInference {
     /// Estimate cognitive load from text
     fn estimate_cognitive_load(&mut self, text: &str) {
         let word_count = text.split_whitespace().count();
-        let has_technical = text.contains("error") || text.contains("config")
-            || text.contains("derivation") || text.contains("flake");
+        let has_technical = text.contains("error")
+            || text.contains("config")
+            || text.contains("derivation")
+            || text.contains("flake");
 
-        let load = (word_count as f64 / 50.0).min(0.5) +
-            if has_technical { 0.3 } else { 0.0 } +
-            self.current_state.frustration * 0.2;
+        let load = (word_count as f64 / 50.0).min(0.5)
+            + if has_technical { 0.3 } else { 0.0 }
+            + self.current_state.frustration * 0.2;
 
         self.current_state.cognitive_load = CognitiveLoadEstimate {
             level: load.min(1.0),
@@ -556,9 +573,18 @@ mod tests {
 
     #[test]
     fn test_context_detection() {
-        assert_eq!(ContextKind::detect("error: package not found"), ContextKind::Troubleshooting);
-        assert_eq!(ContextKind::detect("how do I install vim"), ContextKind::Help);
-        assert_eq!(ContextKind::detect("configure network settings"), ContextKind::Configuration);
+        assert_eq!(
+            ContextKind::detect("error: package not found"),
+            ContextKind::Troubleshooting
+        );
+        assert_eq!(
+            ContextKind::detect("how do I install vim"),
+            ContextKind::Help
+        );
+        assert_eq!(
+            ContextKind::detect("configure network settings"),
+            ContextKind::Configuration
+        );
         assert_eq!(ContextKind::detect("install firefox"), ContextKind::Task);
     }
 

@@ -179,7 +179,9 @@ impl ConsciousLearningEngine {
         let arousal = self.neuromodulators.arousal();
         let valence = self.neuromodulators.emotional_valence();
 
-        let signal = self.adaptive.update(phi, coherence, prediction_error, arousal, valence);
+        let signal = self
+            .adaptive
+            .update(phi, coherence, prediction_error, arousal, valence);
 
         // Check if learning should be gated
         self.update_gate_status(&signal);
@@ -235,18 +237,20 @@ impl ConsciousLearningEngine {
         }
 
         // Record activation in Hebbian engine
-        self.hebbian.record_activation(pre_concept, pre_vector, modulated_strength);
+        self.hebbian
+            .record_activation(pre_concept, pre_vector, modulated_strength);
 
         // Short delay then activate post
-        self.hebbian.record_activation(post_concept, post_vector, modulated_strength);
+        self.hebbian
+            .record_activation(post_concept, post_vector, modulated_strength);
 
         // Explicit Hebbian update with modulated activity levels
         // The modulated_strength acts as the activity level for both concepts
         self.hebbian.hebbian_update(
             pre_concept,
             post_concept,
-            modulated_strength,  // pre_activity
-            modulated_strength,  // post_activity
+            modulated_strength, // pre_activity
+            modulated_strength, // post_activity
         );
 
         // Update stats
@@ -257,7 +261,7 @@ impl ConsciousLearningEngine {
         LearningResult::Learned {
             effective_strength: modulated_strength,
             phi: self.current_phi,
-            surprise: surprise_boost,  // Use pre-extracted value to avoid borrow conflict
+            surprise: surprise_boost, // Use pre-extracted value to avoid borrow conflict
         }
     }
 
@@ -271,7 +275,9 @@ impl ConsciousLearningEngine {
 
         // Sort by surprise (consolidate most surprising first)
         self.consolidation_buffer.sort_by(|a, b| {
-            b.surprise.partial_cmp(&a.surprise).unwrap_or(std::cmp::Ordering::Equal)
+            b.surprise
+                .partial_cmp(&a.surprise)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Replay and strengthen via Hebbian update
@@ -361,8 +367,7 @@ impl ConsciousLearningEngine {
     // Internal: Update running average learning rate
     fn update_average_lr(&mut self, lr: f32) {
         let n = self.stats.successful_learns as f32;
-        self.stats.average_effective_lr =
-            (self.stats.average_effective_lr * (n - 1.0) + lr) / n;
+        self.stats.average_effective_lr = (self.stats.average_effective_lr * (n - 1.0) + lr) / n;
     }
 }
 
@@ -445,7 +450,8 @@ impl ConsciousLearningEngine {
     /// );
     /// ```
     pub fn update_from_hormones(&mut self, dopamine: f32, acetylcholine: f32, cortisol: f32) {
-        let neuro = NeuromodulatorLearningMap::from_hormone_state(dopamine, acetylcholine, cortisol);
+        let neuro =
+            NeuromodulatorLearningMap::from_hormone_state(dopamine, acetylcholine, cortisol);
         self.set_neuromodulators(neuro);
     }
 
@@ -463,7 +469,11 @@ impl ConsciousLearningEngine {
     /// ```
     pub fn update_from_prediction_error_components(&mut self, weighted_error: f32) {
         // Update only the prediction error component, keeping phi and coherence
-        self.observe_consciousness(self.current_phi, self.current_coherence, weighted_error.abs());
+        self.observe_consciousness(
+            self.current_phi,
+            self.current_coherence,
+            weighted_error.abs(),
+        );
     }
 
     /// Full integration update from all systems
@@ -637,9 +647,12 @@ mod tests {
 
         engine.learn_association("x", &pre_vec, "y", &post_vec, 0.5);
 
-        // Buffer should have entry (depends on surprise level)
-        // Note: May or may not have entry depending on surprise threshold
-        // Just verify no panic
+        // After processing, stats should reflect the learning attempt
+        let stats = engine.stats();
+        assert_eq!(
+            stats.total_attempts, 1,
+            "Should have recorded exactly 1 learning attempt"
+        );
     }
 
     #[test]
@@ -648,12 +661,12 @@ mod tests {
 
         // Simulate real-time integration from phi_engine + endocrine + active_inference
         engine.integrated_update(
-            0.7,   // phi from PhiCalculator
-            0.8,   // coherence from CoherenceField
-            0.6,   // dopamine from HormoneState
-            0.5,   // acetylcholine from HormoneState
-            0.3,   // cortisol from HormoneState
-            0.2,   // prediction_error from PredictionError.surprise()
+            0.7, // phi from PhiCalculator
+            0.8, // coherence from CoherenceField
+            0.6, // dopamine from HormoneState
+            0.5, // acetylcholine from HormoneState
+            0.3, // cortisol from HormoneState
+            0.2, // prediction_error from PredictionError.surprise()
         );
 
         // Should be able to learn with these good values
@@ -677,9 +690,15 @@ mod tests {
         let metrics = engine.consciousness_metrics();
         // High dopamine + low cortisol → positive learning rate mod
         // The exact value depends on EMA smoothing and multiple factors
-        assert!(metrics.learning_rate_mod > 0.0,
-            "Expected positive learning_rate_mod, got {}", metrics.learning_rate_mod);
-        assert!(metrics.can_learn, "Should be able to learn with good consciousness state");
+        assert!(
+            metrics.learning_rate_mod > 0.0,
+            "Expected positive learning_rate_mod, got {}",
+            metrics.learning_rate_mod
+        );
+        assert!(
+            metrics.can_learn,
+            "Should be able to learn with good consciousness state"
+        );
     }
 
     #[test]

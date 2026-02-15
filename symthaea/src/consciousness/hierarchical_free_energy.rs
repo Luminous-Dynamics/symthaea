@@ -330,7 +330,13 @@ impl HierarchicalFreeEnergy {
 
         // Clamp or pad observation to state_dim.
         let obs: Vec<f64> = (0..dim)
-            .map(|i| if i < observation.len() { observation[i] } else { 0.0 })
+            .map(|i| {
+                if i < observation.len() {
+                    observation[i]
+                } else {
+                    0.0
+                }
+            })
             .collect();
 
         for l in 0..n {
@@ -419,8 +425,7 @@ impl HierarchicalFreeEnergy {
             //   D_KL = 0.5 * (Σ μ² + d/Π − d − ln(1/Π^d))
             //        = 0.5 * (Σ μ² + d/Π − d + d·ln Π)
             // We use the dominant term 0.5 * Σ μ² for a clean decomposition.
-            let complexity_l: f64 =
-                0.5 * level.beliefs.iter().map(|b| b * b).sum::<f64>();
+            let complexity_l: f64 = 0.5 * level.beliefs.iter().map(|b| b * b).sum::<f64>();
 
             // Accuracy: expected log-likelihood under q.
             // −0.5 × Π_l × ||ε_l||²  (Gaussian observation model).
@@ -635,7 +640,7 @@ mod tests {
         let mut engine_low = HierarchicalFreeEnergy::new(HierarchicalFEConfig {
             num_levels: 3,
             state_dim: 4,
-            learning_rate: 0.05, // smaller LR for stable convergence
+            learning_rate: 0.05,  // smaller LR for stable convergence
             precision_decay: 0.3, // precision drops fast
         });
         for _ in 0..iters {
@@ -791,6 +796,6 @@ mod tests {
         let mut engine = make_engine(); // state_dim = 4
         let updates = engine.update_beliefs(&[1.0, 2.0]); // only 2 elements
         assert_eq!(updates.len(), 3); // one per level
-        // No panic means padding worked.
+                                      // No panic means padding worked.
     }
 }

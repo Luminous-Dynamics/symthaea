@@ -16,6 +16,7 @@
 export {
   CommonsBridgeClient,
   createCommonsBridgeClient,
+  isCommonsBridgeSignal,
   COMMONS_DOMAINS,
   COMMONS_ZOMES,
 } from './commons/index.js';
@@ -23,11 +24,23 @@ export {
 export type {
   CommonsQueryInput,
   CommonsEventInput,
+  CommonsBridgeEventSignal,
+  BridgeSignalHandler as CommonsBridgeSignalHandler,
+  CrossClusterDispatchInput as CommonsCrossClusterInput,
+  CheckEmergencyForAreaInput,
+  EmergencyAreaCheckResult,
+  CheckJusticeDisputesInput,
+  JusticeDisputeCheckResult,
+  PropertyOwnershipQuery,
+  PropertyOwnershipResult,
+  CareAvailabilityQuery,
+  CareAvailabilityResult,
 } from './commons/index.js';
 
 export {
   CivicBridgeClient,
   createCivicBridgeClient,
+  isCivicBridgeSignal,
   CIVIC_DOMAINS,
   CIVIC_ZOMES,
 } from './civic/index.js';
@@ -35,11 +48,96 @@ export {
 export type {
   CivicQueryInput,
   CivicEventInput,
+  CivicBridgeEventSignal,
+  CivicBridgeSignalHandler,
   BridgeHealth,
   DispatchInput,
   DispatchResult,
   EventTypeQuery,
+  CrossClusterDispatchInput as CivicCrossClusterInput,
+  QueryPropertyForEnforcementInput,
+  PropertyEnforcementResult,
+  CheckHousingCapacityInput,
+  HousingCapacityResult,
+  VerifyCareCredentialsInput,
+  CareCredentialVerifyResult,
+  JusticeAreaQuery,
+  JusticeAreaResult,
+  FactcheckStatusQuery,
+  FactcheckStatusResult,
+  AuditTrailQuery,
+  AuditTrailEntry,
+  AuditTrailResult,
 } from './civic/index.js';
+
+// ============================================================================
+// Food Sovereignty Integration
+// ============================================================================
+
+export { FoodClient, createFoodClient, FOOD_ZOMES } from './food/index.js';
+
+export type {
+  // Production types
+  PlotStatus,
+  Plot,
+  CropStatus,
+  Crop,
+  QualityGrade,
+  YieldRecord,
+  SeasonPlan,
+  // Distribution types
+  MarketType,
+  OrderStatus,
+  Market as FoodMarket,
+  Listing,
+  Order as FoodOrder,
+  // Preservation types
+  PreservationStatus,
+  StorageType,
+  SkillLevel,
+  PreservationBatch,
+  PreservationMethod,
+  StorageUnit,
+  // Knowledge types
+  PracticeCategory,
+  SeedVariety,
+  TraditionalPractice,
+  Recipe,
+} from './food/index.js';
+
+// ============================================================================
+// Transport/Mobility Integration
+// ============================================================================
+
+export { TransportClient, createTransportClient, TRANSPORT_ZOMES } from './transport/index.js';
+
+export type {
+  // Route types
+  VehicleType,
+  VehicleStatus,
+  Vehicle,
+  RouteMode,
+  Waypoint,
+  Route,
+  StopType,
+  Stop,
+  // Sharing types
+  RideOfferStatus,
+  RideRequestStatus,
+  RideMatchStatus,
+  RideOffer,
+  RideRequest,
+  RideMatch,
+  CargoOffer,
+  // Impact types
+  TripMode,
+  CreditSource,
+  TripLog,
+  CarbonCredit,
+  EmissionsCalcInput,
+  EmissionsCalcResult,
+  CommunityImpactSummary,
+} from './transport/index.js';
 
 // ============================================================================
 // Mail Integration

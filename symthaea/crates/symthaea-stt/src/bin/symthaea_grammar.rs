@@ -16,8 +16,8 @@ use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use symthaea_stt::lexicon::CmuDictionary;
 use symthaea_stt::holographic_scorer::HolographicScorer;
+use symthaea_stt::lexicon::CmuDictionary;
 
 // ============================================================================
 // CLI STRUCTURE
@@ -94,8 +94,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Train { dict, basis, output, trigrams, limit } => {
-            train_grammar(&dict, basis.as_deref(), &output, trigrams, limit, cli.verbose)?;
+        Commands::Train {
+            dict,
+            basis,
+            output,
+            trigrams,
+            limit,
+        } => {
+            train_grammar(
+                &dict,
+                basis.as_deref(),
+                &output,
+                trigrams,
+                limit,
+                cli.verbose,
+            )?;
         }
         Commands::Test { grammar, basis } => {
             test_grammar(&grammar, basis.as_deref(), cli.verbose)?;
@@ -111,7 +124,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Strip stress markers from ARPAbet phonemes (e.g., "AH0" -> "AH")
 fn strip_stress(phoneme: &str) -> String {
-    phoneme.trim_end_matches(|c: char| c.is_ascii_digit()).to_string()
+    phoneme
+        .trim_end_matches(|c: char| c.is_ascii_digit())
+        .to_string()
 }
 
 fn train_grammar(
@@ -149,16 +164,12 @@ fn train_grammar(
     for word in dict.words() {
         if let Some(entry) = dict.get(word) {
             // Primary pronunciation
-            let seq: Vec<String> = entry.primary.iter()
-                .map(|p| strip_stress(p))
-                .collect();
+            let seq: Vec<String> = entry.primary.iter().map(|p| strip_stress(p)).collect();
             sequences.push(seq);
 
             // Alternates
             for alt in &entry.alternates {
-                let seq: Vec<String> = alt.iter()
-                    .map(|p| strip_stress(p))
-                    .collect();
+                let seq: Vec<String> = alt.iter().map(|p| strip_stress(p)).collect();
                 sequences.push(seq);
             }
         }
@@ -262,11 +273,12 @@ fn test_grammar(
         (vec!["W", "ER", "L", "D"], "world"),
         (vec!["T", "IY", "M"], "team"),
         (vec!["S", "P", "IY", "CH"], "speech"),
-        (vec!["R", "EH", "K", "AH", "G", "N", "IH", "SH", "AH", "N"], "recognition"),
-
+        (
+            vec!["R", "EH", "K", "AH", "G", "N", "IH", "SH", "AH", "N"],
+            "recognition",
+        ),
         // Phonotactically valid but rare
         (vec!["S", "T", "R", "EH", "NG", "TH"], "strength"),
-
         // Invalid sequences (should have lower resonance)
         (vec!["NG", "K", "P", "F"], "invalid-ngkpf"),
         (vec!["ZH", "TH", "DH"], "invalid-zhthdh"),
@@ -284,11 +296,13 @@ fn test_grammar(
         let avg_score = scores.iter().sum::<f32>() / scores.len() as f32;
         let final_score = *scores.last().unwrap_or(&0.0);
 
-        println!("  {:20} {:40} avg={:.3} final={:.3}",
-                 label,
-                 sequence.join(" "),
-                 avg_score,
-                 final_score);
+        println!(
+            "  {:20} {:40} avg={:.3} final={:.3}",
+            label,
+            sequence.join(" "),
+            avg_score,
+            final_score
+        );
     }
 
     println!("\n(Higher scores indicate better resonance with trained grammar)");

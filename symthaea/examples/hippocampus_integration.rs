@@ -17,31 +17,28 @@
 //! cargo run --release --example hippocampus_integration
 //! ```
 
-use symthaea::consciousness::recursive_improvement::{
-    ConsciousnessWorldModel, WorldModelConfig,
-    ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState,
-    DreamMode, DreamConfig,
-};
 use symthaea::brain::HippocampusBridge;
-use symthaea::memory::{HippocampusActor, RecallQuery, EmotionalValence};
+use symthaea::consciousness::recursive_improvement::{
+    ConsciousnessAction, ConsciousnessTransition, ConsciousnessWorldModel, DreamConfig, DreamMode,
+    LatentConsciousnessState, WorldModelConfig,
+};
+use symthaea::memory::{EmotionalValence, HippocampusActor, RecallQuery};
 
 /// Generate varied experience states
-fn generate_experience(phase: usize, i: usize) -> (LatentConsciousnessState, LatentConsciousnessState) {
+fn generate_experience(
+    phase: usize,
+    i: usize,
+) -> (LatentConsciousnessState, LatentConsciousnessState) {
     let base = (phase as f64 * 0.2 + i as f64 * 0.01).min(0.9);
     let noise = (i as f64 * 0.1).sin() * 0.05;
 
-    let from = LatentConsciousnessState::from_observables(
-        base + noise,
-        0.5 + noise,
-        0.5,
-        0.8
-    );
+    let from = LatentConsciousnessState::from_observables(base + noise, 0.5 + noise, 0.5, 0.8);
 
     let to = LatentConsciousnessState::from_observables(
         base + 0.1 + noise,
         0.5 + 0.05 + noise,
         0.55,
-        0.85
+        0.85,
     );
 
     (from, to)
@@ -147,8 +144,14 @@ fn main() -> anyhow::Result<()> {
     let dream_results = dream_mode.batch_dream(&mut world_model);
 
     println!("  Dream cycles: {}", dream_results.stats.cycles_completed);
-    println!("  Concepts from dreams: {}", dream_results.concepts_discovered.len());
-    println!("  Peak consciousness: {:.2}%", dream_results.stats.peak_consciousness * 100.0);
+    println!(
+        "  Concepts from dreams: {}",
+        dream_results.concepts_discovered.len()
+    );
+    println!(
+        "  Peak consciousness: {:.2}%",
+        dream_results.stats.peak_consciousness * 100.0
+    );
 
     // Sync bridge after dreams to encode new concepts as memories
     let dream_memories = hippocampus_bridge.sync(&world_model, &mut hippocampus)?;
@@ -171,7 +174,10 @@ fn main() -> anyhow::Result<()> {
     };
 
     let recall_results = hippocampus.recall(query)?;
-    println!("  Recall 'crystallized concept': {} results", recall_results.len());
+    println!(
+        "  Recall 'crystallized concept': {} results",
+        recall_results.len()
+    );
 
     for (i, result) in recall_results.iter().take(3).enumerate() {
         let content = if result.trace.content.len() > 50 {
@@ -185,18 +191,12 @@ fn main() -> anyhow::Result<()> {
     println!();
 
     // Recall by emotion
-    let positive_memories = hippocampus_bridge.recall_by_emotion(
-        EmotionalValence::Positive,
-        &mut hippocampus,
-        5
-    )?;
+    let positive_memories =
+        hippocampus_bridge.recall_by_emotion(EmotionalValence::Positive, &mut hippocampus, 5)?;
     println!("  Positive memories: {} found", positive_memories.len());
 
-    let negative_memories = hippocampus_bridge.recall_by_emotion(
-        EmotionalValence::Negative,
-        &mut hippocampus,
-        5
-    )?;
+    let negative_memories =
+        hippocampus_bridge.recall_by_emotion(EmotionalValence::Negative, &mut hippocampus, 5)?;
     println!("  Negative memories: {} found", negative_memories.len());
 
     println!();
@@ -235,20 +235,40 @@ fn main() -> anyhow::Result<()> {
 
     println!("  Metric                      | Value");
     println!("  ────────────────────────────┼─────────────────────────────────");
-    println!("  Total Experiences           | {}", PHASES * EXPERIENCES_PER_PHASE);
+    println!(
+        "  Total Experiences           | {}",
+        PHASES * EXPERIENCES_PER_PHASE
+    );
     println!("  Concepts Crystallized       | {}", total_concepts);
-    println!("  Concepts Encoded as Memory  | {}", bridge_stats.concepts_encoded);
-    println!("  Total Memories Stored       | {}", memory_stats.total_memories);
-    println!("  Memory Recalls Performed    | {}", bridge_stats.recalls_performed);
-    println!("  Avg Recall Results          | {:.2}", bridge_stats.avg_recall_count);
-    println!("  Peak Consciousness          | {:.2}%", bridge_stats.peak_consciousness * 100.0);
-    println!("  Avg Memory Strength         | {:.3}", memory_stats.avg_strength);
+    println!(
+        "  Concepts Encoded as Memory  | {}",
+        bridge_stats.concepts_encoded
+    );
+    println!(
+        "  Total Memories Stored       | {}",
+        memory_stats.total_memories
+    );
+    println!(
+        "  Memory Recalls Performed    | {}",
+        bridge_stats.recalls_performed
+    );
+    println!(
+        "  Avg Recall Results          | {:.2}",
+        bridge_stats.avg_recall_count
+    );
+    println!(
+        "  Peak Consciousness          | {:.2}%",
+        bridge_stats.peak_consciousness * 100.0
+    );
+    println!(
+        "  Avg Memory Strength         | {:.3}",
+        memory_stats.avg_strength
+    );
 
     println!();
 
-    let success = total_concepts >= 5
-        && bridge_stats.concepts_encoded > 0
-        && memory_stats.total_memories > 0;
+    let success =
+        total_concepts >= 5 && bridge_stats.concepts_encoded > 0 && memory_stats.total_memories > 0;
 
     if success {
         println!("╔════════════════════════════════════════════════════════════════╗");

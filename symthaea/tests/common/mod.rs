@@ -23,6 +23,7 @@ pub mod fixtures;
 pub mod mocks;
 
 /// Prelude module for convenient imports
+#[allow(unused_imports)]
 pub mod prelude {
     pub use super::assertions::*;
     pub use super::builders::*;

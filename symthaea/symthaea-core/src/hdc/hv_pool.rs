@@ -37,10 +37,10 @@
 //! - Pool miss (allocate): ~50ns
 //! - Standard allocation: ~80-200ns
 
-use std::cell::RefCell;
-use std::ops::{Deref, DerefMut};
 use super::binary_hv::BinaryHV;
 use super::unified_hv::ContinuousHV;
+use std::cell::RefCell;
+use std::ops::{Deref, DerefMut};
 
 // =============================================================================
 // CONFIGURATION
@@ -81,9 +81,7 @@ impl PooledBinaryHV {
     /// Get a new pooled BinaryHV (from pool if available, else allocate)
     #[inline]
     pub fn new() -> Self {
-        let data = HV16_POOL.with(|pool| {
-            pool.borrow_mut().pop()
-        });
+        let data = HV16_POOL.with(|pool| pool.borrow_mut().pop());
 
         let data = data.unwrap_or_else(|| Box::new([0u8; 2048]));
         Self { data: Some(data) }
@@ -226,9 +224,7 @@ impl PooledContinuousHV {
     /// Get a new pooled ContinuousHV (from pool if available, else allocate)
     #[inline]
     pub fn new() -> Self {
-        let data = CONTINUOUS_HV_POOL.with(|pool| {
-            pool.borrow_mut().pop()
-        });
+        let data = CONTINUOUS_HV_POOL.with(|pool| pool.borrow_mut().pop());
 
         let data = data.unwrap_or_else(|| Box::new(vec![0.0f32; Self::DEFAULT_DIM]));
         Self { data: Some(data) }
@@ -562,8 +558,8 @@ mod tests {
     #[test]
     #[ignore = "benchmark test - run with cargo test --release -- --ignored"]
     fn bench_pooled_vs_regular_allocation() {
-        use std::time::Instant;
         use std::hint::black_box;
+        use std::time::Instant;
 
         let iterations = 100_000;
 
@@ -589,15 +585,9 @@ mod tests {
         println!("\n📊 Allocation Performance:");
         println!("  Pooled:  {}ns", pooled_ns);
         println!("  Regular: {}ns", regular_ns);
-        println!("  Speedup: {:.1}x", regular_ns as f64 / pooled_ns.max(1) as f64);
+        println!(
+            "  Speedup: {:.1}x",
+            regular_ns as f64 / pooled_ns.max(1) as f64
+        );
     }
 }
-
-/// Backward-compatible alias: `PooledHV16` is now `PooledBinaryHV`.
-/// Use `PooledBinaryHV` directly in new code.
-#[deprecated(since = "0.5.0", note = "renamed to PooledBinaryHV — use PooledBinaryHV instead")]
-pub type PooledHV16 = PooledBinaryHV;
-/// Backward-compatible alias: `HV16Pool` is now `BinaryHVPool`.
-/// Use `BinaryHVPool` directly in new code.
-#[deprecated(since = "0.5.0", note = "renamed to BinaryHVPool — use BinaryHVPool instead")]
-pub type HV16Pool = BinaryHVPool;

@@ -122,6 +122,14 @@ pub struct CredentialProof {
     /// Algorithm identifier (multicodec u16). None defaults to Ed25519 (0xed01).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub algorithm: Option<u16>,
+    /// Challenge value for replay protection (W3C Data Integrity spec).
+    /// When present, the verifier MUST supply the same challenge to verify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub challenge: Option<String>,
+    /// Domain restriction (W3C Data Integrity spec).
+    /// When present, the verifier MUST supply the same domain to verify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
 }
 
 /// Verifiable Presentation - for presenting credentials
@@ -337,20 +345,61 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::IssuerToCredential => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SubjectToCredential => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::HolderToPresentation => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CredentialToDerived => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SchemaToCredential => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::IssuerToRequest => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::RequesterToRequest => Ok(ValidateCallbackResult::Valid),
-        },
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            if tag.0.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds maximum length of 1024 bytes".into(),
+                ));
+            }
+            match link_type {
+                LinkTypes::IssuerToCredential => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::SubjectToCredential => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::HolderToPresentation => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::CredentialToDerived => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::SchemaToCredential => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::IssuerToRequest => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::RequesterToRequest => Ok(ValidateCallbackResult::Valid),
+            }
+        }
+        FlatOp::RegisterDeleteLink {
+            original_action,
+            action,
+            ..
+        } => {
+            if action.author != original_action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the link creator can delete their links".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(update) => {
+            let action = match &update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(action.original_action_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can update their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDelete(OpDelete { action }) => {
+            let original = must_get_action(action.deletes_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can delete their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -500,10 +549,58 @@ fn validate_create_credential_request(
 
 /// Validate credential request update
 fn validate_update_credential_request(
-    _action: Update,
-    _req: CredentialRequest,
+    action: Update,
+    req: CredentialRequest,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Request updates are allowed (status changes)
+    // Fetch original to enforce state transitions
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: CredentialRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original credential request not found".into()
+        )))?;
+
+    // Immutable fields
+    if req.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Request ID cannot be changed".into(),
+        ));
+    }
+    if req.requester_did != original.requester_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Requester DID cannot be changed".into(),
+        ));
+    }
+    if req.issuer_did != original.issuer_did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Issuer DID cannot be changed".into(),
+        ));
+    }
+    if req.schema_id != original.schema_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema ID cannot be changed".into(),
+        ));
+    }
+
+    // State machine: valid transitions
+    let valid = match (&original.status, &req.status) {
+        (RequestStatus::Pending, RequestStatus::UnderReview)
+        | (RequestStatus::Pending, RequestStatus::Rejected)
+        | (RequestStatus::UnderReview, RequestStatus::Approved)
+        | (RequestStatus::UnderReview, RequestStatus::Rejected)
+        | (RequestStatus::Approved, RequestStatus::Issued) => true,
+        (a, b) if a == b => true, // No-op allowed
+        _ => false,
+    };
+
+    if !valid {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Invalid credential request status transition".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -564,6 +661,8 @@ mod tests {
             proof_value: "zBase64EncodedSignature".into(),
             cryptosuite: None,
             algorithm: None,
+            challenge: None,
+            domain: None,
         }
     }
 

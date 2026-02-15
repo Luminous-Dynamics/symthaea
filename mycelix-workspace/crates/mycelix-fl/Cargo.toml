@@ -1,0 +1,30 @@
+[package]
+name = "mycelix-fl"
+version = "0.1.0"
+edition = "2021"
+description = "Unified WASM-compatible federated learning computation crate for Mycelix"
+license = "MIT"
+
+# WASM-compatible: NO ndarray, NO tokio, NO std::time
+# Only pure computation + serde serialization
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rand = { version = "0.8", default-features = false, features = ["alloc", "small_rng"] }
+thiserror = "1"
+mycelix-fl-core = { path = "../mycelix-fl-core", default-features = false }
+
+[features]
+default = []
+# Enable attack simulation modules (test-only, large)
+attacks = []
+
+[dev-dependencies]
+rand = { version = "0.8", features = ["std", "std_rng"] }
+proptest = "1.0"
+criterion = { version = "0.5", features = ["html_reports"] }
+sha2 = "0.10"
+
+[[bench]]
+name = "fl_benchmarks"
+harness = false

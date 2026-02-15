@@ -63,7 +63,10 @@ impl KokoroEngine {
         let api = match hf_hub::api::sync::Api::new() {
             Ok(api) => api,
             Err(e) => {
-                warn!("Failed to initialize HuggingFace Hub API: {}. TTS unavailable.", e);
+                warn!(
+                    "Failed to initialize HuggingFace Hub API: {}. TTS unavailable.",
+                    e
+                );
                 return None;
             }
         };
@@ -74,8 +77,10 @@ impl KokoroEngine {
         let model_path = match repo.get(&config.model_filename) {
             Ok(path) => path,
             Err(e) => {
-                warn!("Failed to download Kokoro model '{}': {}. TTS unavailable.",
-                       config.model_filename, e);
+                warn!(
+                    "Failed to download Kokoro model '{}': {}. TTS unavailable.",
+                    config.model_filename, e
+                );
                 return None;
             }
         };
@@ -135,8 +140,7 @@ impl KokoroEngine {
         }
 
         let voice_idx = voice_id.unwrap_or(self.config.default_voice);
-        let voice_embed = self.voices.get(voice_idx)
-            .or_else(|| self.voices.first())?;
+        let voice_embed = self.voices.get(voice_idx).or_else(|| self.voices.first())?;
 
         // Prepare input tensors
         let seq_len = phoneme_ids.len();
@@ -147,15 +151,10 @@ impl KokoroEngine {
         // - speed: [1] f32
         let input_ids: Vec<i64> = phoneme_ids.iter().map(|&id| id as i64).collect();
 
-        let input_ids_array = ndarray::Array2::from_shape_vec(
-            (1, seq_len),
-            input_ids,
-        ).ok()?;
+        let input_ids_array = ndarray::Array2::from_shape_vec((1, seq_len), input_ids).ok()?;
 
-        let style_array = ndarray::Array2::from_shape_vec(
-            (1, voice_embed.len()),
-            voice_embed.clone(),
-        ).ok()?;
+        let style_array =
+            ndarray::Array2::from_shape_vec((1, voice_embed.len()), voice_embed.clone()).ok()?;
 
         let speed_array = ndarray::Array1::from_vec(vec![1.0f32]);
 
@@ -270,7 +269,12 @@ pub fn save_wav(samples: &[f32], sample_rate: u32, path: &str) -> Result<()> {
         writer.write_sample(amplitude)?;
     }
     writer.finalize()?;
-    info!("Saved WAV to {}: {} samples at {}Hz", path, samples.len(), sample_rate);
+    info!(
+        "Saved WAV to {}: {} samples at {}Hz",
+        path,
+        samples.len(),
+        sample_rate
+    );
     Ok(())
 }
 

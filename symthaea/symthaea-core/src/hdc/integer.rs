@@ -15,10 +15,10 @@
 //! All operations are sign-aware and use the HybridArithmeticEngine for
 //! magnitude computations, then apply sign rules for integer semantics.
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
 use crate::hdc::arithmetic_engine::HybridArithmeticEngine;
-use serde::{Serialize, Deserialize};
+use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
+use serde::{Deserialize, Serialize};
 
 // ============================================================================
 // CORE TYPES
@@ -91,8 +91,7 @@ pub struct HdcInteger {
 impl HdcInteger {
     /// Create zero - the neutral element
     pub fn zero(primitives: &PrimitiveSystem) -> Self {
-        let zero_prim = primitives.get("ZERO")
-            .expect("ZERO primitive must exist");
+        let zero_prim = primitives.get("ZERO").expect("ZERO primitive must exist");
 
         Self {
             encoding: zero_prim.encoding,
@@ -114,14 +113,15 @@ impl HdcInteger {
 
         // Get magnitude encoding
         let magnitude_encoding = if magnitude == 0 {
-            primitives.get("ZERO")
+            primitives
+                .get("ZERO")
                 .expect("ZERO primitive must exist")
                 .encoding
         } else if magnitude <= 20 {
             // Small numbers: Peano-style construction
-            let zero_prim = primitives.get("ZERO")
-                .expect("ZERO primitive must exist");
-            let succ_prim = primitives.get("SUCCESSOR")
+            let zero_prim = primitives.get("ZERO").expect("ZERO primitive must exist");
+            let succ_prim = primitives
+                .get("SUCCESSOR")
                 .expect("SUCCESSOR primitive must exist");
 
             let mut encoding = zero_prim.encoding;
@@ -139,7 +139,8 @@ impl HdcInteger {
             Sign::Zero => (magnitude_encoding, 0.0),
             Sign::Positive => (magnitude_encoding, magnitude as f64 * 0.1),
             Sign::Negative => {
-                let negation_prim = primitives.get("NOT")
+                let negation_prim = primitives
+                    .get("NOT")
                     .or_else(|| primitives.get("NEGATION"))
                     .expect("NOT/NEGATION primitive must exist");
                 let encoding = negation_prim.encoding.bind(&magnitude_encoding);
@@ -252,9 +253,7 @@ impl IntegerArithmeticEngine {
         let hdc_a = self.encode(a);
         let hdc_b = self.encode(b);
 
-        let mut proof_trace = vec![
-            format!("Add: {} + {}", a, b),
-        ];
+        let mut proof_trace = vec![format!("Add: {} + {}", a, b)];
 
         // Determine sign and magnitude computation
         let phi_operation = match (hdc_a.sign, hdc_b.sign) {
@@ -272,8 +271,15 @@ impl IntegerArithmeticEngine {
                 result.phi
             }
             (Sign::Negative, Sign::Negative) => {
-                let result = self.hybrid_engine.add(hdc_a.unsigned_abs(), hdc_b.unsigned_abs());
-                proof_trace.push(format!("Negative sum: -({} + {}) = -{}", hdc_a.unsigned_abs(), hdc_b.unsigned_abs(), result.value));
+                let result = self
+                    .hybrid_engine
+                    .add(hdc_a.unsigned_abs(), hdc_b.unsigned_abs());
+                proof_trace.push(format!(
+                    "Negative sum: -({} + {}) = -{}",
+                    hdc_a.unsigned_abs(),
+                    hdc_b.unsigned_abs(),
+                    result.value
+                ));
                 result.phi + 1.0 // Extra phi for sign handling
             }
             (Sign::Positive, Sign::Negative) | (Sign::Negative, Sign::Positive) => {
@@ -291,11 +297,7 @@ impl IntegerArithmeticEngine {
         };
 
         let hdc_result = self.encode(result_value);
-        let mut result = IntegerResult::new(
-            hdc_result,
-            format!("{} + {}", a, b),
-            proof_trace,
-        );
+        let mut result = IntegerResult::new(hdc_result, format!("{} + {}", a, b), proof_trace);
         result.add_phi(phi_operation);
         result
     }
@@ -333,9 +335,7 @@ impl IntegerArithmeticEngine {
         let hdc_a = self.encode(a);
         let hdc_b = self.encode(b);
 
-        let mut proof_trace = vec![
-            format!("Multiply: {} × {}", a, b),
-        ];
+        let mut proof_trace = vec![format!("Multiply: {} × {}", a, b)];
 
         // Compute magnitude
         let mag_a = hdc_a.unsigned_abs();
@@ -347,17 +347,19 @@ impl IntegerArithmeticEngine {
         } else {
             let result = self.hybrid_engine.multiply(mag_a, mag_b);
             let result_sign = hdc_a.sign.multiply(&hdc_b.sign);
-            proof_trace.push(format!("Magnitude: {} × {} = {}", mag_a, mag_b, result.value));
-            proof_trace.push(format!("Sign rule: {:?} × {:?} = {:?}", hdc_a.sign, hdc_b.sign, result_sign));
+            proof_trace.push(format!(
+                "Magnitude: {} × {} = {}",
+                mag_a, mag_b, result.value
+            ));
+            proof_trace.push(format!(
+                "Sign rule: {:?} × {:?} = {:?}",
+                hdc_a.sign, hdc_b.sign, result_sign
+            ));
             result.phi + 1.0 // Extra phi for sign rule
         };
 
         let hdc_result = self.encode(result_value);
-        let mut result = IntegerResult::new(
-            hdc_result,
-            format!("{} × {}", a, b),
-            proof_trace,
-        );
+        let mut result = IntegerResult::new(hdc_result, format!("{} × {}", a, b), proof_trace);
         result.add_phi(phi_operation);
         result
     }
@@ -388,14 +390,13 @@ impl IntegerArithmeticEngine {
 
         // Apply sign rule (same as multiplication)
         let result_sign = hdc_a.sign.multiply(&hdc_b.sign);
-        proof_trace.push(format!("Sign rule: {:?} ÷ {:?} = {:?}", hdc_a.sign, hdc_b.sign, result_sign));
+        proof_trace.push(format!(
+            "Sign rule: {:?} ÷ {:?} = {:?}",
+            hdc_a.sign, hdc_b.sign, result_sign
+        ));
 
         let hdc_result = self.encode(result_value);
-        let mut result = IntegerResult::new(
-            hdc_result,
-            format!("{} ÷ {}", a, b),
-            proof_trace,
-        );
+        let mut result = IntegerResult::new(hdc_result, format!("{} ÷ {}", a, b), proof_trace);
         result.add_phi(mag_result as f64 * 0.5 + 2.0); // Phi for division operation
 
         Some(result)
@@ -421,14 +422,13 @@ impl IntegerArithmeticEngine {
         // Compute using: a mod b = a - b * floor(a/b)
         let quotient = a / b;
         proof_trace.push(format!("Quotient: {} ÷ {} = {}", a, b, quotient));
-        proof_trace.push(format!("Remainder: {} - {} × {} = {}", a, b, quotient, result_value));
+        proof_trace.push(format!(
+            "Remainder: {} - {} × {} = {}",
+            a, b, quotient, result_value
+        ));
 
         let hdc_result = self.encode(result_value);
-        let mut result = IntegerResult::new(
-            hdc_result,
-            format!("{} mod {}", a, b),
-            proof_trace,
-        );
+        let mut result = IntegerResult::new(hdc_result, format!("{} mod {}", a, b), proof_trace);
         result.add_phi(2.5); // Phi for modulo computation
 
         Some(result)
@@ -449,13 +449,13 @@ impl IntegerArithmeticEngine {
         ];
 
         let hdc_result = self.encode(result_value);
-        let phi = if hdc_a.sign == Sign::Negative { 1.0 } else { 0.0 };
+        let phi = if hdc_a.sign == Sign::Negative {
+            1.0
+        } else {
+            0.0
+        };
 
-        let mut result = IntegerResult::new(
-            hdc_result,
-            format!("|{}|", a),
-            proof_trace,
-        );
+        let mut result = IntegerResult::new(hdc_result, format!("|{}|", a), proof_trace);
         result.add_phi(phi);
         result
     }
@@ -473,11 +473,7 @@ impl IntegerArithmeticEngine {
         ];
 
         let hdc_result = self.encode(result_value);
-        let mut result = IntegerResult::new(
-            hdc_result,
-            format!("sgn({})", a),
-            proof_trace,
-        );
+        let mut result = IntegerResult::new(hdc_result, format!("sgn({})", a), proof_trace);
         result.add_phi(0.5); // Simple sign extraction
 
         result
@@ -495,11 +491,7 @@ impl IntegerArithmeticEngine {
         ];
 
         let hdc_result = self.encode(result_value);
-        let mut result = IntegerResult::new(
-            hdc_result,
-            format!("-({})", a),
-            proof_trace,
-        );
+        let mut result = IntegerResult::new(hdc_result, format!("-({})", a), proof_trace);
         result.add_phi(1.0); // Phi for negation binding
 
         result

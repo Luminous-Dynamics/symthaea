@@ -412,8 +412,8 @@ impl ConsciousnessPersistence {
     /// Save a snapshot to disk and history
     pub fn save_snapshot(&mut self, snapshot: &ConsciousnessSnapshot) -> Result<PathBuf, String> {
         // Serialize snapshot
-        let payload = bincode::serialize(snapshot)
-            .map_err(|e| format!("Serialization error: {}", e))?;
+        let payload =
+            bincode::serialize(snapshot).map_err(|e| format!("Serialization error: {}", e))?;
 
         // Optionally compress
         let (final_payload, compression_type) = if self.config.compression_enabled {
@@ -434,8 +434,8 @@ impl ConsciousnessPersistence {
         let filename = format!("snapshot_{:08}.sym", snapshot.id);
         let filepath = self.config.base_path.join(&filename);
 
-        let mut file = fs::File::create(&filepath)
-            .map_err(|e| format!("File creation error: {}", e))?;
+        let mut file =
+            fs::File::create(&filepath).map_err(|e| format!("File creation error: {}", e))?;
 
         file.write_all(&header_bytes)
             .map_err(|e| format!("Header write error: {}", e))?;
@@ -482,8 +482,7 @@ impl ConsciousnessPersistence {
         let filename = format!("snapshot_{:08}.sym", id);
         let filepath = self.config.base_path.join(&filename);
 
-        let mut file = fs::File::open(&filepath)
-            .map_err(|e| format!("File open error: {}", e))?;
+        let mut file = fs::File::open(&filepath).map_err(|e| format!("File open error: {}", e))?;
 
         // Read header (fixed size = HEADER_SIZE bytes)
         let mut header_bytes = vec![0u8; HEADER_SIZE];
@@ -661,7 +660,7 @@ impl ConsciousnessPersistence {
 
                 // Get current state
                 let snapshot_opt = {
-                    let state_guard = state.read().unwrap();
+                    let state_guard = state.read().expect("state RwLock poisoned");
                     state_guard.clone()
                 };
 
@@ -801,7 +800,9 @@ mod tests {
             .expect("Failed to create snapshot");
 
         // Load it back
-        let loaded = persist.load_snapshot(snapshot.id).expect("Failed to load snapshot");
+        let loaded = persist
+            .load_snapshot(snapshot.id)
+            .expect("Failed to load snapshot");
 
         assert_eq!(snapshot.id, loaded.id);
         assert_eq!(snapshot.phi, loaded.phi);

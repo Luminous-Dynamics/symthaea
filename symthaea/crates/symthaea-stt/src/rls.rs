@@ -313,7 +313,8 @@ impl FastRlsClassifier {
             let row_start = i * n;
             let ki = self.k_buffer[i];
             for j in 0..n {
-                self.p_matrix[row_start + j] = inv_lambda * (self.p_matrix[row_start + j] - ki * self.px_buffer[j]);
+                self.p_matrix[row_start + j] =
+                    inv_lambda * (self.p_matrix[row_start + j] - ki * self.px_buffer[j]);
             }
         }
     }

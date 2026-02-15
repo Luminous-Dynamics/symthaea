@@ -22,12 +22,16 @@ use crate::hdc::phi_feedback::PhiFeedbackConfig;
 
 /// Helper: generate a batch of distinct random BinaryHVs for pipeline input.
 fn make_input(base_seed: u64, count: usize) -> Vec<BinaryHV> {
-    (0..count).map(|i| BinaryHV::random(base_seed + i as u64)).collect()
+    (0..count)
+        .map(|i| BinaryHV::random(base_seed + i as u64))
+        .collect()
 }
 
 /// Helper: default priorities for a given input count.
 fn make_priorities(count: usize) -> Vec<f64> {
-    (0..count).map(|i| 0.7 + 0.2 * (i as f64 / count as f64)).collect()
+    (0..count)
+        .map(|i| 0.7 + 0.2 * (i as f64 / count as f64))
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -37,10 +41,16 @@ fn make_priorities(count: usize) -> Vec<f64> {
 #[test]
 fn test_phi_feedback_enables_correctly() {
     let mut pipeline = ConsciousnessPipeline::new(IntegrationConfig::default());
-    assert!(!pipeline.has_phi_feedback(), "feedback should be off by default");
+    assert!(
+        !pipeline.has_phi_feedback(),
+        "feedback should be off by default"
+    );
 
     pipeline.enable_phi_feedback();
-    assert!(pipeline.has_phi_feedback(), "feedback should be on after enable");
+    assert!(
+        pipeline.has_phi_feedback(),
+        "feedback should be on after enable"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -71,8 +81,14 @@ fn test_phi_feedback_produces_modulation() {
     );
 
     let modulation = pipeline.latest_modulation().unwrap();
-    assert!(modulation.binding_threshold > 0.0, "binding_threshold must be positive");
-    assert!(modulation.workspace_capacity >= 1, "workspace_capacity must be >= 1");
+    assert!(
+        modulation.binding_threshold > 0.0,
+        "binding_threshold must be positive"
+    );
+    assert!(
+        modulation.workspace_capacity >= 1,
+        "workspace_capacity must be >= 1"
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -116,7 +132,10 @@ fn test_phi_feedback_adapts_workspace_capacity() {
     pipeline.enable_phi_feedback();
 
     let initial_capacity = pipeline.config.workspace_capacity;
-    assert_eq!(initial_capacity, 3, "initial workspace capacity should be 3");
+    assert_eq!(
+        initial_capacity, 3,
+        "initial workspace capacity should be 3"
+    );
 
     // Run 20 cycles
     for cycle in 0..20u64 {

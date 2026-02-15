@@ -32,12 +32,12 @@
 //! - **Mo-93m**: 2.4 keV transition accessible via electron capture
 //! - **Various isomers**: NEEC cross-sections being actively researched
 
+use super::constants::RYDBERG_EV;
+use super::hadrons::Hadrons;
+use super::periodic_table::PeriodicTable;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::periodic_table::PeriodicTable;
-use super::hadrons::Hadrons;
-use super::constants::RYDBERG_EV;
 use serde::{Deserialize, Serialize};
 
 /// Electron shell transition data
@@ -155,11 +155,7 @@ pub struct ElectronNuclearCoupling {
 
 impl ElectronNuclearCoupling {
     /// Create NEEC system from genesis
-    pub fn from_genesis(
-        genesis: &GenesisSeed,
-        table: &PeriodicTable,
-        hadrons: &Hadrons,
-    ) -> Self {
+    pub fn from_genesis(genesis: &GenesisSeed, table: &PeriodicTable, hadrons: &Hadrons) -> Self {
         // Transition multipolarity vectors
         let electric_dipole = genesis.hv(Multipolarity::E1.domain(), PHYSICS_DIM);
         let magnetic_dipole = genesis.hv(Multipolarity::M1.domain(), PHYSICS_DIM);
@@ -209,12 +205,7 @@ impl ElectronNuclearCoupling {
     }
 
     /// Initialize known NEEC-promising candidates
-    fn init_candidates(
-        &mut self,
-        genesis: &GenesisSeed,
-        table: &PeriodicTable,
-        hadrons: &Hadrons,
-    ) {
+    fn init_candidates(&mut self, genesis: &GenesisSeed, table: &PeriodicTable, hadrons: &Hadrons) {
         // Thorium-229m: The "nuclear clock" isomer
         // Extraordinarily low nuclear transition energy (~8.28 eV)
         // This is in the VUV range - accessible with lasers!
@@ -222,10 +213,11 @@ impl ElectronNuclearCoupling {
             genesis,
             table,
             hadrons,
-            90, 229,  // Thorium-229
-            8.28,     // Nuclear transition energy in eV (VUV!)
+            90,
+            229,  // Thorium-229
+            8.28, // Nuclear transition energy in eV (VUV!)
             Multipolarity::M1,
-            7200.0,   // ~2 hour half-life for isomer
+            7200.0, // ~2 hour half-life for isomer
             "Th-229m: Nuclear clock candidate",
         );
         self.candidates.push(th229m);
@@ -235,10 +227,11 @@ impl ElectronNuclearCoupling {
             genesis,
             table,
             hadrons,
-            92, 235,
-            76.8,     // 76.8 eV - still very low for nuclear
+            92,
+            235,
+            76.8, // 76.8 eV - still very low for nuclear
             Multipolarity::M1,
-            1560.0,   // 26 minute half-life
+            1560.0, // 26 minute half-life
             "U-235m: Low-lying actinide isomer",
         );
         self.candidates.push(u235m);
@@ -248,8 +241,9 @@ impl ElectronNuclearCoupling {
             genesis,
             table,
             hadrons,
-            42, 93,
-            2425.0,   // 2.4 keV
+            42,
+            93,
+            2425.0, // 2.4 keV
             Multipolarity::M1,
             6.85 * 3600.0, // 6.85 hour half-life
             "Mo-93m: keV range isomer",
@@ -261,10 +255,11 @@ impl ElectronNuclearCoupling {
             genesis,
             table,
             hadrons,
-            26, 57,
-            14400.0,  // 14.4 keV - Mössbauer transition
+            26,
+            57,
+            14400.0, // 14.4 keV - Mössbauer transition
             Multipolarity::M1,
-            98e-9,    // 98 ns half-life
+            98e-9, // 98 ns half-life
             "Fe-57m: Mössbauer spectroscopy standard",
         );
         self.candidates.push(fe57m);
@@ -274,7 +269,8 @@ impl ElectronNuclearCoupling {
             genesis,
             table,
             hadrons,
-            43, 99,
+            43,
+            99,
             140500.0, // 140.5 keV
             Multipolarity::M1,
             6.0 * 3600.0, // 6 hour half-life
@@ -290,7 +286,8 @@ impl ElectronNuclearCoupling {
         _genesis: &GenesisSeed,
         _table: &PeriodicTable,
         hadrons: &Hadrons,
-        z: u8, a: u16,
+        z: u8,
+        a: u16,
         nuclear_energy_ev: f64,
         multipolarity: Multipolarity,
         half_life_s: f64,
@@ -374,26 +371,26 @@ impl ElectronNuclearCoupling {
         // NIST X-ray absorption edge energies (eV) for 19 elements
         // Format: (K, L, M, N) shell binding energies
         let nist: Option<(f64, f64, f64, f64)> = match z {
-            22 => Some((4_966.0,    564.0,    61.0,    6.0)),     // Ti
-            24 => Some((5_989.0,    696.0,    74.0,    7.0)),     // Cr
-            25 => Some((6_539.0,    769.0,    83.0,    7.0)),     // Mn
-            26 => Some((7_112.0,    846.0,   100.0,    8.0)),     // Fe
-            28 => Some((8_333.0,  1_009.0,   112.0,    8.0)),     // Ni
-            29 => Some((8_979.0,  1_097.0,   120.0,    8.0)),     // Cu
-            30 => Some((9_659.0,  1_194.0,   137.0,   10.0)),     // Zn
-            40 => Some((17_998.0, 2_532.0,   430.0,   51.0)),     // Zr
-            42 => Some((20_000.0, 2_866.0,   505.0,   63.0)),     // Mo
-            43 => Some((21_044.0, 3_043.0,   544.0,   68.0)),     // Tc
-            47 => Some((25_514.0, 3_806.0,   719.0,   97.0)),     // Ag
-            50 => Some((29_200.0, 4_465.0,   884.0,  137.0)),     // Sn
-            56 => Some((37_441.0, 5_989.0, 1_293.0,  253.0)),     // Ba
-            74 => Some((69_525.0, 12_100.0, 2_820.0,  595.0)),    // W
-            78 => Some((78_395.0, 13_880.0, 3_296.0,  725.0)),    // Pt
-            79 => Some((80_725.0, 14_353.0, 3_425.0,  762.0)),    // Au
-            82 => Some((88_005.0, 15_861.0, 3_851.0,  894.0)),    // Pb
-            90 => Some((109_651.0, 20_472.0, 5_182.0, 1_330.0)),  // Th
-            92 => Some((115_606.0, 21_757.0, 5_548.0, 1_441.0)),  // U
-            _  => None,
+            22 => Some((4_966.0, 564.0, 61.0, 6.0)),             // Ti
+            24 => Some((5_989.0, 696.0, 74.0, 7.0)),             // Cr
+            25 => Some((6_539.0, 769.0, 83.0, 7.0)),             // Mn
+            26 => Some((7_112.0, 846.0, 100.0, 8.0)),            // Fe
+            28 => Some((8_333.0, 1_009.0, 112.0, 8.0)),          // Ni
+            29 => Some((8_979.0, 1_097.0, 120.0, 8.0)),          // Cu
+            30 => Some((9_659.0, 1_194.0, 137.0, 10.0)),         // Zn
+            40 => Some((17_998.0, 2_532.0, 430.0, 51.0)),        // Zr
+            42 => Some((20_000.0, 2_866.0, 505.0, 63.0)),        // Mo
+            43 => Some((21_044.0, 3_043.0, 544.0, 68.0)),        // Tc
+            47 => Some((25_514.0, 3_806.0, 719.0, 97.0)),        // Ag
+            50 => Some((29_200.0, 4_465.0, 884.0, 137.0)),       // Sn
+            56 => Some((37_441.0, 5_989.0, 1_293.0, 253.0)),     // Ba
+            74 => Some((69_525.0, 12_100.0, 2_820.0, 595.0)),    // W
+            78 => Some((78_395.0, 13_880.0, 3_296.0, 725.0)),    // Pt
+            79 => Some((80_725.0, 14_353.0, 3_425.0, 762.0)),    // Au
+            82 => Some((88_005.0, 15_861.0, 3_851.0, 894.0)),    // Pb
+            90 => Some((109_651.0, 20_472.0, 5_182.0, 1_330.0)), // Th
+            92 => Some((115_606.0, 21_757.0, 5_548.0, 1_441.0)), // U
+            _ => None,
         };
 
         let (k_energy, l_energy, m_energy, n_energy) = match nist {
@@ -417,11 +414,14 @@ impl ElectronNuclearCoupling {
         ];
 
         // Find closest match
-        shells.into_iter()
+        shells
+            .into_iter()
             .min_by(|a, b| {
                 let diff_a = (a.2 - target_ev).abs();
                 let diff_b = (b.2 - target_ev).abs();
-                diff_a.partial_cmp(&diff_b).unwrap_or(std::cmp::Ordering::Equal)
+                diff_a
+                    .partial_cmp(&diff_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
             })
             .unwrap()
     }
@@ -454,7 +454,9 @@ impl ElectronNuclearCoupling {
     pub fn best_candidates(&self, n: usize) -> Vec<&NEECCoupling> {
         let mut sorted: Vec<&NEECCoupling> = self.candidates.iter().collect();
         sorted.sort_by(|a, b| {
-            b.coupling_strength.partial_cmp(&a.coupling_strength).unwrap_or(std::cmp::Ordering::Equal)
+            b.coupling_strength
+                .partial_cmp(&a.coupling_strength)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
         sorted.into_iter().take(n).collect()
     }
@@ -484,11 +486,7 @@ impl ElectronNuclearCoupling {
     ///
     /// This looks for cases where atom A's electron transition
     /// can excite atom B's nuclear transition.
-    pub fn find_cross_coupling(
-        &self,
-        donor_z: u8,
-        acceptor: &NEECCoupling,
-    ) -> f32 {
+    pub fn find_cross_coupling(&self, donor_z: u8, acceptor: &NEECCoupling) -> f32 {
         // Get donor's characteristic electron energies
         let donor_k = 13.6 * (donor_z as f64 - 2.0).max(1.0).powi(2);
         let donor_l = 13.6 * (donor_z as f64 - 7.0).max(1.0).powi(2) / 4.0;
@@ -540,7 +538,9 @@ mod tests {
         let (_, _, _, neec) = setup();
 
         // Thorium-229m should have the lowest nuclear transition energy
-        let th229m = neec.candidates.iter()
+        let th229m = neec
+            .candidates
+            .iter()
             .find(|c| c.nuclear.z == 90 && c.nuclear.a == 229)
             .expect("Th-229m should exist");
 
@@ -553,7 +553,9 @@ mod tests {
         // It should have high coupling potential due to low energy
         let cross_section = neec.estimate_cross_section(th229m);
 
-        let tc99m = neec.candidates.iter()
+        let tc99m = neec
+            .candidates
+            .iter()
             .find(|c| c.nuclear.z == 43)
             .expect("Tc-99m should exist");
         let tc_cross = neec.estimate_cross_section(tc99m);

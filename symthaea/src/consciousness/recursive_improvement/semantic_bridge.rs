@@ -41,10 +41,10 @@
 //! This transforms consciousness from pattern-matching to genuine understanding.
 
 use super::world_model::{
-    ConsciousnessWorldModel, WorldModelConfig,
-    ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState, ActionType,
+    ActionType, ConsciousnessAction, ConsciousnessTransition, ConsciousnessWorldModel,
+    LatentConsciousnessState, WorldModelConfig,
 };
-use crate::embeddings::{HdcBridge, BridgeConfig};
+use crate::embeddings::{BridgeConfig, HdcBridge};
 use std::collections::VecDeque;
 
 /// Semantic input for consciousness processing
@@ -85,7 +85,9 @@ impl ActionContext {
     fn to_consciousness_action(&self) -> ConsciousnessAction {
         match self {
             ActionContext::Query => ConsciousnessAction::new("explore", ActionType::Generate),
-            ActionContext::Response => ConsciousnessAction::new("consolidate", ActionType::Integrate),
+            ActionContext::Response => {
+                ConsciousnessAction::new("consolidate", ActionType::Integrate)
+            }
             ActionContext::Error => ConsciousnessAction::new("focus", ActionType::Attend),
             ActionContext::Thought => ConsciousnessAction::new("explore", ActionType::Generate),
             ActionContext::Memory => ConsciousnessAction::new("consolidate", ActionType::Recall),
@@ -255,7 +257,10 @@ impl SemanticBridge {
 
     /// Process a batch of semantic inputs
     pub fn process_batch(&mut self, inputs: Vec<SemanticInput>) -> Vec<ProcessingResult> {
-        inputs.into_iter().map(|input| self.process(input)).collect()
+        inputs
+            .into_iter()
+            .map(|input| self.process(input))
+            .collect()
     }
 
     /// Simulate embedding for text (deterministic based on text hash)
@@ -325,11 +330,26 @@ impl SemanticBridge {
     }
 
     /// Convert embedding to consciousness state
-    fn embedding_to_state(&self, embedding: &[f32], input: &SemanticInput) -> LatentConsciousnessState {
+    fn embedding_to_state(
+        &self,
+        embedding: &[f32],
+        input: &SemanticInput,
+    ) -> LatentConsciousnessState {
         // Extract key features from embedding
-        let phi = embedding.get(0).copied().unwrap_or(0.5).abs().clamp(0.0, 1.0) as f64;
-        let integration = embedding.get(1).copied().unwrap_or(0.5).abs().clamp(0.0, 1.0) as f64;
-        let coherence = embedding.get(5..10)
+        let phi = embedding
+            .get(0)
+            .copied()
+            .unwrap_or(0.5)
+            .abs()
+            .clamp(0.0, 1.0) as f64;
+        let integration = embedding
+            .get(1)
+            .copied()
+            .unwrap_or(0.5)
+            .abs()
+            .clamp(0.0, 1.0) as f64;
+        let coherence = embedding
+            .get(5..10)
             .map(|slice| slice.iter().map(|x| x.abs()).sum::<f32>() / 5.0)
             .unwrap_or(0.5) as f64;
 
@@ -358,7 +378,7 @@ impl SemanticBridge {
         let context_factor = match input.action_context {
             ActionContext::Query => 1.0,
             ActionContext::Response => 1.2, // Good response = reward
-            ActionContext::Error => -0.5, // Errors slightly negative
+            ActionContext::Error => -0.5,   // Errors slightly negative
             ActionContext::Thought => 0.8,
             ActionContext::Memory => 1.0,
             ActionContext::Goal => 1.5, // Goals highly rewarded
@@ -485,7 +505,9 @@ mod tests {
         let inputs = vec![
             SemanticInput::query("How do I install nginx?"),
             SemanticInput::thought("Checking system configuration..."),
-            SemanticInput::response("You can install nginx by adding it to environment.systemPackages"),
+            SemanticInput::response(
+                "You can install nginx by adding it to environment.systemPackages",
+            ),
             SemanticInput::query("What about the configuration?"),
             SemanticInput::response("Configure nginx via services.nginx.enable = true;"),
         ];

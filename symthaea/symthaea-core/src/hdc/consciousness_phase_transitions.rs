@@ -51,7 +51,10 @@ impl ConsciousnessPhase {
 
     /// Is this phase conscious?
     pub fn is_conscious(&self) -> bool {
-        matches!(self, ConsciousnessPhase::Supercritical | ConsciousnessPhase::Critical)
+        matches!(
+            self,
+            ConsciousnessPhase::Supercritical | ConsciousnessPhase::Critical
+        )
     }
 
     /// Is this phase pathological?
@@ -92,11 +95,11 @@ impl Default for CriticalExponents {
         // Mean-field theory exponents (Landau)
         // Real brain likely has different universality class
         Self {
-            beta: 0.5,   // Order parameter: ψ ~ (τ - τ_c)^0.5
-            gamma: 1.0,  // Susceptibility diverges
-            nu: 0.5,     // Correlation length diverges
-            eta: 0.0,    // Mean-field: no anomalous dimension
-            z: 2.0,      // Diffusive dynamics
+            beta: 0.5,  // Order parameter: ψ ~ (τ - τ_c)^0.5
+            gamma: 1.0, // Susceptibility diverges
+            nu: 0.5,    // Correlation length diverges
+            eta: 0.0,   // Mean-field: no anomalous dimension
+            z: 2.0,     // Diffusive dynamics
         }
     }
 }
@@ -127,7 +130,7 @@ impl CriticalExponents {
     /// Check hyperscaling relation: 2 - α = d*ν (d=3 for brain)
     pub fn check_hyperscaling(&self, d: f64) -> f64 {
         let alpha = 2.0 - self.gamma - 2.0 * self.beta; // Rushbrooke: α + 2β + γ = 2
-        
+
         (2.0 - alpha - d * self.nu).abs()
     }
 }
@@ -387,7 +390,8 @@ impl ConsciousnessPhaseTransitions {
         }
 
         // Check if relaxation time is increasing
-        let recent: Vec<f64> = self.history
+        let recent: Vec<f64> = self
+            .history
             .iter()
             .rev()
             .take(5)
@@ -471,7 +475,11 @@ impl ConsciousnessPhaseTransitions {
     }
 
     /// Compute correlation function G(r)
-    pub fn compute_correlation_function(&self, state: &[BinaryHV], max_distance: usize) -> Vec<f64> {
+    pub fn compute_correlation_function(
+        &self,
+        state: &[BinaryHV],
+        max_distance: usize,
+    ) -> Vec<f64> {
         let n = state.len();
         if n < 2 {
             return vec![1.0];
@@ -557,9 +565,21 @@ impl ConsciousnessPhaseTransitions {
             state.correlation_length,
             state.susceptibility,
             state.relaxation_time,
-            if at_criticality { "AT CRITICALITY: Maximum computational power! " } else { "" },
-            if slowing_detected { "WARNING: Critical slowing detected - transition imminent! " } else { "" },
-            if pathology_warning { "DANGER: Approaching pathological hypercritical state!" } else { "" },
+            if at_criticality {
+                "AT CRITICALITY: Maximum computational power! "
+            } else {
+                ""
+            },
+            if slowing_detected {
+                "WARNING: Critical slowing detected - transition imminent! "
+            } else {
+                ""
+            },
+            if pathology_warning {
+                "DANGER: Approaching pathological hypercritical state!"
+            } else {
+                ""
+            },
         );
 
         PhaseTransitionAssessment {
@@ -730,13 +750,13 @@ impl HysteresisDetector {
         let mut transition_tau = None;
 
         for i in 1..data.len() {
-            let dtau = data[i].0 - data[i-1].0;
-            let dpsi = data[i].1 - data[i-1].1;
+            let dtau = data[i].0 - data[i - 1].0;
+            let dpsi = data[i].1 - data[i - 1].1;
             if dtau.abs() > 0.001 {
                 let deriv = (dpsi / dtau).abs();
                 if deriv > max_deriv {
                     max_deriv = deriv;
-                    transition_tau = Some((data[i].0 + data[i-1].0) / 2.0);
+                    transition_tau = Some((data[i].0 + data[i - 1].0) / 2.0);
                 }
             }
         }
@@ -840,7 +860,9 @@ mod tests {
         // Sweep from unconscious to supercritical
         for i in 0..20 {
             let tau = 0.1 + i as f64 * 0.05; // 0.1 to 1.05
-            let state: Vec<BinaryHV> = (0..50).map(|j| BinaryHV::random((i * 50 + j) as u64)).collect();
+            let state: Vec<BinaryHV> = (0..50)
+                .map(|j| BinaryHV::random((i * 50 + j) as u64))
+                .collect();
             pt.observe(tau, state);
         }
 
@@ -878,8 +900,12 @@ mod tests {
         let op_random = pt.compute_order_parameter(&random);
 
         // Coherent should have higher order parameter
-        assert!(op_coherent > op_random,
-            "Coherent {} should exceed random {}", op_coherent, op_random);
+        assert!(
+            op_coherent > op_random,
+            "Coherent {} should exceed random {}",
+            op_coherent,
+            op_random
+        );
     }
 
     #[test]
@@ -922,7 +948,10 @@ mod tests {
 
         assert!(pt.num_observations() > 0);
         // Should pass through multiple phases
-        assert!(pt.num_transitions() >= 1, "Should detect at least one transition");
+        assert!(
+            pt.num_transitions() >= 1,
+            "Should detect at least one transition"
+        );
     }
 
     #[test]

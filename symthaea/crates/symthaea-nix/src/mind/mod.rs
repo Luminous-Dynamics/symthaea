@@ -14,22 +14,22 @@
 //! - [`episodic_memory`]: Φ-gated system event consolidation
 //! - [`causal_graph`]: Causal relationships between NixOS options
 
-pub mod world_model;
-pub mod hdc_world_model;
 pub mod active_inference;
 pub mod causal_graph;
-pub mod predictive_hierarchy;
-pub mod working_memory;
 pub mod episodic_memory;
 pub mod goal_inference;
+pub mod hdc_world_model;
 pub mod journal_anomaly;
+pub mod predictive_hierarchy;
+pub mod working_memory;
+pub mod world_model;
 
-pub use world_model::{NixWorldModel, ActionCategory};
-pub use hdc_world_model::{HdcWorldModel, DriftReport, StateProjection};
-pub use active_inference::{NixActiveInference, ActionPlan, ScoredAction};
+pub use active_inference::{ActionPlan, NixActiveInference, ScoredAction};
+pub use causal_graph::{CausalEdge, NixCausalGraph, RootCauseAnalysis, SideEffectPrediction};
+pub use episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
 pub use goal_inference::{GoalInference, InferredGoal};
-pub use predictive_hierarchy::{PredictiveHierarchy, PredictionLevel};
-pub use working_memory::{WorkingMemory, MemoryItem, MemorySource, SavedWorkingMemory};
-pub use episodic_memory::{NixEpisodicMemory, SystemEpisode, EpisodeOutcome};
-pub use causal_graph::{NixCausalGraph, CausalEdge, RootCauseAnalysis, SideEffectPrediction};
+pub use hdc_world_model::{DriftReport, HdcWorldModel, StateProjection};
 pub use journal_anomaly::JournalAnomalyDetector;
+pub use predictive_hierarchy::{PredictionLevel, PredictiveHierarchy};
+pub use working_memory::{MemoryItem, MemorySource, SavedWorkingMemory, WorkingMemory};
+pub use world_model::{ActionCategory, NixWorldModel};

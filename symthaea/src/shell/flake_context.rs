@@ -12,7 +12,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
 
-use crate::language::nix_parser::{NixParser, NixOption, NixValue};
+use crate::language::nix_parser::{NixOption, NixParser, NixValue};
 
 /// Context extracted from flake.nix for shell completions
 #[derive(Debug, Clone, Default)]
@@ -76,7 +76,8 @@ impl FlakeContext {
             let path = PathBuf::from(path);
             if path.exists() {
                 if let Err(e) = ctx.load_from_path(&path) {
-                    ctx.parse_errors.push(format!("Failed to load {}: {}", path.display(), e));
+                    ctx.parse_errors
+                        .push(format!("Failed to load {}: {}", path.display(), e));
                 } else {
                     break;
                 }
@@ -91,9 +92,7 @@ impl FlakeContext {
         let content = std::fs::read_to_string(path)
             .map_err(|e| format!("Failed to read {}: {}", path.display(), e))?;
 
-        let modified = std::fs::metadata(path)
-            .ok()
-            .and_then(|m| m.modified().ok());
+        let modified = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
 
         self.parse_nix_content(&content)?;
 
@@ -111,9 +110,7 @@ impl FlakeContext {
             return false;
         };
 
-        let current_modified = std::fs::metadata(path)
-            .ok()
-            .and_then(|m| m.modified().ok());
+        let current_modified = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
 
         if current_modified != self.last_modified {
             if let Err(e) = self.load_from_path(path) {
@@ -131,10 +128,13 @@ impl FlakeContext {
         let mut parser = NixParser::new();
 
         // Set up tree-sitter language
-        parser.parser.set_language(&tree_sitter_nix::LANGUAGE.into())
+        parser
+            .parser
+            .set_language(&tree_sitter_nix::LANGUAGE.into())
             .map_err(|e| format!("Failed to set language: {}", e))?;
 
-        let config = parser.parse(content)
+        let config = parser
+            .parse(content)
             .map_err(|e| format!("Parse error at {}:{}: {}", e.line, e.column, e.message))?;
 
         // Clear previous context
@@ -157,7 +157,8 @@ impl FlakeContext {
 
         // Record parse errors
         for err in &config.errors {
-            self.parse_errors.push(format!("{}:{}: {}", err.line, err.column, err.message));
+            self.parse_errors
+                .push(format!("{}:{}: {}", err.line, err.column, err.message));
         }
 
         Ok(())
@@ -223,7 +224,10 @@ impl FlakeContext {
             NixValue::Expression(expr) => {
                 // Try to extract simple identifiers
                 for word in expr.split_whitespace() {
-                    if word.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+                    if word
+                        .chars()
+                        .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+                    {
                         packages.insert(word.to_string());
                     }
                 }
@@ -239,7 +243,11 @@ impl FlakeContext {
 
         // Suggest removing installed packages
         if input_lower.starts_with("remove ") || input_lower.starts_with("uninstall ") {
-            let prefix = if input_lower.starts_with("remove ") { "remove " } else { "uninstall " };
+            let prefix = if input_lower.starts_with("remove ") {
+                "remove "
+            } else {
+                "uninstall "
+            };
             let query = input.trim_start_matches(prefix);
 
             for pkg in &self.installed_packages {
@@ -272,14 +280,15 @@ impl FlakeContext {
         if input_lower.contains("enable") || input_lower.starts_with("service") {
             for service in &self.known_services {
                 if !self.enabled_services.contains(service)
-                    && service.to_lowercase().contains(&input_lower) {
-                        suggestions.push(ContextualSuggestion {
-                            text: format!("enable {}", service),
-                            description: format!("Enable {} service", service),
-                            source: SuggestionSource::KnownService,
-                            confidence: 0.8,
-                        });
-                    }
+                    && service.to_lowercase().contains(&input_lower)
+                {
+                    suggestions.push(ContextualSuggestion {
+                        text: format!("enable {}", service),
+                        description: format!("Enable {} service", service),
+                        source: SuggestionSource::KnownService,
+                        confidence: 0.8,
+                    });
+                }
             }
         }
 
@@ -314,7 +323,9 @@ impl FlakeContext {
     pub fn status_summary(&self) -> String {
         let pkg_count = self.installed_packages.len();
         let svc_count = self.enabled_services.len();
-        let path = self.flake_path.as_ref()
+        let path = self
+            .flake_path
+            .as_ref()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|| "none".to_string());
 

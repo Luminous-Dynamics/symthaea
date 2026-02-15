@@ -39,12 +39,12 @@
 //!
 //! The LLM then translates primitive sequences to natural language.
 
+use crate::hdc::hd_ltc_codec::HDLTCCodec;
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, VecDeque};
 use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
-use symthaea_core::hdc::semantic_decoder::{SemanticDecoder, DecodedExpression};
-use crate::hdc::hd_ltc_codec::HDLTCCodec;
-use serde::{Serialize, Deserialize};
-use std::collections::{HashMap, VecDeque};
+use symthaea_core::hdc::semantic_decoder::{DecodedExpression, SemanticDecoder};
 
 /// Maximum context length for generation
 const MAX_CONTEXT_LENGTH: usize = 32;
@@ -205,8 +205,7 @@ impl LTCGenerativeCore {
 
         // Decode seed to get starting primitive
         let seed_decoded = self.decoder.decode(seed);
-        let seed_primitive = seed_decoded.primitives.first()
-            .map(|p| p.name.clone());
+        let seed_primitive = seed_decoded.primitives.first().map(|p| p.name.clone());
 
         // Initialize recurrent state from seed
         self.recurrent_state = self.codec.encode_to_ltc(seed);
@@ -223,7 +222,12 @@ impl LTCGenerativeCore {
             }
 
             // Record step
-            let state_norm = self.recurrent_state.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let state_norm = self
+                .recurrent_state
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
             steps.push(GenerationStep {
                 primitive: next_primitive.clone(),
                 probability,
@@ -288,7 +292,12 @@ impl LTCGenerativeCore {
             // Blend context with recurrent state
             let context_ltc = self.codec.encode_to_ltc(&context_hv);
             let mut blended = vec![0.0f32; self.config.ltc_neurons];
-            for i in 0..self.config.ltc_neurons.min(context_ltc.len()).min(self.recurrent_state.len()) {
+            for i in 0..self
+                .config
+                .ltc_neurons
+                .min(context_ltc.len())
+                .min(self.recurrent_state.len())
+            {
                 blended[i] = 0.7 * self.recurrent_state[i] + 0.3 * context_ltc[i];
             }
             blended
@@ -328,7 +337,7 @@ impl LTCGenerativeCore {
         let mut bundled_hvs = Vec::with_capacity(self.context.len());
         for (i, hv) in self.context.iter().enumerate() {
             // Bind with position vector (rotate by index)
-            let pos_seed = 0xB0510000 + i as u64;  // Position encoding seed
+            let pos_seed = 0xB0510000 + i as u64; // Position encoding seed
             let pos_vec = BinaryHV::random(pos_seed);
             bundled_hvs.push(hv.bind(&pos_vec));
         }
@@ -343,7 +352,9 @@ impl LTCGenerativeCore {
         }
 
         // Apply temperature and top-k
-        let mut candidates: Vec<(String, f32)> = decoded.primitives.iter()
+        let mut candidates: Vec<(String, f32)> = decoded
+            .primitives
+            .iter()
             .take(self.config.top_k)
             .map(|p| {
                 let score = (p.activation / self.config.temperature).exp();
@@ -375,13 +386,19 @@ impl LTCGenerativeCore {
     /// Φ-guided primitive selection
     ///
     /// Higher Φ → prefer primitives that increase integration
-    fn phi_guided_select(&mut self, decoded: &DecodedExpression, current_phi: f32) -> (String, f32, f32) {
+    fn phi_guided_select(
+        &mut self,
+        decoded: &DecodedExpression,
+        current_phi: f32,
+    ) -> (String, f32, f32) {
         if decoded.primitives.is_empty() {
             return ("THINK".to_string(), 0.1, current_phi);
         }
 
         // Score primitives by Φ-compatibility
-        let mut scored: Vec<(String, f32, f32)> = decoded.primitives.iter()
+        let mut scored: Vec<(String, f32, f32)> = decoded
+            .primitives
+            .iter()
             .take(self.config.top_k)
             .map(|p| {
                 let base_score = p.activation;
@@ -417,7 +434,9 @@ impl LTCGenerativeCore {
             let key = (last.clone(), primitive.to_string());
             if let Some(&weight) = self.transition_weights.get(&key) {
                 // Normalize by total transitions from this primitive
-                let total: f32 = self.transition_weights.iter()
+                let total: f32 = self
+                    .transition_weights
+                    .iter()
                     .filter(|((from, _), _)| from == &last)
                     .map(|(_, w)| w)
                     .sum();
@@ -479,7 +498,12 @@ impl LTCGenerativeCore {
 
         // Exponential moving average
         let alpha = 0.3;
-        for i in 0..self.config.ltc_neurons.min(new_ltc.len()).min(self.recurrent_state.len()) {
+        for i in 0..self
+            .config
+            .ltc_neurons
+            .min(new_ltc.len())
+            .min(self.recurrent_state.len())
+        {
             self.recurrent_state[i] = (1.0 - alpha) * self.recurrent_state[i] + alpha * new_ltc[i];
         }
     }
@@ -496,7 +520,11 @@ impl LTCGenerativeCore {
     }
 
     /// Continue generation from an existing thought
-    pub fn continue_thought(&mut self, thought: &GeneratedThought, current_phi: f32) -> GeneratedThought {
+    pub fn continue_thought(
+        &mut self,
+        thought: &GeneratedThought,
+        current_phi: f32,
+    ) -> GeneratedThought {
         // Restore context from thought
         self.reset();
         for prim_name in &thought.primitives {
@@ -511,7 +539,9 @@ impl LTCGenerativeCore {
         }
 
         // Generate continuation
-        let continuation_seed = self.context.back()
+        let continuation_seed = self
+            .context
+            .back()
             .cloned()
             .unwrap_or_else(|| BinaryHV::random(0));
 
@@ -582,7 +612,8 @@ impl LTCGenerativeCore {
 
         // Generate sequence
         for _step_idx in 0..self.config.max_length {
-            let (primitive, prob, phi) = self.predict_next_with_harmonics(current_phi, &harmonic_weight);
+            let (primitive, prob, phi) =
+                self.predict_next_with_harmonics(current_phi, &harmonic_weight);
 
             primitives.push(primitive.clone());
             total_confidence += prob;
@@ -591,7 +622,12 @@ impl LTCGenerativeCore {
             steps.push(GenerationStep {
                 primitive: primitive.clone(),
                 probability: prob,
-                ltc_state_norm: self.recurrent_state.iter().map(|x| x * x).sum::<f32>().sqrt(),
+                ltc_state_norm: self
+                    .recurrent_state
+                    .iter()
+                    .map(|x| x * x)
+                    .sum::<f32>()
+                    .sqrt(),
                 context_size: self.context.len(),
                 phi_estimate: phi,
                 phi_guided: self.config.phi_guided && current_phi >= self.config.min_phi,
@@ -637,7 +673,11 @@ impl LTCGenerativeCore {
     }
 
     /// Predict next primitive with harmonic weights
-    fn predict_next_with_harmonics<F>(&mut self, current_phi: f32, harmonic_weight: &F) -> (String, f32, f32)
+    fn predict_next_with_harmonics<F>(
+        &mut self,
+        current_phi: f32,
+        harmonic_weight: &F,
+    ) -> (String, f32, f32)
     where
         F: Fn(&str) -> f32,
     {
@@ -651,7 +691,12 @@ impl LTCGenerativeCore {
             // Blend context with recurrent state
             let context_ltc = self.codec.encode_to_ltc(&context_hv);
             let mut blended = vec![0.0f32; self.config.ltc_neurons];
-            for i in 0..self.config.ltc_neurons.min(context_ltc.len()).min(self.recurrent_state.len()) {
+            for i in 0..self
+                .config
+                .ltc_neurons
+                .min(context_ltc.len())
+                .min(self.recurrent_state.len())
+            {
                 blended[i] = 0.7 * self.recurrent_state[i] + 0.3 * context_ltc[i];
             }
             blended
@@ -664,7 +709,9 @@ impl LTCGenerativeCore {
         let predicted_hv = self.codec.decode_to_hv(&ltc_state);
 
         // Decode HV to primitive distribution WITH HARMONIC WEIGHTS
-        let decoded = self.decoder.decode_with_harmonics(&predicted_hv, harmonic_weight);
+        let decoded = self
+            .decoder
+            .decode_with_harmonics(&predicted_hv, harmonic_weight);
 
         // Apply Φ-guided selection (uses already-weighted primitives)
         let selected = if self.config.phi_guided && current_phi >= self.config.min_phi {
@@ -704,8 +751,12 @@ mod tests {
         let thought = core.generate(&seed, 0.5);
 
         println!("Generated thought: {}", thought.to_string());
-        println!("Length: {}, Confidence: {:.3}, Avg Φ: {:.3}",
-                 thought.primitives.len(), thought.confidence, thought.avg_phi);
+        println!(
+            "Length: {}, Confidence: {:.3}, Avg Φ: {:.3}",
+            thought.primitives.len(),
+            thought.confidence,
+            thought.avg_phi
+        );
 
         assert!(!thought.primitives.is_empty());
     }
@@ -775,7 +826,10 @@ mod tests {
 
         // Generate with Coherence harmony
         let coherence_thought = core.generate_with_harmonics(&seed, 0.5, coherence_weights);
-        println!("Coherence-guided thought: {}", coherence_thought.to_string());
+        println!(
+            "Coherence-guided thought: {}",
+            coherence_thought.to_string()
+        );
         core.reset();
 
         // Generate without harmonic influence (neutral)
@@ -789,15 +843,21 @@ mod tests {
 
         // Log the differences
         println!("\nPrimitive comparison:");
-        println!("  Play ({} primitives):      {:?}",
-                 play_thought.primitives.len(),
-                 &play_thought.primitives[..play_thought.primitives.len().min(5)]);
-        println!("  Coherence ({} primitives): {:?}",
-                 coherence_thought.primitives.len(),
-                 &coherence_thought.primitives[..coherence_thought.primitives.len().min(5)]);
-        println!("  Neutral ({} primitives):   {:?}",
-                 neutral_thought.primitives.len(),
-                 &neutral_thought.primitives[..neutral_thought.primitives.len().min(5)]);
+        println!(
+            "  Play ({} primitives):      {:?}",
+            play_thought.primitives.len(),
+            &play_thought.primitives[..play_thought.primitives.len().min(5)]
+        );
+        println!(
+            "  Coherence ({} primitives): {:?}",
+            coherence_thought.primitives.len(),
+            &coherence_thought.primitives[..coherence_thought.primitives.len().min(5)]
+        );
+        println!(
+            "  Neutral ({} primitives):   {:?}",
+            neutral_thought.primitives.len(),
+            &neutral_thought.primitives[..neutral_thought.primitives.len().min(5)]
+        );
     }
 
     #[test]
@@ -818,11 +878,17 @@ mod tests {
         println!("KNOW-boosted thought: {}", thought.to_string());
 
         // Count KNOW-related primitives in output
-        let know_count = thought.primitives.iter()
+        let know_count = thought
+            .primitives
+            .iter()
             .filter(|p| p.contains("KNOW") || *p == "KNOWLEDGE" || *p == "COMMON_KNOWLEDGE")
             .count();
 
-        println!("KNOW-related primitives: {} / {}", know_count, thought.primitives.len());
+        println!(
+            "KNOW-related primitives: {} / {}",
+            know_count,
+            thought.primitives.len()
+        );
 
         // The thought should be valid
         assert!(!thought.primitives.is_empty());

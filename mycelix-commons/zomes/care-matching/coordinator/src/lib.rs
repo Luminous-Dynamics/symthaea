@@ -529,3 +529,472 @@ fn compute_overall_score(factors: &MatchFactors) -> f32 {
         + factors.trust_score * 0.20;
     score.clamp(0.0, 1.0)
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn agent_a() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    fn agent_b() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn ts() -> Timestamp {
+        Timestamp::from_micros(0)
+    }
+
+    fn make_offer(category: ServiceCategory, location: &str, availability: &str, hours: f32) -> ServiceOffer {
+        ServiceOffer {
+            provider: agent_a(),
+            category,
+            title: "Test offer".to_string(),
+            description: "Test".to_string(),
+            hours_available: hours,
+            availability: availability.to_string(),
+            location: location.to_string(),
+            skills_required: vec![],
+            active: true,
+            created_at: ts(),
+        }
+    }
+
+    fn make_request(category: ServiceCategory, location: &str, schedule: &str, hours: f32) -> ServiceRequest {
+        ServiceRequest {
+            requester: agent_b(),
+            category,
+            title: "Test request".to_string(),
+            description: "Test".to_string(),
+            hours_needed: hours,
+            preferred_schedule: schedule.to_string(),
+            location: location.to_string(),
+            urgency: UrgencyLevel::Medium,
+            open: true,
+            created_at: ts(),
+        }
+    }
+
+    // ========================================================================
+    // map_care_to_resource_type
+    // ========================================================================
+
+    #[test]
+    fn map_transportation_to_car() {
+        assert!(matches!(
+            map_care_to_resource_type(&ServiceCategory::Transportation),
+            Some(MutualAidResourceType::Car)
+        ));
+    }
+
+    #[test]
+    fn map_gardening_to_garden_tool() {
+        assert!(matches!(
+            map_care_to_resource_type(&ServiceCategory::Gardening),
+            Some(MutualAidResourceType::GardenTool)
+        ));
+    }
+
+    #[test]
+    fn map_home_repair_to_hand_tool() {
+        assert!(matches!(
+            map_care_to_resource_type(&ServiceCategory::HomeRepair),
+            Some(MutualAidResourceType::HandTool)
+        ));
+    }
+
+    #[test]
+    fn map_cooking_to_cooking_equipment() {
+        assert!(matches!(
+            map_care_to_resource_type(&ServiceCategory::Cooking),
+            Some(MutualAidResourceType::CookingEquipment)
+        ));
+    }
+
+    #[test]
+    fn map_art_music_to_music_instrument() {
+        assert!(matches!(
+            map_care_to_resource_type(&ServiceCategory::ArtMusic),
+            Some(MutualAidResourceType::MusicInstrument)
+        ));
+    }
+
+    #[test]
+    fn map_childcare_returns_none() {
+        assert!(map_care_to_resource_type(&ServiceCategory::Childcare).is_none());
+    }
+
+    #[test]
+    fn map_eldercare_returns_none() {
+        assert!(map_care_to_resource_type(&ServiceCategory::Eldercare).is_none());
+    }
+
+    #[test]
+    fn map_tutoring_returns_none() {
+        assert!(map_care_to_resource_type(&ServiceCategory::Tutoring).is_none());
+    }
+
+    #[test]
+    fn map_other_returns_none() {
+        assert!(map_care_to_resource_type(&ServiceCategory::Other("custom".into())).is_none());
+    }
+
+    // ========================================================================
+    // calculate_match_factors — category alignment
+    // ========================================================================
+
+    #[test]
+    fn exact_category_match_gives_full_skill_alignment() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        // skill_alignment = category_match(1.0) * hours_factor(1.0) = 1.0
+        assert!((factors.skill_alignment - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn different_category_gives_zero_skill_alignment() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Cooking, "Austin", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.skill_alignment - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn insufficient_hours_reduces_skill_alignment() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "flexible", 3.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "flexible", 10.0);
+        let factors = calculate_match_factors(&offer, &request);
+        // skill_alignment = 1.0 * (3.0/10.0) = 0.3
+        assert!((factors.skill_alignment - 0.3).abs() < 0.001);
+    }
+
+    #[test]
+    fn exact_hours_match_gives_full_hours_factor() {
+        let offer = make_offer(ServiceCategory::Tutoring, "Dallas", "flexible", 5.0);
+        let request = make_request(ServiceCategory::Tutoring, "Dallas", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.skill_alignment - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn excess_hours_still_gives_full_factor() {
+        let offer = make_offer(ServiceCategory::Tutoring, "Dallas", "flexible", 20.0);
+        let request = make_request(ServiceCategory::Tutoring, "Dallas", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.skill_alignment - 1.0).abs() < 0.001);
+    }
+
+    // ========================================================================
+    // calculate_match_factors — proximity
+    // ========================================================================
+
+    #[test]
+    fn exact_location_match_gives_full_proximity() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin, TX", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin, TX", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.proximity_score - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn case_insensitive_location_match() {
+        let offer = make_offer(ServiceCategory::Childcare, "AUSTIN, TX", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "austin, tx", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.proximity_score - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn partial_location_match_gives_0_6() {
+        let offer = make_offer(ServiceCategory::Childcare, "Downtown Austin", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.proximity_score - 0.6).abs() < 0.001);
+    }
+
+    #[test]
+    fn no_location_match_gives_0_2() {
+        let offer = make_offer(ServiceCategory::Childcare, "Dallas", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Houston", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.proximity_score - 0.2).abs() < 0.001);
+    }
+
+    // ========================================================================
+    // calculate_match_factors — schedule compatibility
+    // ========================================================================
+
+    #[test]
+    fn flexible_offer_gives_0_9_schedule() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "Monday mornings", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.schedule_compatibility - 0.9).abs() < 0.001);
+    }
+
+    #[test]
+    fn flexible_request_gives_0_9_schedule() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "Weekdays", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.schedule_compatibility - 0.9).abs() < 0.001);
+    }
+
+    #[test]
+    fn overlapping_schedule_gives_0_7() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "Monday and Tuesday", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "Monday", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.schedule_compatibility - 0.7).abs() < 0.001);
+    }
+
+    #[test]
+    fn no_schedule_overlap_gives_0_3() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "Weekdays", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "Weekends", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.schedule_compatibility - 0.3).abs() < 0.001);
+    }
+
+    // ========================================================================
+    // calculate_match_factors — trust score
+    // ========================================================================
+
+    #[test]
+    fn trust_score_always_baseline() {
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        assert!((factors.trust_score - 0.5).abs() < 0.001);
+    }
+
+    // ========================================================================
+    // compute_overall_score
+    // ========================================================================
+
+    #[test]
+    fn perfect_match_score() {
+        let factors = MatchFactors {
+            skill_alignment: 1.0,
+            proximity_score: 1.0,
+            schedule_compatibility: 1.0,
+            trust_score: 1.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn zero_match_score() {
+        let factors = MatchFactors {
+            skill_alignment: 0.0,
+            proximity_score: 0.0,
+            schedule_compatibility: 0.0,
+            trust_score: 0.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn weighted_score_calculation() {
+        // skill=1.0*0.35 + prox=0.0*0.25 + sched=0.0*0.20 + trust=0.0*0.20 = 0.35
+        let factors = MatchFactors {
+            skill_alignment: 1.0,
+            proximity_score: 0.0,
+            schedule_compatibility: 0.0,
+            trust_score: 0.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 0.35).abs() < 0.001);
+    }
+
+    #[test]
+    fn proximity_only_score() {
+        // skill=0 + prox=1.0*0.25 + sched=0 + trust=0 = 0.25
+        let factors = MatchFactors {
+            skill_alignment: 0.0,
+            proximity_score: 1.0,
+            schedule_compatibility: 0.0,
+            trust_score: 0.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 0.25).abs() < 0.001);
+    }
+
+    #[test]
+    fn schedule_only_score() {
+        // skill=0 + prox=0 + sched=1.0*0.20 + trust=0 = 0.20
+        let factors = MatchFactors {
+            skill_alignment: 0.0,
+            proximity_score: 0.0,
+            schedule_compatibility: 1.0,
+            trust_score: 0.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 0.20).abs() < 0.001);
+    }
+
+    #[test]
+    fn trust_only_score() {
+        // skill=0 + prox=0 + sched=0 + trust=1.0*0.20 = 0.20
+        let factors = MatchFactors {
+            skill_alignment: 0.0,
+            proximity_score: 0.0,
+            schedule_compatibility: 0.0,
+            trust_score: 1.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 0.20).abs() < 0.001);
+    }
+
+    #[test]
+    fn score_clamped_to_max_1() {
+        // Even with values > 1.0, clamp to 1.0
+        let factors = MatchFactors {
+            skill_alignment: 3.0,
+            proximity_score: 3.0,
+            schedule_compatibility: 3.0,
+            trust_score: 3.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 1.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn score_clamped_to_min_0() {
+        let factors = MatchFactors {
+            skill_alignment: -1.0,
+            proximity_score: -1.0,
+            schedule_compatibility: -1.0,
+            trust_score: -1.0,
+        };
+        let score = compute_overall_score(&factors);
+        assert!((score - 0.0).abs() < 0.001);
+    }
+
+    #[test]
+    fn realistic_good_match_score() {
+        // Exact category, exact location, flexible schedule, baseline trust
+        let offer = make_offer(ServiceCategory::Childcare, "Austin", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Childcare, "Austin", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        let score = compute_overall_score(&factors);
+        // skill=1.0*0.35 + prox=1.0*0.25 + sched=0.9*0.20 + trust=0.5*0.20 = 0.35+0.25+0.18+0.10 = 0.88
+        assert!((score - 0.88).abs() < 0.01);
+    }
+
+    #[test]
+    fn realistic_poor_match_score() {
+        // Different category, different location, no schedule overlap
+        let offer = make_offer(ServiceCategory::Childcare, "Dallas", "Weekdays", 3.0);
+        let request = make_request(ServiceCategory::Cooking, "Houston", "Weekends", 10.0);
+        let factors = calculate_match_factors(&offer, &request);
+        let score = compute_overall_score(&factors);
+        // skill=0.0*0.35 + prox=0.2*0.25 + sched=0.3*0.20 + trust=0.5*0.20 = 0+0.05+0.06+0.10 = 0.21
+        assert!((score - 0.21).abs() < 0.01);
+    }
+
+    #[test]
+    fn match_above_threshold() {
+        let offer = make_offer(ServiceCategory::Tutoring, "Austin", "flexible", 10.0);
+        let request = make_request(ServiceCategory::Tutoring, "Austin", "flexible", 5.0);
+        let factors = calculate_match_factors(&offer, &request);
+        let score = compute_overall_score(&factors);
+        assert!(score >= 0.3, "Good match should be above 0.3 threshold");
+    }
+
+    #[test]
+    fn match_below_threshold() {
+        let offer = make_offer(ServiceCategory::Childcare, "Dallas", "Weekdays", 1.0);
+        let request = make_request(ServiceCategory::Cooking, "Houston", "Weekends", 10.0);
+        let factors = calculate_match_factors(&offer, &request);
+        let score = compute_overall_score(&factors);
+        assert!(score < 0.3, "Poor match should be below 0.3 threshold");
+    }
+
+    // ========================================================================
+    // Serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn service_category_serde_roundtrip() {
+        let categories = vec![
+            ServiceCategory::Childcare,
+            ServiceCategory::Eldercare,
+            ServiceCategory::PetCare,
+            ServiceCategory::Cooking,
+            ServiceCategory::Cleaning,
+            ServiceCategory::Gardening,
+            ServiceCategory::Tutoring,
+            ServiceCategory::TechSupport,
+            ServiceCategory::Transportation,
+            ServiceCategory::Companionship,
+            ServiceCategory::HealthSupport,
+            ServiceCategory::HomeRepair,
+            ServiceCategory::LegalAdvice,
+            ServiceCategory::Counseling,
+            ServiceCategory::ArtMusic,
+            ServiceCategory::LanguageHelp,
+            ServiceCategory::Administrative,
+            ServiceCategory::Other("Plumbing".into()),
+        ];
+        for cat in categories {
+            let json = serde_json::to_string(&cat).unwrap();
+            let back: ServiceCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(cat, back);
+        }
+    }
+
+    #[test]
+    fn urgency_level_serde_roundtrip() {
+        let levels = vec![
+            UrgencyLevel::Low,
+            UrgencyLevel::Medium,
+            UrgencyLevel::High,
+            UrgencyLevel::Critical,
+        ];
+        for level in levels {
+            let json = serde_json::to_string(&level).unwrap();
+            let back: UrgencyLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(level, back);
+        }
+    }
+
+    #[test]
+    fn match_factors_serde_roundtrip() {
+        let factors = MatchFactors {
+            proximity_score: 0.75,
+            skill_alignment: 0.9,
+            schedule_compatibility: 0.6,
+            trust_score: 0.5,
+        };
+        let json = serde_json::to_string(&factors).unwrap();
+        let back: MatchFactors = serde_json::from_str(&json).unwrap();
+        assert_eq!(factors, back);
+    }
+
+    #[test]
+    fn mutual_aid_resource_type_serde_roundtrip() {
+        let types = vec![
+            MutualAidResourceType::Car,
+            MutualAidResourceType::GardenTool,
+            MutualAidResourceType::HandTool,
+            MutualAidResourceType::CookingEquipment,
+            MutualAidResourceType::MusicInstrument,
+            MutualAidResourceType::Custom("Wheelchair".into()),
+        ];
+        for t in types {
+            let json = serde_json::to_string(&t).unwrap();
+            let back: MutualAidResourceType = serde_json::from_str(&json).unwrap();
+            // Custom comparison since no PartialEq derive
+            assert_eq!(json, serde_json::to_string(&back).unwrap());
+        }
+    }
+}

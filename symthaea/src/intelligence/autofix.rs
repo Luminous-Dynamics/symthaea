@@ -154,7 +154,7 @@ struct FixPattern {
 }
 
 #[derive(Clone)]
-#[allow(dead_code)]  // Variants reserved for future fix pattern expansion
+#[allow(dead_code)] // Variants reserved for future fix pattern expansion
 enum FixGenerator {
     /// Fix missing semicolon
     MissingSemicolon,
@@ -175,7 +175,7 @@ enum FixGenerator {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]  // Variants reserved for type inference expansion
+#[allow(dead_code)] // Variants reserved for type inference expansion
 enum NixType {
     Bool,
     String,
@@ -228,11 +228,18 @@ impl AutoFixer {
 
     fn init_option_types(&mut self) {
         // Common option types
-        self.option_types.insert("services.*.enable".to_string(), NixType::Bool);
-        self.option_types.insert("environment.systemPackages".to_string(), NixType::List);
-        self.option_types.insert("networking.hostName".to_string(), NixType::String);
-        self.option_types.insert("services.*.port".to_string(), NixType::Int);
-        self.option_types.insert("users.users.*".to_string(), NixType::AttrsOf(Box::new(NixType::String)));
+        self.option_types
+            .insert("services.*.enable".to_string(), NixType::Bool);
+        self.option_types
+            .insert("environment.systemPackages".to_string(), NixType::List);
+        self.option_types
+            .insert("networking.hostName".to_string(), NixType::String);
+        self.option_types
+            .insert("services.*.port".to_string(), NixType::Int);
+        self.option_types.insert(
+            "users.users.*".to_string(),
+            NixType::AttrsOf(Box::new(NixType::String)),
+        );
     }
 
     /// Analyze error and generate fix suggestions
@@ -241,7 +248,8 @@ impl AutoFixer {
         let lower = error.to_lowercase();
 
         // Collect matching generators first to avoid borrow conflict
-        let matching_generators: Vec<FixGenerator> = self.patterns
+        let matching_generators: Vec<FixGenerator> = self
+            .patterns
             .iter()
             .filter(|p| lower.contains(&p.error_pattern))
             .map(|p| p.generator.clone())
@@ -289,10 +297,10 @@ impl AutoFixer {
                         .with_confidence(0.8)
                         .safe_to_apply();
 
-                    self.suggestions.push(
-                        FixSuggestion::from_fix(fix)
-                            .with_rationale("Let-bindings and attribute definitions require semicolons")
-                    );
+                    self.suggestions
+                        .push(FixSuggestion::from_fix(fix).with_rationale(
+                            "Let-bindings and attribute definitions require semicolons",
+                        ));
                 }
             }
         }
@@ -309,8 +317,13 @@ impl AutoFixer {
                 let common_fixes: HashMap<&str, (&str, &str)> = [
                     ("pkgs", ("Add pkgs to function arguments", "{ pkgs, ... }:")),
                     ("lib", ("Add lib to function arguments", "{ lib, ... }:")),
-                    ("config", ("Add config to function arguments", "{ config, ... }:")),
-                ].into_iter().collect();
+                    (
+                        "config",
+                        ("Add config to function arguments", "{ config, ... }:"),
+                    ),
+                ]
+                .into_iter()
+                .collect();
 
                 if let Some((desc, replacement)) = common_fixes.get(var_name) {
                     let fix = Fix::new(*desc)
@@ -318,22 +331,26 @@ impl AutoFixer {
                         .with_confidence(0.9)
                         .safe_to_apply();
 
-                    self.suggestions.push(
-                        FixSuggestion::from_fix(fix)
-                            .with_rationale(format!("'{}' is a standard NixOS module argument", var_name))
-                    );
+                    self.suggestions
+                        .push(FixSuggestion::from_fix(fix).with_rationale(format!(
+                            "'{}' is a standard NixOS module argument",
+                            var_name
+                        )));
                 } else {
                     // Might be a package
                     let fix = Fix::new(format!("Add {} to packages", var_name))
                         .replace(
                             "environment.systemPackages = with pkgs; [",
-                            format!("environment.systemPackages = with pkgs; [\n    {}", var_name)
+                            format!(
+                                "environment.systemPackages = with pkgs; [\n    {}",
+                                var_name
+                            ),
                         )
                         .with_confidence(0.6);
 
                     self.suggestions.push(
                         FixSuggestion::from_fix(fix)
-                            .with_rationale("Variable might be a package reference")
+                            .with_rationale("Variable might be a package reference"),
                     );
                 }
             }
@@ -351,14 +368,14 @@ impl AutoFixer {
                 let fix = Fix::new(format!("Use mkForce to override {}", option_path))
                     .replace(
                         format!("{} =", option_path),
-                        format!("{} = lib.mkForce", option_path)
+                        format!("{} = lib.mkForce", option_path),
                     )
                     .with_confidence(0.85);
 
                 let alt = Fix::new("Use mkDefault for lower priority".to_string())
                     .replace(
                         format!("{} =", option_path),
-                        format!("{} = lib.mkDefault", option_path)
+                        format!("{} = lib.mkDefault", option_path),
                     )
                     .with_confidence(0.7);
 
@@ -394,8 +411,7 @@ impl AutoFixer {
                         .with_confidence(0.7);
 
                     self.suggestions.push(
-                        FixSuggestion::from_fix(fix)
-                            .with_rationale("Wrap the string in a list")
+                        FixSuggestion::from_fix(fix).with_rationale("Wrap the string in a list"),
                     );
                 }
             }
@@ -407,7 +423,7 @@ impl AutoFixer {
 
                     self.suggestions.push(
                         FixSuggestion::from_fix(fix)
-                            .with_rationale("Convert boolean to string representation")
+                            .with_rationale("Convert boolean to string representation"),
                     );
                 }
             }
@@ -418,12 +434,23 @@ impl AutoFixer {
     fn fix_deprecated_option(&mut self, error: &str, _context: Option<&str>) {
         // Common deprecated option mappings
         let mappings: HashMap<&str, &str> = [
-            ("services.xserver.displayManager.auto", "services.displayManager.autoLogin"),
+            (
+                "services.xserver.displayManager.auto",
+                "services.displayManager.autoLogin",
+            ),
             ("services.xserver.layout", "services.xserver.xkb.layout"),
-            ("services.xserver.xkbVariant", "services.xserver.xkb.variant"),
-            ("services.xserver.xkbOptions", "services.xserver.xkb.options"),
+            (
+                "services.xserver.xkbVariant",
+                "services.xserver.xkb.variant",
+            ),
+            (
+                "services.xserver.xkbOptions",
+                "services.xserver.xkb.options",
+            ),
             ("networking.useDHCP", "networking.interfaces.<name>.useDHCP"),
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
         for (old, new) in &mappings {
             if error.contains(old) {
@@ -434,7 +461,7 @@ impl AutoFixer {
 
                 self.suggestions.push(
                     FixSuggestion::from_fix(fix)
-                        .with_rationale(format!("'{}' is deprecated in favor of '{}'", old, new))
+                        .with_rationale(format!("'{}' is deprecated in favor of '{}'", old, new)),
                 );
                 break;
             }
@@ -465,7 +492,9 @@ impl AutoFixer {
             ("cargo", "cargo"),
             ("go", "go"),
             ("golang", "go"),
-        ].into_iter().collect();
+        ]
+        .into_iter()
+        .collect();
 
         let mut suggestions = Vec::new();
         let lower = typo.to_lowercase();
@@ -543,20 +572,32 @@ fn levenshtein(a: &str, b: &str) -> usize {
     let m = a_chars.len();
     let n = b_chars.len();
 
-    if m == 0 { return n; }
-    if n == 0 { return m; }
+    if m == 0 {
+        return n;
+    }
+    if n == 0 {
+        return m;
+    }
 
     let mut matrix = vec![vec![0; n + 1]; m + 1];
 
-    for i in 0..=m { matrix[i][0] = i; }
-    for j in 0..=n { matrix[0][j] = j; }
+    for i in 0..=m {
+        matrix[i][0] = i;
+    }
+    for j in 0..=n {
+        matrix[0][j] = j;
+    }
 
     for i in 1..=m {
         for j in 1..=n {
-            let cost = if a_chars[i-1] == b_chars[j-1] { 0 } else { 1 };
-            matrix[i][j] = (matrix[i-1][j] + 1)
-                .min(matrix[i][j-1] + 1)
-                .min(matrix[i-1][j-1] + cost);
+            let cost = if a_chars[i - 1] == b_chars[j - 1] {
+                0
+            } else {
+                1
+            };
+            matrix[i][j] = (matrix[i - 1][j] + 1)
+                .min(matrix[i][j - 1] + 1)
+                .min(matrix[i - 1][j - 1] + cost);
         }
     }
 

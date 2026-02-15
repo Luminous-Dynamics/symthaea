@@ -20,14 +20,14 @@ pub const CONTROL_RATE: f32 = SAMPLE_RATE / HOP_SIZE as f32;
 
 /// Frequency signature bins (expanded 8-bin for BPM detection)
 pub const FREQ_BINS: [f32; 8] = [
-    0.25,   // 15 BPM - very slow ambient
-    0.5,    // 30 BPM - slow
-    1.0,    // 60 BPM - ballad
-    1.5,    // 90 BPM - moderate
-    2.0,    // 120 BPM - dance/pop
-    3.0,    // 180 BPM - fast
-    4.0,    // 240 BPM - drum'n'bass
-    6.0,    // 360 BPM - sub-beat divisions
+    0.25, // 15 BPM - very slow ambient
+    0.5,  // 30 BPM - slow
+    1.0,  // 60 BPM - ballad
+    1.5,  // 90 BPM - moderate
+    2.0,  // 120 BPM - dance/pop
+    3.0,  // 180 BPM - fast
+    4.0,  // 240 BPM - drum'n'bass
+    6.0,  // 360 BPM - sub-beat divisions
 ];
 
 // =============================================================================
@@ -51,11 +51,13 @@ impl MelFilterbank {
             .map(|i| mel_min + (mel_max - mel_min) * i as f32 / (MEL_BANDS + 1) as f32)
             .collect();
 
-        let hz_points: Vec<f32> = mel_points.iter()
+        let hz_points: Vec<f32> = mel_points
+            .iter()
             .map(|m| 700.0 * (10.0_f32.powf(m / 2595.0) - 1.0))
             .collect();
 
-        let bin_points: Vec<usize> = hz_points.iter()
+        let bin_points: Vec<usize> = hz_points
+            .iter()
             .map(|f| ((FFT_SIZE as f32 + 1.0) * f / SAMPLE_RATE).floor() as usize)
             .collect();
 
@@ -83,9 +85,18 @@ impl MelFilterbank {
     }
 
     pub fn apply(&self, power_spectrum: &[f32]) -> Vec<f32> {
-        self.filters.iter().map(|filter| {
-            filter.iter().zip(power_spectrum).map(|(f, p)| f * p).sum::<f32>().max(1e-10).log10()
-        }).collect()
+        self.filters
+            .iter()
+            .map(|filter| {
+                filter
+                    .iter()
+                    .zip(power_spectrum)
+                    .map(|(f, p)| f * p)
+                    .sum::<f32>()
+                    .max(1e-10)
+                    .log10()
+            })
+            .collect()
     }
 }
 
@@ -125,13 +136,16 @@ pub fn compute_mfcc(mel_bands: &[f32]) -> Vec<f32> {
     let mfcc = dct_ii(mel_bands, NUM_MFCC);
 
     let lifter_coeff = 22.0;
-    mfcc.iter().enumerate().map(|(i, &c)| {
-        if i == 0 {
-            c
-        } else {
-            c * (1.0 + (lifter_coeff / 2.0) * (PI * i as f32 / lifter_coeff).sin())
-        }
-    }).collect()
+    mfcc.iter()
+        .enumerate()
+        .map(|(i, &c)| {
+            if i == 0 {
+                c
+            } else {
+                c * (1.0 + (lifter_coeff / 2.0) * (PI * i as f32 / lifter_coeff).sin())
+            }
+        })
+        .collect()
 }
 
 /// Compute delta (first derivative) of MFCC over time
@@ -151,7 +165,10 @@ pub fn compute_mfcc_delta(mfcc_history: &[Vec<f32>], window: usize) -> Vec<f32> 
         norm += (i * i) as f32;
         for j in 0..num_coeffs {
             let future = mfcc_history.get(center + i).map(|m| m[j]).unwrap_or(0.0);
-            let past = mfcc_history.get(center.saturating_sub(i)).map(|m| m[j]).unwrap_or(0.0);
+            let past = mfcc_history
+                .get(center.saturating_sub(i))
+                .map(|m| m[j])
+                .unwrap_or(0.0);
             delta[j] += i as f32 * (future - past);
         }
     }
@@ -174,9 +191,11 @@ pub fn compute_temporal_regularity(onset_history: &[f32]) -> f32 {
 
     let n = onset_history.len();
     let mean: f32 = onset_history.iter().sum::<f32>() / n as f32;
-    let variance: f32 = onset_history.iter()
+    let variance: f32 = onset_history
+        .iter()
         .map(|&x| (x - mean).powi(2))
-        .sum::<f32>() / n as f32;
+        .sum::<f32>()
+        / n as f32;
 
     if variance < 1e-10 {
         return 0.0;
@@ -312,7 +331,8 @@ impl FeatureExtractor {
             return 0.5;
         }
 
-        let low_phase: Vec<f32> = low_band.windows(2)
+        let low_phase: Vec<f32> = low_band
+            .windows(2)
             .map(|w| (w[1] - w[0]).atan2(1.0))
             .collect();
 
@@ -333,14 +353,18 @@ impl FeatureExtractor {
             bin_counts[bin] += 1;
         }
 
-        let bin_means: Vec<f32> = bin_sums.iter().zip(&bin_counts)
+        let bin_means: Vec<f32> = bin_sums
+            .iter()
+            .zip(&bin_counts)
             .map(|(&s, &c)| if c > 0 { s / c as f32 } else { 0.0 })
             .collect();
 
         let overall_mean: f32 = bin_means.iter().sum::<f32>() / 4.0;
-        let variance: f32 = bin_means.iter()
+        let variance: f32 = bin_means
+            .iter()
             .map(|&m| (m - overall_mean).powi(2))
-            .sum::<f32>() / 4.0;
+            .sum::<f32>()
+            / 4.0;
 
         (variance.sqrt() / (overall_mean + 1e-10)).clamp(0.0, 1.0)
     }
@@ -362,9 +386,7 @@ impl FeatureExtractor {
 
         let mut max_r = 0.0f32;
         for lag in min_lag..max_lag.min(n / 2) {
-            let r: f32 = (0..(n - lag))
-                .map(|i| samples[i] * samples[i + lag])
-                .sum();
+            let r: f32 = (0..(n - lag)).map(|i| samples[i] * samples[i + lag]).sum();
             if r > max_r {
                 max_r = r;
             }
@@ -382,9 +404,13 @@ impl FeatureExtractor {
         // Spectral centroid
         let total_power: f32 = power_spectrum.iter().sum();
         let spectral_centroid = if total_power > 1e-10 {
-            power_spectrum.iter().enumerate()
+            power_spectrum
+                .iter()
+                .enumerate()
                 .map(|(i, p)| i as f32 * p)
-                .sum::<f32>() / total_power * (SAMPLE_RATE / FFT_SIZE as f32)
+                .sum::<f32>()
+                / total_power
+                * (SAMPLE_RATE / FFT_SIZE as f32)
         } else {
             0.0
         };
@@ -403,16 +429,20 @@ impl FeatureExtractor {
         let spectral_rolloff = rolloff_bin as f32 * (SAMPLE_RATE / FFT_SIZE as f32);
 
         // Onset strength
-        let onset_strength: f32 = power_spectrum.iter().zip(&self.prev_spectrum)
+        let onset_strength: f32 = power_spectrum
+            .iter()
+            .zip(&self.prev_spectrum)
             .map(|(curr, prev)| (curr - prev).max(0.0))
-            .sum::<f32>() / power_spectrum.len() as f32;
+            .sum::<f32>()
+            / power_spectrum.len() as f32;
         self.prev_spectrum = power_spectrum.to_vec();
 
         // RMS energy
         let rms_energy = (samples.iter().map(|s| s * s).sum::<f32>() / samples.len() as f32).sqrt();
 
         // Zero crossing rate
-        let zero_crossings: usize = samples.windows(2)
+        let zero_crossings: usize = samples
+            .windows(2)
             .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
             .count();
         let zero_crossing_rate = zero_crossings as f32 / samples.len() as f32;
@@ -420,12 +450,12 @@ impl FeatureExtractor {
         // Spectral flatness
         let n = power_spectrum.len() as f32;
         let epsilon = 1e-10;
-        let log_sum: f32 = power_spectrum.iter()
-            .map(|&x| (x + epsilon).ln())
-            .sum();
+        let log_sum: f32 = power_spectrum.iter().map(|&x| (x + epsilon).ln()).sum();
         let geometric_mean = (log_sum / n).exp();
         let arithmetic_mean = power_spectrum.iter().sum::<f32>() / n;
-        let spectral_flatness = (geometric_mean / (arithmetic_mean + epsilon)).min(1.0).max(0.0);
+        let spectral_flatness = (geometric_mean / (arithmetic_mean + epsilon))
+            .min(1.0)
+            .max(0.0);
 
         // Temporal regularity
         self.onset_history.push(onset_strength);
@@ -438,10 +468,14 @@ impl FeatureExtractor {
         let burst_density = if self.onset_history.len() < 10 {
             0.5 // Default for insufficient data
         } else {
-            let mean: f32 = self.onset_history.iter().sum::<f32>() / self.onset_history.len() as f32;
-            let variance: f32 = self.onset_history.iter()
+            let mean: f32 =
+                self.onset_history.iter().sum::<f32>() / self.onset_history.len() as f32;
+            let variance: f32 = self
+                .onset_history
+                .iter()
                 .map(|x| (x - mean).powi(2))
-                .sum::<f32>() / self.onset_history.len() as f32;
+                .sum::<f32>()
+                / self.onset_history.len() as f32;
             let std_dev = variance.sqrt();
             let threshold = mean + 0.5 * std_dev;
 
@@ -473,9 +507,11 @@ impl FeatureExtractor {
 
         let envelope_variance = if self.rms_history.len() > 2 {
             let mean: f32 = self.rms_history.iter().sum::<f32>() / self.rms_history.len() as f32;
-            self.rms_history.iter()
+            self.rms_history
+                .iter()
                 .map(|&x| (x - mean).powi(2))
-                .sum::<f32>() / self.rms_history.len() as f32
+                .sum::<f32>()
+                / self.rms_history.len() as f32
         } else {
             0.0
         };
@@ -488,7 +524,9 @@ impl FeatureExtractor {
         }
 
         let attack_sharpness = if self.envelope_delta_history.len() > 4 {
-            let max_positive: f32 = self.envelope_delta_history.iter()
+            let max_positive: f32 = self
+                .envelope_delta_history
+                .iter()
                 .filter(|&&d| d > 0.0)
                 .copied()
                 .fold(0.0f32, |max, d| max.max(d));
@@ -498,15 +536,19 @@ impl FeatureExtractor {
         };
 
         let decay_roughness = if self.envelope_delta_history.len() > 8 {
-            let negative_deltas: Vec<f32> = self.envelope_delta_history.iter()
+            let negative_deltas: Vec<f32> = self
+                .envelope_delta_history
+                .iter()
                 .filter(|&&d| d < 0.0)
                 .copied()
                 .collect();
             if negative_deltas.len() > 2 {
                 let mean: f32 = negative_deltas.iter().sum::<f32>() / negative_deltas.len() as f32;
-                let variance: f32 = negative_deltas.iter()
+                let variance: f32 = negative_deltas
+                    .iter()
                     .map(|&d| (d - mean).powi(2))
-                    .sum::<f32>() / negative_deltas.len() as f32;
+                    .sum::<f32>()
+                    / negative_deltas.len() as f32;
                 (variance * 100.0).sqrt().clamp(0.0, 1.0)
             } else {
                 0.5
@@ -521,9 +563,13 @@ impl FeatureExtractor {
         self.frame_counter += 1;
 
         // Spectral flux
-        let spectral_flux: f32 = mel_bands.iter().zip(&self.prev_mel_bands)
+        let spectral_flux: f32 = mel_bands
+            .iter()
+            .zip(&self.prev_mel_bands)
             .map(|(curr, prev)| (curr - prev).powi(2))
-            .sum::<f32>().sqrt() / mel_bands.len() as f32;
+            .sum::<f32>()
+            .sqrt()
+            / mel_bands.len() as f32;
         self.prev_mel_bands = mel_bands.clone();
 
         // Harmonic ratio
@@ -543,8 +589,8 @@ impl FeatureExtractor {
         let cfc_theta_gamma = self.compute_cfc(&self.low_band_history, &self.high_band_history);
         let cfc_delta_beta = if self.low_band_history.len() > 32 {
             self.compute_cfc(
-                &self.low_band_history[..self.low_band_history.len()/2],
-                &self.high_band_history[self.high_band_history.len()/2..]
+                &self.low_band_history[..self.low_band_history.len() / 2],
+                &self.high_band_history[self.high_band_history.len() / 2..],
             )
         } else {
             0.5
@@ -594,7 +640,9 @@ pub fn compute_power_spectrum(samples: &[f32]) -> Vec<f32> {
     let n = samples.len().min(FFT_SIZE);
     let mut power = vec![0.0; n / 2 + 1];
 
-    let windowed: Vec<f32> = samples.iter().enumerate()
+    let windowed: Vec<f32> = samples
+        .iter()
+        .enumerate()
         .take(n)
         .map(|(i, &s)| {
             let w = 0.5 * (1.0 - (2.0 * PI * i as f32 / (n - 1) as f32).cos());

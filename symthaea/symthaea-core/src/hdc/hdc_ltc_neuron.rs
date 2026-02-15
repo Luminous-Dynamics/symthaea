@@ -97,7 +97,7 @@ pub struct HdcLtcConfig {
 impl Default for HdcLtcConfig {
     fn default() -> Self {
         Self {
-            tau_base: 0.1,           // 100ms base time constant
+            tau_base: 0.1,            // 100ms base time constant
             backbone_tau: 0.5,        // Moderate state dependency
             dimension: HDC_DIMENSION, // 16,384
             activation: ActivationFunction::Tanh,
@@ -133,21 +133,19 @@ impl ActivationFunction {
     /// Apply activation element-wise to a hypervector
     pub fn apply(&self, hv: &ContinuousHV) -> ContinuousHV {
         let values: Vec<f32> = match self {
-            ActivationFunction::Tanh => {
-                hv.values.iter().map(|x| x.tanh()).collect()
-            }
+            ActivationFunction::Tanh => hv.values.iter().map(|x| x.tanh()).collect(),
             ActivationFunction::Sigmoid => {
                 hv.values.iter().map(|x| 1.0 / (1.0 + (-x).exp())).collect()
             }
             ActivationFunction::Softplus => {
                 hv.values.iter().map(|x| (1.0 + x.exp()).ln()).collect()
             }
-            ActivationFunction::LeakyRelu => {
-                hv.values.iter().map(|x| if *x > 0.0 { *x } else { 0.01 * x }).collect()
-            }
-            ActivationFunction::Identity => {
-                hv.values.clone()
-            }
+            ActivationFunction::LeakyRelu => hv
+                .values
+                .iter()
+                .map(|x| if *x > 0.0 { *x } else { 0.01 * x })
+                .collect(),
+            ActivationFunction::Identity => hv.values.clone(),
         };
 
         ContinuousHV::from_values(values)
@@ -164,11 +162,13 @@ impl ActivationFunction {
                 let s = 1.0 / (1.0 + (-x).exp());
                 s * (1.0 - s)
             }
-            ActivationFunction::Softplus => {
-                1.0 / (1.0 + (-x).exp())
-            }
+            ActivationFunction::Softplus => 1.0 / (1.0 + (-x).exp()),
             ActivationFunction::LeakyRelu => {
-                if x > 0.0 { 1.0 } else { 0.01 }
+                if x > 0.0 {
+                    1.0
+                } else {
+                    0.01
+                }
             }
             ActivationFunction::Identity => 1.0,
         }
@@ -403,13 +403,11 @@ impl HdcLtcNeuron {
 
         // Apply with momentum
         let m = self.config.momentum;
-        self.weight_momentum = self.weight_momentum.scale(m)
-            .add(&correlation.scale(lr));
+        self.weight_momentum = self.weight_momentum.scale(m).add(&correlation.scale(lr));
 
         // Weight decay
         let decay = self.config.weight_decay;
-        self.weight_hv = self.weight_hv.scale(1.0 - decay)
-            .add(&self.weight_momentum);
+        self.weight_hv = self.weight_hv.scale(1.0 - decay).add(&self.weight_momentum);
 
         // Normalize to prevent explosion
         if self.weight_hv.norm() > 2.0 {
@@ -442,14 +440,18 @@ impl HdcLtcNeuron {
 
         // Update biased first moment estimate (m)
         // m_t = beta1 * m_{t-1} + (1 - beta1) * g_t
-        self.weight_momentum = self.weight_momentum.scale(beta1)
+        self.weight_momentum = self
+            .weight_momentum
+            .scale(beta1)
             .add(&gradient.scale(1.0 - beta1));
 
         // Update biased second moment estimate (v)
         // v_t = beta2 * v_{t-1} + (1 - beta2) * g_t^2
         // For hypervectors, we use element-wise squared values
         let gradient_squared = gradient.hadamard_product(&gradient);
-        self.weight_velocity = self.weight_velocity.scale(beta2)
+        self.weight_velocity = self
+            .weight_velocity
+            .scale(beta2)
             .add(&gradient_squared.scale(1.0 - beta2));
 
         // Compute bias-corrected estimates
@@ -468,8 +470,7 @@ impl HdcLtcNeuron {
 
         // Weight decay (decoupled, as in AdamW)
         let decay = self.config.weight_decay;
-        self.weight_hv = self.weight_hv.scale(1.0 - decay * lr)
-            .add(&update);
+        self.weight_hv = self.weight_hv.scale(1.0 - decay * lr).add(&update);
 
         // Normalize to prevent explosion
         if self.weight_hv.norm() > 2.0 {
@@ -496,17 +497,20 @@ impl HdcLtcNeuron {
         // Update running average of squared gradients
         // v_t = rho * v_{t-1} + (1 - rho) * g_t^2
         let gradient_squared = gradient.hadamard_product(&gradient);
-        self.weight_velocity = self.weight_velocity.scale(rho)
+        self.weight_velocity = self
+            .weight_velocity
+            .scale(rho)
             .add(&gradient_squared.scale(1.0 - rho));
 
         // Compute update: lr * g_t / (sqrt(v_t) + epsilon)
-        let v_sqrt_inv = self.weight_velocity.map(|x| 1.0 / (x.abs().sqrt() + epsilon));
+        let v_sqrt_inv = self
+            .weight_velocity
+            .map(|x| 1.0 / (x.abs().sqrt() + epsilon));
         let update = gradient.hadamard_product(&v_sqrt_inv).scale(lr);
 
         // Weight decay
         let decay = self.config.weight_decay;
-        self.weight_hv = self.weight_hv.scale(1.0 - decay * lr)
-            .add(&update);
+        self.weight_hv = self.weight_hv.scale(1.0 - decay * lr).add(&update);
 
         // Normalize to prevent explosion
         if self.weight_hv.norm() > 2.0 {
@@ -661,9 +665,7 @@ impl HdcLtcNetwork {
     /// Get output from final layer
     pub fn output(&self) -> ContinuousHV {
         let final_layer = self.layers.last().unwrap();
-        let outputs: Vec<ContinuousHV> = final_layer.iter()
-            .map(|n| n.output())
-            .collect();
+        let outputs: Vec<ContinuousHV> = final_layer.iter().map(|n| n.output()).collect();
 
         let refs: Vec<&ContinuousHV> = outputs.iter().collect();
         ContinuousHV::bundle(&refs)
@@ -671,19 +673,24 @@ impl HdcLtcNetwork {
 
     /// Get all neuron states as a flat vector
     pub fn all_states(&self) -> Vec<&ContinuousHV> {
-        self.layers.iter()
+        self.layers
+            .iter()
             .flat_map(|layer| layer.iter().map(|n| n.state()))
             .collect()
     }
 
     /// Get network statistics
     pub fn stats(&self) -> HdcLtcNetworkStats {
-        let all_stats: Vec<HdcLtcNeuronStats> = self.layers.iter()
+        let all_stats: Vec<HdcLtcNeuronStats> = self
+            .layers
+            .iter()
             .flat_map(|layer| layer.iter().map(|n| n.stats()))
             .collect();
 
-        let avg_norm: f32 = all_stats.iter().map(|s| s.state_norm).sum::<f32>() / all_stats.len() as f32;
-        let avg_tau: f32 = all_stats.iter().map(|s| s.effective_tau).sum::<f32>() / all_stats.len() as f32;
+        let avg_norm: f32 =
+            all_stats.iter().map(|s| s.state_norm).sum::<f32>() / all_stats.len() as f32;
+        let avg_tau: f32 =
+            all_stats.iter().map(|s| s.effective_tau).sum::<f32>() / all_stats.len() as f32;
 
         HdcLtcNetworkStats {
             n_neurons: all_stats.len(),
@@ -770,7 +777,10 @@ mod tests {
         }
 
         let final_norm = neuron.state().norm();
-        assert!(final_norm > initial_norm, "State should evolve away from zero");
+        assert!(
+            final_norm > initial_norm,
+            "State should evolve away from zero"
+        );
         assert!(final_norm < 10.0, "State should remain bounded");
         assert_eq!(neuron.update_count(), 100);
     }
@@ -790,7 +800,12 @@ mod tests {
         let tau_final = neuron.effective_tau();
 
         // Tau should increase as state norm increases
-        assert!(tau_final >= tau_initial * 0.9, "Tau should adapt to state: {} vs {}", tau_final, tau_initial);
+        assert!(
+            tau_final >= tau_initial * 0.9,
+            "Tau should adapt to state: {} vs {}",
+            tau_final,
+            tau_initial
+        );
     }
 
     #[test]
@@ -808,7 +823,11 @@ mod tests {
 
         // States should be similar but not identical
         let similarity = neuron_euler.state().similarity(neuron_rk4.state());
-        assert!(similarity > 0.8, "RK4 and Euler should produce similar results: {}", similarity);
+        assert!(
+            similarity > 0.8,
+            "RK4 and Euler should produce similar results: {}",
+            similarity
+        );
     }
 
     #[test]
@@ -861,7 +880,11 @@ mod tests {
 
         // Weights should change but remain bounded
         // Allow small epsilon for floating point precision
-        assert!(weight_after <= 2.1, "Weights should be approximately normalized (got {})", weight_after);
+        assert!(
+            weight_after <= 2.1,
+            "Weights should be approximately normalized (got {})",
+            weight_after
+        );
     }
 
     #[test]

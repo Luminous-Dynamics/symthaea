@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::hdc::code_encoder::CodeHDEncoder;
-use crate::language::code_parser::{ParsedCode, CodeEntity, EntityKind, Relation};
+use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Relation};
 
 /// Phi-inspired code quality score
 #[derive(Debug, Clone)]
@@ -115,20 +115,19 @@ impl PhiCodeAnalyzer {
         }
 
         for rel in &parsed.structure.relations {
-            adjacency.entry(rel.source.clone()).or_default().push(rel.target.clone());
+            adjacency
+                .entry(rel.source.clone())
+                .or_default()
+                .push(rel.target.clone());
             *referenced.entry(rel.target.clone()).or_insert(false) = true;
         }
 
         // Connectivity: fraction of entities with at least one reference
-        let connected_count = adjacency.values()
-            .filter(|adj| !adj.is_empty())
-            .count();
+        let connected_count = adjacency.values().filter(|adj| !adj.is_empty()).count();
         let connectivity = connected_count as f32 / entity_count as f32;
 
         // Dead code: entities that have no references TO them (except the "main" entries)
-        let dead_count = referenced.values()
-            .filter(|&&is_ref| !is_ref)
-            .count();
+        let dead_count = referenced.values().filter(|&&is_ref| !is_ref).count();
         // Don't count top-level exports as dead
         let dead_code_ratio = if entity_count > 1 {
             (dead_count.saturating_sub(1)) as f32 / entity_count as f32
@@ -179,7 +178,8 @@ impl PhiCodeAnalyzer {
             return 1.0;
         }
 
-        let hvs: Vec<ContinuousHV> = entities.iter()
+        let hvs: Vec<ContinuousHV> = entities
+            .iter()
             .map(|e| self.encoder.encode_entity(e))
             .collect();
 
@@ -238,9 +238,12 @@ mod tests {
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
@@ -259,7 +262,9 @@ mod tests {
     fn test_single_function() {
         let analyzer = PhiCodeAnalyzer::default_dim();
         let mut parsed = ParsedCode::new("fn main() {}", "rust");
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "main", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "main", test_span()));
 
         let score = analyzer.measure_code_phi(&parsed);
         assert_eq!(score.entity_count, 1);
@@ -272,8 +277,16 @@ mod tests {
 
         // Connected code: A calls B
         let mut connected = ParsedCode::new("", "rust");
-        connected.entities.push(CodeEntity::new(EntityKind::Function, "process", test_span()));
-        connected.entities.push(CodeEntity::new(EntityKind::Function, "validate", test_span()));
+        connected.entities.push(CodeEntity::new(
+            EntityKind::Function,
+            "process",
+            test_span(),
+        ));
+        connected.entities.push(CodeEntity::new(
+            EntityKind::Function,
+            "validate",
+            test_span(),
+        ));
         connected.structure.relations.push(CodeRelation {
             source: "process".to_string(),
             relation: Relation::Calls,
@@ -282,16 +295,23 @@ mod tests {
 
         // Disconnected code: A and B are unrelated
         let mut disconnected = ParsedCode::new("", "rust");
-        disconnected.entities.push(CodeEntity::new(EntityKind::Function, "foo", test_span()));
-        disconnected.entities.push(CodeEntity::new(EntityKind::Struct, "Bar", test_span()));
+        disconnected
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "foo", test_span()));
+        disconnected
+            .entities
+            .push(CodeEntity::new(EntityKind::Struct, "Bar", test_span()));
 
         let connected_phi = analyzer.measure_code_phi(&connected);
         let disconnected_phi = analyzer.measure_code_phi(&disconnected);
 
         // Connected code should have higher connectivity
-        assert!(connected_phi.connectivity >= disconnected_phi.connectivity,
+        assert!(
+            connected_phi.connectivity >= disconnected_phi.connectivity,
             "Connected code should have higher connectivity: {} vs {}",
-            connected_phi.connectivity, disconnected_phi.connectivity);
+            connected_phi.connectivity,
+            disconnected_phi.connectivity
+        );
     }
 
     #[test]
@@ -300,13 +320,21 @@ mod tests {
 
         // Before: disconnected
         let mut before = ParsedCode::new("", "rust");
-        before.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
-        before.entities.push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+        before
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        before
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
 
         // After: connected (a calls b)
         let mut after = ParsedCode::new("", "rust");
-        after.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
-        after.entities.push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+        after
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        after
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
         after.structure.relations.push(CodeRelation {
             source: "a".to_string(),
             relation: Relation::Calls,
@@ -320,15 +348,26 @@ mod tests {
     #[test]
     fn test_quality_levels() {
         let score_excellent = PhiCodeScore {
-            integration: 0.9, cohesion: 0.9, connectivity: 0.9,
-            dead_code_ratio: 0.0, component_count: 1, entity_count: 10,
+            integration: 0.9,
+            cohesion: 0.9,
+            connectivity: 0.9,
+            dead_code_ratio: 0.0,
+            component_count: 1,
+            entity_count: 10,
         };
         assert!(score_excellent.quality_level().contains("Excellent"));
 
         let score_poor = PhiCodeScore {
-            integration: 0.1, cohesion: 0.1, connectivity: 0.1,
-            dead_code_ratio: 0.8, component_count: 5, entity_count: 10,
+            integration: 0.1,
+            cohesion: 0.1,
+            connectivity: 0.1,
+            dead_code_ratio: 0.8,
+            component_count: 5,
+            entity_count: 10,
         };
-        assert!(score_poor.quality_level().contains("Poor") || score_poor.quality_level().contains("Critical"));
+        assert!(
+            score_poor.quality_level().contains("Poor")
+                || score_poor.quality_level().contains("Critical")
+        );
     }
 }

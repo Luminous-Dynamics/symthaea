@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::hybrid::{HybridArithmeticEngine, HybridResult};
@@ -61,7 +61,11 @@ impl MultiPathResult {
 
     /// Calculate total Φ across all valid paths
     pub fn total_phi(&self) -> f64 {
-        self.paths.iter().filter(|p| p.is_valid).map(|p| p.total_phi).sum()
+        self.paths
+            .iter()
+            .filter(|p| p.is_valid)
+            .map(|p| p.total_phi)
+            .sum()
     }
 }
 
@@ -172,8 +176,10 @@ impl MultiPathVerifier {
     /// Verify associativity via multiple paths
     pub fn verify_associativity(&mut self, a: u64, b: u64, c: u64, op: &str) -> MultiPathResult {
         self.stats.theorems_verified += 1;
-        let theorem = format!("({} {} {}) {} {} = {} {} ({} {} {})",
-            a, op, b, op, c, a, op, b, op, c);
+        let theorem = format!(
+            "({} {} {}) {} {} = {} {} ({} {} {})",
+            a, op, b, op, c, a, op, b, op, c
+        );
         let mut paths = Vec::new();
 
         // Path 1: Left-first evaluation
@@ -194,8 +200,7 @@ impl MultiPathVerifier {
     /// Verify distributivity via multiple paths
     pub fn verify_distributive(&mut self, a: u64, b: u64, c: u64) -> MultiPathResult {
         self.stats.theorems_verified += 1;
-        let theorem = format!("{} × ({} + {}) = {} × {} + {} × {}",
-            a, b, c, a, b, a, c);
+        let theorem = format!("{} × ({} + {}) = {} × {} + {} × {}", a, b, c, a, b, a, c);
         let mut paths = Vec::new();
 
         // Path 1: Left side first
@@ -273,7 +278,12 @@ impl MultiPathVerifier {
         // Verify equality
         let is_valid = result1.value == result2.value;
         steps.push(ProofPathStep {
-            description: format!("Compare: {} {} {}", result1.value, if is_valid { "=" } else { "≠" }, result2.value),
+            description: format!(
+                "Compare: {} {} {}",
+                result1.value,
+                if is_valid { "=" } else { "≠" },
+                result2.value
+            ),
             operation: "equality_check".to_string(),
             phi: if is_valid { 0.5 } else { 0.0 },
             value: None,
@@ -334,10 +344,14 @@ impl MultiPathVerifier {
 
         let is_valid = result.value == result2.value;
         steps.push(ProofPathStep {
-            description: format!("Verify via encoding similarity: {:.3}",
-                result.encoding.as_ref()
+            description: format!(
+                "Verify via encoding similarity: {:.3}",
+                result
+                    .encoding
+                    .as_ref()
                     .and_then(|e1| result2.encoding.as_ref().map(|e2| e1.similarity(e2)))
-                    .unwrap_or(0.0)),
+                    .unwrap_or(0.0)
+            ),
             operation: "encoding_verification".to_string(),
             phi: 0.3,
             value: None,
@@ -374,7 +388,10 @@ impl MultiPathVerifier {
 
         // Inductive step (conceptual)
         steps.push(ProofPathStep {
-            description: format!("Inductive hypothesis: assume {} {} k = k {} {}", a, op, op, a),
+            description: format!(
+                "Inductive hypothesis: assume {} {} k = k {} {}",
+                a, op, op, a
+            ),
             operation: "inductive_hypothesis".to_string(),
             phi: 0.5,
             value: None,
@@ -397,8 +414,10 @@ impl MultiPathVerifier {
         let is_valid = result.value == result2.value;
 
         steps.push(ProofPathStep {
-            description: format!("By induction: {} {} {} = {} {} {} (both = {})",
-                a, op, b, b, op, a, result.value),
+            description: format!(
+                "By induction: {} {} {} = {} {} {} (both = {})",
+                a, op, b, b, op, a, result.value
+            ),
             operation: "inductive_conclusion".to_string(),
             phi: 0.7,
             value: Some(result.value),
@@ -611,14 +630,20 @@ impl MultiPathVerifier {
         total_phi += left_first.phi + right_first.phi;
 
         steps.push(ProofPathStep {
-            description: format!("Left-first: ({} {} {}) {} {} = {}", a, op, b, op, c, left_first.value),
+            description: format!(
+                "Left-first: ({} {} {}) {} {} = {}",
+                a, op, b, op, c, left_first.value
+            ),
             operation: "left_first".to_string(),
             phi: left_first.phi,
             value: Some(left_first.value),
         });
 
         steps.push(ProofPathStep {
-            description: format!("Right-first: {} {} ({} {} {}) = {}", a, op, b, op, c, right_first.value),
+            description: format!(
+                "Right-first: {} {} ({} {} {}) = {}",
+                a, op, b, op, c, right_first.value
+            ),
             operation: "right_first".to_string(),
             phi: right_first.phi,
             value: Some(right_first.value),
@@ -627,7 +652,10 @@ impl MultiPathVerifier {
         let is_valid = left_first.value == right_first.value;
 
         steps.push(ProofPathStep {
-            description: format!("Both orderings agree: {} = {}", left_first.value, right_first.value),
+            description: format!(
+                "Both orderings agree: {} = {}",
+                left_first.value, right_first.value
+            ),
             operation: "agreement_check".to_string(),
             phi: if is_valid { 0.5 } else { 0.0 },
             value: None,
@@ -893,7 +921,10 @@ impl MultiPathVerifier {
                     description: if is_valid {
                         format!("Remainder is 0, so {} divides {}", d, n)
                     } else {
-                        format!("Remainder is {}, so {} does not divide {}", result.value, d, n)
+                        format!(
+                            "Remainder is {}, so {} does not divide {}",
+                            result.value, d, n
+                        )
                     },
                     operation: "divisibility_check".to_string(),
                     phi: if is_valid { 0.5 } else { 0.1 },
@@ -909,20 +940,18 @@ impl MultiPathVerifier {
                     result: Some(result),
                 }
             }
-            None => {
-                ProofPath {
-                    strategy: "Modulo Check".to_string(),
-                    steps: vec![ProofPathStep {
-                        description: "Modulo operation failed".to_string(),
-                        operation: "error".to_string(),
-                        phi: 0.0,
-                        value: None,
-                    }],
-                    total_phi: 0.0,
-                    is_valid: false,
-                    result: None,
-                }
-            }
+            None => ProofPath {
+                strategy: "Modulo Check".to_string(),
+                steps: vec![ProofPathStep {
+                    description: "Modulo operation failed".to_string(),
+                    operation: "error".to_string(),
+                    phi: 0.0,
+                    value: None,
+                }],
+                total_phi: 0.0,
+                is_valid: false,
+                result: None,
+            },
         }
     }
 
@@ -988,7 +1017,9 @@ impl MultiPathVerifier {
         let total_paths = paths.len();
         self.stats.total_paths_generated += total_paths;
 
-        let valid_paths: Vec<_> = paths.iter().enumerate()
+        let valid_paths: Vec<_> = paths
+            .iter()
+            .enumerate()
             .filter(|(_, p)| p.is_valid)
             .collect();
         let valid_count = valid_paths.len();
@@ -997,9 +1028,9 @@ impl MultiPathVerifier {
         // Check if all valid paths agree on the result
         let paths_agree = if valid_count >= 2 {
             let first_value = valid_paths[0].1.result.as_ref().map(|r| r.value);
-            valid_paths.iter().all(|(_, p)|
-                p.result.as_ref().map(|r| r.value) == first_value
-            )
+            valid_paths
+                .iter()
+                .all(|(_, p)| p.result.as_ref().map(|r| r.value) == first_value)
         } else {
             true
         };
@@ -1011,13 +1042,20 @@ impl MultiPathVerifier {
         }
 
         // Find best path (highest Φ among valid paths)
-        let best_path_index = valid_paths.iter()
-            .max_by(|(_, a), (_, b)|
-                a.total_phi.partial_cmp(&b.total_phi).unwrap_or(std::cmp::Ordering::Equal)
-            )
+        let best_path_index = valid_paths
+            .iter()
+            .max_by(|(_, a), (_, b)| {
+                a.total_phi
+                    .partial_cmp(&b.total_phi)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|(i, _)| *i);
 
-        self.stats.total_phi += paths.iter().filter(|p| p.is_valid).map(|p| p.total_phi).sum::<f64>();
+        self.stats.total_phi += paths
+            .iter()
+            .filter(|p| p.is_valid)
+            .map(|p| p.total_phi)
+            .sum::<f64>();
 
         MultiPathResult {
             theorem,

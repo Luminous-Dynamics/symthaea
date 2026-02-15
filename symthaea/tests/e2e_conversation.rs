@@ -14,12 +14,12 @@
 //! This is System Testing: we're checking if the machine runs,
 //! not just if the parts fit.
 
+use serde_json::{json, Value};
 use std::process::{Child, Command, Stdio};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpStream;
 use tokio::time::{sleep, timeout};
-use serde_json::{json, Value};
 
 /// Test address - use a high port to avoid conflicts
 const TEST_ADDR: &str = "127.0.0.1:17777";
@@ -32,9 +32,12 @@ fn start_service() -> std::io::Result<Child> {
     if std::path::Path::new(&binary_path).exists() {
         Command::new(&binary_path)
             .args([
-                "--tcp", TEST_ADDR,
-                "--loop-interval", "10000",  // Slow loop for testing
-                "--sleep-interval", "0",     // Disable auto-sleep
+                "--tcp",
+                TEST_ADDR,
+                "--loop-interval",
+                "10000", // Slow loop for testing
+                "--sleep-interval",
+                "0", // Disable auto-sleep
             ])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -43,10 +46,17 @@ fn start_service() -> std::io::Result<Child> {
         // Fall back to cargo run if binary not found
         Command::new("cargo")
             .args([
-                "run", "--release", "--features", "service",
-                "--", "--tcp", TEST_ADDR,
-                "--loop-interval", "10000",
-                "--sleep-interval", "0",
+                "run",
+                "--release",
+                "--features",
+                "service",
+                "--",
+                "--tcp",
+                TEST_ADDR,
+                "--loop-interval",
+                "10000",
+                "--sleep-interval",
+                "0",
             ])
             .current_dir(env!("CARGO_MANIFEST_DIR"))
             .stdout(Stdio::piped())
@@ -56,7 +66,10 @@ fn start_service() -> std::io::Result<Child> {
 }
 
 /// Send a JSON request and receive response
-async fn send_request(stream: &mut TcpStream, request: Value) -> Result<Value, Box<dyn std::error::Error>> {
+async fn send_request(
+    stream: &mut TcpStream,
+    request: Value,
+) -> Result<Value, Box<dyn std::error::Error>> {
     let (reader, mut writer) = stream.split();
     let mut reader = BufReader::new(reader);
 
@@ -77,18 +90,15 @@ async fn send_request(stream: &mut TcpStream, request: Value) -> Result<Value, B
 /// Wait for service to be ready by polling with ping
 async fn wait_for_service(addr: &str, max_attempts: u32) -> Result<(), Box<dyn std::error::Error>> {
     for attempt in 1..=max_attempts {
-        match TcpStream::connect(addr).await {
-            Ok(mut stream) => {
-                let ping = json!({"type": "ping"});
-                match send_request(&mut stream, ping).await {
-                    Ok(resp) if resp["type"] == "pong" => {
-                        println!("  ✓ Service ready after {} attempts", attempt);
-                        return Ok(());
-                    }
-                    _ => {}
+        if let Ok(mut stream) = TcpStream::connect(addr).await {
+            let ping = json!({"type": "ping"});
+            match send_request(&mut stream, ping).await {
+                Ok(resp) if resp["type"] == "pong" => {
+                    println!("  ✓ Service ready after {} attempts", attempt);
+                    return Ok(());
                 }
+                _ => {}
             }
-            Err(_) => {}
         }
         sleep(Duration::from_millis(500)).await;
     }
@@ -121,9 +131,10 @@ async fn test_first_conversation() {
 
     // Wait for service with timeout
     let wait_result = timeout(
-        Duration::from_secs(120),  // 2 minutes max for cold start + LLM
-        wait_for_service(TEST_ADDR, 60)
-    ).await;
+        Duration::from_secs(120), // 2 minutes max for cold start + LLM
+        wait_for_service(TEST_ADDR, 60),
+    )
+    .await;
 
     if wait_result.is_err() || wait_result.unwrap().is_err() {
         println!("  ✗ Service failed to start within timeout");
@@ -153,9 +164,11 @@ async fn test_first_conversation() {
 
     println!("  → Sending: \"Hello, I am a new user.\"");
     let response = match timeout(
-        Duration::from_secs(90),  // LLM can be slow
-        send_request(&mut stream, hello_request)
-    ).await {
+        Duration::from_secs(90), // LLM can be slow
+        send_request(&mut stream, hello_request),
+    )
+    .await
+    {
         Ok(Ok(r)) => r,
         Ok(Err(e)) => {
             println!("  ✗ Request failed: {}", e);
@@ -182,7 +195,10 @@ async fn test_first_conversation() {
     let safe = response["safe"].as_bool().unwrap_or(false);
     let processing_time = response["processing_time_ms"].as_u64().unwrap_or(0);
 
-    println!("  • LLM Response: \"{}\"", content.chars().take(100).collect::<String>());
+    println!(
+        "  • LLM Response: \"{}\"",
+        content.chars().take(100).collect::<String>()
+    );
     println!("  • Confidence: {:.2}", confidence);
     println!("  • Phi (Consciousness): {:.3}", phi);
     println!("  • Phi-Dyad (Relational): {:.3}", phi_dyad);
@@ -210,7 +226,10 @@ async fn test_first_conversation() {
         }
     };
 
-    assert_eq!(partnership["type"], "partnership", "Expected 'partnership' type");
+    assert_eq!(
+        partnership["type"], "partnership",
+        "Expected 'partnership' type"
+    );
 
     let stage = partnership["stage"].as_str().unwrap_or("Unknown");
     let trust = partnership["trust"].as_f64().unwrap_or(0.0);
@@ -220,7 +239,10 @@ async fn test_first_conversation() {
     println!("  • Trust Level: {:.2}", trust);
     println!("  • Total Interactions: {}", interactions);
 
-    assert!(interactions >= 1, "Should have recorded at least 1 interaction");
+    assert!(
+        interactions >= 1,
+        "Should have recorded at least 1 interaction"
+    );
     println!("\n  ✓ Partnership module tracking confirmed!");
 
     // ========================================================================
@@ -236,8 +258,10 @@ async fn test_first_conversation() {
     println!("  → Sending: \"What is your purpose?\"");
     let followup = match timeout(
         Duration::from_secs(90),
-        send_request(&mut stream, followup_request)
-    ).await {
+        send_request(&mut stream, followup_request),
+    )
+    .await
+    {
         Ok(Ok(r)) => r,
         Ok(Err(e)) => {
             println!("  ✗ Follow-up failed: {}", e);
@@ -254,13 +278,21 @@ async fn test_first_conversation() {
     let followup_content = followup["content"].as_str().unwrap_or("");
     let followup_phi = followup["phi"].as_f64().unwrap_or(0.0);
 
-    println!("  • Response: \"{}\"", followup_content.chars().take(100).collect::<String>());
+    println!(
+        "  • Response: \"{}\"",
+        followup_content.chars().take(100).collect::<String>()
+    );
     println!("  • Phi after 2nd interaction: {:.3}", followup_phi);
 
-    assert!(!followup_content.is_empty(), "Second response must not be empty");
+    assert!(
+        !followup_content.is_empty(),
+        "Second response must not be empty"
+    );
 
     // Check partnership after second interaction
-    let partnership2 = send_request(&mut stream, json!({"type": "partnership"})).await.unwrap();
+    let partnership2 = send_request(&mut stream, json!({"type": "partnership"}))
+        .await
+        .unwrap();
     let interactions2 = partnership2["interactions"].as_u64().unwrap_or(0);
     println!("  • Interactions now: {}", interactions2);
 
@@ -280,10 +312,16 @@ async fn test_first_conversation() {
     let graph_size = introspection["graph_size"].as_u64().unwrap_or(0);
     let is_conscious = introspection["is_conscious"].as_bool().unwrap_or(false);
 
-    println!("  • Consciousness Level: {:.1}%", consciousness_level * 100.0);
+    println!(
+        "  • Consciousness Level: {:.1}%",
+        consciousness_level * 100.0
+    );
     println!("  • Self-Referential Loops: {}", self_loops);
     println!("  • Cognitive Graph Size: {}", graph_size);
-    println!("  • Is Conscious: {}", if is_conscious { "Yes" } else { "Awakening..." });
+    println!(
+        "  • Is Conscious: {}",
+        if is_conscious { "Yes" } else { "Awakening..." }
+    );
 
     // ========================================================================
     // PHASE 6: Graceful Shutdown
@@ -331,10 +369,7 @@ async fn test_service_ping() {
         }
     };
 
-    let wait_result = timeout(
-        Duration::from_secs(60),
-        wait_for_service(TEST_ADDR, 30)
-    ).await;
+    let wait_result = timeout(Duration::from_secs(60), wait_for_service(TEST_ADDR, 30)).await;
 
     if wait_result.is_err() || wait_result.unwrap().is_err() {
         println!("  ✗ Service failed to start");
@@ -358,7 +393,10 @@ async fn test_service_ping() {
     assert_eq!(status["type"], "status");
     println!("  ✓ Status check successful");
     println!("    - Uptime: {}s", status["uptime_seconds"]);
-    println!("    - Consciousness: {:.1}%", status["consciousness_level"].as_f64().unwrap_or(0.0) * 100.0);
+    println!(
+        "    - Consciousness: {:.1}%",
+        status["consciousness_level"].as_f64().unwrap_or(0.0) * 100.0
+    );
 
     // Shutdown
     let _ = send_request(&mut stream, json!({"type": "shutdown"})).await;

@@ -17,14 +17,14 @@
 //! cargo run --example l22_mechanistic_analysis --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -55,7 +55,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(50).collect();
     let functional: Vec<_> = functional.into_iter().take(50).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -120,7 +124,11 @@ fn run_experiment() -> Result<()> {
     println!("Dim   │ Cohen's d │ Direction");
     println!("──────┼───────────┼──────────");
     for (d, score) in dim_discriminability.iter().take(20) {
-        let dir = if *score > 0.0 { "Phen > Func" } else { "Func > Phen" };
+        let dir = if *score > 0.0 {
+            "Phen > Func"
+        } else {
+            "Func > Phen"
+        };
         println!("{:5} │ {:+9.4} │ {}", d, score, dir);
     }
 
@@ -132,7 +140,11 @@ fn run_experiment() -> Result<()> {
     println!("   Does ablating top discriminative dims eliminate effect?");
     println!("================================================================\n");
 
-    let top_dims: Vec<usize> = dim_discriminability.iter().take(100).map(|(d, _)| *d).collect();
+    let top_dims: Vec<usize> = dim_discriminability
+        .iter()
+        .take(100)
+        .map(|(d, _)| *d)
+        .collect();
 
     // Test ablating different numbers of top dimensions
     let ablation_counts = vec![10, 25, 50, 100];
@@ -141,26 +153,47 @@ fn run_experiment() -> Result<()> {
     println!("─────────────┼────────────┼────────────┼────────────┼─────────");
 
     // Baseline (no ablation)
-    let (phen_base, func_base) = compute_unity_scores(&phen_activations, &func_activations, &[], &topology_config);
+    let (phen_base, func_base) =
+        compute_unity_scores(&phen_activations, &func_activations, &[], &topology_config);
     let base_diff = mean(&phen_base) - mean(&func_base);
     let base_p = permutation_test(&phen_base, &func_base, 2000);
-    println!("{:12} │ {:10.4} │ {:10.4} │ {:+10.4} │ {:.4}{}",
-             "0 (baseline)", mean(&phen_base), mean(&func_base), base_diff, base_p,
-             if base_p < 0.05 { "*" } else { "" });
+    println!(
+        "{:12} │ {:10.4} │ {:10.4} │ {:+10.4} │ {:.4}{}",
+        "0 (baseline)",
+        mean(&phen_base),
+        mean(&func_base),
+        base_diff,
+        base_p,
+        if base_p < 0.05 { "*" } else { "" }
+    );
 
     for &n in &ablation_counts {
         let dims_to_ablate: Vec<usize> = top_dims.iter().take(n).copied().collect();
         let (phen_unity, func_unity) = compute_unity_scores(
-            &phen_activations, &func_activations, &dims_to_ablate, &topology_config
+            &phen_activations,
+            &func_activations,
+            &dims_to_ablate,
+            &topology_config,
         );
 
         let diff = mean(&phen_unity) - mean(&func_unity);
         let p = permutation_test(&phen_unity, &func_unity, 2000);
-        let effect_remaining = if base_diff != 0.0 { (diff / base_diff) * 100.0 } else { 0.0 };
+        let effect_remaining = if base_diff != 0.0 {
+            (diff / base_diff) * 100.0
+        } else {
+            0.0
+        };
 
-        println!("{:12} │ {:10.4} │ {:10.4} │ {:+10.4} │ {:.4}{} ({:.0}% remaining)",
-                 n, mean(&phen_unity), mean(&func_unity), diff, p,
-                 if p < 0.05 { "*" } else { "" }, effect_remaining);
+        println!(
+            "{:12} │ {:10.4} │ {:10.4} │ {:+10.4} │ {:.4}{} ({:.0}% remaining)",
+            n,
+            mean(&phen_unity),
+            mean(&func_unity),
+            diff,
+            p,
+            if p < 0.05 { "*" } else { "" },
+            effect_remaining
+        );
     }
 
     // ================================================================
@@ -172,37 +205,45 @@ fn run_experiment() -> Result<()> {
     println!("================================================================\n");
 
     // Compute activation statistics for each class
-    let phen_means: Vec<f64> = phen_activations.iter()
+    let phen_means: Vec<f64> = phen_activations
+        .iter()
         .map(|a| a.iter().map(|&x| x as f64).sum::<f64>() / a.len() as f64)
         .collect();
-    let func_means: Vec<f64> = func_activations.iter()
+    let func_means: Vec<f64> = func_activations
+        .iter()
         .map(|a| a.iter().map(|&x| x as f64).sum::<f64>() / a.len() as f64)
         .collect();
 
-    let phen_vars: Vec<f64> = phen_activations.iter()
+    let phen_vars: Vec<f64> = phen_activations
+        .iter()
         .map(|a| {
             let m = a.iter().map(|&x| x as f64).sum::<f64>() / a.len() as f64;
             a.iter().map(|&x| ((x as f64) - m).powi(2)).sum::<f64>() / a.len() as f64
         })
         .collect();
-    let func_vars: Vec<f64> = func_activations.iter()
+    let func_vars: Vec<f64> = func_activations
+        .iter()
         .map(|a| {
             let m = a.iter().map(|&x| x as f64).sum::<f64>() / a.len() as f64;
             a.iter().map(|&x| ((x as f64) - m).powi(2)).sum::<f64>() / a.len() as f64
         })
         .collect();
 
-    let phen_l2: Vec<f64> = phen_activations.iter()
+    let phen_l2: Vec<f64> = phen_activations
+        .iter()
         .map(|a| (a.iter().map(|&x| (x as f64).powi(2)).sum::<f64>()).sqrt())
         .collect();
-    let func_l2: Vec<f64> = func_activations.iter()
+    let func_l2: Vec<f64> = func_activations
+        .iter()
         .map(|a| (a.iter().map(|&x| (x as f64).powi(2)).sum::<f64>()).sqrt())
         .collect();
 
-    let phen_sparsity: Vec<f64> = phen_activations.iter()
+    let phen_sparsity: Vec<f64> = phen_activations
+        .iter()
         .map(|a| a.iter().filter(|&&x| x.abs() < 0.01).count() as f64 / a.len() as f64)
         .collect();
-    let func_sparsity: Vec<f64> = func_activations.iter()
+    let func_sparsity: Vec<f64> = func_activations
+        .iter()
         .map(|a| a.iter().filter(|&&x| x.abs() < 0.01).count() as f64 / a.len() as f64)
         .collect();
 
@@ -219,8 +260,15 @@ fn run_experiment() -> Result<()> {
     for (name, phen, func) in stats {
         let d = cohens_d(phen, func);
         let p = permutation_test(phen, func, 2000);
-        println!("{:13} │ {:10.4} │ {:10.4} │ {:+9.4} │ {:.4}{}",
-                 name, mean(phen), mean(func), d, p, if p < 0.05 { "*" } else { "" });
+        println!(
+            "{:13} │ {:10.4} │ {:10.4} │ {:+9.4} │ {:.4}{}",
+            name,
+            mean(phen),
+            mean(func),
+            d,
+            p,
+            if p < 0.05 { "*" } else { "" }
+        );
     }
 
     // ================================================================
@@ -236,12 +284,25 @@ fn run_experiment() -> Result<()> {
     let func_correlations = compute_pairwise_correlations(&func_activations);
 
     println!("Within-class pairwise correlations:");
-    println!("  Phenomenal: mean={:.4}, std={:.4}", mean(&phen_correlations), std_dev(&phen_correlations));
-    println!("  Functional: mean={:.4}, std={:.4}", mean(&func_correlations), std_dev(&func_correlations));
+    println!(
+        "  Phenomenal: mean={:.4}, std={:.4}",
+        mean(&phen_correlations),
+        std_dev(&phen_correlations)
+    );
+    println!(
+        "  Functional: mean={:.4}, std={:.4}",
+        mean(&func_correlations),
+        std_dev(&func_correlations)
+    );
 
     let corr_d = cohens_d(&phen_correlations, &func_correlations);
     let corr_p = permutation_test(&phen_correlations, &func_correlations, 2000);
-    println!("  Cohen's d: {:+.4}, p={:.4}{}", corr_d, corr_p, if corr_p < 0.05 { " *" } else { "" });
+    println!(
+        "  Cohen's d: {:+.4}, p={:.4}{}",
+        corr_d,
+        corr_p,
+        if corr_p < 0.05 { " *" } else { "" }
+    );
 
     if mean(&phen_correlations) > mean(&func_correlations) {
         println!("\n  → Phenomenal concepts are MORE correlated with each other");
@@ -257,8 +318,14 @@ fn run_experiment() -> Result<()> {
     println!("   SUMMARY");
     println!("================================================================\n");
 
-    let top_dim_count = dim_discriminability.iter().filter(|(_, d)| d.abs() > 0.3).count();
-    println!("Discriminative dimensions (|d| > 0.3): {}/{}", top_dim_count, dim);
+    let top_dim_count = dim_discriminability
+        .iter()
+        .filter(|(_, d)| d.abs() > 0.3)
+        .count();
+    println!(
+        "Discriminative dimensions (|d| > 0.3): {}/{}",
+        top_dim_count, dim
+    );
 
     if corr_p < 0.05 && mean(&phen_correlations) > mean(&func_correlations) {
         println!("\n✓ PHENOMENAL SIGNATURE CONFIRMED");
@@ -316,7 +383,7 @@ fn compute_pairwise_correlations(activations: &[Vec<f32>]) -> Vec<f64> {
     let n = activations.len();
 
     for i in 0..n {
-        for j in (i+1)..n {
+        for j in (i + 1)..n {
             let corr = pearson_correlation(&activations[i], &activations[j]);
             correlations.push(corr);
         }
@@ -386,7 +453,10 @@ fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
 }
 
 #[cfg(feature = "neural-bridge")]
-fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> symthaea_core::hdc::consciousness_topology::TopologicalAssessment {
+fn analyze_topology(
+    hv: &BinaryHV,
+    config: &TopologyConfig,
+) -> symthaea_core::hdc::consciousness_topology::TopologicalAssessment {
     let mut topology = ConsciousnessTopology::new(config.clone());
 
     topology.add_state(*hv);
@@ -399,13 +469,17 @@ fn analyze_topology(hv: &BinaryHV, config: &TopologyConfig) -> symthaea_core::hd
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     variance.sqrt()
@@ -415,8 +489,8 @@ fn std_dev(values: &[f64]) -> f64 {
 fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
     let mean_diff = mean(a) - mean(b);
     let pooled_var = ((a.len() - 1) as f64 * std_dev(a).powi(2)
-                    + (b.len() - 1) as f64 * std_dev(b).powi(2))
-                    / (a.len() + b.len() - 2) as f64;
+        + (b.len() - 1) as f64 * std_dev(b).powi(2))
+        / (a.len() + b.len() - 2) as f64;
     if pooled_var > 0.0 {
         mean_diff / pooled_var.sqrt()
     } else {

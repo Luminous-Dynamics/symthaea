@@ -96,9 +96,9 @@ impl EchoStateNetwork {
     /// Create an ESN optimized for chaotic signal prediction
     pub fn for_chaos(seed: u64) -> Self {
         Self::new(
-            100,   // reservoir size
-            0.95,  // spectral radius (edge of chaos)
-            0.9,   // 90% sparse
+            100,  // reservoir size
+            0.95, // spectral radius (edge of chaos)
+            0.9,  // 90% sparse
             seed,
         )
     }
@@ -175,7 +175,11 @@ impl EchoStateNetwork {
 
         // Compute X^T y
         let mut xty = vec![0.0; m];
-        for (state, &target) in self.training_states.iter().zip(self.training_targets.iter()) {
+        for (state, &target) in self
+            .training_states
+            .iter()
+            .zip(self.training_targets.iter())
+        {
             for i in 0..m {
                 xty[i] += state[i] * target;
             }
@@ -228,13 +232,13 @@ impl EchoStateNetwork {
     /// Create ESN optimized for discrete chaotic maps (Logistic, Henon)
     pub fn for_discrete_chaos(seed: u64) -> Self {
         let mut esn = Self::new(
-            50,    // smaller reservoir for 1D maps
-            0.99,  // spectral radius at edge of chaos
-            0.8,   // less sparse for more connections
+            50,   // smaller reservoir for 1D maps
+            0.99, // spectral radius at edge of chaos
+            0.8,  // less sparse for more connections
             seed,
         );
-        esn.leaking_rate = 0.1;  // low leaking for discrete dynamics
-        esn.warmup = 50;         // shorter warmup
+        esn.leaking_rate = 0.1; // low leaking for discrete dynamics
+        esn.warmup = 50; // shorter warmup
         esn
     }
 
@@ -276,7 +280,9 @@ struct SimpleRng {
 
 impl SimpleRng {
     fn new(seed: u64) -> Self {
-        Self { state: seed.wrapping_add(1) }
+        Self {
+            state: seed.wrapping_add(1),
+        }
     }
 
     fn next_u64(&mut self) -> u64 {
@@ -337,7 +343,8 @@ fn solve_linear_system(a: &[Vec<f64>], b: &[f64]) -> Vec<f64> {
     }
 
     // Augmented matrix
-    let mut aug: Vec<Vec<f64>> = a.iter()
+    let mut aug: Vec<Vec<f64>> = a
+        .iter()
         .enumerate()
         .map(|(i, row)| {
             let mut r = row.clone();
@@ -468,7 +475,11 @@ impl HybridEnsemblePredictor {
 
         // Discrete maps: max derivative >> mean derivative (bursty jumps)
         // Continuous: derivatives are more uniform
-        let jump_ratio = if mean_deriv > 1e-10 { max_deriv / mean_deriv } else { 1.0 };
+        let jump_ratio = if mean_deriv > 1e-10 {
+            max_deriv / mean_deriv
+        } else {
+            1.0
+        };
 
         // Compute second derivative (acceleration) - continuous systems smoother
         let mut second_derivs = Vec::new();
@@ -487,12 +498,18 @@ impl HybridEnsemblePredictor {
         // - Logistic: smoothness ~2.08, jump_ratio moderate
         // - Henon: smoothness ~1.76, jump_ratio moderate
         // - Lorenz (subsampled): smoothness ~1.44, jump_ratio high (due to subsampling)
-        self.smoothness_score = if mean_accel > 1e-10 { mean_deriv / mean_accel } else { 10.0 };
+        self.smoothness_score = if mean_accel > 1e-10 {
+            mean_deriv / mean_accel
+        } else {
+            10.0
+        };
 
         // Use derivative variance as additional signal
-        let deriv_variance: f64 = derivatives.iter()
+        let deriv_variance: f64 = derivatives
+            .iter()
             .map(|d| (d - mean_deriv).powi(2))
-            .sum::<f64>() / derivatives.len() as f64;
+            .sum::<f64>()
+            / derivatives.len() as f64;
         let coef_variation = deriv_variance.sqrt() / mean_deriv.max(1e-10);
 
         // Classification based on empirical thresholds
@@ -502,15 +519,15 @@ impl HybridEnsemblePredictor {
         if self.smoothness_score >= 1.7 && coef_variation < 1.5 {
             // Logistic/Henon pattern: higher smoothness, moderate CV
             self.signal_type = SignalType::DiscreteChaos;
-            self.esn_weight = 0.3;  // Trust LTC more
+            self.esn_weight = 0.3; // Trust LTC more
         } else if self.smoothness_score < 1.6 || coef_variation > 1.5 {
             // Lorenz pattern: lower smoothness or high variation
             self.signal_type = SignalType::ContinuousChaos;
-            self.esn_weight = 0.85;  // Trust ESN more
+            self.esn_weight = 0.85; // Trust ESN more
         } else {
             // 1.6 <= smoothness < 1.7 is ambiguous
             self.signal_type = SignalType::Unknown;
-            self.esn_weight = 0.5;  // Equal blend
+            self.esn_weight = 0.5; // Equal blend
         }
     }
 
@@ -523,7 +540,11 @@ impl HybridEnsemblePredictor {
         }
 
         // Update ESN with target being the current value
-        let target = if self.history.len() > 1 { Some(value) } else { None };
+        let target = if self.history.len() > 1 {
+            Some(value)
+        } else {
+            None
+        };
 
         // Feed previous value to ESN
         if self.history.len() > 1 {
@@ -761,7 +782,11 @@ mod tests {
 
         // Training phase
         for i in 0..800 {
-            let target = if i + 1 < data.len() { Some(data[i + 1]) } else { None };
+            let target = if i + 1 < data.len() {
+                Some(data[i + 1])
+            } else {
+                None
+            };
             esn.observe(data[i], target);
         }
         esn.train(0.001);

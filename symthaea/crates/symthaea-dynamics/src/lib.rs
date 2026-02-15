@@ -1,34 +1,19 @@
-pub mod ltc;
-pub mod cfc;
-pub mod world_model;
-pub mod differentiable_hdc;
-pub mod resonator;
-pub mod crystallization;
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::large_enum_variant)]
 
-pub use ltc::LiquidNetwork;
+pub mod cfc;
+pub mod crystallization;
+pub mod differentiable_hdc;
+pub mod ltc;
+pub mod resonator;
+pub mod world_model;
+
 pub use cfc::CfCNetwork;
-pub use world_model::{
-    HierarchicalCfCWorldModel,
-    WorldModelConfig,
-    ExperienceBuffer,
-};
-pub use differentiable_hdc::{
-    DifferentiableHDCEncoder,
-    DifferentiableHDCConfig,
-    HDCEncoder,
-};
-pub use resonator::{
-    ResonatorNetwork,
-    ResonatorConfig,
-    ResonatorMemory,
-    Codebook,
-    Episode,
-};
 pub use crystallization::{
-    ConceptCrystallizer,
-    CrystallizationConfig,
-    CrystalizedConcept,
-    RecurrenceAnalyzer,
+    ConceptCrystallizer, CrystalizedConcept, CrystallizationConfig, RecurrenceAnalyzer, StepResult,
     UnifiedLearningMind,
-    StepResult,
 };
+pub use differentiable_hdc::{DifferentiableHDCConfig, DifferentiableHDCEncoder, HDCEncoder};
+pub use ltc::LiquidNetwork;
+pub use resonator::{Codebook, Episode, ResonatorConfig, ResonatorMemory, ResonatorNetwork};
+pub use world_model::{ExperienceBuffer, HierarchicalCfCWorldModel, WorldModelConfig};

@@ -660,9 +660,10 @@ mod progressive_fees {
         assert!(matches!(FeeTier::from_mycel(0.3), FeeTier::Member));
         assert!(matches!(FeeTier::from_mycel(0.5), FeeTier::Member));
         assert!(matches!(FeeTier::from_mycel(0.69), FeeTier::Member));
+        assert!(matches!(FeeTier::from_mycel(0.7), FeeTier::Member)); // boundary: > 0.7 for Steward
 
         // Steward: > 0.7 -> 0.01% fee
-        assert!(matches!(FeeTier::from_mycel(0.7), FeeTier::Steward));
+        assert!(matches!(FeeTier::from_mycel(0.71), FeeTier::Steward));
         assert!(matches!(FeeTier::from_mycel(0.8), FeeTier::Steward));
         assert!(matches!(FeeTier::from_mycel(1.0), FeeTier::Steward));
     }

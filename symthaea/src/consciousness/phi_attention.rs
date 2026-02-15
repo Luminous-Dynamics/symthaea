@@ -38,8 +38,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Types of actions that require different Φ thresholds
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum ActionType {
     /// Basic queries, information retrieval (Φ ≥ 0.2)
     #[default]
@@ -51,7 +50,6 @@ pub enum ActionType {
     /// Irreversible operations (Φ ≥ 0.6)
     Irreversible,
 }
-
 
 /// Consciousness thresholds for different action types
 ///
@@ -154,12 +152,7 @@ impl PhiAwareScoring {
     /// # Returns
     ///
     /// Φ-weighted score (typically 0.0-1.5)
-    pub fn calculate_score(
-        salience: f32,
-        urgency: f32,
-        emotional_weight: f32,
-        phi: f32,
-    ) -> f32 {
+    pub fn calculate_score(salience: f32, urgency: f32, emotional_weight: f32, phi: f32) -> f32 {
         let base_score = salience * urgency + emotional_weight;
 
         // Φ factor calculation - continuous scaling from 0.6x to 1.3x
@@ -217,25 +210,13 @@ impl PhiAwareScoring {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConfidenceLevel {
     /// Φ ≥ 0.6: High confidence
-    High {
-        phi: f32,
-        recommendation: String,
-    },
+    High { phi: f32, recommendation: String },
     /// Φ ∈ [0.4, 0.6): Medium confidence
-    Medium {
-        phi: f32,
-        recommendation: String,
-    },
+    Medium { phi: f32, recommendation: String },
     /// Φ ∈ [0.2, 0.4): Low confidence
-    Low {
-        phi: f32,
-        recommendation: String,
-    },
+    Low { phi: f32, recommendation: String },
     /// Φ < 0.2: Very low confidence
-    VeryLow {
-        phi: f32,
-        recommendation: String,
-    },
+    VeryLow { phi: f32, recommendation: String },
 }
 
 impl ConfidenceLevel {
@@ -335,9 +316,12 @@ impl AdaptiveThresholds {
         if self.phi_history.len() < 2 {
             return None;
         }
-        let variance = self.phi_history.iter()
+        let variance = self
+            .phi_history
+            .iter()
             .map(|p| (p - avg).powi(2))
-            .sum::<f32>() / (self.phi_history.len() - 1) as f32;
+            .sum::<f32>()
+            / (self.phi_history.len() - 1) as f32;
         Some(variance)
     }
 
@@ -350,7 +334,8 @@ impl AdaptiveThresholds {
         let base = self.base.threshold_for(action_type);
 
         // Variance adjustment
-        let variance_adjustment = self.phi_variance()
+        let variance_adjustment = self
+            .phi_variance()
             .map(|v| if v > 0.01 { v.sqrt() * 0.5 } else { -0.05 })
             .unwrap_or(0.0);
 
@@ -387,10 +372,22 @@ impl AdaptiveThresholds {
             phi_average: self.phi_average(),
             phi_variance: self.phi_variance(),
             current_thresholds: std::collections::HashMap::from([
-                (ActionType::BasicQuery, self.threshold_for(ActionType::BasicQuery)),
-                (ActionType::StateModifying, self.threshold_for(ActionType::StateModifying)),
-                (ActionType::SystemCritical, self.threshold_for(ActionType::SystemCritical)),
-                (ActionType::Irreversible, self.threshold_for(ActionType::Irreversible)),
+                (
+                    ActionType::BasicQuery,
+                    self.threshold_for(ActionType::BasicQuery),
+                ),
+                (
+                    ActionType::StateModifying,
+                    self.threshold_for(ActionType::StateModifying),
+                ),
+                (
+                    ActionType::SystemCritical,
+                    self.threshold_for(ActionType::SystemCritical),
+                ),
+                (
+                    ActionType::Irreversible,
+                    self.threshold_for(ActionType::Irreversible),
+                ),
             ]),
         }
     }

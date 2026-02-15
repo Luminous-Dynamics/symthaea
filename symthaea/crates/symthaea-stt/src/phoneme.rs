@@ -6,7 +6,7 @@
 //! - Modern Hopfield resonator for pattern matching
 //! - Coarticulation model for sequence constraints
 
-use crate::hdc::{HV16, bundle, BundleAccumulator};
+use crate::hdc::{bundle, BundleAccumulator, HV16};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -89,8 +89,8 @@ impl Default for PhonemeInventory {
 impl PhonemeInventory {
     /// Create the standard 44 English phoneme inventory
     pub fn new() -> Self {
-        use Place::*;
         use Manner::*;
+        use Place::*;
         use Voicing::*;
 
         let phonemes = vec![
@@ -124,7 +124,6 @@ impl PhonemeInventory {
             Phoneme::consonant("ɹ", "R", Alveolar, Approximant, Voiced),
             Phoneme::consonant("w", "W", Bilabial, Approximant, Voiced),
             Phoneme::consonant("j", "Y", Palatal, Approximant, Voiced),
-
             // === VOWELS ===
             // High vowels
             Phoneme::vowel("i", "IY", Front, High),
@@ -148,11 +147,10 @@ impl PhonemeInventory {
             // R-colored vowels
             Phoneme::vowel("ɝ", "ER", Central, Mid),
             Phoneme::vowel("ɚ", "AXR", Central, Mid),
-
             // === SPECIAL ===
-            Phoneme::special("sil", "SIL"),   // Silence
-            Phoneme::special("spn", "SPN"),   // Spoken noise
-            Phoneme::special("nsn", "NSN"),   // Non-speech noise
+            Phoneme::special("sil", "SIL"), // Silence
+            Phoneme::special("spn", "SPN"), // Spoken noise
+            Phoneme::special("nsn", "NSN"), // Non-speech noise
         ];
 
         // Build indices
@@ -165,14 +163,34 @@ impl PhonemeInventory {
 
         // Generate feature hypervectors
         let mut place_hvs = HashMap::new();
-        for place in [Bilabial, Labiodental, Dental, Alveolar, Postalveolar,
-                      Palatal, Velar, Glottal, Front, Central, Back] {
+        for place in [
+            Bilabial,
+            Labiodental,
+            Dental,
+            Alveolar,
+            Postalveolar,
+            Palatal,
+            Velar,
+            Glottal,
+            Front,
+            Central,
+            Back,
+        ] {
             place_hvs.insert(place, HV16::random(&format!("place:{:?}", place)));
         }
 
         let mut manner_hvs = HashMap::new();
-        for manner in [Stop, Fricative, Affricate, Nasal, Approximant, Lateral,
-                       High, Mid, Low] {
+        for manner in [
+            Stop,
+            Fricative,
+            Affricate,
+            Nasal,
+            Approximant,
+            Lateral,
+            High,
+            Mid,
+            Low,
+        ] {
             manner_hvs.insert(manner, HV16::random(&format!("manner:{:?}", manner)));
         }
 
@@ -219,13 +237,19 @@ impl PhonemeInventory {
 
     /// Encode articulatory features as hypervector
     pub fn encode_features(&self, phoneme: &Phoneme) -> HV16 {
-        let place_hv = self.place_hvs.get(&phoneme.place)
+        let place_hv = self
+            .place_hvs
+            .get(&phoneme.place)
             .cloned()
             .unwrap_or_else(HV16::zero);
-        let manner_hv = self.manner_hvs.get(&phoneme.manner)
+        let manner_hv = self
+            .manner_hvs
+            .get(&phoneme.manner)
             .cloned()
             .unwrap_or_else(HV16::zero);
-        let voicing_hv = self.voicing_hvs.get(&phoneme.voicing)
+        let voicing_hv = self
+            .voicing_hvs
+            .get(&phoneme.voicing)
             .cloned()
             .unwrap_or_else(HV16::zero);
 
@@ -329,7 +353,9 @@ impl PhonemeResonator {
         }
 
         // Compute similarities
-        let mut results: Vec<(String, f32)> = self.prototypes.iter()
+        let mut results: Vec<(String, f32)> = self
+            .prototypes
+            .iter()
             .map(|(label, proto)| (label.clone(), pattern.similarity(proto)))
             .collect();
 
@@ -349,7 +375,9 @@ impl PhonemeResonator {
         }
 
         // Compute attention scores: exp(β * similarity)
-        let scores: Vec<f32> = self.prototypes.iter()
+        let scores: Vec<f32> = self
+            .prototypes
+            .iter()
             .map(|(_, proto)| (self.beta * query.similarity(proto)).exp())
             .collect();
 
@@ -457,10 +485,13 @@ impl PhonemeDecoder {
         }
 
         // Apply coarticulation penalty and repetition penalty
-        let scored: Vec<(String, f32)> = candidates.iter()
+        let scored: Vec<(String, f32)> = candidates
+            .iter()
             .map(|(label, sim)| {
                 // Transition score from bigram model
-                let transition_score = self.prev_phoneme.as_ref()
+                let transition_score = self
+                    .prev_phoneme
+                    .as_ref()
                     .and_then(|prev| self.transitions.get(&(prev.clone(), label.clone())))
                     .copied()
                     .unwrap_or(1.0);
@@ -474,7 +505,8 @@ impl PhonemeDecoder {
             .collect();
 
         // Find best after reranking
-        let best = scored.iter()
+        let best = scored
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))?;
 
         self.update_history(best.0.clone());
@@ -493,7 +525,9 @@ impl PhonemeDecoder {
         let len = self.recent_history.len();
 
         // Check 1: Simple repetition - count occurrences in recent history
-        let simple_count = self.recent_history.iter()
+        let simple_count = self
+            .recent_history
+            .iter()
             .filter(|p| p.as_str() == phoneme)
             .count();
 
@@ -510,13 +544,22 @@ impl PhonemeDecoder {
                 let mut i = len.saturating_sub(4);
                 while i + 1 < len - 2 {
                     if self.recent_history[i].as_str() == phoneme
-                        && self.recent_history[i + 1].as_str() == prev.as_str() {
+                        && self.recent_history[i + 1].as_str() == prev.as_str()
+                    {
                         oscillation_count += 1;
                     }
-                    if i >= 2 { i -= 2; } else { break; }
+                    if i >= 2 {
+                        i -= 2;
+                    } else {
+                        break;
+                    }
                 }
                 // Heavy penalty for oscillation: 0.3 for 1 cycle, 0.1 for 2+ cycles
-                if oscillation_count >= 2 { 0.1 } else { 0.3 }
+                if oscillation_count >= 2 {
+                    0.1
+                } else {
+                    0.3
+                }
             } else {
                 1.0
             }
@@ -552,7 +595,8 @@ impl PhonemeDecoder {
 
     /// Set transition probability
     pub fn set_transition(&mut self, from: &str, to: &str, prob: f32) {
-        self.transitions.insert((from.to_string(), to.to_string()), prob);
+        self.transitions
+            .insert((from.to_string(), to.to_string()), prob);
     }
 
     /// Reset decoder state
@@ -600,10 +644,10 @@ pub struct TemporalConfig {
 impl Default for TemporalConfig {
     fn default() -> Self {
         Self {
-            window_size: 5,           // 50ms smoothing window
+            window_size: 5,            // 50ms smoothing window
             confidence_threshold: 0.3, // Minimum similarity to accept
-            min_duration_frames: 3,   // 30ms minimum phoneme duration
-            stability_frames: 2,      // 20ms to confirm transition
+            min_duration_frames: 3,    // 30ms minimum phoneme duration
+            stability_frames: 2,       // 20ms to confirm transition
         }
     }
 }
@@ -681,7 +725,8 @@ impl TemporalDecoder {
         let smoothed = self.compute_smoothed_scores();
 
         // 3. Find winner with sufficient confidence
-        let winner = smoothed.into_iter()
+        let winner = smoothed
+            .into_iter()
             .find(|(_, score)| *score >= self.config.confidence_threshold);
 
         if let Some((winner_label, winner_score)) = winner {
@@ -712,7 +757,8 @@ impl TemporalDecoder {
         }
 
         // Compute averages and sort
-        let mut averaged: Vec<(String, f32)> = score_sums.into_iter()
+        let mut averaged: Vec<(String, f32)> = score_sums
+            .into_iter()
             .map(|(label, (sum, count))| (label, sum / count as f32))
             .collect();
 
@@ -737,7 +783,7 @@ impl TemporalDecoder {
                 // Running average of confidence
                 self.current_confidence =
                     (self.current_confidence * (self.current_duration - 1) as f32 + new_score)
-                    / self.current_duration as f32;
+                        / self.current_duration as f32;
                 // Reset any candidate
                 self.candidate_phoneme = None;
                 self.candidate_streak = 0;

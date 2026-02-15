@@ -95,13 +95,9 @@ impl LTCState {
         use rand::SeedableRng;
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
 
-        let hidden: Vec<f32> = (0..num_neurons)
-            .map(|_| rng.gen_range(-0.1..0.1))
-            .collect();
+        let hidden: Vec<f32> = (0..num_neurons).map(|_| rng.gen_range(-0.1..0.1)).collect();
 
-        let tau: Vec<f32> = (0..num_neurons)
-            .map(|_| rng.gen_range(0.5..2.0))
-            .collect();
+        let tau: Vec<f32> = (0..num_neurons).map(|_| rng.gen_range(0.5..2.0)).collect();
 
         Self {
             hidden,
@@ -193,9 +189,7 @@ impl LearnableLTC {
             .map(|_| rng.gen_range(config.tau_bounds.0..config.tau_bounds.1))
             .collect();
 
-        let tau_sens: Vec<f32> = (0..n)
-            .map(|_| rng.gen_range(0.0..0.1))
-            .collect();
+        let tau_sens: Vec<f32> = (0..n).map(|_| rng.gen_range(0.0..0.1)).collect();
 
         // Layer norm parameters
         let layer_norm_gamma = vec![1.0; n];
@@ -233,17 +227,30 @@ impl LearnableLTC {
         let init_scale_rec = (6.0 / (n + n) as f32).sqrt();
         let init_scale_out = (6.0 / (o + n) as f32).sqrt();
         let mut rng = genesis.domain(&format!("{label}::weights"));
-        let w_in: Vec<f32> = (0..(n * i)).map(|_| rng.gen_range(-init_scale_in..init_scale_in)).collect();
-        let w_rec: Vec<f32> = (0..(n * n)).map(|_| rng.gen_range(-init_scale_rec..init_scale_rec)).collect();
-        let w_out: Vec<f32> = (0..(o * n)).map(|_| rng.gen_range(-init_scale_out..init_scale_out)).collect();
+        let w_in: Vec<f32> = (0..(n * i))
+            .map(|_| rng.gen_range(-init_scale_in..init_scale_in))
+            .collect();
+        let w_rec: Vec<f32> = (0..(n * n))
+            .map(|_| rng.gen_range(-init_scale_rec..init_scale_rec))
+            .collect();
+        let w_out: Vec<f32> = (0..(o * n))
+            .map(|_| rng.gen_range(-init_scale_out..init_scale_out))
+            .collect();
         let mut tau_rng = genesis.domain(&format!("{label}::tau"));
-        let tau: Vec<f32> = (0..n).map(|_| tau_rng.gen_range(config.tau_bounds.0..config.tau_bounds.1)).collect();
+        let tau: Vec<f32> = (0..n)
+            .map(|_| tau_rng.gen_range(config.tau_bounds.0..config.tau_bounds.1))
+            .collect();
         let tau_sens: Vec<f32> = (0..n).map(|_| tau_rng.gen_range(0.0..0.1)).collect();
         Ok(Self {
             config: config.clone(),
-            w_in, w_rec, w_out,
-            b_in: vec![0.0; n], b_rec: vec![0.0; n], b_out: vec![0.0; o],
-            tau, tau_sens,
+            w_in,
+            w_rec,
+            w_out,
+            b_in: vec![0.0; n],
+            b_rec: vec![0.0; n],
+            b_out: vec![0.0; o],
+            tau,
+            tau_sens,
             state: LTCState::zeros(n),
             layer_norm_gamma: vec![1.0; n],
             layer_norm_beta: vec![0.0; n],
@@ -296,10 +303,8 @@ impl LearnableLTC {
                 let input_strength: f32 = input_contrib[j].abs();
                 effective_tau[j] = self.tau[j] * (1.0 + self.tau_sens[j] * input_strength);
                 // Clamp to bounds
-                effective_tau[j] = effective_tau[j].clamp(
-                    self.config.tau_bounds.0,
-                    self.config.tau_bounds.1,
-                );
+                effective_tau[j] =
+                    effective_tau[j].clamp(self.config.tau_bounds.0, self.config.tau_bounds.1);
             }
 
             // LTC dynamics: dh/dt = (1/tau) * (-h + f(input + recurrent))
@@ -335,7 +340,9 @@ impl LearnableLTC {
 
         // Compute mean and variance
         let mean: f32 = self.state.hidden.iter().sum::<f32>() / n as f32;
-        let var: f32 = self.state.hidden
+        let var: f32 = self
+            .state
+            .hidden
             .iter()
             .map(|x| (x - mean).powi(2))
             .sum::<f32>()
@@ -412,7 +419,11 @@ impl LearnableLTC {
             h ^= h >> 33;
             h = h.wrapping_mul(0xff51afd7ed558ccd);
             h ^= h >> 33;
-            if h & 1 == 0 { 1.0 } else { -1.0 }
+            if h & 1 == 0 {
+                1.0
+            } else {
+                -1.0
+            }
         };
 
         // Update W_in: perturb output weights (most impact on loss)
@@ -455,10 +466,8 @@ impl LearnableLTC {
         // Update tau (time constants) - smaller updates to preserve dynamics
         for j in 0..n {
             let grad_estimate = self.cached_loss * perturbation(4 * n * o + j) * 0.001;
-            self.tau[j] = (self.tau[j] - lr * grad_estimate).clamp(
-                self.config.tau_bounds.0,
-                self.config.tau_bounds.1,
-            );
+            self.tau[j] = (self.tau[j] - lr * grad_estimate)
+                .clamp(self.config.tau_bounds.0, self.config.tau_bounds.1);
         }
 
         // Update biases
@@ -488,10 +497,12 @@ impl LearnableLTC {
         let (output, _state) = self.forward(input)?;
 
         // Compute MSE loss
-        let loss: f32 = output.iter()
+        let loss: f32 = output
+            .iter()
             .zip(target.iter())
             .map(|(o, t)| (o - t).powi(2))
-            .sum::<f32>() / output.len() as f32;
+            .sum::<f32>()
+            / output.len() as f32;
 
         // Backward pass and optimizer step (placeholder implementation)
         self.zero_grad();
@@ -510,9 +521,7 @@ impl LearnableLTC {
         }
 
         let mean = self.tau.iter().sum::<f32>() / n;
-        let variance = self.tau.iter()
-            .map(|&t| (t - mean).powi(2))
-            .sum::<f32>() / n;
+        let variance = self.tau.iter().map(|&t| (t - mean).powi(2)).sum::<f32>() / n;
         let std = variance.sqrt();
         let min = self.tau.iter().cloned().fold(f32::INFINITY, f32::min);
         let max = self.tau.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
@@ -545,10 +554,8 @@ impl LearnableLTC {
         for j in 0..self.tau.len() {
             // Scale tau while keeping within bounds
             let base_tau = (self.config.tau_bounds.0 + self.config.tau_bounds.1) / 2.0;
-            self.tau[j] = (base_tau * tau_scale).clamp(
-                self.config.tau_bounds.0,
-                self.config.tau_bounds.1,
-            );
+            self.tau[j] =
+                (base_tau * tau_scale).clamp(self.config.tau_bounds.0, self.config.tau_bounds.1);
         }
 
         // Modulate learning rate: higher vitality -> higher plasticity
@@ -574,19 +581,25 @@ impl LearnableLTC {
 
         // 1. Hidden state diversity: variance of activations
         let mean_h: f32 = self.state.hidden.iter().sum::<f32>() / n;
-        let variance_h: f32 = self.state.hidden
+        let variance_h: f32 = self
+            .state
+            .hidden
             .iter()
             .map(|&h| (h - mean_h).powi(2))
-            .sum::<f32>() / n;
+            .sum::<f32>()
+            / n;
         // Normalize: high variance = differentiated states
         let diversity = (variance_h / 0.1).min(1.0); // Cap at 1.0
 
         // 2. Temporal coherence: how structured (non-chaotic) the state is
         // Use tanh saturation as a measure - near-saturated neurons are coherent
-        let saturation: f32 = self.state.hidden
+        let saturation: f32 = self
+            .state
+            .hidden
             .iter()
             .map(|&h| h.abs().min(1.0))
-            .sum::<f32>() / n;
+            .sum::<f32>()
+            / n;
 
         // 3. Tau differentiation: spread of time constants enables multi-scale integration
         let (tau_mean, tau_std, _, _) = self.get_tau_distribution();
@@ -636,7 +649,10 @@ impl std::fmt::Debug for LearnableLTC {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LearnableLTC")
             .field("config", &self.config)
-            .field("num_weights", &(self.w_in.len() + self.w_rec.len() + self.w_out.len()))
+            .field(
+                "num_weights",
+                &(self.w_in.len() + self.w_rec.len() + self.w_out.len()),
+            )
             .field("state_time", &self.state.time)
             .finish()
     }
@@ -733,7 +749,10 @@ mod tests {
 
         for _ in 0..1_000 {
             let (output, _) = ltc.forward(&input).unwrap();
-            assert!(output.iter().all(|x| x.is_finite()), "Zero input caused divergence");
+            assert!(
+                output.iter().all(|x| x.is_finite()),
+                "Zero input caused divergence"
+            );
         }
     }
 
@@ -751,7 +770,10 @@ mod tests {
 
         for _ in 0..100 {
             let (output, _) = ltc.forward(&input).unwrap();
-            assert!(output.iter().all(|x| x.is_finite()), "Large input caused divergence");
+            assert!(
+                output.iter().all(|x| x.is_finite()),
+                "Large input caused divergence"
+            );
         }
     }
 
@@ -784,7 +806,10 @@ mod tests {
         };
         let mut ltc = LearnableLTC::new(config).unwrap();
         let wrong_input = vec![0.5; 7]; // Wrong dimension
-        assert!(ltc.forward(&wrong_input).is_err(), "Should reject wrong input dimension");
+        assert!(
+            ltc.forward(&wrong_input).is_err(),
+            "Should reject wrong input dimension"
+        );
     }
 
     // 4.2: ERROR PATH TESTS (NaN handling)
@@ -806,6 +831,9 @@ mod tests {
         let result = ltc.forward(&nan_input);
         // This test documents the current behavior. Whether NaN propagation
         // is acceptable is a design decision — what's NOT acceptable is a panic.
-        assert!(result.is_ok() || result.is_err(), "NaN input must not panic");
+        assert!(
+            result.is_ok() || result.is_err(),
+            "NaN input must not panic"
+        );
     }
 }

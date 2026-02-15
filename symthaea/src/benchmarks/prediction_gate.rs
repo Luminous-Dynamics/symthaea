@@ -21,9 +21,9 @@
 //! - LR shows consistent improvement
 //! - R > 80% after consolidation
 
-use std::time::Instant;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::time::Instant;
 
 use crate::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
 
@@ -211,15 +211,15 @@ impl TaskType {
                 let phase: f32 = rng.gen_range(0.0..2.0 * std::f32::consts::PI);
 
                 for i in 0..dim {
-                    input[i] = amplitude * (freq * i as f32 + phase).sin()
-                        + rng.gen_range(-0.1..0.1);
+                    input[i] =
+                        amplitude * (freq * i as f32 + phase).sin() + rng.gen_range(-0.1..0.1);
                 }
 
                 // Target: encode periodicity info
-                target[0] = (num_periods as f32 / 5.0).min(1.0);  // Period count
-                target[1] = amplitude;  // Amplitude
+                target[0] = (num_periods as f32 / 5.0).min(1.0); // Period count
+                target[1] = amplitude; // Amplitude
                 if output_dim > 2 {
-                    target[2] = (phase / (2.0 * std::f32::consts::PI)).fract();  // Phase
+                    target[2] = (phase / (2.0 * std::f32::consts::PI)).fract(); // Phase
                 }
 
                 (input, target)
@@ -299,11 +299,13 @@ impl PredictionGate {
 
         // Generate test set (held out)
         let test_set: Vec<(Vec<f32>, Vec<f32>)> = (0..self.config.test_size)
-            .map(|i| task.task_type.generate(
-                self.config.pattern_dim,
-                self.config.output_dim,
-                i as u64 + 10000  // Different seed for test
-            ))
+            .map(|i| {
+                task.task_type.generate(
+                    self.config.pattern_dim,
+                    self.config.output_dim,
+                    i as u64 + 10000, // Different seed for test
+                )
+            })
             .collect();
 
         // Measure initial error (before training)
@@ -317,11 +319,13 @@ impl PredictionGate {
 
             // Generate training examples for this episode
             let train_set: Vec<(Vec<f32>, Vec<f32>)> = (0..self.config.examples_per_episode)
-                .map(|i| task.task_type.generate(
-                    self.config.pattern_dim,
-                    self.config.output_dim,
-                    (episode * 1000 + i) as u64
-                ))
+                .map(|i| {
+                    task.task_type.generate(
+                        self.config.pattern_dim,
+                        self.config.output_dim,
+                        (episode * 1000 + i) as u64,
+                    )
+                })
                 .collect();
 
             // Train on this episode
@@ -366,7 +370,7 @@ impl PredictionGate {
                 let (input, target) = task.task_type.generate(
                     self.config.pattern_dim,
                     self.config.output_dim,
-                    (i + 5000) as u64
+                    (i + 5000) as u64,
                 );
                 let _ = self.ltc.train_step(&input, &target);
                 self.ltc.reset_state();
@@ -391,8 +395,8 @@ impl PredictionGate {
 
         // Calculate learning rate (slope of test_loss decrease)
         let learning_rate = if episodes.len() >= 2 {
-            let first = episodes.first().unwrap().test_loss;
-            let last = episodes.last().unwrap().test_loss;
+            let first = episodes.first().expect("episodes.len() >= 2").test_loss;
+            let last = episodes.last().expect("episodes.len() >= 2").test_loss;
             (first - last) / episodes.len() as f32
         } else {
             0.0
@@ -445,9 +449,12 @@ impl PredictionGate {
             let (output, _) = self.ltc.forward(input)?;
 
             // MSE loss
-            let loss: f32 = output.iter().zip(target.iter())
+            let loss: f32 = output
+                .iter()
+                .zip(target.iter())
                 .map(|(o, t)| (o - t).powi(2))
-                .sum::<f32>() / target.len() as f32;
+                .sum::<f32>()
+                / target.len() as f32;
 
             total_loss += loss;
             self.ltc.reset_state();
@@ -464,12 +471,16 @@ impl PredictionGate {
             let (output, _) = self.ltc.forward(input)?;
 
             // Find argmax for both
-            let pred_max = output.iter().enumerate()
+            let pred_max = output
+                .iter()
+                .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
 
-            let target_max = target.iter().enumerate()
+            let target_max = target
+                .iter()
+                .enumerate()
                 .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
                 .map(|(i, _)| i)
                 .unwrap_or(0);
@@ -541,15 +552,24 @@ pub fn print_prediction_gate_summary(results: &[PredictionGateResults]) {
     let mut total_per = 0.0;
 
     for result in results {
-        let status = if result.passed { "✓ PASS" } else { "✗ FAIL" };
+        let status = if result.passed {
+            "✓ PASS"
+        } else {
+            "✗ FAIL"
+        };
 
         println!("┌─────────────────────────────────────────────────────────────┐");
         println!("│ Task: {:40} {:8} │", result.task_name, status);
         println!("├─────────────────────────────────────────────────────────────┤");
-        println!("│ Initial Error: {:.4}  →  Final Error: {:.4}               │",
-                 result.initial_error, result.final_error);
+        println!(
+            "│ Initial Error: {:.4}  →  Final Error: {:.4}               │",
+            result.initial_error, result.final_error
+        );
         println!("│ {}     │", result.reasoning);
-        println!("│ Time: {}ms                                              │", result.total_time_ms);
+        println!(
+            "│ Time: {}ms                                              │",
+            result.total_time_ms
+        );
         println!("└─────────────────────────────────────────────────────────────┘\n");
 
         if result.passed {
@@ -562,9 +582,16 @@ pub fn print_prediction_gate_summary(results: &[PredictionGateResults]) {
     let pass_rate = passed_count as f32 / results.len() as f32 * 100.0;
 
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║ OVERALL: {}/{} tasks passed ({:.1}%)                          ║",
-             passed_count, results.len(), pass_rate);
-    println!("║ Average Prediction Error Reduction: {:.1}%                    ║", avg_per);
+    println!(
+        "║ OVERALL: {}/{} tasks passed ({:.1}%)                          ║",
+        passed_count,
+        results.len(),
+        pass_rate
+    );
+    println!(
+        "║ Average Prediction Error Reduction: {:.1}%                    ║",
+        avg_per
+    );
 
     if passed_count >= (results.len() as f32 * 0.6) as usize {
         println!("║                                                              ║");

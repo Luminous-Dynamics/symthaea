@@ -6,6 +6,9 @@
 use hdk::prelude::*;
 use revocation_integrity::*;
 
+/// Maximum entries per revocation list before rotation is required
+const MAX_REVOCATION_LIST_ENTRIES: usize = 10_000;
+
 /// Create a deterministic entry hash from a string identifier
 /// This is used for link bases when we need to link from string IDs
 fn string_to_entry_hash(s: &str) -> EntryHash {
@@ -29,6 +32,15 @@ pub fn revoke_credential(input: RevokeInput) -> ExternResult<Record> {
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+    }
+
+    // Verify caller is the issuer
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can revoke it".into()
+        )));
     }
 
     let now = sys_time()?;
@@ -92,6 +104,15 @@ pub fn suspend_credential(input: SuspendInput) -> ExternResult<Record> {
         return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
     }
 
+    // Verify caller is the issuer
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can suspend it".into()
+        )));
+    }
+
     let now = sys_time()?;
 
     let entry = RevocationEntry {
@@ -142,6 +163,15 @@ pub fn reinstate_credential(input: ReinstateInput) -> ExternResult<Record> {
     }
     if input.reason.is_empty() || input.reason.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-4096 characters".into())));
+    }
+
+    // Verify caller is the issuer
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can reinstate it".into()
+        )));
     }
 
     // Find the current revocation entry
@@ -587,11 +617,22 @@ fn add_to_revocation_list(
         )));
     }
 
+    // Enforce max entries to prevent unbounded list growth
+    let new_unique: Vec<&String> = credential_ids.iter()
+        .filter(|id| !list.revoked.contains(id))
+        .collect();
+
+    if list.revoked.len() + new_unique.len() > MAX_REVOCATION_LIST_ENTRIES {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Revocation list '{}' would exceed maximum of {} entries ({} current + {} new). \
+             Create a new revocation list for additional revocations.",
+            list_id, MAX_REVOCATION_LIST_ENTRIES, list.revoked.len(), new_unique.len()
+        ))));
+    }
+
     // Add new credential IDs (avoid duplicates)
-    for id in credential_ids {
-        if !list.revoked.contains(id) {
-            list.revoked.push(id.clone());
-        }
+    for id in new_unique {
+        list.revoked.push(id.clone());
     }
     list.updated = now;
     list.version += 1;
@@ -836,5 +877,13 @@ mod tests {
         let restored: BatchItemError = serde_json::from_str(&json).unwrap();
         assert_eq!(restored.credential_id, "cred:fail");
         assert_eq!(restored.error, "Not found in DHT");
+    }
+
+    // --- Revocation list max entries ---
+
+    #[test]
+    fn max_revocation_list_entries_is_reasonable() {
+        assert!(MAX_REVOCATION_LIST_ENTRIES >= 1_000, "Must allow at least 1K entries");
+        assert!(MAX_REVOCATION_LIST_ENTRIES <= 100_000, "Must not exceed 100K entries (DHT size)");
     }
 }

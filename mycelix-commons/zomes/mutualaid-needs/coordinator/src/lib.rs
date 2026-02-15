@@ -743,3 +743,435 @@ fn all_offers_anchor() -> ExternResult<EntryHash> {
 fn emergency_needs_anchor() -> ExternResult<EntryHash> {
     make_anchor("emergency_needs")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Input struct serde roundtrip tests ─────────────────────────────
+
+    #[test]
+    fn create_need_input_serde_roundtrip() {
+        let input = CreateNeedInput {
+            title: "Winter coat needed".to_string(),
+            description: "Size M, any color".to_string(),
+            category: NeedCategory::Clothing,
+            urgency: UrgencyLevel::High,
+            emergency: false,
+            quantity: Some(1),
+            location: LocationConstraint::Remote,
+            needed_by: None,
+            reciprocity_offers: vec!["Can help with gardening".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateNeedInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.title, "Winter coat needed");
+        assert_eq!(decoded.category, NeedCategory::Clothing);
+        assert_eq!(decoded.urgency, UrgencyLevel::High);
+        assert_eq!(decoded.emergency, false);
+        assert_eq!(decoded.quantity, Some(1));
+        assert_eq!(decoded.reciprocity_offers.len(), 1);
+    }
+
+    #[test]
+    fn create_need_input_emergency_minimal() {
+        let input = CreateNeedInput {
+            title: "Emergency shelter".to_string(),
+            description: "Family displaced by fire".to_string(),
+            category: NeedCategory::Housing,
+            urgency: UrgencyLevel::Emergency,
+            emergency: true,
+            quantity: None,
+            location: LocationConstraint::ToBeArranged,
+            needed_by: None,
+            reciprocity_offers: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateNeedInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.emergency, true);
+        assert_eq!(decoded.quantity, None);
+        assert!(decoded.reciprocity_offers.is_empty());
+    }
+
+    #[test]
+    fn create_offer_input_serde_roundtrip() {
+        let input = CreateOfferInput {
+            title: "Free winter clothes".to_string(),
+            description: "Assorted coats and sweaters".to_string(),
+            category: NeedCategory::Clothing,
+            quantity: Some(5),
+            condition: Some("Gently used".to_string()),
+            location: LocationConstraint::FixedLocation("123 Main St".to_string()),
+            available_until: None,
+            asking_for: vec!["Nothing, happy to help".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateOfferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.title, "Free winter clothes");
+        assert_eq!(decoded.quantity, Some(5));
+        assert_eq!(decoded.condition, Some("Gently used".to_string()));
+    }
+
+    #[test]
+    fn create_offer_input_no_optionals() {
+        let input = CreateOfferInput {
+            title: "Cooking help".to_string(),
+            description: "Can cook meals".to_string(),
+            category: NeedCategory::Food,
+            quantity: None,
+            condition: None,
+            location: LocationConstraint::AtProvider,
+            available_until: None,
+            asking_for: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateOfferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity, None);
+        assert_eq!(decoded.condition, None);
+        assert!(decoded.asking_for.is_empty());
+    }
+
+    #[test]
+    fn propose_match_input_serde_roundtrip() {
+        let need_hash = ActionHash::from_raw_36(vec![0xAA; 36]);
+        let offer_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = ProposeMatchInput {
+            need_hash: need_hash.clone(),
+            offer_hash: offer_hash.clone(),
+            quantity: Some(3),
+            notes: "Looks like a good match".to_string(),
+            scheduled_handoff: None,
+            handoff_location: Some("Community center".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ProposeMatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.need_hash, need_hash);
+        assert_eq!(decoded.offer_hash, offer_hash);
+        assert_eq!(decoded.quantity, Some(3));
+        assert_eq!(decoded.handoff_location, Some("Community center".to_string()));
+    }
+
+    #[test]
+    fn fulfill_match_input_serde_roundtrip() {
+        let match_hash = ActionHash::from_raw_36(vec![0xCC; 36]);
+        let input = FulfillMatchInput {
+            match_hash: match_hash.clone(),
+            quantity_given: Some(2),
+            notes: "All went well".to_string(),
+            gratitude_message: Some("Thank you so much!".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FulfillMatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.match_hash, match_hash);
+        assert_eq!(decoded.quantity_given, Some(2));
+        assert_eq!(decoded.gratitude_message, Some("Thank you so much!".to_string()));
+    }
+
+    #[test]
+    fn fulfill_match_input_no_optionals() {
+        let match_hash = ActionHash::from_raw_36(vec![0xCC; 36]);
+        let input = FulfillMatchInput {
+            match_hash: match_hash.clone(),
+            quantity_given: None,
+            notes: "Done".to_string(),
+            gratitude_message: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FulfillMatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_given, None);
+        assert_eq!(decoded.gratitude_message, None);
+    }
+
+    #[test]
+    fn search_needs_input_serde_roundtrip() {
+        let input = SearchNeedsInput {
+            category: Some(NeedCategory::Food),
+            urgency: Some(UrgencyLevel::Urgent),
+            emergency_only: true,
+            query: Some("rice".to_string()),
+            limit: Some(25),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SearchNeedsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.category, Some(NeedCategory::Food));
+        assert_eq!(decoded.urgency, Some(UrgencyLevel::Urgent));
+        assert_eq!(decoded.emergency_only, true);
+        assert_eq!(decoded.query, Some("rice".to_string()));
+        assert_eq!(decoded.limit, Some(25));
+    }
+
+    #[test]
+    fn search_needs_input_all_none_filters() {
+        let input = SearchNeedsInput {
+            category: None,
+            urgency: None,
+            emergency_only: false,
+            query: None,
+            limit: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SearchNeedsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.category, None);
+        assert_eq!(decoded.emergency_only, false);
+    }
+
+    #[test]
+    fn search_offers_input_serde_roundtrip() {
+        let input = SearchOffersInput {
+            category: Some(NeedCategory::BabyItems),
+            query: Some("stroller".to_string()),
+            limit: Some(10),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SearchOffersInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.category, Some(NeedCategory::BabyItems));
+        assert_eq!(decoded.query, Some("stroller".to_string()));
+        assert_eq!(decoded.limit, Some(10));
+    }
+
+    #[test]
+    fn schedule_handoff_input_serde_roundtrip() {
+        let match_hash = ActionHash::from_raw_36(vec![0xDD; 36]);
+        let input = ScheduleHandoffInput {
+            match_hash: match_hash.clone(),
+            scheduled_time: Timestamp::from_micros(1700000000000000),
+            location: "Main library entrance".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ScheduleHandoffInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.match_hash, match_hash);
+        assert_eq!(decoded.location, "Main library entrance");
+    }
+
+    // ── Integrity enum serde roundtrip tests ──────────────────────────
+
+    #[test]
+    fn need_category_all_variants_serde() {
+        let variants = vec![
+            NeedCategory::Food,
+            NeedCategory::Clothing,
+            NeedCategory::Housing,
+            NeedCategory::Healthcare,
+            NeedCategory::Transportation,
+            NeedCategory::Furniture,
+            NeedCategory::Appliances,
+            NeedCategory::Kitchenware,
+            NeedCategory::Bedding,
+            NeedCategory::BabyItems,
+            NeedCategory::ChildrensItems,
+            NeedCategory::PetSupplies,
+            NeedCategory::SchoolSupplies,
+            NeedCategory::Books,
+            NeedCategory::Computers,
+            NeedCategory::WorkClothes,
+            NeedCategory::Tools,
+            NeedCategory::Equipment,
+            NeedCategory::Hygiene,
+            NeedCategory::Medications,
+            NeedCategory::Rides,
+            NeedCategory::MovingHelp,
+            NeedCategory::Childcare,
+            NeedCategory::PetSitting,
+            NeedCategory::Custom("Emergency Kit".to_string()),
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: NeedCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn urgency_level_all_variants_serde() {
+        let variants = vec![
+            UrgencyLevel::Low,
+            UrgencyLevel::Medium,
+            UrgencyLevel::High,
+            UrgencyLevel::Urgent,
+            UrgencyLevel::Emergency,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: UrgencyLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn need_status_all_variants_serde() {
+        let variants = vec![
+            NeedStatus::Open,
+            NeedStatus::PartiallyMet,
+            NeedStatus::Matched,
+            NeedStatus::Fulfilled,
+            NeedStatus::Withdrawn,
+            NeedStatus::Expired,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: NeedStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn offer_status_all_variants_serde() {
+        let variants = vec![
+            OfferStatus::Available,
+            OfferStatus::Reserved,
+            OfferStatus::Claimed,
+            OfferStatus::Completed,
+            OfferStatus::Withdrawn,
+            OfferStatus::Expired,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: OfferStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn match_status_all_variants_serde() {
+        let variants = vec![
+            MatchStatus::Proposed,
+            MatchStatus::Accepted,
+            MatchStatus::Scheduled,
+            MatchStatus::InProgress,
+            MatchStatus::Completed,
+            MatchStatus::Cancelled,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: MatchStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn location_constraint_all_variants_serde() {
+        let variants = vec![
+            LocationConstraint::Remote,
+            LocationConstraint::FixedLocation("123 Main St".to_string()),
+            LocationConstraint::WithinRadius {
+                geohash: "9q8yy".to_string(),
+                radius_km: 5.0,
+            },
+            LocationConstraint::AtRequester,
+            LocationConstraint::AtProvider,
+            LocationConstraint::ToBeArranged,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: LocationConstraint = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    // ── Boundary and edge case tests ─────────────────────────────────
+
+    #[test]
+    fn search_offers_input_all_none_filters_serde() {
+        let input = SearchOffersInput {
+            category: None,
+            query: None,
+            limit: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SearchOffersInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.category, None);
+        assert_eq!(decoded.query, None);
+        assert_eq!(decoded.limit, None);
+    }
+
+    #[test]
+    fn propose_match_input_all_none_optionals_serde() {
+        let need_hash = ActionHash::from_raw_36(vec![0xAA; 36]);
+        let offer_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = ProposeMatchInput {
+            need_hash: need_hash.clone(),
+            offer_hash: offer_hash.clone(),
+            quantity: None,
+            notes: "".to_string(),
+            scheduled_handoff: None,
+            handoff_location: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ProposeMatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.need_hash, need_hash);
+        assert_eq!(decoded.quantity, None);
+        assert_eq!(decoded.scheduled_handoff, None);
+        assert_eq!(decoded.handoff_location, None);
+        assert_eq!(decoded.notes, "");
+    }
+
+    #[test]
+    fn create_need_input_many_reciprocity_offers_serde() {
+        let offers: Vec<String> = (0..50).map(|i| format!("Reciprocity offer #{}", i)).collect();
+        let input = CreateNeedInput {
+            title: "Large request".to_string(),
+            description: "Needs many things in return".to_string(),
+            category: NeedCategory::Equipment,
+            urgency: UrgencyLevel::Low,
+            emergency: false,
+            quantity: Some(u32::MAX),
+            location: LocationConstraint::Remote,
+            needed_by: Some(Timestamp::from_micros(1800000000000000)),
+            reciprocity_offers: offers.clone(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateNeedInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.reciprocity_offers.len(), 50);
+        assert_eq!(decoded.quantity, Some(u32::MAX));
+    }
+
+    #[test]
+    fn create_offer_input_with_available_until_serde() {
+        let input = CreateOfferInput {
+            title: "Limited time offer".to_string(),
+            description: "Available only this weekend".to_string(),
+            category: NeedCategory::Furniture,
+            quantity: Some(1),
+            condition: Some("Must pick up".to_string()),
+            location: LocationConstraint::FixedLocation("456 Elm St".to_string()),
+            available_until: Some(Timestamp::from_micros(1700500000000000)),
+            asking_for: vec!["Help moving".to_string(), "Baked goods".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateOfferInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.available_until, Some(Timestamp::from_micros(1700500000000000)));
+        assert_eq!(decoded.asking_for.len(), 2);
+    }
+
+    #[test]
+    fn fulfill_match_input_empty_notes_serde() {
+        let match_hash = ActionHash::from_raw_36(vec![0xEE; 36]);
+        let input = FulfillMatchInput {
+            match_hash: match_hash.clone(),
+            quantity_given: Some(u32::MAX),
+            notes: "".to_string(),
+            gratitude_message: Some("".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FulfillMatchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.match_hash, match_hash);
+        assert_eq!(decoded.notes, "");
+        assert_eq!(decoded.gratitude_message, Some("".to_string()));
+        assert_eq!(decoded.quantity_given, Some(u32::MAX));
+    }
+
+    #[test]
+    fn schedule_handoff_input_empty_location_serde() {
+        let match_hash = ActionHash::from_raw_36(vec![0xFF; 36]);
+        let input = ScheduleHandoffInput {
+            match_hash: match_hash.clone(),
+            scheduled_time: Timestamp::from_micros(0),
+            location: "".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ScheduleHandoffInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.match_hash, match_hash);
+        assert_eq!(decoded.location, "");
+        assert_eq!(decoded.scheduled_time, Timestamp::from_micros(0));
+    }
+}

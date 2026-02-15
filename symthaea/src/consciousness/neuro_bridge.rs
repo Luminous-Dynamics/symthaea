@@ -15,7 +15,9 @@
 //!    - High Coherence -> High Energy Production (Flourishing)
 //!    - Low Coherence -> Energy Drain (Decay)
 
-use crate::consciousness::autopoietic_consciousness::{AutopoieticConsciousness, AutopoieticConfig};
+use crate::consciousness::autopoietic_consciousness::{
+    AutopoieticConfig, AutopoieticConsciousness,
+};
 use crate::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
 use anyhow::Result;
 
@@ -40,8 +42,8 @@ impl NeuroAutopoieticBridge {
         // - sensitivity: controls response to perturbations (inversely related to min_vitality)
         // - boundary_threshold: affects system stability
         let body_config = AutopoieticConfig {
-            adaptation_rate: 0.2,   // Moderate adaptation (similar to production_rate)
-            sensitivity: 0.2,       // Lower sensitivity = more stable (like higher min_vitality)
+            adaptation_rate: 0.2,    // Moderate adaptation (similar to production_rate)
+            sensitivity: 0.2,        // Lower sensitivity = more stable (like higher min_vitality)
             boundary_threshold: 0.4, // Moderate boundary for demo stability
             ..Default::default()
         };
@@ -69,7 +71,11 @@ impl NeuroAutopoieticBridge {
     /// # Arguments
     /// * `sensory_input` - Input vector for the brain
     /// * `external_stress` - Stress factor for the body (0.0 - 1.0)
-    pub fn conscious_moment(&mut self, sensory_input: &[f32], external_stress: f32) -> Result<BridgeState> {
+    pub fn conscious_moment(
+        &mut self,
+        sensory_input: &[f32],
+        external_stress: f32,
+    ) -> Result<BridgeState> {
         self.cycle += 1;
 
         // 1. DOWNWARD CAUSATION: Body -> Brain
@@ -92,7 +98,7 @@ impl NeuroAutopoieticBridge {
         self.body.update(
             consciousness_level as f64, // Phi
             consciousness_level as f64, // Coherence
-            external_stress as f64      // Perturbation
+            external_stress as f64,     // Perturbation
         );
 
         Ok(BridgeState {
@@ -136,7 +142,10 @@ mod tests {
 
         let bridge = bridge.unwrap();
         assert_eq!(bridge.cycle, 0, "Initial cycle should be 0");
-        assert!(bridge.body.component_count() > 0, "Body should have components");
+        assert!(
+            bridge.body.component_count() > 0,
+            "Body should have components"
+        );
     }
 
     #[test]
@@ -151,8 +160,14 @@ mod tests {
         assert!(state.is_ok(), "Conscious moment should succeed");
 
         let state = state.unwrap();
-        assert!(state.vitality >= 0.0 && state.vitality <= 1.0, "Vitality should be in [0, 1]");
-        assert!(state.consciousness >= 0.0 && state.consciousness <= 1.0, "Consciousness should be in [0, 1]");
+        assert!(
+            state.vitality >= 0.0 && state.vitality <= 1.0,
+            "Vitality should be in [0, 1]"
+        );
+        assert!(
+            state.consciousness >= 0.0 && state.consciousness <= 1.0,
+            "Consciousness should be in [0, 1]"
+        );
         assert_eq!(state.output.len(), 4, "Output should have 4 dimensions");
         assert!(state.tau_mean > 0.0, "Tau mean should be positive");
         assert_eq!(bridge.cycle, 1, "Cycle should increment");
@@ -170,9 +185,21 @@ mod tests {
 
             let state = state.unwrap();
             // Values should remain stable (no NaN or Inf)
-            assert!(state.vitality.is_finite(), "Vitality should be finite at cycle {}", i);
-            assert!(state.consciousness.is_finite(), "Consciousness should be finite at cycle {}", i);
-            assert!(state.output.iter().all(|x| x.is_finite()), "Output should be finite at cycle {}", i);
+            assert!(
+                state.vitality.is_finite(),
+                "Vitality should be finite at cycle {}",
+                i
+            );
+            assert!(
+                state.consciousness.is_finite(),
+                "Consciousness should be finite at cycle {}",
+                i
+            );
+            assert!(
+                state.output.iter().all(|x| x.is_finite()),
+                "Output should be finite at cycle {}",
+                i
+            );
         }
 
         assert_eq!(bridge.cycle, 10, "Should complete 10 cycles");
@@ -186,8 +213,12 @@ mod tests {
 
         // Run both with different stress levels
         for _ in 0..5 {
-            bridge_low_stress.conscious_moment(&sensory_input, 0.0).unwrap();
-            bridge_high_stress.conscious_moment(&sensory_input, 0.9).unwrap();
+            bridge_low_stress
+                .conscious_moment(&sensory_input, 0.0)
+                .unwrap();
+            bridge_high_stress
+                .conscious_moment(&sensory_input, 0.9)
+                .unwrap();
         }
 
         // High stress should have some effect (though exact behavior depends on implementation)
@@ -205,8 +236,14 @@ mod tests {
         assert!(summary.contains("Cycle:"), "Summary should mention cycle");
         assert!(summary.contains("Body:"), "Summary should mention body");
         assert!(summary.contains("Brain:"), "Summary should mention brain");
-        assert!(summary.contains("Vitality="), "Summary should show vitality");
-        assert!(summary.contains("Conscious="), "Summary should show consciousness level");
+        assert!(
+            summary.contains("Vitality="),
+            "Summary should show vitality"
+        );
+        assert!(
+            summary.contains("Conscious="),
+            "Summary should show consciousness level"
+        );
     }
 
     #[test]
@@ -223,12 +260,15 @@ mod tests {
         // Tau should be affected by neuromodulation
         let new_tau = bridge.brain.get_tau_distribution().0;
         // Note: The exact change depends on vitality, but tau should be valid
-        assert!(new_tau > 0.0, "Tau should remain positive after neuromodulation");
+        assert!(
+            new_tau > 0.0,
+            "Tau should remain positive after neuromodulation"
+        );
         assert!(new_tau.is_finite(), "Tau should be finite");
 
         // Either tau changed or it's within bounds (both are valid)
         assert!(
-            initial_tau != new_tau || (new_tau >= 0.1 && new_tau <= 10.0),
+            initial_tau != new_tau || (0.1..=10.0).contains(&new_tau),
             "Tau should either change or be within valid bounds"
         );
     }
@@ -245,7 +285,10 @@ mod tests {
 
         // Body should have been updated (generation increments during maintain())
         let new_generation = bridge.body.generation();
-        assert!(new_generation > initial_generation, "Body generation should increment after update");
+        assert!(
+            new_generation > initial_generation,
+            "Body generation should increment after update"
+        );
     }
 
     #[test]

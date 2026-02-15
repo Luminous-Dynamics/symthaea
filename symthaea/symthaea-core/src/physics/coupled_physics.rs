@@ -26,15 +26,17 @@
 //!    └───────────┘             └───────────┘             └───────────┘
 //! ```
 
-use crate::genesis::GenesisSeed;
-use super::radiation_damage::FusionReaction;
-use super::thermal_transport::{ThermalProperties, LayerGeometry, ThermalTransport, TemperatureProfile};
-use super::neutron_shielding::{NeutronShielding, OptimalShielding};
-use super::geometry::{GeometryOptimizer, GeometryWeights, EngineGeometry};
-use super::pulse_dynamics::{PulseDynamics, PulseProfile, ThermalCycling};
-use super::high_entropy_alloys::HEADesigner;
 use super::advanced_materials::AdvancedMaterials;
-use super::trigger_systems::{LcfPhysicsConstants, GamowIntegrationResult, DDChannelResult};
+use super::geometry::{EngineGeometry, GeometryOptimizer, GeometryWeights};
+use super::high_entropy_alloys::HEADesigner;
+use super::neutron_shielding::{NeutronShielding, OptimalShielding};
+use super::pulse_dynamics::{PulseDynamics, PulseProfile, ThermalCycling};
+use super::radiation_damage::FusionReaction;
+use super::thermal_transport::{
+    LayerGeometry, TemperatureProfile, ThermalProperties, ThermalTransport,
+};
+use super::trigger_systems::{DDChannelResult, GamowIntegrationResult, LcfPhysicsConstants};
+use crate::genesis::GenesisSeed;
 
 /// Operating conditions for coupled simulation
 #[derive(Debug, Clone)]
@@ -73,7 +75,7 @@ impl OperatingConditions {
             power_kw: 100_000.0,
             reaction: FusionReaction::DT,
             ambient_temp_k: 350.0,
-            h_convection: 50_000.0,  // Liquid metal cooling (NaK/PbLi)
+            h_convection: 50_000.0, // Liquid metal cooling (NaK/PbLi)
             target_lifetime_years: 40.0,
             max_dose_rate: 0.025,
         }
@@ -85,7 +87,7 @@ impl OperatingConditions {
             power_kw: 100_000.0,
             reaction: FusionReaction::DD,
             ambient_temp_k: 350.0,
-            h_convection: 20_000.0,  // Water cooling sufficient for D-D
+            h_convection: 20_000.0, // Water cooling sufficient for D-D
             target_lifetime_years: 40.0,
             max_dose_rate: 0.025,
         }
@@ -157,10 +159,9 @@ impl ThermalDamageCoupling {
         let avg_temp = (profile.t_max + profile.t_shell_outer) / 2.0;
 
         // Arrhenius equation
-        let rate_factor = (
-            -self.activation_energy_ev / kb *
-            (1.0 / avg_temp - 1.0 / self.reference_temp_k)
-        ).exp();
+        let rate_factor = (-self.activation_energy_ev / kb
+            * (1.0 / avg_temp - 1.0 / self.reference_temp_k))
+            .exp();
 
         self.base_healing_rate * rate_factor
     }
@@ -236,7 +237,8 @@ impl TritiumInventory {
         };
 
         // Current inventory (with decay): I(t) = I_eq × (1 - e^(-λt))
-        let inventory_g = equilibrium_inventory_g * (1.0 - (-decay_constant * operating_years).exp());
+        let inventory_g =
+            equilibrium_inventory_g * (1.0 - (-decay_constant * operating_years).exp());
 
         // Activity: 1 gram T = 9,650 Ci
         let activity_ci = inventory_g * 9650.0;
@@ -374,22 +376,15 @@ impl CoupledPhysicsEngine {
         let effective_healing = coupling.effective_healing_rate(&thermal_profile);
 
         // Step 5: Optimize pulse with thermal coupling
-        let pulse_thermal = self.optimize_pulse_thermal(
-            conditions,
-            effective_healing,
-            &thermal_profile,
-        );
+        let pulse_thermal =
+            self.optimize_pulse_thermal(conditions, effective_healing, &thermal_profile);
 
         // Step 6: Calculate Gamow-integrated reaction rate (for D-D)
         let reaction_rate = self.calculate_reaction_rate(conditions, &thermal_profile);
 
         // Step 7: Assess feasibility
-        let (feasible, limiting_factors, recommendations) = self.assess_feasibility(
-            conditions,
-            &thermal_profile,
-            &geo_shield,
-            &pulse_thermal,
-        );
+        let (feasible, limiting_factors, recommendations) =
+            self.assess_feasibility(conditions, &thermal_profile, &geo_shield, &pulse_thermal);
 
         CoupledSimulationResult {
             conditions: conditions.clone(),
@@ -429,7 +424,8 @@ impl CoupledPhysicsEngine {
         // Screening energy: use PdD value (measured ~300eV at 300K)
         // Temperature-adjusted via the new method
         let measured_ue_ev = 300.0;
-        let screening_ue_ev = LcfPhysicsConstants::screening_energy_at_temperature(measured_ue_ev, lattice_temp_k);
+        let screening_ue_ev =
+            LcfPhysicsConstants::screening_energy_at_temperature(measured_ue_ev, lattice_temp_k);
 
         // Phonon modes: assume 2 coherent modes for PdD lattice
         let phonon_modes = 2u32;
@@ -451,7 +447,8 @@ impl CoupledPhysicsEngine {
 
         // Branching with neutron/tritium tracking
         // Use Gamow peak energy as effective CM energy
-        let branching = LcfPhysicsConstants::dd_branched_yield(total_reaction_rate_s, gamow.gamow_peak_kev);
+        let branching =
+            LcfPhysicsConstants::dd_branched_yield(total_reaction_rate_s, gamow.gamow_peak_kev);
 
         // Tritium inventory projection (assume 1 year of operation for snapshot)
         let tritium = TritiumInventory::from_branching(&branching, 1.0);
@@ -472,8 +469,7 @@ impl CoupledPhysicsEngine {
         conditions: &OperatingConditions,
     ) -> (ThermalProperties, ThermalProperties, ThermalProperties) {
         // For high-power DT, use MAX phase shell
-        let shell = if conditions.power_kw > 10_000.0
-            && conditions.reaction == FusionReaction::DT {
+        let shell = if conditions.power_kw > 10_000.0 && conditions.reaction == FusionReaction::DT {
             ThermalProperties::max_phase()
         } else {
             ThermalProperties::hea_shell()
@@ -507,7 +503,9 @@ impl CoupledPhysicsEngine {
             10.0 // kW/m³ for industrial (larger, better cooling)
         };
 
-        let geometry_opt = self.geometry.optimize(conditions.power_kw, power_density, &weights);
+        let geometry_opt = self
+            .geometry
+            .optimize(conditions.power_kw, power_density, &weights);
         let geometry = geometry_opt.geometry;
 
         // Shielding optimization - scale limits based on application
@@ -516,11 +514,11 @@ impl CoupledPhysicsEngine {
         // D-T neutrons (14.1 MeV) need much more shielding than D-D (2.45 MeV)
         // Industrial scale also allows for larger shielding budgets
         let (max_thickness, max_mass) = match (conditions.reaction, conditions.power_kw > 1000.0) {
-            (FusionReaction::DT, true) => (3.0, 20000.0),   // Industrial D-T: 3m, 20 t/m²
-            (FusionReaction::DT, false) => (2.0, 10000.0),  // Consumer D-T: 2m, 10 t/m²
-            (FusionReaction::DD, true) => (1.5, 10000.0),   // Industrial D-D: 1.5m
-            (FusionReaction::DD, false) => (1.0, 5000.0),   // Consumer D-D: 1m
-            (FusionReaction::DHe3, _) => (0.5, 2000.0),     // Aneutronic: minimal
+            (FusionReaction::DT, true) => (3.0, 20000.0), // Industrial D-T: 3m, 20 t/m²
+            (FusionReaction::DT, false) => (2.0, 10000.0), // Consumer D-T: 2m, 10 t/m²
+            (FusionReaction::DD, true) => (1.5, 10000.0), // Industrial D-D: 1.5m
+            (FusionReaction::DD, false) => (1.0, 5000.0), // Consumer D-D: 1m
+            (FusionReaction::DHe3, _) => (0.5, 2000.0),   // Aneutronic: minimal
             (FusionReaction::DdProton, _) => (0.5, 2000.0), // Aneutronic branch
         };
 
@@ -564,20 +562,17 @@ impl CoupledPhysicsEngine {
         let shell_outer = interface_outer + geometry.shell_thickness;
 
         let core_geom = LayerGeometry::sphere(0.0, geometry.core_radius);
-        let interface_geom = LayerGeometry::sphere(
-            geometry.core_radius,
-            interface_outer,
-        );
-        let shell_geom = LayerGeometry::sphere(
-            interface_outer,
-            shell_outer,
-        );
+        let interface_geom = LayerGeometry::sphere(geometry.core_radius, interface_outer);
+        let shell_geom = LayerGeometry::sphere(interface_outer, shell_outer);
 
         self.thermal.steady_state_profile(
             conditions.power_kw * 1000.0,
-            shell, &shell_geom,
-            interface, &interface_geom,
-            core, &core_geom,
+            shell,
+            &shell_geom,
+            interface,
+            &interface_geom,
+            core,
+            &core_geom,
             conditions.ambient_temp_k + 20.0, // Coolant slightly above ambient
             conditions.h_convection,
         )
@@ -683,16 +678,17 @@ impl CoupledPhysicsEngine {
                 "Dose rate {:.4} mSv/hr exceeds limit {:.4} mSv/hr",
                 geo_shield.shielding.final_dose, conditions.max_dose_rate
             ));
-            recommendations.push("Increase shielding thickness or use higher-Z material".to_string());
+            recommendations
+                .push("Increase shielding thickness or use higher-Z material".to_string());
         }
 
         // Check temperature - material-dependent limits
         // Consumer/prototype: HEA shell (1200 K limit)
         // Industrial: MAX phase ceramics (1600 K limit)
         let (max_temp_limit, material_name) = if conditions.power_kw > 10_000.0 {
-            (1600.0, "MAX phase")  // Ti3SiC2 for industrial
+            (1600.0, "MAX phase") // Ti3SiC2 for industrial
         } else {
-            (1200.0, "HEA")  // TiVZrNbPd for consumer
+            (1200.0, "HEA") // TiVZrNbPd for consumer
         };
 
         if thermal_profile.t_max > max_temp_limit {
@@ -706,7 +702,9 @@ impl CoupledPhysicsEngine {
 
         // Check lifetime
         let min_lifetime = conditions.target_lifetime_years * 0.5;
-        let actual_lifetime = pulse_thermal.lifetime_years.min(pulse_thermal.fatigue_lifetime_years);
+        let actual_lifetime = pulse_thermal
+            .lifetime_years
+            .min(pulse_thermal.fatigue_lifetime_years);
         if actual_lifetime < min_lifetime {
             feasible = false;
             limiting_factors.push(format!(
@@ -769,7 +767,10 @@ mod tests {
 
         // Industrial should have larger mass
         let consumer_result = engine.simulate(&OperatingConditions::consumer());
-        assert!(result.geometry_shielding.total_mass_kg > consumer_result.geometry_shielding.total_mass_kg);
+        assert!(
+            result.geometry_shielding.total_mass_kg
+                > consumer_result.geometry_shielding.total_mass_kg
+        );
     }
 
     // === New tests for Gamow integration and tritium inventory ===

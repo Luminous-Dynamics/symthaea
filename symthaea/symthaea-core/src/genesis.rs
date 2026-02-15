@@ -170,7 +170,10 @@ mod tests {
     fn test_reproducibility() {
         let a = GenesisSeed::from_phrase("test phrase").hv("a", 1024);
         let b = GenesisSeed::from_phrase("test phrase").hv("a", 1024);
-        assert_eq!(a.values, b.values, "Same phrase+label must produce identical HVs");
+        assert_eq!(
+            a.values, b.values,
+            "Same phrase+label must produce identical HVs"
+        );
     }
 
     #[test]
@@ -212,13 +215,13 @@ mod tests {
         let child_hv = covenant.seed().hv("x", 1024);
 
         // Must be deterministic
-        let child_hv2 = GenesisCovenant::new(
-            &GenesisSeed::from_phrase("parent"),
-            "child",
-        )
-        .seed()
-        .hv("x", 1024);
-        assert_eq!(child_hv.values, child_hv2.values, "Covenant must be deterministic");
+        let child_hv2 = GenesisCovenant::new(&GenesisSeed::from_phrase("parent"), "child")
+            .seed()
+            .hv("x", 1024);
+        assert_eq!(
+            child_hv.values, child_hv2.values,
+            "Covenant must be deterministic"
+        );
 
         // Must differ from parent
         let sim = parent_hv.similarity(&child_hv);

@@ -99,8 +99,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;
 
+use crate::hdc::tiered_phi::{ApproximationTier, TieredPhi};
 use symthaea_core::hdc::binary_hv::BinaryHV;
-use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier};
 
 // =============================================================================
 // PLASMA SENSOR TYPES
@@ -152,32 +152,32 @@ impl PlasmaSensorType {
     /// Get unique seed for deterministic base vector generation
     pub fn seed(&self) -> u64 {
         match self {
-            Self::PlasmaCurrent => 0x504C41534D415F49,      // "PLASMA_I"
-            Self::ElectronDensity => 0x504C41534D415F4E,    // "PLASMA_N"
+            Self::PlasmaCurrent => 0x504C41534D415F49,   // "PLASMA_I"
+            Self::ElectronDensity => 0x504C41534D415F4E, // "PLASMA_N"
             Self::ElectronTemperature => 0x504C41534D415F54, // "PLASMA_T"
-            Self::RadiatedPower => 0x504C41534D415F50,       // "PLASMA_P"
-            Self::LoopVoltage => 0x504C41534D415F56,         // "PLASMA_V"
-            Self::ToroidalField => 0x504C41534D415F42,       // "PLASMA_B"
-            Self::PoloidalField => 0x504C41534D415F70,       // "PLASMA_p"
-            Self::SafetyFactor => 0x504C41534D415F51,        // "PLASMA_Q"
-            Self::StoredEnergy => 0x504C41534D415F57,        // "PLASMA_W"
-            Self::Beta => 0x504C41534D415F62,                // "PLASMA_b"
+            Self::RadiatedPower => 0x504C41534D415F50,   // "PLASMA_P"
+            Self::LoopVoltage => 0x504C41534D415F56,     // "PLASMA_V"
+            Self::ToroidalField => 0x504C41534D415F42,   // "PLASMA_B"
+            Self::PoloidalField => 0x504C41534D415F70,   // "PLASMA_p"
+            Self::SafetyFactor => 0x504C41534D415F51,    // "PLASMA_Q"
+            Self::StoredEnergy => 0x504C41534D415F57,    // "PLASMA_W"
+            Self::Beta => 0x504C41534D415F62,            // "PLASMA_b"
         }
     }
 
     /// Get typical operating range [min, max]
     pub fn typical_range(&self) -> (f64, f64) {
         match self {
-            Self::PlasmaCurrent => (0.5, 2.0),      // MA
-            Self::ElectronDensity => (0.5, 3.0),   // 10^20 m^-3
+            Self::PlasmaCurrent => (0.5, 2.0),        // MA
+            Self::ElectronDensity => (0.5, 3.0),      // 10^20 m^-3
             Self::ElectronTemperature => (1.0, 10.0), // keV
-            Self::RadiatedPower => (0.1, 5.0),     // MW
-            Self::LoopVoltage => (0.5, 3.0),       // V
-            Self::ToroidalField => (2.0, 6.0),     // T
-            Self::PoloidalField => (0.1, 1.0),     // T
-            Self::SafetyFactor => (2.0, 5.0),      // dimensionless
-            Self::StoredEnergy => (0.1, 10.0),     // MJ
-            Self::Beta => (0.5, 5.0),              // %
+            Self::RadiatedPower => (0.1, 5.0),        // MW
+            Self::LoopVoltage => (0.5, 3.0),          // V
+            Self::ToroidalField => (2.0, 6.0),        // T
+            Self::PoloidalField => (0.1, 1.0),        // T
+            Self::SafetyFactor => (2.0, 5.0),         // dimensionless
+            Self::StoredEnergy => (0.1, 10.0),        // MJ
+            Self::Beta => (0.5, 5.0),                 // %
         }
     }
 
@@ -225,7 +225,8 @@ impl PlasmaSensorType {
             Self::SafetyFactor,
             Self::StoredEnergy,
             Self::Beta,
-        ].into_iter()
+        ]
+        .into_iter()
     }
 }
 
@@ -258,7 +259,12 @@ impl PlasmaReading {
     }
 
     /// Create with quality flag
-    pub fn with_quality(sensor: PlasmaSensorType, value: f64, timestamp: f64, quality: f64) -> Self {
+    pub fn with_quality(
+        sensor: PlasmaSensorType,
+        value: f64,
+        timestamp: f64,
+        quality: f64,
+    ) -> Self {
         Self {
             sensor,
             value,
@@ -338,7 +344,19 @@ impl PlasmaState {
         wmhd: f64,
         beta: f64,
     ) -> Self {
-        Self { timestamp, ip, ne, te, prad, vloop, bt, bp, q95, wmhd, beta }
+        Self {
+            timestamp,
+            ip,
+            ne,
+            te,
+            prad,
+            vloop,
+            bt,
+            bp,
+            q95,
+            wmhd,
+            beta,
+        }
     }
 
     /// Convert to vector of readings
@@ -346,7 +364,11 @@ impl PlasmaState {
         vec![
             PlasmaReading::new(PlasmaSensorType::PlasmaCurrent, self.ip, self.timestamp),
             PlasmaReading::new(PlasmaSensorType::ElectronDensity, self.ne, self.timestamp),
-            PlasmaReading::new(PlasmaSensorType::ElectronTemperature, self.te, self.timestamp),
+            PlasmaReading::new(
+                PlasmaSensorType::ElectronTemperature,
+                self.te,
+                self.timestamp,
+            ),
             PlasmaReading::new(PlasmaSensorType::RadiatedPower, self.prad, self.timestamp),
             PlasmaReading::new(PlasmaSensorType::LoopVoltage, self.vloop, self.timestamp),
             PlasmaReading::new(PlasmaSensorType::ToroidalField, self.bt, self.timestamp),
@@ -393,16 +415,16 @@ impl Default for PlasmaState {
     fn default() -> Self {
         Self {
             timestamp: 0.0,
-            ip: 1.0,      // 1 MA
-            ne: 1.5,      // 1.5 x 10^20 m^-3
-            te: 5.0,      // 5 keV
-            prad: 1.0,    // 1 MW
-            vloop: 1.0,   // 1 V
-            bt: 5.0,      // 5 T
-            bp: 0.5,      // 0.5 T
-            q95: 3.5,     // q95 = 3.5
-            wmhd: 2.0,    // 2 MJ
-            beta: 2.0,    // 2%
+            ip: 1.0,    // 1 MA
+            ne: 1.5,    // 1.5 x 10^20 m^-3
+            te: 5.0,    // 5 keV
+            prad: 1.0,  // 1 MW
+            vloop: 1.0, // 1 V
+            bt: 5.0,    // 5 T
+            bp: 0.5,    // 0.5 T
+            q95: 3.5,   // q95 = 3.5
+            wmhd: 2.0,  // 2 MJ
+            beta: 2.0,  // 2%
         }
     }
 }
@@ -463,7 +485,10 @@ pub struct PlasmaHdcEncoder {
 impl PlasmaHdcEncoder {
     /// Create a new plasma encoder with the given seed
     pub fn new(seed: u64) -> Self {
-        Self::with_config(PlasmaEncoderConfig { seed, ..Default::default() })
+        Self::with_config(PlasmaEncoderConfig {
+            seed,
+            ..Default::default()
+        })
     }
 
     /// Create with full configuration
@@ -569,7 +594,7 @@ impl PlasmaHdcEncoder {
                 // Weighted bundle of state and derivatives
                 let weighted = BinaryHV::bundle_safe(&[
                     state_hv,
-                    state_hv,  // 2x weight for state
+                    state_hv, // 2x weight for state
                     derivative_hv,
                 ]);
                 self.prev_state = Some(state.clone());
@@ -614,11 +639,15 @@ impl PlasmaHdcEncoder {
             return BinaryHV::zero();
         }
 
-        let encoded: Vec<BinaryHV> = states.iter().map(|s| {
-            let readings = s.to_readings();
-            let sensor_hvs: Vec<BinaryHV> = readings.iter().map(|r| self.encode_sample(r)).collect();
-            BinaryHV::bundle_safe(&sensor_hvs)
-        }).collect();
+        let encoded: Vec<BinaryHV> = states
+            .iter()
+            .map(|s| {
+                let readings = s.to_readings();
+                let sensor_hvs: Vec<BinaryHV> =
+                    readings.iter().map(|r| self.encode_sample(r)).collect();
+                BinaryHV::bundle_safe(&sensor_hvs)
+            })
+            .collect();
 
         // Temporal weighting: more recent states get more weight
         // Simple approach: repeat recent states
@@ -880,7 +909,11 @@ impl PlasmaPhiMonitor {
         let critical_sensors = state.critical_sensors();
 
         // Calculate confidence based on history and sensor quality
-        let confidence = if self.phi_history.len() >= 10 { 0.9 } else { 0.6 };
+        let confidence = if self.phi_history.len() >= 10 {
+            0.9
+        } else {
+            0.6
+        };
 
         let compute_time_us = start.elapsed().as_micros() as u64;
 
@@ -914,8 +947,12 @@ impl PlasmaPhiMonitor {
             return 0.0;
         }
 
-        let first = recent.last().unwrap();
-        let last = recent.first().unwrap();
+        let first = recent
+            .last()
+            .expect("recent has at least 2 elements (checked above)");
+        let last = recent
+            .first()
+            .expect("recent has at least 2 elements (checked above)");
         let dt = last.0 - first.0;
 
         if dt.abs() < 1e-6 {
@@ -962,18 +999,17 @@ mod tests {
     fn test_encoder_creates_valid_hvs() {
         let encoder = PlasmaHdcEncoder::new(42);
 
-        let reading = PlasmaReading::new(
-            PlasmaSensorType::PlasmaCurrent,
-            1.5,
-            0.0,
-        );
+        let reading = PlasmaReading::new(PlasmaSensorType::PlasmaCurrent, 1.5, 0.0);
 
         let hv = encoder.encode_sample(&reading);
 
         // HV should have approximately 50% density (random-like)
         let density = hv.density();
-        assert!(density > 0.4 && density < 0.6,
-                "Encoded HV should have balanced density, got {}", density);
+        assert!(
+            density > 0.4 && density < 0.6,
+            "Encoded HV should have balanced density, got {}",
+            density
+        );
     }
 
     #[test]
@@ -981,11 +1017,7 @@ mod tests {
         let encoder1 = PlasmaHdcEncoder::new(42);
         let encoder2 = PlasmaHdcEncoder::new(42);
 
-        let reading = PlasmaReading::new(
-            PlasmaSensorType::ElectronTemperature,
-            5.0,
-            1.0,
-        );
+        let reading = PlasmaReading::new(PlasmaSensorType::ElectronTemperature, 5.0, 1.0);
 
         let hv1 = encoder1.encode_sample(&reading);
         let hv2 = encoder2.encode_sample(&reading);
@@ -1005,7 +1037,11 @@ mod tests {
 
         // Different sensors should have low similarity
         let sim = hv_ip.similarity(&hv_ne);
-        assert!(sim < 0.6, "Different sensors should have low similarity, got {}", sim);
+        assert!(
+            sim < 0.6,
+            "Different sensors should have low similarity, got {}",
+            sim
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -1050,7 +1086,11 @@ mod tests {
         let hv2 = encoder.encode_state(&state2);
 
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.7, "Similar states should have high similarity, got {}", sim);
+        assert!(
+            sim > 0.7,
+            "Similar states should have high similarity, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1062,15 +1102,15 @@ mod tests {
         // Disruption-like state
         let disruption_state = PlasmaState {
             timestamp: 5.0,
-            ip: 0.2,      // Very low current
-            ne: 4.5,      // Above density limit
-            te: 0.3,      // Cold plasma
-            prad: 4.0,    // High radiation
-            vloop: 6.0,   // High loop voltage
+            ip: 0.2,    // Very low current
+            ne: 4.5,    // Above density limit
+            te: 0.3,    // Cold plasma
+            prad: 4.0,  // High radiation
+            vloop: 6.0, // High loop voltage
             bt: 5.0,
             bp: 0.1,
-            q95: 1.5,     // Below kink limit
-            wmhd: 0.1,    // Lost stored energy
+            q95: 1.5,  // Below kink limit
+            wmhd: 0.1, // Lost stored energy
             beta: 0.5,
         };
 
@@ -1079,7 +1119,11 @@ mod tests {
         let hv_disruption = encoder.encode_state(&disruption_state);
 
         let sim = hv_stable.similarity(&hv_disruption);
-        assert!(sim < 0.6, "Stable vs disruption states should have lower similarity, got {}", sim);
+        assert!(
+            sim < 0.6,
+            "Stable vs disruption states should have lower similarity, got {}",
+            sim
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -1094,7 +1138,8 @@ mod tests {
         // Stable state
         let stable = PlasmaState::default();
         let stable_readings = stable.to_readings();
-        let stable_hvs: Vec<BinaryHV> = stable_readings.iter()
+        let stable_hvs: Vec<BinaryHV> = stable_readings
+            .iter()
             .map(|r| encoder.encode_sample(r))
             .collect();
         let phi_stable = phi_calc.compute(&stable_hvs);
@@ -1102,30 +1147,37 @@ mod tests {
         // Disruption state with sensors in critical ranges
         let disruption = PlasmaState {
             timestamp: 0.0,
-            ip: 0.2,      // Critical
-            ne: 4.5,      // Critical
-            te: 0.3,      // Critical
-            prad: 0.9,    // Critical (90% radiation)
-            vloop: 6.0,   // Critical
+            ip: 0.2,    // Critical
+            ne: 4.5,    // Critical
+            te: 0.3,    // Critical
+            prad: 0.9,  // Critical (90% radiation)
+            vloop: 6.0, // Critical
             bt: 5.0,
             bp: 0.1,
-            q95: 1.5,     // Critical
+            q95: 1.5, // Critical
             wmhd: 0.1,
-            beta: 4.0,    // Critical
+            beta: 4.0, // Critical
         };
         let disruption_readings = disruption.to_readings();
-        let disruption_hvs: Vec<BinaryHV> = disruption_readings.iter()
+        let disruption_hvs: Vec<BinaryHV> = disruption_readings
+            .iter()
             .map(|r| encoder.encode_sample(r))
             .collect();
         let phi_disruption = phi_calc.compute(&disruption_hvs);
 
         // Phi should generally be different (the exact relationship depends on implementation)
         // The key insight: disruption states have *different* characteristics
-        println!("Phi stable: {}, Phi disruption: {}", phi_stable, phi_disruption);
+        println!(
+            "Phi stable: {}, Phi disruption: {}",
+            phi_stable, phi_disruption
+        );
 
         // Both should produce valid phi values
         assert!(phi_stable >= 0.0, "Stable phi should be non-negative");
-        assert!(phi_disruption >= 0.0, "Disruption phi should be non-negative");
+        assert!(
+            phi_disruption >= 0.0,
+            "Disruption phi should be non-negative"
+        );
     }
 
     #[test]
@@ -1136,14 +1188,14 @@ mod tests {
         // Test critical state detection via sensor thresholds
         let critical_state = PlasmaState {
             timestamp: 0.0,
-            ip: 0.2,      // Below 0.3 threshold
-            ne: 4.5,      // Above 4.0 threshold
-            te: 0.3,      // Below 0.5 threshold
+            ip: 0.2, // Below 0.3 threshold
+            ne: 4.5, // Above 4.0 threshold
+            te: 0.3, // Below 0.5 threshold
             prad: 0.9,
-            vloop: 6.0,   // Above 5.0 threshold
+            vloop: 6.0, // Above 5.0 threshold
             bt: 5.0,
             bp: 0.1,
-            q95: 1.5,     // Below 2.0 threshold
+            q95: 1.5, // Below 2.0 threshold
             wmhd: 0.1,
             beta: 4.0,
         };
@@ -1151,10 +1203,16 @@ mod tests {
         let assessment = monitor.check_stability(&encoder, &critical_state);
 
         // Should detect critical sensors
-        assert!(!assessment.critical_sensors.is_empty(),
-                "Should detect critical sensors");
-        assert!(assessment.critical_sensors.contains(&PlasmaSensorType::PlasmaCurrent));
-        assert!(assessment.critical_sensors.contains(&PlasmaSensorType::SafetyFactor));
+        assert!(
+            !assessment.critical_sensors.is_empty(),
+            "Should detect critical sensors"
+        );
+        assert!(assessment
+            .critical_sensors
+            .contains(&PlasmaSensorType::PlasmaCurrent));
+        assert!(assessment
+            .critical_sensors
+            .contains(&PlasmaSensorType::SafetyFactor));
     }
 
     // -------------------------------------------------------------------------
@@ -1192,8 +1250,12 @@ mod tests {
         println!("Average encoding time: {:.3} ms", avg_time_ms);
         // Budget: 100ms in release (HDC bundling is inherently O(n*dim)), 500ms in debug
         let threshold = if cfg!(debug_assertions) { 500.0 } else { 100.0 };
-        assert!(avg_time_ms < threshold,
-                "Encoding should complete within {}ms budget, got {}ms", threshold, avg_time_ms);
+        assert!(
+            avg_time_ms < threshold,
+            "Encoding should complete within {}ms budget, got {}ms",
+            threshold,
+            avg_time_ms
+        );
     }
 
     #[test]
@@ -1217,9 +1279,17 @@ mod tests {
         println!("Window encoding (50 states): {} us", elapsed_us);
         // Budget: 5s in release (window encoding bundles 50 states * 10 sensors with
         // temporal weighting, which is O(window * sensors * dim)), 20s in debug
-        let threshold_us: u128 = if cfg!(debug_assertions) { 20_000_000 } else { 5_000_000 };
-        assert!(elapsed_us < threshold_us,
-                "Window encoding should be fast, got {}us (threshold: {}us)", elapsed_us, threshold_us);
+        let threshold_us: u128 = if cfg!(debug_assertions) {
+            20_000_000
+        } else {
+            5_000_000
+        };
+        assert!(
+            elapsed_us < threshold_us,
+            "Window encoding should be fast, got {}us (threshold: {}us)",
+            elapsed_us,
+            threshold_us
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -1232,8 +1302,11 @@ mod tests {
 
         for sensor in PlasmaSensorType::all() {
             let base = encoder.base_vector(sensor);
-            assert!(base.density() > 0.4 && base.density() < 0.6,
-                    "Base vector for {:?} should be balanced", sensor);
+            assert!(
+                base.density() > 0.4 && base.density() < 0.6,
+                "Base vector for {:?} should be balanced",
+                sensor
+            );
         }
     }
 
@@ -1253,8 +1326,11 @@ mod tests {
         let normalized = reading.normalized();
 
         // Ip range is [0.5, 2.0], so 1.25 should map to 0.5
-        assert!((normalized - 0.5).abs() < 0.01,
-                "1.25 MA should normalize to 0.5, got {}", normalized);
+        assert!(
+            (normalized - 0.5).abs() < 0.01,
+            "1.25 MA should normalize to 0.5, got {}",
+            normalized
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -1274,8 +1350,11 @@ mod tests {
         }
 
         assert_eq!(buffer.len(), 10, "Buffer should maintain capacity");
-        assert_eq!(buffer.latest().unwrap().timestamp, 19.0,
-                   "Latest should be most recent push");
+        assert_eq!(
+            buffer.latest().unwrap().timestamp,
+            19.0,
+            "Latest should be most recent push"
+        );
     }
 
     #[test]
@@ -1294,8 +1373,11 @@ mod tests {
         // Bundled HVs should have reasonable density (not all zeros or all ones)
         // The exact balance depends on bundling logic, but should be valid
         let density = window_hv.density();
-        assert!(density > 0.1 && density < 0.9,
-                "Window HV should have reasonable density, got {}", density);
+        assert!(
+            density > 0.1 && density < 0.9,
+            "Window HV should have reasonable density, got {}",
+            density
+        );
     }
 
     // -------------------------------------------------------------------------
@@ -1317,10 +1399,16 @@ mod tests {
         }
 
         let stats = monitor.phi_stats();
-        assert!(stats.is_some(), "Should have phi statistics after multiple samples");
+        assert!(
+            stats.is_some(),
+            "Should have phi statistics after multiple samples"
+        );
 
         let (mean, min, max) = stats.unwrap();
-        assert!(mean >= min && mean <= max, "Mean should be between min and max");
+        assert!(
+            mean >= min && mean <= max,
+            "Mean should be between min and max"
+        );
     }
 
     #[test]
@@ -1363,7 +1451,11 @@ mod tests {
 
         // With 10-second time scale, 0.1s and 9.9s are close (wrapping)
         let sim = hv1.similarity(&hv2);
-        assert!(sim > 0.6, "Times near wrap-around should be similar, got {}", sim);
+        assert!(
+            sim > 0.6,
+            "Times near wrap-around should be similar, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -1424,12 +1516,21 @@ mod tests {
         let hv3 = encoder.encode_state(&state3);
 
         // HVs should all be valid (with reasonable density)
-        assert!(hv1.density() > 0.1 && hv1.density() < 0.9,
-                "State 1 HV should have reasonable density, got {}", hv1.density());
-        assert!(hv2.density() > 0.1 && hv2.density() < 0.9,
-                "State 2 HV should have reasonable density, got {}", hv2.density());
-        assert!(hv3.density() > 0.1 && hv3.density() < 0.9,
-                "State 3 HV should have reasonable density, got {}", hv3.density());
+        assert!(
+            hv1.density() > 0.1 && hv1.density() < 0.9,
+            "State 1 HV should have reasonable density, got {}",
+            hv1.density()
+        );
+        assert!(
+            hv2.density() > 0.1 && hv2.density() < 0.9,
+            "State 2 HV should have reasonable density, got {}",
+            hv2.density()
+        );
+        assert!(
+            hv3.density() > 0.1 && hv3.density() < 0.9,
+            "State 3 HV should have reasonable density, got {}",
+            hv3.density()
+        );
 
         // First state and subsequent states should differ due to derivative contribution
         // (the exact relationship depends on encoding details)

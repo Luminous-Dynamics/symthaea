@@ -63,7 +63,7 @@ use std::collections::VecDeque;
 use std::time::Instant;
 
 use super::autopoietic_consciousness::{AutopoieticConsciousness, LifeState};
-use super::enactive_cognition::{EnactiveCognition, EnactiveState, ActionType, MeaningCategory};
+use super::enactive_cognition::{ActionType, EnactiveCognition, EnactiveState, MeaningCategory};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VITALITY DYNAMICS - The core of living cognition
@@ -167,19 +167,13 @@ pub struct DeepContinuity {
 }
 
 impl DeepContinuity {
-    pub fn compute(
-        life_mind: f64,
-        affect_cog: f64,
-        pred_action: f64,
-        embodiment: f64,
-    ) -> Self {
+    pub fn compute(life_mind: f64, affect_cog: f64, pred_action: f64, embodiment: f64) -> Self {
         // Weighted geometric mean - multiplicative because all aspects must be present
-        let continuity_index = (
-            life_mind.powf(0.3) *
-            affect_cog.powf(0.25) *
-            pred_action.powf(0.25) *
-            embodiment.powf(0.2)
-        ).powf(1.0);
+        let continuity_index = (life_mind.powf(0.3)
+            * affect_cog.powf(0.25)
+            * pred_action.powf(0.25)
+            * embodiment.powf(0.2))
+        .powf(1.0);
 
         Self {
             life_mind_coupling: life_mind,
@@ -217,7 +211,7 @@ pub struct PrimordialAffectivity {
     pub mood: MoodState,
 
     /// Affective history for temporal integration
-    history: VecDeque<(f64, f64, f64)>,  // (valence, arousal, dominance)
+    history: VecDeque<(f64, f64, f64)>, // (valence, arousal, dominance)
 }
 
 /// Background mood states
@@ -257,15 +251,16 @@ impl PrimordialAffectivity {
     pub fn update(&mut self, valence_delta: f64, arousal_delta: f64, dominance_delta: f64) {
         // Smooth update with momentum
         let momentum = 0.8;
-        self.valence = (self.valence * momentum + valence_delta * (1.0 - momentum))
-            .clamp(-1.0, 1.0);
-        self.arousal = (self.arousal * momentum + (0.5 + arousal_delta) * (1.0 - momentum))
-            .clamp(0.0, 1.0);
+        self.valence =
+            (self.valence * momentum + valence_delta * (1.0 - momentum)).clamp(-1.0, 1.0);
+        self.arousal =
+            (self.arousal * momentum + (0.5 + arousal_delta) * (1.0 - momentum)).clamp(0.0, 1.0);
         self.dominance = (self.dominance * momentum + (0.5 + dominance_delta) * (1.0 - momentum))
             .clamp(0.0, 1.0);
 
         // Record history
-        self.history.push_back((self.valence, self.arousal, self.dominance));
+        self.history
+            .push_back((self.valence, self.arousal, self.dominance));
         while self.history.len() > 100 {
             self.history.pop_front();
         }
@@ -520,10 +515,12 @@ impl UnifiedLivingMind {
         let valence_delta = self.compute_valence_from_state(autopoietic_index, &life_state);
         let arousal_delta = self.compute_arousal_from_state(enactive_state.engagement, free_energy);
         let dominance_delta = self.compute_dominance_from_state(autopoietic_index);
-        self.affectivity.update(valence_delta, arousal_delta, dominance_delta);
+        self.affectivity
+            .update(valence_delta, arousal_delta, dominance_delta);
 
         // Compute unified state
-        self.state.vitality = self.compute_vitality(autopoietic_index, &life_state, &enactive_state);
+        self.state.vitality =
+            self.compute_vitality(autopoietic_index, &life_state, &enactive_state);
         self.state.coherence = self.continuity.continuity_index;
         self.state.adaptiveness = autopoietic.health_score();
         self.state.groundedness = embodiment;
@@ -565,7 +562,11 @@ impl UnifiedLivingMind {
     }
 
     /// Compute prediction-action integration
-    fn compute_prediction_action_integration(&self, free_energy: f64, enactive: &EnactiveState) -> f64 {
+    fn compute_prediction_action_integration(
+        &self,
+        free_energy: f64,
+        enactive: &EnactiveState,
+    ) -> f64 {
         // Low free energy + high engagement = good integration
         let prediction_quality = 1.0 - free_energy.min(1.0);
         let action_quality = enactive.engagement;
@@ -619,17 +620,14 @@ impl UnifiedLivingMind {
             LifeState::Dead => 0.0,
         };
 
-        (
-            autopoietic_index * self.config.autopoiesis_weight +
-            enactive.engagement * self.config.enaction_weight +
-            self.affectivity.arousal * self.config.affect_weight +
-            life_contribution * self.config.prediction_weight
-        ) / (
-            self.config.autopoiesis_weight +
-            self.config.enaction_weight +
-            self.config.affect_weight +
-            self.config.prediction_weight
-        )
+        (autopoietic_index * self.config.autopoiesis_weight
+            + enactive.engagement * self.config.enaction_weight
+            + self.affectivity.arousal * self.config.affect_weight
+            + life_contribution * self.config.prediction_weight)
+            / (self.config.autopoiesis_weight
+                + self.config.enaction_weight
+                + self.config.affect_weight
+                + self.config.prediction_weight)
     }
 
     /// Compute meaning richness
@@ -694,7 +692,8 @@ impl UnifiedLivingMind {
         // Running averages
         let n = self.stats.total_updates as f64;
         self.stats.avg_vitality = (self.stats.avg_vitality * (n - 1.0) + self.state.vitality) / n;
-        self.stats.avg_coherence = (self.stats.avg_coherence * (n - 1.0) + self.state.coherence) / n;
+        self.stats.avg_coherence =
+            (self.stats.avg_coherence * (n - 1.0) + self.state.coherence) / n;
     }
 
     /// Get current state

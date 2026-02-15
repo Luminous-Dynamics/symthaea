@@ -105,9 +105,12 @@ pub use zkproof_bridge::ZKProofFLBridge;
 
 // Types that don't require prover features
 pub use zkproof_bridge::{
-    ProvenGradientUpdate, VerifiedAggregationMethod, VerifiedAggregationResult, ZKFLError,
-    ZKFLStats,
+    VerifiedAggregationMethod, VerifiedAggregationResult, ZKFLError, ZKFLStats,
 };
+
+// ProvenGradientUpdate contains GradientProofReceipt, so requires feature gate
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+pub use zkproof_bridge::ProvenGradientUpdate;
 
 // RB-BFT integration for 34% validated Byzantine tolerance
 pub use rbbft_bridge::{

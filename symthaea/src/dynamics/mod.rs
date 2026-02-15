@@ -16,19 +16,19 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 pub mod cfc;
+pub mod cfc_coherence;
 pub mod cfc_gpu;
 pub mod hierarchical_cfc;
-pub mod cfc_coherence;
 pub mod temporal_signatures;
 pub mod world_model;
 
 // Sparse LTC, differentiable HDC, resonator networks, concept crystallization
 // (Ported from crates/symthaea-dynamics 2026-02-06)
-pub mod ltc;
-pub mod differentiable_hdc;
-pub mod resonator;
 pub mod crate_world_model;
 pub mod crystallization;
+pub mod differentiable_hdc;
+pub mod ltc;
+pub mod resonator;
 
 // CfC/LTC stability analysis: Jacobian, Lyapunov exponents, bifurcations
 pub mod stability_analysis;
@@ -53,6 +53,12 @@ pub mod wavelet;
 // Phase-Amplitude Coupling: cross-frequency neural coupling analysis
 // (Modulation Index, Mean Vector Length, comodulogram)
 pub mod phase_amplitude_coupling;
+
+// Narrative arc dynamics using HierarchicalCfC
+pub mod narrative_dynamics;
+
+// Multi-scene story session (wraps algebra + dynamics)
+pub mod story_session;
 
 // Code understanding dynamics (Consciousness-Aware Code)
 #[cfg(feature = "code_generation")]
@@ -165,7 +171,8 @@ impl CrystalizedConcept {
 
     /// Add an association to another concept
     pub fn add_association(&mut self, other_id: u64, strength: f32) {
-        self.associations.insert(other_id, strength.clamp(-1.0, 1.0));
+        self.associations
+            .insert(other_id, strength.clamp(-1.0, 1.0));
     }
 
     /// Get association strength with another concept
@@ -185,7 +192,9 @@ impl CrystalizedConcept {
             return 0.0;
         }
 
-        let dot: f32 = self.embedding.iter()
+        let dot: f32 = self
+            .embedding
+            .iter()
             .zip(other.embedding.iter())
             .map(|(a, b)| a * b)
             .sum();
@@ -245,57 +254,260 @@ pub enum DynamicsError {
 
 // Re-export key types
 pub use cfc::{
-    CfCNetwork, CfCCell, CfCConfig, CfCNetworkConfig,
-    OnlineLearningConfig, OnlineLearningStats, NetworkOnlineLearningStats,
-    // Phi-gated attention
-    PhiGatedConfig, compute_phi_attention_weights,
+    compute_phi_attention_weights,
     // Activation types
     ActivationType,
+    CfCCell,
+    CfCConfig,
+    CfCNetwork,
+    CfCNetworkConfig,
+    NetworkOnlineLearningStats,
+    OnlineLearningConfig,
+    OnlineLearningStats,
+    // Phi-gated attention
+    PhiGatedConfig,
 };
 pub use cfc_coherence::{
-    CfCCoherenceBridge, CoherenceConfig, TemporalCoherenceMetrics, CoherenceSummary
+    CfCCoherenceBridge, CoherenceConfig, CoherenceSummary, TemporalCoherenceMetrics,
+};
+pub use cfc_gpu::{GpuBackend, GpuCfcConfig, GpuCfcNetwork, GpuCfcStats};
+pub use hierarchical_cfc::{
+    HierarchicalCfC, HierarchicalCfCConfig, HierarchicalOutput, DEFAULT_TIME_CONSTANTS,
 };
 pub use temporal_signatures::{
-    TemporalSignatureEncoder, SignatureConfig, ConsciousnessPattern,
-    TrajectoryFeatures, TemporalStateSummary
+    ConsciousnessPattern, SignatureConfig, TemporalSignatureEncoder, TemporalStateSummary,
+    TrajectoryFeatures,
 };
 pub use world_model::{HierarchicalCfCWorldModel, WorldModelConfig, WorldModelLayer};
-pub use hierarchical_cfc::{
-    HierarchicalCfC, HierarchicalCfCConfig, HierarchicalOutput,
-    DEFAULT_TIME_CONSTANTS
-};
-pub use cfc_gpu::{GpuCfcNetwork, GpuCfcConfig, GpuCfcStats, GpuBackend};
 
 // Ported from crates/symthaea-dynamics (2026-02-06)
-pub use ltc::{LiquidNetwork, LiquidNetworkConfig, CsrMatrix, IntegrationMethod};
-pub use differentiable_hdc::{DifferentiableHDCEncoder, DifferentiableHDCConfig, HDCEncoder};
-pub use resonator::{ResonatorNetwork, ResonatorConfig, ResonatorMemory, Codebook, Episode};
 pub use crystallization::{
-    ConceptCrystallizer, CrystallizationConfig,
-    CrystalizedConcept as AttractorConcept,  // Alias to avoid conflict with existing CrystalizedConcept
-    RecurrenceAnalyzer, UnifiedLearningMind, StepResult,
+    ConceptCrystallizer,
+    CrystalizedConcept as AttractorConcept, // Alias to avoid conflict with existing CrystalizedConcept
+    CrystallizationConfig,
+    RecurrenceAnalyzer,
+    StepResult,
+    UnifiedLearningMind,
 };
+pub use differentiable_hdc::{DifferentiableHDCConfig, DifferentiableHDCEncoder, HDCEncoder};
+pub use ltc::{CsrMatrix, IntegrationMethod, LiquidNetwork, LiquidNetworkConfig};
+pub use resonator::{Codebook, Episode, ResonatorConfig, ResonatorMemory, ResonatorNetwork};
 
 // Stability analysis for CfC/LTC dynamics
 pub use stability_analysis::{
-    StabilityAnalyzer, StabilityConfig, JacobianResult, LyapunovResult,
-    FixedPoint, FixedPointType, BifurcationPoint, BifurcationType,
+    BifurcationPoint, BifurcationType, FixedPoint, FixedPointType, JacobianResult, LyapunovResult,
+    StabilityAnalyzer, StabilityConfig,
 };
 
 // ODE solvers for continuous-time neural dynamics
-pub use ode_solvers::{
-    OdeSolver, OdeConfig, OdeResult, OdeSolverEngine, OdeSystem, newton_solve,
-};
+pub use ode_solvers::{newton_solve, OdeConfig, OdeResult, OdeSolver, OdeSolverEngine, OdeSystem};
 
 // Frequency-domain spectral analysis
 pub use spectral_analysis::{
-    SpectralAnalyzer, SpectralConfig, WindowType, Complex,
-    FrequencySpectrum, CoherenceResult, BandPower,
+    BandPower, CoherenceResult, Complex, FrequencySpectrum, SpectralAnalyzer, SpectralConfig,
+    WindowType,
 };
 
 // Stochastic differential equations
 pub use stochastic_dynamics::{
-    SdeSystem, SdeConfig, SdeSolver, SdeResult, SdeStatistics,
-    OrnsteinUhlenbeck, StochasticCfC, FokkerPlanckSolver, LangevinDynamics,
-    SimpleRng,
+    FokkerPlanckSolver, LangevinDynamics, OrnsteinUhlenbeck, SdeConfig, SdeResult, SdeSolver,
+    SdeStatistics, SdeSystem, SimpleRng, StochasticCfC,
 };
+
+// Narrative arc dynamics
+pub use narrative_dynamics::{NarrativeSignal, StoryArcConfig, StoryArcDynamics};
+pub use story_session::{ConflictEntry, SceneRecord, StorySession, StoryState};
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Construction tests ──────────────────────────────────────────
+
+    #[test]
+    fn construct_dimension_mismatch() {
+        let err = DynamicsError::DimensionMismatch {
+            expected: 128,
+            actual: 64,
+        };
+        // Verify the structured fields are accessible via Debug
+        let debug = format!("{:?}", err);
+        assert!(debug.contains("128"));
+        assert!(debug.contains("64"));
+    }
+
+    #[test]
+    fn construct_invalid_config() {
+        let err = DynamicsError::InvalidConfig("tau must be positive".into());
+        let debug = format!("{:?}", err);
+        assert!(debug.contains("InvalidConfig"));
+    }
+
+    #[test]
+    fn construct_computation_error() {
+        let err = DynamicsError::ComputationError("matrix singular".into());
+        let debug = format!("{:?}", err);
+        assert!(debug.contains("ComputationError"));
+    }
+
+    #[test]
+    fn construct_not_initialized() {
+        let err = DynamicsError::NotInitialized;
+        let debug = format!("{:?}", err);
+        assert!(debug.contains("NotInitialized"));
+    }
+
+    // ── Display formatting tests ────────────────────────────────────
+
+    #[test]
+    fn display_dimension_mismatch_contains_values() {
+        let err = DynamicsError::DimensionMismatch {
+            expected: 256,
+            actual: 32,
+        };
+        let msg = err.to_string();
+        assert!(!msg.is_empty());
+        assert!(
+            msg.contains("256"),
+            "display should include expected dimension"
+        );
+        assert!(
+            msg.contains("32"),
+            "display should include actual dimension"
+        );
+        assert!(
+            msg.contains("mismatch") || msg.contains("Mismatch"),
+            "display should mention mismatch"
+        );
+    }
+
+    #[test]
+    fn display_invalid_config_includes_inner_message() {
+        let inner = "hidden_size must be > 0";
+        let err = DynamicsError::InvalidConfig(inner.to_string());
+        let msg = err.to_string();
+        assert!(!msg.is_empty());
+        assert!(
+            msg.contains(inner),
+            "display should include the inner message"
+        );
+    }
+
+    #[test]
+    fn display_computation_error_includes_inner_message() {
+        let inner = "NaN detected in activation";
+        let err = DynamicsError::ComputationError(inner.to_string());
+        let msg = err.to_string();
+        assert!(!msg.is_empty());
+        assert!(
+            msg.contains(inner),
+            "display should include the inner message"
+        );
+    }
+
+    #[test]
+    fn display_not_initialized_is_nonempty() {
+        let err = DynamicsError::NotInitialized;
+        let msg = err.to_string();
+        assert!(!msg.is_empty(), "NotInitialized display must not be empty");
+    }
+
+    // ── std::error::Error trait tests ───────────────────────────────
+
+    #[test]
+    fn all_variants_implement_std_error() {
+        // Verify each variant can be treated as &dyn std::error::Error
+        let errors: Vec<Box<dyn std::error::Error>> = vec![
+            Box::new(DynamicsError::DimensionMismatch {
+                expected: 10,
+                actual: 5,
+            }),
+            Box::new(DynamicsError::InvalidConfig("bad".into())),
+            Box::new(DynamicsError::ComputationError("fail".into())),
+            Box::new(DynamicsError::NotInitialized),
+        ];
+        for err in &errors {
+            // std::error::Error::to_string delegates to Display
+            assert!(!err.to_string().is_empty());
+        }
+    }
+
+    // ── DynamicsResult alias test ───────────────────────────────────
+
+    #[test]
+    fn dynamics_result_ok() {
+        let res: DynamicsResult<i32> = Ok(42);
+        assert_eq!(res.unwrap(), 42);
+    }
+
+    #[test]
+    fn dynamics_result_err() {
+        let res: DynamicsResult<i32> = Err(DynamicsError::NotInitialized);
+        assert!(res.is_err());
+    }
+
+    // ── Edge-case: empty strings ────────────────────────────────────
+
+    #[test]
+    fn invalid_config_with_empty_string() {
+        let err = DynamicsError::InvalidConfig(String::new());
+        // Display should still produce something (the prefix at minimum)
+        let msg = err.to_string();
+        assert!(
+            !msg.is_empty(),
+            "even with empty inner, display has a prefix"
+        );
+    }
+
+    #[test]
+    fn computation_error_with_empty_string() {
+        let err = DynamicsError::ComputationError(String::new());
+        let msg = err.to_string();
+        assert!(
+            !msg.is_empty(),
+            "even with empty inner, display has a prefix"
+        );
+    }
+
+    // ── Dimension mismatch with equal values ────────────────────────
+
+    #[test]
+    fn dimension_mismatch_same_values_still_formats() {
+        // Pathological but constructible: expected == actual
+        let err = DynamicsError::DimensionMismatch {
+            expected: 0,
+            actual: 0,
+        };
+        let msg = err.to_string();
+        assert!(!msg.is_empty());
+    }
+
+    // ── Debug vs Display are distinct ───────────────────────────────
+
+    #[test]
+    fn debug_and_display_differ_for_structured_variant() {
+        let err = DynamicsError::DimensionMismatch {
+            expected: 100,
+            actual: 50,
+        };
+        let debug = format!("{:?}", err);
+        let display = format!("{}", err);
+        // Debug includes variant name with struct syntax; Display is human-readable
+        assert_ne!(
+            debug, display,
+            "Debug and Display should produce different output"
+        );
+    }
+
+    #[test]
+    fn debug_and_display_differ_for_unit_variant() {
+        let err = DynamicsError::NotInitialized;
+        let debug = format!("{:?}", err);
+        let display = format!("{}", err);
+        // Debug is "NotInitialized", Display is "Not initialized"
+        assert_ne!(
+            debug, display,
+            "Debug and Display should produce different output"
+        );
+    }
+}

@@ -191,7 +191,7 @@ export interface PledgeCollateralInput {
 // Property-Specific Types
 // ============================================================================
 
-/** Asset type categories */
+/** Asset type categories (legacy mock — see types.ts for Holochain-aligned AssetType) */
 export type AssetType = 'real_estate' | 'equipment' | 'digital' | 'vehicle' | 'commons' | 'intellectual';
 
 /** Ownership model */

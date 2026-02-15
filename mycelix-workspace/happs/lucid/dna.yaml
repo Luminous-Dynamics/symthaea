@@ -1,0 +1,57 @@
+---
+manifest_version: "0"
+name: lucid
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: lucid_integrity
+      path: ./target/wasm32-unknown-unknown/release/lucid_integrity.wasm
+    - name: sources_integrity
+      path: ./target/wasm32-unknown-unknown/release/sources_integrity.wasm
+    - name: temporal_integrity
+      path: ./target/wasm32-unknown-unknown/release/temporal_integrity.wasm
+    - name: temporal_consciousness_integrity
+      path: ./target/wasm32-unknown-unknown/release/temporal_consciousness_integrity.wasm
+    - name: privacy_integrity
+      path: ./target/wasm32-unknown-unknown/release/privacy_integrity.wasm
+    - name: reasoning_integrity
+      path: ./target/wasm32-unknown-unknown/release/reasoning_integrity.wasm
+    - name: bridge_integrity
+      path: ./target/wasm32-unknown-unknown/release/bridge_integrity.wasm
+    - name: collective_integrity
+      path: ./target/wasm32-unknown-unknown/release/collective_integrity.wasm
+coordinator:
+  zomes:
+    - name: lucid
+      path: ./target/wasm32-unknown-unknown/release/lucid.wasm
+      dependencies:
+        - name: lucid_integrity
+    - name: sources
+      path: ./target/wasm32-unknown-unknown/release/sources.wasm
+      dependencies:
+        - name: sources_integrity
+    - name: temporal
+      path: ./target/wasm32-unknown-unknown/release/temporal.wasm
+      dependencies:
+        - name: temporal_integrity
+    - name: temporal_consciousness
+      path: ./target/wasm32-unknown-unknown/release/temporal_consciousness.wasm
+      dependencies:
+        - name: temporal_consciousness_integrity
+    - name: privacy
+      path: ./target/wasm32-unknown-unknown/release/privacy.wasm
+      dependencies:
+        - name: privacy_integrity
+    - name: reasoning
+      path: ./target/wasm32-unknown-unknown/release/reasoning.wasm
+      dependencies:
+        - name: reasoning_integrity
+    - name: bridge
+      path: ./target/wasm32-unknown-unknown/release/bridge.wasm
+      dependencies:
+        - name: bridge_integrity
+    - name: collective
+      path: ./target/wasm32-unknown-unknown/release/collective.wasm
+      dependencies:
+        - name: collective_integrity

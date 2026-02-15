@@ -71,9 +71,9 @@
 //! └─────────────────────────────────────────────────────────────────────────────────┘
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;
-use serde::{Serialize, Deserialize};
 
 // ============================================================================
 // CONFIGURATION
@@ -163,9 +163,16 @@ impl Default for ComponentWeights {
 impl ComponentWeights {
     /// Get total weight sum for normalization
     pub fn total(&self) -> f64 {
-        self.phi + self.broadcast + self.working_memory + self.attention +
-        self.recurrence + self.embodiment + self.knowledge +
-        self.embodiment_factor + self.narrative + self.social
+        self.phi
+            + self.broadcast
+            + self.working_memory
+            + self.attention
+            + self.recurrence
+            + self.embodiment
+            + self.knowledge
+            + self.embodiment_factor
+            + self.narrative
+            + self.social
     }
 
     /// Normalize weights to sum to 1.0
@@ -217,7 +224,7 @@ pub struct EmbodimentFactor {
 struct PredictionRecord {
     predicted: f64,
     actual: f64,
-    #[allow(dead_code)]  // Stored for potential temporal analysis
+    #[allow(dead_code)] // Stored for potential temporal analysis
     timestamp: Instant,
 }
 
@@ -246,8 +253,7 @@ impl EmbodimentFactor {
 
         // Update EMA
         self.sensorimotor_accuracy =
-            self.sensorimotor_accuracy * (1.0 - self.smoothing) +
-            accuracy * self.smoothing;
+            self.sensorimotor_accuracy * (1.0 - self.smoothing) + accuracy * self.smoothing;
 
         // Store record
         if self.prediction_history.len() >= self.max_history {
@@ -264,8 +270,7 @@ impl EmbodimentFactor {
     pub fn update_interoceptive(&mut self, expected_state: f64, actual_state: f64) {
         let coherence = 1.0 - (expected_state - actual_state).abs().min(1.0);
         self.interoceptive_coherence =
-            self.interoceptive_coherence * (1.0 - self.smoothing) +
-            coherence * self.smoothing;
+            self.interoceptive_coherence * (1.0 - self.smoothing) + coherence * self.smoothing;
     }
 
     /// Compute the embodiment factor M
@@ -289,18 +294,24 @@ impl EmbodimentFactor {
             return 0.0;
         }
 
-        let recent: f64 = self.prediction_history.iter()
+        let recent: f64 = self
+            .prediction_history
+            .iter()
             .rev()
             .take(5)
             .map(|r| 1.0 - (r.predicted - r.actual).abs().min(1.0))
-            .sum::<f64>() / 5.0;
+            .sum::<f64>()
+            / 5.0;
 
-        let older: f64 = self.prediction_history.iter()
+        let older: f64 = self
+            .prediction_history
+            .iter()
             .rev()
             .skip(5)
             .take(5)
             .map(|r| 1.0 - (r.predicted - r.actual).abs().min(1.0))
-            .sum::<f64>() / 5.0;
+            .sum::<f64>()
+            / 5.0;
 
         recent - older
     }
@@ -324,10 +335,12 @@ impl EmbodimentFactor {
     ) {
         // Compute multi-dimensional prediction accuracy
         let dim = predicted_sensory.len().min(actual_sensory.len()).max(1);
-        let mse: f64 = predicted_sensory.iter()
+        let mse: f64 = predicted_sensory
+            .iter()
             .zip(actual_sensory.iter())
             .map(|(p, a)| (p - a).powi(2))
-            .sum::<f64>() / dim as f64;
+            .sum::<f64>()
+            / dim as f64;
         let accuracy = 1.0 - mse.sqrt().min(1.0);
 
         // Include proprioceptive feedback if available
@@ -339,9 +352,8 @@ impl EmbodimentFactor {
         };
 
         // Update EMA with weighted accuracy
-        self.sensorimotor_accuracy =
-            self.sensorimotor_accuracy * (1.0 - self.smoothing) +
-            combined_accuracy * self.smoothing;
+        self.sensorimotor_accuracy = self.sensorimotor_accuracy * (1.0 - self.smoothing)
+            + combined_accuracy * self.smoothing;
 
         // Store record (use motor command as predicted, accuracy as actual for trend analysis)
         if self.prediction_history.len() >= self.max_history {
@@ -402,22 +414,32 @@ impl EmbodimentFactor {
         actual_states: &InteroceptiveState,
     ) {
         // Compute coherence for each system
-        let cardiac_coherence = 1.0 - (expected_states.cardiac - actual_states.cardiac).abs().min(1.0);
-        let respiratory_coherence = 1.0 - (expected_states.respiratory - actual_states.respiratory).abs().min(1.0);
-        let autonomic_coherence = 1.0 - (expected_states.autonomic - actual_states.autonomic).abs().min(1.0);
-        let metabolic_coherence = 1.0 - (expected_states.metabolic - actual_states.metabolic).abs().min(1.0);
+        let cardiac_coherence = 1.0
+            - (expected_states.cardiac - actual_states.cardiac)
+                .abs()
+                .min(1.0);
+        let respiratory_coherence = 1.0
+            - (expected_states.respiratory - actual_states.respiratory)
+                .abs()
+                .min(1.0);
+        let autonomic_coherence = 1.0
+            - (expected_states.autonomic - actual_states.autonomic)
+                .abs()
+                .min(1.0);
+        let metabolic_coherence = 1.0
+            - (expected_states.metabolic - actual_states.metabolic)
+                .abs()
+                .min(1.0);
 
         // Weighted average (cardiac and autonomic weighted higher)
-        let combined_coherence =
-            cardiac_coherence * 0.3 +
-            autonomic_coherence * 0.3 +
-            respiratory_coherence * 0.2 +
-            metabolic_coherence * 0.2;
+        let combined_coherence = cardiac_coherence * 0.3
+            + autonomic_coherence * 0.3
+            + respiratory_coherence * 0.2
+            + metabolic_coherence * 0.2;
 
         // Update with smoothing
-        self.interoceptive_coherence =
-            self.interoceptive_coherence * (1.0 - self.smoothing) +
-            combined_coherence * self.smoothing;
+        self.interoceptive_coherence = self.interoceptive_coherence * (1.0 - self.smoothing)
+            + combined_coherence * self.smoothing;
     }
 
     /// Compute allostatic prediction error
@@ -431,16 +453,16 @@ impl EmbodimentFactor {
         }
 
         // Variance in recent predictions indicates prediction instability
-        let recent: Vec<f64> = self.prediction_history.iter()
+        let recent: Vec<f64> = self
+            .prediction_history
+            .iter()
             .rev()
             .take(10)
             .map(|r| (r.predicted - r.actual).abs())
             .collect();
 
         let mean = recent.iter().sum::<f64>() / recent.len() as f64;
-        let variance = recent.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / recent.len() as f64;
+        let variance = recent.iter().map(|x| (x - mean).powi(2)).sum::<f64>() / recent.len() as f64;
 
         // Lower variance = better allostatic prediction
         1.0 - variance.sqrt().min(1.0)
@@ -487,7 +509,12 @@ impl InteroceptiveState {
     /// Create from a single value (uniform across systems)
     pub fn uniform(value: f64) -> Self {
         let v = value.clamp(0.0, 1.0);
-        Self { cardiac: v, respiratory: v, autonomic: v, metabolic: v }
+        Self {
+            cardiac: v,
+            respiratory: v,
+            autonomic: v,
+            metabolic: v,
+        }
     }
 }
 
@@ -592,7 +619,9 @@ impl NarrativeCoherence {
         let integration = self.compute_episode_integration(&content);
 
         // Find causal links to recent episodes
-        let causal_links: Vec<usize> = self.episodes.iter()
+        let causal_links: Vec<usize> = self
+            .episodes
+            .iter()
             .rev()
             .take(5)
             .enumerate()
@@ -620,7 +649,13 @@ impl NarrativeCoherence {
     }
 
     /// Add a future scenario being simulated
-    pub fn add_future_scenario(&mut self, description: String, horizon_steps: usize, probability: f64, desirability: f64) {
+    pub fn add_future_scenario(
+        &mut self,
+        description: String,
+        horizon_steps: usize,
+        probability: f64,
+        desirability: f64,
+    ) {
         self.future_scenarios.push(FutureScenario {
             description,
             horizon_steps,
@@ -644,16 +679,15 @@ impl NarrativeCoherence {
         }
 
         // Heuristic: integration based on temporal proximity and narrative continuity
-        let recent_count = self.episodes.iter()
-            .rev()
-            .take(10)
-            .count();
+        let recent_count = self.episodes.iter().rev().take(10).count();
 
         // More recent episodes = better integration potential
         let recency_factor = recent_count as f64 / 10.0;
 
         // Causal density (episodes with links)
-        let linked_count = self.episodes.iter()
+        let linked_count = self
+            .episodes
+            .iter()
             .filter(|ep| !ep.causal_links.is_empty())
             .count();
         let causal_density = linked_count as f64 / self.episodes.len().max(1) as f64;
@@ -667,13 +701,16 @@ impl NarrativeCoherence {
             return;
         }
 
-        let avg_integration = self.episodes.iter()
+        let avg_integration = self
+            .episodes
+            .iter()
             .map(|ep| ep.integration_score)
-            .sum::<f64>() / self.episodes.len() as f64;
+            .sum::<f64>()
+            / self.episodes.len() as f64;
 
-        self.autobiographical_integration =
-            self.autobiographical_integration * (1.0 - self.smoothing) +
-            avg_integration * self.smoothing;
+        self.autobiographical_integration = self.autobiographical_integration
+            * (1.0 - self.smoothing)
+            + avg_integration * self.smoothing;
     }
 
     /// Update future simulation depth
@@ -684,7 +721,9 @@ impl NarrativeCoherence {
         }
 
         // Depth based on longest horizon and number of scenarios
-        let max_horizon = self.future_scenarios.iter()
+        let max_horizon = self
+            .future_scenarios
+            .iter()
             .map(|s| s.horizon_steps)
             .max()
             .unwrap_or(1);
@@ -747,11 +786,14 @@ impl NarrativeCoherence {
         let thematic_coherence = self.compute_thematic_coherence(&theme_tags);
 
         // Combined integration score
-        let integration = semantic_integration * 0.5 + thematic_coherence * 0.3 +
-            self.compute_episode_integration(&content) * 0.2;
+        let integration = semantic_integration * 0.5
+            + thematic_coherence * 0.3
+            + self.compute_episode_integration(&content) * 0.2;
 
         // Find causal links based on both valence and temporal proximity
-        let causal_links: Vec<usize> = self.episodes.iter()
+        let causal_links: Vec<usize> = self
+            .episodes
+            .iter()
             .rev()
             .take(10)
             .enumerate()
@@ -784,14 +826,14 @@ impl NarrativeCoherence {
             return 0.5;
         }
 
-        let avg_content_length = self.episodes.iter()
+        let avg_content_length = self
+            .episodes
+            .iter()
             .map(|ep| ep.content.len())
-            .sum::<usize>() as f64 / self.episodes.len() as f64;
+            .sum::<usize>() as f64
+            / self.episodes.len() as f64;
 
-        let embedding_magnitude: f64 = embedding.iter()
-            .map(|x| x.powi(2))
-            .sum::<f64>()
-            .sqrt();
+        let embedding_magnitude: f64 = embedding.iter().map(|x| x.powi(2)).sum::<f64>().sqrt();
 
         let semantic_density = (embedding_magnitude / (embedding.len() as f64).sqrt()).min(1.0);
         let content_coherence = (avg_content_length / 100.0).min(1.0);
@@ -820,14 +862,14 @@ impl NarrativeCoherence {
 
         let valences: Vec<f64> = self.episodes.iter().map(|ep| ep.valence).collect();
         let mean_valence = valences.iter().sum::<f64>() / valences.len() as f64;
-        let variance = valences.iter()
+        let variance = valences
+            .iter()
             .map(|v| (v - mean_valence).powi(2))
-            .sum::<f64>() / valences.len() as f64;
+            .sum::<f64>()
+            / valences.len() as f64;
 
         let variance_factor = 1.0 - (variance - 0.25).abs() * 2.0;
-        let total_links: usize = self.episodes.iter()
-            .map(|ep| ep.causal_links.len())
-            .sum();
+        let total_links: usize = self.episodes.iter().map(|ep| ep.causal_links.len()).sum();
         let link_density = (total_links as f64 / self.episodes.len() as f64).min(1.0);
 
         variance_factor.max(0.0) * 0.5 + link_density * 0.5
@@ -835,7 +877,9 @@ impl NarrativeCoherence {
 
     /// Get the most salient episodes (highest integration + recency)
     pub fn salient_episodes(&self, top_k: usize) -> Vec<&NarrativeEpisode> {
-        let mut scored: Vec<_> = self.episodes.iter()
+        let mut scored: Vec<_> = self
+            .episodes
+            .iter()
             .enumerate()
             .map(|(i, ep)| {
                 let recency = i as f64 / self.episodes.len().max(1) as f64;
@@ -859,8 +903,11 @@ impl NarrativeCoherence {
         horizon_steps: usize,
         branches: Vec<SimulationBranch>,
     ) {
-        let best_branch = branches.iter()
-            .max_by(|a, b| a.probability.partial_cmp(&b.probability).unwrap_or(std::cmp::Ordering::Equal));
+        let best_branch = branches.iter().max_by(|a, b| {
+            a.probability
+                .partial_cmp(&b.probability)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         if let Some(branch) = best_branch {
             self.future_scenarios.push(FutureScenario {
@@ -883,9 +930,15 @@ impl NarrativeCoherence {
         }
 
         while self.future_scenarios.len() > 15 {
-            if let Some(min_idx) = self.future_scenarios.iter()
+            if let Some(min_idx) = self
+                .future_scenarios
+                .iter()
                 .enumerate()
-                .min_by(|a, b| a.1.probability.partial_cmp(&b.1.probability).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|a, b| {
+                    a.1.probability
+                        .partial_cmp(&b.1.probability)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i)
             {
                 self.future_scenarios.remove(min_idx);
@@ -901,23 +954,33 @@ impl NarrativeCoherence {
             return 0.3;
         }
 
-        let avg_horizon = self.future_scenarios.iter()
+        let avg_horizon = self
+            .future_scenarios
+            .iter()
             .map(|s| s.horizon_steps)
-            .sum::<usize>() as f64 / self.future_scenarios.len() as f64;
+            .sum::<usize>() as f64
+            / self.future_scenarios.len() as f64;
         let specificity = 1.0 - (avg_horizon / 20.0).min(1.0);
 
-        let desirabilities: Vec<f64> = self.future_scenarios.iter()
+        let desirabilities: Vec<f64> = self
+            .future_scenarios
+            .iter()
             .map(|s| s.desirability)
             .collect();
         let mean_des = desirabilities.iter().sum::<f64>() / desirabilities.len() as f64;
-        let des_variance = desirabilities.iter()
+        let des_variance = desirabilities
+            .iter()
             .map(|d| (d - mean_des).powi(2))
-            .sum::<f64>() / desirabilities.len() as f64;
+            .sum::<f64>()
+            / desirabilities.len() as f64;
         let action_orientation = des_variance.sqrt().min(1.0);
 
-        let avg_prob = self.future_scenarios.iter()
+        let avg_prob = self
+            .future_scenarios
+            .iter()
             .map(|s| s.probability)
-            .sum::<f64>() / self.future_scenarios.len() as f64;
+            .sum::<f64>()
+            / self.future_scenarios.len() as f64;
         let realism = 1.0 - (avg_prob - 0.5).abs() * 2.0;
 
         specificity * 0.3 + action_orientation * 0.3 + realism.max(0.0) * 0.4
@@ -928,7 +991,9 @@ impl NarrativeCoherence {
         let past_depth = if self.episodes.is_empty() {
             0.0
         } else {
-            let link_depth = self.episodes.iter()
+            let link_depth = self
+                .episodes
+                .iter()
                 .map(|ep| ep.causal_links.len())
                 .max()
                 .unwrap_or(0);
@@ -938,7 +1003,9 @@ impl NarrativeCoherence {
         let future_depth = if self.future_scenarios.is_empty() {
             0.0
         } else {
-            let max_horizon = self.future_scenarios.iter()
+            let max_horizon = self
+                .future_scenarios
+                .iter()
                 .map(|s| s.horizon_steps)
                 .max()
                 .unwrap_or(0);
@@ -1102,7 +1169,7 @@ struct ToMPrediction {
     /// What actually happened
     actual_state: Option<f64>,
     /// Timestamp
-    #[allow(dead_code)]  // Stored for potential temporal analysis
+    #[allow(dead_code)] // Stored for potential temporal analysis
     timestamp: Instant,
 }
 
@@ -1126,7 +1193,14 @@ impl SocialEmbedding {
     }
 
     /// Update or create model of another agent
-    pub fn update_agent_model(&mut self, id: &str, beliefs: Vec<String>, goals: Vec<String>, emotional_state: f64, confidence: f64) {
+    pub fn update_agent_model(
+        &mut self,
+        id: &str,
+        beliefs: Vec<String>,
+        goals: Vec<String>,
+        emotional_state: f64,
+        confidence: f64,
+    ) {
         // Check if agent exists
         if let Some(agent) = self.agent_models.iter_mut().find(|a| a.id == id) {
             agent.beliefs = beliefs;
@@ -1138,7 +1212,8 @@ impl SocialEmbedding {
             // Create new model
             if self.agent_models.len() >= self.max_agents {
                 // Remove oldest
-                self.agent_models.sort_by(|a, b| b.last_update.cmp(&a.last_update));
+                self.agent_models
+                    .sort_by(|a, b| b.last_update.cmp(&a.last_update));
                 self.agent_models.pop();
             }
 
@@ -1181,9 +1256,9 @@ impl SocialEmbedding {
                 let error = (pred.predicted_state - actual_state).abs();
                 let accuracy = 1.0 - error.min(1.0);
 
-                self.other_modeling_accuracy =
-                    self.other_modeling_accuracy * (1.0 - self.smoothing) +
-                    accuracy * self.smoothing;
+                self.other_modeling_accuracy = self.other_modeling_accuracy
+                    * (1.0 - self.smoothing)
+                    + accuracy * self.smoothing;
 
                 break;
             }
@@ -1191,7 +1266,12 @@ impl SocialEmbedding {
     }
 
     /// Update self-model
-    pub fn update_self_model(&mut self, goals: Vec<String>, beliefs: Vec<String>, emotional_state: f64) {
+    pub fn update_self_model(
+        &mut self,
+        goals: Vec<String>,
+        beliefs: Vec<String>,
+        emotional_state: f64,
+    ) {
         self.self_model.goals = goals;
         self.self_model.beliefs = beliefs;
         self.self_model.emotional_state = emotional_state;
@@ -1227,14 +1307,15 @@ impl SocialEmbedding {
             // Check goal overlap
             let self_goals: std::collections::HashSet<_> = self.self_model.goals.iter().collect();
             let other_goals: std::collections::HashSet<_> = agent.goals.iter().collect();
-            let goal_overlap = self_goals.intersection(&other_goals).count() as f64 /
-                self_goals.len().max(1) as f64;
+            let goal_overlap = self_goals.intersection(&other_goals).count() as f64
+                / self_goals.len().max(1) as f64;
 
             // Check belief overlap
-            let self_beliefs: std::collections::HashSet<_> = self.self_model.beliefs.iter().collect();
+            let self_beliefs: std::collections::HashSet<_> =
+                self.self_model.beliefs.iter().collect();
             let other_beliefs: std::collections::HashSet<_> = agent.beliefs.iter().collect();
-            let belief_overlap = self_beliefs.intersection(&other_beliefs).count() as f64 /
-                self_beliefs.len().max(1) as f64;
+            let belief_overlap = self_beliefs.intersection(&other_beliefs).count() as f64
+                / self_beliefs.len().max(1) as f64;
 
             // Distinction is inverse of overlap
             let distinction = 1.0 - (goal_overlap * 0.5 + belief_overlap * 0.5);
@@ -1384,7 +1465,7 @@ impl Default for GatingFactors {
 #[derive(Debug, Clone)]
 struct ConsciousnessSnapshot {
     level: f64,
-    #[allow(dead_code)]  // Stored for potential temporal analysis
+    #[allow(dead_code)] // Stored for potential temporal analysis
     timestamp: Instant,
 }
 
@@ -1455,11 +1536,8 @@ impl MasterConsciousnessEquation {
 
         // Step 5: Final consciousness level with new factors
         // C(t) = σ(softmin) × weighted_sum × S × ρ(t) × M × N × Soc
-        let consciousness_level = sigmoid_bottleneck *
-            weighted_sum *
-            inputs.synchrony *
-            temporal_stability *
-            m * n * soc;
+        let consciousness_level =
+            sigmoid_bottleneck * weighted_sum * inputs.synchrony * temporal_stability * m * n * soc;
 
         // Clamp to [0, 1]
         let consciousness_level = consciousness_level.clamp(0.0, 1.0);
@@ -1522,17 +1600,16 @@ impl MasterConsciousnessEquation {
         let w = &self.config.component_weights;
         let g = &self.gating_factors;
 
-        let numerator =
-            w.phi * inputs.phi * g.phi +
-            w.broadcast * inputs.broadcast * g.broadcast +
-            w.working_memory * inputs.working_memory * g.working_memory +
-            w.attention * inputs.attention * g.attention +
-            w.recurrence * inputs.recurrence * g.recurrence +
-            w.embodiment * inputs.embodiment * g.embodiment +
-            w.knowledge * inputs.knowledge * g.knowledge +
-            w.embodiment_factor * m * g.embodiment_factor +
-            w.narrative * n * g.narrative +
-            w.social * soc * g.social;
+        let numerator = w.phi * inputs.phi * g.phi
+            + w.broadcast * inputs.broadcast * g.broadcast
+            + w.working_memory * inputs.working_memory * g.working_memory
+            + w.attention * inputs.attention * g.attention
+            + w.recurrence * inputs.recurrence * g.recurrence
+            + w.embodiment * inputs.embodiment * g.embodiment
+            + w.knowledge * inputs.knowledge * g.knowledge
+            + w.embodiment_factor * m * g.embodiment_factor
+            + w.narrative * n * g.narrative
+            + w.social * soc * g.social;
 
         let denominator = w.total();
 
@@ -1550,16 +1627,16 @@ impl MasterConsciousnessEquation {
         }
 
         // Compute variance of recent consciousness levels
-        let values: Vec<f64> = self.history.iter()
+        let values: Vec<f64> = self
+            .history
+            .iter()
             .rev()
             .take(20)
             .map(|s| s.level)
             .collect();
 
         let mean = values.iter().sum::<f64>() / values.len() as f64;
-        let variance = values.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f64>() / values.len() as f64;
+        let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
 
         // Lower variance = higher stability
         // Map variance [0, 0.25] to stability [1.0, 0.5]
@@ -1613,18 +1690,24 @@ impl MasterConsciousnessEquation {
             return 0.0;
         }
 
-        let recent: f64 = self.history.iter()
+        let recent: f64 = self
+            .history
+            .iter()
             .rev()
             .take(5)
             .map(|s| s.level)
-            .sum::<f64>() / 5.0;
+            .sum::<f64>()
+            / 5.0;
 
-        let older: f64 = self.history.iter()
+        let older: f64 = self
+            .history
+            .iter()
             .rev()
             .skip(5)
             .take(5)
             .map(|s| s.level)
-            .sum::<f64>() / 5.0;
+            .sum::<f64>()
+            / 5.0;
 
         recent - older
     }
@@ -1711,11 +1794,11 @@ mod tests {
         let mut ef = EmbodimentFactor::new();
 
         // Record some predictions
-        ef.record_prediction(0.5, 0.5);  // Perfect prediction
-        ef.record_prediction(0.5, 0.6);  // Small error
-        ef.record_prediction(0.5, 0.4);  // Small error
+        ef.record_prediction(0.5, 0.5); // Perfect prediction
+        ef.record_prediction(0.5, 0.6); // Small error
+        ef.record_prediction(0.5, 0.4); // Small error
 
-        ef.update_interoceptive(0.7, 0.8);  // Good coherence
+        ef.update_interoceptive(0.7, 0.8); // Good coherence
 
         let m = ef.compute();
         assert!(m > 0.0 && m <= 1.0);
@@ -1800,7 +1883,7 @@ mod tests {
             phi: 0.8,
             broadcast: 0.8,
             working_memory: 0.8,
-            attention: 0.1,  // Bottleneck
+            attention: 0.1, // Bottleneck
             recurrence: 0.8,
             embodiment: 0.8,
             knowledge: 0.8,
@@ -1874,8 +1957,12 @@ mod tests {
         equation.embodiment_factor.record_prediction(0.5, 0.5);
         equation.embodiment_factor.update_interoceptive(0.6, 0.6);
 
-        equation.narrative_coherence.add_episode("test".to_string(), 0.5);
-        equation.narrative_coherence.add_future_scenario("future".to_string(), 3, 0.7, 0.8);
+        equation
+            .narrative_coherence
+            .add_episode("test".to_string(), 0.5);
+        equation
+            .narrative_coherence
+            .add_future_scenario("future".to_string(), 3, 0.7, 0.8);
 
         equation.social_embedding.update_self_model(
             vec!["goal".to_string()],
@@ -2002,10 +2089,10 @@ mod tests {
 
         // Record multi-dimensional predictions
         ef.record_sensorimotor_prediction_extended(
-            0.5, // motor command
-            &[0.5, 0.6, 0.4], // predicted sensory
+            0.5,                // motor command
+            &[0.5, 0.6, 0.4],   // predicted sensory
             &[0.5, 0.55, 0.45], // actual sensory (close to predicted)
-            Some(0.9), // good proprioceptive feedback
+            Some(0.9),          // good proprioceptive feedback
         );
 
         let m = ef.compute();

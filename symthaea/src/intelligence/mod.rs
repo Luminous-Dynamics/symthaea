@@ -11,28 +11,25 @@
 //! - H8: Multivariate DAG discovery (PC algorithm with KCIT)
 
 pub mod adaptive;
-pub mod error_explain;
-pub mod conflict;
 pub mod autofix;
-pub mod causal_discovery;
 pub mod causal_consciousness;
-pub mod nixos_causal;
+pub mod causal_discovery;
+pub mod conflict;
+pub mod error_explain;
 pub mod multivariate_causal;
+pub mod nixos_causal;
 
-pub use adaptive::{AdaptiveCompleter, UserPattern, PatternStore};
-pub use error_explain::{SemanticErrorExplainer, ErrorExplanation, ErrorCategory};
-pub use conflict::{ConflictDetector, Conflict, ConflictSeverity};
+pub use adaptive::{AdaptiveCompleter, PatternStore, UserPattern};
 pub use autofix::{AutoFixer, Fix, FixSuggestion};
-pub use causal_discovery::{CausalDiscoveryEngine, CausalDirection, MetaFeatures};
 pub use causal_consciousness::{
-    CausalConsciousness, CausalAttention, CausalLTCBridge,
-    HSICTest, LiveLearningRouter, CausalAnalysisResult,
-    ThresholdTuner, RandomThresholdSearch, GridSearchResult,
+    CausalAnalysisResult, CausalAttention, CausalConsciousness, CausalLTCBridge, GridSearchResult,
+    HSICTest, LiveLearningRouter, RandomThresholdSearch, ThresholdTuner,
 };
+pub use causal_discovery::{CausalDirection, CausalDiscoveryEngine, MetaFeatures};
+pub use conflict::{Conflict, ConflictDetector, ConflictSeverity};
+pub use error_explain::{ErrorCategory, ErrorExplanation, SemanticErrorExplainer};
+pub use multivariate_causal::{CausalDAG, DirectedEdge, PCAlgorithm, Variable};
 pub use nixos_causal::{
-    NixOSCausalAnalyzer, RootCauseAnalysis, RootCause,
-    SideEffectPrediction, CausalEdge, NixOSCausalPatterns,
-};
-pub use multivariate_causal::{
-    PCAlgorithm, CausalDAG, Variable, DirectedEdge,
+    CausalEdge, NixOSCausalAnalyzer, NixOSCausalPatterns, RootCause, RootCauseAnalysis,
+    SideEffectPrediction,
 };

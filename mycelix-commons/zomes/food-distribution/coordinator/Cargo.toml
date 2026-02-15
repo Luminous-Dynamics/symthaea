@@ -1,0 +1,15 @@
+[package]
+name = "food_distribution"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "food_distribution"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+food_distribution_integrity = { path = "../integrity" }

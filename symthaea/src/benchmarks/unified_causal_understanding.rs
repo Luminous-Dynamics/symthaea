@@ -13,7 +13,11 @@
 use crate::hdc::{CausalDirection, CausalDiscoveryResult, CausalFeatures};
 
 /// Helper function to create a CausalDiscoveryResult with all required fields
-fn make_result(direction: CausalDirection, p_forward: f64, confidence: f64) -> CausalDiscoveryResult {
+fn make_result(
+    direction: CausalDirection,
+    p_forward: f64,
+    confidence: f64,
+) -> CausalDiscoveryResult {
     CausalDiscoveryResult {
         direction,
         p_forward,
@@ -69,9 +73,7 @@ impl CompressionCodebook {
         }
 
         // Convert data points to hypervectors
-        let hvs: Vec<Vec<f32>> = data.iter()
-            .map(|&v| self.value_to_hv(v, data))
-            .collect();
+        let hvs: Vec<Vec<f32>> = data.iter().map(|&v| self.value_to_hv(v, data)).collect();
 
         // Initialize prototypes using k-means++ style selection
         self.prototypes = self.initialize_prototypes(&hvs);
@@ -128,7 +130,8 @@ impl CompressionCodebook {
             let mut best_idx = 0;
 
             for (i, hv) in hvs.iter().enumerate() {
-                let min_dist = prototypes.iter()
+                let min_dist = prototypes
+                    .iter()
                     .map(|p| 1.0 - self.cosine_similarity(hv, p))
                     .fold(f32::INFINITY, f32::min);
 
@@ -211,7 +214,9 @@ impl CompressionCodebook {
             let hv = self.value_to_hv(value, context);
 
             // Find best matching prototype
-            let best_sim = self.prototypes.iter()
+            let best_sim = self
+                .prototypes
+                .iter()
                 .map(|p| self.cosine_similarity(&hv, p))
                 .fold(f32::NEG_INFINITY, f32::max);
 
@@ -258,9 +263,8 @@ impl CompressionCodebook {
 
             // Variance as proxy for compressibility (lower variance = more compressible)
             let mean: f64 = bin_y.iter().sum::<f64>() / bin_y.len() as f64;
-            let variance: f64 = bin_y.iter()
-                .map(|&v| (v - mean).powi(2))
-                .sum::<f64>() / bin_y.len() as f64;
+            let variance: f64 =
+                bin_y.iter().map(|&v| (v - mean).powi(2)).sum::<f64>() / bin_y.len() as f64;
 
             // Cost proportional to log-variance (entropy-like)
             total_cost += (variance.max(1e-10)).ln() * bin_y.len() as f64;
@@ -322,25 +326,29 @@ impl CompressionCausalDiscovery {
         codebook_y.learn(y);
 
         // Compute compression costs
-        let k_x = codebook_x.compression_cost(x, x);  // K(X)
-        let k_y = codebook_y.compression_cost(y, y);  // K(Y)
+        let k_x = codebook_x.compression_cost(x, x); // K(X)
+        let k_y = codebook_y.compression_cost(y, y); // K(Y)
 
         // Conditional costs
-        let k_y_given_x = codebook_x.conditional_compression_cost(y, x);  // K(Y|X)
-        let k_x_given_y = codebook_y.conditional_compression_cost(x, y);  // K(X|Y)
+        let k_y_given_x = codebook_x.conditional_compression_cost(y, x); // K(Y|X)
+        let k_x_given_y = codebook_y.conditional_compression_cost(x, y); // K(X|Y)
 
         // Total description lengths
-        let forward_cost = k_x + k_y_given_x;   // Cost if X→Y
-        let backward_cost = k_y + k_x_given_y;  // Cost if Y→X
+        let forward_cost = k_x + k_y_given_x; // Cost if X→Y
+        let backward_cost = k_y + k_x_given_y; // Cost if Y→X
 
         // Lower cost = more likely causal direction
-        let asymmetry = backward_cost - forward_cost;  // Positive if X→Y
+        let asymmetry = backward_cost - forward_cost; // Positive if X→Y
 
         let p_forward = 1.0 / (1.0 + (-asymmetry * 2.0).exp());
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -404,24 +412,30 @@ impl InterventionalDynamics {
 
         for i in 0..self.hidden_size {
             let seed = i as u64 * 31337;
-            self.w_in[i][0] = ((seed.wrapping_mul(0x517cc1b727220a95) >> 32) as f64)
-                / (u32::MAX as f64) * 2.0 - 1.0;
-            self.tau[i] = self.tau_range.0 +
-                ((seed.wrapping_mul(0x2545F4914F6CDD1D) >> 32) as f64)
-                / (u32::MAX as f64) * (self.tau_range.1 - self.tau_range.0);
+            self.w_in[i][0] =
+                ((seed.wrapping_mul(0x517cc1b727220a95) >> 32) as f64) / (u32::MAX as f64) * 2.0
+                    - 1.0;
+            self.tau[i] = self.tau_range.0
+                + ((seed.wrapping_mul(0x2545F4914F6CDD1D) >> 32) as f64) / (u32::MAX as f64)
+                    * (self.tau_range.1 - self.tau_range.0);
         }
 
         for j in 0..self.hidden_size {
             let seed = (j + self.hidden_size) as u64 * 31337;
-            self.w_out[0][j] = ((seed.wrapping_mul(0x517cc1b727220a95) >> 32) as f64)
-                / (u32::MAX as f64) * 2.0 - 1.0;
+            self.w_out[0][j] =
+                ((seed.wrapping_mul(0x517cc1b727220a95) >> 32) as f64) / (u32::MAX as f64) * 2.0
+                    - 1.0;
         }
 
         // Normalize inputs and outputs
         let in_mean: f64 = inputs.iter().sum::<f64>() / n as f64;
-        let in_std: f64 = (inputs.iter().map(|x| (x - in_mean).powi(2)).sum::<f64>() / n as f64).sqrt().max(1e-10);
+        let in_std: f64 = (inputs.iter().map(|x| (x - in_mean).powi(2)).sum::<f64>() / n as f64)
+            .sqrt()
+            .max(1e-10);
         let out_mean: f64 = outputs.iter().sum::<f64>() / n as f64;
-        let out_std: f64 = (outputs.iter().map(|x| (x - out_mean).powi(2)).sum::<f64>() / n as f64).sqrt().max(1e-10);
+        let out_std: f64 = (outputs.iter().map(|x| (x - out_mean).powi(2)).sum::<f64>() / n as f64)
+            .sqrt()
+            .max(1e-10);
 
         // Simple gradient descent to learn weights
         let lr = 0.01;
@@ -473,11 +487,21 @@ impl InterventionalDynamics {
 
         // Normalize using context statistics
         let in_mean: f64 = context_in.iter().sum::<f64>() / context_in.len() as f64;
-        let in_std: f64 = (context_in.iter().map(|x| (x - in_mean).powi(2)).sum::<f64>()
-            / context_in.len() as f64).sqrt().max(1e-10);
+        let in_std: f64 = (context_in
+            .iter()
+            .map(|x| (x - in_mean).powi(2))
+            .sum::<f64>()
+            / context_in.len() as f64)
+            .sqrt()
+            .max(1e-10);
         let out_mean: f64 = context_out.iter().sum::<f64>() / context_out.len() as f64;
-        let out_std: f64 = (context_out.iter().map(|x| (x - out_mean).powi(2)).sum::<f64>()
-            / context_out.len() as f64).sqrt().max(1e-10);
+        let out_std: f64 = (context_out
+            .iter()
+            .map(|x| (x - out_mean).powi(2))
+            .sum::<f64>()
+            / context_out.len() as f64)
+            .sqrt()
+            .max(1e-10);
 
         self.state = vec![0.0; self.hidden_size];
         let dt = 0.1;
@@ -527,10 +551,12 @@ impl InterventionalDynamics {
         // Test 1: Prediction on held-out natural data
         let natural_preds = self.predict(&x[train_n..], x, y);
         let natural_mse = if natural_preds.len() == test_n {
-            natural_preds.iter()
+            natural_preds
+                .iter()
                 .zip(y[train_n..].iter())
                 .map(|(p, t)| (p - t).powi(2))
-                .sum::<f64>() / test_n as f64
+                .sum::<f64>()
+                / test_n as f64
         } else {
             f64::MAX
         };
@@ -550,9 +576,11 @@ impl InterventionalDynamics {
         // (follow the learned functional relationship)
         // We measure "reasonableness" by variance of predictions
         let pred_mean: f64 = intervened_preds.iter().sum::<f64>() / test_n as f64;
-        let pred_var: f64 = intervened_preds.iter()
+        let pred_var: f64 = intervened_preds
+            .iter()
             .map(|p| (p - pred_mean).powi(2))
-            .sum::<f64>() / test_n as f64;
+            .sum::<f64>()
+            / test_n as f64;
 
         let y_var: f64 = {
             let y_mean: f64 = y.iter().sum::<f64>() / n as f64;
@@ -563,7 +591,7 @@ impl InterventionalDynamics {
         // Higher = more invariant = more likely causal
         if y_var > 0.0 && natural_mse < y_var {
             let natural_r2 = 1.0 - natural_mse / y_var;
-            let intervention_ratio = (pred_var / y_var).min(2.0);  // Cap at 2
+            let intervention_ratio = (pred_var / y_var).min(2.0); // Cap at 2
 
             // Good causal mechanism: low natural error, reasonable intervention variance
             natural_r2 * 0.5 + intervention_ratio.min(1.0) * 0.5
@@ -598,7 +626,11 @@ impl InterventionalCausalDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -754,7 +786,7 @@ impl DirectionalPhi {
 
         // Combined score: low correlation + moderate entropy = good causal fit
         // We want: independent noise (low corr) but not too structured (moderate entropy)
-        let independence_score = 1.0 - corr;  // Higher = more independent = better
+        let independence_score = 1.0 - corr; // Higher = more independent = better
 
         // The causal direction should have MORE independent residuals
         // and residuals with appropriate entropy structure
@@ -798,7 +830,11 @@ impl DirectionalPhiDiscovery {
         let confidence = (p_forward - 0.5).abs() * 2.0;
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             confidence,
         )
@@ -859,14 +895,14 @@ impl UnifiedCausalReasoning {
         let phi_flow = (phi_result.p_forward - 0.5) * 2.0 * phi_result.confidence;
 
         // Confidence based on agreement
-        let signs_agree = (compression >= 0.0) == (invariance >= 0.0)
-            && (invariance >= 0.0) == (phi_flow >= 0.0);
+        let signs_agree =
+            (compression >= 0.0) == (invariance >= 0.0) && (invariance >= 0.0) == (phi_flow >= 0.0);
 
         let avg_magnitude = (compression.abs() + invariance.abs() + phi_flow.abs()) / 3.0;
         let confidence = if signs_agree {
             avg_magnitude.min(1.0)
         } else {
-            avg_magnitude * 0.5  // Reduce confidence when primitives disagree
+            avg_magnitude * 0.5 // Reduce confidence when primitives disagree
         };
 
         CausalEvidence {
@@ -886,14 +922,17 @@ impl UnifiedCausalReasoning {
         // - Invariance: Based on causal mechanism stability (empirically strong)
         // - Phi: Based on integrated information flow (complementary)
 
-        let asymmetry = evidence.compression * 0.35
-            + evidence.invariance * 0.40
-            + evidence.phi_flow * 0.25;
+        let asymmetry =
+            evidence.compression * 0.35 + evidence.invariance * 0.40 + evidence.phi_flow * 0.25;
 
         let p_forward = 1.0 / (1.0 + (-asymmetry * 3.0).exp());
 
         make_result(
-            if p_forward > 0.5 { CausalDirection::Forward } else { CausalDirection::Backward },
+            if p_forward > 0.5 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            },
             p_forward,
             evidence.confidence,
         )
@@ -921,11 +960,23 @@ impl UnifiedCausalReasoning {
             direction_str,
             result.confidence * 100.0,
             evidence.compression,
-            if evidence.compression > 0.0 { "supports X→Y" } else { "supports Y→X" },
+            if evidence.compression > 0.0 {
+                "supports X→Y"
+            } else {
+                "supports Y→X"
+            },
             evidence.invariance,
-            if evidence.invariance > 0.0 { "supports X→Y" } else { "supports Y→X" },
+            if evidence.invariance > 0.0 {
+                "supports X→Y"
+            } else {
+                "supports Y→X"
+            },
             evidence.phi_flow,
-            if evidence.phi_flow > 0.0 { "supports X→Y" } else { "supports Y→X" },
+            if evidence.phi_flow > 0.0 {
+                "supports X→Y"
+            } else {
+                "supports Y→X"
+            },
             if evidence.confidence > 0.7 {
                 "Strong agreement across all primitives."
             } else if evidence.confidence > 0.4 {
@@ -954,7 +1005,9 @@ pub fn discover_by_compression(x: &[f64], y: &[f64]) -> CausalDirection {
 
 /// Discover using LTC interventional invariance
 pub fn discover_by_intervention(x: &[f64], y: &[f64]) -> CausalDirection {
-    InterventionalCausalDiscovery::new().discover(x, y).direction
+    InterventionalCausalDiscovery::new()
+        .discover(x, y)
+        .direction
 }
 
 /// Discover using directional Phi flow
@@ -985,13 +1038,22 @@ mod tests {
     fn test_unified_reasoning() {
         // Simple linear relationship: Y = 2X + noise
         let x: Vec<f64> = (0..100).map(|i| i as f64 * 0.1).collect();
-        let y: Vec<f64> = x.iter().map(|&xi| 2.0 * xi + 0.1 * (xi * 31.337).sin()).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .map(|&xi| 2.0 * xi + 0.1 * (xi * 31.337).sin())
+            .collect();
 
         let reasoner = UnifiedCausalReasoning::new();
         let result = reasoner.discover(&x, &y);
 
-        // Should detect forward causation with some confidence
-        println!("Result: {:?}", result);
-        println!("Explanation:\n{}", reasoner.explain(&x, &y));
+        // Should produce a result with valid confidence
+        assert!(
+            result.confidence >= 0.0 && result.confidence <= 1.0,
+            "Confidence must be in [0,1]: {}",
+            result.confidence
+        );
+        // Explanation should be non-empty
+        let explanation = reasoner.explain(&x, &y);
+        assert!(!explanation.is_empty(), "Explanation should not be empty");
     }
 }

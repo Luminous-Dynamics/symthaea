@@ -10,7 +10,7 @@
 //! - **Uncertain**: Low confidence — generate skeleton with questions
 //! - **Unknown**: Cannot generate — explain what we'd need to know
 
-use super::code_generator::{CodeGenerator, GeneratedCode, CodeContext};
+use super::code_generator::{CodeContext, CodeGenerator, GeneratedCode};
 use super::code_intent::{CodeIntent, CodeIntentClassifier};
 use crate::mind::structured_thought::EpistemicStatus;
 
@@ -53,7 +53,9 @@ impl EpistemicCode {
         match self {
             EpistemicCode::Confident(_) => Vec::new(),
             EpistemicCode::Probable(_, notes) => notes.iter().map(|s| s.as_str()).collect(),
-            EpistemicCode::NeedsInput(_, questions) => questions.iter().map(|s| s.as_str()).collect(),
+            EpistemicCode::NeedsInput(_, questions) => {
+                questions.iter().map(|s| s.as_str()).collect()
+            }
             EpistemicCode::CannotGenerate(reason) => vec![reason.as_str()],
         }
     }
@@ -98,7 +100,8 @@ impl EpistemicCodeGenerator {
 
                 // Add TODO markers to source
                 if !uncertainties.is_empty() {
-                    let markers: String = uncertainties.iter()
+                    let markers: String = uncertainties
+                        .iter()
                         .map(|u| format!("// TODO: Verify — {}", u))
                         .collect::<Vec<_>>()
                         .join("\n");
@@ -126,7 +129,8 @@ impl EpistemicCodeGenerator {
         match intent {
             CodeIntent::Create { spec, .. } => {
                 if spec.signature.is_none() {
-                    uncertainties.push("No type signature specified — using best guess".to_string());
+                    uncertainties
+                        .push("No type signature specified — using best guess".to_string());
                 }
                 if spec.examples.is_empty() {
                     uncertainties.push("No examples provided — verify correctness".to_string());
@@ -137,7 +141,8 @@ impl EpistemicCodeGenerator {
             }
             CodeIntent::Modify { changes, .. } => {
                 if changes.len() > 3 {
-                    uncertainties.push("Multiple simultaneous changes — verify interactions".to_string());
+                    uncertainties
+                        .push("Multiple simultaneous changes — verify interactions".to_string());
                 }
             }
             CodeIntent::Refactor { .. } => {
@@ -200,9 +205,7 @@ impl EpistemicCodeGenerator {
                     target.name
                 )
             }
-            _ => {
-                "Insufficient information to proceed. Please provide more context.".to_string()
-            }
+            _ => "Insufficient information to proceed. Please provide more context.".to_string(),
         }
     }
 }

@@ -6,11 +6,11 @@
 //! - Click detection using Teager-Kaiser energy
 //! - Hierarchical grammar to prevent saturation
 
-use symthaea_stt::temporal_grammar::{TemporalGrammar, TemporalEvent, DomainConfig, Sparsity};
-use symthaea_stt::audio::AudioFrontend;
-use std::path::Path;
 use std::collections::HashMap;
 use std::f32::consts::PI;
+use std::path::Path;
+use symthaea_stt::audio::AudioFrontend;
+use symthaea_stt::temporal_grammar::{DomainConfig, Sparsity, TemporalEvent, TemporalGrammar};
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -86,10 +86,12 @@ fn extract_features(samples: &[f32], sample_rate: f32, prev_centroid: f32) -> Ce
     let freq_resolution = sample_rate / n_fft as f32;
     let total_energy: f32 = spectrum.iter().sum();
     let centroid = if total_energy > 1e-10 {
-        spectrum.iter()
+        spectrum
+            .iter()
             .enumerate()
             .map(|(k, &mag)| k as f32 * freq_resolution * mag)
-            .sum::<f32>() / total_energy
+            .sum::<f32>()
+            / total_energy
     } else {
         0.0
     };
@@ -130,7 +132,7 @@ fn classify_frame(features: &CetaceanFeatures) -> (&'static str, usize) {
     let silence_thresh = 0.01;
     let click_tk_thresh = 0.15;
     let whistle_harm_thresh = 0.4;
-    let fm_up_thresh = 500.0;    // Hz/s
+    let fm_up_thresh = 500.0; // Hz/s
     let fm_down_thresh = -500.0; // Hz/s
 
     if features.energy < silence_thresh {
@@ -217,7 +219,8 @@ fn extract_events_v2(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<
                     }
 
                     if event_type != "silence" {
-                        current_event = Some((event_type.to_string(), class_id, time, features.energy));
+                        current_event =
+                            Some((event_type.to_string(), class_id, time, features.energy));
                     } else {
                         current_event = None;
                     }
@@ -252,11 +255,19 @@ fn extract_events_v2(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<
 /// Create enhanced cetacean domain config
 fn enhanced_cetacean_config() -> DomainConfig {
     let calls = vec![
-        "click_loud", "click_soft",           // 0, 1
-        "whistle_up", "whistle_down", "whistle_flat", // 2, 3, 4
-        "burst_rapid", "burst_slow",          // 5, 6
-        "moan", "silence",                    // 7, 8
-    ].into_iter().map(String::from).collect();
+        "click_loud",
+        "click_soft", // 0, 1
+        "whistle_up",
+        "whistle_down",
+        "whistle_flat", // 2, 3, 4
+        "burst_rapid",
+        "burst_slow", // 5, 6
+        "moan",
+        "silence", // 7, 8
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
 
     DomainConfig {
         name: "cetacean_v2".to_string(),
@@ -286,7 +297,12 @@ fn main() -> std::io::Result<()> {
 
     let whale_files: Vec<_> = std::fs::read_dir(whale_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "wav").unwrap_or(false))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext == "wav")
+                .unwrap_or(false)
+        })
         .collect();
 
     if whale_files.is_empty() {
@@ -326,7 +342,11 @@ fn main() -> std::io::Result<()> {
 
         let events = extract_events_v2(&audio, sample_rate as f32, 2048);
 
-        print!("    {} ({:.1}s): ", filename, audio.len() as f32 / sample_rate as f32);
+        print!(
+            "    {} ({:.1}s): ",
+            filename,
+            audio.len() as f32 / sample_rate as f32
+        );
 
         // Count types
         let mut local_counts: HashMap<String, usize> = HashMap::new();
@@ -372,7 +392,10 @@ fn main() -> std::io::Result<()> {
     }
 
     let stats = grammar.stats();
-    println!("\n    Grammar density: {:.3} (target <0.5)", stats.grammar_density);
+    println!(
+        "\n    Grammar density: {:.3} (target <0.5)",
+        stats.grammar_density
+    );
 
     // Phase 3: Score
     subheader("Phase 3: Scoring");
@@ -407,7 +430,12 @@ fn main() -> std::io::Result<()> {
 
         let test_files: Vec<_> = std::fs::read_dir(test_dir)?
             .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().map(|ext| ext == "wav").unwrap_or(false))
+            .filter(|e| {
+                e.path()
+                    .extension()
+                    .map(|ext| ext == "wav")
+                    .unwrap_or(false)
+            })
             .collect();
 
         for entry in &test_files {
@@ -418,10 +446,20 @@ fn main() -> std::io::Result<()> {
                 let events = extract_events_v2(&audio, sample_rate as f32, 2048);
                 if events.len() >= 2 {
                     let score = grammar.score_sequence(&events);
-                    let label = if filename.contains("whale") { "WHALE" }
-                               else if filename.contains("dolphin") { "DOLPHIN" }
-                               else { "OTHER" };
-                    println!("    [{}] {}: {:.4} ({} events)", label, filename, score, events.len());
+                    let label = if filename.contains("whale") {
+                        "WHALE"
+                    } else if filename.contains("dolphin") {
+                        "DOLPHIN"
+                    } else {
+                        "OTHER"
+                    };
+                    println!(
+                        "    [{}] {}: {:.4} ({} events)",
+                        label,
+                        filename,
+                        score,
+                        events.len()
+                    );
                 }
             }
         }

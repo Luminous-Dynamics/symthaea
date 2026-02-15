@@ -62,13 +62,20 @@ fn load_idx_images(path: &Path) -> Option<Vec<Vec<f32>>> {
     let pixels = rows * cols;
 
     if pixels != DIM {
-        eprintln!("  Unexpected image size: {}x{} (expected 28x28)", rows, cols);
+        eprintln!(
+            "  Unexpected image size: {}x{} (expected 28x28)",
+            rows, cols
+        );
         return None;
     }
 
     let header_size = 16;
     if data.len() < header_size + n_images * pixels {
-        eprintln!("  File too short: {} bytes for {} images", data.len(), n_images);
+        eprintln!(
+            "  File too short: {} bytes for {} images",
+            data.len(),
+            n_images
+        );
         return None;
     }
 
@@ -99,7 +106,11 @@ fn load_idx_labels(path: &Path) -> Option<Vec<usize>> {
     let header_size = 8;
 
     if data.len() < header_size + n_labels {
-        eprintln!("  File too short: {} bytes for {} labels", data.len(), n_labels);
+        eprintln!(
+            "  File too short: {} bytes for {} labels",
+            data.len(),
+            n_labels
+        );
         return None;
     }
 
@@ -129,14 +140,25 @@ fn load_mnist(data_dir: &Path) -> MnistData {
         load_idx_images(&test_images_path),
         load_idx_labels(&test_labels_path),
     ) {
-        println!("  Loaded real MNIST: {} train, {} test", train_imgs.len(), test_imgs.len());
+        println!(
+            "  Loaded real MNIST: {} train, {} test",
+            train_imgs.len(),
+            test_imgs.len()
+        );
         let train: Vec<(Vec<f32>, usize)> = train_imgs.into_iter().zip(train_lbls).collect();
         let test: Vec<(Vec<f32>, usize)> = test_imgs.into_iter().zip(test_lbls).collect();
-        return MnistData { train, test, is_real: true };
+        return MnistData {
+            train,
+            test,
+            is_real: true,
+        };
     }
 
     // Fall back to synthetic
-    println!("  MNIST files not found at {:?}, using synthetic data", data_dir);
+    println!(
+        "  MNIST files not found at {:?}, using synthetic data",
+        data_dir
+    );
     println!("  To use real MNIST, download IDX files (see example header for instructions)");
     let mut rng = StdRng::seed_from_u64(12345);
     let protos = generate_digit_prototypes(&mut rng);
@@ -153,7 +175,11 @@ fn load_mnist(data_dir: &Path) -> MnistData {
             test.push((sample_from_proto(&protos[c], &mut rng, 0.2), c));
         }
     }
-    MnistData { train, test, is_real: false }
+    MnistData {
+        train,
+        test,
+        is_real: false,
+    }
 }
 
 fn generate_digit_prototypes(rng: &mut StdRng) -> Vec<Vec<f32>> {
@@ -174,8 +200,12 @@ fn generate_digit_prototypes(rng: &mut StdRng) -> Vec<Vec<f32>> {
                 };
                 let idx = r * 28 + c;
                 img[idx] = 0.9 + rng.gen_range(-0.05..0.05);
-                if idx > 0 { img[idx - 1] = (img[idx - 1] + 0.4).min(1.0); }
-                if idx + 1 < DIM { img[idx + 1] = (img[idx + 1] + 0.4).min(1.0); }
+                if idx > 0 {
+                    img[idx - 1] = (img[idx - 1] + 0.4).min(1.0);
+                }
+                if idx + 1 < DIM {
+                    img[idx + 1] = (img[idx + 1] + 0.4).min(1.0);
+                }
             }
         }
         protos.push(img);
@@ -184,7 +214,10 @@ fn generate_digit_prototypes(rng: &mut StdRng) -> Vec<Vec<f32>> {
 }
 
 fn sample_from_proto(proto: &[f32], rng: &mut StdRng, noise: f32) -> Vec<f32> {
-    proto.iter().map(|&v| (v + rng.gen_range(-noise..noise)).clamp(0.0, 1.0)).collect()
+    proto
+        .iter()
+        .map(|&v| (v + rng.gen_range(-noise..noise)).clamp(0.0, 1.0))
+        .collect()
 }
 
 // ─── Softmax Model ───────────────────────────────────────────────
@@ -234,7 +267,12 @@ impl SoftmaxModel {
 
     fn predict(&self, input: &[f32]) -> usize {
         let probs = self.forward(input);
-        probs.iter().enumerate().max_by(|a, b| a.1.partial_cmp(b.1).unwrap()).unwrap().0
+        probs
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .unwrap()
+            .0
     }
 
     fn loss(&self, input: &[f32], label: usize) -> f32 {
@@ -267,7 +305,11 @@ fn partition_iid(
     let mut nodes = Vec::new();
     for n in 0..n_nodes {
         let start = n * per_node;
-        let end = if n == n_nodes - 1 { data.len() } else { start + per_node };
+        let end = if n == n_nodes - 1 {
+            data.len()
+        } else {
+            start + per_node
+        };
         let partition: Vec<(Vec<f32>, usize)> = indices[start..end]
             .iter()
             .map(|&i| data[i].clone())
@@ -331,14 +373,21 @@ fn partition_noniid(
 // ─── Evaluation ──────────────────────────────────────────────────
 
 fn evaluate(model: &SoftmaxModel, data: &[(Vec<f32>, usize)]) -> (f32, f32) {
-    if data.is_empty() { return (0.0, f32::MAX); }
+    if data.is_empty() {
+        return (0.0, f32::MAX);
+    }
     let mut correct = 0;
     let mut total_loss = 0.0;
     for (x, y) in data {
-        if model.predict(x) == *y { correct += 1; }
+        if model.predict(x) == *y {
+            correct += 1;
+        }
         total_loss += model.loss(x, *y);
     }
-    (correct as f32 / data.len() as f32, total_loss / data.len() as f32)
+    (
+        correct as f32 / data.len() as f32,
+        total_loss / data.len() as f32,
+    )
 }
 
 fn per_class_accuracy(model: &SoftmaxModel, data: &[(Vec<f32>, usize)]) -> Vec<f32> {
@@ -346,10 +395,18 @@ fn per_class_accuracy(model: &SoftmaxModel, data: &[(Vec<f32>, usize)]) -> Vec<f
     let mut total = vec![0usize; NUM_CLASSES];
     for (x, y) in data {
         total[*y] += 1;
-        if model.predict(x) == *y { correct[*y] += 1; }
+        if model.predict(x) == *y {
+            correct[*y] += 1;
+        }
     }
     (0..NUM_CLASSES)
-        .map(|c| if total[c] > 0 { correct[c] as f32 / total[c] as f32 } else { 0.0 })
+        .map(|c| {
+            if total[c] > 0 {
+                correct[c] as f32 / total[c] as f32
+            } else {
+                0.0
+            }
+        })
         .collect()
 }
 
@@ -378,8 +435,12 @@ fn train_federated(
     let n_honest = node_data.len();
 
     let mut reputations: HashMap<String, f32> = HashMap::new();
-    for i in 0..n_honest { reputations.insert(format!("n{}", i), 0.85); }
-    for i in 0..n_byz { reputations.insert(format!("byz{}", i), 0.15); }
+    for i in 0..n_honest {
+        reputations.insert(format!("n{}", i), 0.85);
+    }
+    for i in 0..n_byz {
+        reputations.insert(format!("byz{}", i), 0.15);
+    }
 
     let mut pipeline = UnifiedPipeline::new(config);
     let mut acc_history = Vec::new();
@@ -389,7 +450,9 @@ fn train_federated(
 
         // Honest nodes: compute gradients on local batch
         for (nid, data) in node_data.iter().enumerate() {
-            if data.is_empty() { continue; }
+            if data.is_empty() {
+                continue;
+            }
             let batch = batch_size.min(data.len());
             // Random batch sampling
             let start = rng.gen_range(0..=data.len().saturating_sub(batch));
@@ -398,12 +461,17 @@ fn train_federated(
             for s in start..start + batch {
                 let (x, y) = &data[s % data.len()];
                 let g = model.compute_gradients(x, *y);
-                for (lg, gg) in grads.iter_mut().zip(g.iter()) { *lg += gg / batch as f32; }
+                for (lg, gg) in grads.iter_mut().zip(g.iter()) {
+                    *lg += gg / batch as f32;
+                }
                 total_loss += model.loss(x, *y);
             }
             contributions.push(GradientUpdate::new(
-                format!("n{}", nid), round as u64 + 1, grads,
-                batch as u32, total_loss / batch as f32,
+                format!("n{}", nid),
+                round as u64 + 1,
+                grads,
+                batch as u32,
+                total_loss / batch as f32,
             ));
         }
 
@@ -413,7 +481,11 @@ fn train_federated(
                 .map(|j| if (j + round) % 3 == 0 { 50.0 } else { -50.0 })
                 .collect();
             contributions.push(GradientUpdate::new(
-                format!("byz{}", i), round as u64 + 1, byz_grads, 100, 0.5,
+                format!("byz{}", i),
+                round as u64 + 1,
+                byz_grads,
+                100,
+                0.5,
             ));
         }
 
@@ -427,7 +499,13 @@ fn train_federated(
 
     let (final_acc, final_loss) = evaluate(&model, test_data);
     let class_acc = per_class_accuracy(&model, test_data);
-    TrainResult { label: label.into(), final_acc, final_loss, acc_history, class_acc }
+    TrainResult {
+        label: label.into(),
+        final_acc,
+        final_loss,
+        acc_history,
+        class_acc,
+    }
 }
 
 // ─── Main ────────────────────────────────────────────────────────
@@ -436,11 +514,7 @@ fn main() {
     println!("=== Real MNIST Federated Benchmark ===\n");
 
     // Try multiple data paths
-    let data_paths = [
-        "data/mnist",
-        "examples/data/mnist",
-        "../data/mnist",
-    ];
+    let data_paths = ["data/mnist", "examples/data/mnist", "../data/mnist"];
 
     let mut mnist = None;
     for path in &data_paths {
@@ -460,9 +534,17 @@ fn main() {
         load_mnist(Path::new("data/mnist"))
     });
 
-    let data_source = if mnist.is_real { "Real MNIST" } else { "Synthetic (MNIST-like)" };
+    let data_source = if mnist.is_real {
+        "Real MNIST"
+    } else {
+        "Synthetic (MNIST-like)"
+    };
     println!("\nData source: {}", data_source);
-    println!("Train: {} samples, Test: {} samples", mnist.train.len(), mnist.test.len());
+    println!(
+        "Train: {} samples, Test: {} samples",
+        mnist.train.len(),
+        mnist.test.len()
+    );
     println!("Model: Linear Softmax (784->10, {} params)\n", PARAMS);
 
     // Class distribution in training data
@@ -497,8 +579,15 @@ fn main() {
         mnist.test
     };
 
-    println!("Using: {} train, {} test (subsampled for benchmark speed)", train_data.len(), test_data.len());
-    println!("Nodes: {}, Rounds: {}, LR: {}, Batch: {}\n", n_nodes, n_rounds, lr, batch_size);
+    println!(
+        "Using: {} train, {} test (subsampled for benchmark speed)",
+        train_data.len(),
+        test_data.len()
+    );
+    println!(
+        "Nodes: {}, Rounds: {}, LR: {}, Batch: {}\n",
+        n_nodes, n_rounds, lr, batch_size
+    );
 
     let mut results = Vec::new();
 
@@ -506,24 +595,42 @@ fn main() {
     println!("--- Experiment 1: IID Partitioning ---");
     let iid_nodes = partition_iid(&train_data, n_nodes, &mut rng);
     results.push(train_federated(
-        "IID-clean", &iid_nodes, &test_data,
-        PipelineConfig::default(), n_rounds, lr, batch_size, 0,
+        "IID-clean",
+        &iid_nodes,
+        &test_data,
+        PipelineConfig::default(),
+        n_rounds,
+        lr,
+        batch_size,
+        0,
     ));
 
     // === Experiment 2: Non-IID (2 classes per node) ===
     println!("--- Experiment 2: Non-IID (2 classes/node) ---");
     let noniid_2 = partition_noniid(&train_data, n_nodes, 2, &mut rng);
     results.push(train_federated(
-        "NonIID-2c", &noniid_2, &test_data,
-        PipelineConfig::default(), n_rounds, lr, batch_size, 0,
+        "NonIID-2c",
+        &noniid_2,
+        &test_data,
+        PipelineConfig::default(),
+        n_rounds,
+        lr,
+        batch_size,
+        0,
     ));
 
     // === Experiment 3: Non-IID (3 classes per node) ===
     println!("--- Experiment 3: Non-IID (3 classes/node) ---");
     let noniid_3 = partition_noniid(&train_data, n_nodes, 3, &mut rng);
     results.push(train_federated(
-        "NonIID-3c", &noniid_3, &test_data,
-        PipelineConfig::default(), n_rounds, lr, batch_size, 0,
+        "NonIID-3c",
+        &noniid_3,
+        &test_data,
+        PipelineConfig::default(),
+        n_rounds,
+        lr,
+        batch_size,
+        0,
     ));
 
     // === Experiment 4: IID with Byzantine (10%, 20%) ===
@@ -532,8 +639,14 @@ fn main() {
         let n_byz = n_nodes * byz_pct / 100;
         let label = format!("IID-byz{}%", byz_pct);
         results.push(train_federated(
-            &label, &iid_nodes, &test_data,
-            PipelineConfig::default(), n_rounds, lr, batch_size, n_byz,
+            &label,
+            &iid_nodes,
+            &test_data,
+            PipelineConfig::default(),
+            n_rounds,
+            lr,
+            batch_size,
+            n_byz,
         ));
     }
 
@@ -541,54 +654,79 @@ fn main() {
     println!("--- Experiment 5: Non-IID-2c + Byzantine 20% ---");
     let n_byz = n_nodes * 20 / 100;
     results.push(train_federated(
-        "NonIID-2c-byz20%", &noniid_2, &test_data,
-        PipelineConfig::default(), n_rounds, lr, batch_size, n_byz,
+        "NonIID-2c-byz20%",
+        &noniid_2,
+        &test_data,
+        PipelineConfig::default(),
+        n_rounds,
+        lr,
+        batch_size,
+        n_byz,
     ));
 
     // === Experiment 6: High security preset ===
     println!("--- Experiment 6: High security preset (IID, 20% byz) ---");
     results.push(train_federated(
-        "HighSec-byz20%", &iid_nodes, &test_data,
-        PipelineConfig::high_security(), n_rounds, lr, batch_size, n_nodes * 20 / 100,
+        "HighSec-byz20%",
+        &iid_nodes,
+        &test_data,
+        PipelineConfig::high_security(),
+        n_rounds,
+        lr,
+        batch_size,
+        n_nodes * 20 / 100,
     ));
 
     // === Results Table ===
     println!("\n=== Results ({} rounds) ===\n", n_rounds);
-    println!("{:<22} {:>8} {:>8} {:>8} {:>8}",
-             "Experiment", "Acc", "Loss", "Acc@R5", "Acc@R15");
+    println!(
+        "{:<22} {:>8} {:>8} {:>8} {:>8}",
+        "Experiment", "Acc", "Loss", "Acc@R5", "Acc@R15"
+    );
     println!("{:-<60}", "");
 
     for r in &results {
         let acc_r5 = r.acc_history.get(4).copied().unwrap_or(0.0);
         let acc_r15 = r.acc_history.get(14).copied().unwrap_or(0.0);
-        println!("{:<22} {:>7.1}% {:>8.3} {:>7.1}% {:>7.1}%",
-                 r.label, r.final_acc * 100.0, r.final_loss,
-                 acc_r5 * 100.0, acc_r15 * 100.0);
+        println!(
+            "{:<22} {:>7.1}% {:>8.3} {:>7.1}% {:>7.1}%",
+            r.label,
+            r.final_acc * 100.0,
+            r.final_loss,
+            acc_r5 * 100.0,
+            acc_r15 * 100.0
+        );
     }
 
     // === Per-Class Accuracy for best model ===
     println!("\n--- Per-Class Accuracy (IID-clean) ---\n");
     let iid_clean = results.iter().find(|r| r.label == "IID-clean").unwrap();
     print!("  Digit:  ");
-    for c in 0..NUM_CLASSES { print!("  {:>3}  ", c); }
+    for c in 0..NUM_CLASSES {
+        print!("  {:>3}  ", c);
+    }
     println!();
     print!("  Acc:    ");
-    for c in 0..NUM_CLASSES { print!("{:>5.1}% ", iid_clean.class_acc[c] * 100.0); }
+    for c in 0..NUM_CLASSES {
+        print!("{:>5.1}% ", iid_clean.class_acc[c] * 100.0);
+    }
     println!("\n");
 
     // === Convergence Curves ===
     println!("--- Convergence Curves ---\n");
     for r in &results {
-        let spark: String = r.acc_history.iter().map(|&a| {
-            match (a * 100.0) as u32 {
+        let spark: String = r
+            .acc_history
+            .iter()
+            .map(|&a| match (a * 100.0) as u32 {
                 0..=10 => '▁',
                 11..=20 => '▂',
                 21..=40 => '▃',
                 41..=60 => '▅',
                 61..=75 => '▇',
                 _ => '█',
-            }
-        }).collect();
+            })
+            .collect();
         println!("  {:<22} {} {:.1}%", r.label, spark, r.final_acc * 100.0);
     }
 
@@ -601,50 +739,80 @@ fn main() {
     // synthetic ~60%+, but with subsample and limited rounds, 30% is safe floor)
     let iid_acc = iid_clean.final_acc;
     if iid_acc > 0.30 {
-        println!("  [PASS] Test 1: IID-clean converges: {:.1}%", iid_acc * 100.0);
+        println!(
+            "  [PASS] Test 1: IID-clean converges: {:.1}%",
+            iid_acc * 100.0
+        );
         passed += 1;
     } else {
-        println!("  [FAIL] Test 1: IID-clean too low: {:.1}%", iid_acc * 100.0);
+        println!(
+            "  [FAIL] Test 1: IID-clean too low: {:.1}%",
+            iid_acc * 100.0
+        );
     }
 
     // Test 2: Non-IID converges (may be lower than IID)
     let noniid = results.iter().find(|r| r.label == "NonIID-2c").unwrap();
     if noniid.final_acc > 0.15 {
-        println!("  [PASS] Test 2: Non-IID-2c converges: {:.1}%", noniid.final_acc * 100.0);
+        println!(
+            "  [PASS] Test 2: Non-IID-2c converges: {:.1}%",
+            noniid.final_acc * 100.0
+        );
         passed += 1;
     } else {
-        println!("  [FAIL] Test 2: Non-IID-2c too low: {:.1}%", noniid.final_acc * 100.0);
+        println!(
+            "  [FAIL] Test 2: Non-IID-2c too low: {:.1}%",
+            noniid.final_acc * 100.0
+        );
     }
 
     // Test 3: More classes per node → better Non-IID accuracy
     let noniid3 = results.iter().find(|r| r.label == "NonIID-3c").unwrap();
     if noniid3.final_acc >= noniid.final_acc - 0.05 {
-        println!("  [PASS] Test 3: NonIID-3c >= NonIID-2c: {:.1}% vs {:.1}%",
-                 noniid3.final_acc * 100.0, noniid.final_acc * 100.0);
+        println!(
+            "  [PASS] Test 3: NonIID-3c >= NonIID-2c: {:.1}% vs {:.1}%",
+            noniid3.final_acc * 100.0,
+            noniid.final_acc * 100.0
+        );
         passed += 1;
     } else {
-        println!("  [FAIL] Test 3: NonIID-3c ({:.1}%) << NonIID-2c ({:.1}%)",
-                 noniid3.final_acc * 100.0, noniid.final_acc * 100.0);
+        println!(
+            "  [FAIL] Test 3: NonIID-3c ({:.1}%) << NonIID-2c ({:.1}%)",
+            noniid3.final_acc * 100.0,
+            noniid.final_acc * 100.0
+        );
     }
 
     // Test 4: Survives 10% Byzantine
     let byz10 = results.iter().find(|r| r.label == "IID-byz10%").unwrap();
     if byz10.final_acc > 0.20 {
-        println!("  [PASS] Test 4: Survives 10% Byzantine: {:.1}%", byz10.final_acc * 100.0);
+        println!(
+            "  [PASS] Test 4: Survives 10% Byzantine: {:.1}%",
+            byz10.final_acc * 100.0
+        );
         passed += 1;
     } else {
-        println!("  [FAIL] Test 4: 10% Byzantine too degraded: {:.1}%", byz10.final_acc * 100.0);
+        println!(
+            "  [FAIL] Test 4: 10% Byzantine too degraded: {:.1}%",
+            byz10.final_acc * 100.0
+        );
     }
 
     // Test 5: Accuracy degrades with more Byzantine
     let byz20 = results.iter().find(|r| r.label == "IID-byz20%").unwrap();
     if byz10.final_acc >= byz20.final_acc - 0.05 {
-        println!("  [PASS] Test 5: More Byzantine → worse: 10%={:.1}%, 20%={:.1}%",
-                 byz10.final_acc * 100.0, byz20.final_acc * 100.0);
+        println!(
+            "  [PASS] Test 5: More Byzantine → worse: 10%={:.1}%, 20%={:.1}%",
+            byz10.final_acc * 100.0,
+            byz20.final_acc * 100.0
+        );
         passed += 1;
     } else {
-        println!("  [FAIL] Test 5: 10% byz ({:.1}%) worse than 20% ({:.1}%)",
-                 byz10.final_acc * 100.0, byz20.final_acc * 100.0);
+        println!(
+            "  [FAIL] Test 5: 10% byz ({:.1}%) worse than 20% ({:.1}%)",
+            byz10.final_acc * 100.0,
+            byz20.final_acc * 100.0
+        );
     }
 
     // Test 6: Convergence improves over training
@@ -652,12 +820,19 @@ fn main() {
         let early = iid_clean.acc_history[4];
         let late = iid_clean.final_acc;
         if late > early {
-            println!("  [PASS] Test 6: Accuracy improves R5→R{}: {:.1}% → {:.1}%",
-                     n_rounds, early * 100.0, late * 100.0);
+            println!(
+                "  [PASS] Test 6: Accuracy improves R5→R{}: {:.1}% → {:.1}%",
+                n_rounds,
+                early * 100.0,
+                late * 100.0
+            );
             passed += 1;
         } else {
-            println!("  [FAIL] Test 6: Accuracy regresses: {:.1}% → {:.1}%",
-                     early * 100.0, late * 100.0);
+            println!(
+                "  [FAIL] Test 6: Accuracy regresses: {:.1}% → {:.1}%",
+                early * 100.0,
+                late * 100.0
+            );
         }
     } else {
         println!("  [FAIL] Test 6: Not enough rounds");
@@ -666,13 +841,22 @@ fn main() {
     // Test 7: At least half the classes have >10% accuracy (model learns something for most digits)
     let classes_above_10 = iid_clean.class_acc.iter().filter(|&&a| a > 0.10).count();
     if classes_above_10 >= 5 {
-        println!("  [PASS] Test 7: {}/10 classes above 10% accuracy", classes_above_10);
+        println!(
+            "  [PASS] Test 7: {}/10 classes above 10% accuracy",
+            classes_above_10
+        );
         passed += 1;
     } else {
-        println!("  [FAIL] Test 7: Only {}/10 classes above 10%", classes_above_10);
+        println!(
+            "  [FAIL] Test 7: Only {}/10 classes above 10%",
+            classes_above_10
+        );
     }
 
-    println!("\n=== RESULTS: {}/{} passed ({}) ===", passed, total_tests, data_source);
+    println!(
+        "\n=== RESULTS: {}/{} passed ({}) ===",
+        passed, total_tests, data_source
+    );
     if passed < total_tests {
         std::process::exit(1);
     }

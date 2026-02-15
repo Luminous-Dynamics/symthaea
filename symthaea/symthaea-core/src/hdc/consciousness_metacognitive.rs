@@ -46,8 +46,14 @@ impl MetacognitiveSubsystem {
         if self.phi_history.len() < 2 {
             return 0.0;
         }
-        let recent = self.phi_history.last().unwrap();
-        let oldest = self.phi_history.first().unwrap();
+        let recent = self
+            .phi_history
+            .last()
+            .expect("phi_history has >= 2 elements");
+        let oldest = self
+            .phi_history
+            .first()
+            .expect("phi_history has >= 2 elements");
         recent - oldest
     }
 }
@@ -63,9 +69,11 @@ impl ConsciousnessSubsystem for MetacognitiveSubsystem {
         "metacognitive"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, _inputs: &[BinaryHV])
-        -> Result<(), SubsystemError>
-    {
+    fn process_cycle(
+        &mut self,
+        state: &mut ConsciousnessState,
+        _inputs: &[BinaryHV],
+    ) -> Result<(), SubsystemError> {
         self.cycle_count += 1;
 
         // Record Phi history
@@ -77,9 +85,12 @@ impl ConsciousnessSubsystem for MetacognitiveSubsystem {
         // Estimate confidence from Phi stability (low variance = high confidence)
         if self.phi_history.len() >= 3 {
             let mean: f64 = self.phi_history.iter().sum::<f64>() / self.phi_history.len() as f64;
-            let variance: f64 = self.phi_history.iter()
+            let variance: f64 = self
+                .phi_history
+                .iter()
                 .map(|p| (p - mean).powi(2))
-                .sum::<f64>() / self.phi_history.len() as f64;
+                .sum::<f64>()
+                / self.phi_history.len() as f64;
 
             // Confidence = inverse of variance (bounded to [0, 1])
             let confidence = 1.0 / (1.0 + variance * 10.0);
@@ -107,7 +118,7 @@ impl ConsciousnessSubsystem for MetacognitiveSubsystem {
 // ENGINE-BACKED VARIANT: Wraps the real MetaConsciousness engine
 // =============================================================================
 
-use super::meta_consciousness::{MetaConsciousness, MetaConfig, MetaConsciousnessState};
+use super::meta_consciousness::{MetaConfig, MetaConsciousness, MetaConsciousnessState};
 
 /// Engine-backed meta-consciousness subsystem.
 ///
@@ -146,9 +157,11 @@ impl ConsciousnessSubsystem for MetaConsciousnessWrapped {
         "meta_consciousness"
     }
 
-    fn process_cycle(&mut self, state: &mut ConsciousnessState, inputs: &[BinaryHV])
-        -> Result<(), SubsystemError>
-    {
+    fn process_cycle(
+        &mut self,
+        state: &mut ConsciousnessState,
+        inputs: &[BinaryHV],
+    ) -> Result<(), SubsystemError> {
         let meta_state = self.engine.meta_reflect(inputs);
         state.metacognitive_confidence = meta_state.metacognitive_confidence;
         self.latest_state = Some(meta_state);
@@ -202,7 +215,10 @@ mod tests {
             sub.process_cycle(&mut state, &inputs).unwrap();
         }
 
-        assert!(sub.phi_trend() > 0.0, "Trend should be positive for rising Phi");
+        assert!(
+            sub.phi_trend() > 0.0,
+            "Trend should be positive for rising Phi"
+        );
     }
 
     #[test]

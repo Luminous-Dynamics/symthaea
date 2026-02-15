@@ -97,7 +97,11 @@ impl RandomProjection {
                 let hash = hasher.finish();
 
                 // Use hash to determine sign
-                matrix[i][j] = if hash.is_multiple_of(2) { scale } else { -scale };
+                matrix[i][j] = if hash.is_multiple_of(2) {
+                    scale
+                } else {
+                    -scale
+                };
             }
         }
 
@@ -314,7 +318,11 @@ impl WordEmbeddingEncoder {
     /// Load word vectors from a text file (word2vec/GloVe format)
     ///
     /// Format: word dim1 dim2 dim3 ...
-    pub fn load_word_vectors<P: AsRef<Path>>(&mut self, path: P, max_words: usize) -> Result<usize, String> {
+    pub fn load_word_vectors<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        max_words: usize,
+    ) -> Result<usize, String> {
         use std::io::{BufRead, BufReader};
 
         let file = std::fs::File::open(path.as_ref())
@@ -461,109 +469,270 @@ impl MoralSemanticEncoder {
 
         // Positive actions
         for (word, valence) in [
-            ("help", 0.8), ("helped", 0.8), ("helping", 0.8),
-            ("save", 0.9), ("saved", 0.9), ("saving", 0.9),
-            ("protect", 0.8), ("protected", 0.8), ("protecting", 0.8),
-            ("give", 0.6), ("gave", 0.6), ("giving", 0.6),
-            ("share", 0.6), ("shared", 0.6), ("sharing", 0.6),
-            ("donate", 0.7), ("donated", 0.7), ("donating", 0.7),
-            ("support", 0.6), ("supported", 0.6), ("supporting", 0.6),
-            ("assist", 0.6), ("assisted", 0.6), ("assisting", 0.6),
-            ("care", 0.7), ("cared", 0.7), ("caring", 0.7),
-            ("comfort", 0.6), ("comforted", 0.6), ("comforting", 0.6),
+            ("help", 0.8),
+            ("helped", 0.8),
+            ("helping", 0.8),
+            ("save", 0.9),
+            ("saved", 0.9),
+            ("saving", 0.9),
+            ("protect", 0.8),
+            ("protected", 0.8),
+            ("protecting", 0.8),
+            ("give", 0.6),
+            ("gave", 0.6),
+            ("giving", 0.6),
+            ("share", 0.6),
+            ("shared", 0.6),
+            ("sharing", 0.6),
+            ("donate", 0.7),
+            ("donated", 0.7),
+            ("donating", 0.7),
+            ("support", 0.6),
+            ("supported", 0.6),
+            ("supporting", 0.6),
+            ("assist", 0.6),
+            ("assisted", 0.6),
+            ("assisting", 0.6),
+            ("care", 0.7),
+            ("cared", 0.7),
+            ("caring", 0.7),
+            ("comfort", 0.6),
+            ("comforted", 0.6),
+            ("comforting", 0.6),
         ] {
             moral_vocabulary.insert(word, ("action_positive", valence));
         }
 
         // Negative actions
         for (word, valence) in [
-            ("harm", -0.9), ("harmed", -0.9), ("harming", -0.9),
-            ("steal", -0.8), ("stole", -0.8), ("stolen", -0.8), ("stealing", -0.8),
-            ("lie", -0.7), ("lied", -0.7), ("lying", -0.7),
-            ("cheat", -0.8), ("cheated", -0.8), ("cheating", -0.8),
-            ("hurt", -0.8), ("hurting", -0.8),
-            ("kill", -1.0), ("killed", -1.0), ("killing", -1.0),
-            ("attack", -0.9), ("attacked", -0.9), ("attacking", -0.9),
-            ("betray", -0.9), ("betrayed", -0.9), ("betraying", -0.9),
-            ("deceive", -0.8), ("deceived", -0.8), ("deceiving", -0.8),
-            ("abuse", -0.9), ("abused", -0.9), ("abusing", -0.9),
-            ("neglect", -0.7), ("neglected", -0.7), ("neglecting", -0.7),
-            ("ignore", -0.5), ("ignored", -0.5), ("ignoring", -0.5),
-            ("break", -0.6), ("broke", -0.6), ("broken", -0.6), ("breaking", -0.6),
+            ("harm", -0.9),
+            ("harmed", -0.9),
+            ("harming", -0.9),
+            ("steal", -0.8),
+            ("stole", -0.8),
+            ("stolen", -0.8),
+            ("stealing", -0.8),
+            ("lie", -0.7),
+            ("lied", -0.7),
+            ("lying", -0.7),
+            ("cheat", -0.8),
+            ("cheated", -0.8),
+            ("cheating", -0.8),
+            ("hurt", -0.8),
+            ("hurting", -0.8),
+            ("kill", -1.0),
+            ("killed", -1.0),
+            ("killing", -1.0),
+            ("attack", -0.9),
+            ("attacked", -0.9),
+            ("attacking", -0.9),
+            ("betray", -0.9),
+            ("betrayed", -0.9),
+            ("betraying", -0.9),
+            ("deceive", -0.8),
+            ("deceived", -0.8),
+            ("deceiving", -0.8),
+            ("abuse", -0.9),
+            ("abused", -0.9),
+            ("abusing", -0.9),
+            ("neglect", -0.7),
+            ("neglected", -0.7),
+            ("neglecting", -0.7),
+            ("ignore", -0.5),
+            ("ignored", -0.5),
+            ("ignoring", -0.5),
+            ("break", -0.6),
+            ("broke", -0.6),
+            ("broken", -0.6),
+            ("breaking", -0.6),
         ] {
             moral_vocabulary.insert(word, ("action_negative", valence));
         }
 
         // Vulnerable entities
-        for word in ["child", "children", "baby", "babies", "infant", "elderly",
-                     "disabled", "sick", "patient", "victim", "homeless", "poor",
-                     "orphan", "widow", "refugee"] {
+        for word in [
+            "child", "children", "baby", "babies", "infant", "elderly", "disabled", "sick",
+            "patient", "victim", "homeless", "poor", "orphan", "widow", "refugee",
+        ] {
             moral_vocabulary.insert(word, ("entity_vulnerable", 0.8));
         }
 
         // Authority entities
-        for word in ["parent", "parents", "father", "mother", "teacher", "judge",
-                     "doctor", "nurse", "police", "officer", "boss", "employer",
-                     "leader", "authority", "guardian"] {
+        for word in [
+            "parent",
+            "parents",
+            "father",
+            "mother",
+            "teacher",
+            "judge",
+            "doctor",
+            "nurse",
+            "police",
+            "officer",
+            "boss",
+            "employer",
+            "leader",
+            "authority",
+            "guardian",
+        ] {
             moral_vocabulary.insert(word, ("entity_authority", 0.6));
         }
 
         // Neutral entities
-        for word in ["friend", "friends", "stranger", "strangers", "colleague",
-                     "neighbor", "person", "people", "someone", "anyone", "everyone",
-                     "man", "woman", "individual"] {
+        for word in [
+            "friend",
+            "friends",
+            "stranger",
+            "strangers",
+            "colleague",
+            "neighbor",
+            "person",
+            "people",
+            "someone",
+            "anyone",
+            "everyone",
+            "man",
+            "woman",
+            "individual",
+        ] {
             moral_vocabulary.insert(word, ("entity_neutral", 0.3));
         }
 
         // Good consequences
-        for word in ["benefit", "benefited", "improve", "improved", "heal", "healed",
-                     "save", "prosper", "flourish", "thrive", "succeed", "happy",
-                     "happiness", "joy", "relief", "safe", "safety", "better"] {
+        for word in [
+            "benefit",
+            "benefited",
+            "improve",
+            "improved",
+            "heal",
+            "healed",
+            "save",
+            "prosper",
+            "flourish",
+            "thrive",
+            "succeed",
+            "happy",
+            "happiness",
+            "joy",
+            "relief",
+            "safe",
+            "safety",
+            "better",
+        ] {
             moral_vocabulary.insert(word, ("consequence_good", 0.7));
         }
 
         // Bad consequences
-        for word in ["damage", "damaged", "destroy", "destroyed", "suffer", "suffered",
-                     "pain", "loss", "death", "injury", "injured", "trauma",
-                     "distress", "grief", "sad", "sadness", "worse", "worst"] {
+        for word in [
+            "damage",
+            "damaged",
+            "destroy",
+            "destroyed",
+            "suffer",
+            "suffered",
+            "pain",
+            "loss",
+            "death",
+            "injury",
+            "injured",
+            "trauma",
+            "distress",
+            "grief",
+            "sad",
+            "sadness",
+            "worse",
+            "worst",
+        ] {
             moral_vocabulary.insert(word, ("consequence_bad", -0.7));
         }
 
         // Duty context
-        for word in ["promise", "promised", "obligation", "duty", "responsibility",
-                     "contract", "agreement", "vow", "oath", "commitment", "trust",
-                     "loyal", "loyalty", "faithful"] {
+        for word in [
+            "promise",
+            "promised",
+            "obligation",
+            "duty",
+            "responsibility",
+            "contract",
+            "agreement",
+            "vow",
+            "oath",
+            "commitment",
+            "trust",
+            "loyal",
+            "loyalty",
+            "faithful",
+        ] {
             moral_vocabulary.insert(word, ("context_duty", 0.5));
         }
 
         // Fairness context
-        for word in ["equal", "equality", "fair", "fairness", "just", "justice",
-                     "deserve", "deserved", "right", "rights", "honest", "honesty",
-                     "impartial", "balanced", "equitable"] {
+        for word in [
+            "equal",
+            "equality",
+            "fair",
+            "fairness",
+            "just",
+            "justice",
+            "deserve",
+            "deserved",
+            "right",
+            "rights",
+            "honest",
+            "honesty",
+            "impartial",
+            "balanced",
+            "equitable",
+        ] {
             moral_vocabulary.insert(word, ("context_fairness", 0.6));
         }
 
         // Care context
-        for word in ["love", "loved", "compassion", "compassionate", "empathy",
-                     "kindness", "kind", "gentle", "tender", "warm", "affection",
-                     "sympathy", "concern", "worried"] {
+        for word in [
+            "love",
+            "loved",
+            "compassion",
+            "compassionate",
+            "empathy",
+            "kindness",
+            "kind",
+            "gentle",
+            "tender",
+            "warm",
+            "affection",
+            "sympathy",
+            "concern",
+            "worried",
+        ] {
             moral_vocabulary.insert(word, ("context_care", 0.6));
         }
 
         // Intent modifiers
         for (word, valence) in [
-            ("deliberately", 0.9), ("intentionally", 0.9), ("purposely", 0.9),
-            ("accidentally", 0.2), ("unintentionally", 0.2), ("mistakenly", 0.2),
-            ("knowingly", 0.8), ("unknowingly", 0.2), ("willfully", 0.9),
+            ("deliberately", 0.9),
+            ("intentionally", 0.9),
+            ("purposely", 0.9),
+            ("accidentally", 0.2),
+            ("unintentionally", 0.2),
+            ("mistakenly", 0.2),
+            ("knowingly", 0.8),
+            ("unknowingly", 0.2),
+            ("willfully", 0.9),
         ] {
             moral_vocabulary.insert(word, ("modifier_intent", valence));
         }
 
         // Degree modifiers
         for (word, valence) in [
-            ("slightly", 0.2), ("somewhat", 0.3), ("moderately", 0.5),
-            ("significantly", 0.7), ("severely", 0.9), ("completely", 1.0),
-            ("totally", 1.0), ("barely", 0.1), ("extremely", 0.95),
+            ("slightly", 0.2),
+            ("somewhat", 0.3),
+            ("moderately", 0.5),
+            ("significantly", 0.7),
+            ("severely", 0.9),
+            ("completely", 1.0),
+            ("totally", 1.0),
+            ("barely", 0.1),
+            ("extremely", 0.95),
         ] {
             moral_vocabulary.insert(word, ("modifier_degree", valence));
         }
@@ -665,7 +834,8 @@ impl SemanticEncoder for MoralSemanticEncoder {
         } else {
             0.0
         };
-        let valence_indicator = ContinuousHV::random(self.dim, self.seed + 99999).scale(avg_valence * 0.3);
+        let valence_indicator =
+            ContinuousHV::random(self.dim, self.seed + 99999).scale(avg_valence * 0.3);
         signature_components.push(valence_indicator);
 
         // Combine bundled content with signature
@@ -726,10 +896,12 @@ pub mod onnx {
 
             let repo = api.model("sentence-transformers/all-MiniLM-L6-v2".to_string());
 
-            let model_path = repo.get("model.onnx")
+            let model_path = repo
+                .get("model.onnx")
                 .map_err(|e| format!("Failed to download model: {}", e))?;
 
-            let tokenizer_path = repo.get("tokenizer.json")
+            let tokenizer_path = repo
+                .get("tokenizer.json")
                 .map_err(|e| format!("Failed to download tokenizer: {}", e))?;
 
             // Load tokenizer
@@ -755,16 +927,25 @@ pub mod onnx {
         /// Encode a single text to embedding
         fn encode_to_embedding(&self, text: &str) -> Result<Vec<f32>, String> {
             // Tokenize
-            let encoding = self.tokenizer.encode(text, true)
+            let encoding = self
+                .tokenizer
+                .encode(text, true)
                 .map_err(|e| format!("Tokenization failed: {}", e))?;
 
             // Lock the session for inference (ORT 2.0 requires &mut)
-            let mut session = self.session.lock()
+            let mut session = self
+                .session
+                .lock()
                 .map_err(|e| format!("Failed to lock session: {}", e))?;
 
             let input_ids: Vec<i64> = encoding.get_ids().iter().map(|&x| x as i64).collect();
-            let attention_mask: Vec<i64> = encoding.get_attention_mask().iter().map(|&x| x as i64).collect();
-            let token_type_ids: Vec<i64> = encoding.get_type_ids().iter().map(|&x| x as i64).collect();
+            let attention_mask: Vec<i64> = encoding
+                .get_attention_mask()
+                .iter()
+                .map(|&x| x as i64)
+                .collect();
+            let token_type_ids: Vec<i64> =
+                encoding.get_type_ids().iter().map(|&x| x as i64).collect();
 
             let seq_len = input_ids.len();
 
@@ -780,12 +961,13 @@ pub mod onnx {
                 .map_err(|e| format!("Failed to create token_type_ids tensor: {}", e))?;
 
             // Run inference using the locked session
-            let outputs = session.run(ort::inputs![
-                "input_ids" => input_ids_tensor,
-                "attention_mask" => attention_mask_tensor,
-                "token_type_ids" => token_type_ids_tensor,
-            ])
-            .map_err(|e| format!("Inference failed: {}", e))?;
+            let outputs = session
+                .run(ort::inputs![
+                    "input_ids" => input_ids_tensor,
+                    "attention_mask" => attention_mask_tensor,
+                    "token_type_ids" => token_type_ids_tensor,
+                ])
+                .map_err(|e| format!("Inference failed: {}", e))?;
 
             // Extract sentence embedding (mean pooling over tokens)
             // ort 2.0 API: try_extract_tensor returns (&Shape, &[T]) tuple
@@ -795,7 +977,11 @@ pub mod onnx {
 
             // Shape is [1, seq_len, embedding_dim]
             let shape: Vec<usize> = extracted.0.iter().map(|&d| d as usize).collect();
-            let hidden_dim = if shape.len() >= 3 { shape[2] } else { self.embedding_dim };
+            let hidden_dim = if shape.len() >= 3 {
+                shape[2]
+            } else {
+                self.embedding_dim
+            };
 
             // Mean pooling: average over sequence dimension (dim 1)
             let mut embedding = vec![0.0f32; self.embedding_dim];
@@ -896,7 +1082,10 @@ pub fn create_best_encoder() -> Box<dyn SemanticEncoder> {
         match onnx::OnnxSemanticEncoder::new() {
             Ok(encoder) => return Box::new(encoder),
             Err(e) => {
-                eprintln!("Warning: ONNX encoder unavailable ({}), using MoralSemantic", e);
+                eprintln!(
+                    "Warning: ONNX encoder unavailable ({}), using MoralSemantic",
+                    e
+                );
             }
         }
     }
@@ -990,7 +1179,10 @@ mod tests {
         let sim_13 = encoder.similarity(s1, s3);
 
         // s1 and s2 share more n-grams than s1 and s3
-        assert!(sim_12 > sim_13, "Similar sentences should have higher n-gram overlap");
+        assert!(
+            sim_12 > sim_13,
+            "Similar sentences should have higher n-gram overlap"
+        );
     }
 
     #[test]
@@ -1027,9 +1219,19 @@ mod tests {
         let cross_sim2 = positive2.similarity(&negative2);
 
         // Positive scenarios should be more similar to each other
-        assert!(pos_sim > cross_sim1, "Same-valence scenarios should cluster: pos_sim={:.3}, cross={:.3}", pos_sim, cross_sim1);
+        assert!(
+            pos_sim > cross_sim1,
+            "Same-valence scenarios should cluster: pos_sim={:.3}, cross={:.3}",
+            pos_sim,
+            cross_sim1
+        );
         // Negative scenarios should be more similar to each other
-        assert!(neg_sim > cross_sim2, "Same-valence scenarios should cluster: neg_sim={:.3}, cross={:.3}", neg_sim, cross_sim2);
+        assert!(
+            neg_sim > cross_sim2,
+            "Same-valence scenarios should cluster: neg_sim={:.3}, cross={:.3}",
+            neg_sim,
+            cross_sim2
+        );
     }
 
     #[test]
@@ -1047,8 +1249,14 @@ mod tests {
         let friend_stranger_sim = with_friend.similarity(&with_stranger);
 
         // These should be reasonably similar (same action) but not identical
-        assert!(child_stranger_sim > 0.5, "Same action should have baseline similarity");
-        assert!(child_stranger_sim < 0.99, "Different entities should differ");
+        assert!(
+            child_stranger_sim > 0.5,
+            "Same action should have baseline similarity"
+        );
+        assert!(
+            child_stranger_sim < 0.99,
+            "Different entities should differ"
+        );
     }
 
     #[test]

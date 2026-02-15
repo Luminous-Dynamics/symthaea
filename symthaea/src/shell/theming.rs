@@ -150,18 +150,45 @@ impl Theme {
 
     /// Get color for role (with fallback)
     pub fn get(&self, role: ColorRole) -> Color {
-        self.colors.get(&role).copied().unwrap_or_else(|| self.fallback(role))
+        self.colors
+            .get(&role)
+            .copied()
+            .unwrap_or_else(|| self.fallback(role))
     }
 
     fn fallback(&self, role: ColorRole) -> Color {
         use ColorRole::*;
         match role {
-            Primary => Color::rgb(100, 149, 237), // Cornflower blue
+            Primary => Color::rgb(100, 149, 237),  // Cornflower blue
             Secondary => Color::rgb(138, 43, 226), // Blue violet
-            Background => if self.is_dark { Color::rgb(30, 30, 30) } else { Color::rgb(250, 250, 250) },
-            Surface => if self.is_dark { Color::rgb(45, 45, 45) } else { Color::rgb(240, 240, 240) },
-            Text => if self.is_dark { Color::rgb(220, 220, 220) } else { Color::rgb(30, 30, 30) },
-            TextMuted => if self.is_dark { Color::rgb(150, 150, 150) } else { Color::rgb(100, 100, 100) },
+            Background => {
+                if self.is_dark {
+                    Color::rgb(30, 30, 30)
+                } else {
+                    Color::rgb(250, 250, 250)
+                }
+            }
+            Surface => {
+                if self.is_dark {
+                    Color::rgb(45, 45, 45)
+                } else {
+                    Color::rgb(240, 240, 240)
+                }
+            }
+            Text => {
+                if self.is_dark {
+                    Color::rgb(220, 220, 220)
+                } else {
+                    Color::rgb(30, 30, 30)
+                }
+            }
+            TextMuted => {
+                if self.is_dark {
+                    Color::rgb(150, 150, 150)
+                } else {
+                    Color::rgb(100, 100, 100)
+                }
+            }
             Success | ConsciousnessHigh | SafetyGreen => Color::rgb(50, 205, 50),
             Warning | ConsciousnessMedium | SafetyYellow => Color::rgb(255, 200, 0),
             Error | ConsciousnessLow | SafetyRed => Color::rgb(220, 50, 50),
@@ -200,8 +227,8 @@ impl Themes {
         Theme::new("Luminous")
             .with_description("Default dark theme with consciousness-aware coloring")
             .dark(true)
-            .with_color(ColorRole::Primary, Color::rgb(138, 180, 248))       // Light blue
-            .with_color(ColorRole::Secondary, Color::rgb(187, 134, 252))     // Light purple
+            .with_color(ColorRole::Primary, Color::rgb(138, 180, 248)) // Light blue
+            .with_color(ColorRole::Secondary, Color::rgb(187, 134, 252)) // Light purple
             .with_color(ColorRole::Background, Color::rgb(18, 18, 18))
             .with_color(ColorRole::Surface, Color::rgb(30, 30, 30))
             .with_color(ColorRole::Text, Color::rgb(232, 234, 237))
@@ -237,15 +264,15 @@ impl Themes {
         Theme::new("Aurora")
             .with_description("Nord-inspired arctic theme")
             .dark(true)
-            .with_color(ColorRole::Primary, Color::rgb(136, 192, 208))       // Nord frost
-            .with_color(ColorRole::Secondary, Color::rgb(180, 142, 173))     // Nord aurora purple
-            .with_color(ColorRole::Background, Color::rgb(46, 52, 64))       // Nord polar night
+            .with_color(ColorRole::Primary, Color::rgb(136, 192, 208)) // Nord frost
+            .with_color(ColorRole::Secondary, Color::rgb(180, 142, 173)) // Nord aurora purple
+            .with_color(ColorRole::Background, Color::rgb(46, 52, 64)) // Nord polar night
             .with_color(ColorRole::Surface, Color::rgb(59, 66, 82))
             .with_color(ColorRole::Text, Color::rgb(236, 239, 244))
             .with_color(ColorRole::TextMuted, Color::rgb(216, 222, 233))
-            .with_color(ColorRole::Success, Color::rgb(163, 190, 140))       // Nord green
-            .with_color(ColorRole::Warning, Color::rgb(235, 203, 139))       // Nord yellow
-            .with_color(ColorRole::Error, Color::rgb(191, 97, 106))          // Nord red
+            .with_color(ColorRole::Success, Color::rgb(163, 190, 140)) // Nord green
+            .with_color(ColorRole::Warning, Color::rgb(235, 203, 139)) // Nord yellow
+            .with_color(ColorRole::Error, Color::rgb(191, 97, 106)) // Nord red
     }
 
     /// High contrast theme
@@ -253,11 +280,11 @@ impl Themes {
         Theme::new("Contrast")
             .with_description("High contrast accessibility theme")
             .dark(true)
-            .with_color(ColorRole::Primary, Color::rgb(255, 255, 0))         // Pure yellow
-            .with_color(ColorRole::Secondary, Color::rgb(0, 255, 255))       // Pure cyan
-            .with_color(ColorRole::Background, Color::rgb(0, 0, 0))          // Pure black
+            .with_color(ColorRole::Primary, Color::rgb(255, 255, 0)) // Pure yellow
+            .with_color(ColorRole::Secondary, Color::rgb(0, 255, 255)) // Pure cyan
+            .with_color(ColorRole::Background, Color::rgb(0, 0, 0)) // Pure black
             .with_color(ColorRole::Surface, Color::rgb(20, 20, 20))
-            .with_color(ColorRole::Text, Color::rgb(255, 255, 255))          // Pure white
+            .with_color(ColorRole::Text, Color::rgb(255, 255, 255)) // Pure white
             .with_color(ColorRole::TextMuted, Color::rgb(200, 200, 200))
             .with_color(ColorRole::Success, Color::rgb(0, 255, 0))
             .with_color(ColorRole::Warning, Color::rgb(255, 255, 0))
@@ -269,15 +296,15 @@ impl Themes {
         Theme::new("Solarized Dark")
             .with_description("Solarized dark color scheme")
             .dark(true)
-            .with_color(ColorRole::Primary, Color::rgb(38, 139, 210))        // Blue
-            .with_color(ColorRole::Secondary, Color::rgb(108, 113, 196))     // Violet
-            .with_color(ColorRole::Background, Color::rgb(0, 43, 54))        // Base03
-            .with_color(ColorRole::Surface, Color::rgb(7, 54, 66))           // Base02
-            .with_color(ColorRole::Text, Color::rgb(131, 148, 150))          // Base0
-            .with_color(ColorRole::TextMuted, Color::rgb(88, 110, 117))      // Base01
-            .with_color(ColorRole::Success, Color::rgb(133, 153, 0))         // Green
-            .with_color(ColorRole::Warning, Color::rgb(181, 137, 0))         // Yellow
-            .with_color(ColorRole::Error, Color::rgb(220, 50, 47))           // Red
+            .with_color(ColorRole::Primary, Color::rgb(38, 139, 210)) // Blue
+            .with_color(ColorRole::Secondary, Color::rgb(108, 113, 196)) // Violet
+            .with_color(ColorRole::Background, Color::rgb(0, 43, 54)) // Base03
+            .with_color(ColorRole::Surface, Color::rgb(7, 54, 66)) // Base02
+            .with_color(ColorRole::Text, Color::rgb(131, 148, 150)) // Base0
+            .with_color(ColorRole::TextMuted, Color::rgb(88, 110, 117)) // Base01
+            .with_color(ColorRole::Success, Color::rgb(133, 153, 0)) // Green
+            .with_color(ColorRole::Warning, Color::rgb(181, 137, 0)) // Yellow
+            .with_color(ColorRole::Error, Color::rgb(220, 50, 47)) // Red
     }
 
     /// Get all built-in themes

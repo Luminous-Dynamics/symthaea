@@ -121,7 +121,11 @@ impl CodePerceptionCortex {
             .build();
 
         for entry in walker.filter_map(|e| e.ok()) {
-            if entry.file_type().map(|ft: std::fs::FileType| ft.is_file()).unwrap_or(false) {
+            if entry
+                .file_type()
+                .map(|ft: std::fs::FileType| ft.is_file())
+                .unwrap_or(false)
+            {
                 let path = entry.path().to_path_buf();
 
                 // Count lines
@@ -131,11 +135,10 @@ impl CodePerceptionCortex {
                         total_lines += lines;
 
                         // Categorize by extension
-                        if let Some(ext) = path.extension().and_then(|e: &std::ffi::OsStr| e.to_str()) {
-                            files_by_type
-                                .entry(ext.to_string())
-                                .or_default()
-                                .push(path);
+                        if let Some(ext) =
+                            path.extension().and_then(|e: &std::ffi::OsStr| e.to_str())
+                        {
+                            files_by_type.entry(ext.to_string()).or_default().push(path);
                         }
 
                         file_count += 1;
@@ -219,12 +222,16 @@ impl CodePerceptionCortex {
         let total_lines = lines.len();
 
         // Count functions (simple heuristic)
-        let function_count = lines.iter()
-            .filter(|line| line.trim_start().starts_with("fn ") || line.trim_start().starts_with("pub fn "))
+        let function_count = lines
+            .iter()
+            .filter(|line| {
+                line.trim_start().starts_with("fn ") || line.trim_start().starts_with("pub fn ")
+            })
             .count();
 
         // Count doc comments
-        let doc_lines = lines.iter()
+        let doc_lines = lines
+            .iter()
             .filter(|line| {
                 let trimmed = line.trim();
                 trimmed.starts_with("///") || trimmed.starts_with("//!")
@@ -232,7 +239,8 @@ impl CodePerceptionCortex {
             .count();
 
         // Count test functions
-        let test_count = lines.iter()
+        let test_count = lines
+            .iter()
             .filter(|line| line.trim_start().starts_with("#[test]"))
             .count();
 
@@ -307,7 +315,9 @@ impl<'ast> Visit<'ast> for RustVisitor {
         match item {
             Item::Fn(func) => {
                 self.semantics.function_count += 1;
-                self.semantics.function_names.push(func.sig.ident.to_string());
+                self.semantics
+                    .function_names
+                    .push(func.sig.ident.to_string());
 
                 if matches!(func.vis, syn::Visibility::Public(_)) {
                     self.public_count += 1;
@@ -443,7 +453,10 @@ mod tests {
     fn test_extension_to_language() {
         assert_eq!(CodePerceptionCortex::extension_to_language("rs"), "Rust");
         assert_eq!(CodePerceptionCortex::extension_to_language("py"), "Python");
-        assert_eq!(CodePerceptionCortex::extension_to_language("js"), "JavaScript");
+        assert_eq!(
+            CodePerceptionCortex::extension_to_language("js"),
+            "JavaScript"
+        );
         assert_eq!(CodePerceptionCortex::extension_to_language("nix"), "Nix");
     }
 }

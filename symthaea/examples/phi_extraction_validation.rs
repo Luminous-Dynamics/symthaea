@@ -26,14 +26,14 @@
 //! cargo run --example phi_extraction_validation --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig};
@@ -64,7 +64,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(50).collect();
     let functional: Vec<_> = functional.into_iter().take(50).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -127,7 +131,8 @@ fn run_experiment() -> Result<()> {
     println!("  Func centroid L2 norm: {:.4}", l2_norm(&func_centroid));
 
     // Step 2: Difference vector (raw)
-    let diff_vector: Vec<f64> = phen_centroid.iter()
+    let diff_vector: Vec<f64> = phen_centroid
+        .iter()
         .zip(func_centroid.iter())
         .map(|(p, f)| p - f)
         .collect();
@@ -142,7 +147,8 @@ fn run_experiment() -> Result<()> {
     // Step 4: Project difference onto functional subspace and subtract
     // Φ = diff - projection(diff, func_subspace)
     let diff_proj_onto_func = project_onto_subspace(&diff_vector, &func_pcs);
-    let phi: Vec<f64> = diff_vector.iter()
+    let phi: Vec<f64> = diff_vector
+        .iter()
         .zip(diff_proj_onto_func.iter())
         .map(|(d, p)| d - p)
         .collect();
@@ -156,20 +162,43 @@ fn run_experiment() -> Result<()> {
     println!("  Φ normalized to unit vector");
 
     // Step 5: Compute Φ loading for each concept
-    let phen_phi_loadings: Vec<f64> = phen_acts.iter()
+    let phen_phi_loadings: Vec<f64> = phen_acts
+        .iter()
         .map(|a| dot_product(a, &phi_normalized))
         .collect();
-    let func_phi_loadings: Vec<f64> = func_acts.iter()
+    let func_phi_loadings: Vec<f64> = func_acts
+        .iter()
         .map(|a| dot_product(a, &phi_normalized))
         .collect();
 
     println!("\nΦ loadings:");
-    println!("  Phenomenal mean: {:.4} ± {:.4}", mean(&phen_phi_loadings), std_dev(&phen_phi_loadings));
-    println!("  Functional mean: {:.4} ± {:.4}", mean(&func_phi_loadings), std_dev(&func_phi_loadings));
+    println!(
+        "  Phenomenal mean: {:.4} ± {:.4}",
+        mean(&phen_phi_loadings),
+        std_dev(&phen_phi_loadings)
+    );
+    println!(
+        "  Functional mean: {:.4} ± {:.4}",
+        mean(&func_phi_loadings),
+        std_dev(&func_phi_loadings)
+    );
 
     let phi_d = cohens_d(&phen_phi_loadings, &func_phi_loadings);
     let phi_p = permutation_test(&phen_phi_loadings, &func_phi_loadings, 5000);
-    println!("  Cohen's d: {:+.4}, p = {:.4}{}", phi_d, phi_p, if phi_p < 0.001 { "***" } else if phi_p < 0.01 { "**" } else if phi_p < 0.05 { "*" } else { "" });
+    println!(
+        "  Cohen's d: {:+.4}, p = {:.4}{}",
+        phi_d,
+        phi_p,
+        if phi_p < 0.001 {
+            "***"
+        } else if phi_p < 0.01 {
+            "**"
+        } else if phi_p < 0.05 {
+            "*"
+        } else {
+            ""
+        }
+    );
 
     // ================================================================
     // PHASE 3: Subtract Φ from phenomenal concepts
@@ -180,7 +209,8 @@ fn run_experiment() -> Result<()> {
 
     // Subtract Φ component from each phenomenal activation
     // phen_minus_phi[i] = phen[i] - (phen[i] · Φ) * Φ
-    let phen_minus_phi: Vec<Vec<f64>> = phen_acts.iter()
+    let phen_minus_phi: Vec<Vec<f64>> = phen_acts
+        .iter()
         .map(|a| {
             let loading = dot_product(a, &phi_normalized);
             a.iter()
@@ -190,14 +220,21 @@ fn run_experiment() -> Result<()> {
         })
         .collect();
 
-    println!("Φ subtracted from {} phenomenal concepts", phen_minus_phi.len());
+    println!(
+        "Φ subtracted from {} phenomenal concepts",
+        phen_minus_phi.len()
+    );
 
     // Verify: Φ loadings should now be ~0 for modified phenomenal
-    let phen_minus_phi_loadings: Vec<f64> = phen_minus_phi.iter()
+    let phen_minus_phi_loadings: Vec<f64> = phen_minus_phi
+        .iter()
         .map(|a| dot_product(a, &phi_normalized))
         .collect();
     println!("Verification - Φ loadings after subtraction:");
-    println!("  Mean: {:.6} (should be ~0)", mean(&phen_minus_phi_loadings));
+    println!(
+        "  Mean: {:.6} (should be ~0)",
+        mean(&phen_minus_phi_loadings)
+    );
 
     // ================================================================
     // PHASE 4: Re-measure unity scores
@@ -209,15 +246,18 @@ fn run_experiment() -> Result<()> {
     // Compute unity for original phenomenal, modified phenomenal, and functional
     print!("Computing unity scores... ");
 
-    let phen_orig_unity: Vec<f64> = phen_acts.iter()
+    let phen_orig_unity: Vec<f64> = phen_acts
+        .iter()
         .map(|a| compute_unity_from_activation(a, &topology_config))
         .collect();
 
-    let phen_minus_phi_unity: Vec<f64> = phen_minus_phi.iter()
+    let phen_minus_phi_unity: Vec<f64> = phen_minus_phi
+        .iter()
         .map(|a| compute_unity_from_activation(a, &topology_config))
         .collect();
 
-    let func_unity: Vec<f64> = func_acts.iter()
+    let func_unity: Vec<f64> = func_acts
+        .iter()
         .map(|a| compute_unity_from_activation(a, &topology_config))
         .collect();
 
@@ -225,13 +265,29 @@ fn run_experiment() -> Result<()> {
 
     println!("Unity Scores:");
     println!("────────────────────────────────────────────────────────────");
-    println!("  Phenomenal (original):  {:.4} ± {:.4}", mean(&phen_orig_unity), std_dev(&phen_orig_unity));
-    println!("  Phenomenal (minus Φ):   {:.4} ± {:.4}", mean(&phen_minus_phi_unity), std_dev(&phen_minus_phi_unity));
-    println!("  Functional:             {:.4} ± {:.4}", mean(&func_unity), std_dev(&func_unity));
+    println!(
+        "  Phenomenal (original):  {:.4} ± {:.4}",
+        mean(&phen_orig_unity),
+        std_dev(&phen_orig_unity)
+    );
+    println!(
+        "  Phenomenal (minus Φ):   {:.4} ± {:.4}",
+        mean(&phen_minus_phi_unity),
+        std_dev(&phen_minus_phi_unity)
+    );
+    println!(
+        "  Functional:             {:.4} ± {:.4}",
+        mean(&func_unity),
+        std_dev(&func_unity)
+    );
 
     let orig_diff = mean(&phen_orig_unity) - mean(&func_unity);
     let new_diff = mean(&phen_minus_phi_unity) - mean(&func_unity);
-    let reduction = if orig_diff != 0.0 { ((orig_diff - new_diff) / orig_diff) * 100.0 } else { 0.0 };
+    let reduction = if orig_diff != 0.0 {
+        ((orig_diff - new_diff) / orig_diff) * 100.0
+    } else {
+        0.0
+    };
 
     println!("\nPhenomenal Advantage:");
     println!("  Original: {:+.4}", orig_diff);
@@ -243,8 +299,16 @@ fn run_experiment() -> Result<()> {
     let p_new = permutation_test(&phen_minus_phi_unity, &func_unity, 5000);
 
     println!("\nStatistical Significance:");
-    println!("  Original vs Functional: p = {:.4}{}", p_orig, if p_orig < 0.05 { " *" } else { "" });
-    println!("  Minus-Φ vs Functional:  p = {:.4}{}", p_new, if p_new < 0.05 { " *" } else { "" });
+    println!(
+        "  Original vs Functional: p = {:.4}{}",
+        p_orig,
+        if p_orig < 0.05 { " *" } else { "" }
+    );
+    println!(
+        "  Minus-Φ vs Functional:  p = {:.4}{}",
+        p_new,
+        if p_new < 0.05 { " *" } else { "" }
+    );
 
     // ================================================================
     // PHASE 5: Re-measure pairwise correlations
@@ -259,13 +323,29 @@ fn run_experiment() -> Result<()> {
 
     println!("Pairwise Correlations:");
     println!("────────────────────────────────────────────────────────────");
-    println!("  Phenomenal (original):  {:.4} ± {:.4}", mean(&phen_orig_corr), std_dev(&phen_orig_corr));
-    println!("  Phenomenal (minus Φ):   {:.4} ± {:.4}", mean(&phen_minus_phi_corr), std_dev(&phen_minus_phi_corr));
-    println!("  Functional:             {:.4} ± {:.4}", mean(&func_corr), std_dev(&func_corr));
+    println!(
+        "  Phenomenal (original):  {:.4} ± {:.4}",
+        mean(&phen_orig_corr),
+        std_dev(&phen_orig_corr)
+    );
+    println!(
+        "  Phenomenal (minus Φ):   {:.4} ± {:.4}",
+        mean(&phen_minus_phi_corr),
+        std_dev(&phen_minus_phi_corr)
+    );
+    println!(
+        "  Functional:             {:.4} ± {:.4}",
+        mean(&func_corr),
+        std_dev(&func_corr)
+    );
 
     let corr_reduction = mean(&phen_orig_corr) - mean(&phen_minus_phi_corr);
     let target_reduction = mean(&phen_orig_corr) - mean(&func_corr);
-    let corr_pct = if target_reduction != 0.0 { (corr_reduction / target_reduction) * 100.0 } else { 0.0 };
+    let corr_pct = if target_reduction != 0.0 {
+        (corr_reduction / target_reduction) * 100.0
+    } else {
+        0.0
+    };
 
     println!("\nCorrelation Change:");
     println!("  Original phen-phen: {:.4}", mean(&phen_orig_corr));
@@ -289,13 +369,22 @@ fn run_experiment() -> Result<()> {
         println!("");
         println!("  Removing Φ from phenomenal concepts:");
         println!("    - Reduced unity advantage by {:.1}%", reduction);
-        println!("    - Reduced correlation by {:.1}% toward functional baseline", corr_pct);
+        println!(
+            "    - Reduced correlation by {:.1}% toward functional baseline",
+            corr_pct
+        );
         if sig_eliminated {
-            println!("    - ELIMINATED statistical significance (p = {:.4})", p_new);
+            println!(
+                "    - ELIMINATED statistical significance (p = {:.4})",
+                p_new
+            );
             println!("");
             println!("  This is CAUSAL PROOF that Φ is the phenomenal signature.");
         } else {
-            println!("    - Significance reduced but not eliminated (p = {:.4})", p_new);
+            println!(
+                "    - Significance reduced but not eliminated (p = {:.4})",
+                p_new
+            );
             println!("");
             println!("  Φ captures MOST but not all phenomenal structure.");
         }
@@ -303,10 +392,16 @@ fn run_experiment() -> Result<()> {
         println!("◐ Φ PARTIALLY VALIDATED");
         println!("");
         println!("  Φ removal had partial effect:");
-        if unity_success { println!("    ✓ Unity reduced by {:.1}%", reduction); }
-        else { println!("    ✗ Unity only reduced by {:.1}%", reduction); }
-        if corr_success { println!("    ✓ Correlation reduced by {:.1}%", corr_pct); }
-        else { println!("    ✗ Correlation only reduced by {:.1}%", corr_pct); }
+        if unity_success {
+            println!("    ✓ Unity reduced by {:.1}%", reduction);
+        } else {
+            println!("    ✗ Unity only reduced by {:.1}%", reduction);
+        }
+        if corr_success {
+            println!("    ✓ Correlation reduced by {:.1}%", corr_pct);
+        } else {
+            println!("    ✗ Correlation only reduced by {:.1}%", corr_pct);
+        }
         println!("");
         println!("  Φ captures some but not all phenomenal structure.");
         println!("  May need more sophisticated extraction method.");
@@ -331,7 +426,8 @@ fn run_experiment() -> Result<()> {
     println!("================================================================\n");
 
     // Find dimensions with highest Φ loading
-    let mut phi_dims: Vec<(usize, f64)> = phi_normalized.iter()
+    let mut phi_dims: Vec<(usize, f64)> = phi_normalized
+        .iter()
         .enumerate()
         .map(|(i, &v)| (i, v))
         .collect();
@@ -346,10 +442,15 @@ fn run_experiment() -> Result<()> {
     }
 
     // Sparsity of Φ
-    let phi_sparsity = phi_normalized.iter().filter(|&&x| x.abs() < 0.01).count() as f64 / dim as f64;
+    let phi_sparsity =
+        phi_normalized.iter().filter(|&&x| x.abs() < 0.01).count() as f64 / dim as f64;
     println!("\nΦ sparsity (|w| < 0.01): {:.1}%", phi_sparsity * 100.0);
 
-    let phi_concentrated = phi_dims.iter().take(50).map(|(_, w)| w.powi(2)).sum::<f64>();
+    let phi_concentrated = phi_dims
+        .iter()
+        .take(50)
+        .map(|(_, w)| w.powi(2))
+        .sum::<f64>();
     println!("Variance in top 50 dims: {:.1}%", phi_concentrated * 100.0);
 
     println!("\n================================================================");
@@ -376,7 +477,8 @@ fn compute_principal_components(activations: &[Vec<f64>], k: usize) -> Vec<Vec<f
     let centroid = compute_centroid(activations);
 
     // Center the data
-    let centered: Vec<Vec<f64>> = activations.iter()
+    let centered: Vec<Vec<f64>> = activations
+        .iter()
         .map(|a| a.iter().zip(centroid.iter()).map(|(x, c)| x - c).collect())
         .collect();
 
@@ -389,7 +491,8 @@ fn compute_principal_components(activations: &[Vec<f64>], k: usize) -> Vec<Vec<f
         let v_norm = l2_norm(&v);
         v = v.iter().map(|x| x / v_norm).collect();
 
-        for _ in 0..20 {  // 20 iterations usually enough
+        for _ in 0..20 {
+            // 20 iterations usually enough
             // v = A^T A v (where A is the data matrix)
             let mut new_v = vec![0.0; dim];
             for row in &residual {
@@ -453,7 +556,7 @@ fn compute_pairwise_correlations(activations: &[Vec<f64>]) -> Vec<f64> {
     let n = activations.len();
 
     for i in 0..n {
-        for j in (i+1)..n {
+        for j in (i + 1)..n {
             correlations.push(pearson_correlation(&activations[i], &activations[j]));
         }
     }
@@ -533,13 +636,17 @@ fn activation_to_hv16(activation: &[f32]) -> BinaryHV {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     variance.sqrt()
@@ -549,8 +656,8 @@ fn std_dev(values: &[f64]) -> f64 {
 fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
     let mean_diff = mean(a) - mean(b);
     let pooled_var = ((a.len() - 1) as f64 * std_dev(a).powi(2)
-                    + (b.len() - 1) as f64 * std_dev(b).powi(2))
-                    / (a.len() + b.len() - 2) as f64;
+        + (b.len() - 1) as f64 * std_dev(b).powi(2))
+        / (a.len() + b.len() - 2) as f64;
     if pooled_var > 0.0 {
         mean_diff / pooled_var.sqrt()
     } else {

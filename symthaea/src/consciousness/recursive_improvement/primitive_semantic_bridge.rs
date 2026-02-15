@@ -56,9 +56,9 @@
 //!
 //! This means decomposition becomes TRIVIAL - just read the birth certificate!
 
-use symthaea_core::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier, Primitive};
-use symthaea_core::hdc::binary_hv::BinaryHV;
 use crate::embeddings::HdcBridge;
+use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 
 // Stub for SemanticPrimitiveEncoder until it's properly implemented
 struct SemanticPrimitiveEncoder {
@@ -78,7 +78,8 @@ impl SemanticPrimitiveEncoder {
         static INSTANCE: OnceLock<SemanticPrimitiveEncoder> = OnceLock::new();
         INSTANCE.get_or_init(|| {
             let prim_system = PrimitiveSystem::global_instance();
-            let primitives = prim_system.all_primitives()
+            let primitives = prim_system
+                .all_primitives()
                 .iter()
                 .map(|p| AlignedPrimitive {
                     name: p.name.clone(),
@@ -108,11 +109,9 @@ impl SemanticPrimitiveEncoder {
         &self.primitives
     }
 }
+use super::world_model::{ConsciousnessAction, ConsciousnessTransition, LatentConsciousnessState};
 #[cfg(feature = "embeddings")]
-use crate::embeddings::qwen3::{Qwen3Embedder, Qwen3Config, QWEN3_FULL_DIMENSION};
-use super::world_model::{
-    ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState,
-};
+use crate::embeddings::qwen3::{Qwen3Config, Qwen3Embedder, QWEN3_FULL_DIMENSION};
 
 // ActionContext definition (used in this module)
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -157,11 +156,11 @@ pub struct PrimitiveSemanticBridgeConfig {
 impl Default for PrimitiveSemanticBridgeConfig {
     fn default() -> Self {
         Self {
-            activation_threshold: 0.52,  // Just above random (0.50)
+            activation_threshold: 0.52, // Just above random (0.50)
             max_active_primitives: 20,
             use_primitive_hypervectors: true,
-            use_aligned_encoding: true,  // Use aligned encoding by default
-            use_real_embeddings: true,   // Use real ML embeddings when available
+            use_aligned_encoding: true, // Use aligned encoding by default
+            use_real_embeddings: true,  // Use real ML embeddings when available
             embedding_model_path: Some("models/qwen3-embedding-0.6b-onnx".to_string()),
             semantic_config: SemanticBridgeConfig::default(),
         }
@@ -258,7 +257,9 @@ impl PrimitiveSemanticBridge {
         // Try to initialize real embedder if enabled
         #[cfg(feature = "embeddings")]
         let (embedder, embed_dim) = if config.use_real_embeddings {
-            let model_path = config.embedding_model_path.clone()
+            let model_path = config
+                .embedding_model_path
+                .clone()
                 .unwrap_or_else(|| "models/qwen3-embedding-0.6b-onnx".to_string());
 
             match Qwen3Embedder::load(&model_path) {
@@ -266,7 +267,8 @@ impl PrimitiveSemanticBridge {
                     let dim = emb.dimension();
                     tracing::info!(
                         "PrimitiveSemanticBridge: Loaded real embedder from {} ({}D)",
-                        model_path, dim
+                        model_path,
+                        dim
                     );
                     (Some(emb), dim)
                 }
@@ -355,23 +357,26 @@ impl PrimitiveSemanticBridge {
         }
 
         // Sort by activation (descending)
-        active.sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap_or(std::cmp::Ordering::Equal));
+        active.sort_by(|a, b| {
+            b.activation
+                .partial_cmp(&a.activation)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         // Truncate to max
         active.truncate(self.config.max_active_primitives);
 
         // Compute combined HV if we have primitives
         let combined_hv = if !active.is_empty() && self.config.use_primitive_hypervectors {
-            let encodings: Vec<BinaryHV> = active.iter()
-                .map(|p| p.encoding.clone())
-                .collect();
+            let encodings: Vec<BinaryHV> = active.iter().map(|p| p.encoding.clone()).collect();
             Some(BinaryHV::bundle(&encodings))
         } else {
             None
         };
 
         // Compute tier distribution
-        let mut tier_map: std::collections::HashMap<PrimitiveTier, usize> = std::collections::HashMap::new();
+        let mut tier_map: std::collections::HashMap<PrimitiveTier, usize> =
+            std::collections::HashMap::new();
         for p in &active {
             *tier_map.entry(p.tier).or_insert(0) += 1;
         }
@@ -447,7 +452,9 @@ impl PrimitiveSemanticBridge {
         }
 
         // Extract primitive birth certificate
-        let primitive_birth: Vec<(String, f32)> = decomposition.primitives.iter()
+        let primitive_birth: Vec<(String, f32)> = decomposition
+            .primitives
+            .iter()
             .map(|p| (p.name.clone(), p.activation))
             .collect();
 
@@ -617,7 +624,8 @@ impl PrimitiveSemanticBridge {
         }
 
         // Use top 2-3 primitives to form a name
-        let top: Vec<&str> = primitive_birth.iter()
+        let top: Vec<&str> = primitive_birth
+            .iter()
             .take(3)
             .map(|(name, _)| name.as_str())
             .collect();
@@ -635,7 +643,8 @@ impl PrimitiveSemanticBridge {
             return "No primitive composition recorded.".to_string();
         }
 
-        let descriptions: Vec<String> = primitive_birth.iter()
+        let descriptions: Vec<String> = primitive_birth
+            .iter()
             .take(5)
             .map(|(name, strength)| format!("{} ({:.0}%)", name, strength * 100.0))
             .collect();

@@ -3,9 +3,9 @@
 //! Provides minimal types to allow integrated_information to compile
 //! without the full observability infrastructure.
 
-use std::sync::{Arc, RwLock};
 use chrono::{DateTime, Utc};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, RwLock};
 
 pub mod types {
     //! Observability types (stubs)
@@ -179,7 +179,10 @@ impl MetricsCollector {
 
     /// Increment the counter for `operation`.
     pub fn record_operation(&mut self, operation: &str) {
-        *self.operation_counts.entry(operation.to_string()).or_insert(0) += 1;
+        *self
+            .operation_counts
+            .entry(operation.to_string())
+            .or_insert(0) += 1;
     }
 
     /// Export the current state as an immutable snapshot.
@@ -212,10 +215,7 @@ impl MetricsCollector {
         if slice.len() < 2 {
             return 0.0;
         }
-        let deltas: Vec<f64> = slice
-            .windows(2)
-            .map(|w| w[1].value - w[0].value)
-            .collect();
+        let deltas: Vec<f64> = slice.windows(2).map(|w| w[1].value - w[0].value).collect();
         deltas.iter().sum::<f64>() / deltas.len() as f64
     }
 

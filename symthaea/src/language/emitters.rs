@@ -137,22 +137,16 @@ impl CodeEmitter for RustEmitter {
             format!(" -> {}", return_type)
         };
 
-        format!(
-            "pub fn {}({}){} {{\n    {}\n}}",
-            name, params, ret, body
-        )
+        format!("pub fn {}({}){} {{\n    {}\n}}", name, params, ret, body)
     }
 
     fn emit_struct(&self, name: &str, fields: &[(String, String)]) -> String {
-        let field_lines: Vec<String> = fields.iter()
+        let field_lines: Vec<String> = fields
+            .iter()
             .map(|(n, t)| format!("    pub {}: {},", n, t))
             .collect();
 
-        format!(
-            "pub struct {} {{\n{}\n}}",
-            name,
-            field_lines.join("\n")
-        )
+        format!("pub struct {} {{\n{}\n}}", name, field_lines.join("\n"))
     }
 
     fn emit_import(&self, module: &str) -> String {
@@ -240,10 +234,7 @@ impl CodeEmitter for PythonEmitter {
             format!(" -> {}", return_type)
         };
 
-        format!(
-            "def {}({}){}:\n    {}",
-            name, params, ret, body
-        )
+        format!("def {}({}){}:\n    {}", name, params, ret, body)
     }
 
     fn emit_struct(&self, name: &str, fields: &[(String, String)]) -> String {
@@ -324,15 +315,12 @@ impl CodeEmitter for NixEmitter {
     }
 
     fn emit_struct(&self, name: &str, fields: &[(String, String)]) -> String {
-        let field_lines: Vec<String> = fields.iter()
+        let field_lines: Vec<String> = fields
+            .iter()
             .map(|(n, _t)| format!("  {} = null; # TODO", n))
             .collect();
 
-        format!(
-            "{} = {{\n{}\n}};",
-            name,
-            field_lines.join("\n")
-        )
+        format!("{} = {{\n{}\n}};", name, field_lines.join("\n"))
     }
 
     fn emit_import(&self, module: &str) -> String {
@@ -381,9 +369,7 @@ mod tests {
     #[test]
     fn test_python_emit_struct() {
         let emitter = PythonEmitter;
-        let fields = vec![
-            ("name".to_string(), "str".to_string()),
-        ];
+        let fields = vec![("name".to_string(), "str".to_string())];
         let result = emitter.emit_struct("Person", &fields);
         assert!(result.contains("class Person"));
         assert!(result.contains("self.name: str"));
@@ -400,14 +386,12 @@ mod tests {
     fn test_rust_emit_from_spec() {
         let emitter = RustEmitter;
         let spec = CodeSpec::new("rust", "sort_vec", "Sort a vector in place");
-        let plan = vec![
-            CodePlanStep {
-                action: PlanAction::DefineFunction,
-                name: None,
-                context: Vec::new(),
-                confidence: 0.9,
-            },
-        ];
+        let plan = vec![CodePlanStep {
+            action: PlanAction::DefineFunction,
+            name: None,
+            context: Vec::new(),
+            confidence: 0.9,
+        }];
         let result = emitter.emit_from_spec(&spec, &plan);
         assert!(result.contains("sort_vec"));
         assert!(result.contains("Sort a vector"));
@@ -416,16 +400,13 @@ mod tests {
     #[test]
     fn test_python_emit_from_spec_with_examples() {
         let emitter = PythonEmitter;
-        let spec = CodeSpec::new("python", "add", "Add two numbers")
-            .with_example("add(1, 2)", "3");
-        let plan = vec![
-            CodePlanStep {
-                action: PlanAction::DefineFunction,
-                name: None,
-                context: Vec::new(),
-                confidence: 0.9,
-            },
-        ];
+        let spec = CodeSpec::new("python", "add", "Add two numbers").with_example("add(1, 2)", "3");
+        let plan = vec![CodePlanStep {
+            action: PlanAction::DefineFunction,
+            name: None,
+            context: Vec::new(),
+            confidence: 0.9,
+        }];
         let result = emitter.emit_from_spec(&spec, &plan);
         assert!(result.contains("def add"));
         assert!(result.contains("test_example_0"));

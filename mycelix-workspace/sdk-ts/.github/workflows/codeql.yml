@@ -1,0 +1,159 @@
+# CodeQL Security Analysis
+# Performs deep semantic code analysis to find security vulnerabilities
+# Runs on every push/PR and on a weekly schedule for comprehensive scanning
+
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'package.json'
+      - '.github/workflows/codeql.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'src/**'
+      - 'package.json'
+  schedule:
+    # Weekly deep scan on Sundays at 3:00 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+    inputs:
+      debug:
+        description: 'Enable debug logging'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  actions: read
+  contents: read
+  security-events: write
+  pull-requests: read
+
+jobs:
+  analyze:
+    name: Analyze TypeScript/JavaScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        # CodeQL supports: cpp, csharp, go, java, javascript, python, ruby
+        language: ['javascript-typescript']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Needed for diff analysis
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build TypeScript
+        run: npm run build
+
+      # Initialize CodeQL tools for scanning
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # Use extended security queries for maximum coverage
+          queries: +security-extended,security-and-quality
+          # Add custom configuration for Byzantine-resistant systems
+          config: |
+            name: "Mycelix SDK Security Config"
+            queries:
+              - uses: security-extended
+              - uses: security-and-quality
+            paths-ignore:
+              - 'node_modules/**'
+              - 'dist/**'
+              - 'docs/**'
+              - 'coverage/**'
+              - '**/*.test.ts'
+              - '**/*.spec.ts'
+              - '**/benchmarks/**'
+            query-filters:
+              # Exclude low-confidence results
+              - exclude:
+                  problem.severity: recommendation
+
+      # Perform CodeQL Analysis
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
+          upload: always
+          output: sarif-results
+
+      # Upload SARIF for GitHub Security tab
+      - name: Upload SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: sarif-results/${{ matrix.language }}.sarif
+          category: codeql
+
+      # Post summary to PR
+      - name: Security Analysis Summary
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## 🔒 CodeQL Security Analysis Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Security scan completed for \`${{ matrix.language }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View detailed results in the **Security** tab of this repository." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Scan Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- Query suites: \`security-extended\`, \`security-and-quality\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Trigger: \`${{ github.event_name }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- Branch: \`${{ github.ref_name }}\`" >> $GITHUB_STEP_SUMMARY
+
+  # Additional security checks specific to Byzantine-resistant systems
+  crypto-audit:
+    name: Cryptographic Usage Audit
+    runs-on: ubuntu-latest
+    needs: analyze
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for unsafe random usage
+        run: |
+          echo "## 🔐 Cryptographic Audit" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Check for Math.random() in security-critical code
+          if grep -rn "Math.random" src/security/ src/matl/ src/fl/ 2>/dev/null; then
+            echo "⚠️ **Warning:** Found \`Math.random()\` usage in security-critical modules" >> $GITHUB_STEP_SUMMARY
+            echo "Consider using cryptographically secure alternatives." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No \`Math.random()\` found in security-critical modules" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for hardcoded secrets patterns
+          if grep -rn -E "(password|secret|key|token)\s*[:=]\s*['\"][^'\"]+['\"]" src/ 2>/dev/null | grep -v ".test.ts" | grep -v ".spec.ts"; then
+            echo "⚠️ **Warning:** Potential hardcoded secrets detected" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No obvious hardcoded secrets found" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          # Check for eval usage
+          if grep -rn "eval(" src/ 2>/dev/null | grep -v ".test.ts"; then
+            echo "❌ **Critical:** Found \`eval()\` usage - security risk!" >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ No \`eval()\` usage found" >> $GITHUB_STEP_SUMMARY
+          fi

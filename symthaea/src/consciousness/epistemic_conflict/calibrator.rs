@@ -50,12 +50,27 @@ impl TheoryCalibrator {
     /// - coverage: fraction of theories with reliability > r_min
     pub fn reliability(&self, metrics: &MultiTheoryMetrics) -> f64 {
         let values = [
-            (metrics.phi, self.calibrations.get(TheoryId::IIT).reliability),
-            (metrics.gwt, self.calibrations.get(TheoryId::GWT).reliability),
-            (metrics.ast, self.calibrations.get(TheoryId::AST).reliability),
+            (
+                metrics.phi,
+                self.calibrations.get(TheoryId::IIT).reliability,
+            ),
+            (
+                metrics.gwt,
+                self.calibrations.get(TheoryId::GWT).reliability,
+            ),
+            (
+                metrics.ast,
+                self.calibrations.get(TheoryId::AST).reliability,
+            ),
             (metrics.pp, self.calibrations.get(TheoryId::PP).reliability),
-            (metrics.rpt, self.calibrations.get(TheoryId::RPT).reliability),
-            (metrics.embodiment, self.calibrations.get(TheoryId::FourE).reliability),
+            (
+                metrics.rpt,
+                self.calibrations.get(TheoryId::RPT).reliability,
+            ),
+            (
+                metrics.embodiment,
+                self.calibrations.get(TheoryId::FourE).reliability,
+            ),
         ];
 
         // Consensus: 1 - weighted stddev (dispersion under calibrated weights)
@@ -175,7 +190,14 @@ pub fn soft_min(a: f64, b: f64, tau: f64) -> f64 {
 mod tests {
     use super::*;
 
-    fn make_metrics(phi: f64, gwt: f64, ast: f64, pp: f64, rpt: f64, emb: f64) -> crate::consciousness::epistemic_conflict::MultiTheoryMetrics {
+    fn make_metrics(
+        phi: f64,
+        gwt: f64,
+        ast: f64,
+        pp: f64,
+        rpt: f64,
+        emb: f64,
+    ) -> crate::consciousness::epistemic_conflict::MultiTheoryMetrics {
         crate::consciousness::epistemic_conflict::MultiTheoryMetrics {
             phi,
             gwt,
@@ -241,7 +263,11 @@ mod tests {
     #[test]
     fn test_soft_min_approaches_min() {
         let result = soft_min(0.3, 0.8, 0.01);
-        assert!((result - 0.3).abs() < 0.05, "softmin(0.3, 0.8, 0.01) ≈ 0.3, got {}", result);
+        assert!(
+            (result - 0.3).abs() < 0.05,
+            "softmin(0.3, 0.8, 0.01) ≈ 0.3, got {}",
+            result
+        );
     }
 
     #[test]

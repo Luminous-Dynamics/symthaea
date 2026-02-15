@@ -21,17 +21,27 @@ fn test_load_real_weights() {
     let weights_path = Path::new("models/neural_bridge/probe_weights_embeddinggemma.npy");
 
     if !weights_path.exists() {
-        eprintln!("Skipping test: weights file not found at {:?}", weights_path);
+        eprintln!(
+            "Skipping test: weights file not found at {:?}",
+            weights_path
+        );
         eprintln!("Run the Python training pipeline first to generate weights.");
         return;
     }
 
-    let bridge = NeuralBridge::load(weights_path)
-        .expect("Failed to load probe weights");
+    let bridge = NeuralBridge::load(weights_path).expect("Failed to load probe weights");
 
     // EmbeddingGemma produces 768-dimensional embeddings
-    assert_eq!(bridge.input_dim(), 768, "Expected input_dim=768 for embeddinggemma");
-    assert_eq!(bridge.output_dim(), 16384, "Expected output_dim=16384 (HDC_DIMENSION)");
+    assert_eq!(
+        bridge.input_dim(),
+        768,
+        "Expected input_dim=768 for embeddinggemma"
+    );
+    assert_eq!(
+        bridge.output_dim(),
+        16384,
+        "Expected output_dim=16384 (HDC_DIMENSION)"
+    );
 
     println!("Loaded NeuralBridge:");
     println!("  Input dim:  {}", bridge.input_dim());
@@ -54,13 +64,10 @@ fn test_projection_with_synthetic_activation() {
     let bridge = NeuralBridge::load(weights_path).unwrap();
 
     // Create synthetic activation (768 dimensions)
-    let activation: Vec<f32> = (0..768)
-        .map(|i| (i as f32 * 0.01).sin() * 0.5)
-        .collect();
+    let activation: Vec<f32> = (0..768).map(|i| (i as f32 * 0.01).sin() * 0.5).collect();
 
     // Project to continuous
-    let continuous = bridge.project(&activation)
-        .expect("Projection failed");
+    let continuous = bridge.project(&activation).expect("Projection failed");
 
     assert_eq!(continuous.len(), 16384);
 
@@ -68,7 +75,8 @@ fn test_projection_with_synthetic_activation() {
     assert!(continuous.iter().all(|&v| v.is_finite()));
 
     // Project to bipolar
-    let bipolar = bridge.project_to_bipolar(&activation)
+    let bipolar = bridge
+        .project_to_bipolar(&activation)
         .expect("Bipolar projection failed");
 
     assert_eq!(bipolar.len(), 16384);
@@ -80,7 +88,10 @@ fn test_projection_with_synthetic_activation() {
     let positive = bipolar.iter().filter(|&&v| v == 1).count();
     let negative = bipolar.iter().filter(|&&v| v == -1).count();
 
-    println!("Bipolar distribution: {} positive, {} negative", positive, negative);
+    println!(
+        "Bipolar distribution: {} positive, {} negative",
+        positive, negative
+    );
 
     // Should be somewhat balanced (allow 60-40 split)
     assert!(positive > 6000, "Too few positive values");
@@ -102,12 +113,11 @@ fn test_packed_bipolar_projection() {
     let bridge = NeuralBridge::load(weights_path).unwrap();
 
     // Create activation
-    let activation: Vec<f32> = (0..768)
-        .map(|i| (i as f32 / 768.0 - 0.5) * 2.0)
-        .collect();
+    let activation: Vec<f32> = (0..768).map(|i| (i as f32 / 768.0 - 0.5) * 2.0).collect();
 
     // Project to packed
-    let packed = bridge.project_to_packed(&activation)
+    let packed = bridge
+        .project_to_packed(&activation)
         .expect("Packed projection failed");
 
     // Get bipolar for comparison
@@ -138,26 +148,26 @@ fn test_activation_differentiation() {
     let bridge = NeuralBridge::load(weights_path).unwrap();
 
     // Create two different activations
-    let activation1: Vec<f32> = (0..768)
-        .map(|i| (i as f32 * 0.01).sin())
-        .collect();
+    let activation1: Vec<f32> = (0..768).map(|i| (i as f32 * 0.01).sin()).collect();
 
-    let activation2: Vec<f32> = (0..768)
-        .map(|i| (i as f32 * 0.02).cos())
-        .collect();
+    let activation2: Vec<f32> = (0..768).map(|i| (i as f32 * 0.02).cos()).collect();
 
     let bipolar1 = bridge.project_to_bipolar(&activation1).unwrap();
     let bipolar2 = bridge.project_to_bipolar(&activation2).unwrap();
 
     // Count matching bits
-    let matching: usize = bipolar1.iter()
+    let matching: usize = bipolar1
+        .iter()
         .zip(bipolar2.iter())
         .filter(|(&a, &b)| a == b)
         .count();
 
     let similarity = matching as f64 / 16384.0;
 
-    println!("Similarity between different activations: {:.4}", similarity);
+    println!(
+        "Similarity between different activations: {:.4}",
+        similarity
+    );
 
     // Different activations should produce somewhat different vectors
     // (not identical, not completely opposite)
@@ -206,24 +216,36 @@ fn test_load_bge_m3_weights() {
     let weights_path = Path::new("models/neural_bridge/probe_weights_bge_m3.npy");
 
     if !weights_path.exists() {
-        eprintln!("Skipping test: BGE-M3 weights not found at {:?}", weights_path);
+        eprintln!(
+            "Skipping test: BGE-M3 weights not found at {:?}",
+            weights_path
+        );
         eprintln!("Run: python scripts/neural_bridge/train_probe_bge_m3.py");
         return;
     }
 
-    let bridge = NeuralBridge::load(weights_path)
-        .expect("Failed to load BGE-M3 probe weights");
+    let bridge = NeuralBridge::load(weights_path).expect("Failed to load BGE-M3 probe weights");
 
     // BGE-M3 produces 1024-dimensional embeddings
-    assert_eq!(bridge.input_dim(), 1024, "Expected input_dim=1024 for BGE-M3");
-    assert_eq!(bridge.output_dim(), 16384, "Expected output_dim=16384 (HDC_DIMENSION)");
+    assert_eq!(
+        bridge.input_dim(),
+        1024,
+        "Expected input_dim=1024 for BGE-M3"
+    );
+    assert_eq!(
+        bridge.output_dim(),
+        16384,
+        "Expected output_dim=16384 (HDC_DIMENSION)"
+    );
 
     println!("Loaded BGE-M3 NeuralBridge:");
     println!("  Input dim:  {}", bridge.input_dim());
     println!("  Output dim: {}", bridge.output_dim());
-    println!("  Weights:    {} floats ({:.1} MB)",
-             bridge.weights().len(),
-             bridge.weights().len() as f64 * 4.0 / 1_000_000.0);
+    println!(
+        "  Weights:    {} floats ({:.1} MB)",
+        bridge.weights().len(),
+        bridge.weights().len() as f64 * 4.0 / 1_000_000.0
+    );
 }
 
 /// Test BGE-M3 projection with synthetic embedding.
@@ -241,9 +263,7 @@ fn test_bge_m3_projection() {
     let bridge = NeuralBridge::load(weights_path).unwrap();
 
     // Create synthetic BGE-M3-like embedding (1024 dimensions, L2-normalized)
-    let mut embedding: Vec<f32> = (0..1024)
-        .map(|i| (i as f32 * 0.01).sin())
-        .collect();
+    let mut embedding: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.01).sin()).collect();
 
     // Normalize to unit length (BGE-M3 outputs normalized embeddings)
     let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -252,7 +272,8 @@ fn test_bge_m3_projection() {
     }
 
     // Project to HDC
-    let packed = bridge.project_to_packed(&embedding)
+    let packed = bridge
+        .project_to_packed(&embedding)
         .expect("Packed projection failed");
 
     // Verify dimension
@@ -263,10 +284,16 @@ fn test_bge_m3_projection() {
     let positive = bipolar.iter().filter(|&&v| v == 1).count();
     let negative = bipolar.iter().filter(|&&v| v == -1).count();
 
-    println!("BGE-M3 projection - Bipolar: {} positive, {} negative", positive, negative);
+    println!(
+        "BGE-M3 projection - Bipolar: {} positive, {} negative",
+        positive, negative
+    );
 
     // Should be roughly balanced
-    assert!(positive > 5000 && negative > 5000, "Distribution too skewed");
+    assert!(
+        positive > 5000 && negative > 5000,
+        "Distribution too skewed"
+    );
 }
 
 /// Test that trained concepts have high similarity to their targets.
@@ -288,18 +315,14 @@ fn test_trained_concept_similarity() {
     let bridge = NeuralBridge::load(weights_path).unwrap();
 
     // Create two similar embeddings
-    let embedding1: Vec<f32> = (0..1024)
-        .map(|i| (i as f32 * 0.001).sin())
-        .collect();
+    let embedding1: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.001).sin()).collect();
 
     let embedding2: Vec<f32> = (0..1024)
-        .map(|i| (i as f32 * 0.001 + 0.001).sin())  // Slightly perturbed
+        .map(|i| (i as f32 * 0.001 + 0.001).sin()) // Slightly perturbed
         .collect();
 
     // Create a very different embedding
-    let embedding3: Vec<f32> = (0..1024)
-        .map(|i| (i as f32 * 0.05).cos())
-        .collect();
+    let embedding3: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.05).cos()).collect();
 
     let packed1 = bridge.project_to_packed(&embedding1).unwrap();
     let packed2 = bridge.project_to_packed(&embedding2).unwrap();
@@ -312,8 +335,10 @@ fn test_trained_concept_similarity() {
     println!("Similarity (different embeddings): {:.4}", sim_13);
 
     // Similar embeddings should have higher similarity
-    assert!(sim_12 > sim_13,
-            "Similar embeddings should produce more similar HDC vectors");
+    assert!(
+        sim_12 > sim_13,
+        "Similar embeddings should produce more similar HDC vectors"
+    );
 }
 
 /// Test epistemic vector uncertainty tracking.
@@ -336,15 +361,20 @@ fn test_epistemic_metadata() {
     let packed_low = PackedBipolar::from_continuous(&low_margin);
 
     // Calculate margin-based uncertainty for low margin case
-    let low_margin_ratio = low_margin.iter().filter(|&&m| m.abs() < 0.1).count() as f32
-                          / HDC_DIMENSION as f32;
+    let low_margin_ratio =
+        low_margin.iter().filter(|&&m| m.abs() < 0.1).count() as f32 / HDC_DIMENSION as f32;
 
     println!("High margin case: margins ~0.9");
-    println!("Low margin case: {:.1}% dimensions near boundary", low_margin_ratio * 100.0);
+    println!(
+        "Low margin case: {:.1}% dimensions near boundary",
+        low_margin_ratio * 100.0
+    );
 
     // Verify the low margin case has high uncertainty
-    assert!(low_margin_ratio > 0.9,
-            "Low margin embeddings should have >90% dimensions near boundary");
+    assert!(
+        low_margin_ratio > 0.9,
+        "Low margin embeddings should have >90% dimensions near boundary"
+    );
 
     // Build epistemic vectors
     let esv_high = EpistemicSemanticVector::with_confidence(packed_high, 0.95);
@@ -384,8 +414,7 @@ fn test_e2e_text_to_hdc() {
     println!("Loading NeuralBridgeV2 (downloading BGE-M3 on first run)...");
     let start = std::time::Instant::now();
 
-    let mut bridge = NeuralBridgeV2::load_default()
-        .expect("Failed to load NeuralBridgeV2");
+    let mut bridge = NeuralBridgeV2::load_default().expect("Failed to load NeuralBridgeV2");
 
     println!("Model loaded in {:.2}s", start.elapsed().as_secs_f64());
     println!("  Encoder dim: {}", bridge.encoder_dim());
@@ -407,13 +436,15 @@ fn test_e2e_text_to_hdc() {
 
     for concept in &concepts {
         let encode_start = std::time::Instant::now();
-        let hdc = bridge.encode_to_hdc(concept)
-            .expect("Encoding failed");
+        let hdc = bridge.encode_to_hdc(concept).expect("Encoding failed");
         let elapsed = encode_start.elapsed();
 
-        println!("  {:40} → {} bits in {:.1}ms",
-                 concept, hdc.to_bipolar().len(),
-                 elapsed.as_secs_f64() * 1000.0);
+        println!(
+            "  {:40} → {} bits in {:.1}ms",
+            concept,
+            hdc.to_bipolar().len(),
+            elapsed.as_secs_f64() * 1000.0
+        );
 
         hdcs.push(hdc);
     }
@@ -440,8 +471,16 @@ fn test_e2e_text_to_hdc() {
     let stats = bridge.stats();
     println!("\nPipeline statistics:");
     println!("  Total calls: {}", stats.total_calls);
-    println!("  HDC cache:   {} ({:.1}%)", stats.hdc_cache_hits, stats.hdc_cache_hit_rate() * 100.0);
-    println!("  Emb cache:   {} ({:.1}%)", stats.embedding_cache_hits, stats.embedding_cache_hit_rate() * 100.0);
+    println!(
+        "  HDC cache:   {} ({:.1}%)",
+        stats.hdc_cache_hits,
+        stats.hdc_cache_hit_rate() * 100.0
+    );
+    println!(
+        "  Emb cache:   {} ({:.1}%)",
+        stats.embedding_cache_hits,
+        stats.embedding_cache_hit_rate() * 100.0
+    );
     println!("  Avg encode:  {:.2}ms", stats.avg_encode_ms());
     println!("  Avg probe:   {:.2}ms", stats.avg_probe_ms());
 
@@ -463,8 +502,7 @@ fn test_e2e_batch_encoding() {
         return;
     }
 
-    let mut bridge = NeuralBridgeV2::load_default()
-        .expect("Failed to load NeuralBridgeV2");
+    let mut bridge = NeuralBridgeV2::load_default().expect("Failed to load NeuralBridgeV2");
 
     let texts: Vec<&str> = vec![
         "consciousness",
@@ -477,24 +515,31 @@ fn test_e2e_batch_encoding() {
     println!("Batch encoding {} texts...", texts.len());
     let start = std::time::Instant::now();
 
-    let hdcs = bridge.encode_batch_to_hdc(&texts)
+    let hdcs = bridge
+        .encode_batch_to_hdc(&texts)
         .expect("Batch encoding failed");
 
     let elapsed = start.elapsed();
     let per_text = elapsed.as_secs_f64() * 1000.0 / texts.len() as f64;
 
-    println!("Batch complete in {:.1}ms ({:.1}ms/text)",
-             elapsed.as_secs_f64() * 1000.0, per_text);
+    println!(
+        "Batch complete in {:.1}ms ({:.1}ms/text)",
+        elapsed.as_secs_f64() * 1000.0,
+        per_text
+    );
 
     assert_eq!(hdcs.len(), texts.len());
 
     // All concepts should have some similarity (related to consciousness)
     for i in 0..hdcs.len() {
-        for j in (i+1)..hdcs.len() {
+        for j in (i + 1)..hdcs.len() {
             let sim = hdcs[i].xor_similarity(&hdcs[j]);
             println!("  {} <-> {}: {:.3}", texts[i], texts[j], sim);
             // Related concepts should have positive similarity
-            assert!(sim > 0.0, "Expected positive similarity between related concepts");
+            assert!(
+                sim > 0.0,
+                "Expected positive similarity between related concepts"
+            );
         }
     }
 }
@@ -512,27 +557,34 @@ fn test_e2e_epistemic_encoding() {
         return;
     }
 
-    let mut bridge = NeuralBridgeV2::load_default()
-        .expect("Failed to load NeuralBridgeV2");
+    let mut bridge = NeuralBridgeV2::load_default().expect("Failed to load NeuralBridgeV2");
 
     // Test well-defined concept
-    let esv_clear = bridge.encode_epistemic("Justice is treating people fairly.")
+    let esv_clear = bridge
+        .encode_epistemic("Justice is treating people fairly.")
         .expect("Encoding failed");
 
     // Test ambiguous/unusual text
-    let esv_unusual = bridge.encode_epistemic("xyzzy plugh zyqqx quantum entanglement maybe")
+    let esv_unusual = bridge
+        .encode_epistemic("xyzzy plugh zyqqx quantum entanglement maybe")
         .expect("Encoding failed");
 
     println!("Epistemic encoding results:");
     println!("  Clear concept:");
     println!("    Confidence: {:.3}", esv_clear.confidence);
     println!("    Stability:  {:?}", esv_clear.stability);
-    println!("    Uncertainty sources: {}", esv_clear.uncertainty_sources.len());
+    println!(
+        "    Uncertainty sources: {}",
+        esv_clear.uncertainty_sources.len()
+    );
 
     println!("  Unusual text:");
     println!("    Confidence: {:.3}", esv_unusual.confidence);
     println!("    Stability:  {:?}", esv_unusual.stability);
-    println!("    Uncertainty sources: {}", esv_unusual.uncertainty_sources.len());
+    println!(
+        "    Uncertainty sources: {}",
+        esv_unusual.uncertainty_sources.len()
+    );
 
     // The unusual text should have more uncertainty sources
     // (though this depends on the specific text and model behavior)
@@ -549,8 +601,8 @@ fn test_e2e_epistemic_encoding() {
 #[test]
 #[ignore = "Performance test - run explicitly with --ignored"]
 fn test_projection_performance() {
-    use symthaea::perception::NeuralBridge;
     use std::time::Instant;
+    use symthaea::perception::NeuralBridge;
 
     let weights_path = Path::new("models/neural_bridge/probe_weights_bge_m3.npy");
 
@@ -562,9 +614,7 @@ fn test_projection_performance() {
     let bridge = NeuralBridge::load(weights_path).unwrap();
 
     // Create test embedding
-    let embedding: Vec<f32> = (0..1024)
-        .map(|i| (i as f32 * 0.01).sin())
-        .collect();
+    let embedding: Vec<f32> = (0..1024).map(|i| (i as f32 * 0.01).sin()).collect();
 
     // Warm up
     for _ in 0..5 {
@@ -585,7 +635,11 @@ fn test_projection_performance() {
     println!("Probe projection performance:");
     println!("  Iterations: {}", iterations);
     println!("  Total time: {:?}", elapsed);
-    println!("  Average: {:.2} µs per projection ({:.2} ms)", avg_us, avg_us / 1000.0);
+    println!(
+        "  Average: {:.2} µs per projection ({:.2} ms)",
+        avg_us,
+        avg_us / 1000.0
+    );
     println!("  Throughput: {:.1} projections/sec", 1_000_000.0 / avg_us);
 
     // Relaxed threshold for debug builds
@@ -597,8 +651,12 @@ fn test_projection_performance() {
     #[cfg(not(debug_assertions))]
     let threshold_us = 10_000.0; // 10ms for release
 
-    assert!(avg_us < threshold_us,
-            "Projection too slow: {:.2} µs (threshold: {:.0} µs)", avg_us, threshold_us);
+    assert!(
+        avg_us < threshold_us,
+        "Projection too slow: {:.2} µs (threshold: {:.0} µs)",
+        avg_us,
+        threshold_us
+    );
 }
 
 /// Test HDC cache effectiveness.
@@ -609,8 +667,8 @@ fn test_projection_performance() {
 #[ignore = "Downloads 2.2GB model - run explicitly with --ignored"]
 #[cfg(feature = "neural-bridge")]
 fn test_e2e_cache_performance() {
-    use symthaea::perception::NeuralBridgeV2;
     use std::time::Instant;
+    use symthaea::perception::NeuralBridgeV2;
 
     let weights_path = Path::new("models/neural_bridge/probe_weights_bge_m3.npy");
     if !weights_path.exists() {
@@ -618,42 +676,61 @@ fn test_e2e_cache_performance() {
         return;
     }
 
-    let mut bridge = NeuralBridgeV2::load_default()
-        .expect("Failed to load NeuralBridgeV2");
+    let mut bridge = NeuralBridgeV2::load_default().expect("Failed to load NeuralBridgeV2");
 
     let test_text = "What is the meaning of consciousness?";
 
     // First encoding - should be slow (~350-400ms)
     let start = Instant::now();
-    let hdc1 = bridge.encode_to_hdc(test_text).expect("First encoding failed");
+    let hdc1 = bridge
+        .encode_to_hdc(test_text)
+        .expect("First encoding failed");
     let first_time = start.elapsed();
 
     // Second encoding - should be fast (<1ms, from cache)
     let start = Instant::now();
-    let hdc2 = bridge.encode_to_hdc(test_text).expect("Second encoding failed");
+    let hdc2 = bridge
+        .encode_to_hdc(test_text)
+        .expect("Second encoding failed");
     let cached_time = start.elapsed();
 
     // Third encoding - also cached
     let start = Instant::now();
-    let hdc3 = bridge.encode_to_hdc(test_text).expect("Third encoding failed");
+    let hdc3 = bridge
+        .encode_to_hdc(test_text)
+        .expect("Third encoding failed");
     let cached_time2 = start.elapsed();
 
     println!("Cache performance test:");
     println!("  First encoding:  {:?}", first_time);
     println!("  Cached (2nd):    {:?}", cached_time);
     println!("  Cached (3rd):    {:?}", cached_time2);
-    println!("  Speedup:         {:.0}x", first_time.as_secs_f64() / cached_time.as_secs_f64());
+    println!(
+        "  Speedup:         {:.0}x",
+        first_time.as_secs_f64() / cached_time.as_secs_f64()
+    );
 
     // Verify cache returns identical results
-    assert_eq!(hdc1.to_bipolar(), hdc2.to_bipolar(), "Cached result differs from original!");
-    assert_eq!(hdc2.to_bipolar(), hdc3.to_bipolar(), "Cached results differ!");
+    assert_eq!(
+        hdc1.to_bipolar(),
+        hdc2.to_bipolar(),
+        "Cached result differs from original!"
+    );
+    assert_eq!(
+        hdc2.to_bipolar(),
+        hdc3.to_bipolar(),
+        "Cached results differ!"
+    );
 
     // Verify cache stats
     let stats = bridge.stats();
     println!("\nCache statistics:");
     println!("  Total calls:     {}", stats.total_calls);
     println!("  HDC cache hits:  {}", stats.hdc_cache_hits);
-    println!("  HDC hit rate:    {:.1}%", stats.hdc_cache_hit_rate() * 100.0);
+    println!(
+        "  HDC hit rate:    {:.1}%",
+        stats.hdc_cache_hit_rate() * 100.0
+    );
 
     // Should have 2 HDC cache hits (calls 2 and 3)
     assert_eq!(stats.hdc_cache_hits, 2, "Expected 2 HDC cache hits");
@@ -661,12 +738,21 @@ fn test_e2e_cache_performance() {
 
     // Cached retrieval should be at least 100x faster
     let speedup = first_time.as_secs_f64() / cached_time.as_secs_f64();
-    assert!(speedup > 100.0,
-            "Cache speedup only {:.0}x (expected >100x)", speedup);
+    assert!(
+        speedup > 100.0,
+        "Cache speedup only {:.0}x (expected >100x)",
+        speedup
+    );
 
     // Cached retrieval should be under 1ms
-    assert!(cached_time.as_millis() < 1,
-            "Cached retrieval took {:?} (expected <1ms)", cached_time);
+    assert!(
+        cached_time.as_millis() < 1,
+        "Cached retrieval took {:?} (expected <1ms)",
+        cached_time
+    );
 
-    println!("\n✓ Cache is working: {:.0}x speedup, <1ms retrieval", speedup);
+    println!(
+        "\n✓ Cache is working: {:.0}x speedup, <1ms retrieval",
+        speedup
+    );
 }

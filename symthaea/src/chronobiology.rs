@@ -10,10 +10,10 @@ use std::f64::consts::PI;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum CircadianPhase {
-    Dawn,   // Waking up, rising arousal
-    Day,    // Peak activity, high focus
-    Dusk,   // Winding down, reflection
-    Night,  // Dreaming, memory consolidation
+    Dawn,  // Waking up, rising arousal
+    Day,   // Peak activity, high focus
+    Dusk,  // Winding down, reflection
+    Night, // Dreaming, memory consolidation
 }
 
 #[derive(Debug, Clone)]
@@ -29,7 +29,7 @@ impl Biorhythm {
     pub fn current() -> Self {
         let now = Local::now();
         let hour = now.hour() as f64 + (now.minute() as f64 / 60.0);
-        
+
         // Circadian cycle (24h sine wave)
         // Peak at 14:00 (2pm), Trough at 02:00 (2am)
         let circadian = -(2.0 * PI * (hour - 14.0) / 24.0).cos(); // -1.0 to 1.0

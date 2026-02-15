@@ -4,10 +4,10 @@
 //! Uses HDC vectors to encode and match usage patterns.
 
 use std::collections::HashMap;
-use std::time::{Duration, Instant, SystemTime};
-use std::path::PathBuf;
 use std::fs;
 use std::io;
+use std::path::PathBuf;
+use std::time::{Duration, Instant, SystemTime};
 
 /// A learned user pattern
 #[derive(Debug, Clone)]
@@ -134,7 +134,8 @@ impl PatternStore {
         let patterns = self.patterns.entry(key).or_default();
 
         // Check if pattern exists
-        if let Some(existing) = patterns.iter_mut()
+        if let Some(existing) = patterns
+            .iter_mut()
             .find(|p| p.context == context && p.selection == selection)
         {
             existing.reinforce();
@@ -149,9 +150,14 @@ impl PatternStore {
         // Trim if over limit
         while patterns.len() > self.max_per_prefix {
             // Remove lowest weight pattern
-            if let Some(min_idx) = patterns.iter()
+            if let Some(min_idx) = patterns
+                .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| a.weight.partial_cmp(&b.weight).unwrap_or(std::cmp::Ordering::Equal))
+                .min_by(|(_, a), (_, b)| {
+                    a.weight
+                        .partial_cmp(&b.weight)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                })
                 .map(|(i, _)| i)
             {
                 patterns.remove(min_idx);
@@ -204,7 +210,8 @@ impl PatternStore {
 
             for patterns in self.patterns.values() {
                 for p in patterns {
-                    let timestamp = p.last_used
+                    let timestamp = p
+                        .last_used
                         .duration_since(SystemTime::UNIX_EPOCH)
                         .unwrap_or_default()
                         .as_secs();
@@ -340,7 +347,8 @@ impl AdaptiveCompleter {
 
     /// Get suggested completions from patterns alone
     pub fn suggest(&self, context: &str) -> Vec<(String, f32)> {
-        self.patterns.query(context)
+        self.patterns
+            .query(context)
             .into_iter()
             .filter(|(_, r)| *r >= self.min_relevance)
             .map(|(p, r)| (p.selection.clone(), r))

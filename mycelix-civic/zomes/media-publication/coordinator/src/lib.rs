@@ -350,9 +350,404 @@ pub fn get_author_stats(author_did: String) -> ExternResult<AuthorStats> {
     })
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
 pub struct AuthorStats {
     pub author_did: String,
     pub publication_count: u32,
     pub total_versions: u32,
+}
+
+/// Pure function: aggregate author stats from a list of version numbers.
+///
+/// Each entry in `versions` represents the current version of one publication.
+pub fn compute_author_stats(author_did: String, versions: &[u32]) -> AuthorStats {
+    let publication_count = versions.len() as u32;
+    let total_versions: u32 = versions.iter().copied().fold(0u32, u32::saturating_add);
+    AuthorStats {
+        author_did,
+        publication_count,
+        total_versions,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // compute_author_stats tests
+    // ========================================================================
+
+    #[test]
+    fn author_stats_no_publications() {
+        let stats = compute_author_stats("did:mycelix:alice".into(), &[]);
+        assert_eq!(stats.publication_count, 0);
+        assert_eq!(stats.total_versions, 0);
+        assert_eq!(stats.author_did, "did:mycelix:alice");
+    }
+
+    #[test]
+    fn author_stats_single_publication_v1() {
+        let stats = compute_author_stats("did:mycelix:bob".into(), &[1]);
+        assert_eq!(stats.publication_count, 1);
+        assert_eq!(stats.total_versions, 1);
+    }
+
+    #[test]
+    fn author_stats_single_publication_many_versions() {
+        let stats = compute_author_stats("did:mycelix:carol".into(), &[7]);
+        assert_eq!(stats.publication_count, 1);
+        assert_eq!(stats.total_versions, 7);
+    }
+
+    #[test]
+    fn author_stats_multiple_publications() {
+        // 3 publications: v1, v3, v5 => total_versions = 9
+        let stats = compute_author_stats("did:mycelix:dave".into(), &[1, 3, 5]);
+        assert_eq!(stats.publication_count, 3);
+        assert_eq!(stats.total_versions, 9);
+    }
+
+    #[test]
+    fn author_stats_all_v1() {
+        let stats = compute_author_stats("did:mycelix:eve".into(), &[1, 1, 1, 1]);
+        assert_eq!(stats.publication_count, 4);
+        assert_eq!(stats.total_versions, 4);
+    }
+
+    #[test]
+    fn author_stats_preserves_did() {
+        let stats = compute_author_stats("did:key:z6Mk_special".into(), &[2]);
+        assert_eq!(stats.author_did, "did:key:z6Mk_special");
+    }
+
+    // ========================================================================
+    // Serde roundtrip tests for coordinator-local structs
+    // ========================================================================
+
+    #[test]
+    fn publish_input_serde_roundtrip() {
+        let input = PublishInput {
+            title: "My Article".into(),
+            content_hash: "QmHash123".into(),
+            content_type: ContentType::Article,
+            author_did: "did:mycelix:alice".into(),
+            co_authors: vec!["did:mycelix:bob".into()],
+            language: "en".into(),
+            tags: vec!["tech".into(), "science".into()],
+            license: License {
+                license_type: LicenseType::CCBY,
+                attribution_required: true,
+                commercial_use: true,
+                derivative_works: true,
+            },
+            encrypted: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: PublishInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.title, "My Article");
+        assert_eq!(input2.content_hash, "QmHash123");
+        assert_eq!(input2.author_did, "did:mycelix:alice");
+        assert_eq!(input2.co_authors.len(), 1);
+        assert_eq!(input2.tags.len(), 2);
+        assert!(!input2.encrypted);
+    }
+
+    #[test]
+    fn publish_input_serde_empty_collections() {
+        let input = PublishInput {
+            title: "Minimal".into(),
+            content_hash: "QmMinimal".into(),
+            content_type: ContentType::Opinion,
+            author_did: "did:mycelix:minimal".into(),
+            co_authors: vec![],
+            language: "es".into(),
+            tags: vec![],
+            license: License {
+                license_type: LicenseType::CC0,
+                attribution_required: false,
+                commercial_use: true,
+                derivative_works: true,
+            },
+            encrypted: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: PublishInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.co_authors.is_empty());
+        assert!(input2.tags.is_empty());
+        assert!(input2.encrypted);
+    }
+
+    #[test]
+    fn add_block_input_serde_roundtrip() {
+        let input = AddBlockInput {
+            publication_id: "pub-1".into(),
+            block_index: 0,
+            content: "Hello world".into(),
+            encrypted_content: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: AddBlockInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.publication_id, "pub-1");
+        assert_eq!(input2.block_index, 0);
+        assert_eq!(input2.content, "Hello world");
+        assert!(input2.encrypted_content.is_none());
+    }
+
+    #[test]
+    fn add_block_input_serde_with_encrypted() {
+        let input = AddBlockInput {
+            publication_id: "pub-2".into(),
+            block_index: 5,
+            content: "cleartext".into(),
+            encrypted_content: Some("enc_data_abc".into()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: AddBlockInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.encrypted_content.as_deref(), Some("enc_data_abc"));
+    }
+
+    #[test]
+    fn update_input_serde_roundtrip() {
+        let input = UpdateInput {
+            publication_id: "pub-1".into(),
+            new_content_hash: "QmNewHash".into(),
+            change_summary: "Fixed typos".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: UpdateInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.publication_id, "pub-1");
+        assert_eq!(input2.new_content_hash, "QmNewHash");
+        assert_eq!(input2.change_summary, "Fixed typos");
+    }
+
+    #[test]
+    fn delete_publication_input_serde_roundtrip() {
+        let input = DeletePublicationInput {
+            publication_id: "pub-99".into(),
+            requester_did: "did:mycelix:admin".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: DeletePublicationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.publication_id, "pub-99");
+        assert_eq!(input2.requester_did, "did:mycelix:admin");
+    }
+
+    #[test]
+    fn add_tags_input_serde_roundtrip() {
+        let input = AddTagsInput {
+            publication_id: "pub-1".into(),
+            requester_did: "did:mycelix:alice".into(),
+            new_tags: vec!["newTag1".into(), "newTag2".into()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: AddTagsInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.new_tags.len(), 2);
+        assert_eq!(input2.new_tags[0], "newTag1");
+    }
+
+    #[test]
+    fn update_license_input_serde_roundtrip() {
+        let input = UpdateLicenseInput {
+            publication_id: "pub-1".into(),
+            requester_did: "did:mycelix:alice".into(),
+            new_license: License {
+                license_type: LicenseType::CCBYNCSA,
+                attribution_required: true,
+                commercial_use: false,
+                derivative_works: true,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: UpdateLicenseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.publication_id, "pub-1");
+        assert!(!input2.new_license.commercial_use);
+        assert!(input2.new_license.derivative_works);
+    }
+
+    #[test]
+    fn author_stats_serde_roundtrip() {
+        let stats = AuthorStats {
+            author_did: "did:mycelix:alice".into(),
+            publication_count: 10,
+            total_versions: 25,
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        let stats2: AuthorStats = serde_json::from_str(&json).unwrap();
+        assert_eq!(stats, stats2);
+    }
+
+    // ========================================================================
+    // Additional edge-case and boundary tests
+    // ========================================================================
+
+    #[test]
+    fn author_stats_large_version_numbers_no_overflow() {
+        // Use large values that don't overflow u32 when summed
+        let stats = compute_author_stats("did:mycelix:heavy".into(), &[u32::MAX / 2, u32::MAX / 2]);
+        assert_eq!(stats.publication_count, 2);
+        assert_eq!(stats.total_versions, (u32::MAX / 2) * 2);
+    }
+
+    #[test]
+    fn author_stats_many_publications() {
+        let versions: Vec<u32> = (1..=50).collect();
+        let stats = compute_author_stats("did:mycelix:prolific".into(), &versions);
+        assert_eq!(stats.publication_count, 50);
+        // sum of 1..=50 = 1275
+        assert_eq!(stats.total_versions, 1275);
+    }
+
+    #[test]
+    fn publish_input_serde_unicode_title() {
+        let input = PublishInput {
+            title: "Articulo en espanol con acentos".into(),
+            content_hash: "QmUnicode".into(),
+            content_type: ContentType::Other("ensayo".into()),
+            author_did: "did:mycelix:unicode_author".into(),
+            co_authors: vec![],
+            language: "es".into(),
+            tags: vec!["ciencia".into()],
+            license: License {
+                license_type: LicenseType::CC0,
+                attribution_required: false,
+                commercial_use: true,
+                derivative_works: true,
+            },
+            encrypted: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: PublishInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.title, "Articulo en espanol con acentos");
+        assert_eq!(input2.language, "es");
+    }
+
+    #[test]
+    fn publish_input_serde_many_co_authors() {
+        let co_authors: Vec<String> = (0..20).map(|i| format!("did:mycelix:coauthor{}", i)).collect();
+        let input = PublishInput {
+            title: "Collaborative Work".into(),
+            content_hash: "QmCollab".into(),
+            content_type: ContentType::Report,
+            author_did: "did:mycelix:lead".into(),
+            co_authors: co_authors.clone(),
+            language: "en".into(),
+            tags: vec![],
+            license: License {
+                license_type: LicenseType::CCBYSA,
+                attribution_required: true,
+                commercial_use: true,
+                derivative_works: true,
+            },
+            encrypted: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: PublishInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.co_authors.len(), 20);
+        assert_eq!(input2.co_authors[0], "did:mycelix:coauthor0");
+        assert_eq!(input2.co_authors[19], "did:mycelix:coauthor19");
+    }
+
+    #[test]
+    fn add_block_input_serde_max_block_index() {
+        let input = AddBlockInput {
+            publication_id: "pub-boundary".into(),
+            block_index: u32::MAX,
+            content: "Last block".into(),
+            encrypted_content: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: AddBlockInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.block_index, u32::MAX);
+    }
+
+    #[test]
+    fn add_tags_input_serde_empty_tags() {
+        let input = AddTagsInput {
+            publication_id: "pub-1".into(),
+            requester_did: "did:mycelix:alice".into(),
+            new_tags: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: AddTagsInput = serde_json::from_str(&json).unwrap();
+        assert!(input2.new_tags.is_empty());
+    }
+
+    #[test]
+    fn update_license_input_serde_custom_license() {
+        let input = UpdateLicenseInput {
+            publication_id: "pub-custom".into(),
+            requester_did: "did:mycelix:owner".into(),
+            new_license: License {
+                license_type: LicenseType::Custom("Proprietary-v2".into()),
+                attribution_required: false,
+                commercial_use: false,
+                derivative_works: false,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let input2: UpdateLicenseInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input2.new_license.license_type, LicenseType::Custom("Proprietary-v2".into()));
+        assert!(!input2.new_license.attribution_required);
+        assert!(!input2.new_license.commercial_use);
+        assert!(!input2.new_license.derivative_works);
+    }
+
+    #[test]
+    fn author_stats_equality() {
+        let a = AuthorStats {
+            author_did: "did:mycelix:test".into(),
+            publication_count: 5,
+            total_versions: 10,
+        };
+        let b = AuthorStats {
+            author_did: "did:mycelix:test".into(),
+            publication_count: 5,
+            total_versions: 10,
+        };
+        assert_eq!(a, b);
+
+        let c = AuthorStats {
+            author_did: "did:mycelix:other".into(),
+            publication_count: 5,
+            total_versions: 10,
+        };
+        assert_ne!(a, c);
+    }
+
+    #[test]
+    fn publish_input_serde_all_content_types() {
+        let content_types = vec![
+            ContentType::Article,
+            ContentType::Opinion,
+            ContentType::Investigation,
+            ContentType::Review,
+            ContentType::Analysis,
+            ContentType::Interview,
+            ContentType::Report,
+            ContentType::Editorial,
+            ContentType::Other("podcast_transcript".into()),
+        ];
+        for ct in content_types {
+            let input = PublishInput {
+                title: "Test".into(),
+                content_hash: "QmTest".into(),
+                content_type: ct.clone(),
+                author_did: "did:mycelix:tester".into(),
+                co_authors: vec![],
+                language: "en".into(),
+                tags: vec![],
+                license: License {
+                    license_type: LicenseType::CC0,
+                    attribution_required: false,
+                    commercial_use: true,
+                    derivative_works: true,
+                },
+                encrypted: false,
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let input2: PublishInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(input2.content_type, ct, "Failed for content type {:?}", ct);
+        }
+    }
 }

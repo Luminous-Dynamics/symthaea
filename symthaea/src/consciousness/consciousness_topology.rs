@@ -106,7 +106,8 @@ pub struct ConsciousnessPoint {
 impl ConsciousnessPoint {
     /// Euclidean distance to another point
     pub fn distance(&self, other: &Self) -> f64 {
-        self.dimensions.iter()
+        self.dimensions
+            .iter()
             .zip(other.dimensions.iter())
             .map(|(a, b)| (a - b).powi(2))
             .sum::<f64>()
@@ -265,7 +266,8 @@ impl BettiNumbers {
 
     /// Count connected components using union-find
     fn count_components(complex: &SimplicialComplex) -> usize {
-        let vertices: Vec<_> = complex.simplices_at_dim(0)
+        let vertices: Vec<_> = complex
+            .simplices_at_dim(0)
             .iter()
             .filter_map(|s| s.vertices.first().copied())
             .collect();
@@ -300,16 +302,18 @@ impl BettiNumbers {
         }
 
         // Count unique roots among vertices
-        let roots: HashSet<_> = vertices.iter()
-            .map(|&v| find(&mut parent, v))
-            .collect();
+        let roots: HashSet<_> = vertices.iter().map(|&v| find(&mut parent, v)).collect();
         roots.len()
     }
 
     /// Consciousness interpretation
     pub fn interpretation(&self) -> TopologyInterpretation {
         TopologyInterpretation {
-            unity: if self.beta_0 == 1 { 1.0 } else { 1.0 / self.beta_0 as f64 },
+            unity: if self.beta_0 == 1 {
+                1.0
+            } else {
+                1.0 / self.beta_0 as f64
+            },
             complexity: (self.beta_1 + self.beta_2 * 2) as f64 / 10.0,
             fragmentation: if self.beta_0 > 1 {
                 (self.beta_0 - 1) as f64 / 10.0
@@ -445,7 +449,8 @@ impl ConsciousnessTopologyAnalyzer {
             for j in (i + 1)..points.len() {
                 let dist = points[i].distance(points[j]);
                 if dist < self.config.edge_threshold {
-                    self.current_complex.add_simplex(Simplex::new(vec![i, j]), dist);
+                    self.current_complex
+                        .add_simplex(Simplex::new(vec![i, j]), dist);
                 }
             }
         }
@@ -471,7 +476,8 @@ impl ConsciousnessTopologyAnalyzer {
                         .filter_map(|v| *v)
                         .fold(0.0f64, |a, &b| a.max(b));
 
-                        self.current_complex.add_simplex(Simplex::new(vec![i, j, k]), max_edge);
+                        self.current_complex
+                            .add_simplex(Simplex::new(vec![i, j, k]), max_edge);
                     }
                 }
             }
@@ -487,7 +493,8 @@ impl ConsciousnessTopologyAnalyzer {
 
         // Compute persistence pairs (simplified)
         let persistence_pairs = self.compute_persistence();
-        let significant = persistence_pairs.iter()
+        let significant = persistence_pairs
+            .iter()
             .filter(|p| p.is_significant(self.config.min_persistence))
             .count();
 
@@ -503,7 +510,8 @@ impl ConsciousnessTopologyAnalyzer {
         let n = self.stats.analyses as f64;
         self.stats.avg_beta_0 = (self.stats.avg_beta_0 * (n - 1.0) + betti.beta_0 as f64) / n;
         self.stats.avg_beta_1 = (self.stats.avg_beta_1 * (n - 1.0) + betti.beta_1 as f64) / n;
-        self.stats.avg_euler = (self.stats.avg_euler * (n - 1.0) + betti.euler_characteristic as f64) / n;
+        self.stats.avg_euler =
+            (self.stats.avg_euler * (n - 1.0) + betti.euler_characteristic as f64) / n;
         self.stats.avg_unity = (self.stats.avg_unity * (n - 1.0) + interpretation.unity) / n;
         self.stats.significant_features += significant as u64;
 
@@ -855,7 +863,7 @@ mod tests {
 
     #[test]
     fn test_euler_characteristic() {
-        let betti = BettiNumbers {
+        let _betti = BettiNumbers {
             beta_0: 1,
             beta_1: 2,
             beta_2: 1,

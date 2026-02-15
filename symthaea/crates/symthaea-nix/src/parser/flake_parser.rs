@@ -4,8 +4,8 @@
 //! `flake.lock`, extracting inputs, outputs, description, and dependency
 //! relationships for HDC encoding and causal reasoning.
 
+use super::nix_parser::{NixConfig, NixParser, NixValue};
 use std::path::Path;
-use super::nix_parser::{NixParser, NixConfig, NixValue};
 
 /// Parses flake structure, inputs, outputs, and dependency graphs.
 pub struct FlakeParser {
@@ -89,7 +89,9 @@ impl FlakeParser {
 
     /// Parse a flake.nix source string.
     pub fn parse_flake_nix(&mut self, source: &str) -> Result<FlakeInfo, String> {
-        let config = self.parser.parse(source)
+        let config = self
+            .parser
+            .parse(source)
             .map_err(|e| format!("Failed to parse flake.nix: {}", e.message))?;
 
         let mut info = FlakeInfo {
@@ -128,7 +130,8 @@ impl FlakeParser {
 
         let version = value["version"].as_u64().unwrap_or(7) as u32;
 
-        let nodes = value["nodes"].as_object()
+        let nodes = value["nodes"]
+            .as_object()
             .ok_or_else(|| "Missing 'nodes' in flake.lock".to_string())?;
 
         let root_inputs: Vec<String> = value["nodes"]["root"]["inputs"]
@@ -152,9 +155,9 @@ impl FlakeParser {
 
             // Check for follows references
             let follows = node["inputs"].as_object().and_then(|inputs_map| {
-                inputs_map.iter().find_map(|(_, v)| {
-                    v.as_str().map(|s| s.to_string())
-                })
+                inputs_map
+                    .iter()
+                    .find_map(|(_, v)| v.as_str().map(|s| s.to_string()))
             });
 
             inputs.push(LockedInput {
@@ -325,7 +328,11 @@ impl FlakeParser {
 
         if !info.inputs.is_empty() {
             let names: Vec<&str> = info.inputs.iter().map(|i| i.name.as_str()).collect();
-            parts.push(format!("Inputs ({}): {}", info.inputs.len(), names.join(", ")));
+            parts.push(format!(
+                "Inputs ({}): {}",
+                info.inputs.len(),
+                names.join(", ")
+            ));
         }
 
         if !info.output_attrs.is_empty() {
@@ -407,14 +414,22 @@ mod tests {
         assert_eq!(lock_info.inputs.len(), 2);
         assert_eq!(lock_info.root_inputs.len(), 2);
 
-        let nixpkgs = lock_info.inputs.iter().find(|i| i.name == "nixpkgs").unwrap();
+        let nixpkgs = lock_info
+            .inputs
+            .iter()
+            .find(|i| i.name == "nixpkgs")
+            .unwrap();
         assert_eq!(nixpkgs.source_type, "github");
         assert_eq!(nixpkgs.owner.as_deref(), Some("NixOS"));
         assert_eq!(nixpkgs.repo.as_deref(), Some("nixpkgs"));
         assert_eq!(nixpkgs.rev.as_deref(), Some("abc123"));
         assert_eq!(nixpkgs.last_modified, Some(1705000000));
 
-        let hm = lock_info.inputs.iter().find(|i| i.name == "home-manager").unwrap();
+        let hm = lock_info
+            .inputs
+            .iter()
+            .find(|i| i.name == "home-manager")
+            .unwrap();
         assert_eq!(hm.follows, Some("nixpkgs".to_string()));
     }
 
@@ -434,8 +449,18 @@ mod tests {
         let info = FlakeInfo {
             description: Some("Test flake".to_string()),
             inputs: vec![
-                FlakeInputDecl { name: "nixpkgs".into(), url: Some("github:NixOS/nixpkgs".into()), follows: None, is_flake: None },
-                FlakeInputDecl { name: "home-manager".into(), url: None, follows: Some("nixpkgs".into()), is_flake: None },
+                FlakeInputDecl {
+                    name: "nixpkgs".into(),
+                    url: Some("github:NixOS/nixpkgs".into()),
+                    follows: None,
+                    is_flake: None,
+                },
+                FlakeInputDecl {
+                    name: "home-manager".into(),
+                    url: None,
+                    follows: Some("nixpkgs".into()),
+                    is_flake: None,
+                },
             ],
             output_attrs: vec!["nixosConfigurations".into(), "packages".into()],
             output_args: vec![],
@@ -460,7 +485,11 @@ mod tests {
 "#;
         let mut parser = FlakeParser::new();
         let info = parser.parse_flake_nix(source).unwrap();
-        assert!(info.inputs.len() >= 2, "Should find at least 2 inputs, got {}", info.inputs.len());
+        assert!(
+            info.inputs.len() >= 2,
+            "Should find at least 2 inputs, got {}",
+            info.inputs.len()
+        );
     }
 
     #[test]

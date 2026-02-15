@@ -2,8 +2,8 @@
 //!
 //! Shared types and utilities used across the recursive improvement modules.
 
-use std::time::{Instant, Duration};
 use serde::{Deserialize, Serialize};
+use std::time::{Duration, Instant};
 
 /// Get current instant (for timing)
 pub fn instant_now() -> Instant {
@@ -167,21 +167,30 @@ mod tests {
     fn test_calculate_trend_increasing() {
         let values = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let trend = calculate_trend(&values);
-        assert!(trend > 0.0, "Trend should be positive for increasing values");
+        assert!(
+            trend > 0.0,
+            "Trend should be positive for increasing values"
+        );
     }
 
     #[test]
     fn test_calculate_trend_decreasing() {
         let values = vec![5.0, 4.0, 3.0, 2.0, 1.0];
         let trend = calculate_trend(&values);
-        assert!(trend < 0.0, "Trend should be negative for decreasing values");
+        assert!(
+            trend < 0.0,
+            "Trend should be negative for decreasing values"
+        );
     }
 
     #[test]
     fn test_calculate_trend_flat() {
         let values = vec![3.0, 3.0, 3.0, 3.0];
         let trend = calculate_trend(&values);
-        assert!(trend.abs() < 0.01, "Trend should be near zero for flat values");
+        assert!(
+            trend.abs() < 0.01,
+            "Trend should be near zero for flat values"
+        );
     }
 
     #[test]

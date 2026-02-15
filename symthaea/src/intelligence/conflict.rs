@@ -32,9 +32,9 @@ impl ConflictSeverity {
     /// Get ANSI color code
     pub fn color(&self) -> &'static str {
         match self {
-            ConflictSeverity::Info => "\x1b[34m",    // Blue
-            ConflictSeverity::Warning => "\x1b[33m", // Yellow
-            ConflictSeverity::Error => "\x1b[31m",   // Red
+            ConflictSeverity::Info => "\x1b[34m",     // Blue
+            ConflictSeverity::Warning => "\x1b[33m",  // Yellow
+            ConflictSeverity::Error => "\x1b[31m",    // Red
             ConflictSeverity::Critical => "\x1b[91m", // Bright red
         }
     }
@@ -44,38 +44,22 @@ impl ConflictSeverity {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConflictType {
     /// Same option set to different values
-    OptionCollision {
-        path: String,
-        values: Vec<String>,
-    },
+    OptionCollision { path: String, values: Vec<String> },
     /// Mutually exclusive services
-    ServiceExclusion {
-        services: Vec<String>,
-    },
+    ServiceExclusion { services: Vec<String> },
     /// Package version conflict
     VersionConflict {
         package: String,
         versions: Vec<String>,
     },
     /// Missing dependency
-    MissingDependency {
-        package: String,
-        dependency: String,
-    },
+    MissingDependency { package: String, dependency: String },
     /// Port collision
-    PortConflict {
-        port: u16,
-        services: Vec<String>,
-    },
+    PortConflict { port: u16, services: Vec<String> },
     /// File path collision
-    PathConflict {
-        path: String,
-        sources: Vec<String>,
-    },
+    PathConflict { path: String, sources: Vec<String> },
     /// Circular dependency
-    CircularDependency {
-        chain: Vec<String>,
-    },
+    CircularDependency { chain: Vec<String> },
     /// Deprecated option usage
     DeprecatedOption {
         old_path: String,
@@ -135,10 +119,7 @@ impl Conflict {
                 )
             }
             ConflictType::ServiceExclusion { services } => {
-                format!(
-                    "Services {} are mutually exclusive",
-                    services.join(" and ")
-                )
+                format!("Services {} are mutually exclusive", services.join(" and "))
             }
             ConflictType::VersionConflict { package, versions } => {
                 format!(
@@ -147,8 +128,14 @@ impl Conflict {
                     versions.join(", ")
                 )
             }
-            ConflictType::MissingDependency { package, dependency } => {
-                format!("Package '{}' requires '{}' which is not installed", package, dependency)
+            ConflictType::MissingDependency {
+                package,
+                dependency,
+            } => {
+                format!(
+                    "Package '{}' requires '{}' which is not installed",
+                    package, dependency
+                )
             }
             ConflictType::PortConflict { port, services } => {
                 format!(
@@ -174,29 +161,31 @@ impl Conflict {
                     format!("Option '{}' is deprecated and should be removed", old_path)
                 }
             }
-            ConflictType::TypeMismatch { path, expected, actual } => {
-                format!(
-                    "Option '{}' expects {} but got {}",
-                    path, expected, actual
-                )
+            ConflictType::TypeMismatch {
+                path,
+                expected,
+                actual,
+            } => {
+                format!("Option '{}' expects {} but got {}", path, expected, actual)
             }
         }
     }
 
     fn suggest(conflict_type: &ConflictType) -> Option<String> {
         match conflict_type {
-            ConflictType::OptionCollision { .. } => {
-                Some("Use mkForce to override or mkDefault to set a lower-priority value".to_string())
-            }
+            ConflictType::OptionCollision { .. } => Some(
+                "Use mkForce to override or mkDefault to set a lower-priority value".to_string(),
+            ),
             ConflictType::ServiceExclusion { .. } => {
                 Some("Disable one of the conflicting services".to_string())
             }
             ConflictType::VersionConflict { .. } => {
                 Some("Pin to a specific version or use an overlay".to_string())
             }
-            ConflictType::MissingDependency { dependency, .. } => {
-                Some(format!("Add '{}' to environment.systemPackages", dependency))
-            }
+            ConflictType::MissingDependency { dependency, .. } => Some(format!(
+                "Add '{}' to environment.systemPackages",
+                dependency
+            )),
             ConflictType::PortConflict { .. } => {
                 Some("Change the port for one of the services".to_string())
             }
@@ -251,15 +240,15 @@ impl ConflictDetector {
         // Deprecated options
         self.deprecated.insert(
             "services.xserver.displayManager.auto".to_string(),
-            Some("services.displayManager.autoLogin".to_string())
+            Some("services.displayManager.autoLogin".to_string()),
         );
         self.deprecated.insert(
             "services.xserver.layout".to_string(),
-            Some("services.xserver.xkb.layout".to_string())
+            Some("services.xserver.xkb.layout".to_string()),
         );
         self.deprecated.insert(
             "networking.useDHCP".to_string(),
-            Some("networking.interfaces.<name>.useDHCP".to_string())
+            Some("networking.interfaces.<name>.useDHCP".to_string()),
         );
     }
 
@@ -402,7 +391,10 @@ impl ConflictDetector {
 
     /// Get conflicts by severity
     pub fn by_severity(&self, severity: ConflictSeverity) -> Vec<&Conflict> {
-        self.conflicts.iter().filter(|c| c.severity == severity).collect()
+        self.conflicts
+            .iter()
+            .filter(|c| c.severity == severity)
+            .collect()
     }
 
     /// Clear detected conflicts

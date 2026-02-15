@@ -418,18 +418,59 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::DidToMfaState => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::AgentToMfaState => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DidToEnrollments => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DidToVerifications => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::MfaStateHistory => Ok(ValidateCallbackResult::Valid),
-        },
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            if tag.0.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds maximum length of 1024 bytes".into(),
+                ));
+            }
+            match link_type {
+                LinkTypes::DidToMfaState => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::AgentToMfaState => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DidToEnrollments => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DidToVerifications => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::MfaStateHistory => Ok(ValidateCallbackResult::Valid),
+            }
+        }
+        FlatOp::RegisterDeleteLink {
+            original_action,
+            action,
+            ..
+        } => {
+            if action.author != original_action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the link creator can delete their links".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(update) => {
+            let action = match &update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(action.original_action_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can update their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDelete(OpDelete { action }) => {
+            let original = must_get_action(action.deletes_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can delete their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -499,6 +540,47 @@ fn validate_update_mfa_state(
     if state.factors.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot remove all factors".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: MfaState = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original MFA state not found".into()
+        )))?;
+
+    // Immutable fields
+    if state.did != original.did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA DID cannot be changed".into(),
+        ));
+    }
+    if state.owner != original.owner {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA owner cannot be changed".into(),
+        ));
+    }
+    if state.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA created timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Version must increment
+    if state.version <= original.version {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA state version must increase on update".into(),
+        ));
+    }
+
+    // Updated timestamp must advance
+    if state.updated <= original.updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "MFA updated timestamp must advance".into(),
         ));
     }
 
@@ -1056,6 +1138,190 @@ mod tests {
         };
 
         assert!(verification.new_strength < 0.0, "Negative strength should fail validation");
+    }
+
+    // =========================================================================
+    // Property-Based Tests (proptest)
+    // =========================================================================
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        fn arb_factor_type() -> impl Strategy<Value = FactorType> {
+            prop_oneof![
+                Just(FactorType::PrimaryKeyPair),
+                Just(FactorType::HardwareKey),
+                Just(FactorType::Biometric),
+                Just(FactorType::SocialRecovery),
+                Just(FactorType::ReputationAttestation),
+                Just(FactorType::GitcoinPassport),
+                Just(FactorType::VerifiableCredential),
+                Just(FactorType::RecoveryPhrase),
+                Just(FactorType::SecurityQuestions),
+            ]
+        }
+
+        fn arb_assurance_level() -> impl Strategy<Value = AssuranceLevel> {
+            prop_oneof![
+                Just(AssuranceLevel::Anonymous),
+                Just(AssuranceLevel::Basic),
+                Just(AssuranceLevel::Verified),
+                Just(AssuranceLevel::HighlyAssured),
+                Just(AssuranceLevel::ConstitutionallyCritical),
+            ]
+        }
+
+        fn arb_enrollment_action() -> impl Strategy<Value = EnrollmentAction> {
+            prop_oneof![
+                Just(EnrollmentAction::Enroll),
+                Just(EnrollmentAction::Revoke),
+                Just(EnrollmentAction::Update),
+                Just(EnrollmentAction::Reverify),
+            ]
+        }
+
+        proptest! {
+            /// Every factor type maps to exactly one category.
+            #[test]
+            fn factor_type_has_category(ft in arb_factor_type()) {
+                let _ = ft.category(); // Should not panic
+            }
+
+            /// Every factor type has a positive base weight.
+            #[test]
+            fn factor_type_has_positive_weight(ft in arb_factor_type()) {
+                prop_assert!(ft.base_weight() > 0.0);
+                prop_assert!(ft.base_weight() <= 2.0);
+            }
+
+            /// Decay configuration has positive grace period and reverify threshold.
+            #[test]
+            fn decay_config_valid(ft in arb_factor_type()) {
+                let (grace, decay_rate, reverify) = ft.decay_config();
+                prop_assert!(grace > 0, "Grace period must be positive");
+                prop_assert!(decay_rate >= 0.0, "Decay rate must be non-negative");
+                prop_assert!(reverify > 0, "Reverify threshold must be positive");
+                prop_assert!(reverify >= grace, "Reverify should be >= grace period");
+            }
+
+            /// Current strength is always in [0.0, 1.0] for active factors.
+            #[test]
+            fn current_strength_clamped(
+                ft in arb_factor_type(),
+                days_ago in 0u64..1000
+            ) {
+                let base_micros: i64 = 1735689600_000_000;
+                let now = Timestamp::from_micros(base_micros);
+                let verified = Timestamp::from_micros(base_micros - (days_ago as i64 * 86400 * 1_000_000));
+
+                let factor = EnrolledFactor {
+                    factor_type: ft,
+                    factor_id: "test".to_string(),
+                    enrolled_at: verified,
+                    last_verified: verified,
+                    metadata: "{}".to_string(),
+                    effective_strength: 1.0,
+                    active: true,
+                };
+
+                let strength = factor.current_strength(now);
+                prop_assert!(strength >= 0.0, "Strength must be >= 0.0, got {}", strength);
+                prop_assert!(strength <= 1.0, "Strength must be <= 1.0, got {}", strength);
+            }
+
+            /// Inactive factors always have zero strength regardless of time.
+            #[test]
+            fn inactive_factor_zero_strength(
+                ft in arb_factor_type(),
+                days_ago in 0u64..1000
+            ) {
+                let base_micros: i64 = 1735689600_000_000;
+                let now = Timestamp::from_micros(base_micros);
+                let verified = Timestamp::from_micros(base_micros - (days_ago as i64 * 86400 * 1_000_000));
+
+                let factor = EnrolledFactor {
+                    factor_type: ft,
+                    factor_id: "test".to_string(),
+                    enrolled_at: verified,
+                    last_verified: verified,
+                    metadata: "{}".to_string(),
+                    effective_strength: 1.0,
+                    active: false,
+                };
+
+                prop_assert_eq!(factor.current_strength(now), 0.0);
+            }
+
+            /// Strength decays monotonically (older verification → weaker).
+            #[test]
+            fn strength_monotonically_decreasing(
+                ft in arb_factor_type(),
+                d1 in 0u64..500,
+                d2 in 0u64..500
+            ) {
+                let base_micros: i64 = 1735689600_000_000;
+                let now = Timestamp::from_micros(base_micros);
+
+                let make_factor = |days: u64| EnrolledFactor {
+                    factor_type: ft.clone(),
+                    factor_id: "test".to_string(),
+                    enrolled_at: Timestamp::from_micros(base_micros - (days as i64 * 86400 * 1_000_000)),
+                    last_verified: Timestamp::from_micros(base_micros - (days as i64 * 86400 * 1_000_000)),
+                    metadata: "{}".to_string(),
+                    effective_strength: 1.0,
+                    active: true,
+                };
+
+                let s1 = make_factor(d1).current_strength(now);
+                let s2 = make_factor(d2).current_strength(now);
+
+                if d1 <= d2 {
+                    prop_assert!(s1 >= s2, "d1={} s1={} should be >= d2={} s2={}", d1, s1, d2, s2);
+                }
+            }
+
+            /// Assurance level scores are monotonically increasing.
+            #[test]
+            fn assurance_scores_monotone(a in arb_assurance_level(), b in arb_assurance_level()) {
+                if a <= b {
+                    prop_assert!(a.score() <= b.score());
+                }
+            }
+
+            /// FactorType JSON round-trips.
+            #[test]
+            fn factor_type_json_roundtrip(ft in arb_factor_type()) {
+                let json = serde_json::to_string(&ft).unwrap();
+                let back: FactorType = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(ft, back);
+            }
+
+            /// AssuranceLevel JSON round-trips.
+            #[test]
+            fn assurance_level_json_roundtrip(level in arb_assurance_level()) {
+                let json = serde_json::to_string(&level).unwrap();
+                let back: AssuranceLevel = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(level, back);
+            }
+
+            /// EnrollmentAction JSON round-trips.
+            #[test]
+            fn enrollment_action_json_roundtrip(action in arb_enrollment_action()) {
+                let json = serde_json::to_string(&action).unwrap();
+                let back: EnrollmentAction = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(action, back);
+            }
+
+            /// FactorCategory JSON round-trips.
+            #[test]
+            fn factor_category_json_roundtrip(ft in arb_factor_type()) {
+                let cat = ft.category();
+                let json = serde_json::to_string(&cat).unwrap();
+                let back: FactorCategory = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(cat, back);
+            }
+        }
     }
 
     #[test]

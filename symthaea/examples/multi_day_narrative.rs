@@ -17,16 +17,14 @@
 //! cargo run --release --example multi_day_narrative
 //! ```
 
+use symthaea::brain::{
+    AffectiveBridge, AffectiveBridgeConfig, BridgeConfig as PrefrontalBridgeConfig,
+    ConsciousnessBridge, HippocampusBridge, HippocampusBridgeConfig,
+};
 use symthaea::consciousness::recursive_improvement::{
-    SemanticBridge, SemanticBridgeConfig, SemanticInput, ActionContext,
-    DreamMode, DreamConfig,
+    ActionContext, DreamConfig, DreamMode, SemanticBridge, SemanticBridgeConfig, SemanticInput,
 };
 use symthaea::HippocampusActor;
-use symthaea::brain::{
-    HippocampusBridge, HippocampusBridgeConfig,
-    AffectiveBridge, AffectiveBridgeConfig,
-    ConsciousnessBridge, BridgeConfig as PrefrontalBridgeConfig,
-};
 
 /// A simulated "day" of activity
 struct Day {
@@ -82,7 +80,8 @@ fn main() {
                 SemanticInput::thought("This is interesting - declarative configs"),
                 SemanticInput::query("How do I install packages?"),
                 SemanticInput::response("Add packages to environment.systemPackages"),
-                SemanticInput::new("Goal: Learn NixOS basics", ActionContext::Goal).with_emotion(0.7),
+                SemanticInput::new("Goal: Learn NixOS basics", ActionContext::Goal)
+                    .with_emotion(0.7),
             ],
         },
         Day {
@@ -96,7 +95,8 @@ fn main() {
                 SemanticInput::error("Error: nginx failed to start").with_emotion(-0.5),
                 SemanticInput::thought("Need to check the configuration syntax"),
                 SemanticInput::response("Fixed: missing semicolon in nginx.conf"),
-                SemanticInput::new("Goal: Deploy secure web server", ActionContext::Goal).with_emotion(0.8),
+                SemanticInput::new("Goal: Deploy secure web server", ActionContext::Goal)
+                    .with_emotion(0.8),
             ],
         },
         Day {
@@ -109,7 +109,8 @@ fn main() {
                 SemanticInput::response("Create flake.nix with inputs and outputs"),
                 SemanticInput::query("Can I use flakes with home-manager?"),
                 SemanticInput::response("Yes, add home-manager as a flake input"),
-                SemanticInput::new("Goal: Convert project to flakes", ActionContext::Goal).with_emotion(0.9),
+                SemanticInput::new("Goal: Convert project to flakes", ActionContext::Goal)
+                    .with_emotion(0.9),
             ],
         },
         Day {
@@ -120,9 +121,11 @@ fn main() {
                 SemanticInput::thought("Could automate deployment with CI/CD"),
                 SemanticInput::query("Set up GitHub Actions for NixOS?"),
                 SemanticInput::response("Use nix-community/nixos-install-action"),
-                SemanticInput::error("Error: remote deployment failed - SSH key missing").with_emotion(-0.4),
+                SemanticInput::error("Error: remote deployment failed - SSH key missing")
+                    .with_emotion(-0.4),
                 SemanticInput::response("Added SSH key to secrets, deployment works now"),
-                SemanticInput::new("Goal: Automated deployment pipeline", ActionContext::Goal).with_emotion(0.95),
+                SemanticInput::new("Goal: Automated deployment pipeline", ActionContext::Goal)
+                    .with_emotion(0.95),
             ],
         },
         Day {
@@ -134,8 +137,13 @@ fn main() {
                 SemanticInput::query("Best practices for NixOS module structure?"),
                 SemanticInput::response("Separate options, config, and lib; use imports"),
                 SemanticInput::thought("This is elegant - everything is composable"),
-                SemanticInput::new("Insight: NixOS enables reproducible infrastructure", ActionContext::Memory).with_emotion(0.98),
-                SemanticInput::new("Goal: Become NixOS expert", ActionContext::Goal).with_emotion(1.0),
+                SemanticInput::new(
+                    "Insight: NixOS enables reproducible infrastructure",
+                    ActionContext::Memory,
+                )
+                .with_emotion(0.98),
+                SemanticInput::new("Goal: Become NixOS expert", ActionContext::Goal)
+                    .with_emotion(1.0),
             ],
         },
     ];
@@ -164,9 +172,11 @@ fn main() {
 
         let concepts_after = bridge.world_model().pending_concepts.len();
         let new_concepts = concepts_after - concepts_before;
-        let avg_consciousness = day_consciousness_levels.iter().sum::<f64>()
-            / day_consciousness_levels.len() as f64;
-        let peak_consciousness = day_consciousness_levels.iter().cloned()
+        let avg_consciousness =
+            day_consciousness_levels.iter().sum::<f64>() / day_consciousness_levels.len() as f64;
+        let peak_consciousness = day_consciousness_levels
+            .iter()
+            .cloned()
             .fold(f64::NEG_INFINITY, f64::max);
 
         println!("  New concepts: {}", new_concepts);
@@ -187,20 +197,28 @@ fn main() {
                 } else {
                     "neutral"
                 };
-                println!("    {} ({}) - {:?}", affect.concept_uid, valence_str, affect.category);
+                println!(
+                    "    {} ({}) - {:?}",
+                    affect.concept_uid, valence_str, affect.category
+                );
             }
             println!();
         }
 
         // Sync with hippocampus (encode memories)
-        let encoded = hippocampus_bridge.sync(bridge.world_model(), &mut hippocampus).unwrap_or_default();
+        let encoded = hippocampus_bridge
+            .sync(bridge.world_model(), &mut hippocampus)
+            .unwrap_or_default();
         println!("  Memories encoded: {}", encoded.len());
 
         // Sync with prefrontal (compete for attention)
         let converted_before = consciousness_bridge.stats().concepts_converted;
         consciousness_bridge.sync(bridge.world_model());
         let converted_after = consciousness_bridge.stats().concepts_converted;
-        println!("  Concepts converted to bids: {}", converted_after - converted_before);
+        println!(
+            "  Concepts converted to bids: {}",
+            converted_after - converted_before
+        );
 
         // Store day summary
         day_summaries.push((
@@ -227,8 +245,14 @@ fn main() {
             let dream_results = dream_mode.batch_dream(bridge.world_model_mut());
 
             println!("  Dream cycles: {}", dream_results.stats.cycles_completed);
-            println!("  Dream consciousness peak: {:.2}%", dream_results.stats.peak_consciousness * 100.0);
-            println!("  Concepts from dreams: {}", dream_results.concepts_discovered.len());
+            println!(
+                "  Dream consciousness peak: {:.2}%",
+                dream_results.stats.peak_consciousness * 100.0
+            );
+            println!(
+                "  Concepts from dreams: {}",
+                dream_results.concepts_discovered.len()
+            );
         }
 
         println!();
@@ -249,7 +273,11 @@ fn main() {
     for (name, new, total, avg, peak) in &day_summaries {
         println!(
             "  {:22} | {:>5} | {:>5} | {:>8.2}% | {:>8.2}%",
-            name, new, total, avg * 100.0, peak * 100.0
+            name,
+            new,
+            total,
+            avg * 100.0,
+            peak * 100.0
         );
     }
 
@@ -264,20 +292,50 @@ fn main() {
     println!("  Final Statistics");
     println!("  ─────────────────────────────────────────────────────────────────");
     println!("  Total texts processed:     {}", stats.texts_processed);
-    println!("  Total concepts crystallized: {}", world_stats.concepts_crystallized);
-    println!("  Final consciousness:       {:.2}%", world_stats.consciousness_level * 100.0);
-    println!("  Peak consciousness:        {:.2}%", stats.peak_consciousness * 100.0);
-    println!("  Accumulated surprise:      {:.4}", world_stats.accumulated_surprise);
+    println!(
+        "  Total concepts crystallized: {}",
+        world_stats.concepts_crystallized
+    );
+    println!(
+        "  Final consciousness:       {:.2}%",
+        world_stats.consciousness_level * 100.0
+    );
+    println!(
+        "  Peak consciousness:        {:.2}%",
+        stats.peak_consciousness * 100.0
+    );
+    println!(
+        "  Accumulated surprise:      {:.4}",
+        world_stats.accumulated_surprise
+    );
     println!();
     println!("  Affective:");
-    println!("    Positive concepts:       {}", affective_stats.positive_concepts);
-    println!("    Negative concepts:       {}", affective_stats.negative_concepts);
-    println!("    Neutral concepts:        {}", affective_stats.neutral_concepts);
-    println!("    Average valence:         {:.3}", affective_stats.avg_valence);
+    println!(
+        "    Positive concepts:       {}",
+        affective_stats.positive_concepts
+    );
+    println!(
+        "    Negative concepts:       {}",
+        affective_stats.negative_concepts
+    );
+    println!(
+        "    Neutral concepts:        {}",
+        affective_stats.neutral_concepts
+    );
+    println!(
+        "    Average valence:         {:.3}",
+        affective_stats.avg_valence
+    );
     println!();
     println!("  Hippocampus:");
-    println!("    Total memories stored:   {}", hippocampus_stats.total_memories);
-    println!("    Average strength:        {:.3}", hippocampus_stats.avg_strength);
+    println!(
+        "    Total memories stored:   {}",
+        hippocampus_stats.total_memories
+    );
+    println!(
+        "    Average strength:        {:.3}",
+        hippocampus_stats.avg_strength
+    );
     println!();
 
     // Success criteria
@@ -286,7 +344,8 @@ fn main() {
     let memories_formed = hippocampus_stats.total_memories > 10;
     let affects_evaluated = affective_stats.concepts_evaluated > 5;
 
-    let success = total_concepts >= 20 && consciousness_grew && memories_formed && affects_evaluated;
+    let success =
+        total_concepts >= 20 && consciousness_grew && memories_formed && affects_evaluated;
 
     if success {
         println!("╔════════════════════════════════════════════════════════════════════╗");

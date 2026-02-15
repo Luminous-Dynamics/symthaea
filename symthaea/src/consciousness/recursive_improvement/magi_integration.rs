@@ -51,7 +51,7 @@ use super::world_prediction::{
     WorldActionContext, WorldPrediction,
 };
 use crate::consciousness::compositionality::{
-    CompositionalityEngine, ComposedPrimitive, CompositionType,
+    ComposedPrimitive, CompositionType, CompositionalityEngine,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -160,14 +160,23 @@ impl SelfModel {
     }
 
     /// Update capability after observation
-    pub fn update_capability(&mut self, domain: CapabilityDomain, observed: f64, learning_rate: f64) {
+    pub fn update_capability(
+        &mut self,
+        domain: CapabilityDomain,
+        observed: f64,
+        learning_rate: f64,
+    ) {
         let current = self.get_capability(domain);
         let updated = current * (1.0 - learning_rate) + observed * learning_rate;
         self.capabilities.insert(domain, updated);
     }
 
     /// Predict behavior in a domain
-    pub fn predict_behavior(&mut self, domain: CapabilityDomain, description: impl Into<String>) -> BehaviorPrediction {
+    pub fn predict_behavior(
+        &mut self,
+        domain: CapabilityDomain,
+        description: impl Into<String>,
+    ) -> BehaviorPrediction {
         let prediction = BehaviorPrediction {
             prediction: description.into(),
             confidence: self.get_capability(domain),
@@ -187,7 +196,10 @@ impl SelfModel {
         } else {
             domains.iter().map(|d| self.get_capability(*d)).sum::<f64>() / domains.len() as f64
         };
-        let primary_domain = domains.first().copied().unwrap_or(CapabilityDomain::Reasoning);
+        let primary_domain = domains
+            .first()
+            .copied()
+            .unwrap_or(CapabilityDomain::Reasoning);
         BehaviorPrediction {
             prediction: format!("Multi-domain prediction across {:?}", domains),
             confidence: avg_confidence,
@@ -434,12 +446,17 @@ impl WorldGroundedSelfModel {
     /// When set, the MAGI update step can compose primitives (e.g. creating
     /// fallback or parallel compositions for weak domains). This is opt-in:
     /// if never called, behaviour is unchanged.
-    pub fn set_compositionality_engine(&mut self, engine: Arc<std::sync::Mutex<CompositionalityEngine>>) {
+    pub fn set_compositionality_engine(
+        &mut self,
+        engine: Arc<std::sync::Mutex<CompositionalityEngine>>,
+    ) {
         self.compositionality_engine = Some(engine);
     }
 
     /// Get a reference to the compositionality engine, if attached.
-    pub fn compositionality_engine(&self) -> Option<&Arc<std::sync::Mutex<CompositionalityEngine>>> {
+    pub fn compositionality_engine(
+        &self,
+    ) -> Option<&Arc<std::sync::Mutex<CompositionalityEngine>>> {
         self.compositionality_engine.as_ref()
     }
 
@@ -881,11 +898,7 @@ impl WorldGroundedSelfModel {
         // If there is a strongest and weakest domain, compose a fallback
         // so the strong domain backs up the weak one.
         if domains.len() >= 2 {
-            let _ = engine.compose_fallback(
-                &domains[0],
-                domains.last().unwrap(),
-                0.6,
-            );
+            let _ = engine.compose_fallback(&domains[0], domains.last().unwrap(), 0.6);
         }
     }
 
@@ -1113,8 +1126,7 @@ impl WorldGroundedSelfModel {
         let contribution = self.compute_efe_contribution(action);
 
         // Combine base EFE with calibration contribution
-        let calibrated = base_efe
-            - (weights.pragmatic * contribution.pragmatic)
+        let calibrated = base_efe - (weights.pragmatic * contribution.pragmatic)
             + (weights.epistemic * contribution.epistemic)
             - (weights.novelty * contribution.novelty);
 
@@ -1138,7 +1150,11 @@ impl WorldGroundedSelfModel {
     /// Adjust an action's confidence based on domain calibration
     ///
     /// This should be called when making predictions about actions.
-    pub fn adjust_action_confidence(&self, action: &WorldActionContext, raw_confidence: f64) -> f64 {
+    pub fn adjust_action_confidence(
+        &self,
+        action: &WorldActionContext,
+        raw_confidence: f64,
+    ) -> f64 {
         let domain = PredictionDomain::from_action_type(&action.action_type);
         self.calibration.adjust_confidence(domain, raw_confidence)
     }
@@ -1164,7 +1180,11 @@ impl WorldGroundedSelfModel {
     /// Uses active inference principles:
     /// - High epistemic horizon → explore
     /// - Good calibration → exploit
-    pub fn should_explore_domain(&self, domain: PredictionDomain, exploration_threshold: f64) -> bool {
+    pub fn should_explore_domain(
+        &self,
+        domain: PredictionDomain,
+        exploration_threshold: f64,
+    ) -> bool {
         self.epistemic_horizon(domain) > exploration_threshold
     }
 }
@@ -1195,8 +1215,7 @@ pub struct EfeContribution {
 impl EfeContribution {
     /// Get the total contribution (for logging/debugging)
     pub fn total(&self, weights: &EfeWeights) -> f64 {
-        -(weights.pragmatic * self.pragmatic)
-            + (weights.epistemic * self.epistemic)
+        -(weights.pragmatic * self.pragmatic) + (weights.epistemic * self.epistemic)
             - (weights.novelty * self.novelty)
     }
 }
@@ -1305,7 +1324,11 @@ pub struct SystemSnapshot {
 
 impl SystemSnapshot {
     /// Create a new snapshot
-    pub fn new(calibration: CalibrationSummary, loop_state: MagiLoopState, pending_count: usize) -> Self {
+    pub fn new(
+        calibration: CalibrationSummary,
+        loop_state: MagiLoopState,
+        pending_count: usize,
+    ) -> Self {
         Self {
             timestamp: Instant::now(),
             calibration,
@@ -1337,32 +1360,49 @@ pub enum ModelUpdate {
         new_capability: f64,
     },
     /// Update confidence adjustment parameters
-    ConfidenceAdjustment {
-        old_factor: f64,
-        new_factor: f64,
-    },
+    ConfidenceAdjustment { old_factor: f64, new_factor: f64 },
     /// Custom update type
-    Custom {
-        name: String,
-        description: String,
-    },
+    Custom { name: String, description: String },
 }
 
 impl ModelUpdate {
     /// Get a description of the update
     pub fn description(&self) -> String {
         match self {
-            Self::CalibrationAdjustment { domain, old_adjustment, new_adjustment } => {
-                format!("Calibration {:?}: {:.3} -> {:.3}", domain, old_adjustment, new_adjustment)
+            Self::CalibrationAdjustment {
+                domain,
+                old_adjustment,
+                new_adjustment,
+            } => {
+                format!(
+                    "Calibration {:?}: {:.3} -> {:.3}",
+                    domain, old_adjustment, new_adjustment
+                )
             }
-            Self::GateThreshold { old_threshold, new_threshold } => {
+            Self::GateThreshold {
+                old_threshold,
+                new_threshold,
+            } => {
                 format!("Gate threshold: {:?} -> {:?}", old_threshold, new_threshold)
             }
-            Self::CapabilityUpdate { domain, old_capability, new_capability } => {
-                format!("Capability {:?}: {:.3} -> {:.3}", domain, old_capability, new_capability)
+            Self::CapabilityUpdate {
+                domain,
+                old_capability,
+                new_capability,
+            } => {
+                format!(
+                    "Capability {:?}: {:.3} -> {:.3}",
+                    domain, old_capability, new_capability
+                )
             }
-            Self::ConfidenceAdjustment { old_factor, new_factor } => {
-                format!("Confidence adjustment: {:.3} -> {:.3}", old_factor, new_factor)
+            Self::ConfidenceAdjustment {
+                old_factor,
+                new_factor,
+            } => {
+                format!(
+                    "Confidence adjustment: {:.3} -> {:.3}",
+                    old_factor, new_factor
+                )
             }
             Self::Custom { name, description } => {
                 format!("{}: {}", name, description)
@@ -1375,33 +1415,19 @@ impl ModelUpdate {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RollbackCondition {
     /// Accuracy drops by more than threshold
-    AccuracyDrop {
-        threshold: f64,
-    },
+    AccuracyDrop { threshold: f64 },
     /// Calibration error increases by more than threshold
-    CalibrationWorse {
-        threshold: f64,
-    },
+    CalibrationWorse { threshold: f64 },
     /// Core constraint violated
-    ConstraintViolation {
-        constraint: String,
-    },
+    ConstraintViolation { constraint: String },
     /// Consecutive failures exceed count
-    ConsecutiveFailures {
-        count: usize,
-    },
+    ConsecutiveFailures { count: usize },
     /// Brier score exceeds threshold
-    BrierScoreExceeds {
-        threshold: f64,
-    },
+    BrierScoreExceeds { threshold: f64 },
     /// ECE exceeds threshold
-    EceExceeds {
-        threshold: f64,
-    },
+    EceExceeds { threshold: f64 },
     /// Time-based rollback (if no improvement within duration)
-    NoImprovementWithin {
-        duration_secs: u64,
-    },
+    NoImprovementWithin { duration_secs: u64 },
     /// Custom condition
     Custom {
         name: String,
@@ -1414,7 +1440,8 @@ impl RollbackCondition {
     pub fn is_triggered(&self, baseline: &SystemSnapshot, current: &SystemSnapshot) -> bool {
         match self {
             Self::AccuracyDrop { threshold } => {
-                let drop = baseline.calibration.global_accuracy - current.calibration.global_accuracy;
+                let drop =
+                    baseline.calibration.global_accuracy - current.calibration.global_accuracy;
                 drop > *threshold
             }
             Self::CalibrationWorse { threshold } => {
@@ -1427,14 +1454,11 @@ impl RollbackCondition {
             }
             Self::ConsecutiveFailures { count } => {
                 // Check recent attributions
-                current.loop_state.attributions_generated > baseline.loop_state.attributions_generated + count
+                current.loop_state.attributions_generated
+                    > baseline.loop_state.attributions_generated + count
             }
-            Self::BrierScoreExceeds { threshold } => {
-                current.calibration.global_brier > *threshold
-            }
-            Self::EceExceeds { threshold } => {
-                current.calibration.global_ece > *threshold
-            }
+            Self::BrierScoreExceeds { threshold } => current.calibration.global_brier > *threshold,
+            Self::EceExceeds { threshold } => current.calibration.global_ece > *threshold,
             Self::NoImprovementWithin { .. } => {
                 // Time-based check would need external timer
                 false
@@ -1630,15 +1654,27 @@ impl SafeUpdateManager {
 
     /// Get statistics about updates
     pub fn statistics(&self) -> UpdateStatistics {
-        let committed = self.history.iter().filter(|u| u.status == UpdateStatus::Committed).count();
-        let rolled_back = self.history.iter().filter(|u| u.status == UpdateStatus::RolledBack).count();
+        let committed = self
+            .history
+            .iter()
+            .filter(|u| u.status == UpdateStatus::Committed)
+            .count();
+        let rolled_back = self
+            .history
+            .iter()
+            .filter(|u| u.status == UpdateStatus::RolledBack)
+            .count();
         let total = committed + rolled_back;
 
         UpdateStatistics {
             active_count: self.active_updates.len(),
             committed_count: committed,
             rolled_back_count: rolled_back,
-            success_rate: if total > 0 { committed as f64 / total as f64 } else { 0.0 },
+            success_rate: if total > 0 {
+                committed as f64 / total as f64
+            } else {
+                0.0
+            },
         }
     }
 }

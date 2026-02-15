@@ -10,36 +10,36 @@ use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 
-use crate::articulatory::{ArticulatoryHDC, Voicing, Manner, Place};
-use crate::hdc::{HV16, BundleAccumulator};
+use crate::articulatory::{ArticulatoryHDC, Manner, Place, Voicing};
+use crate::hdc::{BundleAccumulator, HV16};
 
 /// Loaded CfC weights for articulatory detection
 #[derive(Debug, Clone)]
 pub struct CfCWeights {
     // CfC backbone
-    pub w_in_weight: Vec<Vec<f32>>,   // [hidden_size, input_size]
-    pub w_in_bias: Vec<f32>,          // [hidden_size]
-    pub w_rec_weight: Vec<Vec<f32>>,  // [hidden_size, hidden_size]
-    pub w_rec_bias: Vec<f32>,         // [hidden_size]
-    pub log_tau: Vec<f32>,            // [hidden_size]
+    pub w_in_weight: Vec<Vec<f32>>,  // [hidden_size, input_size]
+    pub w_in_bias: Vec<f32>,         // [hidden_size]
+    pub w_rec_weight: Vec<Vec<f32>>, // [hidden_size, hidden_size]
+    pub w_rec_bias: Vec<f32>,        // [hidden_size]
+    pub log_tau: Vec<f32>,           // [hidden_size]
 
     // Voicing head
-    pub voicing_layer0_weight: Vec<Vec<f32>>,  // [32, hidden_size]
-    pub voicing_layer0_bias: Vec<f32>,         // [32]
-    pub voicing_layer2_weight: Vec<Vec<f32>>,  // [2, 32]
-    pub voicing_layer2_bias: Vec<f32>,         // [2]
+    pub voicing_layer0_weight: Vec<Vec<f32>>, // [32, hidden_size]
+    pub voicing_layer0_bias: Vec<f32>,        // [32]
+    pub voicing_layer2_weight: Vec<Vec<f32>>, // [2, 32]
+    pub voicing_layer2_bias: Vec<f32>,        // [2]
 
     // Manner head
-    pub manner_layer0_weight: Vec<Vec<f32>>,   // [32, hidden_size]
-    pub manner_layer0_bias: Vec<f32>,          // [32]
-    pub manner_layer2_weight: Vec<Vec<f32>>,   // [7, 32]
-    pub manner_layer2_bias: Vec<f32>,          // [7]
+    pub manner_layer0_weight: Vec<Vec<f32>>, // [32, hidden_size]
+    pub manner_layer0_bias: Vec<f32>,        // [32]
+    pub manner_layer2_weight: Vec<Vec<f32>>, // [7, 32]
+    pub manner_layer2_bias: Vec<f32>,        // [7]
 
     // Place head
-    pub place_layer0_weight: Vec<Vec<f32>>,    // [32, hidden_size]
-    pub place_layer0_bias: Vec<f32>,           // [32]
-    pub place_layer2_weight: Vec<Vec<f32>>,    // [10, 32]
-    pub place_layer2_bias: Vec<f32>,           // [10]
+    pub place_layer0_weight: Vec<Vec<f32>>, // [32, hidden_size]
+    pub place_layer0_bias: Vec<f32>,        // [32]
+    pub place_layer2_weight: Vec<Vec<f32>>, // [10, 32]
+    pub place_layer2_bias: Vec<f32>,        // [10]
 
     // Config
     pub input_size: usize,
@@ -56,12 +56,16 @@ impl CfCWeights {
 
         // Read metadata length
         let mut len_bytes = [0u8; 4];
-        reader.read_exact(&mut len_bytes).map_err(|e| format!("Failed to read header: {}", e))?;
+        reader
+            .read_exact(&mut len_bytes)
+            .map_err(|e| format!("Failed to read header: {}", e))?;
         let metadata_len = u32::from_le_bytes(len_bytes) as usize;
 
         // Read metadata JSON
         let mut metadata_bytes = vec![0u8; metadata_len];
-        reader.read_exact(&mut metadata_bytes).map_err(|e| format!("Failed to read metadata: {}", e))?;
+        reader
+            .read_exact(&mut metadata_bytes)
+            .map_err(|e| format!("Failed to read metadata: {}", e))?;
 
         // Remove null terminator and parse JSON
         let metadata_str = String::from_utf8_lossy(&metadata_bytes)
@@ -91,7 +95,8 @@ impl CfCWeights {
 
         let parse_2d = |name: &str| -> Result<Vec<Vec<f32>>, String> {
             let meta = &weights_meta[name];
-            let shape: Vec<usize> = meta["shape"].as_array()
+            let shape: Vec<usize> = meta["shape"]
+                .as_array()
                 .ok_or_else(|| format!("Missing shape for {}", name))?
                 .iter()
                 .map(|v| v.as_u64().unwrap_or(0) as usize)
@@ -232,7 +237,10 @@ impl LearnedArticulatoryDetector {
         let mut h_new = vec![0.0; hidden_size];
 
         // Compute tau (clamped)
-        let tau: Vec<f32> = self.weights.log_tau.iter()
+        let tau: Vec<f32> = self
+            .weights
+            .log_tau
+            .iter()
             .map(|lt| lt.exp().clamp(self.weights.tau_min, self.weights.tau_max))
             .collect();
 
@@ -374,21 +382,32 @@ impl LearnedArticulatoryDetector {
         let mut acc = BundleAccumulator::new();
 
         // Weighted voicing
-        let voiced_hv = self.hdc.role_voicing.bind(self.hdc.voicing_hv(Voicing::Voiced));
-        let voiceless_hv = self.hdc.role_voicing.bind(self.hdc.voicing_hv(Voicing::Voiceless));
+        let voiced_hv = self
+            .hdc
+            .role_voicing
+            .bind(self.hdc.voicing_hv(Voicing::Voiced));
+        let voiceless_hv = self
+            .hdc
+            .role_voicing
+            .bind(self.hdc.voicing_hv(Voicing::Voiceless));
 
         let voiced_weight = (voicing_probs[1] * 10.0) as usize;
         let voiceless_weight = (voicing_probs[0] * 10.0) as usize;
 
-        for _ in 0..voiced_weight { acc.add(&voiced_hv); }
-        for _ in 0..voiceless_weight { acc.add(&voiceless_hv); }
+        for _ in 0..voiced_weight {
+            acc.add(&voiced_hv);
+        }
+        for _ in 0..voiceless_weight {
+            acc.add(&voiceless_hv);
+        }
 
         // Weighted manner (simplified - just top 2)
-        let mut manner_indices: Vec<(usize, f32)> = manner_probs.iter()
+        let mut manner_indices: Vec<(usize, f32)> = manner_probs
+            .iter()
             .enumerate()
             .map(|(i, &p)| (i, p))
             .collect();
-        manner_indices.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        manner_indices.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         for (idx, prob) in manner_indices.iter().take(2) {
             let manner = match idx {
@@ -402,15 +421,18 @@ impl LearnedArticulatoryDetector {
             };
             let hv = self.hdc.role_manner.bind(self.hdc.manner_hv(manner));
             let weight = (*prob * 10.0) as usize;
-            for _ in 0..weight { acc.add(&hv); }
+            for _ in 0..weight {
+                acc.add(&hv);
+            }
         }
 
         // Weighted place (top 2)
-        let mut place_indices: Vec<(usize, f32)> = place_probs.iter()
+        let mut place_indices: Vec<(usize, f32)> = place_probs
+            .iter()
             .enumerate()
             .map(|(i, &p)| (i, p))
             .collect();
-        place_indices.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        place_indices.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         for (idx, prob) in place_indices.iter().take(2) {
             let place = match idx {
@@ -427,16 +449,19 @@ impl LearnedArticulatoryDetector {
             };
             let hv = self.hdc.role_place.bind(self.hdc.place_hv(place));
             let weight = (*prob * 10.0) as usize;
-            for _ in 0..weight { acc.add(&hv); }
+            for _ in 0..weight {
+                acc.add(&hv);
+            }
         }
 
         acc.finalize()
     }
 
     fn argmax(probs: &[f32]) -> usize {
-        probs.iter()
+        probs
+            .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(i, _)| i)
             .unwrap_or(0)
     }
@@ -451,7 +476,12 @@ impl LearnedArticulatoryDetector {
 
     /// Forward pass with temperature scaling
     /// Higher temperature = more uniform predictions
-    pub fn forward_temperature(&mut self, mel_features: &[f32], dt: f32, temperature: f32) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
+    pub fn forward_temperature(
+        &mut self,
+        mel_features: &[f32],
+        dt: f32,
+        temperature: f32,
+    ) -> (Vec<f32>, Vec<f32>, Vec<f32>) {
         // Update hidden state with CfC dynamics
         let h_new = self.cfc_forward(mel_features, dt);
         self.hidden_state = h_new.clone();
@@ -489,7 +519,12 @@ impl LearnedArticulatoryDetector {
 
     /// Detect with temperature scaling for Place classifier
     /// Uses higher temperature to reduce overconfidence
-    pub fn detect_balanced(&mut self, mel_features: &[f32], dt: f32, place_temperature: f32) -> HV16 {
+    pub fn detect_balanced(
+        &mut self,
+        mel_features: &[f32],
+        dt: f32,
+        place_temperature: f32,
+    ) -> HV16 {
         // Normal forward for voicing/manner, temperature-scaled for place
         let h_new = self.cfc_forward(mel_features, dt);
         self.hidden_state = h_new.clone();
@@ -578,7 +613,11 @@ impl LearnedArticulatoryDetector {
     pub fn get_raw_outputs(&mut self, mel_features: &[f32], dt: f32) -> (usize, usize, usize) {
         let (voicing_probs, manner_probs, place_probs) = self.forward(mel_features, dt);
 
-        let voicing = if voicing_probs[1] > voicing_probs[0] { 1 } else { 0 };
+        let voicing = if voicing_probs[1] > voicing_probs[0] {
+            1
+        } else {
+            0
+        };
         let manner = Self::argmax(&manner_probs);
         let place = Self::argmax(&place_probs);
 

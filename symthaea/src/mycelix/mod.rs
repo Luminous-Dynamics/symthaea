@@ -61,14 +61,16 @@
 //! println!("Perspectives considered: {}", response.perspectives_considered);
 //! ```
 
-pub mod types;
-pub mod mapper;
 pub mod gis;
 pub mod kosmic_song;
+pub mod mapper;
 pub mod network;
+pub mod types;
 
-pub use types::*;
-pub use mapper::*;
 pub use gis::GracefulIgnoranceSystem;
-pub use kosmic_song::{KosmicSong, KosmicSongBuilder, HarmonicProfile, KosmicResponse};
-pub use network::{NetworkClient, NetworkKVector, SpectralKResult, SpectralKComputer, MycelixNetworkBridge};
+pub use kosmic_song::{HarmonicProfile, KosmicResponse, KosmicSong, KosmicSongBuilder};
+pub use mapper::*;
+pub use network::{
+    MycelixNetworkBridge, NetworkClient, NetworkKVector, SpectralKComputer, SpectralKResult,
+};
+pub use types::*;

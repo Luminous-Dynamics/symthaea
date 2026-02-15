@@ -314,6 +314,536 @@ pub fn get_resource_requests(disaster_hash: ActionHash) -> ExternResult<Vec<Reco
     Ok(requests)
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn register_resource_input_serde_roundtrip() {
+        let input = RegisterResourceInput {
+            id: "res-1".to_string(),
+            resource_type: ResourceType::Medical,
+            name: "Portable Defibrillator".to_string(),
+            quantity: 5,
+            unit: "units".to_string(),
+            location: "Warehouse A".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RegisterResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "res-1");
+        assert_eq!(decoded.name, "Portable Defibrillator");
+        assert_eq!(decoded.quantity, 5);
+        assert_eq!(decoded.resource_type, ResourceType::Medical);
+    }
+
+    #[test]
+    fn deploy_resource_input_serde_roundtrip() {
+        let input = DeployResourceInput {
+            resource_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            disaster_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            deployment_location: "Field Hospital Zone B".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: DeployResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.deployment_location, "Field Hospital Zone B");
+    }
+
+    #[test]
+    fn request_resource_input_serde_roundtrip() {
+        let input = RequestResourceInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            resource_type: ResourceType::Water,
+            quantity_needed: 1000,
+            urgency: UrgencyLevel::Critical,
+            location: "Evacuation Center 3".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RequestResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.resource_type, ResourceType::Water);
+        assert_eq!(decoded.quantity_needed, 1000);
+        assert_eq!(decoded.urgency, UrgencyLevel::Critical);
+    }
+
+    #[test]
+    fn fulfill_request_input_serde_roundtrip() {
+        let input = FulfillRequestInput {
+            request_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            resource_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let _decoded: FulfillRequestInput = serde_json::from_str(&json).unwrap();
+    }
+
+    #[test]
+    fn find_shelters_for_resource_input_serde_roundtrip() {
+        let input = FindSheltersForResourceInput {
+            lat: 34.05,
+            lon: -118.25,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FindSheltersForResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.lat, 34.05);
+        assert_eq!(decoded.lon, -118.25);
+        assert_eq!(decoded.radius_km, 10.0);
+    }
+
+    #[test]
+    fn shelter_info_serde_roundtrip() {
+        let info = ShelterInfo {
+            name: "Central High School".to_string(),
+            address: "123 Main St".to_string(),
+            capacity: 500,
+            current_occupancy: 320,
+            available_capacity: 180,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let decoded: ShelterInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Central High School");
+        assert_eq!(decoded.capacity, 500);
+        assert_eq!(decoded.current_occupancy, 320);
+        assert_eq!(decoded.available_capacity, 180);
+    }
+
+    #[test]
+    fn nearby_shelters_result_serde_roundtrip() {
+        let result = NearbySheltersResult {
+            shelters_found: 2,
+            total_available_capacity: 350,
+            shelters: vec![
+                ShelterInfo {
+                    name: "Shelter A".to_string(),
+                    address: "456 Oak Ave".to_string(),
+                    capacity: 200,
+                    current_occupancy: 150,
+                    available_capacity: 50,
+                },
+            ],
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: NearbySheltersResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.shelters_found, 2);
+        assert_eq!(decoded.total_available_capacity, 350);
+        assert_eq!(decoded.shelters.len(), 1);
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn nearby_shelters_result_with_error_serde() {
+        let result = NearbySheltersResult {
+            shelters_found: 0,
+            total_available_capacity: 0,
+            shelters: vec![],
+            error: Some("Zome not available".to_string()),
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: NearbySheltersResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.error, Some("Zome not available".to_string()));
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn resource_type_all_variants_serde() {
+        let variants = vec![
+            ResourceType::Medical,
+            ResourceType::Personnel,
+            ResourceType::Equipment,
+            ResourceType::Shelter,
+            ResourceType::Transport,
+            ResourceType::Communication,
+            ResourceType::Food,
+            ResourceType::Water,
+            ResourceType::Power,
+            ResourceType::Fuel,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ResourceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn resource_status_all_variants_serde() {
+        let variants = vec![
+            ResourceStatus::Available,
+            ResourceStatus::Deployed,
+            ResourceStatus::InTransit,
+            ResourceStatus::Depleted,
+            ResourceStatus::Damaged,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ResourceStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn urgency_level_all_variants_serde() {
+        let variants = vec![
+            UrgencyLevel::Critical,
+            UrgencyLevel::High,
+            UrgencyLevel::Medium,
+            UrgencyLevel::Low,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: UrgencyLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn request_status_all_variants_serde() {
+        let variants = vec![
+            RequestStatus::Pending,
+            RequestStatus::Approved,
+            RequestStatus::Fulfilled,
+            RequestStatus::PartiallyFulfilled,
+            RequestStatus::Denied,
+            RequestStatus::Cancelled,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: RequestStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // EmergencyResource full struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn emergency_resource_full_struct_serde_roundtrip() {
+        let resource = EmergencyResource {
+            id: "res-42".to_string(),
+            resource_type: ResourceType::Equipment,
+            name: "Portable Generator".to_string(),
+            quantity: 10,
+            unit: "units".to_string(),
+            location: "Staging Area C".to_string(),
+            owner: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            status: ResourceStatus::Available,
+            deployed_to: None,
+        };
+        let json = serde_json::to_string(&resource).unwrap();
+        let decoded: EmergencyResource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "res-42");
+        assert_eq!(decoded.name, "Portable Generator");
+        assert_eq!(decoded.quantity, 10);
+        assert_eq!(decoded.resource_type, ResourceType::Equipment);
+        assert_eq!(decoded.status, ResourceStatus::Available);
+        assert!(decoded.deployed_to.is_none());
+    }
+
+    #[test]
+    fn emergency_resource_deployed_serde_roundtrip() {
+        let resource = EmergencyResource {
+            id: "res-d1".to_string(),
+            resource_type: ResourceType::Medical,
+            name: "Field Hospital Kit".to_string(),
+            quantity: 1,
+            unit: "kit".to_string(),
+            location: "Disaster Zone B".to_string(),
+            owner: AgentPubKey::from_raw_36(vec![2u8; 36]),
+            status: ResourceStatus::Deployed,
+            deployed_to: Some(ActionHash::from_raw_36(vec![3u8; 36])),
+        };
+        let json = serde_json::to_string(&resource).unwrap();
+        let decoded: EmergencyResource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, ResourceStatus::Deployed);
+        assert!(decoded.deployed_to.is_some());
+    }
+
+    #[test]
+    fn emergency_resource_zero_quantity_serde() {
+        let resource = EmergencyResource {
+            id: "res-0".to_string(),
+            resource_type: ResourceType::Water,
+            name: "Water Tank".to_string(),
+            quantity: 0,
+            unit: "gallons".to_string(),
+            location: "Empty".to_string(),
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            status: ResourceStatus::Depleted,
+            deployed_to: None,
+        };
+        let json = serde_json::to_string(&resource).unwrap();
+        let decoded: EmergencyResource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity, 0);
+        assert_eq!(decoded.status, ResourceStatus::Depleted);
+    }
+
+    #[test]
+    fn emergency_resource_max_quantity_serde() {
+        let resource = EmergencyResource {
+            id: "res-max".to_string(),
+            resource_type: ResourceType::Food,
+            name: "MRE Packs".to_string(),
+            quantity: u32::MAX,
+            unit: "meals".to_string(),
+            location: "National Stockpile".to_string(),
+            owner: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            status: ResourceStatus::Available,
+            deployed_to: None,
+        };
+        let json = serde_json::to_string(&resource).unwrap();
+        let decoded: EmergencyResource = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity, u32::MAX);
+    }
+
+    // ========================================================================
+    // ResourceRequest full struct serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn resource_request_full_struct_serde_roundtrip() {
+        let request = ResourceRequest {
+            disaster_hash: ActionHash::from_raw_36(vec![10u8; 36]),
+            requesting_team: AgentPubKey::from_raw_36(vec![11u8; 36]),
+            resource_type: ResourceType::Personnel,
+            quantity_needed: 25,
+            urgency: UrgencyLevel::High,
+            location: "Command Post Alpha".to_string(),
+            status: RequestStatus::Pending,
+            fulfilled_by: None,
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: ResourceRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.resource_type, ResourceType::Personnel);
+        assert_eq!(decoded.quantity_needed, 25);
+        assert_eq!(decoded.urgency, UrgencyLevel::High);
+        assert_eq!(decoded.status, RequestStatus::Pending);
+        assert!(decoded.fulfilled_by.is_none());
+    }
+
+    #[test]
+    fn resource_request_fulfilled_serde_roundtrip() {
+        let request = ResourceRequest {
+            disaster_hash: ActionHash::from_raw_36(vec![20u8; 36]),
+            requesting_team: AgentPubKey::from_raw_36(vec![21u8; 36]),
+            resource_type: ResourceType::Communication,
+            quantity_needed: 100,
+            urgency: UrgencyLevel::Critical,
+            location: "City Hall".to_string(),
+            status: RequestStatus::Fulfilled,
+            fulfilled_by: Some(ActionHash::from_raw_36(vec![22u8; 36])),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: ResourceRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.status, RequestStatus::Fulfilled);
+        assert!(decoded.fulfilled_by.is_some());
+    }
+
+    // ========================================================================
+    // Input struct boundary conditions
+    // ========================================================================
+
+    #[test]
+    fn register_resource_input_all_resource_types() {
+        let types = vec![
+            ResourceType::Medical,
+            ResourceType::Personnel,
+            ResourceType::Equipment,
+            ResourceType::Shelter,
+            ResourceType::Transport,
+            ResourceType::Communication,
+            ResourceType::Food,
+            ResourceType::Water,
+            ResourceType::Power,
+            ResourceType::Fuel,
+        ];
+        for rt in types {
+            let input = RegisterResourceInput {
+                id: "r-1".to_string(),
+                resource_type: rt.clone(),
+                name: "Test Resource".to_string(),
+                quantity: 1,
+                unit: "ea".to_string(),
+                location: "Loc".to_string(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: RegisterResourceInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.resource_type, rt);
+        }
+    }
+
+    #[test]
+    fn register_resource_input_zero_quantity_serde() {
+        let input = RegisterResourceInput {
+            id: "r-0".to_string(),
+            resource_type: ResourceType::Fuel,
+            name: "Empty Fuel Tank".to_string(),
+            quantity: 0,
+            unit: "liters".to_string(),
+            location: "Depot".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RegisterResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity, 0);
+    }
+
+    #[test]
+    fn register_resource_input_max_quantity_serde() {
+        let input = RegisterResourceInput {
+            id: "r-max".to_string(),
+            resource_type: ResourceType::Power,
+            name: "Battery Packs".to_string(),
+            quantity: u32::MAX,
+            unit: "packs".to_string(),
+            location: "Grid".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RegisterResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity, u32::MAX);
+    }
+
+    #[test]
+    fn request_resource_input_all_urgency_levels() {
+        let levels = vec![
+            UrgencyLevel::Critical,
+            UrgencyLevel::High,
+            UrgencyLevel::Medium,
+            UrgencyLevel::Low,
+        ];
+        for level in levels {
+            let input = RequestResourceInput {
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                resource_type: ResourceType::Medical,
+                quantity_needed: 1,
+                urgency: level.clone(),
+                location: "Test".to_string(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: RequestResourceInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.urgency, level);
+        }
+    }
+
+    // ========================================================================
+    // ShelterInfo and NearbySheltersResult edge cases
+    // ========================================================================
+
+    #[test]
+    fn shelter_info_zero_values_serde() {
+        let info = ShelterInfo {
+            name: "Empty".to_string(),
+            address: "N/A".to_string(),
+            capacity: 0,
+            current_occupancy: 0,
+            available_capacity: 0,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let decoded: ShelterInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.capacity, 0);
+        assert_eq!(decoded.available_capacity, 0);
+    }
+
+    #[test]
+    fn shelter_info_max_capacity_serde() {
+        let info = ShelterInfo {
+            name: "Mega Shelter".to_string(),
+            address: "1 Big Way".to_string(),
+            capacity: u32::MAX,
+            current_occupancy: 0,
+            available_capacity: u32::MAX,
+        };
+        let json = serde_json::to_string(&info).unwrap();
+        let decoded: ShelterInfo = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.capacity, u32::MAX);
+    }
+
+    #[test]
+    fn nearby_shelters_result_empty_shelters_no_error() {
+        let result = NearbySheltersResult {
+            shelters_found: 0,
+            total_available_capacity: 0,
+            shelters: vec![],
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: NearbySheltersResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.shelters_found, 0);
+        assert!(decoded.shelters.is_empty());
+        assert!(decoded.error.is_none());
+    }
+
+    #[test]
+    fn nearby_shelters_result_multiple_shelters_serde() {
+        let result = NearbySheltersResult {
+            shelters_found: 3,
+            total_available_capacity: 500,
+            shelters: vec![
+                ShelterInfo {
+                    name: "A".to_string(),
+                    address: "1 St".to_string(),
+                    capacity: 200,
+                    current_occupancy: 100,
+                    available_capacity: 100,
+                },
+                ShelterInfo {
+                    name: "B".to_string(),
+                    address: "2 St".to_string(),
+                    capacity: 300,
+                    current_occupancy: 100,
+                    available_capacity: 200,
+                },
+                ShelterInfo {
+                    name: "C".to_string(),
+                    address: "3 St".to_string(),
+                    capacity: 400,
+                    current_occupancy: 200,
+                    available_capacity: 200,
+                },
+            ],
+            error: None,
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        let decoded: NearbySheltersResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.shelters.len(), 3);
+        assert_eq!(decoded.total_available_capacity, 500);
+    }
+
+    // ========================================================================
+    // Resource status lifecycle
+    // ========================================================================
+
+    #[test]
+    fn all_resource_statuses_serde_individual() {
+        // Verify each status serializes to the expected string
+        let available_json = serde_json::to_string(&ResourceStatus::Available).unwrap();
+        assert!(available_json.contains("Available"));
+
+        let deployed_json = serde_json::to_string(&ResourceStatus::Deployed).unwrap();
+        assert!(deployed_json.contains("Deployed"));
+
+        let damaged_json = serde_json::to_string(&ResourceStatus::Damaged).unwrap();
+        assert!(damaged_json.contains("Damaged"));
+    }
+
+    #[test]
+    fn all_request_statuses_serde_individual() {
+        let pending_json = serde_json::to_string(&RequestStatus::Pending).unwrap();
+        assert!(pending_json.contains("Pending"));
+
+        let denied_json = serde_json::to_string(&RequestStatus::Denied).unwrap();
+        assert!(denied_json.contains("Denied"));
+
+        let partial_json = serde_json::to_string(&RequestStatus::PartiallyFulfilled).unwrap();
+        assert!(partial_json.contains("PartiallyFulfilled"));
+    }
+}
+
 // ============================================================================
 // Cross-domain: Find nearby shelters for resource deployment
 // ============================================================================

@@ -356,10 +356,7 @@ impl RingVerifier {
         result
     }
 
-    fn check_commutativity(
-        elements: &[AlgebraicElement],
-        op: &dyn BinaryOperation,
-    ) -> AxiomCheck {
+    fn check_commutativity(elements: &[AlgebraicElement], op: &dyn BinaryOperation) -> AxiomCheck {
         let mut total_sim = 0.0f32;
         let mut count = 0;
         let mut holds = true;
@@ -413,7 +410,8 @@ impl RingVerifier {
         for a in elements {
             for b in elements {
                 let result = op.apply(a, b);
-                let (_closest_idx, sim) = GroupVerifier::find_closest_element(&result.encoding, elements);
+                let (_closest_idx, sim) =
+                    GroupVerifier::find_closest_element(&result.encoding, elements);
 
                 total_sim += sim;
                 count += 1;
@@ -626,12 +624,8 @@ impl FieldVerifier {
         if let Some(zero_elem) = zero {
             let mul_identity = Self::find_identity(elements, mul_op);
             if let Some(one_elem) = mul_identity {
-                let inverse_check = Self::check_multiplicative_inverses(
-                    elements,
-                    mul_op,
-                    &zero_elem,
-                    &one_elem,
-                );
+                let inverse_check =
+                    Self::check_multiplicative_inverses(elements, mul_op, &zero_elem, &one_elem);
                 result.add_check(inverse_check);
             }
         }
@@ -873,8 +867,157 @@ mod tests {
         let identity_map = |e: &AlgebraicElement| e.clone();
         let op = XorOp;
 
-        let result =
-            HomomorphismVerifier::verify(&domain, &codomain, &identity_map, &op, &op);
+        let result = HomomorphismVerifier::verify(&domain, &codomain, &identity_map, &op, &op);
         assert!(!result.axioms_checked.is_empty());
+    }
+
+    #[test]
+    fn test_group_axiom_count() {
+        let zero = AlgebraicElement {
+            label: "0".into(),
+            encoding: BinaryHV([0u8; 2048]),
+        };
+        let one = AlgebraicElement {
+            label: "1".into(),
+            encoding: BinaryHV::random(1),
+        };
+        let result = GroupVerifier::verify(&[zero, one], &XorOp);
+        // Must check at least 4 axioms: closure, associativity, identity, inverse
+        assert!(
+            result.axioms_checked.len() >= 4,
+            "Group verification should check ≥4 axioms, got {}",
+            result.axioms_checked.len()
+        );
+        // Total phi should be non-negative
+        assert!(result.total_phi >= 0.0);
+    }
+
+    #[test]
+    fn test_single_element_group() {
+        // Trivial group: {e} under any operation
+        let e = AlgebraicElement {
+            label: "e".into(),
+            encoding: BinaryHV([0u8; 2048]),
+        };
+        let result = GroupVerifier::verify(&[e], &XorOp);
+        // Single element: e*e should be ~e (closure), identity is e, inverse is e
+        assert!(!result.axioms_checked.is_empty());
+    }
+
+    // Define addition-like and multiplication-like operations for ring tests
+    struct BundleAddOp;
+    impl BinaryOperation for BundleAddOp {
+        fn apply(&self, a: &AlgebraicElement, b: &AlgebraicElement) -> AlgebraicElement {
+            AlgebraicElement {
+                label: format!("({}+{})", a.label, b.label),
+                encoding: BinaryHV::bundle(&[a.encoding.clone(), b.encoding.clone()]),
+            }
+        }
+        fn name(&self) -> &str {
+            "bundle_add"
+        }
+    }
+
+    struct BindMulOp;
+    impl BinaryOperation for BindMulOp {
+        fn apply(&self, a: &AlgebraicElement, b: &AlgebraicElement) -> AlgebraicElement {
+            AlgebraicElement {
+                label: format!("({}*{})", a.label, b.label),
+                encoding: a.encoding.bind(&b.encoding),
+            }
+        }
+        fn name(&self) -> &str {
+            "bind_mul"
+        }
+    }
+
+    #[test]
+    fn test_ring_verifier_checks_distributivity() {
+        let elements: Vec<AlgebraicElement> = (0..3)
+            .map(|i| AlgebraicElement {
+                label: format!("{}", i),
+                encoding: BinaryHV::random(i as u64 + 100),
+            })
+            .collect();
+
+        let result = RingVerifier::verify(&elements, &BundleAddOp, &BindMulOp);
+        // Should have axioms from group + ring checks including distributivity
+        let axiom_names: Vec<&str> = result
+            .axioms_checked
+            .iter()
+            .map(|a| a.axiom.as_str())
+            .collect();
+        assert!(
+            axiom_names.iter().any(|n| n.contains("Distribut")),
+            "Ring verification should check distributivity, got: {:?}",
+            axiom_names
+        );
+    }
+
+    #[test]
+    fn test_field_verifier_runs() {
+        let elements: Vec<AlgebraicElement> = (0..3)
+            .map(|i| AlgebraicElement {
+                label: format!("{}", i),
+                encoding: BinaryHV::random(i as u64 + 200),
+            })
+            .collect();
+
+        let result = FieldVerifier::verify(&elements, &BundleAddOp, &BindMulOp);
+        // Should check more axioms than a ring (multiplicative inverse)
+        assert!(
+            result.axioms_checked.len() >= 6,
+            "Field should check many axioms, got {}",
+            result.axioms_checked.len()
+        );
+    }
+
+    #[test]
+    fn test_structure_verification_phi_nonnegative() {
+        let elements: Vec<AlgebraicElement> = (0..4)
+            .map(|i| AlgebraicElement {
+                label: format!("e{}", i),
+                encoding: BinaryHV::random(i as u64 + 300),
+            })
+            .collect();
+
+        let result = GroupVerifier::verify(&elements, &XorOp);
+        assert!(
+            result.total_phi >= 0.0,
+            "Total Phi should be non-negative: {}",
+            result.total_phi
+        );
+        for check in &result.axioms_checked {
+            assert!(
+                check.phi >= 0.0,
+                "Axiom Phi should be non-negative: {} = {}",
+                check.axiom,
+                check.phi
+            );
+        }
+    }
+
+    #[test]
+    fn test_axiom_check_counterexample_on_failure() {
+        // When an axiom fails, counterexample should be populated
+        let elements: Vec<AlgebraicElement> = (0..3)
+            .map(|i| AlgebraicElement {
+                label: format!("{}", i),
+                encoding: BinaryHV::random(i as u64 + 400),
+            })
+            .collect();
+
+        let result = GroupVerifier::verify(&elements, &XorOp);
+        // For random elements, some axioms may fail
+        for check in &result.axioms_checked {
+            if !check.holds {
+                // Failed axioms should have counterexamples
+                assert!(
+                    check.counterexample.is_some(),
+                    "Failed axiom '{}' should have a counterexample",
+                    check.axiom
+                );
+            }
+        }
     }
 }

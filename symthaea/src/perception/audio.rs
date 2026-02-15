@@ -30,8 +30,8 @@
 //! PerceptionInput(Auditory)
 //! ```
 
+use anyhow::{anyhow, Result};
 use std::path::Path;
-use anyhow::{Result, anyhow};
 
 // Re-define types locally when full_perception is not available
 // This allows the audio module to work standalone
@@ -179,8 +179,8 @@ impl AudioPerception {
         let start = std::time::Instant::now();
 
         // Load audio
-        let (samples, _sample_rate) = symthaea_stt::AudioFrontend::load_wav(path)
-            .context("Failed to load audio file")?;
+        let (samples, _sample_rate) =
+            symthaea_stt::AudioFrontend::load_wav(path).context("Failed to load audio file")?;
 
         // Project through LTC
         let hvs = self.projector.project(&samples);
@@ -264,7 +264,7 @@ impl AudioPerception {
         // Count zero crossings as rough pitch proxy
         let mut zero_crossings = 0u32;
         for i in 1..samples.len() {
-            if (samples[i-1] > 0.0) != (samples[i] > 0.0) {
+            if (samples[i - 1] > 0.0) != (samples[i] > 0.0) {
                 zero_crossings += 1;
             }
         }

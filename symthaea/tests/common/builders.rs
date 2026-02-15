@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Test Data Builders
 //!
 //! Factory functions and builder patterns for creating test data.
@@ -172,7 +173,7 @@ pub fn create_memory_batch(
     (0..count)
         .map(|i| {
             let id = format!("{}-{}", prefix, i);
-            create_test_memory(&id, start_seed + i as u64, memory_type.clone())
+            create_test_memory(&id, start_seed + i as u64, memory_type)
         })
         .collect()
 }
@@ -184,7 +185,8 @@ pub fn create_memory_batch(
 /// Standard test content strings
 pub mod test_content {
     pub const SHORT: &str = "Short test content";
-    pub const MEDIUM: &str = "This is a medium-length test content string for integration testing purposes.";
+    pub const MEDIUM: &str =
+        "This is a medium-length test content string for integration testing purposes.";
     pub const LONG: &str = "This is a longer test content string that spans multiple sentences. \
         It contains various words and phrases to test content handling. \
         The content should be processed correctly by all database operations. \

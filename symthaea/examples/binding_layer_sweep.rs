@@ -16,17 +16,19 @@
 //! cargo run --example binding_layer_sweep --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig, TopologicalAssessment};
+use symthaea_core::hdc::consciousness_topology::{
+    ConsciousnessTopology, TopologicalAssessment, TopologyConfig,
+};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -52,21 +54,27 @@ fn run_experiment() -> Result<()> {
     let functional = load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
 
     // Create pairs
-    let phen_pairs: Vec<(&str, &str)> = phenomenal.iter()
+    let phen_pairs: Vec<(&str, &str)> = phenomenal
+        .iter()
         .take(40)
         .collect::<Vec<_>>()
         .chunks(2)
         .map(|c| (c[0].as_str(), c[1].as_str()))
         .collect();
 
-    let func_pairs: Vec<(&str, &str)> = functional.iter()
+    let func_pairs: Vec<(&str, &str)> = functional
+        .iter()
         .take(40)
         .collect::<Vec<_>>()
         .chunks(2)
         .map(|c| (c[0].as_str(), c[1].as_str()))
         .collect();
 
-    println!("Using {} phenomenal pairs, {} functional pairs\n", phen_pairs.len(), func_pairs.len());
+    println!(
+        "Using {} phenomenal pairs, {} functional pairs\n",
+        phen_pairs.len(),
+        func_pairs.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -109,7 +117,9 @@ fn run_experiment() -> Result<()> {
 
         // Process phenomenal pairs
         for (i, (a, b)) in phen_pairs.iter().enumerate() {
-            if i % 5 == 0 { print!("  Phen {}/{}\\r", i, phen_pairs.len()); }
+            if i % 5 == 0 {
+                print!("  Phen {}/{}\\r", i, phen_pairs.len());
+            }
 
             let acts_a = extractor.extract_layers(a, &[layer])?;
             let acts_b = extractor.extract_layers(b, &[layer])?;
@@ -124,12 +134,16 @@ fn run_experiment() -> Result<()> {
             let bundle_topo = analyze_topology(&bundled, &topology_config);
 
             results.phen_bind_pers.push(total_persistence(&bound_topo));
-            results.phen_bundle_pers.push(total_persistence(&bundle_topo));
+            results
+                .phen_bundle_pers
+                .push(total_persistence(&bundle_topo));
         }
 
         // Process functional pairs
         for (i, (a, b)) in func_pairs.iter().enumerate() {
-            if i % 5 == 0 { print!("  Func {}/{}\\r", i, func_pairs.len()); }
+            if i % 5 == 0 {
+                print!("  Func {}/{}\\r", i, func_pairs.len());
+            }
 
             let acts_a = extractor.extract_layers(a, &[layer])?;
             let acts_b = extractor.extract_layers(b, &[layer])?;
@@ -144,7 +158,9 @@ fn run_experiment() -> Result<()> {
             let bundle_topo = analyze_topology(&bundled, &topology_config);
 
             results.func_bind_pers.push(total_persistence(&bound_topo));
-            results.func_bundle_pers.push(total_persistence(&bundle_topo));
+            results
+                .func_bundle_pers
+                .push(total_persistence(&bundle_topo));
         }
         println!("  Done                    ");
 
@@ -170,20 +186,31 @@ fn run_experiment() -> Result<()> {
         let p_phen = permutation_test(&results.phen_bind_pers, &results.phen_bundle_pers, 2000);
 
         // Interaction test
-        let phen_diffs: Vec<f64> = results.phen_bind_pers.iter()
+        let phen_diffs: Vec<f64> = results
+            .phen_bind_pers
+            .iter()
             .zip(results.phen_bundle_pers.iter())
             .map(|(b, bu)| b - bu)
             .collect();
-        let func_diffs: Vec<f64> = results.func_bind_pers.iter()
+        let func_diffs: Vec<f64> = results
+            .func_bind_pers
+            .iter()
             .zip(results.func_bundle_pers.iter())
             .map(|(b, bu)| b - bu)
             .collect();
         let p_interaction = permutation_test(&phen_diffs, &func_diffs, 2000);
 
-        println!("{:5} │ {:+11.4} │ {:+11.4} │ {:+10.4} │ {:10.4}{} │ {:12.4}{}",
-                 layer, phen_effect, func_effect, interaction,
-                 p_phen, if p_phen < 0.05 { "*" } else { " " },
-                 p_interaction, if p_interaction < 0.05 { "*" } else { " " });
+        println!(
+            "{:5} │ {:+11.4} │ {:+11.4} │ {:+10.4} │ {:10.4}{} │ {:12.4}{}",
+            layer,
+            phen_effect,
+            func_effect,
+            interaction,
+            p_phen,
+            if p_phen < 0.05 { "*" } else { " " },
+            p_interaction,
+            if p_interaction < 0.05 { "*" } else { " " }
+        );
 
         if interaction.abs() > strongest_interaction.abs() {
             strongest_interaction = interaction;
@@ -200,7 +227,10 @@ fn run_experiment() -> Result<()> {
 
     // Re-extract for detailed analysis at the strongest layer
     let analysis_layer = strongest_layer;
-    println!("Analyzing Layer {} (strongest interaction)...\n", analysis_layer);
+    println!(
+        "Analyzing Layer {} (strongest interaction)...\n",
+        analysis_layer
+    );
 
     let mut phen_bind_norms = Vec::new();
     let mut phen_bundle_norms = Vec::new();
@@ -247,19 +277,28 @@ fn run_experiment() -> Result<()> {
 
     println!("Metric     │ Phen Bind │ Phen Bundle │ Func Bind │ Func Bundle");
     println!("───────────┼───────────┼─────────────┼───────────┼────────────");
-    println!("Mean Norm  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
-             mean(&phen_bind_norms), mean(&phen_bundle_norms),
-             mean(&func_bind_norms), mean(&func_bundle_norms));
-    println!("Mean Var   │ {:9.4} │ {:11.4} │ {:9.4} │ {:10.4}",
-             mean(&phen_bind_vars), mean(&phen_bundle_vars),
-             mean(&func_bind_vars), mean(&func_bundle_vars));
+    println!(
+        "Mean Norm  │ {:9.2} │ {:11.2} │ {:9.2} │ {:10.2}",
+        mean(&phen_bind_norms),
+        mean(&phen_bundle_norms),
+        mean(&func_bind_norms),
+        mean(&func_bundle_norms)
+    );
+    println!(
+        "Mean Var   │ {:9.4} │ {:11.4} │ {:9.4} │ {:10.4}",
+        mean(&phen_bind_vars),
+        mean(&phen_bundle_vars),
+        mean(&func_bind_vars),
+        mean(&func_bundle_vars)
+    );
 
     // Interpretation
     println!("\n================================================================");
     println!("   INTERPRETATION");
     println!("================================================================\n");
 
-    let phen_effect_21 = results_by_layer.iter()
+    let phen_effect_21 = results_by_layer
+        .iter()
         .find(|(l, _)| *l == 21)
         .map(|(_, r)| mean(&r.phen_bind_pers) - mean(&r.phen_bundle_pers))
         .unwrap_or(0.0);
@@ -286,7 +325,10 @@ fn run_experiment() -> Result<()> {
         println!("FINDING: No clear binding effect on phenomenal persistence");
     }
 
-    println!("\nStrongest layer-specific effect at Layer {}", strongest_layer);
+    println!(
+        "\nStrongest layer-specific effect at Layer {}",
+        strongest_layer
+    );
     println!("Interaction magnitude: {:+.4}", strongest_interaction);
 
     println!("\n================================================================");
@@ -359,15 +401,19 @@ fn hv_variance(hv: &BinaryHV) -> f64 {
     // Variance of the bipolar interpretation
     let bipolar = hv.to_bipolar();
     let mean_val: f64 = bipolar.iter().map(|&x| x as f64).sum::<f64>() / bipolar.len() as f64;
-    let variance: f64 = bipolar.iter()
+    let variance: f64 = bipolar
+        .iter()
         .map(|&x| ((x as f64) - mean_val).powi(2))
-        .sum::<f64>() / bipolar.len() as f64;
+        .sum::<f64>()
+        / bipolar.len() as f64;
     variance
 }
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 

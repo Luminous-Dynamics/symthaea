@@ -1,0 +1,15 @@
+[package]
+name = "transport_sharing"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "transport_sharing"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+transport_sharing_integrity = { path = "../integrity" }

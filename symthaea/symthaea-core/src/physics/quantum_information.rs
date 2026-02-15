@@ -23,18 +23,18 @@
 //! - **Shor**: Exponential speedup for factoring
 //! - **Quantum simulation**: Simulating quantum systems
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// Pauli matrices
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum PauliMatrix {
-    I,  // Identity
-    X,  // Bit flip
-    Y,  // Combined
-    Z,  // Phase flip
+    I, // Identity
+    X, // Bit flip
+    Y, // Combined
+    Z, // Phase flip
 }
 
 impl PauliMatrix {
@@ -56,8 +56,8 @@ pub enum GateType {
     PauliX,
     PauliY,
     PauliZ,
-    Phase,      // S gate
-    TGate,      // T gate (π/8)
+    Phase, // S gate
+    TGate, // T gate (π/8)
     // Two qubit gates
     CNOT,
     CZ,
@@ -87,8 +87,12 @@ impl GateType {
     /// Number of qubits this gate acts on
     pub fn num_qubits(&self) -> u8 {
         match self {
-            GateType::Hadamard | GateType::PauliX | GateType::PauliY |
-            GateType::PauliZ | GateType::Phase | GateType::TGate => 1,
+            GateType::Hadamard
+            | GateType::PauliX
+            | GateType::PauliY
+            | GateType::PauliZ
+            | GateType::Phase
+            | GateType::TGate => 1,
             GateType::CNOT | GateType::CZ | GateType::SWAP => 2,
             GateType::Toffoli | GateType::Fredkin => 3,
         }
@@ -122,12 +126,12 @@ impl EntanglementType {
 /// Error correction code type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QECCode {
-    BitFlip3,      // 3-qubit repetition code
-    PhaseFlip3,    // 3-qubit phase flip code
-    Shor9,         // Shor's 9-qubit code
-    Steane7,       // Steane's 7-qubit code
-    Surface,       // Surface code (topological)
-    Color,         // Color code
+    BitFlip3,   // 3-qubit repetition code
+    PhaseFlip3, // 3-qubit phase flip code
+    Shor9,      // Shor's 9-qubit code
+    Steane7,    // Steane's 7-qubit code
+    Surface,    // Surface code (topological)
+    Color,      // Color code
 }
 
 impl QECCode {
@@ -148,13 +152,13 @@ impl QECCode {
             QECCode::BitFlip3 | QECCode::PhaseFlip3 => 3,
             QECCode::Steane7 => 7,
             QECCode::Shor9 => 9,
-            QECCode::Surface | QECCode::Color => 17,  // Typical small instance
+            QECCode::Surface | QECCode::Color => 17, // Typical small instance
         }
     }
 
     /// Number of logical qubits encoded
     pub fn logical_qubits(&self) -> u32 {
-        1  // All these encode 1 logical qubit
+        1 // All these encode 1 logical qubit
     }
 }
 
@@ -223,8 +227,8 @@ pub struct QIEncoder {
 
     // Decoherence
     pub decoherence: ContinuousHV,
-    pub t1_decay: ContinuousHV,  // Amplitude damping
-    pub t2_dephasing: ContinuousHV,  // Phase damping
+    pub t1_decay: ContinuousHV,     // Amplitude damping
+    pub t2_dephasing: ContinuousHV, // Phase damping
 
     // Information concepts
     pub entropy: ContinuousHV,
@@ -292,8 +296,8 @@ impl QIEncoder {
     /// Create |+⟩ = (|0⟩ + |1⟩)/√2
     pub fn ket_plus(&self) -> Qubit {
         let inv_sqrt2 = 1.0 / std::f64::consts::SQRT_2;
-        let vector = ContinuousHV::bundle(&[&self.ket_zero, &self.ket_one])
-            .bind(&self.superposition);
+        let vector =
+            ContinuousHV::bundle(&[&self.ket_zero, &self.ket_one]).bind(&self.superposition);
         Qubit {
             alpha: inv_sqrt2,
             beta: inv_sqrt2,
@@ -352,12 +356,14 @@ impl QIEncoder {
         let vector = ContinuousHV::bundle(&[
             &self.ket_zero.bind(&self.ket_zero),
             &self.ket_one.bind(&self.ket_one),
-        ]).bind(&self.bell_state).bind(&self.entanglement);
+        ])
+        .bind(&self.bell_state)
+        .bind(&self.entanglement);
 
         EntangledState {
             entanglement_type: EntanglementType::Bell,
             num_qubits: 2,
-            concurrence: 1.0,  // Maximally entangled
+            concurrence: 1.0, // Maximally entangled
             vector,
         }
     }
@@ -367,7 +373,9 @@ impl QIEncoder {
         let vector = ContinuousHV::bundle(&[
             &self.ket_zero.bind(&self.ket_one),
             &self.ket_one.bind(&self.ket_zero),
-        ]).bind(&self.bell_state).bind(&self.entanglement);
+        ])
+        .bind(&self.bell_state)
+        .bind(&self.entanglement);
 
         EntangledState {
             entanglement_type: EntanglementType::Bell,
@@ -400,9 +408,15 @@ impl QIEncoder {
     }
 
     /// Encode a logical qubit using error correction
-    pub fn encode_logical(&self, qubit: &Qubit, code: QECCode, genesis: &GenesisSeed) -> ContinuousHV {
+    pub fn encode_logical(
+        &self,
+        qubit: &Qubit,
+        code: QECCode,
+        genesis: &GenesisSeed,
+    ) -> ContinuousHV {
         let code_vec = genesis.hv(code.domain(), PHYSICS_DIM);
-        qubit.vector
+        qubit
+            .vector
             .bind(&code_vec)
             .bind(&self.logical_qubit)
             .scale(code.physical_qubits() as f32)
@@ -508,7 +522,7 @@ mod tests {
 
         assert_eq!(bell.entanglement_type, EntanglementType::Bell);
         assert_eq!(bell.num_qubits, 2);
-        assert!((bell.concurrence - 1.0).abs() < 0.01);  // Maximally entangled
+        assert!((bell.concurrence - 1.0).abs() < 0.01); // Maximally entangled
 
         // Should have entanglement character
         let ent_sim = bell.vector.similarity(&encoder.entanglement);
@@ -533,7 +547,10 @@ mod tests {
         // The norms differ proportionally to qubit count
         let norm3 = ghz3.vector.norm();
         let norm5 = ghz5.vector.norm();
-        assert!(norm5 > norm3, "5-qubit GHZ should have larger norm than 3-qubit");
+        assert!(
+            norm5 > norm3,
+            "5-qubit GHZ should have larger norm than 3-qubit"
+        );
     }
 
     #[test]

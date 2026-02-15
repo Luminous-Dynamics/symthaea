@@ -8,7 +8,7 @@
 //! Run with: cargo run --example audio_analysis
 
 use std::fs::File;
-use std::io::{Read, BufReader};
+use std::io::{BufReader, Read};
 use std::path::Path;
 
 fn main() {
@@ -27,8 +27,10 @@ fn main() {
         ("rap_double_time.wav", "Rap: Double-time flow (100 BPM)"),
     ];
 
-    println!("{:<25} {:>10} {:>10} {:>10} {:>10} {:>12}",
-             "File", "Duration", "RMS", "Peak", "Crest", "Dom. Freq");
+    println!(
+        "{:<25} {:>10} {:>10} {:>10} {:>10} {:>12}",
+        "File", "Duration", "RMS", "Peak", "Crest", "Dom. Freq"
+    );
     println!("{:-<87}", "");
 
     for (filename, description) in &files {
@@ -36,9 +38,15 @@ fn main() {
         if path.exists() {
             match analyze_wav(&path) {
                 Ok(stats) => {
-                    println!("{:<25} {:>9.2}s {:>10.4} {:>10.4} {:>9.2}dB {:>10.0}Hz",
-                             filename, stats.duration, stats.rms, stats.peak,
-                             stats.crest_factor_db, stats.dominant_freq);
+                    println!(
+                        "{:<25} {:>9.2}s {:>10.4} {:>10.4} {:>9.2}dB {:>10.0}Hz",
+                        filename,
+                        stats.duration,
+                        stats.rms,
+                        stats.peak,
+                        stats.crest_factor_db,
+                        stats.dominant_freq
+                    );
                 }
                 Err(e) => {
                     println!("{:<25} Error: {}", filename, e);
@@ -57,18 +65,28 @@ fn main() {
             if let Ok(stats) = analyze_wav(&path) {
                 println!("{}:", description);
                 println!("  File: {}", filename);
-                println!("  Duration: {:.2}s ({} samples @ {}Hz)",
-                         stats.duration, stats.sample_count, stats.sample_rate);
-                println!("  Amplitude: RMS={:.4}, Peak={:.4}, Crest={:.2}dB",
-                         stats.rms, stats.peak, stats.crest_factor_db);
-                println!("  Dynamics: Min={:.4}, Max={:.4}, Range={:.2}dB",
-                         stats.min_sample, stats.max_sample, stats.dynamic_range_db);
-                println!("  Zero crossings: {} ({:.1}/s = ~{:.0}Hz fundamental)",
-                         stats.zero_crossings,
-                         stats.zero_crossings as f32 / stats.duration,
-                         stats.zero_crossings as f32 / stats.duration / 2.0);
-                println!("  Spectral: Dominant freq ~{:.0}Hz, Energy centroid ~{:.0}Hz",
-                         stats.dominant_freq, stats.spectral_centroid);
+                println!(
+                    "  Duration: {:.2}s ({} samples @ {}Hz)",
+                    stats.duration, stats.sample_count, stats.sample_rate
+                );
+                println!(
+                    "  Amplitude: RMS={:.4}, Peak={:.4}, Crest={:.2}dB",
+                    stats.rms, stats.peak, stats.crest_factor_db
+                );
+                println!(
+                    "  Dynamics: Min={:.4}, Max={:.4}, Range={:.2}dB",
+                    stats.min_sample, stats.max_sample, stats.dynamic_range_db
+                );
+                println!(
+                    "  Zero crossings: {} ({:.1}/s = ~{:.0}Hz fundamental)",
+                    stats.zero_crossings,
+                    stats.zero_crossings as f32 / stats.duration,
+                    stats.zero_crossings as f32 / stats.duration / 2.0
+                );
+                println!(
+                    "  Spectral: Dominant freq ~{:.0}Hz, Energy centroid ~{:.0}Hz",
+                    stats.dominant_freq, stats.spectral_centroid
+                );
 
                 // Quality assessment
                 let quality = assess_quality(&stats);
@@ -81,7 +99,11 @@ fn main() {
     // Compare emotional variations
     println!("--- Emotional Pacing Comparison ---\n");
 
-    let emotional_files = ["emotion_calm.wav", "emotion_excited.wav", "emotion_focused.wav"];
+    let emotional_files = [
+        "emotion_calm.wav",
+        "emotion_excited.wav",
+        "emotion_focused.wav",
+    ];
     let mut emotional_stats: Vec<(&str, AudioStats)> = Vec::new();
 
     for filename in &emotional_files {
@@ -92,27 +114,35 @@ fn main() {
     }
 
     if emotional_stats.len() == 3 {
-        println!("{:<20} {:>12} {:>12} {:>12}",
-                 "Metric", "Calm", "Excited", "Focused");
+        println!(
+            "{:<20} {:>12} {:>12} {:>12}",
+            "Metric", "Calm", "Excited", "Focused"
+        );
         println!("{:-<58}", "");
 
-        println!("{:<20} {:>12.4} {:>12.4} {:>12.4}",
-                 "RMS Energy",
-                 emotional_stats[0].1.rms,
-                 emotional_stats[1].1.rms,
-                 emotional_stats[2].1.rms);
+        println!(
+            "{:<20} {:>12.4} {:>12.4} {:>12.4}",
+            "RMS Energy",
+            emotional_stats[0].1.rms,
+            emotional_stats[1].1.rms,
+            emotional_stats[2].1.rms
+        );
 
-        println!("{:<20} {:>12.0} {:>12.0} {:>12.0}",
-                 "Dom. Freq (Hz)",
-                 emotional_stats[0].1.dominant_freq,
-                 emotional_stats[1].1.dominant_freq,
-                 emotional_stats[2].1.dominant_freq);
+        println!(
+            "{:<20} {:>12.0} {:>12.0} {:>12.0}",
+            "Dom. Freq (Hz)",
+            emotional_stats[0].1.dominant_freq,
+            emotional_stats[1].1.dominant_freq,
+            emotional_stats[2].1.dominant_freq
+        );
 
-        println!("{:<20} {:>12.0} {:>12.0} {:>12.0}",
-                 "Zero Cross/s",
-                 emotional_stats[0].1.zero_crossings as f32 / emotional_stats[0].1.duration,
-                 emotional_stats[1].1.zero_crossings as f32 / emotional_stats[1].1.duration,
-                 emotional_stats[2].1.zero_crossings as f32 / emotional_stats[2].1.duration);
+        println!(
+            "{:<20} {:>12.0} {:>12.0} {:>12.0}",
+            "Zero Cross/s",
+            emotional_stats[0].1.zero_crossings as f32 / emotional_stats[0].1.duration,
+            emotional_stats[1].1.zero_crossings as f32 / emotional_stats[1].1.duration,
+            emotional_stats[2].1.zero_crossings as f32 / emotional_stats[2].1.duration
+        );
     }
 
     // Compare rap flows
@@ -124,16 +154,20 @@ fn main() {
         ("rap_double_time.wav", "Double-time (100 BPM)"),
     ];
 
-    println!("{:<25} {:>10} {:>12} {:>12}",
-             "Flow", "Duration", "Density", "Avg Pitch");
+    println!(
+        "{:<25} {:>10} {:>12} {:>12}",
+        "Flow", "Duration", "Density", "Avg Pitch"
+    );
     println!("{:-<61}", "");
 
     for (filename, flow_name) in &rap_files {
         let path = audio_dir.join(filename);
         if let Ok(stats) = analyze_wav(&path) {
             let syllable_density = stats.zero_crossings as f32 / stats.duration / 100.0;
-            println!("{:<25} {:>9.2}s {:>11.1}/s {:>11.0}Hz",
-                     flow_name, stats.duration, syllable_density, stats.dominant_freq);
+            println!(
+                "{:<25} {:>9.2}s {:>11.1}/s {:>11.0}Hz",
+                flow_name, stats.duration, syllable_density, stats.dominant_freq
+            );
         }
     }
 
@@ -221,7 +255,8 @@ fn analyze_wav(path: &Path) -> Result<AudioStats, String> {
     };
 
     // Zero crossings
-    let zero_crossings = samples.windows(2)
+    let zero_crossings = samples
+        .windows(2)
         .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
         .count();
 
@@ -288,9 +323,11 @@ fn estimate_pitch(samples: &[f32], sample_rate: u32) -> f32 {
 fn estimate_spectral_centroid(samples: &[f32], sample_rate: u32) -> f32 {
     // Simplified spectral centroid using zero-crossing rate
     // A proper implementation would use FFT
-    let zc_rate = samples.windows(2)
+    let zc_rate = samples
+        .windows(2)
         .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
-        .count() as f32 / samples.len() as f32;
+        .count() as f32
+        / samples.len() as f32;
 
     // ZC rate roughly correlates with spectral centroid
     zc_rate * sample_rate as f32 / 2.0

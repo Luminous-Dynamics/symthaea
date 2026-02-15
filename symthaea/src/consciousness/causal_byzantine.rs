@@ -42,10 +42,8 @@
 //! // "Tighten name_min_length to 5 to prevent 85% of future name-based attacks"
 //! ```
 
-use super::meta_learning_byzantine::{
-    MetaLearningByzantineDefense, AttackFeatures,
-};
 use super::byzantine_collective::ContributionOutcome;
+use super::meta_learning_byzantine::{AttackFeatures, MetaLearningByzantineDefense};
 use super::primitive_evolution::CandidatePrimitive;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -368,7 +366,9 @@ impl CausalByzantineDefense {
         let event = match outcome {
             ContributionOutcome::Malicious => "Attack detected",
             ContributionOutcome::Rejected => "Contribution rejected (low quality)",
-            ContributionOutcome::Accepted | ContributionOutcome::Verified => "Contribution accepted",
+            ContributionOutcome::Accepted | ContributionOutcome::Verified => {
+                "Contribution accepted"
+            }
         };
 
         // Identify causal factors
@@ -393,8 +393,10 @@ impl CausalByzantineDefense {
                 description: if features.phi < 0.0 || features.phi > 1.0 {
                     format!("Φ={:.2} is INVALID (must be 0.0-1.0)", features.phi)
                 } else if features.phi > thresholds.phi_upper {
-                    format!("Φ={:.2} is {:.0}% above threshold {:.2}",
-                        features.phi, deviation, thresholds.phi_upper)
+                    format!(
+                        "Φ={:.2} is {:.0}% above threshold {:.2}",
+                        features.phi, deviation, thresholds.phi_upper
+                    )
                 } else {
                     format!("Φ={:.2} is suspiciously low", features.phi)
                 },
@@ -404,7 +406,8 @@ impl CausalByzantineDefense {
         // Factor 2: Name suspicion
         if features.name_suspicion > 0.3 {
             let deviation = if features.name_length < thresholds.name_min {
-                ((thresholds.name_min - features.name_length) as f64 / thresholds.name_min as f64) * 100.0
+                ((thresholds.name_min - features.name_length) as f64 / thresholds.name_min as f64)
+                    * 100.0
             } else {
                 ((features.name_length - 100) as f64 / 100.0) * 100.0
             };
@@ -416,8 +419,10 @@ impl CausalByzantineDefense {
                 deviation,
                 causal_strength: features.name_suspicion,
                 description: if features.name_length < thresholds.name_min {
-                    format!("Name length={} is {:.0}% below minimum {}",
-                        features.name_length, deviation, thresholds.name_min)
+                    format!(
+                        "Name length={} is {:.0}% below minimum {}",
+                        features.name_length, deviation, thresholds.name_min
+                    )
                 } else {
                     format!("Name length={} is suspiciously long", features.name_length)
                 },
@@ -427,7 +432,9 @@ impl CausalByzantineDefense {
         // Factor 3: Definition suspicion
         if features.definition_suspicion > 0.3 {
             let deviation = if features.definition_length < thresholds.definition_min {
-                ((thresholds.definition_min - features.definition_length) as f64 / thresholds.definition_min as f64) * 100.0
+                ((thresholds.definition_min - features.definition_length) as f64
+                    / thresholds.definition_min as f64)
+                    * 100.0
             } else {
                 ((features.definition_length - 1000) as f64 / 1000.0) * 100.0
             };
@@ -439,10 +446,15 @@ impl CausalByzantineDefense {
                 deviation,
                 causal_strength: features.definition_suspicion,
                 description: if features.definition_length < thresholds.definition_min {
-                    format!("Definition length={} is {:.0}% below minimum {}",
-                        features.definition_length, deviation, thresholds.definition_min)
+                    format!(
+                        "Definition length={} is {:.0}% below minimum {}",
+                        features.definition_length, deviation, thresholds.definition_min
+                    )
                 } else {
-                    format!("Definition length={} is suspiciously long", features.definition_length)
+                    format!(
+                        "Definition length={} is suspiciously long",
+                        features.definition_length
+                    )
                 },
             });
         }
@@ -473,8 +485,12 @@ impl CausalByzantineDefense {
         } else {
             let mut parts = vec![format!("{} BECAUSE:", event)];
             for (i, factor) in factors.iter().take(3).enumerate() {
-                parts.push(format!("  {}. {} (causal strength: {:.2})",
-                    i + 1, factor.description, factor.causal_strength));
+                parts.push(format!(
+                    "  {}. {} (causal strength: {:.2})",
+                    i + 1,
+                    factor.description,
+                    factor.causal_strength
+                ));
             }
             parts.push(format!("Primary cause: {}", primary_cause.feature));
             parts.join("\n")
@@ -496,8 +512,9 @@ impl CausalByzantineDefense {
 
         self.explanation_history.push(causal_explanation.clone());
         self.stats.explanations_generated += 1;
-        self.stats.avg_explanation_confidence =
-            (self.stats.avg_explanation_confidence * (self.stats.explanations_generated - 1) as f64 + confidence)
+        self.stats.avg_explanation_confidence = (self.stats.avg_explanation_confidence
+            * (self.stats.explanations_generated - 1) as f64
+            + confidence)
             / self.stats.explanations_generated as f64;
 
         Ok(causal_explanation)
@@ -523,14 +540,18 @@ impl CausalByzantineDefense {
             // Extract value from query
             if let Some(value) = Self::extract_number(query) {
                 counterfactual_thresholds.phi_upper = value;
-                intervention_description = format!("Φ threshold changed from {:.2} to {:.2}",
-                    original_thresholds.phi_upper, value);
+                intervention_description = format!(
+                    "Φ threshold changed from {:.2} to {:.2}",
+                    original_thresholds.phi_upper, value
+                );
             }
         } else if query.contains("name") && query.contains("length") {
             if let Some(value) = Self::extract_number(query) {
                 counterfactual_thresholds.name_min = value as usize;
-                intervention_description = format!("Name min length changed from {} to {}",
-                    original_thresholds.name_min, value as usize);
+                intervention_description = format!(
+                    "Name min length changed from {} to {}",
+                    original_thresholds.name_min, value as usize
+                );
             }
         }
 
@@ -540,9 +561,13 @@ impl CausalByzantineDefense {
         // Compute differences
         let mut differences = vec![intervention_description];
 
-        if std::mem::discriminant(original_outcome) != std::mem::discriminant(&counterfactual_outcome) {
-            differences.push(format!("Outcome would change from {:?} to {:?}",
-                original_outcome, counterfactual_outcome));
+        if std::mem::discriminant(original_outcome)
+            != std::mem::discriminant(&counterfactual_outcome)
+        {
+            differences.push(format!(
+                "Outcome would change from {:?} to {:?}",
+                original_outcome, counterfactual_outcome
+            ));
         } else {
             differences.push("Outcome would remain the same".to_string());
         }
@@ -598,15 +623,14 @@ impl CausalByzantineDefense {
         }
 
         // Find most common attack type
-        let most_common_pattern = patterns.iter()
-            .max_by_key(|p| p.occurrence_count)
-            .unwrap();
+        let most_common_pattern = patterns.iter().max_by_key(|p| p.occurrence_count).unwrap();
 
         // Recommend intervention based on pattern
         let thresholds = self.get_threshold_snapshot();
 
-        let plan = if most_common_pattern.description.contains("Φ") ||
-                      most_common_pattern.description.contains("phi") {
+        let plan = if most_common_pattern.description.contains("Φ")
+            || most_common_pattern.description.contains("phi")
+        {
             // Φ-based attacks - tighten Φ threshold
             let new_threshold = thresholds.phi_upper * 0.9; // 10% stricter
             InterventionPlan {
@@ -614,16 +638,18 @@ impl CausalByzantineDefense {
                 parameter: "phi_upper_threshold".to_string(),
                 current_value: thresholds.phi_upper,
                 recommended_value: new_threshold,
-                effectiveness: (most_common_pattern.occurrence_count as f64 /
-                    (most_common_pattern.occurrence_count + 1) as f64) * 100.0,
+                effectiveness: (most_common_pattern.occurrence_count as f64
+                    / (most_common_pattern.occurrence_count + 1) as f64)
+                    * 100.0,
                 justification: format!(
                     "Pattern '{}' occurred {} times with Φ-based attacks. \
                     Tightening threshold to {:.2} would prevent {}% of similar attacks.",
                     most_common_pattern.id,
                     most_common_pattern.occurrence_count,
                     new_threshold,
-                    ((most_common_pattern.occurrence_count as f64 /
-                      (most_common_pattern.occurrence_count + 1) as f64) * 100.0) as u32
+                    ((most_common_pattern.occurrence_count as f64
+                        / (most_common_pattern.occurrence_count + 1) as f64)
+                        * 100.0) as u32
                 ),
                 side_effects: vec![
                     "May increase false positive rate by ~5%".to_string(),
@@ -638,16 +664,18 @@ impl CausalByzantineDefense {
                 parameter: "name_min_length".to_string(),
                 current_value: thresholds.name_min as f64,
                 recommended_value: new_min as f64,
-                effectiveness: (most_common_pattern.occurrence_count as f64 /
-                    (most_common_pattern.occurrence_count + 1) as f64) * 100.0,
+                effectiveness: (most_common_pattern.occurrence_count as f64
+                    / (most_common_pattern.occurrence_count + 1) as f64)
+                    * 100.0,
                 justification: format!(
                     "Pattern '{}' occurred {} times with short names. \
                     Increasing minimum to {} would prevent {}% of similar attacks.",
                     most_common_pattern.id,
                     most_common_pattern.occurrence_count,
                     new_min,
-                    ((most_common_pattern.occurrence_count as f64 /
-                      (most_common_pattern.occurrence_count + 1) as f64) * 100.0) as u32
+                    ((most_common_pattern.occurrence_count as f64
+                        / (most_common_pattern.occurrence_count + 1) as f64)
+                        * 100.0) as u32
                 ),
                 side_effects: vec![
                     "May reject legitimate short primitive names".to_string(),
@@ -688,31 +716,55 @@ impl CausalByzantineDefense {
         outcome: &ContributionOutcome,
     ) -> Result<()> {
         // Add/update nodes for features
-        self.causal_graph.update_node("phi", NodeType::Feature, features.phi);
-        self.causal_graph.update_node("phi_suspicion", NodeType::Derived, features.phi_suspicion);
-        self.causal_graph.update_node("name_length", NodeType::Feature, features.name_length as f64);
-        self.causal_graph.update_node("name_suspicion", NodeType::Derived, features.name_suspicion);
+        self.causal_graph
+            .update_node("phi", NodeType::Feature, features.phi);
+        self.causal_graph
+            .update_node("phi_suspicion", NodeType::Derived, features.phi_suspicion);
+        self.causal_graph.update_node(
+            "name_length",
+            NodeType::Feature,
+            features.name_length as f64,
+        );
+        self.causal_graph
+            .update_node("name_suspicion", NodeType::Derived, features.name_suspicion);
 
         // Add outcome node
         let outcome_value = match outcome {
             ContributionOutcome::Malicious => 1.0,
             _ => 0.0,
         };
-        self.causal_graph.update_node("detected", NodeType::Outcome, outcome_value);
+        self.causal_graph
+            .update_node("detected", NodeType::Outcome, outcome_value);
 
         // Add/strengthen causal edges
         if features.phi_suspicion > 0.5 {
-            self.causal_graph.add_edge("phi", "phi_suspicion", features.phi_suspicion,
-                CausalRelationship::DirectCause)?;
-            self.causal_graph.add_edge("phi_suspicion", "detected", features.phi_suspicion,
-                CausalRelationship::DirectCause)?;
+            self.causal_graph.add_edge(
+                "phi",
+                "phi_suspicion",
+                features.phi_suspicion,
+                CausalRelationship::DirectCause,
+            )?;
+            self.causal_graph.add_edge(
+                "phi_suspicion",
+                "detected",
+                features.phi_suspicion,
+                CausalRelationship::DirectCause,
+            )?;
         }
 
         if features.name_suspicion > 0.5 {
-            self.causal_graph.add_edge("name_length", "name_suspicion", features.name_suspicion,
-                CausalRelationship::InverseCause)?;
-            self.causal_graph.add_edge("name_suspicion", "detected", features.name_suspicion,
-                CausalRelationship::DirectCause)?;
+            self.causal_graph.add_edge(
+                "name_length",
+                "name_suspicion",
+                features.name_suspicion,
+                CausalRelationship::InverseCause,
+            )?;
+            self.causal_graph.add_edge(
+                "name_suspicion",
+                "detected",
+                features.name_suspicion,
+                CausalRelationship::DirectCause,
+            )?;
         }
 
         self.stats.causal_edges_discovered = self.causal_graph.edges.len();
@@ -736,7 +788,8 @@ impl CausalByzantineDefense {
         thresholds: &ThresholdSnapshot,
     ) -> ContributionOutcome {
         // Simulate detection logic with counterfactual thresholds
-        let phi_violation = features.phi > thresholds.phi_upper || features.phi < 0.0 || features.phi > 1.0;
+        let phi_violation =
+            features.phi > thresholds.phi_upper || features.phi < 0.0 || features.phi > 1.0;
         let name_violation = features.name_length < thresholds.name_min;
         let def_violation = features.definition_length < thresholds.definition_min;
 
@@ -773,6 +826,11 @@ impl CausalByzantineDefense {
     /// Get all intervention plans
     pub fn interventions(&self) -> &[InterventionPlan] {
         &self.intervention_plans
+    }
+
+    /// Access the causal graph (for testing/inspection)
+    pub fn causal_graph(&self) -> &CausalGraph {
+        &self.causal_graph
     }
 
     /// Access underlying MLBD system (if initialized)
@@ -819,8 +877,19 @@ impl CausalGraph {
         }
     }
 
+    /// Number of edges in the causal graph
+    pub fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    /// Number of nodes in the causal graph
+    pub fn node_count(&self) -> usize {
+        self.nodes.len()
+    }
+
     fn update_node(&mut self, id: &str, node_type: NodeType, value: f64) {
-        self.nodes.entry(id.to_string())
+        self.nodes
+            .entry(id.to_string())
             .and_modify(|node| {
                 node.value = value;
                 node.activation_count += 1;
@@ -858,13 +927,354 @@ impl CausalGraph {
         }
 
         // Update feature importance
-        let importance = self.edges.iter()
+        let importance = self
+            .edges
+            .iter()
             .filter(|e| e.from == from)
             .map(|e| e.strength)
-            .sum::<f64>() / self.edges.len() as f64;
+            .sum::<f64>()
+            / self.edges.len() as f64;
 
         self.feature_importance.insert(from.to_string(), importance);
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::consciousness::epistemic_tiers::EpistemicCoordinate;
+    use crate::hdc::BinaryHV;
+    use symthaea_core::hdc::primitive_system::PrimitiveTier;
+
+    /// Helper: build a CandidatePrimitive with given name, definition, and fitness.
+    fn make_primitive(name: &str, definition: &str, fitness: f64) -> CandidatePrimitive {
+        CandidatePrimitive {
+            name: name.to_string(),
+            tier: PrimitiveTier::NSM,
+            definition: definition.to_string(),
+            fitness,
+            encoding: BinaryHV::default(),
+            epistemic_coordinate: EpistemicCoordinate::default(),
+            harmonic_alignment: 0.5,
+        }
+    }
+
+    /// Helper: build a suspicious primitive (short name, short def, extreme fitness).
+    fn make_suspicious_primitive() -> CandidatePrimitive {
+        make_primitive("ab", "hi", 0.99)
+    }
+
+    /// Helper: build a normal/benign primitive.
+    fn make_benign_primitive() -> CandidatePrimitive {
+        make_primitive(
+            "valid_prim",
+            "A well-formed definition of reasonable length",
+            0.5,
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 1: new_for_testing creates successfully
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_new_for_testing_creates_successfully() {
+        let cbd = CausalByzantineDefense::new_for_testing();
+        assert!(cbd.mlbd().is_none(), "testing mode should have no MLBD");
+        assert!(cbd.explanations().is_empty());
+        assert!(cbd.counterfactuals().is_empty());
+        assert!(cbd.interventions().is_empty());
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 2: causal_stats returns zeroed stats initially
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_causal_stats_initially_zeroed() {
+        let cbd = CausalByzantineDefense::new_for_testing();
+        let stats = cbd.causal_stats();
+        assert_eq!(stats.explanations_generated, 0);
+        assert_eq!(stats.counterfactuals_analyzed, 0);
+        assert_eq!(stats.interventions_recommended, 0);
+        assert_eq!(stats.causal_edges_discovered, 0);
+        assert_eq!(stats.avg_explanation_confidence, 0.0);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 3: add_instance errors in testing mode (no MLBD)
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_add_instance_errors_without_mlbd() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let result = cbd.add_instance("node-1".to_string());
+        assert!(result.is_err(), "add_instance should fail without MLBD");
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 4: extract_features returns valid AttackFeatures for a test primitive
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_extract_features_benign() {
+        let cbd = CausalByzantineDefense::new_for_testing();
+        let prim = make_benign_primitive();
+        let features = cbd.extract_features(&prim);
+
+        assert!((features.phi - 0.5).abs() < f64::EPSILON);
+        assert_eq!(features.name_length, "valid_prim".len());
+        assert!(
+            features.phi_suspicion < 0.1,
+            "normal phi should not be suspicious"
+        );
+        assert!(
+            features.name_suspicion < 0.1,
+            "normal name should not be suspicious"
+        );
+        assert!(
+            features.definition_suspicion < 0.1,
+            "normal definition should not be suspicious"
+        );
+        assert!(features.overall_suspicion < 0.1);
+    }
+
+    #[test]
+    fn test_extract_features_suspicious() {
+        let cbd = CausalByzantineDefense::new_for_testing();
+        let prim = make_suspicious_primitive();
+        let features = cbd.extract_features(&prim);
+
+        assert!(
+            features.phi_suspicion > 0.5,
+            "extreme phi should be suspicious"
+        );
+        assert!(
+            features.name_suspicion > 0.5,
+            "short name should be suspicious"
+        );
+        assert!(
+            features.definition_suspicion > 0.5,
+            "short definition should be suspicious"
+        );
+        assert!(features.overall_suspicion > 0.5);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 5: generate_explanation returns explanation with finite confidence
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_generate_explanation_finite_confidence() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let prim = make_suspicious_primitive();
+        let features = cbd.extract_features(&prim);
+        let thresholds = ThresholdSnapshot {
+            phi_upper: 0.95,
+            name_min: 3,
+            definition_min: 5,
+        };
+
+        let explanation = cbd
+            .generate_explanation(&features, &thresholds, &ContributionOutcome::Malicious)
+            .unwrap();
+
+        assert!(explanation.confidence.is_finite());
+        assert!(explanation.confidence > 0.0);
+        assert!(explanation.confidence <= 1.0);
+        assert!(!explanation.explanation.is_empty());
+        assert!(!explanation.event.is_empty());
+    }
+
+    #[test]
+    fn test_generate_explanation_benign_low_confidence() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let prim = make_benign_primitive();
+        let features = cbd.extract_features(&prim);
+        let thresholds = ThresholdSnapshot {
+            phi_upper: 0.95,
+            name_min: 3,
+            definition_min: 5,
+        };
+
+        let explanation = cbd
+            .generate_explanation(&features, &thresholds, &ContributionOutcome::Accepted)
+            .unwrap();
+
+        // Benign primitive has no suspicious features, so confidence should be the
+        // fallback value of 0.3 (the "no strong factors" path).
+        assert!(
+            (explanation.confidence - 0.3).abs() < f64::EPSILON,
+            "benign explanation confidence should be 0.3, got {}",
+            explanation.confidence
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 6: counterfactual produces valid CounterfactualAnalysis
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_counterfactual_analysis() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let prim = make_suspicious_primitive();
+        let features = cbd.extract_features(&prim);
+
+        let analysis = cbd
+            .counterfactual(
+                "What if Φ threshold was 0.80?",
+                &features,
+                &ContributionOutcome::Malicious,
+            )
+            .unwrap();
+
+        assert_eq!(analysis.query, "What if Φ threshold was 0.80?");
+        assert!(!analysis.differences.is_empty());
+        assert!(!analysis.explanation.is_empty());
+        // The counterfactual thresholds should have been modified
+        assert!(
+            (analysis.counterfactual.thresholds.phi_upper - 0.80).abs() < f64::EPSILON,
+            "counterfactual phi_upper should be 0.80"
+        );
+        // Original thresholds should remain at default
+        assert!(
+            (analysis.original.thresholds.phi_upper - 0.95).abs() < f64::EPSILON,
+            "original phi_upper should remain 0.95"
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 7: recommend_intervention produces an InterventionPlan
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_recommend_intervention_no_patterns() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let plan = cbd.recommend_intervention().unwrap();
+
+        // Without MLBD, there are no attack patterns, so we get the NO_PATTERNS plan.
+        assert_eq!(plan.id, "NO_PATTERNS");
+        assert_eq!(plan.effectiveness, 0.0);
+        assert!(plan.side_effects.is_empty());
+        assert_eq!(cbd.causal_stats().interventions_recommended, 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 8: explanations() and counterfactuals() return accumulated history
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_history_accumulates() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let prim = make_suspicious_primitive();
+        let features = cbd.extract_features(&prim);
+        let thresholds = ThresholdSnapshot {
+            phi_upper: 0.95,
+            name_min: 3,
+            definition_min: 5,
+        };
+
+        // Generate two explanations
+        cbd.generate_explanation(&features, &thresholds, &ContributionOutcome::Malicious)
+            .unwrap();
+        cbd.generate_explanation(&features, &thresholds, &ContributionOutcome::Accepted)
+            .unwrap();
+
+        assert_eq!(cbd.explanations().len(), 2);
+        assert_eq!(cbd.causal_stats().explanations_generated, 2);
+
+        // Generate two counterfactuals
+        cbd.counterfactual(
+            "What if Φ threshold was 0.80?",
+            &features,
+            &ContributionOutcome::Malicious,
+        )
+        .unwrap();
+        cbd.counterfactual(
+            "What if name length min was 5?",
+            &features,
+            &ContributionOutcome::Malicious,
+        )
+        .unwrap();
+
+        assert_eq!(cbd.counterfactuals().len(), 2);
+        assert_eq!(cbd.causal_stats().counterfactuals_analyzed, 2);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 9: Causal graph edge discovery during causal_contribute
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_causal_contribute_discovers_edges() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let suspicious = make_suspicious_primitive();
+
+        // Before any contributions, the graph should be empty.
+        assert_eq!(cbd.causal_graph().edge_count(), 0);
+        assert_eq!(cbd.causal_graph().node_count(), 0);
+
+        let (outcome, explanation) = cbd.causal_contribute("test-node", suspicious).unwrap();
+
+        // Suspicious primitive should be detected as malicious by mock detection.
+        assert!(
+            matches!(outcome, ContributionOutcome::Malicious),
+            "suspicious primitive should be detected, got {:?}",
+            outcome
+        );
+
+        // The graph should now have edges and nodes.
+        assert!(
+            cbd.causal_graph().edge_count() > 0,
+            "causal graph should have edges after suspicious contribution"
+        );
+        assert!(
+            cbd.causal_graph().node_count() > 0,
+            "causal graph should have nodes after suspicious contribution"
+        );
+        assert!(
+            cbd.causal_stats().causal_edges_discovered > 0,
+            "stats should record discovered edges"
+        );
+
+        // Explanation should also have been recorded.
+        assert!(!explanation.explanation.is_empty());
+        assert_eq!(cbd.explanations().len(), 1);
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 10: Stats counters increment correctly after operations
+    // -----------------------------------------------------------------------
+    #[test]
+    fn test_stats_counters_increment() {
+        let mut cbd = CausalByzantineDefense::new_for_testing();
+        let suspicious = make_suspicious_primitive();
+        let benign = make_benign_primitive();
+
+        // Initial state
+        assert_eq!(cbd.causal_stats().explanations_generated, 0);
+        assert_eq!(cbd.causal_stats().counterfactuals_analyzed, 0);
+        assert_eq!(cbd.causal_stats().interventions_recommended, 0);
+
+        // causal_contribute increments explanations_generated
+        cbd.causal_contribute("n1", suspicious.clone()).unwrap();
+        assert_eq!(cbd.causal_stats().explanations_generated, 1);
+
+        cbd.causal_contribute("n1", benign.clone()).unwrap();
+        assert_eq!(cbd.causal_stats().explanations_generated, 2);
+
+        // counterfactual increments counterfactuals_analyzed
+        let features = cbd.extract_features(&suspicious);
+        cbd.counterfactual(
+            "What if Φ threshold was 0.70?",
+            &features,
+            &ContributionOutcome::Malicious,
+        )
+        .unwrap();
+        assert_eq!(cbd.causal_stats().counterfactuals_analyzed, 1);
+
+        // recommend_intervention increments interventions_recommended
+        cbd.recommend_intervention().unwrap();
+        assert_eq!(cbd.causal_stats().interventions_recommended, 1);
+        cbd.recommend_intervention().unwrap();
+        assert_eq!(cbd.causal_stats().interventions_recommended, 2);
+
+        // avg_explanation_confidence should be finite and non-negative
+        let avg = cbd.causal_stats().avg_explanation_confidence;
+        assert!(avg.is_finite(), "avg confidence must be finite");
+        assert!(avg >= 0.0, "avg confidence must be non-negative");
     }
 }

@@ -198,21 +198,13 @@ impl EmpiricalTier {
     /// Full description
     pub fn description(&self) -> &str {
         match self {
-            EmpiricalTier::E0Null => {
-                "Inferred from theory, no empirical evidence yet"
-            }
-            EmpiricalTier::E1Testimonial => {
-                "Single observation in this system (testimonial)"
-            }
-            EmpiricalTier::E2PrivatelyVerifiable => {
-                "Multiple observations, verified internally"
-            }
+            EmpiricalTier::E0Null => "Inferred from theory, no empirical evidence yet",
+            EmpiricalTier::E1Testimonial => "Single observation in this system (testimonial)",
+            EmpiricalTier::E2PrivatelyVerifiable => "Multiple observations, verified internally",
             EmpiricalTier::E3CryptographicallyProven => {
                 "Causal claim with counterfactual proof (ZKP/statistical)"
             }
-            EmpiricalTier::E4PubliclyReproducible => {
-                "Open data + code, anyone can reproduce"
-            }
+            EmpiricalTier::E4PubliclyReproducible => "Open data + code, anyone can reproduce",
         }
     }
 }
@@ -271,18 +263,10 @@ impl NormativeTier {
     /// Full description
     pub fn description(&self) -> &str {
         match self {
-            NormativeTier::N0Personal => {
-                "Personal knowledge (this system instance only)"
-            }
-            NormativeTier::N1Communal => {
-                "Communal consensus (local agent community)"
-            }
-            NormativeTier::N2Network => {
-                "Network consensus (global agreement)"
-            }
-            NormativeTier::N3Axiomatic => {
-                "Axiomatic truth (mathematical/constitutional)"
-            }
+            NormativeTier::N0Personal => "Personal knowledge (this system instance only)",
+            NormativeTier::N1Communal => "Communal consensus (local agent community)",
+            NormativeTier::N2Network => "Network consensus (global agreement)",
+            NormativeTier::N3Axiomatic => "Axiomatic truth (mathematical/constitutional)",
         }
     }
 }
@@ -341,18 +325,10 @@ impl MaterialityTier {
     /// Full description
     pub fn description(&self) -> &str {
         match self {
-            MaterialityTier::M0Ephemeral => {
-                "Ephemeral (session-specific, context-dependent)"
-            }
-            MaterialityTier::M1Temporal => {
-                "Temporal (valid until model updates)"
-            }
-            MaterialityTier::M2Persistent => {
-                "Persistent (long-term archived knowledge)"
-            }
-            MaterialityTier::M3Foundational => {
-                "Foundational (core consciousness principle)"
-            }
+            MaterialityTier::M0Ephemeral => "Ephemeral (session-specific, context-dependent)",
+            MaterialityTier::M1Temporal => "Temporal (valid until model updates)",
+            MaterialityTier::M2Persistent => "Persistent (long-term archived knowledge)",
+            MaterialityTier::M3Foundational => "Foundational (core consciousness principle)",
         }
     }
 }
@@ -406,12 +382,24 @@ impl EmpiricalTierPrimitiveGrounding {
             ),
             // E3: Cryptographic/counterfactual proof
             EmpiricalTier::E3CryptographicallyProven => (
-                vec!["KNOW".into(), "TRUE".into(), "CAN".into(), "NOT".into(), "OTHER".into()],
+                vec![
+                    "KNOW".into(),
+                    "TRUE".into(),
+                    "CAN".into(),
+                    "NOT".into(),
+                    "OTHER".into(),
+                ],
                 0.75,
             ),
             // E4: Publicly reproducible (open data + code)
             EmpiricalTier::E4PubliclyReproducible => (
-                vec!["ALL".into(), "CAN".into(), "SEE".into(), "DO".into(), "SAME".into()],
+                vec![
+                    "ALL".into(),
+                    "CAN".into(),
+                    "SEE".into(),
+                    "DO".into(),
+                    "SAME".into(),
+                ],
                 1.0,
             ),
         }
@@ -447,23 +435,35 @@ impl NormativeTierPrimitiveGrounding {
     fn nsm_mapping(tier: NormativeTier) -> (Vec<String>, f64) {
         match tier {
             // N0: Only this system believes
-            NormativeTier::N0Personal => (
-                vec!["I".into(), "THINK".into(), "THIS".into()],
-                0.0,
-            ),
+            NormativeTier::N0Personal => (vec!["I".into(), "THINK".into(), "THIS".into()], 0.0),
             // N1: Local community agrees
             NormativeTier::N1Communal => (
-                vec!["SOME".into(), "PEOPLE".into(), "THINK".into(), "SAME".into()],
+                vec![
+                    "SOME".into(),
+                    "PEOPLE".into(),
+                    "THINK".into(),
+                    "SAME".into(),
+                ],
                 0.33,
             ),
             // N2: Network-wide consensus
             NormativeTier::N2Network => (
-                vec!["MANY".into(), "PEOPLE".into(), "THINK".into(), "SAME".into()],
+                vec![
+                    "MANY".into(),
+                    "PEOPLE".into(),
+                    "THINK".into(),
+                    "SAME".into(),
+                ],
                 0.67,
             ),
             // N3: Mathematical/constitutional truth
             NormativeTier::N3Axiomatic => (
-                vec!["TRUE".into(), "BECAUSE".into(), "TRUE".into(), "ALWAYS".into()],
+                vec![
+                    "TRUE".into(),
+                    "BECAUSE".into(),
+                    "TRUE".into(),
+                    "ALWAYS".into(),
+                ],
                 1.0,
             ),
         }
@@ -499,13 +499,16 @@ impl MaterialityTierPrimitiveGrounding {
     fn nsm_mapping(tier: MaterialityTier) -> (Vec<String>, f64) {
         match tier {
             // M0: Session-specific only
-            MaterialityTier::M0Ephemeral => (
-                vec!["NOW".into(), "NOT".into(), "AFTER".into()],
-                0.0,
-            ),
+            MaterialityTier::M0Ephemeral => (vec!["NOW".into(), "NOT".into(), "AFTER".into()], 0.0),
             // M1: Until model updates
             MaterialityTier::M1Temporal => (
-                vec!["NOW".into(), "SOME".into(), "TIME".into(), "MAYBE".into(), "NOT".into()],
+                vec![
+                    "NOW".into(),
+                    "SOME".into(),
+                    "TIME".into(),
+                    "MAYBE".into(),
+                    "NOT".into(),
+                ],
                 0.33,
             ),
             // M2: Long-term archived
@@ -515,7 +518,12 @@ impl MaterialityTierPrimitiveGrounding {
             ),
             // M3: Core principle, foundational
             MaterialityTier::M3Foundational => (
-                vec!["ALWAYS".into(), "TRUE".into(), "BECAUSE".into(), "THIS".into()],
+                vec![
+                    "ALWAYS".into(),
+                    "TRUE".into(),
+                    "BECAUSE".into(),
+                    "THIS".into(),
+                ],
                 1.0,
             ),
         }
@@ -580,13 +588,19 @@ impl EpistemicNSMGrounding {
 
     /// Get combined encoding for an epistemic coordinate
     pub fn encode_coordinate(&self, coord: &EpistemicCoordinate) -> BinaryHV {
-        let e_enc = self.empirical_tiers.get(&coord.empirical)
+        let e_enc = self
+            .empirical_tiers
+            .get(&coord.empirical)
             .map(|g| g.primitive_encoding)
             .unwrap_or_else(|| BinaryHV::random(0));
-        let n_enc = self.normative_tiers.get(&coord.normative)
+        let n_enc = self
+            .normative_tiers
+            .get(&coord.normative)
             .map(|g| g.primitive_encoding)
             .unwrap_or_else(|| BinaryHV::random(1));
-        let m_enc = self.materiality_tiers.get(&coord.materiality)
+        let m_enc = self
+            .materiality_tiers
+            .get(&coord.materiality)
             .map(|g| g.primitive_encoding)
             .unwrap_or_else(|| BinaryHV::random(2));
 
@@ -596,7 +610,9 @@ impl EpistemicNSMGrounding {
 
     /// Query empirical tiers by semantic similarity
     pub fn query_empirical(&self, query: &BinaryHV, threshold: f32) -> Vec<(&EmpiricalTier, f32)> {
-        let mut results: Vec<_> = self.empirical_tiers.iter()
+        let mut results: Vec<_> = self
+            .empirical_tiers
+            .iter()
             .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -606,7 +622,9 @@ impl EpistemicNSMGrounding {
 
     /// Query normative tiers by semantic similarity
     pub fn query_normative(&self, query: &BinaryHV, threshold: f32) -> Vec<(&NormativeTier, f32)> {
-        let mut results: Vec<_> = self.normative_tiers.iter()
+        let mut results: Vec<_> = self
+            .normative_tiers
+            .iter()
             .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -615,8 +633,14 @@ impl EpistemicNSMGrounding {
     }
 
     /// Query materiality tiers by semantic similarity
-    pub fn query_materiality(&self, query: &BinaryHV, threshold: f32) -> Vec<(&MaterialityTier, f32)> {
-        let mut results: Vec<_> = self.materiality_tiers.iter()
+    pub fn query_materiality(
+        &self,
+        query: &BinaryHV,
+        threshold: f32,
+    ) -> Vec<(&MaterialityTier, f32)> {
+        let mut results: Vec<_> = self
+            .materiality_tiers
+            .iter()
             .map(|(tier, grounding)| (tier, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -626,7 +650,8 @@ impl EpistemicNSMGrounding {
 
     /// Get tiers with high verification strength
     pub fn high_verification_tiers(&self) -> Vec<&EmpiricalTier> {
-        self.empirical_tiers.iter()
+        self.empirical_tiers
+            .iter()
             .filter(|(_, g)| g.verification_strength >= 0.5)
             .map(|(t, _)| t)
             .collect()
@@ -634,7 +659,8 @@ impl EpistemicNSMGrounding {
 
     /// Get tiers with high consensus breadth
     pub fn high_consensus_tiers(&self) -> Vec<&NormativeTier> {
-        self.normative_tiers.iter()
+        self.normative_tiers
+            .iter()
             .filter(|(_, g)| g.consensus_breadth >= 0.5)
             .map(|(t, _)| t)
             .collect()
@@ -642,7 +668,8 @@ impl EpistemicNSMGrounding {
 
     /// Get tiers with high temporal persistence
     pub fn high_persistence_tiers(&self) -> Vec<&MaterialityTier> {
-        self.materiality_tiers.iter()
+        self.materiality_tiers
+            .iter()
             .filter(|(_, g)| g.temporal_persistence >= 0.5)
             .map(|(t, _)| t)
             .collect()
@@ -660,7 +687,9 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
                 p.encoding
             } else {
                 // Fallback: deterministic random for unknown primitives
-                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                let seed = name
+                    .bytes()
+                    .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                 BinaryHV::random(seed)
             }
         })

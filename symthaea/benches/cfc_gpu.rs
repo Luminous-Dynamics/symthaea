@@ -25,12 +25,11 @@
 //! | train_step | 500-1000 | 50-100 | 10-20x |
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use symthaea::dynamics::{
-    CfCNetwork, CfCNetworkConfig, CfCConfig,
-    GpuCfcNetwork, GpuCfcConfig, GpuBackend,
-};
 use ndarray::Array1;
 use std::time::Duration;
+use symthaea::dynamics::{
+    CfCConfig, CfCNetwork, CfCNetworkConfig, GpuBackend, GpuCfcConfig, GpuCfcNetwork,
+};
 
 // =============================================================================
 // CONFIGURATION
@@ -39,34 +38,43 @@ use std::time::Duration;
 /// Standard network configurations for benchmarking
 fn configs() -> Vec<(&'static str, GpuCfcConfig)> {
     vec![
-        ("small_32x64", GpuCfcConfig {
-            input_dim: 32,
-            hidden_dim: 64,
-            num_layers: 2,
-            output_dim: 16,
-            use_backbone: false,
-            ..Default::default()
-        }),
-        ("medium_64x128", GpuCfcConfig {
-            input_dim: 64,
-            hidden_dim: 128,
-            num_layers: 2,
-            output_dim: 32,
-            use_backbone: true,
-            backbone_layers: 2,
-            backbone_dim: 96,
-            ..Default::default()
-        }),
-        ("large_128x256", GpuCfcConfig {
-            input_dim: 128,
-            hidden_dim: 256,
-            num_layers: 3,
-            output_dim: 64,
-            use_backbone: true,
-            backbone_layers: 3,
-            backbone_dim: 192,
-            ..Default::default()
-        }),
+        (
+            "small_32x64",
+            GpuCfcConfig {
+                input_dim: 32,
+                hidden_dim: 64,
+                num_layers: 2,
+                output_dim: 16,
+                use_backbone: false,
+                ..Default::default()
+            },
+        ),
+        (
+            "medium_64x128",
+            GpuCfcConfig {
+                input_dim: 64,
+                hidden_dim: 128,
+                num_layers: 2,
+                output_dim: 32,
+                use_backbone: true,
+                backbone_layers: 2,
+                backbone_dim: 96,
+                ..Default::default()
+            },
+        ),
+        (
+            "large_128x256",
+            GpuCfcConfig {
+                input_dim: 128,
+                hidden_dim: 256,
+                num_layers: 3,
+                output_dim: 64,
+                use_backbone: true,
+                backbone_layers: 3,
+                backbone_dim: 192,
+                ..Default::default()
+            },
+        ),
     ]
 }
 
@@ -113,16 +121,12 @@ fn bench_forward_single(c: &mut Criterion) {
 
         // CPU benchmark (original implementation)
         let mut cpu_network = CfCNetwork::new(cpu_config.clone());
-        group.bench_with_input(
-            BenchmarkId::new("cpu", name),
-            &name,
-            |b, _| {
-                b.iter(|| {
-                    cpu_network.reset();
-                    black_box(cpu_network.forward(&input_arr, dt))
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("cpu", name), &name, |b, _| {
+            b.iter(|| {
+                cpu_network.reset();
+                black_box(cpu_network.forward(&input_arr, dt))
+            })
+        });
 
         // GPU/Unified benchmark
         let mut gpu_network = GpuCfcNetwork::new(gpu_config.clone(), GpuBackend::Auto)
@@ -157,9 +161,8 @@ fn bench_forward_batch(c: &mut Criterion) {
                 .map(|i| vec![(i as f32 * 0.01); gpu_config.input_dim])
                 .collect();
             let dts: Vec<f32> = vec![0.1; batch_size];
-            let inputs_arr: Vec<Array1<f32>> = inputs.iter()
-                .map(|v| Array1::from_vec(v.clone()))
-                .collect();
+            let inputs_arr: Vec<Array1<f32>> =
+                inputs.iter().map(|v| Array1::from_vec(v.clone())).collect();
 
             group.throughput(Throughput::Elements(batch_size as u64));
 
@@ -218,25 +221,25 @@ fn bench_train_step(c: &mut Criterion) {
             .collect();
         let dts: Vec<f32> = vec![0.1; batch_size];
 
-        let inputs_arr: Vec<Array1<f32>> = inputs.iter()
-            .map(|v| Array1::from_vec(v.clone()))
-            .collect();
-        let targets_arr: Vec<Array1<f32>> = targets.iter()
+        let inputs_arr: Vec<Array1<f32>> =
+            inputs.iter().map(|v| Array1::from_vec(v.clone())).collect();
+        let targets_arr: Vec<Array1<f32>> = targets
+            .iter()
             .map(|v| Array1::from_vec(v.clone()))
             .collect();
 
         // CPU training benchmark
         let mut cpu_network = CfCNetwork::new(cpu_config.clone());
-        group.bench_with_input(
-            BenchmarkId::new("cpu_train", name),
-            &name,
-            |b, _| {
-                b.iter(|| {
-                    cpu_network.reset();
-                    black_box(cpu_network.train_step_bptt(&inputs_arr, &targets_arr, &dts, 0.001).unwrap())
-                })
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("cpu_train", name), &name, |b, _| {
+            b.iter(|| {
+                cpu_network.reset();
+                black_box(
+                    cpu_network
+                        .train_step_bptt(&inputs_arr, &targets_arr, &dts, 0.001)
+                        .unwrap(),
+                )
+            })
+        });
 
         // GPU training benchmark
         let mut gpu_network = GpuCfcNetwork::new(gpu_config.clone(), GpuBackend::Auto)
@@ -248,7 +251,11 @@ fn bench_train_step(c: &mut Criterion) {
             |b, _| {
                 b.iter(|| {
                     gpu_network.reset();
-                    black_box(gpu_network.train_step(&inputs, &targets, &dts, 0.001).unwrap())
+                    black_box(
+                        gpu_network
+                            .train_step(&inputs, &targets, &dts, 0.001)
+                            .unwrap(),
+                    )
                 })
             },
         );
@@ -289,9 +296,8 @@ fn bench_sequence_processing(c: &mut Criterion) {
             })
             .collect();
         let dts: Vec<f32> = vec![0.1; seq_len];
-        let inputs_arr: Vec<Array1<f32>> = inputs.iter()
-            .map(|v| Array1::from_vec(v.clone()))
-            .collect();
+        let inputs_arr: Vec<Array1<f32>> =
+            inputs.iter().map(|v| Array1::from_vec(v.clone())).collect();
 
         group.throughput(Throughput::Elements(seq_len as u64));
 
@@ -315,11 +321,7 @@ fn bench_sequence_processing(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new(format!("gpu_{}_sequence", backend_name), seq_len),
             &seq_len,
-            |b, _| {
-                b.iter(|| {
-                    black_box(gpu_network.forward_sequence(&inputs, &dts).unwrap())
-                })
-            },
+            |b, _| b.iter(|| black_box(gpu_network.forward_sequence(&inputs, &dts).unwrap())),
         );
     }
 
@@ -396,4 +398,9 @@ criterion_group!(
     targets = validate_gpu_cpu_equivalence
 );
 
-criterion_main!(forward_benches, training_benches, sequence_benches, validation_benches);
+criterion_main!(
+    forward_benches,
+    training_benches,
+    sequence_benches,
+    validation_benches
+);

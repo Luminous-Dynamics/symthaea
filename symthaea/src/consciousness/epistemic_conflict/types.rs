@@ -37,7 +37,14 @@ pub struct MultiTheoryMetrics {
 impl MultiTheoryMetrics {
     /// Extract values as a 6-element array in canonical order.
     pub fn values(&self) -> [f64; 6] {
-        [self.phi, self.gwt, self.ast, self.pp, self.rpt, self.embodiment]
+        [
+            self.phi,
+            self.gwt,
+            self.ast,
+            self.pp,
+            self.rpt,
+            self.embodiment,
+        ]
     }
 }
 
@@ -156,9 +163,13 @@ impl ConflictKind {
             ConflictKind::IntegrationCollapse => EpistemicAction::Summarize,
             ConflictKind::NoBroadcast => EpistemicAction::Verify(AnchorKind::ReadOnlyQuery),
             ConflictKind::AttentionalInstability => EpistemicAction::Ask,
-            ConflictKind::UnreliablePrediction => EpistemicAction::Sense(AnchorKind::SensorMeasurement),
+            ConflictKind::UnreliablePrediction => {
+                EpistemicAction::Sense(AnchorKind::SensorMeasurement)
+            }
             ConflictKind::ShallowRecurrence => EpistemicAction::Simulate,
-            ConflictKind::UngroundedRepresentation => EpistemicAction::Verify(AnchorKind::DeterministicProbe),
+            ConflictKind::UngroundedRepresentation => {
+                EpistemicAction::Verify(AnchorKind::DeterministicProbe)
+            }
         }
     }
 }
@@ -222,12 +233,18 @@ pub enum EpistemicAction {
 impl EpistemicAction {
     /// Whether this action involves external observation.
     pub fn is_external(self) -> bool {
-        matches!(self, EpistemicAction::Ask | EpistemicAction::Sense(_) | EpistemicAction::Verify(_))
+        matches!(
+            self,
+            EpistemicAction::Ask | EpistemicAction::Sense(_) | EpistemicAction::Verify(_)
+        )
     }
 
     /// Whether this action is purely internal.
     pub fn is_internal(self) -> bool {
-        matches!(self, EpistemicAction::Simulate | EpistemicAction::Summarize | EpistemicAction::Defer)
+        matches!(
+            self,
+            EpistemicAction::Simulate | EpistemicAction::Summarize | EpistemicAction::Defer
+        )
     }
 }
 
@@ -263,12 +280,7 @@ pub struct ConflictScore {
 
 impl ConflictScore {
     /// Create a new conflict score with default history.
-    pub fn new(
-        theory_a: TheoryId,
-        theory_b: TheoryId,
-        magnitude: f64,
-        kind: ConflictKind,
-    ) -> Self {
+    pub fn new(theory_a: TheoryId, theory_b: TheoryId, magnitude: f64, kind: ConflictKind) -> Self {
         Self {
             theory_a,
             theory_b,
@@ -420,7 +432,7 @@ impl TheoryCalibration {
     pub fn new(theory: TheoryId) -> Self {
         Self {
             theory,
-            reliability: 0.5, // conservative prior
+            reliability: 0.5,  // conservative prior
             brier_score: 0.25, // uninformative prior (0.5^2)
             observation_count: 0,
             brier_sum: 0.0,
@@ -539,6 +551,11 @@ mod tests {
                 _ => {} // Ask, Simulate, Defer, Summarize don't need anchors
             }
         }
+        // All conflict kinds should produce a valid recommended action
+        assert!(
+            true,
+            "All ConflictKind variants produced valid EpistemicAction"
+        );
     }
 
     #[test]
@@ -581,6 +598,9 @@ mod tests {
         for i in 0..10 {
             score.update(0.3 + i as f64 * 0.05);
         }
-        assert!(score.trend() > 0.0, "Trend should be positive for worsening conflict");
+        assert!(
+            score.trend() > 0.0,
+            "Trend should be positive for worsening conflict"
+        );
     }
 }

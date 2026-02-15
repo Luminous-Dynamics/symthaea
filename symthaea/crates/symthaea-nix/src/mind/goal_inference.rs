@@ -7,9 +7,9 @@
 //! Multi-turn understanding: "Set up a web server" → "Use nginx" → "Add SSL"
 //! builds a goal vector that progressively refines.
 
-use symthaea_core::hdc::ContinuousHV;
-use super::working_memory::{WorkingMemory, MemorySource};
+use super::working_memory::{MemorySource, WorkingMemory};
 use crate::encoding::{NixCodebook, UserInputEncoder};
+use symthaea_core::hdc::ContinuousHV;
 
 /// Inferred goal with confidence.
 #[derive(Debug, Clone)]
@@ -46,11 +46,7 @@ impl GoalInference {
     /// The goal vector is computed by encoding the input and blending with
     /// accumulated context in working memory. Multi-turn conversations
     /// progressively refine the goal.
-    pub fn infer(
-        &mut self,
-        input: &str,
-        codebook: &mut NixCodebook,
-    ) -> InferredGoal {
+    pub fn infer(&mut self, input: &str, codebook: &mut NixCodebook) -> InferredGoal {
         // Encode user input
         let input_hv = {
             let mut enc = UserInputEncoder::new(codebook);
@@ -58,11 +54,8 @@ impl GoalInference {
         };
 
         // Store in working memory
-        self.working_memory.push(
-            input_hv.clone(),
-            MemorySource::UserInput,
-            input.to_string(),
-        );
+        self.working_memory
+            .push(input_hv.clone(), MemorySource::UserInput, input.to_string());
 
         // Boost items related to current input
         self.working_memory.attend(&input_hv, 0.3);
@@ -92,16 +85,9 @@ impl GoalInference {
     }
 
     /// Infer goal given a pre-encoded input vector.
-    pub fn infer_from_hv(
-        &mut self,
-        input_hv: ContinuousHV,
-        label: &str,
-    ) -> InferredGoal {
-        self.working_memory.push(
-            input_hv.clone(),
-            MemorySource::UserInput,
-            label.to_string(),
-        );
+    pub fn infer_from_hv(&mut self, input_hv: ContinuousHV, label: &str) -> InferredGoal {
+        self.working_memory
+            .push(input_hv.clone(), MemorySource::UserInput, label.to_string());
 
         let context = self.working_memory.context_vector();
         let goal_state = if context.norm() > 1e-6 {
@@ -157,10 +143,12 @@ impl GoalInference {
 
         // Check for specific action words (higher confidence)
         let action_words = [
-            "install", "remove", "enable", "disable", "rebuild",
-            "switch", "rollback", "update", "upgrade", "search",
+            "install", "remove", "enable", "disable", "rebuild", "switch", "rollback", "update",
+            "upgrade", "search",
         ];
-        let has_action = words.iter().any(|w| action_words.contains(&w.to_lowercase().as_str()));
+        let has_action = words
+            .iter()
+            .any(|w| action_words.contains(&w.to_lowercase().as_str()));
 
         if has_action && word_count >= 2 {
             0.8

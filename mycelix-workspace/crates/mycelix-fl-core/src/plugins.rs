@@ -274,7 +274,9 @@ impl CompressionPlugin for RandomProjectionPlugin {
         let mut projected = Vec::with_capacity(n_proj);
         for row in 0..n_proj {
             let proj_vec = self.generate_projection_row(row, dim);
-            let dot: f32 = update.gradients.iter()
+            let dot: f32 = update
+                .gradients
+                .iter()
                 .zip(proj_vec.iter())
                 .map(|(g, p)| g * p)
                 .sum();
@@ -450,7 +452,11 @@ mod tests {
         let update = GradientUpdate::new("n1".into(), 1, vec![0.1; 10_000], 100, 0.5);
         let compressed = plugin.compress(&update);
         let ratio = (10_000 * 4) as f32 / compressed.data.len() as f32;
-        assert!(ratio > 15.0 && ratio < 25.0, "Expected ~20x, got {:.1}x", ratio);
+        assert!(
+            ratio > 15.0 && ratio < 25.0,
+            "Expected ~20x, got {:.1}x",
+            ratio
+        );
     }
 
     #[test]
@@ -463,7 +469,10 @@ mod tests {
         let c1 = p1.compress(&update);
         let c2 = p2.compress(&update);
 
-        assert_eq!(c1.data, c2.data, "Same seed should produce identical compression");
+        assert_eq!(
+            c1.data, c2.data,
+            "Same seed should produce identical compression"
+        );
     }
 
     #[test]
@@ -480,12 +489,20 @@ mod tests {
         let decompressed = plugin.decompress(&compressed, 5000);
 
         // Cosine similarity should be positive (preserves direction)
-        let dot: f32 = gradients.iter().zip(decompressed.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = gradients
+            .iter()
+            .zip(decompressed.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let norm_a: f32 = gradients.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = decompressed.iter().map(|x| x * x).sum::<f32>().sqrt();
         let cos_sim = dot / (norm_a * norm_b);
 
-        assert!(cos_sim > 0.0, "Cosine similarity should be positive, got {}", cos_sim);
+        assert!(
+            cos_sim > 0.0,
+            "Cosine similarity should be positive, got {}",
+            cos_sim
+        );
     }
 
     #[test]

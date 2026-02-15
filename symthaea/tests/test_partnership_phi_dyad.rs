@@ -2,7 +2,7 @@
 
 use symthaea::core::HDC_DIMENSION;
 use symthaea::hdc::relational_consciousness::{
-    RelationalAssessment, RelationMode, RelationshipStage,
+    RelationMode, RelationalAssessment, RelationshipStage,
 };
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::partnership::{
@@ -27,10 +27,12 @@ fn dummy_relational_assessment() -> RelationalAssessment {
 
 #[test]
 fn test_phi_dyad_basic_sanity() {
-    let ai_states: Vec<ContinuousHV> =
-        (0..4).map(|i| ContinuousHV::random(HDC_DIMENSION, 100 + i)).collect();
-    let human_states: Vec<ContinuousHV> =
-        (0..4).map(|i| ContinuousHV::random(HDC_DIMENSION, 200 + i)).collect();
+    let ai_states: Vec<ContinuousHV> = (0..4)
+        .map(|i| ContinuousHV::random(HDC_DIMENSION, 100 + i))
+        .collect();
+    let human_states: Vec<ContinuousHV> = (0..4)
+        .map(|i| ContinuousHV::random(HDC_DIMENSION, 200 + i))
+        .collect();
 
     let assessment = dummy_relational_assessment();
     let human_model = HumanPartnerModel::new("human");
@@ -83,4 +85,3 @@ fn test_human_partner_model_updates() {
     assert_eq!(human.interactions_count, events.len() as u64);
     assert!(human.last_interaction_ts.is_some());
 }
-

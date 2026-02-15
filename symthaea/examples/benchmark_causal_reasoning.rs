@@ -12,9 +12,8 @@ use std::time::Instant;
 
 #[cfg(feature = "counterfactual")]
 use symthaea::consciousness::counterfactual::{
-    CausalDAG, CausalQuery, CounterfactualReasoner, ObservationalData,
-    PCAlgorithm, EffectEstimator, MediationAnalysis, IVEstimator,
-    TimeSeriesCausalDiscovery, TimeSeriesData,
+    CausalDAG, CausalQuery, CounterfactualReasoner, EffectEstimator, IVEstimator,
+    MediationAnalysis, ObservationalData, PCAlgorithm, TimeSeriesCausalDiscovery, TimeSeriesData,
 };
 
 #[cfg(feature = "counterfactual")]
@@ -50,7 +49,7 @@ fn bench_dseparation() {
     for n in [5, 10, 15, 20] {
         // Create chain DAG: 0 → 1 → 2 → ... → n-1
         let nodes: Vec<String> = (0..n).map(|i| format!("X{}", i)).collect();
-        let edges: Vec<(usize, usize)> = (0..n-1).map(|i| (i, i+1)).collect();
+        let edges: Vec<(usize, usize)> = (0..n - 1).map(|i| (i, i + 1)).collect();
         let dag = CausalDAG::new(nodes, edges);
 
         let mut cond_set = std::collections::HashSet::new();
@@ -60,14 +59,16 @@ fn bench_dseparation() {
         let iterations = 10000;
 
         for _ in 0..iterations {
-            let _ = dag.is_d_separated(0, n-1, &cond_set);
+            let _ = dag.is_d_separated(0, n - 1, &cond_set);
         }
 
         let elapsed = start.elapsed();
         let per_op = elapsed.as_nanos() / iterations as u128;
 
-        println!("  DAG size {:>2} nodes: {:>6} ns/op ({} iterations)",
-            n, per_op, iterations);
+        println!(
+            "  DAG size {:>2} nodes: {:>6} ns/op ({} iterations)",
+            n, per_op, iterations
+        );
     }
     println!();
 }
@@ -82,9 +83,7 @@ fn bench_pc_algorithm() {
         let n_obs = 200;
 
         // Generate sample data
-        let mut data = ObservationalData::new(
-            (0..n_vars).map(|i| format!("X{}", i)).collect()
-        );
+        let mut data = ObservationalData::new((0..n_vars).map(|i| format!("X{}", i)).collect());
 
         for i in 0..n_obs {
             let obs: Vec<f64> = (0..n_vars)
@@ -105,8 +104,10 @@ fn bench_pc_algorithm() {
         let elapsed = start.elapsed();
         let per_op = elapsed.as_micros() / iterations as u128;
 
-        println!("  {} variables, {} observations: {:>6} µs/discovery",
-            n_vars, n_obs, per_op);
+        println!(
+            "  {} variables, {} observations: {:>6} µs/discovery",
+            n_vars, n_obs, per_op
+        );
     }
     println!();
 }
@@ -127,7 +128,11 @@ fn bench_effect_estimation() {
 
         for i in 0..n_obs {
             let z = (i % 5) as f64 / 4.0;
-            let x = if z + 0.1 * (i % 3) as f64 / 3.0 > 0.4 { 1.0 } else { 0.0 };
+            let x = if z + 0.1 * (i % 3) as f64 / 3.0 > 0.4 {
+                1.0
+            } else {
+                0.0
+            };
             let y = 1.5 * x + 0.8 * z + 0.02 * (i % 7) as f64 / 7.0;
             data.add_observation(vec![x, y, z]);
         }
@@ -182,7 +187,10 @@ fn bench_iv_estimation() {
         let elapsed = start.elapsed();
         let per_op = elapsed.as_micros() / iterations as u128;
 
-        println!("  {} observations (2SLS): {:>6} µs/estimation", n_obs, per_op);
+        println!(
+            "  {} observations (2SLS): {:>6} µs/estimation",
+            n_obs, per_op
+        );
     }
     println!();
 }
@@ -236,7 +244,11 @@ fn bench_time_series_discovery() {
 
         for t in 0..n_timepoints {
             let x = (t as f64 * 0.1).sin();
-            let y = if t > 0 { 0.7 * ((t - 1) as f64 * 0.1).sin() } else { 0.0 };
+            let y = if t > 0 {
+                0.7 * ((t - 1) as f64 * 0.1).sin()
+            } else {
+                0.0
+            };
             let z = (t as f64 * 0.05).cos();
             data.add_observation(vec![x, y, z]);
         }
@@ -253,7 +265,10 @@ fn bench_time_series_discovery() {
         let elapsed = start.elapsed();
         let per_op = elapsed.as_micros() / iterations as u128;
 
-        println!("  {} timepoints, 3 vars: {:>6} µs/discovery", n_timepoints, per_op);
+        println!(
+            "  {} timepoints, 3 vars: {:>6} µs/discovery",
+            n_timepoints, per_op
+        );
     }
     println!();
 }

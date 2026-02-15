@@ -3,12 +3,12 @@
 //! This demo compares the unified architecture (Hierarchical + CfC + Grammar)
 //! against individual components to measure the improvement.
 
-use symthaea_stt::unified_grammar::UnifiedGrammar;
-use symthaea_stt::temporal_grammar::{TemporalGrammar, TemporalEvent, DomainConfig, Sparsity};
-use symthaea_stt::audio::AudioFrontend;
-use std::path::Path;
 use std::collections::HashMap;
 use std::f32::consts::PI;
+use std::path::Path;
+use symthaea_stt::audio::AudioFrontend;
+use symthaea_stt::temporal_grammar::{DomainConfig, Sparsity, TemporalEvent, TemporalGrammar};
+use symthaea_stt::unified_grammar::UnifiedGrammar;
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -50,7 +50,8 @@ fn compute_stats(audio: &[f32], sample_rate: f32, frame_size: usize) -> (f32, f3
     let p75 = sorted.get(3 * sorted.len() / 4).copied().unwrap_or(0.0);
     let std = {
         let mean = energies.iter().sum::<f32>() / energies.len().max(1) as f32;
-        (energies.iter().map(|e| (e - mean).powi(2)).sum::<f32>() / energies.len().max(1) as f32).sqrt()
+        (energies.iter().map(|e| (e - mean).powi(2)).sum::<f32>() / energies.len().max(1) as f32)
+            .sqrt()
     };
 
     (p25, p75, std)
@@ -81,7 +82,9 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
                 tk_sum += (frame[j] * frame[j] - frame[j - 1] * frame[j + 1]).abs();
             }
             (tk_sum / (frame.len() - 2) as f32).sqrt()
-        } else { 0.0 };
+        } else {
+            0.0
+        };
 
         // Spectral centroid
         let mut spectrum = vec![0.0f32; n_fft / 2];
@@ -99,14 +102,27 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
         let freq_res = sample_rate / n_fft as f32;
         let total: f32 = spectrum.iter().sum();
         let centroid = if total > 1e-10 {
-            spectrum.iter().enumerate().map(|(k, &m)| k as f32 * freq_res * m).sum::<f32>() / total
-        } else { 0.0 };
+            spectrum
+                .iter()
+                .enumerate()
+                .map(|(k, &m)| k as f32 * freq_res * m)
+                .sum::<f32>()
+                / total
+        } else {
+            0.0
+        };
 
         let bandwidth = if total > 1e-10 {
-            (spectrum.iter().enumerate()
+            (spectrum
+                .iter()
+                .enumerate()
                 .map(|(k, &m)| (k as f32 * freq_res - centroid).powi(2) * m)
-                .sum::<f32>() / total).sqrt()
-        } else { 0.0 };
+                .sum::<f32>()
+                / total)
+                .sqrt()
+        } else {
+            0.0
+        };
 
         // Crest factor
         let peak = frame.iter().map(|s| s.abs()).fold(0.0f32, |a, b| a.max(b));
@@ -125,13 +141,25 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
             if energy < silence {
                 ("silence", 8)
             } else if crest > 4.0 && tk_ratio > 0.3 {
-                if energy > loud { ("click_loud", 0) } else { ("click_soft", 1) }
+                if energy > loud {
+                    ("click_loud", 0)
+                } else {
+                    ("click_soft", 1)
+                }
             } else {
-                let bw_ratio = if centroid > 100.0 { bandwidth / centroid } else { 1.0 };
+                let bw_ratio = if centroid > 100.0 {
+                    bandwidth / centroid
+                } else {
+                    1.0
+                };
                 if bw_ratio < 0.4 {
-                    if fm_slope > 200.0 { ("whistle_up", 2) }
-                    else if fm_slope < -200.0 { ("whistle_down", 3) }
-                    else { ("whistle_flat", 4) }
+                    if fm_slope > 200.0 {
+                        ("whistle_up", 2)
+                    } else if fm_slope < -200.0 {
+                        ("whistle_down", 3)
+                    } else {
+                        ("whistle_flat", 4)
+                    }
                 } else if bandwidth > 800.0 {
                     ("burst_rapid", 5)
                 } else {
@@ -155,7 +183,9 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
                     }
                     current = if etype != "silence" {
                         Some((etype.to_string(), cid, time, energy))
-                    } else { None };
+                    } else {
+                        None
+                    };
                 } else {
                     current = Some((ct.clone(), *cc, *st, pk.max(energy)));
                 }
@@ -179,11 +209,19 @@ fn extract_events(audio: &[f32], sample_rate: f32, frame_size: usize) -> Vec<Tem
 /// Create baseline temporal grammar for comparison
 fn baseline_cetacean_config() -> DomainConfig {
     let calls = vec![
-        "click_loud", "click_soft",
-        "whistle_up", "whistle_down", "whistle_flat",
-        "burst_rapid", "burst_slow",
-        "moan", "silence",
-    ].into_iter().map(String::from).collect();
+        "click_loud",
+        "click_soft",
+        "whistle_up",
+        "whistle_down",
+        "whistle_flat",
+        "burst_rapid",
+        "burst_slow",
+        "moan",
+        "silence",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
 
     DomainConfig {
         name: "cetacean_baseline".to_string(),
@@ -213,7 +251,12 @@ fn main() -> std::io::Result<()> {
 
     let whale_files: Vec<_> = std::fs::read_dir(whale_dir)?
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map(|ext| ext == "wav").unwrap_or(false))
+        .filter(|e| {
+            e.path()
+                .extension()
+                .map(|ext| ext == "wav")
+                .unwrap_or(false)
+        })
         .collect();
 
     if whale_files.is_empty() {
@@ -266,12 +309,16 @@ fn main() -> std::io::Result<()> {
     let unified_stats = unified.stats();
     let baseline_stats = baseline.stats();
 
-    println!("\n    Unified:  {} clusters, {:.1}% global density, {:.1}% cluster density",
-             unified_stats.num_clusters,
-             unified_stats.global_density * 100.0,
-             unified_stats.avg_cluster_density * 100.0);
-    println!("    Baseline: {:.1}% density",
-             baseline_stats.grammar_density * 100.0);
+    println!(
+        "\n    Unified:  {} clusters, {:.1}% global density, {:.1}% cluster density",
+        unified_stats.num_clusters,
+        unified_stats.global_density * 100.0,
+        unified_stats.avg_cluster_density * 100.0
+    );
+    println!(
+        "    Baseline: {:.1}% density",
+        baseline_stats.grammar_density * 100.0
+    );
 
     // Score both
     subheader("Phase 3: Scoring Comparison");
@@ -288,8 +335,13 @@ fn main() -> std::io::Result<()> {
             let b_score = baseline.score_sequence(events);
             unified_train.push(u_score);
             baseline_train.push(b_score);
-            println!("      {}: unified={:+.4} baseline={:+.4} (Δ={:+.4})",
-                     filename, u_score, b_score, u_score - b_score);
+            println!(
+                "      {}: unified={:+.4} baseline={:+.4} (Δ={:+.4})",
+                filename,
+                u_score,
+                b_score,
+                u_score - b_score
+            );
         }
     }
 
@@ -300,8 +352,13 @@ fn main() -> std::io::Result<()> {
             let b_score = baseline.score_sequence(events);
             unified_test.push(u_score);
             baseline_test.push(b_score);
-            println!("      {}: unified={:+.4} baseline={:+.4} (Δ={:+.4})",
-                     filename, u_score, b_score, u_score - b_score);
+            println!(
+                "      {}: unified={:+.4} baseline={:+.4} (Δ={:+.4})",
+                filename,
+                u_score,
+                b_score,
+                u_score - b_score
+            );
         }
     }
 
@@ -398,7 +455,10 @@ fn run_synthetic_tests() {
     ];
 
     println!("    Scoring patterns:\n");
-    println!("    {:30} {:>10} {:>10} {:>10}", "Pattern", "Unified", "Baseline", "Δ");
+    println!(
+        "    {:30} {:>10} {:>10} {:>10}",
+        "Pattern", "Unified", "Baseline", "Δ"
+    );
     println!("    {}", "-".repeat(62));
 
     let mut unified_trained = 0.0f32;
@@ -471,7 +531,10 @@ fn run_synthetic_tests() {
     println!("    Trained on rapid click events:");
     println!("      Rapid events score: {:+.4}", rapid_score);
     println!("      Slow events score:  {:+.4}", slow_on_rapid);
-    println!("      Temporal discrimination: {:+.4}", rapid_score - slow_on_rapid);
+    println!(
+        "      Temporal discrimination: {:+.4}",
+        rapid_score - slow_on_rapid
+    );
 
     if rapid_score > slow_on_rapid {
         println!("\n  [SUCCESS] CfC adapts to temporal dynamics!");

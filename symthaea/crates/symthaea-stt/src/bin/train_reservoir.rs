@@ -20,11 +20,8 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    LtcCell, LtcConfig,
-    LiquidProjection, LiquidProjectionConfig, RidgeAccumulator,
-    load_alignments, id_to_audio_path,
-    HDC_DIM,
+    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, LiquidProjection,
+    LiquidProjectionConfig, LtcCell, LtcConfig, RidgeAccumulator, HDC_DIM,
 };
 
 #[derive(Parser)]
@@ -74,7 +71,11 @@ struct Cli {
 
 /// Stack multiple frames together for temporal context
 fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> Vec<f32> {
-    let n_mels = if features.is_empty() { 40 } else { features[0].len() };
+    let n_mels = if features.is_empty() {
+        40
+    } else {
+        features[0].len()
+    };
     let half = context_frames / 2;
     let mut stacked = Vec::with_capacity(n_mels * context_frames);
 
@@ -90,10 +91,24 @@ fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> 
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("    LIQUID PROJECTION TRAINING                             ").bold().cyan());
-    println!("{}", style("    Reservoir Computing + Ridge Regression                 ").cyan());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("    LIQUID PROJECTION TRAINING                             ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("    Reservoir Computing + Ridge Regression                 ").cyan()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!();
     println!("  Architecture: Mel -> LTC Reservoir -> Learned Readout -> HDC");
     println!("  Training: Ridge Regression (no backprop needed)");
@@ -101,11 +116,19 @@ fn main() {
 
     // Check paths
     if !cli.alignments.exists() {
-        eprintln!("{} Alignments file not found: {:?}", style("ERROR:").red().bold(), cli.alignments);
+        eprintln!(
+            "{} Alignments file not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.alignments
+        );
         std::process::exit(1);
     }
     if !cli.audio_dir.exists() {
-        eprintln!("{} Audio directory not found: {:?}", style("ERROR:").red().bold(), cli.audio_dir);
+        eprintln!(
+            "{} Audio directory not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.audio_dir
+        );
         std::process::exit(1);
     }
 
@@ -114,7 +137,11 @@ fn main() {
     let alignments = match load_alignments(&cli.alignments) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("{} Failed to load alignments: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load alignments: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -151,12 +178,15 @@ fn main() {
     // Create LTC reservoir with stacked input size
     let mut ltc_config = LtcConfig::default();
     ltc_config.hidden_size = cli.reservoir_size;
-    let n_mels = 40;  // Standard mel filterbank size
+    let n_mels = 40; // Standard mel filterbank size
     let input_size = n_mels * cli.context_frames;
     let mut reservoir = LtcCell::new(input_size, ltc_config);
 
     if cli.context_frames > 1 {
-        println!("    Context frames: {} ({} input dims)", cli.context_frames, input_size);
+        println!(
+            "    Context frames: {} ({} input dims)",
+            cli.context_frames, input_size
+        );
     }
 
     // Create Ridge Regression accumulator
@@ -173,10 +203,12 @@ fn main() {
 
     // Progress bar
     let pb = ProgressBar::new(total as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("#>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
 
     let mut processed = 0;
     let mut skipped = 0;
@@ -242,7 +274,10 @@ fn main() {
             let segment_len = end_frame.saturating_sub(start_frame);
             let margin = segment_len / 4;
             let center_start = (start_frame + margin).min(reservoir_states.len().saturating_sub(1));
-            let center_end = end_frame.saturating_sub(margin).min(reservoir_states.len()).max(center_start + 1);
+            let center_end = end_frame
+                .saturating_sub(margin)
+                .min(reservoir_states.len())
+                .max(center_start + 1);
 
             // Add center frames to accumulator
             for frame_idx in center_start..center_end {
@@ -270,7 +305,10 @@ fn main() {
     // Solve Ridge Regression
     println!("\n🔧 Solving Ridge Regression...");
     println!("    Computing W = (X^T X + λI)^(-1) X^T Y");
-    println!("    Matrix size: {}x{} -> {}x{}", cli.reservoir_size, cli.reservoir_size, HDC_DIM, cli.reservoir_size);
+    println!(
+        "    Matrix size: {}x{} -> {}x{}",
+        cli.reservoir_size, cli.reservoir_size, HDC_DIM, cli.reservoir_size
+    );
 
     let weights = accumulator.solve(cli.ridge_lambda);
     encoder.set_readout_weights(weights);
@@ -331,7 +369,10 @@ fn main() {
         if total_test > 0 {
             let accuracy = correct as f32 / total_test as f32 * 100.0;
             let avg_sim = total_sim / total_test as f32;
-            println!("    Frame accuracy: {:.1}% ({}/{})", accuracy, correct, total_test);
+            println!(
+                "    Frame accuracy: {:.1}% ({}/{})",
+                accuracy, correct, total_test
+            );
             println!("    Average similarity: {:.3}", avg_sim);
         }
     }
@@ -350,8 +391,19 @@ fn main() {
 
     println!("  ✓ Saved Liquid Projection encoder");
 
-    println!("\n{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("             LIQUID PROJECTION TRAINING COMPLETE           ").bold().green());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "\n{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("             LIQUID PROJECTION TRAINING COMPLETE           ")
+            .bold()
+            .green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!("\n  Next: Evaluate with the trained encoder");
 }

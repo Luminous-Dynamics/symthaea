@@ -1,14 +1,15 @@
+#![allow(dead_code)]
 //! Mock Implementations
 //!
 //! Mock servers, clients, and other test doubles for integration testing.
 
-use std::sync::Arc;
 use parking_lot::Mutex;
+use std::sync::Arc;
 
 #[cfg(feature = "shell")]
-use std::path::PathBuf;
-#[cfg(feature = "shell")]
 use std::collections::VecDeque;
+#[cfg(feature = "shell")]
+use std::path::PathBuf;
 
 // ============================================================================
 // Mock IPC Server (for shell feature)
@@ -17,9 +18,9 @@ use std::collections::VecDeque;
 #[cfg(feature = "shell")]
 pub mod ipc {
     use super::*;
-    use tokio::net::UnixListener;
+    use symthaea::shell::ipc_client::{RequestEnvelope, Response, ResponseEnvelope};
     use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-    use symthaea::shell::ipc_client::{Response, ResponseEnvelope, RequestEnvelope};
+    use tokio::net::UnixListener;
 
     /// Mock IPC server that responds with predefined responses
     ///
@@ -69,13 +70,14 @@ pub mod ipc {
                         Ok(_) => {
                             if let Ok(envelope) = serde_json::from_str::<RequestEnvelope>(&line) {
                                 // Get next response or default Pong
-                                let response = self.responses.lock().pop_front().unwrap_or(
-                                    Response::Pong { timestamp_ms: std::time::SystemTime::now()
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_millis() as u64
-                                    }
-                                );
+                                let response =
+                                    self.responses.lock().pop_front().unwrap_or(Response::Pong {
+                                        timestamp_ms: std::time::SystemTime::now()
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap()
+                                            .as_millis()
+                                            as u64,
+                                    });
 
                                 let response_envelope = ResponseEnvelope {
                                     id: envelope.id,
@@ -83,7 +85,8 @@ pub mod ipc {
                                     response,
                                 };
 
-                                let json = serde_json::to_string(&response_envelope).unwrap() + "\n";
+                                let json =
+                                    serde_json::to_string(&response_envelope).unwrap() + "\n";
                                 if write_half.write_all(json.as_bytes()).await.is_err() {
                                     break;
                                 }
@@ -170,7 +173,11 @@ impl CallRecorder {
 
     /// Get the number of times a method was called
     pub fn call_count(&self, method: &str) -> usize {
-        self.calls.lock().iter().filter(|c| c.starts_with(method)).count()
+        self.calls
+            .lock()
+            .iter()
+            .filter(|c| c.starts_with(method))
+            .count()
     }
 
     /// Clear recorded calls

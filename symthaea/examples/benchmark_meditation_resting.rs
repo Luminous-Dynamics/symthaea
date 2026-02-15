@@ -18,8 +18,8 @@
 use std::time::Instant;
 
 use symthaea::perception::physio::{
-    MeditationSentinel, MeditationSimulator, MeditationCategory, MeditationChannel,
-    MeditationEEG, MeditationState,
+    MeditationCategory, MeditationChannel, MeditationEEG, MeditationSentinel, MeditationSimulator,
+    MeditationState,
 };
 
 fn main() {
@@ -83,14 +83,29 @@ fn main() {
             total += 1;
         }
 
-        println!("  {:20} → {}/{} correct", target.name(), trial_correct, n_trials);
+        println!(
+            "  {:20} → {}/{} correct",
+            target.name(),
+            trial_correct,
+            n_trials
+        );
     }
 
     let exact_accuracy = correct as f64 / total as f64;
     let binary_accuracy = meditative_correct as f64 / total as f64;
 
-    println!("\n  Exact classification: {:.1}% ({}/{})", exact_accuracy * 100.0, correct, total);
-    println!("  Binary (med/wander):  {:.1}% ({}/{})", binary_accuracy * 100.0, meditative_correct, total);
+    println!(
+        "\n  Exact classification: {:.1}% ({}/{})",
+        exact_accuracy * 100.0,
+        correct,
+        total
+    );
+    println!(
+        "  Binary (med/wander):  {:.1}% ({}/{})",
+        binary_accuracy * 100.0,
+        meditative_correct,
+        total
+    );
 
     // ═══════════════════════════════════════════════════════════════
     // Test 2: EEG Signature Validation
@@ -157,8 +172,16 @@ fn main() {
     }
 
     // Flow and Absorption should have highest quality
-    let flow_quality = qualities.iter().find(|(c, _)| *c == MeditationCategory::Flow).unwrap().1;
-    let wander_quality = qualities.iter().find(|(c, _)| *c == MeditationCategory::Wandering).unwrap().1;
+    let flow_quality = qualities
+        .iter()
+        .find(|(c, _)| *c == MeditationCategory::Flow)
+        .unwrap()
+        .1;
+    let wander_quality = qualities
+        .iter()
+        .find(|(c, _)| *c == MeditationCategory::Wandering)
+        .unwrap()
+        .1;
     let quality_ordered = flow_quality > wander_quality;
     println!("  Flow > Wandering quality: {}", quality_ordered);
 
@@ -193,8 +216,8 @@ fn main() {
     }
 
     // Quality should generally increase through session
-    let session_improves = phase_qualities.len() >= 2 &&
-        phase_qualities.last().unwrap().1 > phase_qualities.first().unwrap().1;
+    let session_improves = phase_qualities.len() >= 2
+        && phase_qualities.last().unwrap().1 > phase_qualities.first().unwrap().1;
     println!("  Session quality improves: {}", session_improves);
 
     // Check category stats
@@ -226,7 +249,10 @@ fn main() {
     let per_window_ms = elapsed * 1000.0 / n_iter as f64;
     let realtime = per_window_ms < window_sec * 1000.0; // Must process faster than real-time
 
-    println!("  {} windows in {:.2}s ({:.2}ms each)", n_iter, elapsed, per_window_ms);
+    println!(
+        "  {} windows in {:.2}s ({:.2}ms each)",
+        n_iter, elapsed, per_window_ms
+    );
     println!("  Real-time capable: {}", realtime);
 
     // ═══════════════════════════════════════════════════════════════
@@ -237,7 +263,10 @@ fn main() {
     println!("╠══════════════════════════════════════════════════════════════╣");
 
     let checks = vec![
-        ("Binary accuracy (med/wander) >= 50%", binary_accuracy >= 0.50),
+        (
+            "Binary accuracy (med/wander) >= 50%",
+            binary_accuracy >= 0.50,
+        ),
         ("Gamma higher in flow state", gamma_higher_flow),
         ("Theta higher in absorption", theta_high_absorption),
         ("Quality: flow > wandering", quality_ordered),
@@ -248,10 +277,16 @@ fn main() {
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save

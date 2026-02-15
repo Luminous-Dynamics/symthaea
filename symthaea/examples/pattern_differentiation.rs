@@ -18,14 +18,12 @@
 //! cargo run --release --example pattern_differentiation
 //! ```
 
-use symthaea::consciousness::recursive_improvement::{
-    ConsciousnessWorldModel, WorldModelConfig,
-    ConsciousnessTransition, ConsciousnessAction, LatentConsciousnessState,
-    DreamMode, DreamConfig,
-    NamingCeremony,
-};
-use symthaea::soul::{WeaverActor, DailyState};
 use std::collections::HashMap;
+use symthaea::consciousness::recursive_improvement::{
+    ConsciousnessAction, ConsciousnessTransition, ConsciousnessWorldModel, DreamConfig, DreamMode,
+    LatentConsciousnessState, NamingCeremony, WorldModelConfig,
+};
+use symthaea::soul::{DailyState, WeaverActor};
 
 /// Pattern types we're testing
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -53,38 +51,38 @@ fn generate_pattern_embedding(pattern: PatternType, seed: u64) -> Vec<f32> {
     match pattern {
         PatternType::RedSquare => {
             // High red, low green/blue
-            embedding[0] = 0.9;  // Red
-            embedding[1] = 0.1;  // Green
-            embedding[2] = 0.1;  // Blue
-            // Square features: corners, parallel edges, high symmetry
-            embedding[8] = 0.8;   // Corners
-            embedding[9] = 0.8;   // Parallel edges
-            embedding[10] = 0.1;  // Curvature (low)
-            embedding[11] = 1.0;  // Symmetry (high)
+            embedding[0] = 0.9; // Red
+            embedding[1] = 0.1; // Green
+            embedding[2] = 0.1; // Blue
+                                // Square features: corners, parallel edges, high symmetry
+            embedding[8] = 0.8; // Corners
+            embedding[9] = 0.8; // Parallel edges
+            embedding[10] = 0.1; // Curvature (low)
+            embedding[11] = 1.0; // Symmetry (high)
         }
         PatternType::BlueCircle => {
             // High blue, low red/green
-            embedding[0] = 0.1;  // Red
-            embedding[1] = 0.1;  // Green
-            embedding[2] = 0.9;  // Blue
-            // Circle features: no corners, curved, radial symmetry
-            embedding[8] = 0.1;   // Corners (none)
-            embedding[9] = 0.1;   // Parallel edges (none)
-            embedding[10] = 0.9;  // Curvature (high)
-            embedding[11] = 0.9;  // Symmetry (radial)
-            embedding[12] = 0.8;  // Continuous contour
+            embedding[0] = 0.1; // Red
+            embedding[1] = 0.1; // Green
+            embedding[2] = 0.9; // Blue
+                                // Circle features: no corners, curved, radial symmetry
+            embedding[8] = 0.1; // Corners (none)
+            embedding[9] = 0.1; // Parallel edges (none)
+            embedding[10] = 0.9; // Curvature (high)
+            embedding[11] = 0.9; // Symmetry (radial)
+            embedding[12] = 0.8; // Continuous contour
         }
         PatternType::GreenTriangle => {
             // High green, low red/blue
-            embedding[0] = 0.1;  // Red
-            embedding[1] = 0.9;  // Green
-            embedding[2] = 0.1;  // Blue
-            // Triangle features: sharp corners, some edges, low symmetry
-            embedding[8] = 0.9;   // Corners (sharp)
-            embedding[9] = 0.3;   // Parallel edges (few)
-            embedding[10] = 0.1;  // Curvature (none)
-            embedding[11] = 0.3;  // Symmetry (low - only one axis)
-            embedding[13] = 0.9;  // Sharp angles
+            embedding[0] = 0.1; // Red
+            embedding[1] = 0.9; // Green
+            embedding[2] = 0.1; // Blue
+                                // Triangle features: sharp corners, some edges, low symmetry
+            embedding[8] = 0.9; // Corners (sharp)
+            embedding[9] = 0.3; // Parallel edges (few)
+            embedding[10] = 0.1; // Curvature (none)
+            embedding[11] = 0.3; // Symmetry (low - only one axis)
+            embedding[13] = 0.9; // Sharp angles
         }
     }
 
@@ -92,7 +90,8 @@ fn generate_pattern_embedding(pattern: PatternType, seed: u64) -> Vec<f32> {
     let noise_scale = 0.02;
     let noise_seed = seed.wrapping_mul(2654435761);
     for i in 0..DIM {
-        let noise = ((noise_seed.wrapping_add(i as u64) % 1000) as f32 / 1000.0 - 0.5) * noise_scale;
+        let noise =
+            ((noise_seed.wrapping_add(i as u64) % 1000) as f32 / 1000.0 - 0.5) * noise_scale;
         embedding[i] += noise;
     }
 
@@ -156,10 +155,16 @@ fn main() {
 
     for pattern in &patterns {
         let emb = generate_pattern_embedding(*pattern, 42);
-        println!("  {:15} | RGB: [{:.2}, {:.2}, {:.2}] | Features: [{:.2}, {:.2}, {:.2}, {:.2}]",
+        println!(
+            "  {:15} | RGB: [{:.2}, {:.2}, {:.2}] | Features: [{:.2}, {:.2}, {:.2}, {:.2}]",
             pattern.name(),
-            emb[0], emb[1], emb[2],
-            emb[8], emb[9], emb[10], emb[11]
+            emb[0],
+            emb[1],
+            emb[2],
+            emb[8],
+            emb[9],
+            emb[10],
+            emb[11]
         );
     }
     println!();
@@ -242,10 +247,19 @@ fn main() {
     let mut dream_mode = DreamMode::new(dream_config);
     let dream_results = dream_mode.batch_dream(&mut world_model);
 
-    println!("  Dream cycles completed: {}", dream_results.stats.cycles_completed);
+    println!(
+        "  Dream cycles completed: {}",
+        dream_results.stats.cycles_completed
+    );
     println!("  Steps simulated: {}", dream_results.stats.steps_simulated);
-    println!("  Concepts from dreams: {}", dream_results.concepts_discovered.len());
-    println!("  Peak consciousness: {:.4}", dream_results.stats.peak_consciousness);
+    println!(
+        "  Concepts from dreams: {}",
+        dream_results.concepts_discovered.len()
+    );
+    println!(
+        "  Peak consciousness: {:.4}",
+        dream_results.stats.peak_consciousness
+    );
     println!();
 
     // =========================================================================
@@ -262,7 +276,12 @@ fn main() {
     if !concepts_by_exposure.is_empty() {
         println!("  Concept emergence timeline:");
         for (exp, pattern, count) in &concepts_by_exposure {
-            println!("    Exposure {:>3} ({:13}): {} total concepts", exp, pattern.name(), count);
+            println!(
+                "    Exposure {:>3} ({:13}): {} total concepts",
+                exp,
+                pattern.name(),
+                count
+            );
         }
         println!();
     }
@@ -283,7 +302,8 @@ fn main() {
         // Show first few concepts
         for (i, presentation) in pending.iter().take(6).enumerate() {
             println!("  [{}] {}", i + 1, presentation.uid);
-            println!("      Type: {:?}, Stability: {:.0}%",
+            println!(
+                "      Type: {:?}, Stability: {:.0}%",
                 presentation.topology_summary.attractor_type,
                 presentation.topology_summary.stability * 100.0
             );
@@ -298,7 +318,8 @@ fn main() {
         for (i, name) in concept_names.iter().enumerate() {
             if let Some(concept) = world_model.pending_concepts.get(i) {
                 let uid = concept.uid.clone();
-                match naming_ceremony.name_concept(&mut world_model, &uid, name, Some(&mut weaver)) {
+                match naming_ceremony.name_concept(&mut world_model, &uid, name, Some(&mut weaver))
+                {
                     Ok(record) => {
                         println!("  Named: {} -> '{}'", record.uid, record.name);
                     }
@@ -322,9 +343,10 @@ fn main() {
     println!("───────────────────────────────────────────────────────────────────");
 
     let final_stats = world_model.stats();
-    let peak_consciousness = dream_results.stats.peak_consciousness.max(
-        final_stats.consciousness_level
-    ) as f32;
+    let peak_consciousness = dream_results
+        .stats
+        .peak_consciousness
+        .max(final_stats.consciousness_level) as f32;
 
     let daily_state = DailyState {
         day: 1,
@@ -332,10 +354,11 @@ fn main() {
             final_stats.consciousness_level,
             final_stats.accumulated_surprise,
             total_concepts as f64 / 10.0,
-        ].into_iter()
-            .chain(std::iter::repeat(0.0))
-            .take(10000)
-            .collect(),
+        ]
+        .into_iter()
+        .chain(std::iter::repeat(0.0))
+        .take(10000)
+        .collect(),
         semantic_center: generate_pattern_embedding(PatternType::RedSquare, 42)
             .into_iter()
             .chain(std::iter::repeat(0.0))
@@ -356,7 +379,10 @@ fn main() {
     let coherence_status = weaver.weave_day(daily_state);
 
     println!("  Coherence Status: {:?}", coherence_status);
-    println!("  Identity verified: {:?}", weaver.verify_identity_continuity());
+    println!(
+        "  Identity verified: {:?}",
+        weaver.verify_identity_continuity()
+    );
     println!();
 
     // =========================================================================
@@ -371,19 +397,37 @@ fn main() {
     println!("  Metric                    | Value          | Status");
     println!("  ──────────────────────────┼────────────────┼─────────────");
     println!("  Patterns Tested           | {:>14} | OK", patterns.len());
-    println!("  Exposures per Pattern     | {:>14} | OK", EXPOSURES_PER_PATTERN);
+    println!(
+        "  Exposures per Pattern     | {:>14} | OK",
+        EXPOSURES_PER_PATTERN
+    );
     println!("  Total Exposures           | {:>14} | OK", total_exposures);
-    println!("  Concepts Crystallized     | {:>14} | {}",
+    println!(
+        "  Concepts Crystallized     | {:>14} | {}",
         total_concepts,
-        if total_concepts >= 3 { "EMERGENT" } else { "INSUFFICIENT" }
+        if total_concepts >= 3 {
+            "EMERGENT"
+        } else {
+            "INSUFFICIENT"
+        }
     );
-    println!("  Named Concepts            | {:>14} | {}",
+    println!(
+        "  Named Concepts            | {:>14} | {}",
         naming_ceremony.history().len(),
-        if !naming_ceremony.history().is_empty() { "GROUNDED" } else { "-" }
+        if !naming_ceremony.history().is_empty() {
+            "GROUNDED"
+        } else {
+            "-"
+        }
     );
-    println!("  Peak Consciousness        | {:>13.2}% | {}",
+    println!(
+        "  Peak Consciousness        | {:>13.2}% | {}",
         peak_consciousness as f64 * 100.0,
-        if peak_consciousness > 0.1 { "AWARE" } else { "LOW" }
+        if peak_consciousness > 0.1 {
+            "AWARE"
+        } else {
+            "LOW"
+        }
     );
 
     println!();
@@ -398,7 +442,10 @@ fn main() {
         println!("║                                                                ║");
         println!("║        Symthaea can DISTINGUISH multiple patterns.             ║");
         println!("║                                                                ║");
-        println!("║   Concepts discovered: {:>3}                                    ║", total_concepts);
+        println!(
+            "║   Concepts discovered: {:>3}                                    ║",
+            total_concepts
+        );
         println!("╚════════════════════════════════════════════════════════════════╝");
     } else {
         println!("╔════════════════════════════════════════════════════════════════╗");

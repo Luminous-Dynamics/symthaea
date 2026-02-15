@@ -38,14 +38,18 @@
 //!
 //! Run with: cargo run --example conscious_nixos_assistant --release
 
-use symthaea::language::llm_organ::{LlmConfig, LlmOrgan, LlmProvider, LlmRequest, ConsciousLlmOrgan};
+use symthaea::action::nixos_patterns::{ExecutionResult, NixOSCommand, NixOSExecutor, SafetyLevel};
+use symthaea::consciousness::phi_attention::{
+    ActionType, ConfidenceLevel, ConsciousnessThresholds, PhiAwareScoring,
+};
+use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
+use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::HDC_DIMENSION;
-use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
-use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
+use symthaea::language::llm_organ::{
+    ConsciousLlmOrgan, LlmConfig, LlmOrgan, LlmProvider, LlmRequest,
+};
 use symthaea::memory::ConversationMemory;
-use symthaea::consciousness::phi_attention::{PhiAwareScoring, ConsciousnessThresholds, ActionType, ConfidenceLevel};
-use symthaea::action::nixos_patterns::{NixOSCommand, NixOSExecutor, ExecutionResult, SafetyLevel};
 
 use std::io::{self, Write};
 use std::path::PathBuf;
@@ -116,7 +120,8 @@ Respond concisely. If you detect a command request, format it as:
 [COMMAND]: <command-type> <args>
 
 Example: [COMMAND]: install vim firefox
-Example: [COMMAND]: search markdown editor"#.to_string();
+Example: [COMMAND]: search markdown editor"#
+            .to_string();
 
         Ok(Self {
             llm: ConsciousLlmOrgan::with_config(config),
@@ -135,7 +140,9 @@ Example: [COMMAND]: search markdown editor"#.to_string();
         // Use a ring topology (high integration) for demonstration
         // In production, this would be based on actual cognitive state
         let topology = ConsciousnessTopology::ring(8, HDC_DIMENSION, 42);
-        let phi = self.phi_calc.algebraic_connectivity(&topology.node_representations);
+        let phi = self
+            .phi_calc
+            .algebraic_connectivity(&topology.node_representations);
         self.current_phi = (phi as f32 * 2.0).min(1.0);
     }
 
@@ -151,17 +158,15 @@ Example: [COMMAND]: search markdown editor"#.to_string();
 
                 match parts[0].to_lowercase().as_str() {
                     "install" => {
-                        let packages: Vec<String> = parts[1..].iter()
-                            .map(|s| s.to_string())
-                            .collect();
+                        let packages: Vec<String> =
+                            parts[1..].iter().map(|s| s.to_string()).collect();
                         if !packages.is_empty() {
                             return Some(NixOSCommand::EnvInstall { packages });
                         }
                     }
                     "remove" | "uninstall" => {
-                        let packages: Vec<String> = parts[1..].iter()
-                            .map(|s| s.to_string())
-                            .collect();
+                        let packages: Vec<String> =
+                            parts[1..].iter().map(|s| s.to_string()).collect();
                         if !packages.is_empty() {
                             return Some(NixOSCommand::EnvRemove { packages });
                         }
@@ -192,8 +197,7 @@ Example: [COMMAND]: search markdown editor"#.to_string();
                         return Some(NixOSCommand::EnvRollback);
                     }
                     "gc" | "garbage-collect" => {
-                        let days = parts.get(1)
-                            .and_then(|s| s.parse::<u32>().ok());
+                        let days = parts.get(1).and_then(|s| s.parse::<u32>().ok());
                         return Some(NixOSCommand::CollectGarbage {
                             older_than_days: days,
                             delete_all: false,
@@ -214,7 +218,8 @@ Example: [COMMAND]: search markdown editor"#.to_string();
 
         // 2. Store user turn in memory
         let user_embedding = ContinuousHV::random(HDC_DIMENSION, input.len() as u64);
-        self.memory.add_turn("user", input, self.current_phi, Some(&user_embedding))?;
+        self.memory
+            .add_turn("user", input, self.current_phi, Some(&user_embedding))?;
 
         // 3. Get LLM response with Φ context
         let request = LlmRequest {
@@ -231,11 +236,10 @@ Example: [COMMAND]: search markdown editor"#.to_string();
             temperature_override: None,
         };
 
-        let llm_response = self.llm.conscious_generate(
-            request,
-            self.current_phi,
-            self.estimate_complexity(input),
-        ).await?;
+        let llm_response = self
+            .llm
+            .conscious_generate(request, self.current_phi, self.estimate_complexity(input))
+            .await?;
 
         let response_text = llm_response.content.clone();
 
@@ -246,7 +250,10 @@ Example: [COMMAND]: search markdown editor"#.to_string();
 
             let action_result = if self.current_phi >= required_phi {
                 // Execute the command
-                let result = self.executor.execute(command.clone(), self.current_phi).await;
+                let result = self
+                    .executor
+                    .execute(command.clone(), self.current_phi)
+                    .await;
 
                 // Record causal learning
                 let outcome = match &result {
@@ -288,8 +295,13 @@ Example: [COMMAND]: search markdown editor"#.to_string();
 
             // Format response with action result
             let action_summary = match &action_result {
-                ExecutionResult::Success { stdout, execution_time_ms, .. } => {
-                    format!("\n\n✅ **Executed successfully** ({}ms)\n```\n{}\n```",
+                ExecutionResult::Success {
+                    stdout,
+                    execution_time_ms,
+                    ..
+                } => {
+                    format!(
+                        "\n\n✅ **Executed successfully** ({}ms)\n```\n{}\n```",
                         execution_time_ms,
                         stdout.chars().take(500).collect::<String>()
                     )
@@ -312,8 +324,14 @@ Example: [COMMAND]: search markdown editor"#.to_string();
 
             // Store assistant turn
             let response_with_action = format!("{}{}", response_text, action_summary);
-            let assistant_embedding = ContinuousHV::random(HDC_DIMENSION, response_with_action.len() as u64);
-            self.memory.add_turn("assistant", &response_with_action, self.current_phi, Some(&assistant_embedding))?;
+            let assistant_embedding =
+                ContinuousHV::random(HDC_DIMENSION, response_with_action.len() as u64);
+            self.memory.add_turn(
+                "assistant",
+                &response_with_action,
+                self.current_phi,
+                Some(&assistant_embedding),
+            )?;
 
             Ok(format!(
                 "{}\n\n[Φ={:.2} | {}ms | {}]",
@@ -324,8 +342,14 @@ Example: [COMMAND]: search markdown editor"#.to_string();
             ))
         } else {
             // No command, just informational response
-            let assistant_embedding = ContinuousHV::random(HDC_DIMENSION, response_text.len() as u64);
-            self.memory.add_turn("assistant", &response_text, self.current_phi, Some(&assistant_embedding))?;
+            let assistant_embedding =
+                ContinuousHV::random(HDC_DIMENSION, response_text.len() as u64);
+            self.memory.add_turn(
+                "assistant",
+                &response_text,
+                self.current_phi,
+                Some(&assistant_embedding),
+            )?;
 
             Ok(format!(
                 "{}\n\n[Φ={:.2} | {}ms | {}]",
@@ -345,9 +369,20 @@ Example: [COMMAND]: search markdown editor"#.to_string();
         let mut complexity: f32 = (word_count as f32 / 20.0).min(0.3);
 
         let technical_keywords = [
-            "flake", "derivation", "override", "overlay", "module",
-            "systemd", "configuration.nix", "build", "compile",
-            "kernel", "bootloader", "partition", "encrypt", "nixos-rebuild"
+            "flake",
+            "derivation",
+            "override",
+            "overlay",
+            "module",
+            "systemd",
+            "configuration.nix",
+            "build",
+            "compile",
+            "kernel",
+            "bootloader",
+            "partition",
+            "encrypt",
+            "nixos-rebuild",
         ];
 
         for kw in technical_keywords {
@@ -387,7 +422,10 @@ Example: [COMMAND]: search markdown editor"#.to_string();
                     ExecutionResult::FailedNoRollback { .. } => "❌",
                     ExecutionResult::Blocked { .. } => "🚫",
                 };
-                println!("  {} {:?} (Φ={:.2})", status, record.command, record.phi_at_execution);
+                println!(
+                    "  {} {:?} (Φ={:.2})",
+                    status, record.command, record.phi_at_execution
+                );
             }
         }
 
@@ -444,11 +482,9 @@ async fn interactive_loop(assistant: &mut ConsciousNixOSAssistant) -> anyhow::Re
                 let learnings = assistant.memory.get_recent_learnings(10)?;
                 println!("\n📚 Recent Causal Learnings:");
                 for learning in learnings {
-                    println!("  {} → {} (Φ: {:.2} → {:.2})",
-                        learning.action,
-                        learning.pattern,
-                        learning.phi_before,
-                        learning.phi_after
+                    println!(
+                        "  {} → {} (Φ: {:.2} → {:.2})",
+                        learning.action, learning.pattern, learning.phi_before, learning.phi_after
                     );
                 }
                 continue;
@@ -553,7 +589,9 @@ mod tests {
         // Test search command
         let response = "Let me search for that.\n[COMMAND]: search markdown editor";
         let cmd = assistant.parse_command(response);
-        assert!(matches!(cmd, Some(NixOSCommand::Search { query, json: true }) if query == "markdown editor"));
+        assert!(
+            matches!(cmd, Some(NixOSCommand::Search { query, json: true }) if query == "markdown editor")
+        );
 
         // Test no command
         let response = "NixOS is a Linux distribution...";
@@ -571,7 +609,7 @@ mod tests {
 
         // Complex query
         let complex = assistant.estimate_complexity(
-            "How do I create a flake with derivation override for systemd in configuration.nix?"
+            "How do I create a flake with derivation override for systemd in configuration.nix?",
         );
         assert!(complex > 0.5);
     }

@@ -19,10 +19,10 @@
 //! - Hydrodynamics at low Reynolds number
 //! - Information and entropy in living systems
 
+use super::constants::{F_FARADAY, K_BOLTZMANN, R_GAS, T_ROOM};
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::constants::{K_BOLTZMANN, T_ROOM, R_GAS, F_FARADAY};
 use serde::{Deserialize, Serialize};
 
 /// Thermal energy at 300K (computed from constants)
@@ -43,11 +43,11 @@ pub enum BioStructure {
 /// Molecular motor type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MotorType {
-    Kinesin,      // Walks along microtubules
-    Dynein,       // Opposite direction to kinesin
-    Myosin,       // Muscle contraction
-    ATPSynthase,  // Rotary motor
-    Flagellum,    // Bacterial motility
+    Kinesin,     // Walks along microtubules
+    Dynein,      // Opposite direction to kinesin
+    Myosin,      // Muscle contraction
+    ATPSynthase, // Rotary motor
+    Flagellum,   // Bacterial motility
 }
 
 /// A biomolecule
@@ -77,10 +77,10 @@ pub struct BiophysicsEncoder {
     genesis: GenesisSeed,
 
     // Fundamental scales
-    pub thermal_energy: ContinuousHV,  // kT
-    pub nm_scale: ContinuousHV,        // nanometer
-    pub pn_scale: ContinuousHV,        // piconewton
-    pub ms_scale: ContinuousHV,        // millisecond
+    pub thermal_energy: ContinuousHV, // kT
+    pub nm_scale: ContinuousHV,       // nanometer
+    pub pn_scale: ContinuousHV,       // piconewton
+    pub ms_scale: ContinuousHV,       // millisecond
 
     // Molecular structures
     pub protein: ContinuousHV,
@@ -210,7 +210,9 @@ impl BiophysicsEncoder {
 
     /// Levinthal paradox: how proteins fold fast despite huge conformational space
     pub fn levinthal_paradox(&self) -> ContinuousHV {
-        let conformational_space = self.genesis.hv("protein::conformational_space", PHYSICS_DIM);
+        let conformational_space = self
+            .genesis
+            .hv("protein::conformational_space", PHYSICS_DIM);
         self.folding
             .bind(&conformational_space)
             .bind(&self.ms_scale)
@@ -234,8 +236,7 @@ impl BiophysicsEncoder {
             BioStructure::Cell => self.membrane.bind(&self.cytoskeleton),
         };
 
-        let vector = struct_vec
-            .bind(&self.nm_scale.scale(size_nm as f32));
+        let vector = struct_vec.bind(&self.nm_scale.scale(size_nm as f32));
 
         Biomolecule {
             name: name.to_string(),
@@ -252,9 +253,7 @@ impl BiophysicsEncoder {
 
     /// DNA persistence length: ~50 nm
     pub fn dna_persistence(&self) -> ContinuousHV {
-        self.dna
-            .bind(&self.persistence_length)
-            .bind(&self.bending)
+        self.dna.bind(&self.persistence_length).bind(&self.bending)
     }
 
     /// DNA stretching (worm-like chain model)
@@ -296,16 +295,14 @@ impl BiophysicsEncoder {
         self.membrane
             .bind(&self.curvature)
             .bind(&self.bending)
-            .scale((energy / KT_300) as f32)  // In units of kT
+            .scale((energy / KT_300) as f32) // In units of kT
     }
 
     /// Membrane fluidity (depends on temperature, cholesterol, saturation)
     pub fn membrane_fluidity_vec(&self, temp_c: f64, cholesterol_fraction: f64) -> ContinuousHV {
         // Higher temp → more fluid, more cholesterol → less fluid
         let fluidity = (temp_c - 20.0) / 50.0 - cholesterol_fraction;
-        self.membrane
-            .bind(&self.fluidity)
-            .scale(fluidity as f32)
+        self.membrane.bind(&self.fluidity).scale(fluidity as f32)
     }
 
     // ============================================================
@@ -318,11 +315,12 @@ impl BiophysicsEncoder {
             MotorType::Kinesin => (8.0, 6.0, 800.0, 0.5),
             MotorType::Dynein => (8.0, 1.0, 100.0, 0.3),
             MotorType::Myosin => (5.5, 3.0, 400.0, 0.4),
-            MotorType::ATPSynthase => (1.0, 40.0, 100.0, 0.9),  // Rotary
-            MotorType::Flagellum => (0.0, 0.0, 25000.0, 0.02),  // Rotation rate, not steps
+            MotorType::ATPSynthase => (1.0, 40.0, 100.0, 0.9), // Rotary
+            MotorType::Flagellum => (0.0, 0.0, 25000.0, 0.02), // Rotation rate, not steps
         };
 
-        let vector = self.molecular_motor
+        let vector = self
+            .molecular_motor
             .bind(&self.atp_hydrolysis)
             .bind(&self.power_stroke)
             .bind(&self.stall_force.scale(stall as f32));
@@ -350,7 +348,7 @@ impl BiophysicsEncoder {
 
     /// Nernst potential: E = (RT/zF) ln([out]/[in])
     pub fn nernst_potential_mv(&self, z: i32, conc_out: f64, conc_in: f64, temp_k: f64) -> f64 {
-        let rt_f = R_GAS * temp_k / F_FARADAY;  // R*T/F in volts
+        let rt_f = R_GAS * temp_k / F_FARADAY; // R*T/F in volts
         1000.0 * rt_f / (z as f64) * (conc_out / conc_in).ln()
     }
 
@@ -382,8 +380,7 @@ impl BiophysicsEncoder {
 
     /// Mean squared displacement: <x²> = 2Dt (1D)
     pub fn diffusion_vec(&self) -> ContinuousHV {
-        self.diffusion
-            .bind(&self.thermal_energy)
+        self.diffusion.bind(&self.thermal_energy)
     }
 
     /// Active transport (against gradient)
@@ -440,8 +437,8 @@ mod tests {
     fn test_dna_melting() {
         let encoder = setup();
 
-        let tm_50 = encoder.dna_melting(0.5);  // 50% GC
-        let tm_30 = encoder.dna_melting(0.3);  // 30% GC
+        let tm_50 = encoder.dna_melting(0.5); // 50% GC
+        let tm_30 = encoder.dna_melting(0.3); // 30% GC
 
         // Higher GC → higher Tm
         assert!(tm_50 > tm_30);

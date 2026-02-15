@@ -2,9 +2,9 @@
 //!
 //! Extracted from `mod.rs` to reduce file size.
 
-use crate::shell::ipc_server::{CommandExecutor, ExecutionResult, ValidationResult};
-use crate::shell::context::{Completion, CompletionKind};
 use crate::action::DestructivenessLevel;
+use crate::shell::context::{Completion, CompletionKind};
+use crate::shell::ipc_server::{CommandExecutor, ExecutionResult, ValidationResult};
 
 /// CommandExecutor implementation for CognitiveLoopService
 ///

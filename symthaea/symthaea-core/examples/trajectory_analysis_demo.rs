@@ -7,8 +7,8 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    CoupledPhysicsEngine, OperatingConditions, FusionReaction,
-    TrajectoryAnalysisEngine, compare_trajectories,
+    compare_trajectories, CoupledPhysicsEngine, FusionReaction, OperatingConditions,
+    TrajectoryAnalysisEngine,
 };
 
 fn main() {
@@ -46,12 +46,19 @@ fn main() {
 
         if i % 4 == 0 || i == 19 {
             let health = rampup_trajectory.stream_health();
-            println!("│  {:>4}  {:>5.0}    {:>6.4}   {:>6.4}    {:>6.4}      {}  │",
-                     state.step, power,
-                     state.metrics.overall_integration,
-                     state.temporal_binding,
-                     state.continuity,
-                     if health.is_flowing { "FLOWING" } else { "BUILDING" });
+            println!(
+                "│  {:>4}  {:>5.0}    {:>6.4}   {:>6.4}    {:>6.4}      {}  │",
+                state.step,
+                power,
+                state.metrics.overall_integration,
+                state.temporal_binding,
+                state.continuity,
+                if health.is_flowing {
+                    "FLOWING"
+                } else {
+                    "BUILDING"
+                }
+            );
         }
     }
 
@@ -59,8 +66,10 @@ fn main() {
 
     let rampup_metrics = rampup_trajectory.trajectory_metrics();
     println!("\n  {}", rampup_metrics.summary());
-    println!("  Integration trend: {:.4} (negative = declining as power increases)",
-             rampup_trajectory.integration_trend());
+    println!(
+        "  Integration trend: {:.4} (negative = declining as power increases)",
+        rampup_trajectory.integration_trend()
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SCENARIO 2: STEADY-STATE OPERATION
@@ -81,7 +90,10 @@ fn main() {
 
     println!("  {}", steady_metrics.summary());
     println!("  Stream: {}", steady_health);
-    println!("  Integration trend: {:.4}", steady_trajectory.integration_trend());
+    println!(
+        "  Integration trend: {:.4}",
+        steady_trajectory.integration_trend()
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SCENARIO 3: OSCILLATING OPERATION
@@ -104,7 +116,10 @@ fn main() {
 
     let oscillating_metrics = oscillating_trajectory.trajectory_metrics();
     println!("  {}", oscillating_metrics.summary());
-    println!("  Integration trend: {:.4}", oscillating_trajectory.integration_trend());
+    println!(
+        "  Integration trend: {:.4}",
+        oscillating_trajectory.integration_trend()
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // COMPARISON SUMMARY
@@ -116,24 +131,30 @@ fn main() {
     println!("┌────────────────────────────────────────────────────────────────────────┐");
     println!("│  Scenario      Quality   Coherence   Mean I    Peak I    Valley I     │");
     println!("├────────────────────────────────────────────────────────────────────────┤");
-    println!("│  Ramp-up      {:>6.4}    {:>6.4}     {:>6.4}   {:>6.4}   {:>6.4}      │",
-             rampup_metrics.trajectory_quality,
-             rampup_metrics.coherence,
-             rampup_metrics.mean_integration,
-             rampup_metrics.peak_integration,
-             rampup_metrics.valley_integration);
-    println!("│  Steady       {:>6.4}    {:>6.4}     {:>6.4}   {:>6.4}   {:>6.4}      │",
-             steady_metrics.trajectory_quality,
-             steady_metrics.coherence,
-             steady_metrics.mean_integration,
-             steady_metrics.peak_integration,
-             steady_metrics.valley_integration);
-    println!("│  Oscillating  {:>6.4}    {:>6.4}     {:>6.4}   {:>6.4}   {:>6.4}      │",
-             oscillating_metrics.trajectory_quality,
-             oscillating_metrics.coherence,
-             oscillating_metrics.mean_integration,
-             oscillating_metrics.peak_integration,
-             oscillating_metrics.valley_integration);
+    println!(
+        "│  Ramp-up      {:>6.4}    {:>6.4}     {:>6.4}   {:>6.4}   {:>6.4}      │",
+        rampup_metrics.trajectory_quality,
+        rampup_metrics.coherence,
+        rampup_metrics.mean_integration,
+        rampup_metrics.peak_integration,
+        rampup_metrics.valley_integration
+    );
+    println!(
+        "│  Steady       {:>6.4}    {:>6.4}     {:>6.4}   {:>6.4}   {:>6.4}      │",
+        steady_metrics.trajectory_quality,
+        steady_metrics.coherence,
+        steady_metrics.mean_integration,
+        steady_metrics.peak_integration,
+        steady_metrics.valley_integration
+    );
+    println!(
+        "│  Oscillating  {:>6.4}    {:>6.4}     {:>6.4}   {:>6.4}   {:>6.4}      │",
+        oscillating_metrics.trajectory_quality,
+        oscillating_metrics.coherence,
+        oscillating_metrics.mean_integration,
+        oscillating_metrics.peak_integration,
+        oscillating_metrics.valley_integration
+    );
     println!("└────────────────────────────────────────────────────────────────────────┘");
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -167,14 +188,20 @@ fn main() {
         }
 
         let metrics = traj.trajectory_metrics();
-        let health_str = if metrics.is_healthy() { "HEALTHY" } else { "WARNING" };
+        let health_str = if metrics.is_healthy() {
+            "HEALTHY"
+        } else {
+            "WARNING"
+        };
 
-        println!("│  {:18} {:>10.4}    {:>8.4}    {:>10.4}   {:>7}  │",
-                 name,
-                 metrics.trajectory_quality,
-                 metrics.coherence,
-                 metrics.mean_integration,
-                 health_str);
+        println!(
+            "│  {:18} {:>10.4}    {:>8.4}    {:>10.4}   {:>7}  │",
+            name,
+            metrics.trajectory_quality,
+            metrics.coherence,
+            metrics.mean_integration,
+            health_str
+        );
     }
 
     println!("└────────────────────────────────────────────────────────────────────────┘");

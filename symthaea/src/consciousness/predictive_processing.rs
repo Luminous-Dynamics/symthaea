@@ -24,9 +24,9 @@
 //! Inspired by Karl Friston's Free Energy Principle, Andy Clark's Surfing Uncertainty,
 //! Jakob Hohwy's Predictive Mind, and Anil Seth's "controlled hallucination" view.
 
+use crate::hdc::binary_hv::BinaryHV;
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use crate::hdc::binary_hv::BinaryHV;
 
 /// A prediction at any level of the hierarchy
 #[derive(Debug, Clone)]
@@ -112,7 +112,7 @@ pub struct PredictiveLayer {
 #[derive(Debug, Clone)]
 struct GenerativeModel {
     /// Learned associations for generation
-    associations: Vec<(BinaryHV, BinaryHV, f64)>,  // (cause, effect, strength)
+    associations: Vec<(BinaryHV, BinaryHV, f64)>, // (cause, effect, strength)
     capacity: usize,
 }
 
@@ -120,7 +120,7 @@ struct GenerativeModel {
 #[derive(Debug, Clone)]
 struct RecognitionModel {
     /// Learned inferences
-    inferences: Vec<(BinaryHV, BinaryHV, f64)>,  // (observation, cause, strength)
+    inferences: Vec<(BinaryHV, BinaryHV, f64)>, // (observation, cause, strength)
     capacity: usize,
 }
 
@@ -162,7 +162,9 @@ impl GenerativeModel {
             self.associations.push((cause, effect, strength));
         } else {
             // Replace weakest
-            if let Some((idx, _)) = self.associations.iter()
+            if let Some((idx, _)) = self
+                .associations
+                .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.2.partial_cmp(&b.2).unwrap())
             {
@@ -206,7 +208,9 @@ impl RecognitionModel {
 
         if self.inferences.len() < self.capacity {
             self.inferences.push((observation, cause, strength));
-        } else if let Some((idx, _)) = self.inferences.iter()
+        } else if let Some((idx, _)) = self
+            .inferences
+            .iter()
             .enumerate()
             .min_by(|(_, a), (_, b)| a.2.partial_cmp(&b.2).unwrap())
         {
@@ -231,7 +235,9 @@ impl PredictiveLayer {
 
     /// Generate prediction for level below
     pub fn generate_prediction(&self) -> Prediction {
-        let content = self.generative_weights.predict(&self.belief)
+        let content = self
+            .generative_weights
+            .predict(&self.belief)
             .map(|(c, _)| c)
             .unwrap_or_else(|| self.belief);
 
@@ -251,9 +257,7 @@ impl PredictiveLayer {
         let weighted_error = error.magnitude * self.precision;
 
         // Update belief using recognition model
-        if let Some((inferred_cause, confidence)) =
-            self.recognition_weights.infer(&error.actual)
-        {
+        if let Some((inferred_cause, confidence)) = self.recognition_weights.infer(&error.actual) {
             // Blend current belief with inference
             let blend_factor = weighted_error * confidence * self.learning_rate;
             self.belief = self.blend_beliefs(&self.belief, &inferred_cause, blend_factor);
@@ -293,7 +297,7 @@ impl PredictiveLayer {
         if factor > 0.5 {
             *b
         } else if factor > 0.3 {
-            a.bind(b)  // Combine
+            a.bind(b) // Combine
         } else {
             *a
         }
@@ -431,7 +435,8 @@ impl PredictiveHierarchy {
 
         // Update free energy
         let avg_error = total_error / self.layers.len() as f64;
-        self.free_energy = self.free_energy * self.config.energy_decay + avg_error * (1.0 - self.config.energy_decay);
+        self.free_energy = self.free_energy * self.config.energy_decay
+            + avg_error * (1.0 - self.config.energy_decay);
 
         // Track accuracy
         self.total_predictions += 1;
@@ -451,7 +456,7 @@ impl PredictiveHierarchy {
     /// Generate prediction for expected future state
     pub fn predict_future(&self) -> Prediction {
         // Use highest level to generate prediction
-        let top_level = self.layers.last().unwrap();
+        let top_level = self.layers.last().expect("layers must not be empty");
         top_level.generate_prediction()
     }
 
@@ -488,7 +493,10 @@ impl PredictiveHierarchy {
 
     /// Get the highest level belief (closest to "conscious" content)
     pub fn highest_level_belief(&self) -> BinaryHV {
-        self.layers.last().map(|l| l.belief).unwrap_or_else(|| BinaryHV::random(100))
+        self.layers
+            .last()
+            .map(|l| l.belief)
+            .unwrap_or_else(|| BinaryHV::random(100))
     }
 
     /// Get accuracy statistics
@@ -663,19 +671,22 @@ impl ActiveInferenceEngine {
         }
 
         // Select action with LOWEST expected free energy
-        self.action_repertoire.iter()
-            .min_by(|a, b| {
-                let efe_a = self.expected_free_energy.get(&a.id).unwrap_or(&1.0);
-                let efe_b = self.expected_free_energy.get(&b.id).unwrap_or(&1.0);
-                efe_a.partial_cmp(efe_b).unwrap()
-            })
+        self.action_repertoire.iter().min_by(|a, b| {
+            let efe_a = self.expected_free_energy.get(&a.id).unwrap_or(&1.0);
+            let efe_b = self.expected_free_energy.get(&b.id).unwrap_or(&1.0);
+            efe_a.partial_cmp(efe_b).unwrap()
+        })
     }
 
     /// Calculate Expected Free Energy (EFE) for an action
     /// EFE = Epistemic value + Pragmatic value
-    fn calculate_expected_free_energy(&self, action: &ActionTemplate, current_state: &BinaryHV) -> f64 {
+    fn calculate_expected_free_energy(
+        &self,
+        action: &ActionTemplate,
+        current_state: &BinaryHV,
+    ) -> f64 {
         // Epistemic value: How much would this action reduce uncertainty?
-        let epistemic_value = 1.0 - action.success_rate;  // Higher for novel actions
+        let epistemic_value = 1.0 - action.success_rate; // Higher for novel actions
 
         // Pragmatic value: How close would outcome be to desired states?
         let mut pragmatic_value = 0.0;
@@ -695,9 +706,14 @@ impl ActiveInferenceEngine {
 
     /// Learn from action outcome
     pub fn learn_outcome(&mut self, action_id: u32, actual_outcome: &BinaryHV, success: bool) {
-        if let Some(action) = self.action_repertoire.iter_mut().find(|a| a.id == action_id) {
+        if let Some(action) = self
+            .action_repertoire
+            .iter_mut()
+            .find(|a| a.id == action_id)
+        {
             // Update success rate
-            action.success_rate = action.success_rate * 0.9 + (if success { 1.0 } else { 0.0 }) * 0.1;
+            action.success_rate =
+                action.success_rate * 0.9 + (if success { 1.0 } else { 0.0 }) * 0.1;
 
             // Update expected outcome
             if success {
@@ -707,11 +723,13 @@ impl ActiveInferenceEngine {
 
         // Update motor hierarchy
         self.motor_hierarchy.learn_from_action(
-            &self.action_repertoire.get(action_id as usize)
+            &self
+                .action_repertoire
+                .get(action_id as usize)
                 .map(|a| a.motor_command)
                 .unwrap_or_else(|| BinaryHV::random(100)),
             actual_outcome,
-            success
+            success,
         );
     }
 }
@@ -797,7 +815,7 @@ impl PrecisionDynamics {
     pub fn effective_precision(&self, level: u32) -> f64 {
         // Lower levels use more sensory precision
         // Higher levels use more prior precision
-        let blend = level as f64 / 4.0;  // Assuming 4 levels
+        let blend = level as f64 / 4.0; // Assuming 4 levels
         let base = self.sensory_precision * (1.0 - blend) + self.prior_precision * blend;
         (base * self.affective_gain).min(1.0)
     }
@@ -809,10 +827,14 @@ impl PrecisionDynamics {
         }
 
         // Calculate variance
-        let mean: f64 = self.precision_history.iter().sum::<f64>() / self.precision_history.len() as f64;
-        let variance: f64 = self.precision_history.iter()
+        let mean: f64 =
+            self.precision_history.iter().sum::<f64>() / self.precision_history.len() as f64;
+        let variance: f64 = self
+            .precision_history
+            .iter()
             .map(|x| (x - mean).powi(2))
-            .sum::<f64>() / self.precision_history.len() as f64;
+            .sum::<f64>()
+            / self.precision_history.len() as f64;
 
         // Low variance = high stability
         1.0 - variance.sqrt().min(0.5) * 2.0
@@ -868,7 +890,8 @@ impl PredictiveMind {
         self.precision.update_from_error(perception_result.surprise);
 
         // Update model evidence
-        self.model_evidence = self.model_evidence * 0.95 + (1.0 - perception_result.free_energy) * 0.05;
+        self.model_evidence =
+            self.model_evidence * 0.95 + (1.0 - perception_result.free_energy) * 0.05;
 
         // Select action if needed
         let selected_action = if perception_result.free_energy > 0.6 {
@@ -998,7 +1021,10 @@ mod tests {
 
         // Should have better accuracy for repeated pattern
         let result = hierarchy.process_sensory_input(&pattern);
-        assert!(result.surprise < 0.8, "Surprise should decrease with repetition");
+        assert!(
+            result.surprise < 0.8,
+            "Surprise should decrease with repetition"
+        );
     }
 
     #[test]
@@ -1026,7 +1052,7 @@ mod tests {
         engine.add_goal(BinaryHV::random(100), 0.9, 5);
 
         // Add actions
-        let outcome1 = engine.desired_states[0].state.clone();
+        let outcome1 = engine.desired_states[0].state;
         engine.add_action(BinaryHV::random(100), outcome1);
         engine.add_action(BinaryHV::random(100), BinaryHV::random(100));
 
@@ -1095,7 +1121,7 @@ mod tests {
 
         let phi_mod = mind.calculate_phi_modulation();
         assert!(phi_mod > 0.0);
-        assert!(phi_mod <= 1.5);  // Should be bounded
+        assert!(phi_mod <= 1.5); // Should be bounded
     }
 
     #[test]
@@ -1105,7 +1131,7 @@ mod tests {
         let cause = BinaryHV::random(100);
         let effect = BinaryHV::random(100);
 
-        model.learn(cause.clone(), effect.clone(), 0.9);
+        model.learn(cause, effect, 0.9);
 
         let prediction = model.predict(&cause);
         assert!(prediction.is_some());

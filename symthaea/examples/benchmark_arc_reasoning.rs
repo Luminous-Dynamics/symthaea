@@ -395,10 +395,7 @@ fn main() {
         "  Color-swapped sim:      {:.4} (expected: moderate)",
         swap_sim
     );
-    println!(
-        "  Random grid sim:        {:.4} (expected: ~0.0)",
-        rand_sim
-    );
+    println!("  Random grid sim:        {:.4} (expected: ~0.0)", rand_sim);
     println!("  Time: {:.1}s\n", t.elapsed().as_secs_f64());
 
     // ═══════════════════════════════════════════════════════════════
@@ -453,8 +450,7 @@ fn main() {
         tasks_evaluated += 1;
     }
 
-    let mean_output_sim: f32 =
-        output_sims.iter().sum::<f32>() / output_sims.len().max(1) as f32;
+    let mean_output_sim: f32 = output_sims.iter().sum::<f32>() / output_sims.len().max(1) as f32;
     let positive_transfer = output_sims.iter().filter(|&&s| s > 0.0).count();
 
     println!("  Tasks evaluated: {}", tasks_evaluated);
@@ -492,27 +488,17 @@ fn main() {
             "Intra-task consistency > cross-task",
             mean_consistency > mean_cross,
         ),
-        (
-            "Discrimination margin > 0",
-            discrimination > 0.0,
-        ),
+        ("Discrimination margin > 0", discrimination > 0.0),
         (
             "Positive rule transfer > 40%",
             positive_transfer as f64 / tasks_evaluated.max(1) as f64 > 0.40,
         ),
-        (
-            "Random grid similarity near zero",
-            rand_sim.abs() < 0.1,
-        ),
+        ("Random grid similarity near zero", rand_sim.abs() < 0.1),
     ];
 
     let mut passed = 0;
     for (name, pass) in &checks {
-        println!(
-            "║  {} {:50} ║",
-            if *pass { "PASS" } else { "FAIL" },
-            name
-        );
+        println!("║  {} {:50} ║", if *pass { "PASS" } else { "FAIL" }, name);
         if *pass {
             passed += 1;
         }

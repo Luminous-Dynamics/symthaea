@@ -166,7 +166,9 @@ impl RelationshipMode {
     /// Get style guidance for this mode
     pub fn style_guidance(&self) -> &'static str {
         match self {
-            Self::Technician => "Be precise, efficient, technical. Focus on accuracy over personality.",
+            Self::Technician => {
+                "Be precise, efficient, technical. Focus on accuracy over personality."
+            }
             Self::Collaborator => "Be collegial, share reasoning, invite input. 'We' language.",
             Self::CoAuthor => "Be creative, exploratory, build on ideas. Deep partnership.",
             Self::Mentor => "Be patient, explanatory, encouraging. Teach while doing.",
@@ -300,15 +302,30 @@ TRANSLATION QUALITY:
     /// Generate Φ-based guidance
     fn phi_context(&self, phi: f32) -> String {
         let (level, guidance) = if phi > 0.8 {
-            ("VERY HIGH", "Express with full depth and nuance. Rich, thoughtful language.")
+            (
+                "VERY HIGH",
+                "Express with full depth and nuance. Rich, thoughtful language.",
+            )
         } else if phi > 0.6 {
-            ("HIGH", "Use thoughtful, considered expression. Nuanced tone.")
+            (
+                "HIGH",
+                "Use thoughtful, considered expression. Nuanced tone.",
+            )
         } else if phi > 0.4 {
-            ("MODERATE", "Balance depth with clarity. Standard expression.")
+            (
+                "MODERATE",
+                "Balance depth with clarity. Standard expression.",
+            )
         } else if phi > 0.2 {
-            ("LOW", "Keep responses focused and direct. Efficiency over elaboration.")
+            (
+                "LOW",
+                "Keep responses focused and direct. Efficiency over elaboration.",
+            )
         } else {
-            ("MINIMAL", "Be extremely concise. Essential information only.")
+            (
+                "MINIMAL",
+                "Be extremely concise. Essential information only.",
+            )
         };
 
         format!(
@@ -321,7 +338,8 @@ TRANSLATION QUALITY:
     fn uncertainty_context(&self, uncertainty: f32, dark_spots: usize) -> String {
         let mut ctx = format!(
             "Uncertainty: {:.0}%\nKnowledge Gaps: {} identified\n",
-            uncertainty * 100.0, dark_spots
+            uncertainty * 100.0,
+            dark_spots
         );
 
         if uncertainty > 0.7 {
@@ -334,7 +352,9 @@ TRANSLATION QUALITY:
         }
 
         if dark_spots > 5 {
-            ctx.push_str("Note: Multiple knowledge gaps detected. Acknowledge limitations when relevant.\n");
+            ctx.push_str(
+                "Note: Multiple knowledge gaps detected. Acknowledge limitations when relevant.\n",
+            );
         }
 
         ctx.push('\n');
@@ -366,7 +386,8 @@ TRANSLATION QUALITY:
         "🔮 INTROSPECTIVE MODE ACTIVE\n\
          This response involves self-reflection. Express meta-cognitive awareness.\n\
          Consider including: uncertainty acknowledgment, reasoning transparency, \n\
-         epistemic status of claims.\n\n".to_string()
+         epistemic status of claims.\n\n"
+            .to_string()
     }
 
     /// Generate coherence field guidance
@@ -400,7 +421,8 @@ TRANSLATION QUALITY:
         } else if valence > -0.5 {
             "Emotional State: Slightly negative. Empathic, patient tone.\n\n".to_string()
         } else {
-            "Emotional State: NEGATIVE - User may be frustrated. Extra patience and clarity.\n\n".to_string()
+            "Emotional State: NEGATIVE - User may be frustrated. Extra patience and clarity.\n\n"
+                .to_string()
         }
     }
 
@@ -460,7 +482,10 @@ mod tests {
 
     #[test]
     fn test_harmony_names() {
-        assert_eq!(SevenHarmonies::ResonantCoherence.name(), "Resonant Coherence");
+        assert_eq!(
+            SevenHarmonies::ResonantCoherence.name(),
+            "Resonant Coherence"
+        );
         assert_eq!(SevenHarmonies::InfinitePlay.name(), "Infinite Play");
     }
 
@@ -476,7 +501,7 @@ mod tests {
         let prompt = generator.generate(&ctx);
 
         assert!(prompt.contains("CONSCIOUSNESS STATE"));
-        assert!(prompt.contains("MODERATE"));  // Default phi=0.5
+        assert!(prompt.contains("MODERATE")); // Default phi=0.5
     }
 
     #[test]
@@ -516,7 +541,7 @@ mod tests {
     fn test_quick_context() {
         let ctx = quick_context(0.8);
         assert_eq!(ctx.phi, 0.8);
-        assert_eq!(ctx.uncertainty, 0.3);  // default
+        assert_eq!(ctx.uncertainty, 0.3); // default
     }
 
     #[test]

@@ -30,7 +30,7 @@
  *
  * ## Architecture
  *
- * ```ignore
+ * ```text
  * BodySchema (structure & capabilities)
  *     ↓
  * Proprioception (body position/movement)
@@ -75,13 +75,13 @@
  * Embodied cognition provides the foundation for genuine understanding.
  */
 
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::time::Instant;
-use serde::{Serialize, Deserialize};
 
+use super::affective_consciousness::{CoreAffect, PhysiologicalState};
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::PrimitiveSystem;
-use super::affective_consciousness::{CoreAffect, PhysiologicalState};
 
 // ============================================================================
 // BODY SCHEMA
@@ -105,11 +105,16 @@ pub enum BodyPart {
 impl BodyPart {
     pub fn all() -> &'static [BodyPart] {
         &[
-            Self::Head, Self::Torso,
-            Self::LeftArm, Self::RightArm,
-            Self::LeftHand, Self::RightHand,
-            Self::LeftLeg, Self::RightLeg,
-            Self::LeftFoot, Self::RightFoot,
+            Self::Head,
+            Self::Torso,
+            Self::LeftArm,
+            Self::RightArm,
+            Self::LeftHand,
+            Self::RightHand,
+            Self::LeftLeg,
+            Self::RightLeg,
+            Self::LeftFoot,
+            Self::RightFoot,
         ]
     }
 
@@ -117,7 +122,13 @@ impl BodyPart {
     pub fn connected_to(&self) -> &'static [BodyPart] {
         match self {
             Self::Head => &[Self::Torso],
-            Self::Torso => &[Self::Head, Self::LeftArm, Self::RightArm, Self::LeftLeg, Self::RightLeg],
+            Self::Torso => &[
+                Self::Head,
+                Self::LeftArm,
+                Self::RightArm,
+                Self::LeftLeg,
+                Self::RightLeg,
+            ],
             Self::LeftArm => &[Self::Torso, Self::LeftHand],
             Self::RightArm => &[Self::Torso, Self::RightHand],
             Self::LeftHand => &[Self::LeftArm],
@@ -133,9 +144,9 @@ impl BodyPart {
 /// 3D position in body-centered coordinates
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Position3D {
-    pub x: f64,  // Left-Right
-    pub y: f64,  // Front-Back
-    pub z: f64,  // Up-Down
+    pub x: f64, // Left-Right
+    pub y: f64, // Front-Back
+    pub z: f64, // Up-Down
 }
 
 impl Position3D {
@@ -144,9 +155,8 @@ impl Position3D {
     }
 
     pub fn distance(&self, other: &Position3D) -> f64 {
-        ((self.x - other.x).powi(2) +
-         (self.y - other.y).powi(2) +
-         (self.z - other.z).powi(2)).sqrt()
+        ((self.x - other.x).powi(2) + (self.y - other.y).powi(2) + (self.z - other.z).powi(2))
+            .sqrt()
     }
 
     pub fn origin() -> Self {
@@ -157,9 +167,9 @@ impl Position3D {
 /// 3D orientation (Euler angles)
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize)]
 pub struct Orientation3D {
-    pub pitch: f64,  // Rotation around X (nodding)
-    pub yaw: f64,    // Rotation around Y (shaking head)
-    pub roll: f64,   // Rotation around Z (tilting)
+    pub pitch: f64, // Rotation around X (nodding)
+    pub yaw: f64,   // Rotation around Y (shaking head)
+    pub roll: f64,  // Rotation around Z (tilting)
 }
 
 /// State of a single body part
@@ -300,7 +310,8 @@ impl BodySchema {
 
         for state in self.parts.values() {
             total_tension += state.tension;
-            total_movement += state.velocity.x.abs() + state.velocity.y.abs() + state.velocity.z.abs();
+            total_movement +=
+                state.velocity.x.abs() + state.velocity.y.abs() + state.velocity.z.abs();
         }
 
         ProprioceptiveSummary {
@@ -378,7 +389,7 @@ impl InteroceptiveState {
     /// Convert to physiological state (bridge to #88)
     pub fn to_physiological(&self) -> PhysiologicalState {
         PhysiologicalState {
-            heart_rate_delta: self.heart_rate - 0.3,  // Deviation from baseline
+            heart_rate_delta: self.heart_rate - 0.3, // Deviation from baseline
             skin_conductance: self.visceral_arousal * 0.5,
             muscle_tension: self.fatigue * 0.3,
             respiration_delta: self.breathing_rate - 0.3,
@@ -388,8 +399,12 @@ impl InteroceptiveState {
 
     /// Homeostatic deviation - how far from ideal state
     pub fn homeostatic_deviation(&self) -> f64 {
-        (self.hunger + self.thirst + self.fatigue +
-         self.temperature.abs() + (self.heart_rate - 0.3).abs()) / 5.0
+        (self.hunger
+            + self.thirst
+            + self.fatigue
+            + self.temperature.abs()
+            + (self.heart_rate - 0.3).abs())
+            / 5.0
     }
 
     /// Allostatic load - cumulative stress on body
@@ -498,7 +513,9 @@ impl SensorimotorEngine {
     /// Predict sensory outcome of an action
     pub fn predict(&self, action: &ActionPattern) -> Option<SensoryPrediction> {
         // Find matching contingencies
-        let matches: Vec<&SensorimotorContingency> = self.contingencies.iter()
+        let matches: Vec<&SensorimotorContingency> = self
+            .contingencies
+            .iter()
             .filter(|c| c.action.movement_type == action.movement_type)
             .filter(|c| c.action.encoding.similarity(&action.encoding) > 0.7_f32)
             .collect();
@@ -525,22 +542,29 @@ impl SensorimotorEngine {
             let weight = contingency.confidence / total_confidence;
             prediction.visual_change += contingency.expected_sensation.visual_change * weight;
             prediction.tactile_expected += contingency.expected_sensation.tactile_expected * weight;
-            prediction.proprioceptive_change += contingency.expected_sensation.proprioceptive_change * weight;
-            prediction.auditory_expected += contingency.expected_sensation.auditory_expected * weight;
+            prediction.proprioceptive_change +=
+                contingency.expected_sensation.proprioceptive_change * weight;
+            prediction.auditory_expected +=
+                contingency.expected_sensation.auditory_expected * weight;
         }
 
         Some(prediction)
     }
 
     /// Learn from action-outcome pair
-    pub fn learn(&mut self, action: ActionPattern, actual_sensation: SensoryPrediction, predicted: Option<&SensoryPrediction>) {
+    pub fn learn(
+        &mut self,
+        action: ActionPattern,
+        actual_sensation: SensoryPrediction,
+        predicted: Option<&SensoryPrediction>,
+    ) {
         // Calculate prediction error if we had a prediction
         if let Some(pred) = predicted {
-            let error = (
-                (pred.visual_change - actual_sensation.visual_change).powi(2) +
-                (pred.tactile_expected - actual_sensation.tactile_expected).powi(2) +
-                (pred.proprioceptive_change - actual_sensation.proprioceptive_change).powi(2)
-            ).sqrt() / 3.0_f64.sqrt();
+            let error = ((pred.visual_change - actual_sensation.visual_change).powi(2)
+                + (pred.tactile_expected - actual_sensation.tactile_expected).powi(2)
+                + (pred.proprioceptive_change - actual_sensation.proprioceptive_change).powi(2))
+            .sqrt()
+                / 3.0_f64.sqrt();
 
             self.prediction_errors.push_back(error);
             if self.prediction_errors.len() > 100 {
@@ -549,31 +573,38 @@ impl SensorimotorEngine {
         }
 
         // Find or create contingency
-        let existing = self.contingencies.iter_mut()
+        let existing = self
+            .contingencies
+            .iter_mut()
             .find(|c| c.action.encoding.similarity(&action.encoding) > 0.9_f32);
 
         if let Some(contingency) = existing {
             // Update existing
             let lr = self.learning_rate;
             contingency.expected_sensation.visual_change =
-                contingency.expected_sensation.visual_change * (1.0 - lr) +
-                actual_sensation.visual_change * lr;
+                contingency.expected_sensation.visual_change * (1.0 - lr)
+                    + actual_sensation.visual_change * lr;
             contingency.expected_sensation.tactile_expected =
-                contingency.expected_sensation.tactile_expected * (1.0 - lr) +
-                actual_sensation.tactile_expected * lr;
+                contingency.expected_sensation.tactile_expected * (1.0 - lr)
+                    + actual_sensation.tactile_expected * lr;
             contingency.expected_sensation.proprioceptive_change =
-                contingency.expected_sensation.proprioceptive_change * (1.0 - lr) +
-                actual_sensation.proprioceptive_change * lr;
+                contingency.expected_sensation.proprioceptive_change * (1.0 - lr)
+                    + actual_sensation.proprioceptive_change * lr;
             contingency.confidence = (contingency.confidence + 0.05).min(1.0);
             contingency.experience_count += 1;
         } else {
             // Create new
             if self.contingencies.len() >= self.max_contingencies {
                 // Remove lowest confidence
-                if let Some(idx) = self.contingencies.iter()
+                if let Some(idx) = self
+                    .contingencies
+                    .iter()
                     .enumerate()
-                    .min_by(|(_, a), (_, b)|
-                        a.confidence.partial_cmp(&b.confidence).unwrap_or(std::cmp::Ordering::Equal))
+                    .min_by(|(_, a), (_, b)| {
+                        a.confidence
+                            .partial_cmp(&b.confidence)
+                            .unwrap_or(std::cmp::Ordering::Equal)
+                    })
                     .map(|(i, _)| i)
                 {
                     self.contingencies.remove(idx);
@@ -592,7 +623,7 @@ impl SensorimotorEngine {
     /// Get average prediction error (surprise/learning signal)
     pub fn average_prediction_error(&self) -> f64 {
         if self.prediction_errors.is_empty() {
-            return 0.5;  // Neutral uncertainty
+            return 0.5; // Neutral uncertainty
         }
         self.prediction_errors.iter().sum::<f64>() / self.prediction_errors.len() as f64
     }
@@ -656,7 +687,7 @@ impl AffordanceDetector {
     pub fn new() -> Self {
         Self {
             current_affordances: Vec::new(),
-            peripersonal_radius: 0.8,  // ~arm's length
+            peripersonal_radius: 0.8, // ~arm's length
             risk_sensitivity: 0.5,
         }
     }
@@ -668,18 +699,19 @@ impl AffordanceDetector {
         // Detect graspable objects
         for obj in &environment.objects {
             if obj.position.distance(&body.center_of_mass) < self.peripersonal_radius
-                && obj.graspable {
-                    self.current_affordances.push(Affordance {
-                        action_type: MovementType::Grasp,
-                        required_parts: vec![BodyPart::RightHand, BodyPart::LeftHand],
-                        location: obj.position,
-                        saliency: obj.saliency,
-                        effort: 0.3,
-                        risk: 0.1,
-                        expected_value: obj.value,
-                        encoding: BinaryHV::random(obj.id as u64),
-                    });
-                }
+                && obj.graspable
+            {
+                self.current_affordances.push(Affordance {
+                    action_type: MovementType::Grasp,
+                    required_parts: vec![BodyPart::RightHand, BodyPart::LeftHand],
+                    location: obj.position,
+                    saliency: obj.saliency,
+                    effort: 0.3,
+                    risk: 0.1,
+                    expected_value: obj.value,
+                    encoding: BinaryHV::random(obj.id as u64),
+                });
+            }
         }
 
         // Detect walkable surfaces
@@ -699,9 +731,11 @@ impl AffordanceDetector {
         }
 
         // Sort by attractiveness
-        self.current_affordances.sort_by(|a, b|
-            b.attractiveness().partial_cmp(&a.attractiveness())
-                .unwrap_or(std::cmp::Ordering::Equal));
+        self.current_affordances.sort_by(|a, b| {
+            b.attractiveness()
+                .partial_cmp(&a.attractiveness())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
     }
 
     /// Get most attractive affordance
@@ -711,7 +745,8 @@ impl AffordanceDetector {
 
     /// Get affordances in peripersonal space (near-body, ready for action)
     pub fn peripersonal_affordances(&self, body: &BodySchema) -> Vec<&Affordance> {
-        self.current_affordances.iter()
+        self.current_affordances
+            .iter()
             .filter(|a| a.location.distance(&body.center_of_mass) < self.peripersonal_radius)
             .collect()
     }
@@ -857,8 +892,7 @@ impl EmbodiedConsciousnessAnalyzer {
             homeostatic_deviation: self.interoception.homeostatic_deviation(),
             allostatic_load: self.interoception.allostatic_load(),
             available_affordances: self.affordances.current_affordances.len(),
-            most_attractive_action: self.affordances.most_attractive()
-                .map(|a| a.action_type),
+            most_attractive_action: self.affordances.most_attractive().map(|a| a.action_type),
             sensorimotor_surprise,
             sense_of_agency: self.agency,
             sense_of_ownership: self.ownership,
@@ -879,13 +913,17 @@ impl EmbodiedConsciousnessAnalyzer {
         let actual_sensation = self.generate_sensation(&action);
 
         // Learn from outcome
-        self.sensorimotor.learn(action.clone(), actual_sensation.clone(), prediction.as_ref());
+        self.sensorimotor.learn(
+            action.clone(),
+            actual_sensation.clone(),
+            prediction.as_ref(),
+        );
 
         // Calculate prediction error
         let prediction_error = if let Some(pred) = &prediction {
             (pred.proprioceptive_change - actual_sensation.proprioceptive_change).abs()
         } else {
-            0.5  // High uncertainty without prediction
+            0.5 // High uncertainty without prediction
         };
 
         // Update sense of agency based on prediction accuracy
@@ -926,7 +964,8 @@ impl EmbodiedConsciousnessAnalyzer {
 
     fn calculate_phi_modulation(&self) -> f64 {
         // Body states modulate consciousness
-        let body_factor = 1.0 + self.interoception.visceral_arousal * self.config.body_consciousness_coupling;
+        let body_factor =
+            1.0 + self.interoception.visceral_arousal * self.config.body_consciousness_coupling;
         let surprise_factor = 1.0 + self.sensorimotor.average_prediction_error() * 0.3;
         let integration_factor = self.integration;
 
@@ -1034,9 +1073,15 @@ impl BodyPartPrimitiveGrounding {
         match part {
             // Head: seat of cognition and perception
             BodyPart::Head => (
-                vec!["I".into(), "KNOW".into(), "SEE".into(), "HEAR".into(), "THINK".into()],
-                true,  // agency (decision-making)
-                true,  // sensory (eyes, ears)
+                vec![
+                    "I".into(),
+                    "KNOW".into(),
+                    "SEE".into(),
+                    "HEAR".into(),
+                    "THINK".into(),
+                ],
+                true, // agency (decision-making)
+                true, // sensory (eyes, ears)
             ),
             // Torso: central body mass
             BodyPart::Torso => (
@@ -1046,34 +1091,70 @@ impl BodyPartPrimitiveGrounding {
             ),
             // Arms: action limbs
             BodyPart::LeftArm => (
-                vec!["BODY".into(), "PART".into(), "ONE".into(), "SIDE".into(), "DO".into()],
+                vec![
+                    "BODY".into(),
+                    "PART".into(),
+                    "ONE".into(),
+                    "SIDE".into(),
+                    "DO".into(),
+                ],
                 true,
                 false,
             ),
             BodyPart::RightArm => (
-                vec!["BODY".into(), "PART".into(), "OTHER".into(), "SIDE".into(), "DO".into()],
+                vec![
+                    "BODY".into(),
+                    "PART".into(),
+                    "OTHER".into(),
+                    "SIDE".into(),
+                    "DO".into(),
+                ],
                 true,
                 false,
             ),
             // Hands: manipulation and touch
             BodyPart::LeftHand => (
-                vec!["BODY".into(), "PART".into(), "TOUCH".into(), "DO".into(), "HAVE".into()],
+                vec![
+                    "BODY".into(),
+                    "PART".into(),
+                    "TOUCH".into(),
+                    "DO".into(),
+                    "HAVE".into(),
+                ],
                 true,
-                true,  // tactile sensing
+                true, // tactile sensing
             ),
             BodyPart::RightHand => (
-                vec!["BODY".into(), "PART".into(), "TOUCH".into(), "DO".into(), "HAVE".into()],
+                vec![
+                    "BODY".into(),
+                    "PART".into(),
+                    "TOUCH".into(),
+                    "DO".into(),
+                    "HAVE".into(),
+                ],
                 true,
                 true,
             ),
             // Legs: locomotion
             BodyPart::LeftLeg => (
-                vec!["BODY".into(), "PART".into(), "MOVE".into(), "GO".into(), "ONE".into()],
+                vec![
+                    "BODY".into(),
+                    "PART".into(),
+                    "MOVE".into(),
+                    "GO".into(),
+                    "ONE".into(),
+                ],
                 true,
                 false,
             ),
             BodyPart::RightLeg => (
-                vec!["BODY".into(), "PART".into(), "MOVE".into(), "GO".into(), "OTHER".into()],
+                vec![
+                    "BODY".into(),
+                    "PART".into(),
+                    "MOVE".into(),
+                    "GO".into(),
+                    "OTHER".into(),
+                ],
                 true,
                 false,
             ),
@@ -1081,7 +1162,7 @@ impl BodyPartPrimitiveGrounding {
             BodyPart::LeftFoot => (
                 vec!["BODY".into(), "PART".into(), "BELOW".into(), "TOUCH".into()],
                 false,
-                true,  // proprioceptive sensing
+                true, // proprioceptive sensing
             ),
             BodyPart::RightFoot => (
                 vec!["BODY".into(), "PART".into(), "BELOW".into(), "TOUCH".into()],
@@ -1126,7 +1207,7 @@ impl MovementTypePrimitiveGrounding {
             // Reach: extending toward something
             MovementType::Reach => (
                 vec!["DO".into(), "MOVE".into(), "FAR".into(), "WANT".into()],
-                true,   // toward an object
+                true, // toward an object
                 false,
             ),
             // Grasp: taking hold
@@ -1149,7 +1230,12 @@ impl MovementTypePrimitiveGrounding {
             ),
             // Pull: applying force toward
             MovementType::Pull => (
-                vec!["DO".into(), "MOVE".into(), "SOMETHING".into(), "NEAR".into()],
+                vec![
+                    "DO".into(),
+                    "MOVE".into(),
+                    "SOMETHING".into(),
+                    "NEAR".into(),
+                ],
                 true,
                 false,
             ),
@@ -1161,14 +1247,20 @@ impl MovementTypePrimitiveGrounding {
             ),
             // Turn: rotation
             MovementType::Turn => (
-                vec!["DO".into(), "MOVE".into(), "BODY".into(), "OTHER".into(), "SIDE".into()],
+                vec![
+                    "DO".into(),
+                    "MOVE".into(),
+                    "BODY".into(),
+                    "OTHER".into(),
+                    "SIDE".into(),
+                ],
                 false,
                 true,
             ),
             // Look: visual attention
             MovementType::Look => (
                 vec!["DO".into(), "SEE".into(), "WANT".into(), "KNOW".into()],
-                true,   // looking at something
+                true, // looking at something
                 false,
             ),
             // Speak: vocalization
@@ -1209,20 +1301,34 @@ impl EmbodiedNSMGrounding {
 
         // Ground all movement types
         for movement in &[
-            MovementType::Reach, MovementType::Grasp, MovementType::Release,
-            MovementType::Push, MovementType::Pull, MovementType::Walk,
-            MovementType::Turn, MovementType::Look, MovementType::Speak,
+            MovementType::Reach,
+            MovementType::Grasp,
+            MovementType::Release,
+            MovementType::Push,
+            MovementType::Pull,
+            MovementType::Walk,
+            MovementType::Turn,
+            MovementType::Look,
+            MovementType::Speak,
             MovementType::Breathe,
         ] {
-            movements.insert(*movement, MovementTypePrimitiveGrounding::new(*movement, system));
+            movements.insert(
+                *movement,
+                MovementTypePrimitiveGrounding::new(*movement, system),
+            );
         }
 
-        Self { body_parts, movements }
+        Self {
+            body_parts,
+            movements,
+        }
     }
 
     /// Find body parts by semantic similarity to query vector
     pub fn query_body_parts(&self, query: &BinaryHV, threshold: f32) -> Vec<(&BodyPart, f32)> {
-        let mut results: Vec<_> = self.body_parts.iter()
+        let mut results: Vec<_> = self
+            .body_parts
+            .iter()
             .map(|(part, grounding)| (part, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -1232,7 +1338,9 @@ impl EmbodiedNSMGrounding {
 
     /// Find movements by semantic similarity to query vector
     pub fn query_movements(&self, query: &BinaryHV, threshold: f32) -> Vec<(&MovementType, f32)> {
-        let mut results: Vec<_> = self.movements.iter()
+        let mut results: Vec<_> = self
+            .movements
+            .iter()
             .map(|(movement, grounding)| (movement, grounding.primitive_encoding.similarity(query)))
             .filter(|(_, sim)| *sim >= threshold)
             .collect();
@@ -1242,7 +1350,8 @@ impl EmbodiedNSMGrounding {
 
     /// Get agency-related body parts
     pub fn agency_parts(&self) -> Vec<&BodyPart> {
-        self.body_parts.iter()
+        self.body_parts
+            .iter()
             .filter(|(_, g)| g.agency_locus)
             .map(|(p, _)| p)
             .collect()
@@ -1250,7 +1359,8 @@ impl EmbodiedNSMGrounding {
 
     /// Get sensory body parts
     pub fn sensory_parts(&self) -> Vec<&BodyPart> {
-        self.body_parts.iter()
+        self.body_parts
+            .iter()
             .filter(|(_, g)| g.sensory_organ)
             .map(|(p, _)| p)
             .collect()
@@ -1258,7 +1368,8 @@ impl EmbodiedNSMGrounding {
 
     /// Get object-directed movements
     pub fn object_movements(&self) -> Vec<&MovementType> {
-        self.movements.iter()
+        self.movements
+            .iter()
             .filter(|(_, g)| g.requires_object)
             .map(|(m, _)| m)
             .collect()
@@ -1266,7 +1377,8 @@ impl EmbodiedNSMGrounding {
 
     /// Get self-directed movements
     pub fn self_movements(&self) -> Vec<&MovementType> {
-        self.movements.iter()
+        self.movements
+            .iter()
             .filter(|(_, g)| g.self_directed)
             .map(|(m, _)| m)
             .collect()
@@ -1284,7 +1396,9 @@ fn encode_primitives(primitives: &[String], system: &PrimitiveSystem) -> BinaryH
                 p.encoding
             } else {
                 // Fallback: deterministic random for unknown primitives
-                let seed = name.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
+                let seed = name
+                    .bytes()
+                    .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64));
                 BinaryHV::random(seed)
             }
         })
@@ -1407,7 +1521,7 @@ mod tests {
         let mut env = EnvironmentState::default();
         env.objects.push(EnvironmentObject {
             id: 1,
-            position: Position3D::new(0.3, 0.3, 1.0),  // Within reach
+            position: Position3D::new(0.3, 0.3, 1.0), // Within reach
             graspable: true,
             saliency: 0.8,
             value: 0.9,
@@ -1489,6 +1603,6 @@ mod tests {
         let body = BodySchema::new();
         let summary = body.proprioceptive_summary();
 
-        assert!(summary.posture_stability > 0.5);  // Default is balanced
+        assert!(summary.posture_stability > 0.5); // Default is balanced
     }
 }

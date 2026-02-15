@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
+use crate::hdc::arithmetic_engine::HybridArithmeticEngine;
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::seed_from_name;
-use crate::hdc::arithmetic_engine::HybridArithmeticEngine;
 
 /// Logical proposition that can be evaluated or reasoned about
 #[derive(Debug, Clone)]
@@ -22,10 +22,7 @@ pub enum Proposition {
     /// Logical conjunction: P ∧ Q
     And(Box<Proposition>, Box<Proposition>),
     /// Named predicate with arguments
-    Predicate {
-        name: String,
-        args: Vec<i64>,
-    },
+    Predicate { name: String, args: Vec<i64> },
 }
 
 impl Proposition {
@@ -34,18 +31,17 @@ impl Proposition {
     pub fn evaluate(&self) -> Option<bool> {
         match self {
             Proposition::Equals(lhs, rhs) => Some(lhs == rhs),
-            Proposition::And(p, q) => {
-                match (p.evaluate(), q.evaluate()) {
-                    (Some(a), Some(b)) => Some(a && b),
-                    _ => None,
-                }
-            }
-            Proposition::Implies { antecedent, consequent } => {
-                match (antecedent.evaluate(), consequent.evaluate()) {
-                    (Some(a), Some(b)) => Some(!a || b),
-                    _ => None,
-                }
-            }
+            Proposition::And(p, q) => match (p.evaluate(), q.evaluate()) {
+                (Some(a), Some(b)) => Some(a && b),
+                _ => None,
+            },
+            Proposition::Implies {
+                antecedent,
+                consequent,
+            } => match (antecedent.evaluate(), consequent.evaluate()) {
+                (Some(a), Some(b)) => Some(!a || b),
+                _ => None,
+            },
             Proposition::ForAll { .. } => None, // Cannot evaluate universal quantification
             Proposition::Predicate { .. } => None, // Needs interpretation
         }
@@ -58,17 +54,24 @@ impl Proposition {
             Proposition::ForAll { variable, body } => {
                 format!("∀{}. {}", variable, body.display())
             }
-            Proposition::Implies { antecedent, consequent } => {
+            Proposition::Implies {
+                antecedent,
+                consequent,
+            } => {
                 format!("({}) → ({})", antecedent.display(), consequent.display())
             }
             Proposition::And(p, q) => {
                 format!("({}) ∧ ({})", p.display(), q.display())
             }
             Proposition::Predicate { name, args } => {
-                format!("{}({})", name, args.iter()
-                    .map(|a| a.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "))
+                format!(
+                    "{}({})",
+                    name,
+                    args.iter()
+                        .map(|a| a.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                )
             }
         }
     }
@@ -97,7 +100,10 @@ impl Proposition {
 
                 BinaryHV::bundle(&[forall_hv, var_hv.bind(&body_hv)])
             }
-            Proposition::Implies { antecedent, consequent } => {
+            Proposition::Implies {
+                antecedent,
+                consequent,
+            } => {
                 let implies_seed = seed_from_name("implies");
                 let implies_hv = BinaryHV::random(implies_seed);
                 let ant_hv = antecedent.encoding();
@@ -117,7 +123,8 @@ impl Proposition {
                 let pred_seed = seed_from_name(name);
                 let pred_hv = BinaryHV::random(pred_seed);
 
-                let arg_hvs: Vec<BinaryHV> = args.iter()
+                let arg_hvs: Vec<BinaryHV> = args
+                    .iter()
                     .map(|a| BinaryHV::random(seed_from_name(&format!("int_{}", a))))
                     .collect();
 
@@ -177,14 +184,15 @@ impl ProofTerm {
     /// Check the validity of this proof term
     pub fn check(&self) -> ProofCheckResult {
         match self {
-            ProofTerm::Axiom { name, statement } => {
-                ProofCheckResult {
-                    valid: true,
-                    description: format!("Axiom '{}': {}", name, statement.display()),
-                    phi: 1.0,
-                }
-            }
-            ProofTerm::ModusPonens { premise, implication } => {
+            ProofTerm::Axiom { name, statement } => ProofCheckResult {
+                valid: true,
+                description: format!("Axiom '{}': {}", name, statement.display()),
+                phi: 1.0,
+            },
+            ProofTerm::ModusPonens {
+                premise,
+                implication,
+            } => {
                 let premise_result = premise.check();
                 let impl_result = implication.check();
 
@@ -199,9 +207,17 @@ impl ProofTerm {
                     valid,
                     description: format!(
                         "Modus ponens: premise {} ({}), implication {} ({})",
-                        if premise_result.valid { "valid" } else { "invalid" },
+                        if premise_result.valid {
+                            "valid"
+                        } else {
+                            "invalid"
+                        },
                         premise_result.description,
-                        if impl_result.valid { "valid" } else { "invalid" },
+                        if impl_result.valid {
+                            "valid"
+                        } else {
+                            "invalid"
+                        },
                         impl_result.description
                     ),
                     phi,
@@ -224,7 +240,11 @@ impl ProofTerm {
                     phi,
                 }
             }
-            ProofTerm::Induction { base_case, inductive_step, property } => {
+            ProofTerm::Induction {
+                base_case,
+                inductive_step,
+                property,
+            } => {
                 let base_result = base_case.check();
                 let step_result = inductive_step.check();
 
@@ -240,24 +260,39 @@ impl ProofTerm {
                     description: format!(
                         "Induction on '{}': base {} ({}), step {} ({})",
                         property,
-                        if base_result.valid { "valid" } else { "invalid" },
+                        if base_result.valid {
+                            "valid"
+                        } else {
+                            "invalid"
+                        },
                         base_result.description,
-                        if step_result.valid { "valid" } else { "invalid" },
+                        if step_result.valid {
+                            "valid"
+                        } else {
+                            "invalid"
+                        },
                         step_result.description
                     ),
                     phi,
                 }
             }
-            ProofTerm::Computation { description, lhs, rhs } => {
+            ProofTerm::Computation {
+                description,
+                lhs,
+                rhs,
+            } => {
                 let valid = lhs == rhs;
                 let phi = if valid { 0.5 } else { 0.0 };
 
                 ProofCheckResult {
                     valid,
-                    description: format!("Computation '{}': {} {} {}",
-                        description, lhs,
+                    description: format!(
+                        "Computation '{}': {} {} {}",
+                        description,
+                        lhs,
                         if valid { "=" } else { "≠" },
-                        rhs),
+                        rhs
+                    ),
                     phi,
                 }
             }
@@ -269,15 +304,16 @@ impl ProofTerm {
         match self {
             ProofTerm::Axiom { .. } => 1.0,
             ProofTerm::Computation { .. } => 0.5,
-            ProofTerm::ModusPonens { premise, implication } => {
-                premise.proof_phi() + implication.proof_phi() + 0.5
-            }
-            ProofTerm::UniversalInstantiation { universal, .. } => {
-                universal.proof_phi() + 0.3
-            }
-            ProofTerm::Induction { base_case, inductive_step, .. } => {
-                base_case.proof_phi() + inductive_step.proof_phi() + 2.0
-            }
+            ProofTerm::ModusPonens {
+                premise,
+                implication,
+            } => premise.proof_phi() + implication.proof_phi() + 0.5,
+            ProofTerm::UniversalInstantiation { universal, .. } => universal.proof_phi() + 0.3,
+            ProofTerm::Induction {
+                base_case,
+                inductive_step,
+                ..
+            } => base_case.proof_phi() + inductive_step.proof_phi() + 2.0,
         }
     }
 
@@ -294,7 +330,10 @@ impl ProofTerm {
 
                 BinaryHV::bundle(&[axiom_hv, name_hv.bind(&stmt_hv)])
             }
-            ProofTerm::ModusPonens { premise, implication } => {
+            ProofTerm::ModusPonens {
+                premise,
+                implication,
+            } => {
                 let mp_seed = seed_from_name("modus_ponens");
                 let mp_hv = BinaryHV::random(mp_seed);
                 let prem_hv = premise.encoding();
@@ -312,7 +351,11 @@ impl ProofTerm {
 
                 BinaryHV::bundle(&[ui_hv, wit_hv.bind(&univ_hv)])
             }
-            ProofTerm::Induction { base_case, inductive_step, property } => {
+            ProofTerm::Induction {
+                base_case,
+                inductive_step,
+                property,
+            } => {
                 let ind_seed = seed_from_name("induction");
                 let prop_seed = seed_from_name(property);
 
@@ -323,7 +366,11 @@ impl ProofTerm {
 
                 BinaryHV::bundle(&[ind_hv, prop_hv, base_hv.bind(&step_hv)])
             }
-            ProofTerm::Computation { description, lhs, rhs } => {
+            ProofTerm::Computation {
+                description,
+                lhs,
+                rhs,
+            } => {
                 let comp_seed = seed_from_name("computation");
                 let desc_seed = seed_from_name(description);
                 let lhs_seed = seed_from_name(&format!("int_{}", lhs));
@@ -398,11 +445,12 @@ impl InductionEngine {
 
         let inductive_step = ProofCheckResult {
             valid: step_valid,
-            description: format!(
-                "Inductive step verified for {} samples",
-                step_count
-            ),
-            phi: if step_valid { 1.0 + (step_count as f64 * 0.1) } else { 0.0 },
+            description: format!("Inductive step verified for {} samples", step_count),
+            phi: if step_valid {
+                1.0 + (step_count as f64 * 0.1)
+            } else {
+                0.0
+            },
         };
 
         let valid = base_valid && step_valid;
@@ -428,24 +476,19 @@ impl InductionEngine {
 
         // Base case: 0 + b = b + 0 for test values (uses standard arithmetic)
         let base_check = |_n: u64| -> bool {
-            test_values.iter().all(|&b| {
-                0u64.wrapping_add(b) == b.wrapping_add(0)
-            })
+            test_values
+                .iter()
+                .all(|&b| 0u64.wrapping_add(b) == b.wrapping_add(0))
         };
 
         // Inductive step: (k+1) + b = b + (k+1)
         let step_check = |k: u64| -> bool {
-            test_values.iter().all(|&b| {
-                (k + 1).wrapping_add(b) == b.wrapping_add(k + 1)
-            })
+            test_values
+                .iter()
+                .all(|&b| (k + 1).wrapping_add(b) == b.wrapping_add(k + 1))
         };
 
-        self.prove_by_induction(
-            "addition_commutative",
-            &base_check,
-            &step_check,
-            20,
-        )
+        self.prove_by_induction("addition_commutative", &base_check, &step_check, 20)
     }
 
     /// Prove the sum formula: 1 + 2 + ... + n = n*(n+1)/2
@@ -472,12 +515,7 @@ impl InductionEngine {
             sum == formula
         };
 
-        self.prove_by_induction(
-            "sum_formula",
-            &base_check,
-            &step_check,
-            test_up_to as usize,
-        )
+        self.prove_by_induction("sum_formula", &base_check, &step_check, test_up_to as usize)
     }
 }
 
@@ -542,8 +580,8 @@ mod tests {
         // Property: n < 5 (true for small n, fails at n=5)
         let proof = engine.prove_by_induction(
             "n < 5",
-            &|n| n < 5,  // base check
-            &|n| n + 1 < 5,  // step check: if P(n) then P(n+1)
+            &|n| n < 5,     // base check
+            &|n| n + 1 < 5, // step check: if P(n) then P(n+1)
             10,
         );
         assert!(!proof.valid); // Should fail because step fails at n=4

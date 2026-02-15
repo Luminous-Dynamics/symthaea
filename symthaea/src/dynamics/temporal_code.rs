@@ -187,7 +187,9 @@ impl TemporalCodeAnalyzer {
         let msg_hv = self.encoder.encode_name(&commit.message);
 
         // Encode changed files
-        let file_hvs: Vec<ContinuousHV> = commit.files_changed.iter()
+        let file_hvs: Vec<ContinuousHV> = commit
+            .files_changed
+            .iter()
             .map(|(path, _)| self.encoder.encode_name(path))
             .collect();
 
@@ -245,9 +247,8 @@ impl TemporalCodeAnalyzer {
         }
 
         let mean: f32 = norms.iter().sum::<f32>() / norms.len() as f32;
-        let variance: f32 = norms.iter()
-            .map(|n| (n - mean).powi(2))
-            .sum::<f32>() / norms.len() as f32;
+        let variance: f32 =
+            norms.iter().map(|n| (n - mean).powi(2)).sum::<f32>() / norms.len() as f32;
 
         // Convert variance to stability (0-1)
         // Low variance = high stability
@@ -265,12 +266,48 @@ impl TemporalCodeAnalyzer {
         }
 
         let categories = [
-            (ChangeCategory::BugFix, state[0..self.hidden_dim / 6].iter().map(|v| v.abs()).sum::<f32>()),
-            (ChangeCategory::NewFeature, state[self.hidden_dim / 6..2 * self.hidden_dim / 6].iter().map(|v| v.abs()).sum::<f32>()),
-            (ChangeCategory::Refactor, state[2 * self.hidden_dim / 6..3 * self.hidden_dim / 6].iter().map(|v| v.abs()).sum::<f32>()),
-            (ChangeCategory::Documentation, state[3 * self.hidden_dim / 6..4 * self.hidden_dim / 6].iter().map(|v| v.abs()).sum::<f32>()),
-            (ChangeCategory::Testing, state[4 * self.hidden_dim / 6..5 * self.hidden_dim / 6].iter().map(|v| v.abs()).sum::<f32>()),
-            (ChangeCategory::Maintenance, state[5 * self.hidden_dim / 6..].iter().map(|v| v.abs()).sum::<f32>()),
+            (
+                ChangeCategory::BugFix,
+                state[0..self.hidden_dim / 6]
+                    .iter()
+                    .map(|v| v.abs())
+                    .sum::<f32>(),
+            ),
+            (
+                ChangeCategory::NewFeature,
+                state[self.hidden_dim / 6..2 * self.hidden_dim / 6]
+                    .iter()
+                    .map(|v| v.abs())
+                    .sum::<f32>(),
+            ),
+            (
+                ChangeCategory::Refactor,
+                state[2 * self.hidden_dim / 6..3 * self.hidden_dim / 6]
+                    .iter()
+                    .map(|v| v.abs())
+                    .sum::<f32>(),
+            ),
+            (
+                ChangeCategory::Documentation,
+                state[3 * self.hidden_dim / 6..4 * self.hidden_dim / 6]
+                    .iter()
+                    .map(|v| v.abs())
+                    .sum::<f32>(),
+            ),
+            (
+                ChangeCategory::Testing,
+                state[4 * self.hidden_dim / 6..5 * self.hidden_dim / 6]
+                    .iter()
+                    .map(|v| v.abs())
+                    .sum::<f32>(),
+            ),
+            (
+                ChangeCategory::Maintenance,
+                state[5 * self.hidden_dim / 6..]
+                    .iter()
+                    .map(|v| v.abs())
+                    .sum::<f32>(),
+            ),
         ];
 
         let total: f32 = categories.iter().map(|(_, v)| v).sum();
@@ -281,9 +318,10 @@ impl TemporalCodeAnalyzer {
             };
         }
 
-        let (best_cat, best_score) = categories.iter()
+        let (best_cat, best_score) = categories
+            .iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .unwrap();
+            .expect("categories is non-empty (checked via total > 0)");
 
         PredictedChange {
             category: *best_cat,
@@ -300,7 +338,8 @@ mod tests {
         CommitInfo {
             hash: "abc123".to_string(),
             message: message.to_string(),
-            files_changed: files.iter()
+            files_changed: files
+                .iter()
                 .map(|f| (f.to_string(), ChangeType::Modified))
                 .collect(),
             timestamp: 0,
@@ -347,7 +386,11 @@ mod tests {
         // Uniform state norms = high stability
         let uniform = vec![1.0, 1.0, 1.0, 1.0];
         let stability = analyzer.compute_stability(&uniform);
-        assert!(stability > 0.9, "Uniform norms should be stable: {}", stability);
+        assert!(
+            stability > 0.9,
+            "Uniform norms should be stable: {}",
+            stability
+        );
 
         // Volatile state norms = lower stability
         let volatile = vec![0.1, 5.0, 0.2, 4.0];

@@ -159,7 +159,7 @@ impl MaterialityLevel {
             Self::Ephemeral => Some(Duration::from_secs(3600)), // 1 hour
             Self::ShortTerm => Some(Duration::from_secs(86400 * 7)), // 1 week
             Self::MediumTerm => Some(Duration::from_secs(86400 * 365)), // 1 year
-            Self::Permanent => None, // No expiry
+            Self::Permanent => None,                            // No expiry
         }
     }
 
@@ -306,16 +306,23 @@ pub struct EpistemicClassification {
 
 impl EpistemicClassification {
     /// Create a new classification
-    pub fn new(empirical: EmpiricalLevel, normative: NormativeLevel, materiality: MaterialityLevel) -> Self {
-        Self { empirical, normative, materiality }
+    pub fn new(
+        empirical: EmpiricalLevel,
+        normative: NormativeLevel,
+        materiality: MaterialityLevel,
+    ) -> Self {
+        Self {
+            empirical,
+            normative,
+            materiality,
+        }
     }
 
     /// Get the classification code (e.g., "E2/N1/M2")
     pub fn code(&self) -> String {
-        format!("E{}/N{}/M{}",
-            self.empirical as u8,
-            self.normative as u8,
-            self.materiality as u8
+        format!(
+            "E{}/N{}/M{}",
+            self.empirical as u8, self.normative as u8, self.materiality as u8
         )
     }
 
@@ -482,12 +489,30 @@ mod tests {
 
     #[test]
     fn test_empirical_from_phi() {
-        assert_eq!(EmpiricalLevel::from_phi(0.05, false), EmpiricalLevel::Subjective);
-        assert_eq!(EmpiricalLevel::from_phi(0.15, false), EmpiricalLevel::Testimonial);
-        assert_eq!(EmpiricalLevel::from_phi(0.25, false), EmpiricalLevel::PrivatelyVerifiable);
-        assert_eq!(EmpiricalLevel::from_phi(0.35, false), EmpiricalLevel::CryptographicallyVerifiable);
-        assert_eq!(EmpiricalLevel::from_phi(0.45, true), EmpiricalLevel::PubliclyReproducible);
-        assert_eq!(EmpiricalLevel::from_phi(0.45, false), EmpiricalLevel::CryptographicallyVerifiable);
+        assert_eq!(
+            EmpiricalLevel::from_phi(0.05, false),
+            EmpiricalLevel::Subjective
+        );
+        assert_eq!(
+            EmpiricalLevel::from_phi(0.15, false),
+            EmpiricalLevel::Testimonial
+        );
+        assert_eq!(
+            EmpiricalLevel::from_phi(0.25, false),
+            EmpiricalLevel::PrivatelyVerifiable
+        );
+        assert_eq!(
+            EmpiricalLevel::from_phi(0.35, false),
+            EmpiricalLevel::CryptographicallyVerifiable
+        );
+        assert_eq!(
+            EmpiricalLevel::from_phi(0.45, true),
+            EmpiricalLevel::PubliclyReproducible
+        );
+        assert_eq!(
+            EmpiricalLevel::from_phi(0.45, false),
+            EmpiricalLevel::CryptographicallyVerifiable
+        );
     }
 
     #[test]
@@ -500,7 +525,10 @@ mod tests {
         assert_eq!(class.code(), "E3/N2/M2");
 
         let parsed = EpistemicClassification::from_code("E3/N2/M2").unwrap();
-        assert_eq!(parsed.empirical, EmpiricalLevel::CryptographicallyVerifiable);
+        assert_eq!(
+            parsed.empirical,
+            EmpiricalLevel::CryptographicallyVerifiable
+        );
         assert_eq!(parsed.normative, NormativeLevel::Network);
         assert_eq!(parsed.materiality, MaterialityLevel::MediumTerm);
     }
@@ -508,7 +536,9 @@ mod tests {
     #[test]
     fn test_materiality_ttl() {
         assert!(MaterialityLevel::Ephemeral.suggested_ttl().unwrap() < Duration::from_secs(86400));
-        assert!(MaterialityLevel::ShortTerm.suggested_ttl().unwrap() <= Duration::from_secs(86400 * 7));
+        assert!(
+            MaterialityLevel::ShortTerm.suggested_ttl().unwrap() <= Duration::from_secs(86400 * 7)
+        );
         assert!(MaterialityLevel::Permanent.suggested_ttl().is_none());
     }
 

@@ -4,17 +4,16 @@
 //! Each objective is encoded as a hyperdimensional vector (HDC) that
 //! captures its semantic meaning.
 
-use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use ndarray::Array1;
 use std::hash::{Hash, Hasher};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DIFFICULTY LEVELS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Difficulty level of a learning objective
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Difficulty {
     /// Very easy, foundational concepts (0.0 - 0.2)
     Beginner,
@@ -57,14 +56,12 @@ impl Difficulty {
     }
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // DOMAIN
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Knowledge domain for categorizing objectives
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-#[derive(Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub enum Domain {
     /// NixOS system administration
     #[default]
@@ -145,7 +142,6 @@ impl Domain {
         }
     }
 }
-
 
 impl From<&str> for Domain {
     fn from(s: &str) -> Self {
@@ -341,7 +337,8 @@ impl ObjectiveBuilder {
 
     /// Add multiple prerequisites
     pub fn with_prerequisites(mut self, prereqs: &[&str]) -> Self {
-        self.prerequisites.extend(prereqs.iter().map(|s| s.to_string()));
+        self.prerequisites
+            .extend(prereqs.iter().map(|s| s.to_string()));
         self
     }
 
@@ -378,7 +375,9 @@ impl ObjectiveBuilder {
 
         // Bind base with domain, scale by inverse difficulty
         // (easier concepts have stronger/cleaner encodings)
-        let encoding = base.bind(&domain_hv).scale(1.0 - self.difficulty.as_f32() * 0.3);
+        let encoding = base
+            .bind(&domain_hv)
+            .scale(1.0 - self.difficulty.as_f32() * 0.3);
 
         LearningObjective {
             id: self.id,
@@ -464,8 +463,8 @@ mod tests {
         let sim_diff = obj1.similarity(&obj3);
 
         // Both should be in [-1, 1]
-        assert!(sim_same >= -1.0 && sim_same <= 1.0);
-        assert!(sim_diff >= -1.0 && sim_diff <= 1.0);
+        assert!((-1.0..=1.0).contains(&sim_same));
+        assert!((-1.0..=1.0).contains(&sim_diff));
     }
 
     #[test]
@@ -481,6 +480,9 @@ mod tests {
     fn test_domain_from_str() {
         assert_eq!(Domain::from("nixos"), Domain::NixOS);
         assert_eq!(Domain::from("flakes"), Domain::Flakes);
-        assert_eq!(Domain::from("custom-thing"), Domain::Custom("custom-thing".to_string()));
+        assert_eq!(
+            Domain::from("custom-thing"),
+            Domain::Custom("custom-thing".to_string())
+        );
     }
 }

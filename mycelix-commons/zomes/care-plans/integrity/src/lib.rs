@@ -165,7 +165,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
 }
 
 fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<ValidateCallbackResult> {
-    if plan.title.is_empty() {
+    if plan.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Plan title cannot be empty".into(),
         ));
@@ -175,7 +175,7 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
             "Plan title must be 256 characters or fewer".into(),
         ));
     }
-    if plan.description.is_empty() {
+    if plan.description.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Plan description cannot be empty".into(),
         ));
@@ -185,7 +185,7 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
             "Plan description must be 4096 characters or fewer".into(),
         ));
     }
-    if plan.schedule.is_empty() {
+    if plan.schedule.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Schedule cannot be empty".into(),
         ));
@@ -224,7 +224,7 @@ fn validate_create_plan(_action: Create, plan: CarePlan) -> ExternResult<Validat
 }
 
 fn validate_update_plan(plan: CarePlan) -> ExternResult<ValidateCallbackResult> {
-    if plan.title.is_empty() {
+    if plan.title.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Plan title cannot be empty".into(),
         ));
@@ -274,4 +274,783 @@ fn validate_create_session(
         ));
     }
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ============================================================================
+    // Factory Functions
+    // ============================================================================
+
+    fn valid_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xdb; 36])
+    }
+
+    fn valid_agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xdc; 36])
+    }
+
+    fn valid_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xab; 36])
+    }
+
+    fn valid_timestamp_start() -> Timestamp {
+        Timestamp::from_micros(1000000)
+    }
+
+    fn valid_timestamp_end() -> Timestamp {
+        Timestamp::from_micros(2000000)
+    }
+
+    fn valid_plan() -> CarePlan {
+        CarePlan {
+            recipient: valid_agent(),
+            title: "Daily Care Plan".to_string(),
+            description: "A comprehensive care plan for daily assistance".to_string(),
+            care_type: CareType::Eldercare,
+            schedule: "Mon/Wed/Fri 9am-12pm".to_string(),
+            caregivers: vec![valid_agent_2()],
+            status: PlanStatus::Active,
+            created_at: valid_timestamp_start(),
+            updated_at: valid_timestamp_start(),
+            hours_per_week: 20.0,
+            special_instructions: "Patient prefers morning care".to_string(),
+        }
+    }
+
+    fn valid_session() -> CareSession {
+        CareSession {
+            plan_hash: valid_action_hash(),
+            caregiver: valid_agent(),
+            started_at: valid_timestamp_start(),
+            ended_at: valid_timestamp_end(),
+            hours: 3.0,
+            notes: "Session went well".to_string(),
+            tasks_completed: vec!["Morning medication".to_string(), "Breakfast assistance".to_string()],
+        }
+    }
+
+    fn mock_create_action() -> Create {
+        Create {
+            author: valid_agent(),
+            timestamp: valid_timestamp_start(),
+            action_seq: 0,
+            prev_action: ActionHash::from_raw_36(vec![0; 36]),
+            entry_type: EntryType::App(AppEntryDef {
+                entry_index: 0.into(),
+                zome_index: 0.into(),
+                visibility: EntryVisibility::Public,
+            }),
+            entry_hash: EntryHash::from_raw_36(vec![0; 36]),
+            weight: Default::default(),
+        }
+    }
+
+    // ============================================================================
+    // CarePlan Validation Tests - Create
+    // ============================================================================
+
+    #[test]
+    fn test_valid_plan_passes() {
+        let plan = valid_plan();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_empty_title() {
+        let mut plan = valid_plan();
+        plan.title = "".to_string();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_title_too_long() {
+        let mut plan = valid_plan();
+        plan.title = "x".repeat(257);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_title_exactly_256_chars() {
+        let mut plan = valid_plan();
+        plan.title = "x".repeat(256);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_title_255_chars() {
+        let mut plan = valid_plan();
+        plan.title = "x".repeat(255);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_empty_description() {
+        let mut plan = valid_plan();
+        plan.description = "".to_string();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_description_too_long() {
+        let mut plan = valid_plan();
+        plan.description = "x".repeat(4097);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_description_exactly_4096_chars() {
+        let mut plan = valid_plan();
+        plan.description = "x".repeat(4096);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_description_4095_chars() {
+        let mut plan = valid_plan();
+        plan.description = "x".repeat(4095);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_empty_schedule() {
+        let mut plan = valid_plan();
+        plan.schedule = "".to_string();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_schedule_too_long() {
+        let mut plan = valid_plan();
+        plan.schedule = "x".repeat(513);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_schedule_exactly_512_chars() {
+        let mut plan = valid_plan();
+        plan.schedule = "x".repeat(512);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_schedule_511_chars() {
+        let mut plan = valid_plan();
+        plan.schedule = "x".repeat(511);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_empty_caregivers() {
+        let mut plan = valid_plan();
+        plan.caregivers = vec![];
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_too_many_caregivers() {
+        let mut plan = valid_plan();
+        plan.caregivers = (0..51).map(|_| valid_agent()).collect();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_exactly_50_caregivers() {
+        let mut plan = valid_plan();
+        plan.caregivers = (0..50).map(|_| valid_agent()).collect();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_49_caregivers() {
+        let mut plan = valid_plan();
+        plan.caregivers = (0..49).map(|_| valid_agent()).collect();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_single_caregiver() {
+        let mut plan = valid_plan();
+        plan.caregivers = vec![valid_agent()];
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_zero_hours() {
+        let mut plan = valid_plan();
+        plan.hours_per_week = 0.0;
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_negative_hours() {
+        let mut plan = valid_plan();
+        plan.hours_per_week = -5.0;
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_hours_exceed_168() {
+        let mut plan = valid_plan();
+        plan.hours_per_week = 169.0;
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_exactly_168_hours() {
+        let mut plan = valid_plan();
+        plan.hours_per_week = 168.0;
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_167_hours() {
+        let mut plan = valid_plan();
+        plan.hours_per_week = 167.0;
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_minimum_positive_hours() {
+        let mut plan = valid_plan();
+        plan.hours_per_week = 0.1;
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_special_instructions_too_long() {
+        let mut plan = valid_plan();
+        plan.special_instructions = "x".repeat(4097);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_special_instructions_exactly_4096_chars() {
+        let mut plan = valid_plan();
+        plan.special_instructions = "x".repeat(4096);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_special_instructions_4095_chars() {
+        let mut plan = valid_plan();
+        plan.special_instructions = "x".repeat(4095);
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_empty_special_instructions() {
+        let mut plan = valid_plan();
+        plan.special_instructions = "".to_string();
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // ============================================================================
+    // CarePlan Validation Tests - Update
+    // ============================================================================
+
+    #[test]
+    fn test_valid_plan_update_passes() {
+        let plan = valid_plan();
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_update_empty_title() {
+        let mut plan = valid_plan();
+        plan.title = "".to_string();
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_update_empty_caregivers() {
+        let mut plan = valid_plan();
+        plan.caregivers = vec![];
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_plan_update_single_caregiver() {
+        let mut plan = valid_plan();
+        plan.caregivers = vec![valid_agent()];
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_update_allows_long_description() {
+        let mut plan = valid_plan();
+        plan.description = "x".repeat(5000);
+        let result = validate_update_plan(plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // ============================================================================
+    // CareSession Validation Tests - Create
+    // ============================================================================
+
+    #[test]
+    fn test_valid_session_passes() {
+        let session = valid_session();
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_zero_hours() {
+        let mut session = valid_session();
+        session.hours = 0.0;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_negative_hours() {
+        let mut session = valid_session();
+        session.hours = -1.0;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_hours_exceed_24() {
+        let mut session = valid_session();
+        session.hours = 24.1;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_exactly_24_hours() {
+        let mut session = valid_session();
+        session.hours = 24.0;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_23_point_9_hours() {
+        let mut session = valid_session();
+        session.hours = 23.9;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_minimum_positive_hours() {
+        let mut session = valid_session();
+        session.hours = 0.1;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_notes_too_long() {
+        let mut session = valid_session();
+        session.notes = "x".repeat(4097);
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_notes_exactly_4096_chars() {
+        let mut session = valid_session();
+        session.notes = "x".repeat(4096);
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_notes_4095_chars() {
+        let mut session = valid_session();
+        session.notes = "x".repeat(4095);
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_empty_notes() {
+        let mut session = valid_session();
+        session.notes = "".to_string();
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_too_many_tasks() {
+        let mut session = valid_session();
+        session.tasks_completed = (0..51).map(|i| format!("Task {}", i)).collect();
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_exactly_50_tasks() {
+        let mut session = valid_session();
+        session.tasks_completed = (0..50).map(|i| format!("Task {}", i)).collect();
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_49_tasks() {
+        let mut session = valid_session();
+        session.tasks_completed = (0..49).map(|i| format!("Task {}", i)).collect();
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_zero_tasks() {
+        let mut session = valid_session();
+        session.tasks_completed = vec![];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_single_task() {
+        let mut session = valid_session();
+        session.tasks_completed = vec!["One task".to_string()];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_task_too_long() {
+        let mut session = valid_session();
+        session.tasks_completed = vec!["x".repeat(257)];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_task_exactly_256_chars() {
+        let mut session = valid_session();
+        session.tasks_completed = vec!["x".repeat(256)];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_task_255_chars() {
+        let mut session = valid_session();
+        session.tasks_completed = vec!["x".repeat(255)];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_multiple_tasks_one_too_long() {
+        let mut session = valid_session();
+        session.tasks_completed = vec![
+            "Valid task".to_string(),
+            "x".repeat(257),
+            "Another valid task".to_string(),
+        ];
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_ended_before_started() {
+        let mut session = valid_session();
+        session.started_at = valid_timestamp_end();
+        session.ended_at = valid_timestamp_start();
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_ended_equals_started() {
+        let mut session = valid_session();
+        session.ended_at = session.started_at;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn test_session_minimal_time_difference() {
+        let mut session = valid_session();
+        session.started_at = Timestamp::from_micros(1000000);
+        session.ended_at = Timestamp::from_micros(1000001);
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    // ============================================================================
+    // CareType Tests
+    // ============================================================================
+
+    #[test]
+    fn test_care_type_childcare_anchor() {
+        let care_type = CareType::Childcare;
+        assert_eq!(care_type.anchor_key(), "childcare");
+    }
+
+    #[test]
+    fn test_care_type_eldercare_anchor() {
+        let care_type = CareType::Eldercare;
+        assert_eq!(care_type.anchor_key(), "eldercare");
+    }
+
+    #[test]
+    fn test_care_type_disability_anchor() {
+        let care_type = CareType::DisabilitySupport;
+        assert_eq!(care_type.anchor_key(), "disability");
+    }
+
+    #[test]
+    fn test_care_type_postsurgery_anchor() {
+        let care_type = CareType::PostSurgery;
+        assert_eq!(care_type.anchor_key(), "postsurgery");
+    }
+
+    #[test]
+    fn test_care_type_mentalhealth_anchor() {
+        let care_type = CareType::MentalHealth;
+        assert_eq!(care_type.anchor_key(), "mentalhealth");
+    }
+
+    #[test]
+    fn test_care_type_respite_anchor() {
+        let care_type = CareType::Respite;
+        assert_eq!(care_type.anchor_key(), "respite");
+    }
+
+    #[test]
+    fn test_care_type_other_anchor() {
+        let care_type = CareType::Other("Custom Care".to_string());
+        assert_eq!(care_type.anchor_key(), "other_custom_care");
+    }
+
+    #[test]
+    fn test_care_type_other_anchor_with_spaces() {
+        let care_type = CareType::Other("Multiple Word Type".to_string());
+        assert_eq!(care_type.anchor_key(), "other_multiple_word_type");
+    }
+
+    #[test]
+    fn test_care_type_other_anchor_uppercase() {
+        let care_type = CareType::Other("UPPERCASE".to_string());
+        assert_eq!(care_type.anchor_key(), "other_uppercase");
+    }
+
+    #[test]
+    fn test_care_type_serde_childcare() {
+        let care_type = CareType::Childcare;
+        let serialized = serde_json::to_string(&care_type).unwrap();
+        let deserialized: CareType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(care_type, deserialized);
+    }
+
+    #[test]
+    fn test_care_type_serde_other() {
+        let care_type = CareType::Other("Test".to_string());
+        let serialized = serde_json::to_string(&care_type).unwrap();
+        let deserialized: CareType = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(care_type, deserialized);
+    }
+
+    // ============================================================================
+    // PlanStatus Tests
+    // ============================================================================
+
+    #[test]
+    fn test_plan_status_serde_draft() {
+        let status = PlanStatus::Draft;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: PlanStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_plan_status_serde_active() {
+        let status = PlanStatus::Active;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: PlanStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_plan_status_serde_paused() {
+        let status = PlanStatus::Paused;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: PlanStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_plan_status_serde_completed() {
+        let status = PlanStatus::Completed;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: PlanStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    #[test]
+    fn test_plan_status_serde_cancelled() {
+        let status = PlanStatus::Cancelled;
+        let serialized = serde_json::to_string(&status).unwrap();
+        let deserialized: PlanStatus = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(status, deserialized);
+    }
+
+    // ============================================================================
+    // Entry Type Roundtrip Tests
+    // ============================================================================
+
+    #[test]
+    fn test_care_plan_serde_roundtrip() {
+        let plan = valid_plan();
+        let serialized = serde_json::to_string(&plan).unwrap();
+        let deserialized: CarePlan = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(plan, deserialized);
+    }
+
+    #[test]
+    fn test_care_session_serde_roundtrip() {
+        let session = valid_session();
+        let serialized = serde_json::to_string(&session).unwrap();
+        let deserialized: CareSession = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(session, deserialized);
+    }
+
+    #[test]
+    fn test_anchor_serde_roundtrip() {
+        let anchor = Anchor("test_anchor".to_string());
+        let serialized = serde_json::to_string(&anchor).unwrap();
+        let deserialized: Anchor = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(anchor, deserialized);
+    }
+
+    // ============================================================================
+    // Complex Validation Scenarios
+    // ============================================================================
+
+    #[test]
+    fn test_plan_with_all_care_types() {
+        for care_type in vec![
+            CareType::Childcare,
+            CareType::Eldercare,
+            CareType::DisabilitySupport,
+            CareType::PostSurgery,
+            CareType::MentalHealth,
+            CareType::Respite,
+            CareType::Other("Custom".to_string()),
+        ] {
+            let mut plan = valid_plan();
+            plan.care_type = care_type;
+            let result = validate_create_plan(mock_create_action(), plan);
+            assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+        }
+    }
+
+    #[test]
+    fn test_plan_with_all_statuses() {
+        for status in vec![
+            PlanStatus::Draft,
+            PlanStatus::Active,
+            PlanStatus::Paused,
+            PlanStatus::Completed,
+            PlanStatus::Cancelled,
+        ] {
+            let mut plan = valid_plan();
+            plan.status = status;
+            let result = validate_create_plan(mock_create_action(), plan);
+            assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+        }
+    }
+
+    #[test]
+    fn test_session_with_maximum_valid_tasks() {
+        let mut session = valid_session();
+        // Each task exactly 256 chars (largest valid size)
+        session.tasks_completed = (0..50).map(|_| "x".repeat(256)).collect();
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_with_fractional_hours() {
+        let mut plan = valid_plan();
+        plan.hours_per_week = 20.5;
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_with_fractional_hours() {
+        let mut session = valid_session();
+        session.hours = 2.75;
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_plan_minimal_valid() {
+        let plan = CarePlan {
+            recipient: valid_agent(),
+            title: "X".to_string(),
+            description: "Y".to_string(),
+            care_type: CareType::Other("Z".to_string()),
+            schedule: "S".to_string(),
+            caregivers: vec![valid_agent()],
+            status: PlanStatus::Draft,
+            created_at: valid_timestamp_start(),
+            updated_at: valid_timestamp_start(),
+            hours_per_week: 0.1,
+            special_instructions: "".to_string(),
+        };
+        let result = validate_create_plan(mock_create_action(), plan);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn test_session_minimal_valid() {
+        let session = CareSession {
+            plan_hash: valid_action_hash(),
+            caregiver: valid_agent(),
+            started_at: Timestamp::from_micros(1000000),
+            ended_at: Timestamp::from_micros(1000001),
+            hours: 0.1,
+            notes: "".to_string(),
+            tasks_completed: vec![],
+        };
+        let result = validate_create_session(mock_create_action(), session);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
 }

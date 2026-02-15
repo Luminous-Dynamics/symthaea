@@ -3,10 +3,10 @@
 //! Wraps the existing `NixParser` to implement the unified `CodeParser` trait,
 //! enabling Nix to participate in the multi-language code understanding pipeline.
 
+use super::nix_parser::{ErrorSeverity, NixConfig, NixParser, NixValue};
 use crate::traits::{
-    CodeParser, ParsedCode, CodeEntity, EntityKind, Span, CodeDiagnostic, DiagnosticSeverity,
+    CodeDiagnostic, CodeEntity, CodeParser, DiagnosticSeverity, EntityKind, ParsedCode, Span,
 };
-use super::nix_parser::{NixParser, NixConfig, NixValue, ErrorSeverity};
 
 /// Adapter that makes NixParser implement CodeParser
 pub struct NixCodeParser {
@@ -28,22 +28,28 @@ impl NixCodeParser {
         // Convert module args to parameters
         for arg in &config.module_args {
             let span = Span {
-                start_byte: 0, end_byte: 0,
-                start_line: 0, start_col: 0,
-                end_line: 0, end_col: 0,
+                start_byte: 0,
+                end_byte: 0,
+                start_line: 0,
+                start_col: 0,
+                end_line: 0,
+                end_col: 0,
             };
             entities.push(
                 CodeEntity::new(EntityKind::Variable, arg, span)
-                    .with_annotation("kind", "module_arg")
+                    .with_annotation("kind", "module_arg"),
             );
         }
 
         // Convert imports
         for import in &config.imports {
             let span = Span {
-                start_byte: 0, end_byte: 0,
-                start_line: 0, start_col: 0,
-                end_line: 0, end_col: 0,
+                start_byte: 0,
+                end_byte: 0,
+                start_line: 0,
+                start_col: 0,
+                end_line: 0,
+                end_col: 0,
             };
             entities.push(CodeEntity::new(EntityKind::Import, import, span));
         }
@@ -51,7 +57,8 @@ impl NixCodeParser {
         // Convert options to bindings
         for option in &config.options {
             let span = Span {
-                start_byte: 0, end_byte: 0,
+                start_byte: 0,
+                end_byte: 0,
                 start_line: option.line.saturating_sub(1),
                 start_col: option.column.saturating_sub(1),
                 end_line: option.line.saturating_sub(1),
@@ -61,13 +68,22 @@ impl NixCodeParser {
             let kind = self.classify_nix_option(&option.path, &option.value);
             let mut entity = CodeEntity::new(kind, &option.path, span)
                 .with_source(option.raw_value.clone())
-                .with_annotation("value_type", &format!("{:?}", std::mem::discriminant(&option.value)));
+                .with_annotation(
+                    "value_type",
+                    &format!("{:?}", std::mem::discriminant(&option.value)),
+                );
 
             // Detect flake-specific patterns
             if option.path.starts_with("inputs.") {
-                entity = CodeEntity { kind: EntityKind::FlakeInput, ..entity };
+                entity = CodeEntity {
+                    kind: EntityKind::FlakeInput,
+                    ..entity
+                };
             } else if option.path.starts_with("outputs") {
-                entity = CodeEntity { kind: EntityKind::FlakeOutput, ..entity };
+                entity = CodeEntity {
+                    kind: EntityKind::FlakeOutput,
+                    ..entity
+                };
             }
 
             entities.push(entity);
@@ -76,13 +92,15 @@ impl NixCodeParser {
         // Detect flake structure from source
         if config.source().contains("inputs") && config.source().contains("outputs") {
             let span = Span {
-                start_byte: 0, end_byte: config.source().len(),
-                start_line: 0, start_col: 0,
-                end_line: 0, end_col: 0,
+                start_byte: 0,
+                end_byte: config.source().len(),
+                start_line: 0,
+                start_col: 0,
+                end_line: 0,
+                end_col: 0,
             };
             entities.push(
-                CodeEntity::new(EntityKind::Module, "flake", span)
-                    .with_annotation("type", "flake")
+                CodeEntity::new(EntityKind::Module, "flake", span).with_annotation("type", "flake"),
             );
         }
 
@@ -94,8 +112,10 @@ impl NixCodeParser {
         if path.contains("enable") {
             return EntityKind::Binding;
         }
-        if path.starts_with("services.") || path.starts_with("networking.")
-            || path.starts_with("boot.") || path.starts_with("environment.")
+        if path.starts_with("services.")
+            || path.starts_with("networking.")
+            || path.starts_with("boot.")
+            || path.starts_with("environment.")
         {
             return EntityKind::Binding;
         }
@@ -124,7 +144,8 @@ impl CodeParser for NixCodeParser {
             severity: DiagnosticSeverity::Error,
             message: e.message,
             span: Some(Span {
-                start_byte: 0, end_byte: 0,
+                start_byte: 0,
+                end_byte: 0,
                 start_line: e.line.saturating_sub(1),
                 start_col: e.column.saturating_sub(1),
                 end_line: e.line.saturating_sub(1),
@@ -135,8 +156,10 @@ impl CodeParser for NixCodeParser {
         let entities = self.convert_entities(&config);
 
         // Convert NixParseErrors to CodeDiagnostics
-        let diagnostics: Vec<CodeDiagnostic> = config.errors.iter().map(|e| {
-            CodeDiagnostic {
+        let diagnostics: Vec<CodeDiagnostic> = config
+            .errors
+            .iter()
+            .map(|e| CodeDiagnostic {
                 severity: match e.severity {
                     ErrorSeverity::Error => DiagnosticSeverity::Error,
                     ErrorSeverity::Warning => DiagnosticSeverity::Warning,
@@ -144,14 +167,15 @@ impl CodeParser for NixCodeParser {
                 },
                 message: e.message.clone(),
                 span: Some(Span {
-                    start_byte: 0, end_byte: 0,
+                    start_byte: 0,
+                    end_byte: 0,
                     start_line: e.line.saturating_sub(1),
                     start_col: e.column.saturating_sub(1),
                     end_line: e.line.saturating_sub(1),
                     end_col: e.column.saturating_sub(1),
                 }),
-            }
-        }).collect();
+            })
+            .collect();
 
         let tree = config.tree().cloned();
         let mut parsed = ParsedCode::new(source, "nix");
@@ -177,18 +201,25 @@ impl CodeParser for NixCodeParser {
         for (i, line) in lines.iter().enumerate() {
             let trimmed = line.trim();
             // Heuristic: attribute binding without semicolon
-            if trimmed.contains(" = ") && !trimmed.ends_with(';')
-                && !trimmed.ends_with('{') && !trimmed.ends_with('[')
-                && !trimmed.is_empty() && !trimmed.starts_with('#')
-                && !trimmed.starts_with("let") && !trimmed.starts_with("in")
+            if trimmed.contains(" = ")
+                && !trimmed.ends_with(';')
+                && !trimmed.ends_with('{')
+                && !trimmed.ends_with('[')
+                && !trimmed.is_empty()
+                && !trimmed.starts_with('#')
+                && !trimmed.starts_with("let")
+                && !trimmed.starts_with("in")
             {
                 diags.push(CodeDiagnostic {
                     severity: DiagnosticSeverity::Warning,
                     message: format!("Possible missing semicolon on line {}", i + 1),
                     span: Some(Span {
-                        start_byte: 0, end_byte: 0,
-                        start_line: i, start_col: 0,
-                        end_line: i, end_col: trimmed.len(),
+                        start_byte: 0,
+                        end_byte: 0,
+                        start_line: i,
+                        start_col: 0,
+                        end_line: i,
+                        end_col: trimmed.len(),
                     }),
                 });
             }
@@ -245,7 +276,8 @@ mod tests {
         let result = parser.parse(code).unwrap();
 
         let vars = result.entities_of_kind(EntityKind::Variable);
-        let module_args: Vec<_> = vars.iter()
+        let module_args: Vec<_> = vars
+            .iter()
             .filter(|e| e.annotations.get("kind") == Some(&"module_arg".to_string()))
             .collect();
         assert!(module_args.len() >= 2); // config, pkgs at minimum

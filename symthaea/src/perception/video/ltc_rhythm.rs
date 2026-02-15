@@ -19,10 +19,10 @@
 //! This is what makes Symthaea fundamentally different from transformers:
 //! we "live in time" rather than "spatializing time."
 
-use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
-use crate::hierarchical_cantor_ltc::{HierarchicalCantorLtcNetwork, CantorLtcConfig};
 use super::temporal_features::TemporalFeatures;
+use crate::hierarchical_cantor_ltc::{CantorLtcConfig, HierarchicalCantorLtcNetwork};
 use std::collections::HashMap;
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 /// Configuration for LTC rhythm detection
 #[derive(Clone, Debug)]
@@ -50,8 +50,8 @@ impl Default for LtcRhythmConfig {
 
         Self {
             ltc_config,
-            dt_ms: 33.3, // ~30 fps
-            trajectory_length: 90, // 3 seconds at 30fps
+            dt_ms: 33.3,               // ~30 fps
+            trajectory_length: 90,     // 3 seconds at 30fps
             min_trajectory_length: 30, // 1 second minimum
             detection_threshold: 0.6,
         }
@@ -140,7 +140,7 @@ impl RhythmPrototype {
         // - Velocity shape captures timing differences
         // - Position shape provides baseline consistency
         // - Amplitude/variance handle intensity differences
-                // Amplitude characteristics
+        // Amplitude characteristics
 
         0.35 * freq_sim +      // Frequency is king for rhythm
             0.30 * velocity_sim +  // Velocity captures timing
@@ -174,7 +174,8 @@ impl RhythmPrototype {
         for i in 0..n_samples {
             let idx_self = i * n_self / n_samples;
             let idx_other = i * n_other / n_samples;
-            shape_sim += self.velocity_trajectory[idx_self].similarity(&other.velocity_trajectory[idx_other]);
+            shape_sim += self.velocity_trajectory[idx_self]
+                .similarity(&other.velocity_trajectory[idx_other]);
         }
         shape_sim /= n_samples as f32;
 
@@ -191,11 +192,23 @@ impl RhythmPrototype {
         let self_sum: f32 = self.frequency_signature.iter().sum::<f32>().max(1e-6);
         let other_sum: f32 = other.frequency_signature.iter().sum::<f32>().max(1e-6);
 
-        let self_norm: Vec<f32> = self.frequency_signature.iter().map(|x| x / self_sum).collect();
-        let other_norm: Vec<f32> = other.frequency_signature.iter().map(|x| x / other_sum).collect();
+        let self_norm: Vec<f32> = self
+            .frequency_signature
+            .iter()
+            .map(|x| x / self_sum)
+            .collect();
+        let other_norm: Vec<f32> = other
+            .frequency_signature
+            .iter()
+            .map(|x| x / other_sum)
+            .collect();
 
         // Compute cosine similarity on normalized frequency distributions
-        let dot: f32 = self_norm.iter().zip(other_norm.iter()).map(|(a, b)| a * b).sum();
+        let dot: f32 = self_norm
+            .iter()
+            .zip(other_norm.iter())
+            .map(|(a, b)| a * b)
+            .sum();
         let mag_self: f32 = self_norm.iter().map(|x| x * x).sum::<f32>().sqrt();
         let mag_other: f32 = other_norm.iter().map(|x| x * x).sum::<f32>().sqrt();
 
@@ -256,8 +269,10 @@ impl RhythmPrototype {
         self.velocity_trajectory.clear();
         for i in 1..self.root_trajectory.len() {
             let mut velocity = ContinuousHV::zero(HDC_DIMENSION);
-            for (j, (curr, prev)) in self.root_trajectory[i].values.iter()
-                .zip(self.root_trajectory[i-1].values.iter())
+            for (j, (curr, prev)) in self.root_trajectory[i]
+                .values
+                .iter()
+                .zip(self.root_trajectory[i - 1].values.iter())
                 .enumerate()
             {
                 velocity.values[j] = curr - prev;
@@ -335,7 +350,9 @@ impl RhythmPrototype {
         }
 
         // Use summary signal (sum of first 100 dimensions)
-        let signal: Vec<f32> = self.root_trajectory.iter()
+        let signal: Vec<f32> = self
+            .root_trajectory
+            .iter()
             .map(|state| state.values.iter().take(100).sum::<f32>())
             .collect();
 
@@ -371,7 +388,9 @@ impl RhythmPrototype {
             return;
         }
 
-        let signal: Vec<f32> = self.root_trajectory.iter()
+        let signal: Vec<f32> = self
+            .root_trajectory
+            .iter()
             .map(|state| state.values.iter().take(100).sum::<f32>())
             .collect();
 
@@ -388,7 +407,9 @@ impl RhythmPrototype {
 
         // Use first 100 dimensions as a "summary signal"
         let n = self.root_trajectory.len();
-        let signal: Vec<f32> = self.root_trajectory.iter()
+        let signal: Vec<f32> = self
+            .root_trajectory
+            .iter()
             .map(|state| state.values.iter().take(100).sum::<f32>())
             .collect();
 
@@ -399,7 +420,7 @@ impl RhythmPrototype {
         let mut best_lag = 0;
         let mut best_corr = 0.0;
 
-        for lag in 5..n/2 {
+        for lag in 5..n / 2 {
             let mut sum = 0.0;
             for i in 0..(n - lag) {
                 sum += centered[i] * centered[i + lag];
@@ -510,7 +531,9 @@ impl LtcRhythmDetector {
         for (i, &f) in features.features.iter().enumerate() {
             let seed = (i as u64).wrapping_mul(0x5851F42D4C957F2D);
             for d in 0..HDC_DIMENSION {
-                let hash = seed.wrapping_mul(d as u64 + 1).wrapping_add(0x14057B7EF767814F);
+                let hash = seed
+                    .wrapping_mul(d as u64 + 1)
+                    .wrapping_add(0x14057B7EF767814F);
                 let sign = if hash.is_multiple_of(2) { 1.0 } else { -1.0 };
                 // Sparse: ~10% of dimensions active per feature
                 if hash.is_multiple_of(10) {
@@ -568,7 +591,8 @@ impl LtcRhythmDetector {
         let phi = self.ltc.compute_hierarchical_phi();
 
         // Find best matching pattern
-        let (pattern, confidence) = if let Some((&best_key, &best_sim)) = similarities.iter()
+        let (pattern, confidence) = if let Some((&best_key, &best_sim)) = similarities
+            .iter()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
         {
             // Check if it's above threshold
@@ -600,7 +624,8 @@ impl LtcRhythmDetector {
         self.current_trajectory.clear();
 
         // Create or reset the target prototype
-        self.patterns.insert(pattern, RhythmPrototype::new(&pattern.to_string()));
+        self.patterns
+            .insert(pattern, RhythmPrototype::new(&pattern.to_string()));
 
         // Reset LTC state for clean learning
         self.ltc = HierarchicalCantorLtcNetwork::new(self.config.ltc_config.clone());
@@ -627,14 +652,16 @@ impl LtcRhythmDetector {
 
     /// Check if a pattern is ready for detection
     pub fn pattern_ready(&self, pattern: char) -> bool {
-        self.patterns.get(&pattern)
+        self.patterns
+            .get(&pattern)
             .map(|p| p.is_ready(self.config.min_trajectory_length))
             .unwrap_or(false)
     }
 
     /// Get number of learned patterns
     pub fn learned_pattern_count(&self) -> usize {
-        self.patterns.values()
+        self.patterns
+            .values()
             .filter(|p| p.is_ready(self.config.min_trajectory_length))
             .count()
     }
@@ -660,7 +687,9 @@ impl LtcRhythmDetector {
 
     /// Get detected period in BPM (if available)
     pub fn get_pattern_bpm(&self, pattern: char, fps: u32) -> Option<f32> {
-        let period = self.patterns.get(&pattern)
+        let period = self
+            .patterns
+            .get(&pattern)
             .map(|p| p.period_frames)
             .unwrap_or(0);
 
@@ -680,13 +709,13 @@ impl LtcRhythmDetector {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::temporal_features::TemporalFeatures;
+    use super::*;
 
     fn create_test_features(brightness: f32, seq: u64) -> TemporalFeatures {
         let mut features = [0.0f32; 32];
         features[28] = brightness;
-        features[30] = if seq % 2 == 0 { 0.5 } else { 0.0 }; // Alternating motion
+        features[30] = if seq.is_multiple_of(2) { 0.5 } else { 0.0 }; // Alternating motion
 
         TemporalFeatures {
             features,

@@ -148,7 +148,11 @@ pub struct ConsciousnessState {
 impl ConsciousnessState {
     /// Create new consciousness state
     pub fn new(phi: f64, binding: f64, workspace: f64, attention: f64, recursion: f64) -> Self {
-        let c_raw = phi.min(binding).min(workspace).min(attention).min(recursion);
+        let c_raw = phi
+            .min(binding)
+            .min(workspace)
+            .min(attention)
+            .min(recursion);
         Self {
             phi,
             binding,
@@ -172,7 +176,13 @@ impl ConsciousnessState {
 
     /// Convert to vector
     pub fn to_vec(&self) -> Vec<f64> {
-        vec![self.phi, self.binding, self.workspace, self.attention, self.recursion]
+        vec![
+            self.phi,
+            self.binding,
+            self.workspace,
+            self.attention,
+            self.recursion,
+        ]
     }
 
     /// Get limiting component
@@ -185,7 +195,8 @@ impl ConsciousnessState {
             ("Recursion", self.recursion),
         ];
 
-        components.iter()
+        components
+            .iter()
             .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|&(name, val)| (name, val))
             .unwrap_or(("Unknown", 0.0))
@@ -219,8 +230,11 @@ impl StateUncertainty {
         let recursion_std = diag.get(4).map(|&v| v.sqrt()).unwrap_or(0.0);
 
         // C uncertainty from component uncertainties (max of components)
-        let c_std = phi_std.max(binding_std).max(workspace_std)
-            .max(attention_std).max(recursion_std);
+        let c_std = phi_std
+            .max(binding_std)
+            .max(workspace_std)
+            .max(attention_std)
+            .max(recursion_std);
 
         Self {
             phi_std,
@@ -372,7 +386,8 @@ impl PredictiveConsciousness {
         for i in 0..dim {
             for j in 0..dim {
                 for k in 0..dim {
-                    ap[i * dim + j] += self.transition_matrix[i * dim + k] * self.covariance[k * dim + j];
+                    ap[i * dim + j] +=
+                        self.transition_matrix[i * dim + k] * self.covariance[k * dim + j];
                 }
             }
         }
@@ -558,7 +573,9 @@ impl PredictiveConsciousness {
         }
 
         // Extract C values from history
-        let c_values: Vec<f64> = self.history.iter()
+        let c_values: Vec<f64> = self
+            .history
+            .iter()
             .rev()
             .take(window)
             .map(|s| s.c_raw)

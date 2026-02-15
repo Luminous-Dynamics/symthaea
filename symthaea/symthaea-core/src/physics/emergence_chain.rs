@@ -30,20 +30,20 @@
 //! | Neuron → Circuit | Weighted bundle | neurons + synapses |
 //! | Circuit → Mind | Phenomenal bind | integrated info |
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
-use super::hadrons::Hadrons;
-use super::periodic_table::PeriodicTable;
 use super::chemistry::Chemistry;
+use super::consciousness_bridge::PhysicsConsciousnessBridge;
+use super::hadrons::Hadrons;
+use super::hdc_emergence_metrics::{
+    CompositionNode, EmergenceAnalysis, EmergenceMetrics, TreeCoherenceResult,
+    TreeRecoverabilityResult,
+};
 use super::molecular_biology::MolBioEncoder;
 use super::neuroscience::NeuroEncoder;
-use super::consciousness_bridge::PhysicsConsciousnessBridge;
-use super::true_phi::{TruePhiCalculator, TruePhiResult, EntropyConfig};
-use super::hdc_emergence_metrics::{
-    EmergenceMetrics, EmergenceAnalysis, CompositionNode,
-    TreeRecoverabilityResult, TreeCoherenceResult,
-};
+use super::periodic_table::PeriodicTable;
+use super::standard_model::{StandardModel, PHYSICS_DIM};
+use super::true_phi::{EntropyConfig, TruePhiCalculator, TruePhiResult};
+use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Emergence level in the hierarchy
@@ -291,9 +291,9 @@ impl EmergenceChain {
 
     /// Compose nucleus and electrons into an atom
     pub fn nucleus_to_atom(&self, atomic_number: u8) -> Option<ContinuousHV> {
-        self.table.element(atomic_number).map(|e| {
-            e.vector.bind(self.level_vector(EmergenceLevel::Atom))
-        })
+        self.table
+            .element(atomic_number)
+            .map(|e| e.vector.bind(self.level_vector(EmergenceLevel::Atom)))
     }
 
     /// Compose atoms into a molecule
@@ -329,7 +329,11 @@ impl EmergenceChain {
     }
 
     /// Compose neurons with synapses into a circuit
-    pub fn neurons_to_circuit(&self, neurons: &[&ContinuousHV], synapses: &[&ContinuousHV]) -> ContinuousHV {
+    pub fn neurons_to_circuit(
+        &self,
+        neurons: &[&ContinuousHV],
+        synapses: &[&ContinuousHV],
+    ) -> ContinuousHV {
         let neuron_bundle = ContinuousHV::bundle(neurons);
         let synapse_bundle = ContinuousHV::bundle(synapses);
         let circuit = neuron_bundle.bind(&synapse_bundle);
@@ -345,16 +349,12 @@ impl EmergenceChain {
         integrated.bind(self.level_vector(EmergenceLevel::Consciousness))
     }
 
-    /// Calculate phenomenal index for a vector at a given level
+    /// Estimate phenomenal index for a vector at a given level using level weight
+    /// and similarity to consciousness concepts.
     ///
-    /// NOTE: This is the legacy method using hardcoded level weights.
+    /// This is a fast heuristic used internally by trace/profile methods.
     /// For rigorous computation, use `phenomenal_index_rigorous()` instead.
-    #[deprecated(
-        since = "0.6.0",
-        note = "Use phenomenal_index_rigorous() for entropy-based computation. \
-                This method uses circular hardcoded level weights."
-    )]
-    pub fn phenomenal_index(&self, vector: &ContinuousHV, level: EmergenceLevel) -> f64 {
+    fn estimate_level_phenomenal_index(&self, vector: &ContinuousHV, level: EmergenceLevel) -> f64 {
         // Higher levels have more phenomenal character
         let level_weight = (level as usize) as f64 / 9.0;
 
@@ -481,9 +481,7 @@ impl EmergenceChain {
 
         // Estimate integration from distinctiveness
         if components.len() >= 2 {
-            let bundled_all = ContinuousHV::bundle(
-                &components.iter().collect::<Vec<_>>()
-            );
+            let bundled_all = ContinuousHV::bundle(&components.iter().collect::<Vec<_>>());
             let mut distinctiveness = 0.0;
             for c in components {
                 distinctiveness += (1.0 - bundled_all.similarity(c).abs()) as f64;
@@ -544,12 +542,11 @@ impl EmergenceChain {
     }
 
     /// Get phenomenal profile across all levels for a concept
-    #[allow(deprecated)]
     pub fn phenomenal_profile(&self, concept: &ContinuousHV) -> Vec<(EmergenceLevel, f64)> {
         EmergenceLevel::all()
             .iter()
             .map(|level| {
-                let phi = self.phenomenal_index(concept, *level);
+                let phi = self.estimate_level_phenomenal_index(concept, *level);
                 (*level, phi)
             })
             .collect()
@@ -561,14 +558,13 @@ impl EmergenceChain {
     }
 
     /// Trace the full emergence path from quarks to a given concept
-    #[allow(deprecated)]
     pub fn trace_emergence(&self, concept: &ContinuousHV) -> Vec<EmergenceStep> {
         EmergenceLevel::all()
             .iter()
             .map(|level| {
                 let level_marker = self.level_vector(*level);
                 let at_level = concept.bind(level_marker);
-                let phi = self.phenomenal_index(&at_level, *level);
+                let phi = self.estimate_level_phenomenal_index(&at_level, *level);
                 EmergenceStep {
                     level: *level,
                     vector: at_level,
@@ -579,7 +575,6 @@ impl EmergenceChain {
     }
 
     /// Create a complete emergence trace from hydrogen to consciousness
-    #[allow(deprecated)]
     pub fn hydrogen_to_consciousness(&self) -> Vec<EmergenceStep> {
         let mut steps = Vec::new();
 
@@ -588,7 +583,7 @@ impl EmergenceChain {
         steps.push(EmergenceStep {
             level: EmergenceLevel::Quark,
             vector: quark.clone(),
-            phenomenal_index: self.phenomenal_index(quark, EmergenceLevel::Quark),
+            phenomenal_index: self.estimate_level_phenomenal_index(quark, EmergenceLevel::Quark),
         });
 
         // Hadron level - proton
@@ -596,7 +591,7 @@ impl EmergenceChain {
         steps.push(EmergenceStep {
             level: EmergenceLevel::Hadron,
             vector: hadron.clone(),
-            phenomenal_index: self.phenomenal_index(hadron, EmergenceLevel::Hadron),
+            phenomenal_index: self.estimate_level_phenomenal_index(hadron, EmergenceLevel::Hadron),
         });
 
         // Nucleus level - hydrogen nucleus (just a proton)
@@ -604,7 +599,8 @@ impl EmergenceChain {
         steps.push(EmergenceStep {
             level: EmergenceLevel::Nucleus,
             vector: nucleus.clone(),
-            phenomenal_index: self.phenomenal_index(&nucleus, EmergenceLevel::Nucleus),
+            phenomenal_index: self
+                .estimate_level_phenomenal_index(&nucleus, EmergenceLevel::Nucleus),
         });
 
         // Atom level - hydrogen
@@ -612,7 +608,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Atom,
                 vector: atom.clone(),
-                phenomenal_index: self.phenomenal_index(&atom, EmergenceLevel::Atom),
+                phenomenal_index: self.estimate_level_phenomenal_index(&atom, EmergenceLevel::Atom),
             });
         }
 
@@ -622,7 +618,8 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Molecule,
                 vector: h2.clone(),
-                phenomenal_index: self.phenomenal_index(&h2, EmergenceLevel::Molecule),
+                phenomenal_index: self
+                    .estimate_level_phenomenal_index(&h2, EmergenceLevel::Molecule),
             });
 
             // Macromolecule level - simple chain
@@ -630,7 +627,8 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Macromolecule,
                 vector: macro_vec.clone(),
-                phenomenal_index: self.phenomenal_index(&macro_vec, EmergenceLevel::Macromolecule),
+                phenomenal_index: self
+                    .estimate_level_phenomenal_index(&macro_vec, EmergenceLevel::Macromolecule),
             });
 
             // Cell level
@@ -638,7 +636,7 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Cell,
                 vector: cell.clone(),
-                phenomenal_index: self.phenomenal_index(&cell, EmergenceLevel::Cell),
+                phenomenal_index: self.estimate_level_phenomenal_index(&cell, EmergenceLevel::Cell),
             });
 
             // Neuron level
@@ -646,7 +644,8 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Neuron,
                 vector: neuron.clone(),
-                phenomenal_index: self.phenomenal_index(&neuron, EmergenceLevel::Neuron),
+                phenomenal_index: self
+                    .estimate_level_phenomenal_index(&neuron, EmergenceLevel::Neuron),
             });
 
             // Circuit level
@@ -654,7 +653,8 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Circuit,
                 vector: circuit.clone(),
-                phenomenal_index: self.phenomenal_index(&circuit, EmergenceLevel::Circuit),
+                phenomenal_index: self
+                    .estimate_level_phenomenal_index(&circuit, EmergenceLevel::Circuit),
             });
 
             // Consciousness level
@@ -662,7 +662,8 @@ impl EmergenceChain {
             steps.push(EmergenceStep {
                 level: EmergenceLevel::Consciousness,
                 vector: consciousness.clone(),
-                phenomenal_index: self.phenomenal_index(&consciousness, EmergenceLevel::Consciousness),
+                phenomenal_index: self
+                    .estimate_level_phenomenal_index(&consciousness, EmergenceLevel::Consciousness),
             });
         }
 
@@ -712,7 +713,11 @@ mod tests {
     fn test_quarks_to_hadron() {
         let chain = setup();
         let proton = chain.quarks_to_hadron(
-            &[&chain.model.up_quark, &chain.model.up_quark, &chain.model.down_quark],
+            &[
+                &chain.model.up_quark,
+                &chain.model.up_quark,
+                &chain.model.down_quark,
+            ],
             &[1.0, 1.0, 1.0],
         );
         assert!(proton.norm() > 0.0);
@@ -751,16 +756,26 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_phenomenal_index_increases_with_level() {
         let chain = setup();
         let test_vec = chain.genesis.hv("test::concept", PHYSICS_DIM);
 
-        let phi_quark = chain.phenomenal_index(&test_vec, EmergenceLevel::Quark);
-        let phi_consciousness = chain.phenomenal_index(&test_vec, EmergenceLevel::Consciousness);
+        let profile = chain.phenomenal_profile(&test_vec);
+        let phi_quark = profile
+            .iter()
+            .find(|(l, _)| *l == EmergenceLevel::Quark)
+            .unwrap()
+            .1;
+        let phi_consciousness = profile
+            .iter()
+            .find(|(l, _)| *l == EmergenceLevel::Consciousness)
+            .unwrap()
+            .1;
 
-        assert!(phi_consciousness > phi_quark,
-            "Consciousness level should have higher phenomenal index");
+        assert!(
+            phi_consciousness > phi_quark,
+            "Consciousness level should have higher phenomenal index"
+        );
     }
 
     #[test]
@@ -783,7 +798,11 @@ mod tests {
         // The level markers themselves should identify correctly
         let quark_marker = chain.level_vector(EmergenceLevel::Quark);
         let identified = chain.identify_level(quark_marker);
-        assert_eq!(identified, EmergenceLevel::Quark, "Level marker should identify its own level");
+        assert_eq!(
+            identified,
+            EmergenceLevel::Quark,
+            "Level marker should identify its own level"
+        );
     }
 
     #[test]
@@ -808,7 +827,10 @@ mod tests {
 
         // Should be different vectors
         let sim = at_atom.similarity(&at_neuron);
-        assert!(sim < 0.9, "Different levels should produce different vectors");
+        assert!(
+            sim < 0.9,
+            "Different levels should produce different vectors"
+        );
     }
 
     #[test]
@@ -825,19 +847,33 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_circuit_to_consciousness() {
         let chain = setup();
         let circuit = chain.genesis.hv("test::circuit", PHYSICS_DIM);
         let consciousness = chain.circuit_to_consciousness(&circuit);
 
         // The resulting vector should be non-zero
-        assert!(consciousness.norm() > 0.0, "Consciousness vector should be non-zero");
+        assert!(
+            consciousness.norm() > 0.0,
+            "Consciousness vector should be non-zero"
+        );
 
         // The consciousness level should have higher phenomenal index than lower levels
-        let phi_cons = chain.phenomenal_index(&consciousness, EmergenceLevel::Consciousness);
-        let phi_quark = chain.phenomenal_index(&consciousness, EmergenceLevel::Quark);
-        assert!(phi_cons > phi_quark, "Consciousness should have higher phenomenal index");
+        let profile = chain.phenomenal_profile(&consciousness);
+        let phi_cons = profile
+            .iter()
+            .find(|(l, _)| *l == EmergenceLevel::Consciousness)
+            .unwrap()
+            .1;
+        let phi_quark = profile
+            .iter()
+            .find(|(l, _)| *l == EmergenceLevel::Quark)
+            .unwrap()
+            .1;
+        assert!(
+            phi_cons > phi_quark,
+            "Consciousness should have higher phenomenal index"
+        );
     }
 
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -852,7 +888,11 @@ mod tests {
         let result = chain.phenomenal_index_rigorous(&single, None);
 
         // Single component should have near-zero phi
-        assert!(result.true_phi < 0.1, "Single component should have low phi: {}", result.true_phi);
+        assert!(
+            result.true_phi < 0.1,
+            "Single component should have low phi: {}",
+            result.true_phi
+        );
     }
 
     #[test]
@@ -866,9 +906,15 @@ mod tests {
 
         // Multiple components should have positive values
         assert!(result.true_phi >= 0.0, "Phi should be non-negative");
-        assert!(result.emergence_score >= 0.0, "Emergence score should be non-negative");
-        assert!(result.combined_index >= 0.0 && result.combined_index <= 1.0,
-            "Combined index should be in [0,1]: {}", result.combined_index);
+        assert!(
+            result.emergence_score >= 0.0,
+            "Emergence score should be non-negative"
+        );
+        assert!(
+            result.combined_index >= 0.0 && result.combined_index <= 1.0,
+            "Combined index should be in [0,1]: {}",
+            result.combined_index
+        );
     }
 
     #[test]
@@ -895,7 +941,10 @@ mod tests {
 
         // With tree, we should have structural analysis
         assert!(result.binding_depth >= 1, "Should detect binding depth");
-        assert!(result.emergence_details.is_some(), "Should have emergence details");
+        assert!(
+            result.emergence_details.is_some(),
+            "Should have emergence details"
+        );
     }
 
     #[test]
@@ -922,9 +971,12 @@ mod tests {
         println!("Correlated Φ: {:.4}", phi_correlated.true_phi);
 
         // Correlated should have higher integration (more mutual information)
-        assert!(phi_correlated.true_phi > phi_independent.true_phi * 0.8,
+        assert!(
+            phi_correlated.true_phi > phi_independent.true_phi * 0.8,
             "Correlated should have higher or similar phi: corr={:.4} > ind={:.4}",
-            phi_correlated.true_phi, phi_independent.true_phi);
+            phi_correlated.true_phi,
+            phi_independent.true_phi
+        );
     }
 
     #[test]
@@ -985,8 +1037,11 @@ mod tests {
 
         assert_eq!(profile.len(), 10, "Should have profile for all 10 levels");
         for (level, result) in &profile {
-            assert!(result.combined_index >= 0.0 && result.combined_index <= 1.0,
-                "Level {:?} should have valid index", level);
+            assert!(
+                result.combined_index >= 0.0 && result.combined_index <= 1.0,
+                "Level {:?} should have valid index",
+                level
+            );
         }
     }
 
@@ -1022,10 +1077,16 @@ mod tests {
 
         // Single vector should have low emergence
         let single_emergence = chain.estimate_emergence_from_vectors(&single);
-        assert!(single_emergence < 0.1, "Single vector emergence should be low");
+        assert!(
+            single_emergence < 0.1,
+            "Single vector emergence should be low"
+        );
 
         // Multiple vectors should have positive emergence
         let multi_emergence = chain.estimate_emergence_from_vectors(&multiple);
-        assert!(multi_emergence >= 0.0, "Multi-vector emergence should be non-negative");
+        assert!(
+            multi_emergence >= 0.0,
+            "Multi-vector emergence should be non-negative"
+        );
     }
 }

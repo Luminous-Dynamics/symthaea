@@ -1,14 +1,17 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use symthaea::consciousness::stability_regime::{
-    StabilityRegimeType, StabilityRegimeConfig, CfCPrimitive, StabilityRegimeProcessor,
-};
 use symthaea::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor;
+use symthaea::consciousness::stability_regime::{
+    CfCPrimitive, StabilityRegimeConfig, StabilityRegimeProcessor, StabilityRegimeType,
+};
+use symthaea_core::hdc::binary_hv::BinaryHV;
 use symthaea_core::hdc::primitive_system::PrimitiveTier;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
-use symthaea_core::hdc::binary_hv::BinaryHV;
 
-fn make_primitive(name: &str, tier: PrimitiveTier) -> symthaea_core::hdc::primitive_system::Primitive {
+fn make_primitive(
+    name: &str,
+    tier: PrimitiveTier,
+) -> symthaea_core::hdc::primitive_system::Primitive {
     symthaea_core::hdc::primitive_system::Primitive {
         name: name.to_string(),
         tier,

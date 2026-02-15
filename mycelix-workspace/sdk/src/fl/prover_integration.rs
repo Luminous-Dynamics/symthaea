@@ -34,7 +34,10 @@ use thiserror::Error;
 #[cfg(feature = "std")]
 use hex;
 
-use crate::zkproof::{GradientConstraints, GradientProofReceipt};
+use crate::zkproof::GradientConstraints;
+
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+use crate::zkproof::GradientProofReceipt;
 
 #[cfg(any(feature = "simulation", feature = "risc0"))]
 use crate::zkproof::GradientProver;

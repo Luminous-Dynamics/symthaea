@@ -6,11 +6,13 @@
 use std::collections::HashMap;
 use std::f32::consts::PI;
 
-use crate::hdc::{HV, HDC_DIM};
-use crate::temporal::{HierarchicalLtc, LtcPreset};
+use crate::encoding::{AudioHdcEncoder, AudioHdcVectors, EncoderMode, PremiumHdcEncoder};
 use crate::features::{AudioFeatures, CONTROL_RATE, FREQ_BINS};
-use crate::encoding::{AudioHdcEncoder, PremiumHdcEncoder, AudioHdcVectors, EncoderMode};
-use crate::patterns::{AudioPattern, AudioCategory, PatternSimilarity, NUM_LTC_LEVELS, MAX_EXEMPLARS};
+use crate::hdc::{HDC_DIM, HV};
+use crate::patterns::{
+    AudioCategory, AudioPattern, PatternSimilarity, MAX_EXEMPLARS, NUM_LTC_LEVELS,
+};
+use crate::temporal::{HierarchicalLtc, LtcPreset};
 
 // =============================================================================
 // Audio Detection Result
@@ -131,7 +133,12 @@ impl AudioSentinel {
         self.compute_similarities(features, &vectors)
     }
 
-    fn accumulate_learning(&mut self, name: &str, vectors: &AudioHdcVectors, features: &AudioFeatures) {
+    fn accumulate_learning(
+        &mut self,
+        name: &str,
+        vectors: &AudioHdcVectors,
+        features: &AudioFeatures,
+    ) {
         if let Some(pattern) = self.patterns.get_mut(name) {
             pattern.timbre_prototype = pattern.timbre_prototype.add(&vectors.timbre);
             pattern.rhythm_prototype = pattern.rhythm_prototype.add(&vectors.rhythm);
@@ -142,10 +149,16 @@ impl AudioSentinel {
             if self.encoder_mode == EncoderMode::Standard {
                 let timbre_velocities = self.ltc_timbre.get_level_velocities();
                 let rhythm_velocities = self.ltc_rhythm.get_level_velocities();
-                for (i, (tv, rv)) in timbre_velocities.iter().zip(rhythm_velocities.iter()).enumerate() {
+                for (i, (tv, rv)) in timbre_velocities
+                    .iter()
+                    .zip(rhythm_velocities.iter())
+                    .enumerate()
+                {
                     if i < NUM_LTC_LEVELS {
-                        pattern.timbre_scale_prototypes[i] = pattern.timbre_scale_prototypes[i].add(tv);
-                        pattern.rhythm_scale_prototypes[i] = pattern.rhythm_scale_prototypes[i].add(rv);
+                        pattern.timbre_scale_prototypes[i] =
+                            pattern.timbre_scale_prototypes[i].add(tv);
+                        pattern.rhythm_scale_prototypes[i] =
+                            pattern.rhythm_scale_prototypes[i].add(rv);
                     }
                 }
             }
@@ -175,7 +188,11 @@ impl AudioSentinel {
         }
     }
 
-    fn compute_similarities(&self, features: &AudioFeatures, vectors: &AudioHdcVectors) -> AudioDetectionResult {
+    fn compute_similarities(
+        &self,
+        features: &AudioFeatures,
+        vectors: &AudioHdcVectors,
+    ) -> AudioDetectionResult {
         let rhythm_sig = self.compute_frequency_signature(&self.rhythm_trajectory);
         let timbre_sig = self.compute_frequency_signature(&self.timbre_trajectory);
 
@@ -187,34 +204,54 @@ impl AudioSentinel {
         let current_rhythm_velocities = self.ltc_rhythm.get_level_velocities();
 
         for (name, pattern) in &self.patterns {
-            if pattern.frame_count == 0 { continue; }
+            if pattern.frame_count == 0 {
+                continue;
+            }
 
             if self.encoder_mode == EncoderMode::Premium {
                 let sim = self.compute_premium_similarity(
-                    features, vectors, pattern, &rhythm_sig, &timbre_sig, WINDOW_SIZE
+                    features,
+                    vectors,
+                    pattern,
+                    &rhythm_sig,
+                    &timbre_sig,
+                    WINDOW_SIZE,
                 );
                 similarities.insert(name.clone(), sim);
             } else {
                 let sim = self.compute_standard_similarity(
-                    features, vectors, pattern, &rhythm_sig, &timbre_sig,
-                    &current_timbre_velocities, &current_rhythm_velocities, WINDOW_SIZE
+                    features,
+                    vectors,
+                    pattern,
+                    &rhythm_sig,
+                    &timbre_sig,
+                    &current_timbre_velocities,
+                    &current_rhythm_velocities,
+                    WINDOW_SIZE,
                 );
                 similarities.insert(name.clone(), sim);
             }
         }
 
         // Find best match
-        let (best_name, best_sim) = similarities.iter()
+        let (best_name, best_sim) = similarities
+            .iter()
             .max_by(|(_, a), (_, b)| a.combined.partial_cmp(&b.combined).unwrap())
             .map(|(n, s)| (n.clone(), s.combined))
             .unwrap_or(("Unknown".to_string(), 0.0));
 
-        let detected_category = self.patterns.get(&best_name)
+        let detected_category = self
+            .patterns
+            .get(&best_name)
             .map(|p| p.category)
             .unwrap_or(AudioCategory::Unknown);
 
         AudioDetectionResult {
-            detected_pattern: if best_sim > 0.4 { best_name } else { "Unknown".to_string() },
+            detected_pattern: if best_sim > 0.4 {
+                best_name
+            } else {
+                "Unknown".to_string()
+            },
             detected_category,
             confidence: best_sim,
             similarities,
@@ -239,32 +276,48 @@ impl AudioSentinel {
         let envelope_sim = vectors.envelope.similarity(&pattern.envelope_prototype);
 
         let timbre_traj_sim = self.windowed_trajectory_similarity(
-            &self.timbre_trajectory, &pattern.timbre_prototype, window_size
+            &self.timbre_trajectory,
+            &pattern.timbre_prototype,
+            window_size,
         );
         let rhythm_traj_sim = self.windowed_trajectory_similarity(
-            &self.rhythm_trajectory, &pattern.rhythm_prototype, window_size
+            &self.rhythm_trajectory,
+            &pattern.rhythm_prototype,
+            window_size,
         );
 
         let timbre_combined = 0.6 * timbre_traj_sim + 0.4 * timbre_sim;
         let rhythm_combined = 0.6 * rhythm_traj_sim + 0.4 * rhythm_sim;
 
-        let rhythm_freq_sim = self.freq_signature_similarity(rhythm_sig, &pattern.rhythm_freq_signature);
-        let timbre_freq_sim = self.freq_signature_similarity(timbre_sig, &pattern.timbre_freq_signature);
+        let rhythm_freq_sim =
+            self.freq_signature_similarity(rhythm_sig, &pattern.rhythm_freq_signature);
+        let timbre_freq_sim =
+            self.freq_signature_similarity(timbre_sig, &pattern.timbre_freq_signature);
 
         let log_curr = (features.spectral_centroid + 1.0).ln();
         let log_pattern = (pattern.mean_spectral_centroid + 1.0).ln();
         let centroid_sim = 1.0 - ((log_curr - log_pattern).abs() / 2.0).min(1.0);
 
-        let flatness_sim = 1.0 - ((features.spectral_flatness - pattern.mean_spectral_flatness).abs() * 4.0).min(1.0);
-        let regularity_sim = 1.0 - ((features.temporal_regularity - pattern.mean_temporal_regularity).abs() * 2.0).min(1.0);
+        let flatness_sim = 1.0
+            - ((features.spectral_flatness - pattern.mean_spectral_flatness).abs() * 4.0).min(1.0);
+        let regularity_sim = 1.0
+            - ((features.temporal_regularity - pattern.mean_temporal_regularity).abs() * 2.0)
+                .min(1.0);
 
         let mel_sim = if !pattern.mean_mel_bands.is_empty() && !features.mel_bands.is_empty() {
-            let dot: f32 = features.mel_bands.iter()
+            let dot: f32 = features
+                .mel_bands
+                .iter()
                 .zip(&pattern.mean_mel_bands)
                 .map(|(a, b)| a * b)
                 .sum();
             let norm_a: f32 = features.mel_bands.iter().map(|x| x * x).sum::<f32>().sqrt();
-            let norm_b: f32 = pattern.mean_mel_bands.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let norm_b: f32 = pattern
+                .mean_mel_bands
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
             if norm_a > 1e-10 && norm_b > 1e-10 {
                 (dot / (norm_a * norm_b)).max(0.0)
             } else {
@@ -274,17 +327,21 @@ impl AudioSentinel {
             0.5
         };
 
-        let silence_sim = 1.0 - ((features.silence_ratio - pattern.mean_silence_ratio).abs() * 3.0).min(1.0);
+        let silence_sim =
+            1.0 - ((features.silence_ratio - pattern.mean_silence_ratio).abs() * 3.0).min(1.0);
 
         // IOI Variance similarity - discriminates rhythm regularity (Rain vs Clock)
-        let burst_density_sim = 1.0 - ((features.burst_density - pattern.mean_burst_density).abs() * 4.0).min(1.0);
+        let burst_density_sim =
+            1.0 - ((features.burst_density - pattern.mean_burst_density).abs() * 4.0).min(1.0);
 
         // Harmonic similarity - discriminates tonal (Birds/Sirens) vs atonal (Clock ticks)
         // Birds sing (high harmonicity), Clocks click (low harmonicity)
-        let harmonic_sim = 1.0 - ((features.harmonic_ratio - pattern.mean_harmonic_ratio).abs() * 3.0).min(1.0);
+        let harmonic_sim =
+            1.0 - ((features.harmonic_ratio - pattern.mean_harmonic_ratio).abs() * 3.0).min(1.0);
 
         let hdc_sim = 0.5 * timbre_combined + 0.5 * rhythm_combined;
-        let spectral_sim = 0.3 * centroid_sim + 0.3 * mel_sim + 0.2 * flatness_sim + 0.2 * regularity_sim;
+        let spectral_sim =
+            0.3 * centroid_sim + 0.3 * mel_sim + 0.2 * flatness_sim + 0.2 * regularity_sim;
         let freq_sim = 0.5 * rhythm_freq_sim + 0.5 * timbre_freq_sim;
 
         // "Tri-Chromat" Weighting: Four sensory channels for complete sound discrimination
@@ -292,8 +349,12 @@ impl AudioSentinel {
         // Silence: 20% (Density - fixes Dog/Clock)
         // Harmonicity: 15% (Tone - fixes Birds/Clock)
         // IOI Variance: 15% (Rhythm - fixes Rain/Clock)
-        let combined = 0.23 * hdc_sim + 0.14 * spectral_sim + 0.13 * freq_sim
-                     + 0.20 * silence_sim + 0.15 * harmonic_sim + 0.15 * burst_density_sim;
+        let combined = 0.23 * hdc_sim
+            + 0.14 * spectral_sim
+            + 0.13 * freq_sim
+            + 0.20 * silence_sim
+            + 0.15 * harmonic_sim
+            + 0.15 * burst_density_sim;
 
         PatternSimilarity {
             timbre: timbre_combined,
@@ -319,10 +380,14 @@ impl AudioSentinel {
         window_size: usize,
     ) -> PatternSimilarity {
         let timbre_sim = self.windowed_trajectory_similarity(
-            &self.timbre_trajectory, &pattern.timbre_prototype, window_size
+            &self.timbre_trajectory,
+            &pattern.timbre_prototype,
+            window_size,
         );
         let rhythm_sim = self.windowed_trajectory_similarity(
-            &self.rhythm_trajectory, &pattern.rhythm_prototype, window_size
+            &self.rhythm_trajectory,
+            &pattern.rhythm_prototype,
+            window_size,
         );
         let envelope_sim = vectors.envelope.similarity(&pattern.envelope_prototype);
 
@@ -332,14 +397,30 @@ impl AudioSentinel {
         for i in 0..NUM_LTC_LEVELS {
             let level_weight = 1.0 / (1.0 + 0.3 * i as f32);
 
-            let curr_timbre_mag: f32 = current_timbre_velocities[i].values.iter()
-                .map(|x| x * x).sum::<f32>().sqrt();
-            let proto_timbre_mag: f32 = pattern.timbre_scale_prototypes[i].values.iter()
-                .map(|x| x * x).sum::<f32>().sqrt();
-            let curr_rhythm_mag: f32 = current_rhythm_velocities[i].values.iter()
-                .map(|x| x * x).sum::<f32>().sqrt();
-            let proto_rhythm_mag: f32 = pattern.rhythm_scale_prototypes[i].values.iter()
-                .map(|x| x * x).sum::<f32>().sqrt();
+            let curr_timbre_mag: f32 = current_timbre_velocities[i]
+                .values
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
+            let proto_timbre_mag: f32 = pattern.timbre_scale_prototypes[i]
+                .values
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
+            let curr_rhythm_mag: f32 = current_rhythm_velocities[i]
+                .values
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
+            let proto_rhythm_mag: f32 = pattern.rhythm_scale_prototypes[i]
+                .values
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
 
             let timbre_mag_sim = if curr_timbre_mag > 1e-10 && proto_timbre_mag > 1e-10 {
                 let ratio = curr_timbre_mag / proto_timbre_mag;
@@ -357,13 +438,17 @@ impl AudioSentinel {
             timbre_scale_sim += level_weight * timbre_mag_sim;
             rhythm_scale_sim += level_weight * rhythm_mag_sim;
         }
-        let weight_sum: f32 = (0..NUM_LTC_LEVELS).map(|i| 1.0 / (1.0 + 0.3 * i as f32)).sum();
+        let weight_sum: f32 = (0..NUM_LTC_LEVELS)
+            .map(|i| 1.0 / (1.0 + 0.3 * i as f32))
+            .sum();
         timbre_scale_sim /= weight_sum;
         rhythm_scale_sim /= weight_sum;
         let multi_scale_sim = 0.5 * timbre_scale_sim + 0.5 * rhythm_scale_sim;
 
-        let rhythm_freq_sim = self.freq_signature_similarity(rhythm_sig, &pattern.rhythm_freq_signature);
-        let timbre_freq_sim = self.freq_signature_similarity(timbre_sig, &pattern.timbre_freq_signature);
+        let rhythm_freq_sim =
+            self.freq_signature_similarity(rhythm_sig, &pattern.rhythm_freq_signature);
+        let timbre_freq_sim =
+            self.freq_signature_similarity(timbre_sig, &pattern.timbre_freq_signature);
 
         // Spectral features
         let log_curr = (features.spectral_centroid + 1.0).ln();
@@ -372,12 +457,19 @@ impl AudioSentinel {
         let centroid_sim = 1.0 - centroid_diff.min(1.0);
 
         let mel_sim = if !pattern.mean_mel_bands.is_empty() && !features.mel_bands.is_empty() {
-            let dot: f32 = features.mel_bands.iter()
+            let dot: f32 = features
+                .mel_bands
+                .iter()
                 .zip(&pattern.mean_mel_bands)
                 .map(|(a, b)| a * b)
                 .sum();
             let norm_a: f32 = features.mel_bands.iter().map(|x| x * x).sum::<f32>().sqrt();
-            let norm_b: f32 = pattern.mean_mel_bands.iter().map(|x| x * x).sum::<f32>().sqrt();
+            let norm_b: f32 = pattern
+                .mean_mel_bands
+                .iter()
+                .map(|x| x * x)
+                .sum::<f32>()
+                .sqrt();
             if norm_a > 1e-10 && norm_b > 1e-10 {
                 (dot / (norm_a * norm_b)).max(0.0)
             } else {
@@ -390,7 +482,8 @@ impl AudioSentinel {
         let flatness_diff = (features.spectral_flatness - pattern.mean_spectral_flatness).abs();
         let flatness_sim = 1.0 - (flatness_diff * 8.0).min(1.0);
 
-        let regularity_diff = (features.temporal_regularity - pattern.mean_temporal_regularity).abs();
+        let regularity_diff =
+            (features.temporal_regularity - pattern.mean_temporal_regularity).abs();
         let regularity_sim = 1.0 - (regularity_diff * 2.0).min(1.0);
 
         let base_spectral_sim = 0.30 * centroid_sim + 0.40 * mel_sim + 0.30 * regularity_sim;
@@ -410,7 +503,11 @@ impl AudioSentinel {
         let temporal_freq_avg = 0.35 * rhythm_freq_sim + 0.65 * timbre_freq_sim;
         let hdc_gate = 0.5 + 0.5 * hdc_sim * hdc_sim;
 
-        let base_combined = (0.25 * temporal_freq_avg + 0.35 * spectral_sim + 0.30 * hdc_sim + 0.10 * multi_scale_sim) * hdc_gate;
+        let base_combined = (0.25 * temporal_freq_avg
+            + 0.35 * spectral_sim
+            + 0.30 * hdc_sim
+            + 0.10 * multi_scale_sim)
+            * hdc_gate;
 
         let both_tonal = features.spectral_flatness < 0.1 && pattern.mean_spectral_flatness < 0.1;
         let temporal_gate = if spectral_sim > 0.7 && both_tonal {
@@ -447,7 +544,12 @@ impl AudioSentinel {
         encoded.normalize()
     }
 
-    fn windowed_trajectory_similarity(&self, trajectory: &[HV], prototype: &HV, window_size: usize) -> f32 {
+    fn windowed_trajectory_similarity(
+        &self,
+        trajectory: &[HV],
+        prototype: &HV,
+        window_size: usize,
+    ) -> f32 {
         if trajectory.is_empty() {
             return 0.0;
         }
@@ -482,7 +584,8 @@ impl AudioSentinel {
             return [0.0; 8];
         }
 
-        let signal: Vec<f32> = trajectory.iter()
+        let signal: Vec<f32> = trajectory
+            .iter()
             .map(|hv| hv.values.iter().take(1024).sum())
             .collect();
 
@@ -518,7 +621,8 @@ impl AudioSentinel {
 
     pub fn start_learning(&mut self, name: &str, category: AudioCategory) {
         self.learning_pattern = Some(name.to_string());
-        self.patterns.insert(name.to_string(), AudioPattern::new(name, category));
+        self.patterns
+            .insert(name.to_string(), AudioPattern::new(name, category));
         self.ltc_timbre.reset();
         self.ltc_rhythm.reset();
         if let Some(ref mut encoder) = self.premium_encoder {
@@ -548,24 +652,32 @@ impl AudioSentinel {
                     let n = pattern.frame_count as f32;
                     pattern.timbre_prototype = pattern.timbre_prototype.scale(1.0 / n).normalize();
                     pattern.rhythm_prototype = pattern.rhythm_prototype.scale(1.0 / n).normalize();
-                    pattern.envelope_prototype = pattern.envelope_prototype.scale(1.0 / n).normalize();
-                    pattern.context_prototype = pattern.context_prototype.scale(1.0 / n).normalize();
+                    pattern.envelope_prototype =
+                        pattern.envelope_prototype.scale(1.0 / n).normalize();
+                    pattern.context_prototype =
+                        pattern.context_prototype.scale(1.0 / n).normalize();
 
                     if pattern.timbre_exemplars.len() < MAX_EXEMPLARS {
-                        pattern.timbre_exemplars.push(pattern.timbre_prototype.clone());
-                        pattern.rhythm_exemplars.push(pattern.rhythm_prototype.clone());
+                        pattern
+                            .timbre_exemplars
+                            .push(pattern.timbre_prototype.clone());
+                        pattern
+                            .rhythm_exemplars
+                            .push(pattern.rhythm_prototype.clone());
                     }
 
                     pattern.trajectory_prototype = trajectory_hv;
                     if pattern.trajectory_exemplars.len() < MAX_EXEMPLARS {
-                        pattern.trajectory_exemplars.push(pattern.trajectory_prototype.clone());
+                        pattern
+                            .trajectory_exemplars
+                            .push(pattern.trajectory_prototype.clone());
                     }
 
                     for i in 0..NUM_LTC_LEVELS {
-                        pattern.timbre_scale_prototypes[i] = pattern.timbre_scale_prototypes[i]
-                            .scale(1.0 / n);
-                        pattern.rhythm_scale_prototypes[i] = pattern.rhythm_scale_prototypes[i]
-                            .scale(1.0 / n);
+                        pattern.timbre_scale_prototypes[i] =
+                            pattern.timbre_scale_prototypes[i].scale(1.0 / n);
+                        pattern.rhythm_scale_prototypes[i] =
+                            pattern.rhythm_scale_prototypes[i].scale(1.0 / n);
                     }
 
                     pattern.rhythm_freq_signature = rhythm_freq_sig;

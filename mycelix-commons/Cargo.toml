@@ -69,6 +69,24 @@ members = [
     "zomes/water-wisdom/integrity",
     "zomes/water-wisdom/coordinator",
 
+    # Food domain (4 zomes)
+    "zomes/food-production/integrity",
+    "zomes/food-production/coordinator",
+    "zomes/food-distribution/integrity",
+    "zomes/food-distribution/coordinator",
+    "zomes/food-preservation/integrity",
+    "zomes/food-preservation/coordinator",
+    "zomes/food-knowledge/integrity",
+    "zomes/food-knowledge/coordinator",
+
+    # Transport domain (3 zomes)
+    "zomes/transport-routes/integrity",
+    "zomes/transport-routes/coordinator",
+    "zomes/transport-sharing/integrity",
+    "zomes/transport-sharing/coordinator",
+    "zomes/transport-impact/integrity",
+    "zomes/transport-impact/coordinator",
+
     # Unified bridge (1 zome)
     "zomes/commons-bridge/integrity",
     "zomes/commons-bridge/coordinator",

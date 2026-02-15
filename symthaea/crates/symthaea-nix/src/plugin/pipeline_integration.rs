@@ -10,11 +10,9 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::mind::{
-    NixActiveInference, ActionPlan, ActionCategory,
-};
-use crate::encoding::NixCodebook;
 use crate::action::executor::{NixOSCommand, SafetyLevel};
+use crate::encoding::NixCodebook;
+use crate::mind::{ActionCategory, ActionPlan, NixActiveInference};
 
 // =============================================================================
 // PIPELINE STAGES
@@ -56,8 +54,13 @@ impl NixPipelineStage {
     /// Ordered sequence of all stages.
     pub fn all() -> &'static [NixPipelineStage] {
         &[
-            Self::Observe, Self::Encode, Self::InferGoal, Self::PlanActions,
-            Self::PhiGate, Self::Execute, Self::Learn,
+            Self::Observe,
+            Self::Encode,
+            Self::InferGoal,
+            Self::PlanActions,
+            Self::PhiGate,
+            Self::Execute,
+            Self::Learn,
         ]
     }
 }
@@ -147,12 +150,7 @@ pub trait NixPipelineHook: Send + Sync {
     fn pre_process(&self) -> f64;
 
     /// Run the full NixOS cognition pipeline on user input.
-    fn process_nix_input(
-        &mut self,
-        input: &str,
-        phi: f64,
-        confidence: f64,
-    ) -> NixPipelineResult;
+    fn process_nix_input(&mut self, input: &str, phi: f64, confidence: f64) -> NixPipelineResult;
 
     /// Called after action execution to record the outcome.
     fn post_execute(&mut self, action: &str, success: bool, output: &str);
@@ -202,11 +200,11 @@ impl NixPipelineProcessor {
     pub fn process(&mut self, input: &str, phi: f64, confidence: f64) -> NixPipelineResult {
         // Stage 1: Observe (skip if configured, e.g. in tests)
         if !self.skip_observe {
-        if let Ok(snapshot) = crate::observe::SystemObserver::snapshot() {
-            let mut encoder = crate::encoding::SystemStateEncoder::new(&mut self.codebook);
-            let state_hv = encoder.encode_snapshot(&snapshot);
-            self.engine.observe_state(state_hv);
-        }
+            if let Ok(snapshot) = crate::observe::SystemObserver::snapshot() {
+                let mut encoder = crate::encoding::SystemStateEncoder::new(&mut self.codebook);
+                let state_hv = encoder.encode_snapshot(&snapshot);
+                self.engine.observe_state(state_hv);
+            }
         }
 
         // Stage 2+3: Infer goal + plan actions
@@ -224,11 +222,17 @@ impl NixPipelineProcessor {
             SafetyLevel::ReadOnly
         } else {
             match plan.actions.first().map(|a| &a.action) {
-                Some(ActionCategory::Rebuild) | Some(ActionCategory::Update) => SafetyLevel::SystemModify,
+                Some(ActionCategory::Rebuild) | Some(ActionCategory::Update) => {
+                    SafetyLevel::SystemModify
+                }
                 Some(ActionCategory::Rollback) => SafetyLevel::SystemCritical,
                 Some(ActionCategory::GarbageCollect) => SafetyLevel::Destructive,
-                Some(ActionCategory::Install) | Some(ActionCategory::Remove) => SafetyLevel::UserModify,
-                Some(ActionCategory::Enable) | Some(ActionCategory::Disable) => SafetyLevel::SystemModify,
+                Some(ActionCategory::Install) | Some(ActionCategory::Remove) => {
+                    SafetyLevel::UserModify
+                }
+                Some(ActionCategory::Enable) | Some(ActionCategory::Disable) => {
+                    SafetyLevel::SystemModify
+                }
                 Some(ActionCategory::Configure) => SafetyLevel::UserModify,
                 _ => SafetyLevel::ReadOnly,
             }
@@ -238,7 +242,9 @@ impl NixPipelineProcessor {
         let phi_allowed = phi >= self.phi_threshold && quadrant.allows_execution();
 
         // Build working memory snapshot
-        let active_memory = self.engine.goal_inference()
+        let active_memory = self
+            .engine
+            .goal_inference()
             .working_memory()
             .items()
             .iter()
@@ -272,7 +278,8 @@ impl NixPipelineProcessor {
         };
         let state_before = self.engine.world_model().system_state().clone();
         let action_cat = ActionCategory::from_command(action);
-        self.engine.learn_from_outcome(&state_before, action_cat, &state_after, outcome, 0.5);
+        self.engine
+            .learn_from_outcome(&state_before, action_cat, &state_after, outcome, 0.5);
     }
 
     /// Access the underlying engine.

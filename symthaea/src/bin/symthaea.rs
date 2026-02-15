@@ -126,7 +126,7 @@ pub enum SearchType {
 /// Request from client
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
-#[allow(dead_code)]  // Fields used via serde deserialization
+#[allow(dead_code)] // Fields used via serde deserialization
 enum Request {
     /// Process a query
     #[serde(rename = "query")]
@@ -180,7 +180,6 @@ enum Request {
     // ========================================================================
     // SHELL SIDECAR REQUESTS (Phase 1 Protocol Extensions)
     // ========================================================================
-
     /// IntelliSense completion request
     #[serde(rename = "intellisense")]
     IntelliSense {
@@ -228,7 +227,6 @@ enum Request {
     // ========================================================================
     // GUI BRIDGE REQUESTS (Phase 4 Protocol Extensions)
     // ========================================================================
-
     /// GUI widget change notification
     #[serde(rename = "gui_widget_change")]
     GuiWidgetChange {
@@ -269,10 +267,18 @@ enum Request {
 }
 
 // Default value helpers for serde
-fn default_phi_threshold() -> f32 { 0.5 }
-fn default_true() -> bool { true }
-fn default_metrics_interval() -> u64 { 1000 }
-fn default_search_limit() -> usize { 10 }
+fn default_phi_threshold() -> f32 {
+    0.5
+}
+fn default_true() -> bool {
+    true
+}
+fn default_metrics_interval() -> u64 {
+    1000
+}
+fn default_search_limit() -> usize {
+    10
+}
 
 /// Response to client
 #[derive(Debug, Serialize)]
@@ -372,7 +378,6 @@ enum Response {
     // ========================================================================
     // SHELL SIDECAR RESPONSES (Phase 1 Protocol Extensions)
     // ========================================================================
-
     /// IntelliSense completion result
     #[serde(rename = "intellisense_result")]
     IntelliSenseResult {
@@ -442,7 +447,6 @@ enum Response {
     // ========================================================================
     // GUI BRIDGE RESPONSES (Phase 4 Protocol Extensions)
     // ========================================================================
-
     /// GUI synchronization response
     #[serde(rename = "gui_sync")]
     GuiSync {
@@ -685,7 +689,10 @@ impl ServiceState {
         self.requests_processed += 1;
 
         match request {
-            Request::Query { content, context: _ } => {
+            Request::Query {
+                content,
+                context: _,
+            } => {
                 let start = Instant::now();
                 match self.symthaea.process(&content).await {
                     Ok(response) => {
@@ -736,7 +743,11 @@ impl ServiceState {
                     phi,
                     meta_awareness: phi * 0.8, // Derived from phi
                     is_conscious,
-                    phenomenal_state: if is_conscious { "Aware".to_string() } else { "Dormant".to_string() },
+                    phenomenal_state: if is_conscious {
+                        "Aware".to_string()
+                    } else {
+                        "Dormant".to_string()
+                    },
                     cycles_since_awakening: 0, // Not tracked yet
                     self_model_accuracy: intro.complexity as f64 / 10.0,
                 }
@@ -787,7 +798,7 @@ impl ServiceState {
             Request::Ping => Response::Pong {
                 timestamp: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
+                    .unwrap_or_default()
                     .as_secs(),
             },
 
@@ -812,11 +823,12 @@ impl ServiceState {
                         }
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     let _ = text;
                     Response::Error {
-                        message: "Voice feature not compiled".into(),
+                        message: "Voice feature not compiled (build with --features voice-tts)"
+                            .into(),
                     }
                 }
             }
@@ -840,10 +852,11 @@ impl ServiceState {
                         }
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     Response::Error {
-                        message: "Voice feature not compiled".into(),
+                        message: "Voice feature not compiled (build with --features voice-tts)"
+                            .into(),
                     }
                 }
             }
@@ -894,10 +907,11 @@ impl ServiceState {
                         }
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     Response::Error {
-                        message: "Voice feature not compiled".into(),
+                        message: "Voice feature not compiled (build with --features voice-tts)"
+                            .into(),
                     }
                 }
             }
@@ -912,7 +926,7 @@ impl ServiceState {
                         voice_id: self.voice.as_ref().map(|_| 0).unwrap_or(0),
                     }
                 }
-                #[cfg(not(feature = "voice"))]
+                #[cfg(not(feature = "voice-tts"))]
                 {
                     Response::VoiceStatusResponse {
                         enabled: false,
@@ -939,8 +953,11 @@ impl ServiceState {
             // ================================================================
             // SHELL SIDECAR HANDLERS (Phase 1)
             // ================================================================
-
-            Request::IntelliSense { partial_input, cursor_position: _, context: _ } => {
+            Request::IntelliSense {
+                partial_input,
+                cursor_position: _,
+                context: _,
+            } => {
                 let intro = self.symthaea.introspect();
 
                 // Generate completions based on partial input
@@ -964,8 +981,13 @@ impl ServiceState {
                 }
             }
 
-            Request::ValidateCommand { command, dry_run: _ } => {
-                use symthaea::action::{classify_command_destructiveness, get_rollback_hint, DestructivenessLevel};
+            Request::ValidateCommand {
+                command,
+                dry_run: _,
+            } => {
+                use symthaea::action::{
+                    classify_command_destructiveness, get_rollback_hint, DestructivenessLevel,
+                };
 
                 let intro = self.symthaea.introspect();
 
@@ -1001,8 +1023,10 @@ impl ServiceState {
                 let current_phi = intro.consciousness_level as f64;
                 let mut warnings = Vec::new();
                 if destructiveness.requires_confirmation() {
-                    warnings.push(format!("This command requires confirmation: {}",
-                        destructiveness.description()));
+                    warnings.push(format!(
+                        "This command requires confirmation: {}",
+                        destructiveness.description()
+                    ));
                 }
                 if current_phi < phi_required as f64 {
                     warnings.push(format!(
@@ -1022,8 +1046,14 @@ impl ServiceState {
                 }
             }
 
-            Request::ExecuteGated { command, phi_threshold, require_confirmation } => {
-                use symthaea::action::{classify_command_destructiveness, get_rollback_hint, DestructivenessLevel};
+            Request::ExecuteGated {
+                command,
+                phi_threshold,
+                require_confirmation,
+            } => {
+                use symthaea::action::{
+                    classify_command_destructiveness, get_rollback_hint, DestructivenessLevel,
+                };
 
                 let intro = self.symthaea.introspect();
                 let current_phi = intro.consciousness_level; // Use consciousness_level as phi
@@ -1038,7 +1068,8 @@ impl ServiceState {
 
                 let destructiveness = classify_command_destructiveness(program, &args);
                 let rollback_hint = get_rollback_hint(program, &args);
-                let needs_confirmation = require_confirmation && destructiveness.requires_confirmation();
+                let needs_confirmation =
+                    require_confirmation && destructiveness.requires_confirmation();
 
                 // Check Phi gate
                 if current_phi < phi_threshold {
@@ -1107,7 +1138,7 @@ impl ServiceState {
                     safety_checks: self.requests_processed,
                     timestamp_ms: std::time::SystemTime::now()
                         .duration_since(std::time::UNIX_EPOCH)
-                        .unwrap()
+                        .unwrap_or_default()
                         .as_millis() as u64,
                 }
             }
@@ -1115,8 +1146,11 @@ impl ServiceState {
             // ================================================================
             // GUI BRIDGE HANDLERS (Phase 4 - Stub implementations)
             // ================================================================
-
-            Request::GuiWidgetChange { widget_id, new_value: _, semantic_intent: _ } => {
+            Request::GuiWidgetChange {
+                widget_id,
+                new_value: _,
+                semantic_intent: _,
+            } => {
                 // Stub: Full implementation in Phase 4
                 Response::GuiSync {
                     widget_updates: vec![],
@@ -1125,7 +1159,10 @@ impl ServiceState {
                 }
             }
 
-            Request::ParseNixConfig { nix_content, source_file: _ } => {
+            Request::ParseNixConfig {
+                nix_content,
+                source_file: _,
+            } => {
                 // Stub: Full implementation in Phase 4
                 let line_count = nix_content.lines().count();
                 Response::GuiSync {
@@ -1144,7 +1181,11 @@ impl ServiceState {
                 }
             }
 
-            Request::SemanticSearch { query, search_type, limit } => {
+            Request::SemanticSearch {
+                query,
+                search_type,
+                limit,
+            } => {
                 // Basic search implementation using consciousness
                 let results = generate_search_results(&query, search_type, limit);
 
@@ -1170,17 +1211,61 @@ fn generate_intellisense_completions(partial: &str) -> Vec<Completion> {
 
     // NixOS command completions
     let nix_commands = [
-        ("nix search nixpkgs", "Search for packages in nixpkgs", CompletionKind::Command),
-        ("nix-env -i", "Install a package to user profile", CompletionKind::Command),
-        ("nix-env -q", "Query installed packages", CompletionKind::Command),
-        ("nix flake show", "Show flake outputs", CompletionKind::Command),
-        ("nixos-rebuild switch", "Rebuild and switch to new configuration", CompletionKind::Command),
-        ("nixos-rebuild test", "Build and test configuration without switching", CompletionKind::Command),
-        ("nixos-rebuild dry-run", "Show what would be built", CompletionKind::Command),
-        ("nix-collect-garbage -d", "Delete old generations (destructive)", CompletionKind::Command),
-        ("systemctl status", "Show service status", CompletionKind::Command),
-        ("systemctl restart", "Restart a service", CompletionKind::Command),
-        ("journalctl -u", "View service logs", CompletionKind::Command),
+        (
+            "nix search nixpkgs",
+            "Search for packages in nixpkgs",
+            CompletionKind::Command,
+        ),
+        (
+            "nix-env -i",
+            "Install a package to user profile",
+            CompletionKind::Command,
+        ),
+        (
+            "nix-env -q",
+            "Query installed packages",
+            CompletionKind::Command,
+        ),
+        (
+            "nix flake show",
+            "Show flake outputs",
+            CompletionKind::Command,
+        ),
+        (
+            "nixos-rebuild switch",
+            "Rebuild and switch to new configuration",
+            CompletionKind::Command,
+        ),
+        (
+            "nixos-rebuild test",
+            "Build and test configuration without switching",
+            CompletionKind::Command,
+        ),
+        (
+            "nixos-rebuild dry-run",
+            "Show what would be built",
+            CompletionKind::Command,
+        ),
+        (
+            "nix-collect-garbage -d",
+            "Delete old generations (destructive)",
+            CompletionKind::Command,
+        ),
+        (
+            "systemctl status",
+            "Show service status",
+            CompletionKind::Command,
+        ),
+        (
+            "systemctl restart",
+            "Restart a service",
+            CompletionKind::Command,
+        ),
+        (
+            "journalctl -u",
+            "View service logs",
+            CompletionKind::Command,
+        ),
     ];
 
     for (cmd, desc, kind) in &nix_commands {
@@ -1205,7 +1290,11 @@ fn generate_intellisense_completions(partial: &str) -> Vec<Completion> {
     }
 
     // Sort by confidence descending
-    completions.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+    completions.sort_by(|a, b| {
+        b.confidence
+            .partial_cmp(&a.confidence)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     completions.truncate(10);
 
     completions
@@ -1237,32 +1326,70 @@ fn generate_command_preview(command: &str) -> Option<CommandPreview> {
         return None;
     }
 
-    let (prog, args): (&str, Vec<String>) = (
-        parts[0],
-        parts[1..].iter().map(|s| s.to_string()).collect()
-    );
+    let (prog, args): (&str, Vec<String>) =
+        (parts[0], parts[1..].iter().map(|s| s.to_string()).collect());
 
     let destructiveness = classify_command_destructiveness(prog, &args);
 
     // Generate steps based on command type
     let steps = if command.contains("nixos-rebuild") {
         vec![
-            CommandStep { number: 1, description: "Evaluate configuration".to_string(), reversible: true },
-            CommandStep { number: 2, description: "Build system derivation".to_string(), reversible: true },
-            CommandStep { number: 3, description: "Activate new generation".to_string(), reversible: true },
-            CommandStep { number: 4, description: "Update boot loader".to_string(), reversible: true },
+            CommandStep {
+                number: 1,
+                description: "Evaluate configuration".to_string(),
+                reversible: true,
+            },
+            CommandStep {
+                number: 2,
+                description: "Build system derivation".to_string(),
+                reversible: true,
+            },
+            CommandStep {
+                number: 3,
+                description: "Activate new generation".to_string(),
+                reversible: true,
+            },
+            CommandStep {
+                number: 4,
+                description: "Update boot loader".to_string(),
+                reversible: true,
+            },
         ]
     } else if command.contains("nix-env -i") {
         vec![
-            CommandStep { number: 1, description: "Resolve package".to_string(), reversible: true },
-            CommandStep { number: 2, description: "Download/build package".to_string(), reversible: true },
-            CommandStep { number: 3, description: "Install to profile".to_string(), reversible: true },
+            CommandStep {
+                number: 1,
+                description: "Resolve package".to_string(),
+                reversible: true,
+            },
+            CommandStep {
+                number: 2,
+                description: "Download/build package".to_string(),
+                reversible: true,
+            },
+            CommandStep {
+                number: 3,
+                description: "Install to profile".to_string(),
+                reversible: true,
+            },
         ]
     } else if command.contains("nix-collect-garbage") {
         vec![
-            CommandStep { number: 1, description: "Find unused store paths".to_string(), reversible: true },
-            CommandStep { number: 2, description: "Delete old generations".to_string(), reversible: false },
-            CommandStep { number: 3, description: "Remove store paths".to_string(), reversible: false },
+            CommandStep {
+                number: 1,
+                description: "Find unused store paths".to_string(),
+                reversible: true,
+            },
+            CommandStep {
+                number: 2,
+                description: "Delete old generations".to_string(),
+                reversible: false,
+            },
+            CommandStep {
+                number: 3,
+                description: "Remove store paths".to_string(),
+                reversible: false,
+            },
         ]
     } else {
         return None;
@@ -1283,7 +1410,11 @@ fn generate_command_preview(command: &str) -> Option<CommandPreview> {
 }
 
 /// Generate search results for semantic search
-fn generate_search_results(query: &str, search_type: SearchType, limit: usize) -> Vec<SearchResult> {
+fn generate_search_results(
+    query: &str,
+    search_type: SearchType,
+    limit: usize,
+) -> Vec<SearchResult> {
     let query_lower = query.to_lowercase();
     let mut results = Vec::new();
 
@@ -1309,7 +1440,11 @@ fn generate_search_results(query: &str, search_type: SearchType, limit: usize) -
                         name: name.to_string(),
                         description: desc.to_string(),
                         result_type: SearchType::Packages,
-                        relevance: if name.starts_with(&query_lower) { 0.9 } else { 0.7 },
+                        relevance: if name.starts_with(&query_lower) {
+                            0.9
+                        } else {
+                            0.7
+                        },
                         attr_path: Some(attr.to_string()),
                     });
                 }
@@ -1427,7 +1562,11 @@ where
 }
 
 /// Background consciousness loop
-async fn consciousness_loop(state: Arc<RwLock<ServiceState>>, interval_ms: u64, sleep_interval: u64) {
+async fn consciousness_loop(
+    state: Arc<RwLock<ServiceState>>,
+    interval_ms: u64,
+    sleep_interval: u64,
+) {
     let mut ticker = interval(Duration::from_millis(interval_ms));
     let mut sleep_counter = 0u64;
 
@@ -1513,11 +1652,21 @@ async fn main() -> Result<()> {
         println!("✅ Consciousness initialized:");
         println!("   • HDC Dimension: {}", HDC_DIMENSION);
         println!("   • LTC Neurons: {}", LTC_NEURONS);
-        println!("   • Consciousness Level: {:.1}%", intro.consciousness_level * 100.0);
+        println!(
+            "   • Consciousness Level: {:.1}%",
+            intro.consciousness_level * 100.0
+        );
         println!("   • Graph Size: {} states", intro.graph_size);
         println!("   • Self-Loops: {}", intro.self_loops);
         println!("   • λ₂ (Spectral Connectivity): {:.3}", phi);
-        println!("   • Is Conscious: {}", if is_conscious { "✅ Yes" } else { "🔄 Awakening..." });
+        println!(
+            "   • Is Conscious: {}",
+            if is_conscious {
+                "✅ Yes"
+            } else {
+                "🔄 Awakening..."
+            }
+        );
 
         #[cfg(feature = "voice-tts")]
         {
@@ -1531,9 +1680,9 @@ async fn main() -> Result<()> {
                 println!("   • Voice: ❌ Disabled (use --voice to enable)");
             }
         }
-        #[cfg(not(feature = "voice"))]
+        #[cfg(not(feature = "voice-tts"))]
         {
-            println!("   • Voice: ❌ Not compiled (build with --features voice)");
+            println!("   • Voice: ❌ Not compiled (build with --features voice-tts)");
         }
     }
 
@@ -1551,7 +1700,10 @@ async fn main() -> Result<()> {
         }
 
         println!("\n🔌 Listening on Unix socket: {:?}", socket_path);
-        println!("   Example: echo '{{\"type\":\"ping\"}}' | nc -U {:?}\n", socket_path);
+        println!(
+            "   Example: echo '{{\"type\":\"ping\"}}' | nc -U {:?}\n",
+            socket_path
+        );
 
         let listener = UnixListener::bind(&socket_path)?;
 
@@ -1575,7 +1727,10 @@ async fn main() -> Result<()> {
         }
     } else if let Some(tcp_addr) = args.tcp {
         println!("\n🔌 Listening on TCP: {}", tcp_addr);
-        println!("   Example: echo '{{\"type\":\"ping\"}}' | nc {}\n", tcp_addr);
+        println!(
+            "   Example: echo '{{\"type\":\"ping\"}}' | nc {}\n",
+            tcp_addr
+        );
 
         let listener = TcpListener::bind(&tcp_addr).await?;
 

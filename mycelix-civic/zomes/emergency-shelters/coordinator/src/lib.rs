@@ -153,6 +153,22 @@ pub struct UpdateShelterStatusInput {
     pub new_status: ShelterStatus,
 }
 
+/// Update a shelter entry (general update)
+#[hdk_extern]
+pub fn update_shelter(input: UpdateShelterInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::Shelter(input.updated_entry),
+    )
+}
+
+/// Input for updating a shelter
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateShelterInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: Shelter,
+}
+
 /// Check in a person or party to a shelter
 #[hdk_extern]
 pub fn check_in_person(input: CheckInPersonInput) -> ExternResult<Record> {
@@ -431,4 +447,592 @@ pub struct FindNearbySheltersInput {
     pub lat: f64,
     pub lon: f64,
     pub radius_km: f32,
+}
+
+/// Haversine distance between two (lat, lon) points in kilometres.
+///
+/// Uses the standard formula with Earth radius = 6371 km.
+/// Extracted as a pure function for testability.
+pub fn haversine_distance_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let dlat = (lat2 - lat1).to_radians();
+    let dlon = (lon2 - lon1).to_radians();
+    let a = (dlat / 2.0).sin().powi(2)
+        + lat1.to_radians().cos()
+            * lat2.to_radians().cos()
+            * (dlon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+    6371.0 * c
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // HAVERSINE DISTANCE TESTS
+    // ========================================================================
+
+    #[test]
+    fn haversine_same_point_is_zero() {
+        let d = haversine_distance_km(40.7128, -74.0060, 40.7128, -74.0060);
+        assert!(d.abs() < 1e-10, "Same point should be 0, got {}", d);
+    }
+
+    #[test]
+    fn haversine_nyc_to_la() {
+        // NYC (40.7128, -74.0060) to LA (34.0522, -118.2437)
+        // Expected: ~3,944 km
+        let d = haversine_distance_km(40.7128, -74.0060, 34.0522, -118.2437);
+        assert!(
+            (d - 3944.0).abs() < 50.0,
+            "NYC to LA expected ~3944 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_london_to_tokyo() {
+        // London (51.5074, -0.1278) to Tokyo (35.6762, 139.6503)
+        // Expected: ~9,560 km
+        let d = haversine_distance_km(51.5074, -0.1278, 35.6762, 139.6503);
+        assert!(
+            (d - 9560.0).abs() < 50.0,
+            "London to Tokyo expected ~9560 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_antipodal_points() {
+        // North pole to south pole: exactly 20015.09 km (half circumference)
+        let d = haversine_distance_km(90.0, 0.0, -90.0, 0.0);
+        assert!(
+            (d - 20015.0).abs() < 100.0,
+            "Pole-to-pole expected ~20015 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_equator_opposite_sides() {
+        // (0, 0) to (0, 180): half equatorial circumference ~20015 km
+        let d = haversine_distance_km(0.0, 0.0, 0.0, 180.0);
+        assert!(
+            (d - 20015.0).abs() < 100.0,
+            "Equator 0-180 expected ~20015 km, got {} km",
+            d
+        );
+    }
+
+    #[test]
+    fn haversine_symmetry() {
+        let d1 = haversine_distance_km(40.7128, -74.0060, 34.0522, -118.2437);
+        let d2 = haversine_distance_km(34.0522, -118.2437, 40.7128, -74.0060);
+        assert!(
+            (d1 - d2).abs() < 1e-10,
+            "Distance should be symmetric: {} vs {}",
+            d1,
+            d2
+        );
+    }
+
+    #[test]
+    fn haversine_short_distance() {
+        // Two points about 1 km apart in Richardson, TX
+        // (32.9483, -96.7299) to (32.9573, -96.7299) -- ~1 km north
+        let d = haversine_distance_km(32.9483, -96.7299, 32.9573, -96.7299);
+        assert!(
+            (d - 1.0).abs() < 0.1,
+            "Expected ~1 km, got {} km",
+            d
+        );
+    }
+
+    // ========================================================================
+    // INPUT STRUCT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn register_shelter_input_serde_roundtrip() {
+        let input = RegisterShelterInput {
+            id: "shelter-1".into(),
+            name: "Community Center".into(),
+            location_lat: 32.9483,
+            location_lon: -96.7299,
+            address: "123 Main St".into(),
+            capacity: 200,
+            shelter_type: ShelterType::Community,
+            amenities: vec![Amenity::Power, Amenity::Water],
+            contact: "555-0100".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: RegisterShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.id, "shelter-1");
+        assert_eq!(parsed.name, "Community Center");
+        assert!((parsed.location_lat - 32.9483).abs() < 1e-10);
+        assert_eq!(parsed.capacity, 200);
+        assert_eq!(parsed.amenities.len(), 2);
+    }
+
+    #[test]
+    fn find_nearby_input_serde_roundtrip() {
+        let input = FindNearbySheltersInput {
+            lat: 32.9483,
+            lon: -96.7299,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: FindNearbySheltersInput = serde_json::from_str(&json).expect("deserialize");
+        assert!((parsed.lat - 32.9483).abs() < 1e-10);
+        assert!((parsed.lon - (-96.7299)).abs() < 1e-10);
+        assert!((parsed.radius_km - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn update_shelter_status_input_serde_roundtrip() {
+        // Can't construct ActionHash easily in tests, but we can test
+        // the ShelterStatus enum serde via the integrity crate
+        let statuses = vec![
+            ShelterStatus::Open,
+            ShelterStatus::Full,
+            ShelterStatus::Closed,
+            ShelterStatus::Evacuating,
+        ];
+        for status in statuses {
+            let json = serde_json::to_string(&status).expect("serialize");
+            let parsed: ShelterStatus = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, status);
+        }
+    }
+
+    #[test]
+    fn check_in_person_input_serde_roundtrip() {
+        // Test the serializable parts of CheckInPersonInput
+        // (ActionHash field requires special handling, test the rest)
+        let special_needs: Vec<String> = vec!["wheelchair".into(), "oxygen".into()];
+        let json = serde_json::to_string(&special_needs).expect("serialize");
+        let parsed: Vec<String> = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed, vec!["wheelchair", "oxygen"]);
+    }
+
+    // ========================================================================
+    // FULL INPUT STRUCT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn check_in_person_input_full_serde_roundtrip() {
+        let input = CheckInPersonInput {
+            shelter_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            person_name: "Alice Smith".into(),
+            person_id: Some("TX-99999".into()),
+            party_size: 4,
+            special_needs: vec!["diabetic".into(), "service animal".into()],
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: CheckInPersonInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.person_name, "Alice Smith");
+        assert_eq!(parsed.person_id, Some("TX-99999".into()));
+        assert_eq!(parsed.party_size, 4);
+        assert_eq!(parsed.special_needs.len(), 2);
+    }
+
+    #[test]
+    fn check_in_person_input_no_id_serde() {
+        let input = CheckInPersonInput {
+            shelter_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            person_name: "Bob Jones".into(),
+            person_id: None,
+            party_size: 1,
+            special_needs: vec![],
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: CheckInPersonInput = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.person_id.is_none());
+        assert!(parsed.special_needs.is_empty());
+        assert_eq!(parsed.party_size, 1);
+    }
+
+    #[test]
+    fn check_out_person_input_serde_roundtrip() {
+        let input = CheckOutPersonInput {
+            registration_hash: ActionHash::from_raw_36(vec![5u8; 36]),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let _parsed: CheckOutPersonInput = serde_json::from_str(&json).expect("deserialize");
+    }
+
+    #[test]
+    fn update_shelter_status_input_full_serde_roundtrip() {
+        let input = UpdateShelterStatusInput {
+            shelter_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            new_status: ShelterStatus::Evacuating,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateShelterStatusInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.new_status, ShelterStatus::Evacuating);
+    }
+
+    // ========================================================================
+    // SHELTER TYPE ALL VARIANTS SERDE
+    // ========================================================================
+
+    #[test]
+    fn shelter_type_all_variants_serde() {
+        let variants = vec![
+            ShelterType::Emergency,
+            ShelterType::Community,
+            ShelterType::Medical,
+            ShelterType::PetFriendly,
+            ShelterType::Accessible,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).expect("serialize");
+            let parsed: ShelterType = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, variant);
+        }
+    }
+
+    // ========================================================================
+    // AMENITY ALL VARIANTS SERDE
+    // ========================================================================
+
+    #[test]
+    fn amenity_all_variants_serde() {
+        let variants = vec![
+            Amenity::Power,
+            Amenity::Water,
+            Amenity::Medical,
+            Amenity::Food,
+            Amenity::Showers,
+            Amenity::Wifi,
+            Amenity::Charging,
+            Amenity::Cots,
+            Amenity::Blankets,
+            Amenity::PetArea,
+            Amenity::ChildCare,
+            Amenity::MentalHealth,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).expect("serialize");
+            let parsed: Amenity = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed, variant);
+        }
+    }
+
+    // ========================================================================
+    // SHELTER STRUCT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn shelter_full_struct_serde_roundtrip() {
+        let shelter = Shelter {
+            id: "shelter-100".into(),
+            name: "High School Gym".into(),
+            location_lat: 32.95,
+            location_lon: -96.73,
+            address: "456 Oak Ave, Richardson TX".into(),
+            capacity: 500,
+            current_occupancy: 250,
+            shelter_type: ShelterType::Emergency,
+            amenities: vec![
+                Amenity::Power,
+                Amenity::Water,
+                Amenity::Food,
+                Amenity::Cots,
+                Amenity::Blankets,
+                Amenity::MentalHealth,
+            ],
+            status: ShelterStatus::Open,
+            contact: "911-SHELTER".into(),
+        };
+        let json = serde_json::to_string(&shelter).expect("serialize");
+        let parsed: Shelter = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed, shelter);
+    }
+
+    #[test]
+    fn shelter_zero_occupancy_serde() {
+        let shelter = Shelter {
+            id: "s-new".into(),
+            name: "New Shelter".into(),
+            location_lat: 0.0,
+            location_lon: 0.0,
+            address: "1 Street".into(),
+            capacity: 100,
+            current_occupancy: 0,
+            shelter_type: ShelterType::Community,
+            amenities: vec![],
+            status: ShelterStatus::Open,
+            contact: "555-0000".into(),
+        };
+        let json = serde_json::to_string(&shelter).expect("serialize");
+        let parsed: Shelter = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.current_occupancy, 0);
+        assert!(parsed.amenities.is_empty());
+    }
+
+    #[test]
+    fn shelter_full_capacity_status_serde() {
+        let shelter = Shelter {
+            id: "s-full".into(),
+            name: "Full Shelter".into(),
+            location_lat: 33.0,
+            location_lon: -97.0,
+            address: "789 Elm St".into(),
+            capacity: 50,
+            current_occupancy: 50,
+            shelter_type: ShelterType::PetFriendly,
+            amenities: vec![Amenity::PetArea],
+            status: ShelterStatus::Full,
+            contact: "555-1111".into(),
+        };
+        let json = serde_json::to_string(&shelter).expect("serialize");
+        let parsed: Shelter = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.status, ShelterStatus::Full);
+        assert_eq!(parsed.current_occupancy, parsed.capacity);
+    }
+
+    // ========================================================================
+    // SHELTER REGISTRATION STRUCT SERDE TESTS
+    // ========================================================================
+
+    #[test]
+    fn shelter_registration_full_serde_roundtrip() {
+        let reg = ShelterRegistration {
+            shelter_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            person_name: "Jane Doe".into(),
+            person_id: Some("DL-123456".into()),
+            party_size: 3,
+            special_needs: vec!["infant".into(), "medication refrigeration".into()],
+            registered_at: Timestamp::from_micros(5000000),
+            checked_out_at: None,
+        };
+        let json = serde_json::to_string(&reg).expect("serialize");
+        let parsed: ShelterRegistration = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.person_name, "Jane Doe");
+        assert_eq!(parsed.party_size, 3);
+        assert!(parsed.checked_out_at.is_none());
+        assert_eq!(parsed.special_needs.len(), 2);
+    }
+
+    #[test]
+    fn shelter_registration_checked_out_serde() {
+        let reg = ShelterRegistration {
+            shelter_hash: ActionHash::from_raw_36(vec![2u8; 36]),
+            person_name: "John Smith".into(),
+            person_id: None,
+            party_size: 1,
+            special_needs: vec![],
+            registered_at: Timestamp::from_micros(1000),
+            checked_out_at: Some(Timestamp::from_micros(9000)),
+        };
+        let json = serde_json::to_string(&reg).expect("serialize");
+        let parsed: ShelterRegistration = serde_json::from_str(&json).expect("deserialize");
+        assert!(parsed.checked_out_at.is_some());
+        assert!(parsed.person_id.is_none());
+    }
+
+    // ========================================================================
+    // BOUNDARY CONDITION TESTS
+    // ========================================================================
+
+    #[test]
+    fn check_in_person_input_max_party_size() {
+        let input = CheckInPersonInput {
+            shelter_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            person_name: "Large Family".into(),
+            person_id: None,
+            party_size: u8::MAX, // 255
+            special_needs: vec![],
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: CheckInPersonInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.party_size, 255);
+    }
+
+    #[test]
+    fn register_shelter_input_max_capacity() {
+        let input = RegisterShelterInput {
+            id: "s-big".into(),
+            name: "Convention Center".into(),
+            location_lat: 40.0,
+            location_lon: -74.0,
+            address: "1 Convention Way".into(),
+            capacity: u32::MAX,
+            shelter_type: ShelterType::Emergency,
+            amenities: vec![],
+            contact: "emergency@city.gov".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: RegisterShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.capacity, u32::MAX);
+    }
+
+    #[test]
+    fn register_shelter_input_all_amenities() {
+        let input = RegisterShelterInput {
+            id: "s-deluxe".into(),
+            name: "Deluxe Shelter".into(),
+            location_lat: 32.0,
+            location_lon: -96.0,
+            address: "1 Luxury Way".into(),
+            capacity: 1000,
+            shelter_type: ShelterType::Accessible,
+            amenities: vec![
+                Amenity::Power,
+                Amenity::Water,
+                Amenity::Medical,
+                Amenity::Food,
+                Amenity::Showers,
+                Amenity::Wifi,
+                Amenity::Charging,
+                Amenity::Cots,
+                Amenity::Blankets,
+                Amenity::PetArea,
+                Amenity::ChildCare,
+                Amenity::MentalHealth,
+            ],
+            contact: "555-ALL-AMENITIES".into(),
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: RegisterShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.amenities.len(), 12);
+    }
+
+    // ========================================================================
+    // UPDATE SHELTER INPUT TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_shelter_input_serde_roundtrip() {
+        let input = UpdateShelterInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: Shelter {
+                id: "shelter-1".into(),
+                name: "Updated Community Center".into(),
+                location_lat: 32.9483,
+                location_lon: -96.7299,
+                address: "123 Main St".into(),
+                capacity: 300,
+                current_occupancy: 50,
+                shelter_type: ShelterType::Community,
+                amenities: vec![Amenity::Power, Amenity::Water, Amenity::Medical],
+                status: ShelterStatus::Open,
+                contact: "555-0200".into(),
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(parsed.updated_entry.name, "Updated Community Center");
+        assert_eq!(parsed.updated_entry.capacity, 300);
+        assert_eq!(parsed.updated_entry.amenities.len(), 3);
+    }
+
+    #[test]
+    fn update_shelter_input_clone() {
+        let input = UpdateShelterInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: Shelter {
+                id: "s-clone".into(),
+                name: "Clone Test".into(),
+                location_lat: 0.0,
+                location_lon: 0.0,
+                address: "1 St".into(),
+                capacity: 10,
+                current_occupancy: 0,
+                shelter_type: ShelterType::Emergency,
+                amenities: vec![],
+                status: ShelterStatus::Open,
+                contact: "555-0000".into(),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.name, "Clone Test");
+    }
+
+    #[test]
+    fn update_shelter_input_full_status_serde() {
+        let input = UpdateShelterInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: Shelter {
+                id: "s-full".into(),
+                name: "Full Shelter".into(),
+                location_lat: 33.0,
+                location_lon: -97.0,
+                address: "789 Elm St".into(),
+                capacity: 50,
+                current_occupancy: 50,
+                shelter_type: ShelterType::PetFriendly,
+                amenities: vec![Amenity::PetArea],
+                status: ShelterStatus::Full,
+                contact: "555-1111".into(),
+            },
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: UpdateShelterInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.updated_entry.status, ShelterStatus::Full);
+        assert_eq!(parsed.updated_entry.current_occupancy, parsed.updated_entry.capacity);
+    }
+
+    #[test]
+    fn find_nearby_input_zero_radius() {
+        let input = FindNearbySheltersInput {
+            lat: 0.0,
+            lon: 0.0,
+            radius_km: 0.0,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: FindNearbySheltersInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.radius_km, 0.0);
+    }
+
+    #[test]
+    fn find_nearby_input_extreme_coordinates() {
+        let input = FindNearbySheltersInput {
+            lat: -90.0,
+            lon: 180.0,
+            radius_km: 20015.0,
+        };
+        let json = serde_json::to_string(&input).expect("serialize");
+        let parsed: FindNearbySheltersInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(parsed.lat, -90.0);
+        assert_eq!(parsed.lon, 180.0);
+    }
+
+    // ========================================================================
+    // ANCHOR STRUCT SERDE
+    // ========================================================================
+
+    // ========================================================================
+    // REGISTER SHELTER INPUT EACH SHELTER TYPE
+    // ========================================================================
+
+    #[test]
+    fn register_shelter_input_each_shelter_type() {
+        let types = vec![
+            ShelterType::Emergency,
+            ShelterType::Community,
+            ShelterType::Medical,
+            ShelterType::PetFriendly,
+            ShelterType::Accessible,
+        ];
+        for st in types {
+            let input = RegisterShelterInput {
+                id: "s-t".into(),
+                name: "Type Test".into(),
+                location_lat: 0.0,
+                location_lon: 0.0,
+                address: "123 St".into(),
+                capacity: 10,
+                shelter_type: st.clone(),
+                amenities: vec![],
+                contact: "555-0000".into(),
+            };
+            let json = serde_json::to_string(&input).expect("serialize");
+            let parsed: RegisterShelterInput = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(parsed.shelter_type, st);
+        }
+    }
 }

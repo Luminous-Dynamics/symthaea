@@ -39,8 +39,8 @@
 //! └──────────────────────────────────────────────────────────────────┘
 //! ```
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// A dream insight - a counterfactual that outperformed reality
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -235,13 +235,15 @@ impl DreamFeedbackBridge {
         // Update preferred direction (exponential moving average)
         if prior.preferred_direction.len() == insight.alternative_action.len() {
             for (i, val) in insight.alternative_action.iter().enumerate() {
-                prior.preferred_direction[i] = (1.0 - blend_weight as f32) * prior.preferred_direction[i]
+                prior.preferred_direction[i] = (1.0 - blend_weight as f32)
+                    * prior.preferred_direction[i]
                     + blend_weight as f32 * val;
             }
         }
 
         // Update strength based on phi improvement
-        prior.strength = (prior.strength * (1.0 - blend_weight) + insight.phi_improvement * blend_weight)
+        prior.strength = (prior.strength * (1.0 - blend_weight)
+            + insight.phi_improvement * blend_weight)
             .min(1.0);
 
         self.stats.priors_created += 1;
@@ -277,7 +279,9 @@ impl DreamFeedbackBridge {
 
         if has_prior {
             // If we have a prior, we're more confident (dreams taught us about this context)
-            let boost = self.action_priors.get(&context_hash)
+            let boost = self
+                .action_priors
+                .get(&context_hash)
                 .map(|p| p.strength * 0.1) // Up to 10% boost
                 .unwrap_or(0.0);
 
@@ -304,11 +308,14 @@ impl DreamFeedbackBridge {
     pub fn mark_risky_context(&mut self, context_hash: u64, reason: String, severity: f64) {
         let multiplier = 1.0 - (severity * 0.5).min(0.5); // At most 50% reduction
 
-        self.confidence_adjustments.insert(context_hash, ConfidenceAdjustment {
+        self.confidence_adjustments.insert(
             context_hash,
-            multiplier,
-            reason,
-        });
+            ConfidenceAdjustment {
+                context_hash,
+                multiplier,
+                reason,
+            },
+        );
     }
 
     /// Get statistics
@@ -345,23 +352,36 @@ impl DreamFeedbackBridge {
 
         report.push_str("=== Dream Feedback Bridge Summary ===\n\n");
 
-        report.push_str(&format!("Total insights processed: {}\n", self.stats.total_insights));
+        report.push_str(&format!(
+            "Total insights processed: {}\n",
+            self.stats.total_insights
+        ));
         report.push_str(&format!("Active priors: {}\n", self.num_priors()));
-        report.push_str(&format!("Confidence adjustments: {}\n", self.num_adjustments()));
+        report.push_str(&format!(
+            "Confidence adjustments: {}\n",
+            self.num_adjustments()
+        ));
 
         report.push_str("\nCalibration:\n");
         if let Some(dream_brier) = self.stats.dream_informed_brier() {
-            report.push_str(&format!("  Dream-informed Brier: {:.4} (n={})\n",
-                                     dream_brier, self.stats.dream_informed_predictions));
+            report.push_str(&format!(
+                "  Dream-informed Brier: {:.4} (n={})\n",
+                dream_brier, self.stats.dream_informed_predictions
+            ));
         }
         if let Some(baseline_brier) = self.stats.baseline_brier() {
-            report.push_str(&format!("  Baseline Brier: {:.4} (n={})\n",
-                                     baseline_brier, self.stats.baseline_predictions));
+            report.push_str(&format!(
+                "  Baseline Brier: {:.4} (n={})\n",
+                baseline_brier, self.stats.baseline_predictions
+            ));
         }
         if let Some(improvement) = self.stats.brier_improvement() {
             let direction = if improvement < 0.0 { "better" } else { "worse" };
-            report.push_str(&format!("  Dream feedback is {} by {:.4}\n",
-                                     direction, improvement.abs()));
+            report.push_str(&format!(
+                "  Dream feedback is {} by {:.4}\n",
+                direction,
+                improvement.abs()
+            ));
         }
 
         report

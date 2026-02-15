@@ -4,11 +4,11 @@
 //! This is not a security boundary; real command execution is opt-in.
 
 use std::collections::HashMap;
+use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::fs;
 use std::time::{Duration, Instant};
-use std::io::Read;
 use wait_timeout::ChildExt;
 
 /// Sandbox for isolated command execution
@@ -97,8 +97,7 @@ impl Sandbox {
         }
 
         // Create sandbox directory structure
-        fs::create_dir_all(&self.root)
-            .map_err(|e| SandboxError::InitFailed(e.to_string()))?;
+        fs::create_dir_all(&self.root).map_err(|e| SandboxError::InitFailed(e.to_string()))?;
 
         fs::create_dir_all(self.root.join("etc"))
             .map_err(|e| SandboxError::InitFailed(e.to_string()))?;
@@ -111,8 +110,7 @@ impl Sandbox {
 
         // Create minimal /etc/nixos for dry-run
         let nixos_dir = self.root.join("etc/nixos");
-        fs::create_dir_all(&nixos_dir)
-            .map_err(|e| SandboxError::InitFailed(e.to_string()))?;
+        fs::create_dir_all(&nixos_dir).map_err(|e| SandboxError::InitFailed(e.to_string()))?;
 
         self.initialized = true;
         Ok(())
@@ -181,7 +179,11 @@ impl Sandbox {
 
         self.run_command_with_timeout(
             "nixos-rebuild",
-            &["dry-build", "-I", &format!("nixos-config={}", sandbox_config.display())],
+            &[
+                "dry-build",
+                "-I",
+                &format!("nixos-config={}", sandbox_config.display()),
+            ],
             start,
         )
     }
@@ -235,12 +237,17 @@ impl Sandbox {
             .spawn()
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
 
-        let mut stdout = child.stdout.take()
+        let mut stdout = child
+            .stdout
+            .take()
             .ok_or_else(|| SandboxError::ExecutionFailed("Missing stdout pipe".to_string()))?;
-        let mut stderr = child.stderr.take()
+        let mut stderr = child
+            .stderr
+            .take()
             .ok_or_else(|| SandboxError::ExecutionFailed("Missing stderr pipe".to_string()))?;
 
-        let status = match child.wait_timeout(self.timeout)
+        let status = match child
+            .wait_timeout(self.timeout)
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?
         {
             Some(status) => status,
@@ -253,9 +260,11 @@ impl Sandbox {
 
         let mut stdout_buf = Vec::new();
         let mut stderr_buf = Vec::new();
-        stdout.read_to_end(&mut stdout_buf)
+        stdout
+            .read_to_end(&mut stdout_buf)
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
-        stderr.read_to_end(&mut stderr_buf)
+        stderr
+            .read_to_end(&mut stderr_buf)
             .map_err(|e| SandboxError::ExecutionFailed(e.to_string()))?;
 
         Ok(SandboxResult {
@@ -300,9 +309,9 @@ impl Sandbox {
             .map(|s| s.to_string_lossy())
             .unwrap_or_default();
 
-        self.allowed_commands.iter().any(|c| {
-            c == command || c == base.as_ref()
-        })
+        self.allowed_commands
+            .iter()
+            .any(|c| c == command || c == base.as_ref())
     }
 
     fn simulate_command(&self, command: &str, args: &[&str]) -> SandboxResult {
@@ -310,14 +319,25 @@ impl Sandbox {
 
         // Simulate common commands
         let (exit_code, stdout, stderr) = match command {
-            "nix" | "nix-build" | "nix-shell" | "nix-env" => {
-                (0, format!("[Simulated] {} would execute successfully", full_cmd), String::new())
-            }
+            "nix" | "nix-build" | "nix-shell" | "nix-env" => (
+                0,
+                format!("[Simulated] {} would execute successfully", full_cmd),
+                String::new(),
+            ),
             "nixos-rebuild" => {
                 if args.contains(&"dry-build") || args.contains(&"dry-run") {
-                    (0, "[Simulated] Dry run successful\n  - Configuration valid\n  - No errors".to_string(), String::new())
+                    (
+                        0,
+                        "[Simulated] Dry run successful\n  - Configuration valid\n  - No errors"
+                            .to_string(),
+                        String::new(),
+                    )
                 } else {
-                    (0, "[Simulated] Build would succeed".to_string(), String::new())
+                    (
+                        0,
+                        "[Simulated] Build would succeed".to_string(),
+                        String::new(),
+                    )
                 }
             }
             "nix-instantiate" => {
@@ -329,9 +349,11 @@ impl Sandbox {
                     (0, format!("[Simulated] {}", full_cmd), String::new())
                 }
             }
-            _ => {
-                (0, format!("[Simulated] {} completed", full_cmd), String::new())
-            }
+            _ => (
+                0,
+                format!("[Simulated] {} completed", full_cmd),
+                String::new(),
+            ),
         };
 
         SandboxResult {
@@ -589,5 +611,171 @@ mod tests {
         let result = sandbox.nixos_dry_run(&config_path).unwrap();
         assert!(result.simulated);
         assert!(result.success());
+    }
+
+    // ---- SandboxError variant construction and Display/Debug tests ----
+
+    #[test]
+    fn test_error_init_failed_display() {
+        let err = SandboxError::InitFailed("permission denied".to_string());
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert!(msg.contains("Sandbox init failed"));
+        assert!(msg.contains("permission denied"));
+    }
+
+    #[test]
+    fn test_error_command_not_allowed_display() {
+        let err = SandboxError::CommandNotAllowed("rm".to_string());
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert!(msg.contains("Command not allowed"));
+        assert!(msg.contains("rm"));
+    }
+
+    #[test]
+    fn test_error_execution_failed_display() {
+        let err = SandboxError::ExecutionFailed("segfault".to_string());
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert!(msg.contains("Execution failed"));
+        assert!(msg.contains("segfault"));
+    }
+
+    #[test]
+    fn test_error_real_execution_disabled_display() {
+        let err = SandboxError::RealExecutionDisabled;
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert!(msg.contains("Real execution disabled"));
+    }
+
+    #[test]
+    fn test_error_timeout_display() {
+        let err = SandboxError::Timeout;
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert!(msg.contains("timed out"));
+    }
+
+    #[test]
+    fn test_error_cleanup_failed_display() {
+        let err = SandboxError::CleanupFailed("device busy".to_string());
+        let msg = format!("{}", err);
+        assert!(!msg.is_empty());
+        assert!(msg.contains("Cleanup failed"));
+        assert!(msg.contains("device busy"));
+    }
+
+    #[test]
+    fn test_error_debug_formatting_all_variants() {
+        let variants: Vec<SandboxError> = vec![
+            SandboxError::InitFailed("init reason".to_string()),
+            SandboxError::CommandNotAllowed("dangerous-cmd".to_string()),
+            SandboxError::ExecutionFailed("exec reason".to_string()),
+            SandboxError::RealExecutionDisabled,
+            SandboxError::Timeout,
+            SandboxError::CleanupFailed("cleanup reason".to_string()),
+        ];
+
+        for err in &variants {
+            let debug = format!("{:?}", err);
+            assert!(!debug.is_empty(), "Debug output should be non-empty");
+        }
+    }
+
+    #[test]
+    fn test_error_clone_all_variants() {
+        let variants: Vec<SandboxError> = vec![
+            SandboxError::InitFailed("clone test".to_string()),
+            SandboxError::CommandNotAllowed("clone test".to_string()),
+            SandboxError::ExecutionFailed("clone test".to_string()),
+            SandboxError::RealExecutionDisabled,
+            SandboxError::Timeout,
+            SandboxError::CleanupFailed("clone test".to_string()),
+        ];
+
+        for err in &variants {
+            let cloned = err.clone();
+            assert_eq!(format!("{}", err), format!("{}", cloned));
+            assert_eq!(format!("{:?}", err), format!("{:?}", cloned));
+        }
+    }
+
+    #[test]
+    fn test_error_implements_std_error() {
+        let err = SandboxError::Timeout;
+        // Verify the std::error::Error trait is implemented
+        let std_err: &dyn std::error::Error = &err;
+        // source() should return None since there are no nested errors
+        assert!(std_err.source().is_none());
+        // Display via std::error::Error should match Display directly
+        assert_eq!(format!("{}", std_err), format!("{}", err));
+    }
+
+    #[test]
+    fn test_error_display_messages_are_distinct() {
+        let init = format!("{}", SandboxError::InitFailed("x".to_string()));
+        let not_allowed = format!("{}", SandboxError::CommandNotAllowed("x".to_string()));
+        let exec = format!("{}", SandboxError::ExecutionFailed("x".to_string()));
+        let disabled = format!("{}", SandboxError::RealExecutionDisabled);
+        let timeout = format!("{}", SandboxError::Timeout);
+        let cleanup = format!("{}", SandboxError::CleanupFailed("x".to_string()));
+
+        // All error messages should be unique
+        let messages = [&init, &not_allowed, &exec, &disabled, &timeout, &cleanup];
+        for (i, a) in messages.iter().enumerate() {
+            for (j, b) in messages.iter().enumerate() {
+                if i != j {
+                    assert_ne!(
+                        a, b,
+                        "Error messages for variants {} and {} should differ",
+                        i, j
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_error_command_not_allowed_triggered_by_run() {
+        let mut sandbox = Sandbox::new().simulation_only();
+        let err = sandbox.run("rm", &["-rf", "/"]).unwrap_err();
+        assert!(matches!(err, SandboxError::CommandNotAllowed(ref cmd) if cmd == "rm"));
+        let msg = format!("{}", err);
+        assert!(msg.contains("rm"));
+    }
+
+    #[test]
+    fn test_error_real_execution_disabled_triggered_by_run() {
+        // Default sandbox (not simulation, not real-execution-enabled)
+        let mut sandbox = Sandbox::new();
+        let err = sandbox.run("nix", &["--version"]).unwrap_err();
+        assert!(matches!(err, SandboxError::RealExecutionDisabled));
+    }
+
+    #[test]
+    fn test_error_with_empty_inner_message() {
+        // Ensure variants with empty strings still produce non-empty Display output
+        let variants = vec![
+            SandboxError::InitFailed(String::new()),
+            SandboxError::CommandNotAllowed(String::new()),
+            SandboxError::ExecutionFailed(String::new()),
+            SandboxError::CleanupFailed(String::new()),
+        ];
+
+        for err in &variants {
+            let msg = format!("{}", err);
+            assert!(
+                !msg.is_empty(),
+                "Display should be non-empty even with empty inner string"
+            );
+            // The prefix part of the message should still be present
+            assert!(
+                msg.len() > 5,
+                "Display should contain a meaningful prefix: got '{}'",
+                msg
+            );
+        }
     }
 }

@@ -38,7 +38,11 @@ pub struct RoleSubstitution {
 
 impl RoleSubstitution {
     pub fn new(role: SemanticRole, original: BinaryHV, replacement: BinaryHV) -> Self {
-        Self { role, original, replacement }
+        Self {
+            role,
+            original,
+            replacement,
+        }
     }
 
     /// Apply the substitution to a causal vector.
@@ -65,7 +69,10 @@ impl RoleSubstitution {
 }
 
 /// Apply multiple role substitutions to a causal vector.
-pub fn apply_substitutions(causal_vector: &BinaryHV, substitutions: &[RoleSubstitution]) -> BinaryHV {
+pub fn apply_substitutions(
+    causal_vector: &BinaryHV,
+    substitutions: &[RoleSubstitution],
+) -> BinaryHV {
     let mut result = causal_vector.clone();
     for sub in substitutions {
         result = sub.apply(&result);
@@ -105,7 +112,8 @@ mod tests {
         let substituted = sub.apply(&causal);
 
         // Reverse substitution should recover original
-        let reverse = RoleSubstitution::new(SemanticRole::Agent, replacement_filler, original_filler);
+        let reverse =
+            RoleSubstitution::new(SemanticRole::Agent, replacement_filler, original_filler);
         let recovered = reverse.apply(&substituted);
 
         let similarity = recovered.similarity(&causal);

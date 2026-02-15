@@ -3,10 +3,10 @@
 //! Encodes natural language queries as HDC vectors and finds the most
 //! semantically similar NixOS options using the shared codebook.
 
-use symthaea_core::hdc::ContinuousHV;
 use super::codebook::NixCodebook;
 use super::option_encoder::OptionEncoder;
 use super::user_input_encoder::UserInputEncoder;
+use symthaea_core::hdc::ContinuousHV;
 
 /// A search result matching a NixOS option.
 #[derive(Debug, Clone)]
@@ -35,7 +35,8 @@ pub fn search_options(
     let query_hv = input_encoder.encode_input(query);
 
     // Encode all known paths and compute similarity to query
-    let mut matches: Vec<OptionMatch> = known_paths.iter()
+    let mut matches: Vec<OptionMatch> = known_paths
+        .iter()
         .map(|path| {
             let mut encoder = OptionEncoder::new(codebook);
             let path_hv = encoder.encode_path(path);
@@ -65,7 +66,11 @@ pub fn search_options(
         }
     }
 
-    matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    matches.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     matches.truncate(top_k);
     matches
 }
@@ -77,7 +82,8 @@ pub fn search_options_by_vector(
     known_paths: &[&str],
     top_k: usize,
 ) -> Vec<OptionMatch> {
-    let mut matches: Vec<OptionMatch> = known_paths.iter()
+    let mut matches: Vec<OptionMatch> = known_paths
+        .iter()
         .map(|path| {
             let mut encoder = OptionEncoder::new(codebook);
             let path_hv = encoder.encode_path(path);
@@ -90,7 +96,11 @@ pub fn search_options_by_vector(
         })
         .collect();
 
-    matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+    matches.sort_by(|a, b| {
+        b.similarity
+            .partial_cmp(&a.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
     matches.truncate(top_k);
     matches
 }
@@ -137,17 +147,18 @@ mod tests {
         assert!(result_paths.contains(&"boot.loader.grub.enable"));
         // All similarities should be finite
         for r in &results {
-            assert!(r.similarity.is_finite(), "Similarity should be finite for {}", r.path);
+            assert!(
+                r.similarity.is_finite(),
+                "Similarity should be finite for {}",
+                r.path
+            );
         }
     }
 
     #[test]
     fn test_search_by_vector() {
         let mut codebook = NixCodebook::new();
-        let paths = [
-            "services.nginx.enable",
-            "networking.firewall.enable",
-        ];
+        let paths = ["services.nginx.enable", "networking.firewall.enable"];
 
         // Encode "nginx" and search by its vector
         let hv = codebook.get_or_create("nginx").clone();

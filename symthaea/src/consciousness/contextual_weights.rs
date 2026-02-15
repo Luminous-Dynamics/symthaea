@@ -37,8 +37,7 @@ use std::collections::HashMap;
 /// Type of action being evaluated.
 ///
 /// Canonical action type enum, re-exported by `unified_value_evaluator::types`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ActionType {
     /// Basic action (default threshold)
     #[default]
@@ -51,10 +50,8 @@ pub enum ActionType {
     Constitutional,
 }
 
-
 /// Domain classification for actions
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ActionDomain {
     /// General/unclassified action
     #[default]
@@ -74,7 +71,6 @@ pub enum ActionDomain {
     /// Environmental, sustainability
     Environmental,
 }
-
 
 /// Weight profile for harmonies in a specific context
 #[derive(Debug, Clone)]
@@ -157,34 +153,34 @@ impl ContextualWeights {
         self.action_type_profiles.insert(
             ActionType::Governance,
             HarmonyWeightProfile::new("Governance", "Proposals affecting collective decisions")
-                .with_weight(Harmony::IntegralWisdom, 1.4)        // Truth is crucial
-                .with_weight(Harmony::SacredReciprocity, 1.3)     // Fairness matters
+                .with_weight(Harmony::IntegralWisdom, 1.4) // Truth is crucial
+                .with_weight(Harmony::SacredReciprocity, 1.3) // Fairness matters
                 .with_weight(Harmony::PanSentientFlourishing, 1.2) // Do no harm
                 .with_weight(Harmony::UniversalInterconnectedness, 1.2) // Consider all stakeholders
-                .with_weight(Harmony::InfinitePlay, 0.8),         // Creativity less critical
+                .with_weight(Harmony::InfinitePlay, 0.8), // Creativity less critical
         );
 
         // Voting: emphasize truth, interconnectedness, fairness
         self.action_type_profiles.insert(
             ActionType::Voting,
             HarmonyWeightProfile::new("Voting", "Casting votes on community decisions")
-                .with_weight(Harmony::IntegralWisdom, 1.5)        // Truth paramount
+                .with_weight(Harmony::IntegralWisdom, 1.5) // Truth paramount
                 .with_weight(Harmony::UniversalInterconnectedness, 1.4) // Consider community
-                .with_weight(Harmony::SacredReciprocity, 1.3)     // Fair to all
+                .with_weight(Harmony::SacredReciprocity, 1.3) // Fair to all
                 .with_weight(Harmony::PanSentientFlourishing, 1.2) // Don't harm minority
-                .with_weight(Harmony::InfinitePlay, 0.7),         // Play less relevant
+                .with_weight(Harmony::InfinitePlay, 0.7), // Play less relevant
         );
 
         // Constitutional: maximum scrutiny on all core harmonies
         self.action_type_profiles.insert(
             ActionType::Constitutional,
             HarmonyWeightProfile::new("Constitutional", "Fundamental changes to governance")
-                .with_weight(Harmony::IntegralWisdom, 1.6)        // Wisdom paramount
+                .with_weight(Harmony::IntegralWisdom, 1.6) // Wisdom paramount
                 .with_weight(Harmony::PanSentientFlourishing, 1.5) // Protect all
-                .with_weight(Harmony::SacredReciprocity, 1.5)     // Long-term fairness
+                .with_weight(Harmony::SacredReciprocity, 1.5) // Long-term fairness
                 .with_weight(Harmony::UniversalInterconnectedness, 1.4) // Systemic thinking
                 .with_weight(Harmony::EvolutionaryProgression, 1.3) // Enable growth
-                .with_weight(Harmony::ResonantCoherence, 1.2),    // System integrity
+                .with_weight(Harmony::ResonantCoherence, 1.2), // System integrity
         );
 
         // === DOMAIN PROFILES ===
@@ -199,20 +195,20 @@ impl ContextualWeights {
         self.domain_profiles.insert(
             ActionDomain::Financial,
             HarmonyWeightProfile::new("Financial", "Money, resources, transactions")
-                .with_weight(Harmony::SacredReciprocity, 1.4)     // Fair exchange
+                .with_weight(Harmony::SacredReciprocity, 1.4) // Fair exchange
                 .with_weight(Harmony::PanSentientFlourishing, 1.3) // Don't harm
-                .with_weight(Harmony::IntegralWisdom, 1.2)        // No deception
-                .with_weight(Harmony::InfinitePlay, 0.7),         // Less playful
+                .with_weight(Harmony::IntegralWisdom, 1.2) // No deception
+                .with_weight(Harmony::InfinitePlay, 0.7), // Less playful
         );
 
         // Creative domain: play, coherence, evolution
         self.domain_profiles.insert(
             ActionDomain::Creative,
             HarmonyWeightProfile::new("Creative", "Art, design, innovation")
-                .with_weight(Harmony::InfinitePlay, 1.5)          // Creativity central
-                .with_weight(Harmony::ResonantCoherence, 1.3)     // Aesthetic harmony
+                .with_weight(Harmony::InfinitePlay, 1.5) // Creativity central
+                .with_weight(Harmony::ResonantCoherence, 1.3) // Aesthetic harmony
                 .with_weight(Harmony::EvolutionaryProgression, 1.2) // Growth through creation
-                .with_weight(Harmony::SacredReciprocity, 0.8),    // Less about exchange
+                .with_weight(Harmony::SacredReciprocity, 0.8), // Less about exchange
         );
 
         // Social domain: interconnectedness, care, reciprocity
@@ -220,29 +216,29 @@ impl ContextualWeights {
             ActionDomain::Social,
             HarmonyWeightProfile::new("Social", "Relationships, community interactions")
                 .with_weight(Harmony::UniversalInterconnectedness, 1.4) // Relationships key
-                .with_weight(Harmony::PanSentientFlourishing, 1.3)      // Care for others
-                .with_weight(Harmony::SacredReciprocity, 1.2)           // Give and take
-                .with_weight(Harmony::InfinitePlay, 1.1),               // Playful engagement
+                .with_weight(Harmony::PanSentientFlourishing, 1.3) // Care for others
+                .with_weight(Harmony::SacredReciprocity, 1.2) // Give and take
+                .with_weight(Harmony::InfinitePlay, 1.1), // Playful engagement
         );
 
         // Technical domain: coherence, wisdom, evolution
         self.domain_profiles.insert(
             ActionDomain::Technical,
             HarmonyWeightProfile::new("Technical", "System operations, code, infrastructure")
-                .with_weight(Harmony::ResonantCoherence, 1.4)     // System integrity
-                .with_weight(Harmony::IntegralWisdom, 1.3)        // Correct decisions
+                .with_weight(Harmony::ResonantCoherence, 1.4) // System integrity
+                .with_weight(Harmony::IntegralWisdom, 1.3) // Correct decisions
                 .with_weight(Harmony::EvolutionaryProgression, 1.2) // Continuous improvement
-                .with_weight(Harmony::InfinitePlay, 0.9),         // Some creativity
+                .with_weight(Harmony::InfinitePlay, 0.9), // Some creativity
         );
 
         // Educational domain: wisdom, evolution, interconnectedness
         self.domain_profiles.insert(
             ActionDomain::Educational,
             HarmonyWeightProfile::new("Educational", "Teaching, learning, knowledge sharing")
-                .with_weight(Harmony::IntegralWisdom, 1.5)        // Truth in teaching
+                .with_weight(Harmony::IntegralWisdom, 1.5) // Truth in teaching
                 .with_weight(Harmony::EvolutionaryProgression, 1.4) // Growth through learning
                 .with_weight(Harmony::UniversalInterconnectedness, 1.2) // Shared knowledge
-                .with_weight(Harmony::InfinitePlay, 1.2),         // Playful learning
+                .with_weight(Harmony::InfinitePlay, 1.2), // Playful learning
         );
 
         // Healthcare domain: flourishing, wisdom, care
@@ -250,9 +246,9 @@ impl ContextualWeights {
             ActionDomain::Healthcare,
             HarmonyWeightProfile::new("Healthcare", "Health, wellbeing, medical")
                 .with_weight(Harmony::PanSentientFlourishing, 1.6) // Do no harm primary
-                .with_weight(Harmony::IntegralWisdom, 1.4)        // Evidence-based
-                .with_weight(Harmony::SacredReciprocity, 1.2)     // Patient autonomy
-                .with_weight(Harmony::InfinitePlay, 0.7),         // Less playful
+                .with_weight(Harmony::IntegralWisdom, 1.4) // Evidence-based
+                .with_weight(Harmony::SacredReciprocity, 1.2) // Patient autonomy
+                .with_weight(Harmony::InfinitePlay, 0.7), // Less playful
         );
 
         // Environmental domain: interconnectedness, evolution, flourishing
@@ -260,9 +256,9 @@ impl ContextualWeights {
             ActionDomain::Environmental,
             HarmonyWeightProfile::new("Environmental", "Sustainability, ecology, nature")
                 .with_weight(Harmony::UniversalInterconnectedness, 1.5) // Ecosystem thinking
-                .with_weight(Harmony::EvolutionaryProgression, 1.4)    // Long-term thinking
-                .with_weight(Harmony::PanSentientFlourishing, 1.3)     // All beings
-                .with_weight(Harmony::SacredReciprocity, 1.2),         // Give back to earth
+                .with_weight(Harmony::EvolutionaryProgression, 1.4) // Long-term thinking
+                .with_weight(Harmony::PanSentientFlourishing, 1.3) // All beings
+                .with_weight(Harmony::SacredReciprocity, 1.2), // Give back to earth
         );
     }
 
@@ -280,7 +276,9 @@ impl ContextualWeights {
         }
 
         // Safe: we just inserted the key if it didn't exist
-        self.cached_profiles.get(&key).expect("profile was just inserted")
+        self.cached_profiles
+            .get(&key)
+            .expect("profile was just inserted")
     }
 
     /// Compute a combined profile from action type and domain
@@ -339,7 +337,11 @@ impl ContextualWeights {
     }
 
     /// Register a custom action type profile
-    pub fn register_action_profile(&mut self, action_type: ActionType, profile: HarmonyWeightProfile) {
+    pub fn register_action_profile(
+        &mut self,
+        action_type: ActionType,
+        profile: HarmonyWeightProfile,
+    ) {
         self.action_type_profiles.insert(action_type, profile);
         // Invalidate cache
         self.cached_profiles.retain(|(at, _), _| *at != action_type);
@@ -373,70 +375,211 @@ impl DomainClassifier {
         keywords.insert(
             ActionDomain::Financial,
             vec![
-                "money", "payment", "transfer", "invest", "budget", "cost", "price",
-                "fund", "capital", "revenue", "profit", "expense", "transaction",
-                "bank", "loan", "credit", "debt", "asset", "stock", "crypto",
-                "dollar", "euro", "bitcoin", "salary", "wage", "tax", "fee",
+                "money",
+                "payment",
+                "transfer",
+                "invest",
+                "budget",
+                "cost",
+                "price",
+                "fund",
+                "capital",
+                "revenue",
+                "profit",
+                "expense",
+                "transaction",
+                "bank",
+                "loan",
+                "credit",
+                "debt",
+                "asset",
+                "stock",
+                "crypto",
+                "dollar",
+                "euro",
+                "bitcoin",
+                "salary",
+                "wage",
+                "tax",
+                "fee",
             ],
         );
 
         keywords.insert(
             ActionDomain::Creative,
             vec![
-                "create", "design", "art", "music", "write", "compose", "paint",
-                "draw", "build", "craft", "imagine", "invent", "innovate",
-                "story", "poem", "song", "novel", "aesthetic", "beautiful",
-                "creative", "artistic", "express", "inspire", "style", "color",
+                "create",
+                "design",
+                "art",
+                "music",
+                "write",
+                "compose",
+                "paint",
+                "draw",
+                "build",
+                "craft",
+                "imagine",
+                "invent",
+                "innovate",
+                "story",
+                "poem",
+                "song",
+                "novel",
+                "aesthetic",
+                "beautiful",
+                "creative",
+                "artistic",
+                "express",
+                "inspire",
+                "style",
+                "color",
             ],
         );
 
         keywords.insert(
             ActionDomain::Social,
             vec![
-                "friend", "family", "community", "relationship", "connect", "share",
-                "together", "collaborate", "team", "group", "social", "people",
-                "conversation", "message", "chat", "communicate", "meet", "party",
-                "invite", "gather", "network", "introduce", "support", "help others",
+                "friend",
+                "family",
+                "community",
+                "relationship",
+                "connect",
+                "share",
+                "together",
+                "collaborate",
+                "team",
+                "group",
+                "social",
+                "people",
+                "conversation",
+                "message",
+                "chat",
+                "communicate",
+                "meet",
+                "party",
+                "invite",
+                "gather",
+                "network",
+                "introduce",
+                "support",
+                "help others",
             ],
         );
 
         keywords.insert(
             ActionDomain::Technical,
             vec![
-                "code", "program", "software", "system", "server", "database",
-                "api", "config", "deploy", "install", "update", "fix", "debug",
-                "compile", "run", "execute", "script", "function", "module",
-                "nix", "linux", "container", "docker", "kubernetes", "git",
+                "code",
+                "program",
+                "software",
+                "system",
+                "server",
+                "database",
+                "api",
+                "config",
+                "deploy",
+                "install",
+                "update",
+                "fix",
+                "debug",
+                "compile",
+                "run",
+                "execute",
+                "script",
+                "function",
+                "module",
+                "nix",
+                "linux",
+                "container",
+                "docker",
+                "kubernetes",
+                "git",
             ],
         );
 
         keywords.insert(
             ActionDomain::Educational,
             vec![
-                "learn", "teach", "study", "course", "lesson", "tutorial",
-                "explain", "understand", "knowledge", "educate", "train",
-                "school", "university", "lecture", "research", "discover",
-                "curious", "question", "answer", "mentor", "student", "teacher",
+                "learn",
+                "teach",
+                "study",
+                "course",
+                "lesson",
+                "tutorial",
+                "explain",
+                "understand",
+                "knowledge",
+                "educate",
+                "train",
+                "school",
+                "university",
+                "lecture",
+                "research",
+                "discover",
+                "curious",
+                "question",
+                "answer",
+                "mentor",
+                "student",
+                "teacher",
             ],
         );
 
         keywords.insert(
             ActionDomain::Healthcare,
             vec![
-                "health", "medical", "doctor", "patient", "treatment", "medicine",
-                "hospital", "clinic", "symptom", "diagnosis", "therapy", "care",
-                "wellbeing", "wellness", "fitness", "exercise", "diet", "nutrition",
-                "mental", "anxiety", "depression", "heal", "recover", "pain",
+                "health",
+                "medical",
+                "doctor",
+                "patient",
+                "treatment",
+                "medicine",
+                "hospital",
+                "clinic",
+                "symptom",
+                "diagnosis",
+                "therapy",
+                "care",
+                "wellbeing",
+                "wellness",
+                "fitness",
+                "exercise",
+                "diet",
+                "nutrition",
+                "mental",
+                "anxiety",
+                "depression",
+                "heal",
+                "recover",
+                "pain",
             ],
         );
 
         keywords.insert(
             ActionDomain::Environmental,
             vec![
-                "environment", "climate", "nature", "sustainable", "green", "eco",
-                "recycle", "renewable", "carbon", "pollution", "conservation",
-                "wildlife", "forest", "ocean", "biodiversity", "organic",
-                "solar", "wind", "energy", "footprint", "earth", "planet",
+                "environment",
+                "climate",
+                "nature",
+                "sustainable",
+                "green",
+                "eco",
+                "recycle",
+                "renewable",
+                "carbon",
+                "pollution",
+                "conservation",
+                "wildlife",
+                "forest",
+                "ocean",
+                "biodiversity",
+                "organic",
+                "solar",
+                "wind",
+                "energy",
+                "footprint",
+                "earth",
+                "planet",
             ],
         );
 
@@ -545,7 +688,8 @@ mod tests {
     #[test]
     fn test_constitutional_has_high_scrutiny() {
         let mut weights = ContextualWeights::new();
-        let profile = weights.get_combined_profile(ActionType::Constitutional, ActionDomain::General);
+        let profile =
+            weights.get_combined_profile(ActionType::Constitutional, ActionDomain::General);
 
         // All core harmonies should have elevated weights
         assert!(profile.get_weight(&Harmony::IntegralWisdom) > 1.0);
@@ -646,17 +790,23 @@ mod tests {
         let classifier = DomainClassifier::new();
 
         // Strong financial signal
-        let (domain, confidence) = classifier.classify_with_confidence(
-            "Transfer money to bank, pay the loan, check credit score"
-        );
+        let (domain, confidence) = classifier
+            .classify_with_confidence("Transfer money to bank, pay the loan, check credit score");
         assert_eq!(domain, ActionDomain::Financial);
-        assert!(confidence > 0.8, "Strong signal should have high confidence: {}", confidence);
+        assert!(
+            confidence > 0.8,
+            "Strong signal should have high confidence: {}",
+            confidence
+        );
 
         // Mixed signal
-        let (_, mixed_confidence) = classifier.classify_with_confidence(
-            "Create art about money and health"
+        let (_, mixed_confidence) =
+            classifier.classify_with_confidence("Create art about money and health");
+        assert!(
+            mixed_confidence < 0.8,
+            "Mixed signal should have lower confidence: {}",
+            mixed_confidence
         );
-        assert!(mixed_confidence < 0.8, "Mixed signal should have lower confidence: {}", mixed_confidence);
     }
 
     #[test]
@@ -714,7 +864,12 @@ mod tests {
             // All profiles should have non-zero weights
             for harmony in Harmony::all() {
                 let weight = profile.get_weight(&harmony);
-                assert!(weight > 0.0, "{:?} should have positive weight for {:?}", action_type, harmony);
+                assert!(
+                    weight > 0.0,
+                    "{:?} should have positive weight for {:?}",
+                    action_type,
+                    harmony
+                );
             }
         }
     }
@@ -729,7 +884,11 @@ mod tests {
         let interconnectedness = profile.get_weight(&Harmony::UniversalInterconnectedness);
 
         assert!(wisdom > 1.0, "Voting should elevate wisdom: {}", wisdom);
-        assert!(interconnectedness > 1.0, "Voting should elevate interconnectedness: {}", interconnectedness);
+        assert!(
+            interconnectedness > 1.0,
+            "Voting should elevate interconnectedness: {}",
+            interconnectedness
+        );
     }
 
     #[test]
@@ -767,10 +926,14 @@ mod tests {
         assert_eq!(weights_vec.len(), 7, "Should have 7 harmonies");
 
         // Find InfinitePlay in the vector
-        let play_entry = weights_vec.iter()
+        let play_entry = weights_vec
+            .iter()
             .find(|(h, _)| *h == Harmony::InfinitePlay)
             .expect("InfinitePlay should be in the vector");
-        assert!((play_entry.1 - 1.5).abs() < 0.01, "InfinitePlay should have weight 1.5");
+        assert!(
+            (play_entry.1 - 1.5).abs() < 0.01,
+            "InfinitePlay should have weight 1.5"
+        );
     }
 
     #[test]
@@ -785,7 +948,8 @@ mod tests {
     fn test_domain_classifier_social() {
         let classifier = DomainClassifier::new();
 
-        let domain = classifier.classify("Let's collaborate with the team and share ideas together");
+        let domain =
+            classifier.classify("Let's collaborate with the team and share ideas together");
         assert_eq!(domain, ActionDomain::Social);
     }
 
@@ -793,7 +957,8 @@ mod tests {
     fn test_domain_classifier_environmental() {
         let classifier = DomainClassifier::new();
 
-        let domain = classifier.classify("We need to focus on sustainable and renewable energy sources");
+        let domain =
+            classifier.classify("We need to focus on sustainable and renewable energy sources");
         assert_eq!(domain, ActionDomain::Environmental);
     }
 
@@ -804,11 +969,15 @@ mod tests {
         let weight = weights.get_weight(
             &Harmony::IntegralWisdom,
             ActionType::Governance,
-            ActionDomain::General
+            ActionDomain::General,
         );
 
         // Governance elevates wisdom to 1.4
-        assert!(weight > 1.0, "Governance wisdom weight should be elevated: {}", weight);
+        assert!(
+            weight > 1.0,
+            "Governance wisdom weight should be elevated: {}",
+            weight
+        );
     }
 
     #[test]
@@ -817,7 +986,11 @@ mod tests {
 
         let all_weights = weights.get_all_weights(ActionType::Basic, ActionDomain::General);
 
-        assert_eq!(all_weights.len(), 7, "Should return weights for all 7 harmonies");
+        assert_eq!(
+            all_weights.len(),
+            7,
+            "Should return weights for all 7 harmonies"
+        );
 
         // Basic/General should all be close to 1.0
         for (harmony, weight) in all_weights {

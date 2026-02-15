@@ -13,7 +13,7 @@ use std::time::Instant;
 use anyhow::Result;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -42,8 +42,10 @@ fn run_analysis() -> Result<()> {
     println!("================================================================\n");
 
     // Load expanded concept corpora
-    let phenomenal_corpus = load_corpus("data/consciousness_probe/phenomenal_concepts_expanded.json")?;
-    let functional_corpus = load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
+    let phenomenal_corpus =
+        load_corpus("data/consciousness_probe/phenomenal_concepts_expanded.json")?;
+    let functional_corpus =
+        load_corpus("data/consciousness_probe/functional_concepts_expanded.json")?;
 
     println!("Loaded expanded corpora:");
     println!("  Phenomenal concepts: {}", phenomenal_corpus.len());
@@ -57,8 +59,14 @@ fn run_analysis() -> Result<()> {
         ..Default::default()
     };
     let extractor = LayerExtractor::load(config)?;
-    println!("  Model loaded in {:.2}s", load_start.elapsed().as_secs_f64());
-    println!("  Device: {}\n", if extractor.is_cuda() { "CUDA" } else { "CPU" });
+    println!(
+        "  Model loaded in {:.2}s",
+        load_start.elapsed().as_secs_f64()
+    );
+    println!(
+        "  Device: {}\n",
+        if extractor.is_cuda() { "CUDA" } else { "CPU" }
+    );
 
     // Analyze all layers for fine-grained view
     let layers_to_analyze = vec![0, 3, 6, 9, 12, 15, 18, 21, 23];
@@ -81,7 +89,11 @@ fn run_analysis() -> Result<()> {
             phenomenal_by_layer[j].push(act.activation);
         }
     }
-    println!("  Completed {} concepts in {:.1}s", phenomenal_corpus.len(), phen_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed {} concepts in {:.1}s",
+        phenomenal_corpus.len(),
+        phen_start.elapsed().as_secs_f64()
+    );
 
     // Extract activations for functional concepts
     println!("Processing functional concepts...");
@@ -97,11 +109,18 @@ fn run_analysis() -> Result<()> {
             functional_by_layer[j].push(act.activation);
         }
     }
-    println!("  Completed {} concepts in {:.1}s\n", functional_corpus.len(), func_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed {} concepts in {:.1}s\n",
+        functional_corpus.len(),
+        func_start.elapsed().as_secs_f64()
+    );
 
     // Analyze topology at each layer
     println!("================================================================");
-    println!("   LAYER-WISE TOPOLOGY COMPARISON (n={} per class)", phenomenal_corpus.len());
+    println!(
+        "   LAYER-WISE TOPOLOGY COMPARISON (n={} per class)",
+        phenomenal_corpus.len()
+    );
     println!("================================================================\n");
 
     let topology_config = TopologyConfig {
@@ -135,10 +154,20 @@ fn run_analysis() -> Result<()> {
 
         let diff = phen_mean - func_mean;
         let pooled_std = ((phen_std.powi(2) + func_std.powi(2)) / 2.0).sqrt();
-        let cohens_d = if pooled_std > 0.0 { diff / pooled_std } else { 0.0 };
+        let cohens_d = if pooled_std > 0.0 {
+            diff / pooled_std
+        } else {
+            0.0
+        };
 
         let p_value = permutation_test(&phen_scores, &func_scores, 10000);
-        let sig = if p_value < 0.01 { "**" } else if p_value < 0.05 { "*" } else { "" };
+        let sig = if p_value < 0.01 {
+            "**"
+        } else if p_value < 0.05 {
+            "*"
+        } else {
+            ""
+        };
 
         println!(
             "{:5} │ {:10.4} │ {:10.4} │ {:+8.4} │ {:+9.4} │ {:9.4} │ {:>3}",
@@ -154,7 +183,8 @@ fn run_analysis() -> Result<()> {
     println!("================================================================\n");
 
     // Find significant layers
-    let significant_layers: Vec<_> = layer_results.iter()
+    let significant_layers: Vec<_> = layer_results
+        .iter()
         .filter(|(_, _, _, _, _, p)| *p < 0.05)
         .collect();
 
@@ -163,8 +193,10 @@ fn run_analysis() -> Result<()> {
     } else {
         println!("Statistically significant layers (p < 0.05):");
         for (layer, phen, func, diff, d, p) in &significant_layers {
-            println!("  Layer {:2}: Phen={:.3}, Func={:.3}, Diff={:+.3}, d={:+.3}, p={:.4}",
-                     layer, phen, func, diff, d, p);
+            println!(
+                "  Layer {:2}: Phen={:.3}, Func={:.3}, Diff={:+.3}, d={:+.3}, p={:.4}",
+                layer, phen, func, diff, d, p
+            );
         }
     }
 
@@ -174,9 +206,16 @@ fn run_analysis() -> Result<()> {
         .max_by(|a, b| a.3.partial_cmp(&b.3).unwrap())
         .unwrap();
 
-    println!("\nLayer with maximum phenomenal advantage: Layer {}", best_layer.0);
+    println!(
+        "\nLayer with maximum phenomenal advantage: Layer {}",
+        best_layer.0
+    );
     println!("  Difference: {:+.4}", best_layer.3);
-    println!("  Cohen's d: {:+.4} ({})", best_layer.4, effect_size_label(best_layer.4));
+    println!(
+        "  Cohen's d: {:+.4} ({})",
+        best_layer.4,
+        effect_size_label(best_layer.4)
+    );
     println!("  p-value: {:.4}", best_layer.5);
 
     // Bonferroni correction
@@ -185,19 +224,32 @@ fn run_analysis() -> Result<()> {
 
     println!("\nMultiple comparison correction:");
     println!("  Bonferroni threshold: {:.4}", bonferroni_threshold);
-    println!("  Survives correction: {}", if survives_bonferroni { "YES" } else { "NO" });
+    println!(
+        "  Survives correction: {}",
+        if survives_bonferroni { "YES" } else { "NO" }
+    );
 
     // Layer-wise pattern analysis
     println!("\n================================================================");
     println!("   LAYER-WISE PATTERN");
     println!("================================================================\n");
 
-    let early_layers: Vec<_> = layer_results.iter().filter(|(l, _, _, _, _, _)| *l <= 6).collect();
-    let middle_layers: Vec<_> = layer_results.iter().filter(|(l, _, _, _, _, _)| *l > 6 && *l <= 15).collect();
-    let late_layers: Vec<_> = layer_results.iter().filter(|(l, _, _, _, _, _)| *l > 15).collect();
+    let early_layers: Vec<_> = layer_results
+        .iter()
+        .filter(|(l, _, _, _, _, _)| *l <= 6)
+        .collect();
+    let middle_layers: Vec<_> = layer_results
+        .iter()
+        .filter(|(l, _, _, _, _, _)| *l > 6 && *l <= 15)
+        .collect();
+    let late_layers: Vec<_> = layer_results
+        .iter()
+        .filter(|(l, _, _, _, _, _)| *l > 15)
+        .collect();
 
     let early_mean_diff = early_layers.iter().map(|x| x.3).sum::<f64>() / early_layers.len() as f64;
-    let middle_mean_diff = middle_layers.iter().map(|x| x.3).sum::<f64>() / middle_layers.len() as f64;
+    let middle_mean_diff =
+        middle_layers.iter().map(|x| x.3).sum::<f64>() / middle_layers.len() as f64;
     let late_mean_diff = late_layers.iter().map(|x| x.3).sum::<f64>() / late_layers.len() as f64;
 
     println!("Mean phenomenal advantage by layer group:");

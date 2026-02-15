@@ -34,15 +34,15 @@
 //!                    └─────────────────────────────────────────────────┘
 //! ```
 
+use super::consciousness_streaming::{
+    ConsciousnessEvent, ConsciousnessEventEmitter, ConsciousnessEventType, EventPayload,
+};
+use super::counterfactual_dreams::{CounterfactualDreamEngine, CounterfactualDreamScenario};
 use super::emotional_depth::{EmotionalBlend, EmotionalDepthSystem};
 use super::self_improvement_integration::{
-    SelfImprovementSystem, ImprovementRecommendation, ImprovementType,
+    ImprovementRecommendation, ImprovementType, SelfImprovementSystem,
 };
 use super::sleep_and_altered_states::{DreamGenerator, DreamScenario};
-use super::counterfactual_dreams::{CounterfactualDreamEngine, CounterfactualDreamScenario};
-use super::consciousness_streaming::{
-    ConsciousnessEvent, ConsciousnessEventType, ConsciousnessEventEmitter, EventPayload,
-};
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -128,7 +128,8 @@ impl EmotionalDreamBridge {
         // High arousal → weaker binding → more bizarre dreams
         // Low arousal → stronger binding → more coherent dreams
         // Range: arousal (0 to 1) → binding (0.6 - arousal*0.4)
-        let binding_strength = 0.6 - (emotional_state.arousal * self.config.arousal_influence * 0.4);
+        let binding_strength =
+            0.6 - (emotional_state.arousal * self.config.arousal_influence * 0.4);
         generator.set_binding_strength(binding_strength.clamp(0.1, 0.8));
     }
 
@@ -224,7 +225,8 @@ impl EmotionalDreamBridge {
             .sum();
 
         let numerator = n * sum_ev_dv - sum_ev * sum_dv;
-        let denominator = ((n * sum_ev2 - sum_ev * sum_ev) * (n * sum_dv2 - sum_dv * sum_dv)).sqrt();
+        let denominator =
+            ((n * sum_ev2 - sum_ev * sum_ev) * (n * sum_dv2 - sum_dv * sum_dv)).sqrt();
 
         if denominator > 0.001 {
             (numerator / denominator).clamp(-1.0, 1.0)
@@ -325,8 +327,8 @@ impl SelfImprovementDreamBridge {
         let recommendation_stress = top_rec.priority;
 
         // Combined stress (weighted average)
-        let stress = (phi_stress * 0.4 + trend_stress * 0.3 + recommendation_stress * 0.3)
-            .clamp(0.0, 1.0);
+        let stress =
+            (phi_stress * 0.4 + trend_stress * 0.3 + recommendation_stress * 0.3).clamp(0.0, 1.0);
 
         // Record for trend analysis
         self.stress_history.push(stress);
@@ -384,7 +386,9 @@ impl SelfImprovementDreamBridge {
         } else if self.config.enable_consolidation_dreams && stress > self.config.stress_threshold {
             // Moderate stress → consolidation dream (attempting to process)
             let mut dream = generator.generate_dream(duration_minutes, false);
-            dream.themes.insert(0, "Processing unresolved cognitive load".to_string());
+            dream
+                .themes
+                .insert(0, "Processing unresolved cognitive load".to_string());
             dream
         } else {
             generator.generate_dream(duration_minutes, false)
@@ -495,7 +499,9 @@ impl<'a> SelfImprovementEventEmitter<'a> {
 
         // Emit recommendation event if priority changed significantly
         let priority_change = (top_rec.priority - self.last_recommendation_priority).abs();
-        if priority_change > 0.2 || (top_rec.priority > 0.7 && self.last_recommendation_priority <= 0.7) {
+        if priority_change > 0.2
+            || (top_rec.priority > 0.7 && self.last_recommendation_priority <= 0.7)
+        {
             self.emit_recommendation_event(system, &top_rec);
             self.last_recommendation_priority = top_rec.priority;
         }
@@ -556,10 +562,8 @@ impl<'a> SelfImprovementEventEmitter<'a> {
             "stable"
         };
 
-        let event = ConsciousnessEvent::phi_update(
-            system.current_phi(),
-            system.self_model().predicted_phi,
-        );
+        let event =
+            ConsciousnessEvent::phi_update(system.current_phi(), system.self_model().predicted_phi);
 
         self.emitter.emit(event);
     }
@@ -571,7 +575,11 @@ impl<'a> SelfImprovementEventEmitter<'a> {
     }
 
     /// Emit improvement applied event
-    pub fn emit_improvement_applied(&self, improvement_type: ImprovementType, system: &SelfImprovementSystem) {
+    pub fn emit_improvement_applied(
+        &self,
+        improvement_type: ImprovementType,
+        system: &SelfImprovementSystem,
+    ) {
         let event = ConsciousnessEvent::new(
             ConsciousnessEventType::CognitiveModeTransition,
             EventPayload::CognitiveMode {
@@ -645,26 +653,34 @@ impl ConsciousnessIntegrationBridge {
         let mut generator = DreamGenerator::new(seed);
 
         // Apply emotional configuration
-        self.emotional_dream.configure_dream_generator(&mut generator, emotional_state);
+        self.emotional_dream
+            .configure_dream_generator(&mut generator, emotional_state);
 
         // Override binding if stress is higher impact
         if stress > 0.5 {
-            self.stress_dream.configure_dream_generator_from_stress(&mut generator, stress);
+            self.stress_dream
+                .configure_dream_generator_from_stress(&mut generator, stress);
         }
 
         // Determine dream type
         let dream = if stress > 0.7 && emotional_state.valence < 0.0 {
             // High stress + negative emotion → nightmare
             let mut nightmare = generator.generate_nightmare(duration_minutes);
-            nightmare.themes.insert(0, format!(
-                "Processing stress ({:.0}%) and emotional state ({:.0}% valence)",
-                stress * 100.0, emotional_state.valence * 100.0
-            ));
+            nightmare.themes.insert(
+                0,
+                format!(
+                    "Processing stress ({:.0}%) and emotional state ({:.0}% valence)",
+                    stress * 100.0,
+                    emotional_state.valence * 100.0
+                ),
+            );
             nightmare
         } else if stress > 0.5 {
             // High stress → consolidation dream
             let mut dream = generator.generate_dream(duration_minutes, false);
-            dream.themes.insert(0, "Cognitive consolidation".to_string());
+            dream
+                .themes
+                .insert(0, "Cognitive consolidation".to_string());
             dream
         } else if emotional_state.arousal < 0.3 && emotional_state.valence > 0.2 {
             // Low arousal + positive valence → lucid dream potential
@@ -674,7 +690,8 @@ impl ConsciousnessIntegrationBridge {
         };
 
         // Record correlation in emotional bridge
-        self.emotional_dream.record_correlation(emotional_state, &dream);
+        self.emotional_dream
+            .record_correlation(emotional_state, &dream);
 
         dream
     }
@@ -691,11 +708,13 @@ impl ConsciousnessIntegrationBridge {
         let stress = self.stress_dream.calculate_stress(self_improvement);
 
         // Configure from both emotional state and stress
-        self.emotional_dream.configure_counterfactual_engine(engine, emotional_state);
+        self.emotional_dream
+            .configure_counterfactual_engine(engine, emotional_state);
 
         // Stress overrides if higher
         if stress > 0.5 {
-            self.stress_dream.configure_counterfactual_from_stress(engine, stress);
+            self.stress_dream
+                .configure_counterfactual_from_stress(engine, stress);
         }
 
         // Generate appropriate type based on combined state

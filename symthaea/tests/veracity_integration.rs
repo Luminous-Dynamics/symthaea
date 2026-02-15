@@ -29,11 +29,11 @@
 //! 2. Epistemic status flows from brain to translator
 //! 3. Hallucination is prevented by architecture, not prompting
 
-use symthaea::mind::{
-    StructuredThought, SemanticIntent, ResponseType, EpistemicStatus,
-    EmotionalTone, ActivatedConcept, ConstraintType, ResponseConstraint,
-};
 use symthaea::language::{LLMOrgan, LLMOrganConfig, TRANSLATION_SYSTEM_PROMPT};
+use symthaea::mind::{
+    ActivatedConcept, ConstraintType, EmotionalTone, EpistemicStatus, ResponseConstraint,
+    ResponseType, SemanticIntent, StructuredThought,
+};
 use symthaea::Symthaea;
 use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
 
@@ -74,7 +74,10 @@ async fn test_uncertain_thought_produces_hedged_translation() {
     };
 
     // The thought SHOULD require hedging
-    assert!(thought.should_hedge(), "Uncertain thoughts should require hedging");
+    assert!(
+        thought.should_hedge(),
+        "Uncertain thoughts should require hedging"
+    );
 
     // Translate the thought
     let result = llm.translate_thought(&thought).await;
@@ -218,13 +221,11 @@ async fn test_certain_thought_can_be_confident() {
         relation_mode: RelationMode::IThou,
         trust: 0.8,
         code_context: None,
-        activated_concepts: vec![
-            ActivatedConcept {
-                name: "greeting".to_string(),
-                activation: 0.95,
-                relevance: 0.9,
-            },
-        ],
+        activated_concepts: vec![ActivatedConcept {
+            name: "greeting".to_string(),
+            activation: 0.95,
+            relevance: 0.9,
+        }],
         structured_data: None,
         domain_context: None,
         constraints: vec![],
@@ -233,7 +234,10 @@ async fn test_certain_thought_can_be_confident() {
     };
 
     // This should NOT require hedging
-    assert!(!thought.should_hedge(), "Certain thoughts should not require hedging");
+    assert!(
+        !thought.should_hedge(),
+        "Certain thoughts should not require hedging"
+    );
 
     let result = llm.translate_thought(&thought).await;
     println!("Certain thought output: {}", result.text);
@@ -264,12 +268,10 @@ async fn test_must_include_constraint_verified() {
         activated_concepts: vec![],
         structured_data: None,
         domain_context: None,
-        constraints: vec![
-            ResponseConstraint {
-                constraint_type: ConstraintType::MustInclude,
-                instruction: "symthaea".to_string(),
-            },
-        ],
+        constraints: vec![ResponseConstraint {
+            constraint_type: ConstraintType::MustInclude,
+            instruction: "symthaea".to_string(),
+        }],
         original_input: Some("What is your name?".to_string()),
         primitive_tiers: vec![],
     };
@@ -282,7 +284,10 @@ async fn test_must_include_constraint_verified() {
     // Test fidelity check with a response that OMITS the required word
     let bad_response = "I am an AI assistant here to help.";
     let fidelity_bad = verify_fidelity_helper(&thought, bad_response);
-    assert!(!fidelity_bad, "Response missing required content should fail");
+    assert!(
+        !fidelity_bad,
+        "Response missing required content should fail"
+    );
 }
 
 #[tokio::test]
@@ -302,12 +307,10 @@ async fn test_must_exclude_constraint_verified() {
         activated_concepts: vec![],
         structured_data: None,
         domain_context: None,
-        constraints: vec![
-            ResponseConstraint {
-                constraint_type: ConstraintType::MustExclude,
-                instruction: "definitely".to_string(),
-            },
-        ],
+        constraints: vec![ResponseConstraint {
+            constraint_type: ConstraintType::MustExclude,
+            instruction: "definitely".to_string(),
+        }],
         original_input: Some("Are you sure?".to_string()),
         primitive_tiers: vec![],
     };
@@ -315,7 +318,10 @@ async fn test_must_exclude_constraint_verified() {
     // Response WITHOUT forbidden word should pass
     let good_response = "Yes, I am confident in this answer.";
     let fidelity_good = verify_fidelity_helper(&thought, good_response);
-    assert!(fidelity_good, "Response without forbidden content should pass");
+    assert!(
+        fidelity_good,
+        "Response without forbidden content should pass"
+    );
 
     // Response WITH forbidden word should fail
     let bad_response = "Yes, I am definitely sure about this.";
@@ -402,7 +408,10 @@ async fn test_full_pipeline_respects_epistemic_status() {
 
     // Process a query that should trigger uncertainty
     // (novel query with no memory of Atlantis)
-    let response = symthaea.process("What is the capital of Atlantis?").await.unwrap();
+    let response = symthaea
+        .process("What is the capital of Atlantis?")
+        .await
+        .unwrap();
 
     println!("Full pipeline response: {}", response.content);
     println!("Translation verified: {}", response.translation_verified);
@@ -420,6 +429,20 @@ async fn test_full_pipeline_respects_epistemic_status() {
 
     // Note: With a fresh mind and novel query, the system should recognize uncertainty
     // The exact behavior depends on the mind's state, but we can verify the pipeline works
+    assert!(
+        thought.phi >= 0.0 && thought.phi <= 1.0,
+        "Phi should be in [0,1], got {}",
+        thought.phi
+    );
+    assert!(
+        thought.coherence >= 0.0 && thought.coherence <= 1.0,
+        "Coherence should be in [0,1], got {}",
+        thought.coherence
+    );
+    assert!(
+        !response.content.is_empty(),
+        "Response content should not be empty"
+    );
 }
 
 #[tokio::test]
@@ -436,6 +459,15 @@ async fn test_greeting_produces_acknowledgment() {
 
     // A greeting should be handled with reasonable confidence
     // (greetings are within the system's capability)
+    assert!(
+        !response.content.is_empty(),
+        "Response content should not be empty"
+    );
+    assert!(
+        thought.coherence >= 0.0 && thought.coherence <= 1.0,
+        "Coherence should be in [0,1], got {}",
+        thought.coherence
+    );
 }
 
 // ============================================================================
@@ -473,9 +505,18 @@ fn test_translation_prompt_includes_epistemic_markers() {
     println!("Generated prompt:\n{}", prompt);
 
     // Verify critical markers are present
-    assert!(prompt.contains("EPISTEMIC_STATUS: Unknown"), "Prompt should include epistemic status");
-    assert!(prompt.contains("INTENT: ExpressUncertainty"), "Prompt should include intent");
-    assert!(prompt.contains("phi=0.20"), "Prompt should include phi value");
+    assert!(
+        prompt.contains("EPISTEMIC_STATUS: Unknown"),
+        "Prompt should include epistemic status"
+    );
+    assert!(
+        prompt.contains("INTENT: ExpressUncertainty"),
+        "Prompt should include intent"
+    );
+    assert!(
+        prompt.contains("phi=0.20"),
+        "Prompt should include phi value"
+    );
 }
 
 #[test]
@@ -519,19 +560,19 @@ fn verify_fidelity_helper(thought: &StructuredThought, text: &str) -> bool {
 
     // Check 2: MustInclude constraints
     for constraint in &thought.constraints {
-        if constraint.constraint_type == ConstraintType::MustInclude {
-            if !text_lower.contains(&constraint.instruction.to_lowercase()) {
-                verified = false;
-            }
+        if constraint.constraint_type == ConstraintType::MustInclude
+            && !text_lower.contains(&constraint.instruction.to_lowercase())
+        {
+            verified = false;
         }
     }
 
     // Check 3: MustExclude constraints
     for constraint in &thought.constraints {
-        if constraint.constraint_type == ConstraintType::MustExclude {
-            if text_lower.contains(&constraint.instruction.to_lowercase()) {
-                verified = false;
-            }
+        if constraint.constraint_type == ConstraintType::MustExclude
+            && text_lower.contains(&constraint.instruction.to_lowercase())
+        {
+            verified = false;
         }
     }
 

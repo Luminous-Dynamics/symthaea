@@ -903,7 +903,7 @@ impl TemporalReasoner {
             })
             .collect();
 
-        similarities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        similarities.sort_by(|a, b| b.1.total_cmp(&a.1));
         similarities.truncate(top_k);
         similarities
     }
@@ -1115,7 +1115,7 @@ impl ConsciousnessTemporalAnalyzer {
 
         // Sort intervals by start time
         let mut sorted: Vec<_> = self.conscious_intervals.iter().collect();
-        sorted.sort_by(|a, b| a.interval.start.partial_cmp(&b.interval.start).unwrap());
+        sorted.sort_by(|a, b| a.interval.start.total_cmp(&b.interval.start));
 
         // Build chains greedily
         for start in &sorted {
@@ -1179,7 +1179,7 @@ impl ConsciousnessTemporalAnalyzer {
 
         // Sort by start time
         let mut sorted: Vec<_> = self.conscious_intervals.iter().collect();
-        sorted.sort_by(|a, b| a.interval.start.partial_cmp(&b.interval.start).unwrap());
+        sorted.sort_by(|a, b| a.interval.start.total_cmp(&b.interval.start));
 
         for window in sorted.windows(2) {
             let a = &window[0];
@@ -1391,10 +1391,7 @@ impl TemporalPrimitiveSystem {
 
         for (relation, grounding) in &all_groundings {
             // Combine domain rotation with NSM-grounded encoding
-            let encoding = BinaryHV::bundle(&[
-                domain_rotation,
-                grounding.primitive_encoding,
-            ]);
+            let encoding = BinaryHV::bundle(&[domain_rotation, grounding.primitive_encoding]);
 
             relation_primitives.insert(
                 *relation,
@@ -1568,7 +1565,7 @@ impl TemporalPrimitiveSystem {
                 let similarity = query.similarity(&pattern.encoding);
                 (pattern.name.clone(), similarity)
             })
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(&b.1))
     }
 }
 

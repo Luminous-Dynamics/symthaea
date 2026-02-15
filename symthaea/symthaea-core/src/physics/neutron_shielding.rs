@@ -27,10 +27,10 @@
 //! - **Macroscopic cross-section (Σ)**: 1/λ = N * σ
 //! - **Tenth-value layer (TVL)**: Thickness to reduce flux by 10x
 
+use super::radiation_damage::FusionReaction;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::radiation_damage::FusionReaction;
 
 /// Neutron interaction cross-sections for a material
 #[derive(Debug, Clone)]
@@ -209,7 +209,9 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Water (H2O)".to_string(),
-                z: 1, a: 18.0, density: 1000.0,
+                z: 1,
+                a: 18.0,
+                density: 1000.0,
                 sigma_elastic_14mev: 0.7,
                 sigma_elastic_2mev: 2.5,
                 sigma_abs_thermal: 0.33,
@@ -223,7 +225,9 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Polyethylene".to_string(),
-                z: 1, a: 14.0, density: 940.0,
+                z: 1,
+                a: 14.0,
+                density: 940.0,
                 sigma_elastic_14mev: 0.8,
                 sigma_elastic_2mev: 3.0,
                 sigma_abs_thermal: 0.00,
@@ -238,21 +242,25 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Borated Polyethylene".to_string(),
-                z: 5, a: 14.5, density: 1000.0,
+                z: 5,
+                a: 14.5,
+                density: 1000.0,
                 sigma_elastic_14mev: 0.8,
                 sigma_elastic_2mev: 3.0,
                 sigma_abs_thermal: 767.0, // B-10 has huge absorption
                 inelastic_threshold: 0.0,
             },
             function: ShieldFunction::Composite,
-            gamma_production: 0.5,  // (n,α) produces gammas
+            gamma_production: 0.5, // (n,α) produces gammas
             activation: 0.1,
         });
 
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Boron Carbide (B4C)".to_string(),
-                z: 5, a: 55.0, density: 2520.0,
+                z: 5,
+                a: 55.0,
+                density: 2520.0,
                 sigma_elastic_14mev: 1.0,
                 sigma_elastic_2mev: 2.0,
                 sigma_abs_thermal: 600.0,
@@ -266,7 +274,9 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Gadolinium".to_string(),
-                z: 64, a: 157.0, density: 7900.0,
+                z: 64,
+                a: 157.0,
+                density: 7900.0,
                 sigma_elastic_14mev: 5.0,
                 sigma_elastic_2mev: 6.0,
                 sigma_abs_thermal: 49000.0, // Highest known
@@ -281,7 +291,9 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Concrete".to_string(),
-                z: 14, a: 23.0, density: 2300.0,
+                z: 14,
+                a: 23.0,
+                density: 2300.0,
                 sigma_elastic_14mev: 2.5,
                 sigma_elastic_2mev: 4.0,
                 sigma_abs_thermal: 0.003,
@@ -295,7 +307,9 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Steel".to_string(),
-                z: 26, a: 56.0, density: 7800.0,
+                z: 26,
+                a: 56.0,
+                density: 7800.0,
                 sigma_elastic_14mev: 2.0,
                 sigma_elastic_2mev: 3.0,
                 sigma_abs_thermal: 2.6,
@@ -309,7 +323,9 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Lead".to_string(),
-                z: 82, a: 207.0, density: 11340.0,
+                z: 82,
+                a: 207.0,
+                density: 11340.0,
                 sigma_elastic_14mev: 5.0,
                 sigma_elastic_2mev: 7.0,
                 sigma_abs_thermal: 0.17,
@@ -324,7 +340,9 @@ impl NeutronShielding {
         self.materials.push(ShieldingMaterial {
             cross_section: NeutronCrossSection {
                 name: "Lithium Hydride (LiH)".to_string(),
-                z: 3, a: 8.0, density: 780.0,
+                z: 3,
+                a: 8.0,
+                density: 780.0,
                 sigma_elastic_14mev: 1.0,
                 sigma_elastic_2mev: 4.0,
                 sigma_abs_thermal: 71.0, // Li-6 absorption
@@ -337,7 +355,11 @@ impl NeutronShielding {
     }
 
     /// Analyze shielding effectiveness
-    pub fn analyze(&self, material: &ShieldingMaterial, reaction: FusionReaction) -> ShieldingAnalysis {
+    pub fn analyze(
+        &self,
+        material: &ShieldingMaterial,
+        reaction: FusionReaction,
+    ) -> ShieldingAnalysis {
         let energy = reaction.neutron_energy_mev().unwrap_or(2.45);
 
         let tvl = material.cross_section.tvl(energy);
@@ -353,9 +375,8 @@ impl NeutronShielding {
         let gamma_factor = 1.0 - material.gamma_production;
         let activation_factor = 1.0 - material.activation;
 
-        let quality_score = (thickness_factor * 0.4
-            + gamma_factor * 0.3
-            + activation_factor * 0.3) as f32;
+        let quality_score =
+            (thickness_factor * 0.4 + gamma_factor * 0.3 + activation_factor * 0.3) as f32;
 
         ShieldingAnalysis {
             material: material.cross_section.name.clone(),
@@ -416,7 +437,7 @@ impl NeutronShielding {
         let annual_dose = dose_rate_msv_hr * 2000.0;
 
         let occupational_safe = annual_dose < 20.0; // 20 mSv/year
-        let public_safe = annual_dose < 1.0;        // 1 mSv/year
+        let public_safe = annual_dose < 1.0; // 1 mSv/year
 
         // Additional shielding needed
         let additional = if public_safe {
@@ -519,7 +540,8 @@ impl NeutronShielding {
             }
 
             // Calculate actual dose with this thickness
-            let shielded = self.shielded_dose(reaction, power_kw, distance_m, material, actual_thickness);
+            let shielded =
+                self.shielded_dose(reaction, power_kw, distance_m, material, actual_thickness);
 
             // Score: prioritize meeting target, then minimize thickness
             let dose_factor = if shielded.dose_rate_msv_hr <= target_dose_msv_hr {
@@ -544,7 +566,8 @@ impl NeutronShielding {
             }
         }
 
-        let (name, thickness, mass, dose, quality) = best.expect("Should find at least one material");
+        let (name, thickness, mass, dose, quality) =
+            best.expect("Should find at least one material");
 
         OptimalShielding {
             primary_material: name,
@@ -587,7 +610,9 @@ mod tests {
     fn test_cross_section_calculations() {
         let water = NeutronCrossSection {
             name: "Water".to_string(),
-            z: 1, a: 18.0, density: 1000.0,
+            z: 1,
+            a: 18.0,
+            density: 1000.0,
             sigma_elastic_14mev: 0.7,
             sigma_elastic_2mev: 2.5,
             sigma_abs_thermal: 0.33,
@@ -610,7 +635,9 @@ mod tests {
     fn test_shielding_analysis() {
         let shielding = setup();
 
-        let borated_pe = shielding.materials.iter()
+        let borated_pe = shielding
+            .materials
+            .iter()
             .find(|m| m.cross_section.name.contains("Borated"))
             .expect("Should have borated polyethylene");
 
@@ -637,7 +664,9 @@ mod tests {
     fn test_shielded_dose() {
         let shielding = setup();
 
-        let borated_pe = shielding.materials.iter()
+        let borated_pe = shielding
+            .materials
+            .iter()
             .find(|m| m.cross_section.name.contains("Borated"))
             .unwrap();
 

@@ -28,10 +28,10 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
-use super::predictive_coding::{PredictiveCoding, ActiveInference};
 use super::causal_encoder::CausalSpace;
+use super::integrated_information::IntegratedInformation;
 use super::modern_hopfield::ModernHopfieldNetwork;
+use super::predictive_coding::{ActiveInference, PredictiveCoding};
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -150,7 +150,8 @@ impl ConsciousnessOptimizer {
                 let high_phi_vec = BinaryHV::random(6000); // Represents high consciousness
                 let strength = ((current_phi - prev_phi) as f32).min(1.0) as f64;
 
-                self.causal_model.add_causal_link(action_vec, high_phi_vec, strength);
+                self.causal_model
+                    .add_causal_link(action_vec, high_phi_vec, strength);
             }
         }
 
@@ -399,10 +400,13 @@ mod tests {
             optimizer.optimize_step();
         }
 
-        // Should have stored some high-Φ states
-        // (May be 0 if Φ never exceeded 0.5, which is possible with random initialization)
-        let _num_stored = optimizer.num_stored_states();
-        // Just check the method works - value can be 0 with random initialization
+        // Stored states should not exceed the number of optimization steps
+        let num_stored = optimizer.num_stored_states();
+        assert!(
+            num_stored <= 30,
+            "Stored states ({}) should not exceed optimization steps (30)",
+            num_stored
+        );
     }
 
     #[test]

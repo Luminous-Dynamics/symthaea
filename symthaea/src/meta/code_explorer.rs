@@ -135,7 +135,8 @@ impl ActiveCodeExplorer {
                 let file_len = file_hv.values.len().min(self.dim);
 
                 for i in 0..model_len.min(file_len) {
-                    new_values[i] = model.values[i] * prior_weight + file_hv.values[i] * blend_weight;
+                    new_values[i] =
+                        model.values[i] * prior_weight + file_hv.values[i] * blend_weight;
                 }
 
                 // Normalize
@@ -190,13 +191,16 @@ mod tests {
     use super::*;
     use crate::hdc::code_encoder::CodeHDEncoder;
     use crate::hdc::code_memory::CodebaseMemory;
-    use crate::language::code_parser::{ParsedCode, CodeEntity, EntityKind, Span};
+    use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Span};
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
@@ -216,7 +220,11 @@ mod tests {
 
         // Same vector should have low surprise
         let surprise_same = explorer.compute_surprise(&model);
-        assert!(surprise_same < 0.1, "Same vector should have low surprise: {}", surprise_same);
+        assert!(
+            surprise_same < 0.1,
+            "Same vector should have low surprise: {}",
+            surprise_same
+        );
 
         // Random vector should have higher surprise
         let random = ContinuousHV::random(512, 99);
@@ -245,11 +253,16 @@ mod tests {
 
         // Index diverse files
         let mut p1 = ParsedCode::new("", "rust");
-        p1.entities.push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+        p1.entities
+            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
         memory.index_file(Path::new("sort.rs"), &p1);
 
         let mut p2 = ParsedCode::new("", "rust");
-        p2.entities.push(CodeEntity::new(EntityKind::Function, "connect", test_span()));
+        p2.entities.push(CodeEntity::new(
+            EntityKind::Function,
+            "connect",
+            test_span(),
+        ));
         memory.index_file(Path::new("network.rs"), &p2);
 
         let mut explorer = ActiveCodeExplorer::new(512);

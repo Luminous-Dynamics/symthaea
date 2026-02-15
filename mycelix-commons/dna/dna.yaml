@@ -1,7 +1,7 @@
 ---
 # Mycelix Commons DNA
-# Universal Resource Coordination: property + housing + care + mutualaid + water
-# 27 domain zomes + 1 unified bridge = 28 zomes
+# Universal Resource Coordination: property + housing + care + mutualaid + water + food + transport
+# 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport = 34 domain + 1 bridge = 35 coordinator zomes
 
 manifest_version: "0"
 name: mycelix_commons
@@ -76,6 +76,24 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/water_steward_integrity.wasm
     - name: water_wisdom_integrity
       path: ../target/wasm32-unknown-unknown/release/water_wisdom_integrity.wasm
+
+    # Food domain
+    - name: food_production_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_production_integrity.wasm
+    - name: food_distribution_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_distribution_integrity.wasm
+    - name: food_preservation_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_preservation_integrity.wasm
+    - name: food_knowledge_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_knowledge_integrity.wasm
+
+    # Transport domain
+    - name: transport_routes_integrity
+      path: ../target/wasm32-unknown-unknown/release/transport_routes_integrity.wasm
+    - name: transport_sharing_integrity
+      path: ../target/wasm32-unknown-unknown/release/transport_sharing_integrity.wasm
+    - name: transport_impact_integrity
+      path: ../target/wasm32-unknown-unknown/release/transport_impact_integrity.wasm
 
     # Unified bridge
     - name: commons_bridge_integrity
@@ -206,6 +224,38 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/water_wisdom.wasm
       dependencies:
         - name: water_wisdom_integrity
+
+    # Food domain
+    - name: food_production
+      path: ../target/wasm32-unknown-unknown/release/food_production.wasm
+      dependencies:
+        - name: food_production_integrity
+    - name: food_distribution
+      path: ../target/wasm32-unknown-unknown/release/food_distribution.wasm
+      dependencies:
+        - name: food_distribution_integrity
+    - name: food_preservation
+      path: ../target/wasm32-unknown-unknown/release/food_preservation.wasm
+      dependencies:
+        - name: food_preservation_integrity
+    - name: food_knowledge
+      path: ../target/wasm32-unknown-unknown/release/food_knowledge.wasm
+      dependencies:
+        - name: food_knowledge_integrity
+
+    # Transport domain
+    - name: transport_routes
+      path: ../target/wasm32-unknown-unknown/release/transport_routes.wasm
+      dependencies:
+        - name: transport_routes_integrity
+    - name: transport_sharing
+      path: ../target/wasm32-unknown-unknown/release/transport_sharing.wasm
+      dependencies:
+        - name: transport_sharing_integrity
+    - name: transport_impact
+      path: ../target/wasm32-unknown-unknown/release/transport_impact.wasm
+      dependencies:
+        - name: transport_impact_integrity
 
     # Unified bridge
     - name: commons_bridge

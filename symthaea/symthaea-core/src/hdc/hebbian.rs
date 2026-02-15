@@ -118,10 +118,8 @@ impl Synapse {
 
         // If weights have been increasing, raise threshold (harder to potentiate)
         // If weights have been decreasing, lower threshold (easier to potentiate)
-        let recent_trend: f32 = self.weight_history.iter()
-            .rev()
-            .take(10)
-            .sum::<f32>() / 10.0_f32.min(self.weight_history.len() as f32);
+        let recent_trend: f32 = self.weight_history.iter().rev().take(10).sum::<f32>()
+            / 10.0_f32.min(self.weight_history.len() as f32);
 
         // Sigmoid transformation for smooth modulation
         let modifier = 1.0 / (1.0 + (-recent_trend * 10.0).exp());
@@ -316,7 +314,8 @@ impl HebbianEngine {
         // Ensure synapse exists
         self.ensure_synapse(pre_id, post_id);
 
-        let synapse = self.synapses
+        let synapse = self
+            .synapses
             .get_mut(pre_id)
             .unwrap()
             .get_mut(post_id)
@@ -368,12 +367,16 @@ impl HebbianEngine {
         }
 
         // Find activation times
-        let pre_time = self.activation_history.iter()
+        let pre_time = self
+            .activation_history
+            .iter()
             .filter(|r| r.concept_id == pre_id)
             .max_by_key(|r| r.time)
             .map(|r| r.time);
 
-        let post_time = self.activation_history.iter()
+        let post_time = self
+            .activation_history
+            .iter()
             .filter(|r| r.concept_id == post_id)
             .max_by_key(|r| r.time)
             .map(|r| r.time);
@@ -401,7 +404,8 @@ impl HebbianEngine {
 
         // Apply to synapse
         self.ensure_synapse(pre_id, post_id);
-        let synapse = self.synapses
+        let synapse = self
+            .synapses
             .get_mut(pre_id)
             .unwrap()
             .get_mut(post_id)
@@ -443,9 +447,8 @@ impl HebbianEngine {
             return 1.0;
         }
 
-        let avg_weight: f32 = outgoing.values()
-            .map(|s| s.weight)
-            .sum::<f32>() / outgoing.len() as f32;
+        let avg_weight: f32 =
+            outgoing.values().map(|s| s.weight).sum::<f32>() / outgoing.len() as f32;
 
         // Calculate scaling factor to reach target
         let scale_factor = if avg_weight > 0.01 {
@@ -492,7 +495,11 @@ impl HebbianEngine {
     /// # Arguments
     /// * `target` - The target concept
     /// * `candidates` - List of (concept_id, similarity) pairs
-    pub fn competitive_update(&mut self, target: &str, mut candidates: Vec<(&str, f32)>) -> Vec<String> {
+    pub fn competitive_update(
+        &mut self,
+        target: &str,
+        mut candidates: Vec<(&str, f32)>,
+    ) -> Vec<String> {
         if !self.config.enable_competitive || candidates.is_empty() {
             return Vec::new();
         }
@@ -511,11 +518,7 @@ impl HebbianEngine {
         // Weaken losers
         for (id, sim) in candidates.iter().skip(self.config.competitive_k) {
             self.ensure_synapse(id, target);
-            let synapse = self.synapses
-                .get_mut(*id)
-                .unwrap()
-                .get_mut(target)
-                .unwrap();
+            let synapse = self.synapses.get_mut(*id).unwrap().get_mut(target).unwrap();
 
             // Anti-Hebbian for losers
             let delta = -self.config.learning_rate * sim * 0.5;
@@ -589,7 +592,8 @@ impl HebbianEngine {
     pub fn weighted_bind(&self, id_a: &str, vec_a: &[f32], id_b: &str, vec_b: &[f32]) -> Vec<f32> {
         let weight = self.get_weight(id_a, id_b);
 
-        vec_a.iter()
+        vec_a
+            .iter()
             .zip(vec_b.iter())
             .map(|(a, b)| a * b * weight)
             .collect()
@@ -597,15 +601,15 @@ impl HebbianEngine {
 
     /// Get learning statistics
     pub fn stats(&self) -> HebbianStats {
-        let total_synapses: usize = self.synapses.values()
-            .map(|m| m.len())
-            .sum();
+        let total_synapses: usize = self.synapses.values().map(|m| m.len()).sum();
 
         let avg_weight: f32 = if total_synapses > 0 {
-            self.synapses.values()
+            self.synapses
+                .values()
                 .flat_map(|m| m.values())
                 .map(|s| s.weight)
-                .sum::<f32>() / total_synapses as f32
+                .sum::<f32>()
+                / total_synapses as f32
         } else {
             0.5
         };
@@ -726,7 +730,10 @@ impl HebbianAssociativeMemory {
         *self.activation_counts.entry(id.to_string()).or_insert(0) += 1;
 
         // Find co-active concepts (recently activated)
-        let coactive: Vec<_> = self.engine.activation_history.iter()
+        let coactive: Vec<_> = self
+            .engine
+            .activation_history
+            .iter()
             .filter(|r| r.concept_id != id)
             .filter(|r| r.time.elapsed() < Duration::from_millis(100))
             .map(|r| (r.concept_id.clone(), r.strength))
@@ -749,7 +756,8 @@ impl HebbianAssociativeMemory {
     pub fn recall(&self, query_id: &str, limit: usize) -> Vec<(String, f32)> {
         let connections = self.engine.get_connections(query_id);
 
-        let mut sorted: Vec<_> = connections.into_iter()
+        let mut sorted: Vec<_> = connections
+            .into_iter()
             .filter(|(id, _)| id != query_id)
             .collect();
 
@@ -850,7 +858,10 @@ mod tests {
 
         // No history = modifier of 1.0 (baseline)
         let baseline = synapse.metaplastic_modifier();
-        assert!((baseline - 1.0).abs() < 0.1, "No history should give baseline modifier");
+        assert!(
+            (baseline - 1.0).abs() < 0.1,
+            "No history should give baseline modifier"
+        );
 
         // Add positive history (potentiation has been happening)
         for _ in 0..10 {
@@ -869,9 +880,12 @@ mod tests {
         let after_negative = neg_synapse.metaplastic_modifier();
 
         // Positive trend should differ from negative trend
-        assert!((after_positive - after_negative).abs() > 0.2,
+        assert!(
+            (after_positive - after_negative).abs() > 0.2,
             "Different histories should produce different modifiers (pos: {}, neg: {})",
-            after_positive, after_negative);
+            after_positive,
+            after_negative
+        );
     }
 
     #[test]
@@ -895,7 +909,10 @@ mod tests {
         }
 
         let final_weight = engine.get_weight("A", "B");
-        assert!(final_weight > initial, "Co-activation should strengthen synapse");
+        assert!(
+            final_weight > initial,
+            "Co-activation should strengthen synapse"
+        );
     }
 
     #[test]
@@ -906,7 +923,10 @@ mod tests {
         let delta = engine.hebbian_update("A", "B", 0.1, 0.1);
 
         // Change should be small (0.01 * 0.1 * 0.1 = 0.0001)
-        assert!(delta.abs() < 0.01, "Low activity should produce small changes");
+        assert!(
+            delta.abs() < 0.01,
+            "Low activity should produce small changes"
+        );
     }
 
     #[test]
@@ -997,8 +1017,10 @@ mod tests {
         let after_decay = engine.get_weight("A", "B");
 
         // Weight should decay toward baseline (0.5)
-        assert!((after_decay - 0.5).abs() < (before_decay - 0.5).abs(),
-            "Decay should move weight toward baseline");
+        assert!(
+            (after_decay - 0.5).abs() < (before_decay - 0.5).abs(),
+            "Decay should move weight toward baseline"
+        );
     }
 
     #[test]
@@ -1009,12 +1031,7 @@ mod tests {
             ..Default::default()
         });
 
-        let candidates = vec![
-            ("A", 0.9),
-            ("B", 0.8),
-            ("C", 0.3),
-            ("D", 0.1),
-        ];
+        let candidates = vec![("A", 0.9), ("B", 0.8), ("C", 0.3), ("D", 0.1)];
 
         let winners = engine.competitive_update("target", candidates);
 
@@ -1034,16 +1051,16 @@ mod tests {
         let initial_ba = engine.get_weight("B", "A");
 
         // Learn association
-        engine.learn_association(
-            ("A", &vec_a, 1.0),
-            ("B", &vec_b, 1.0),
-        );
+        engine.learn_association(("A", &vec_a, 1.0), ("B", &vec_b, 1.0));
 
         let final_ab = engine.get_weight("A", "B");
         let final_ba = engine.get_weight("B", "A");
 
         assert!(final_ab > initial_ab, "A→B should strengthen");
-        assert!(final_ba > initial_ba, "B→A should strengthen (bidirectional)");
+        assert!(
+            final_ba > initial_ba,
+            "B→A should strengthen (bidirectional)"
+        );
     }
 
     #[test]
@@ -1078,8 +1095,10 @@ mod tests {
         let stats_after = engine.stats();
 
         // Weak synapses (near baseline) should be pruned
-        assert!(stats_after.total_synapses <= stats_before.total_synapses,
-            "Pruning should reduce synapse count");
+        assert!(
+            stats_after.total_synapses <= stats_before.total_synapses,
+            "Pruning should reduce synapse count"
+        );
         println!("Pruned {} weak synapses", pruned);
     }
 
@@ -1157,7 +1176,9 @@ mod tests {
         let synapse = engine.synapses.get("A").unwrap().get("B").unwrap();
 
         // BCM threshold should have increased due to high activity
-        assert!(synapse.bcm_threshold > 0.5,
-            "BCM threshold should increase with high activity");
+        assert!(
+            synapse.bcm_threshold > 0.5,
+            "BCM threshold should increase with high activity"
+        );
     }
 }

@@ -144,9 +144,15 @@ impl DatabaseRole {
     pub fn primary_capability(&self) -> &str {
         match self {
             DatabaseRole::SensoryCortex => "Ultra-fast Hamming distance search (2048-bit BinaryHV)",
-            DatabaseRole::PrefrontalCortex => "Recursive Datalog for meta-consciousness and causal reasoning",
-            DatabaseRole::LongTermMemory => "Massive local-first storage for multimodal life records",
-            DatabaseRole::EpistemicAuditor => "Statistical analysis of knowledge quality (K-Index, Φ metrics)",
+            DatabaseRole::PrefrontalCortex => {
+                "Recursive Datalog for meta-consciousness and causal reasoning"
+            }
+            DatabaseRole::LongTermMemory => {
+                "Massive local-first storage for multimodal life records"
+            }
+            DatabaseRole::EpistemicAuditor => {
+                "Statistical analysis of knowledge quality (K-Index, Φ metrics)"
+            }
         }
     }
 
@@ -477,9 +483,9 @@ impl ImprovementMapping {
 pub struct QdrantConfig {
     pub url: String,
     pub collection_name: String,
-    pub vector_dim: usize,           // 2048 for BinaryHV
-    pub distance_metric: String,     // "Cosine" or "Dot"
-    pub shard_count: usize,          // For scaling
+    pub vector_dim: usize,       // 2048 for BinaryHV
+    pub distance_metric: String, // "Cosine" or "Dot"
+    pub shard_count: usize,      // For scaling
 }
 
 impl QdrantConfig {
@@ -487,7 +493,7 @@ impl QdrantConfig {
         Self {
             url: "http://localhost:6333".to_string(),
             collection_name: "symthaea_sensory".to_string(),
-            vector_dim: 2048,  // BinaryHV::DIM
+            vector_dim: 2048, // BinaryHV::DIM
             distance_metric: "Cosine".to_string(),
             shard_count: 4,
         }
@@ -498,8 +504,8 @@ impl QdrantConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CozoDbConfig {
     pub data_dir: String,
-    pub engine: String,              // "mem", "sqlite", "rocksdb"
-    pub max_recursion_depth: usize,  // For Datalog recursion
+    pub engine: String,             // "mem", "sqlite", "rocksdb"
+    pub max_recursion_depth: usize, // For Datalog recursion
 }
 
 impl CozoDbConfig {
@@ -507,7 +513,7 @@ impl CozoDbConfig {
         Self {
             data_dir: "/var/lib/symthaea/cozo".to_string(),
             engine: "rocksdb".to_string(),
-            max_recursion_depth: 100,  // Deep reasoning
+            max_recursion_depth: 100, // Deep reasoning
         }
     }
 }
@@ -517,8 +523,8 @@ impl CozoDbConfig {
 pub struct LanceDbConfig {
     pub data_dir: String,
     pub table_name: String,
-    pub vector_dim: usize,           // 2048 for BinaryHV
-    pub enable_multimodal: bool,     // Images, audio, text
+    pub vector_dim: usize,       // 2048 for BinaryHV
+    pub enable_multimodal: bool, // Images, audio, text
 }
 
 impl LanceDbConfig {
@@ -536,7 +542,7 @@ impl LanceDbConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DuckDbConfig {
     pub database_path: String,
-    pub memory_limit: String,        // "4GB"
+    pub memory_limit: String, // "4GB"
     pub threads: usize,
 }
 
@@ -670,7 +676,7 @@ pub struct DatabaseHealth {
     pub role: DatabaseRole,
     pub available: bool,
     pub latency_ms: Option<u64>,
-    pub last_check: Option<u64>,  // Unix timestamp
+    pub last_check: Option<u64>, // Unix timestamp
     pub error_message: Option<String>,
     pub consecutive_failures: u32,
 }
@@ -685,7 +691,7 @@ impl DatabaseHealth {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
-                    .unwrap_or(0)
+                    .unwrap_or(0),
             ),
             error_message: None,
             consecutive_failures: 0,
@@ -701,7 +707,7 @@ impl DatabaseHealth {
                 std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .map(|d| d.as_secs())
-                    .unwrap_or(0)
+                    .unwrap_or(0),
             ),
             error_message: Some(error),
             consecutive_failures: 1,
@@ -825,7 +831,7 @@ impl DatabaseClient for StubClient {
 pub struct QdrantClientWrapper {
     config: QdrantConfig,
     #[cfg(feature = "qdrant")]
-    _client: Option<()>,  // Placeholder for actual qdrant_client::Qdrant
+    _client: Option<()>, // Placeholder for actual qdrant_client::Qdrant
     connected: std::sync::atomic::AtomicBool,
 }
 
@@ -845,7 +851,8 @@ impl QdrantClientWrapper {
     pub async fn connect(&mut self) -> DatabaseResult<()> {
         // When qdrant feature is enabled, actual connection would go here:
         // self._client = Some(qdrant_client::Qdrant::from_url(&self.config.url).build()?);
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -856,7 +863,11 @@ impl QdrantClientWrapper {
 
     /// Search for similar vectors (episodic memory retrieval)
     #[cfg(feature = "qdrant")]
-    pub async fn search_similar(&self, query: &BinaryHV, limit: usize) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
+    pub async fn search_similar(
+        &self,
+        query: &BinaryHV,
+        limit: usize,
+    ) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("Qdrant".to_string()));
         }
@@ -865,13 +876,22 @@ impl QdrantClientWrapper {
     }
 
     #[cfg(not(feature = "qdrant"))]
-    pub async fn search_similar(&self, _query: &BinaryHV, _limit: usize) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
+    pub async fn search_similar(
+        &self,
+        _query: &BinaryHV,
+        _limit: usize,
+    ) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
         Err(DatabaseError::FeatureNotEnabled("qdrant".to_string()))
     }
 
     /// Store a vector in episodic memory
     #[cfg(feature = "qdrant")]
-    pub async fn store(&self, id: &str, vector: &BinaryHV, metadata: HashMap<String, String>) -> DatabaseResult<()> {
+    pub async fn store(
+        &self,
+        id: &str,
+        vector: &BinaryHV,
+        metadata: HashMap<String, String>,
+    ) -> DatabaseResult<()> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("Qdrant".to_string()));
         }
@@ -881,7 +901,12 @@ impl QdrantClientWrapper {
     }
 
     #[cfg(not(feature = "qdrant"))]
-    pub async fn store(&self, _id: &str, _vector: &BinaryHV, _metadata: HashMap<String, String>) -> DatabaseResult<()> {
+    pub async fn store(
+        &self,
+        _id: &str,
+        _vector: &BinaryHV,
+        _metadata: HashMap<String, String>,
+    ) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotEnabled("qdrant".to_string()))
     }
 }
@@ -905,12 +930,15 @@ impl DatabaseClient for QdrantClientWrapper {
         }
         #[cfg(not(feature = "qdrant"))]
         {
-            Ok(DatabaseHealth::feature_disabled(DatabaseRole::SensoryCortex))
+            Ok(DatabaseHealth::feature_disabled(
+                DatabaseRole::SensoryCortex,
+            ))
         }
     }
 
     fn close(&self) -> DatabaseResult<()> {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 }
@@ -924,7 +952,7 @@ impl DatabaseClient for QdrantClientWrapper {
 pub struct CozoClientWrapper {
     config: CozoDbConfig,
     #[cfg(feature = "datalog")]
-    _db: Option<()>,  // Placeholder for actual cozo::DbInstance
+    _db: Option<()>, // Placeholder for actual cozo::DbInstance
     connected: std::sync::atomic::AtomicBool,
 }
 
@@ -943,7 +971,8 @@ impl CozoClientWrapper {
     pub fn open(&mut self) -> DatabaseResult<()> {
         // When datalog feature is enabled:
         // self._db = Some(cozo::DbInstance::new(...))?;
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -969,7 +998,11 @@ impl CozoClientWrapper {
 
     /// Store a causal relation
     #[cfg(feature = "datalog")]
-    pub fn store_relation(&self, relation: &str, facts: &[Vec<serde_json::Value>]) -> DatabaseResult<()> {
+    pub fn store_relation(
+        &self,
+        relation: &str,
+        facts: &[Vec<serde_json::Value>],
+    ) -> DatabaseResult<()> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("CozoDB".to_string()));
         }
@@ -978,7 +1011,11 @@ impl CozoClientWrapper {
     }
 
     #[cfg(not(feature = "datalog"))]
-    pub fn store_relation(&self, _relation: &str, _facts: &[Vec<serde_json::Value>]) -> DatabaseResult<()> {
+    pub fn store_relation(
+        &self,
+        _relation: &str,
+        _facts: &[Vec<serde_json::Value>],
+    ) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotEnabled("datalog".to_string()))
     }
 }
@@ -1002,12 +1039,15 @@ impl DatabaseClient for CozoClientWrapper {
         }
         #[cfg(not(feature = "datalog"))]
         {
-            Ok(DatabaseHealth::feature_disabled(DatabaseRole::PrefrontalCortex))
+            Ok(DatabaseHealth::feature_disabled(
+                DatabaseRole::PrefrontalCortex,
+            ))
         }
     }
 
     fn close(&self) -> DatabaseResult<()> {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 }
@@ -1021,7 +1061,7 @@ impl DatabaseClient for CozoClientWrapper {
 pub struct LanceClientWrapper {
     config: LanceDbConfig,
     #[cfg(feature = "lance")]
-    _db: Option<()>,  // Placeholder for actual lancedb::Connection
+    _db: Option<()>, // Placeholder for actual lancedb::Connection
     connected: std::sync::atomic::AtomicBool,
 }
 
@@ -1040,7 +1080,8 @@ impl LanceClientWrapper {
     pub async fn connect(&mut self) -> DatabaseResult<()> {
         // When lance feature is enabled:
         // self._db = Some(lancedb::connect(&self.config.data_dir).execute().await?);
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -1051,7 +1092,13 @@ impl LanceClientWrapper {
 
     /// Store an experience (episodic memory)
     #[cfg(feature = "lance")]
-    pub async fn store_experience(&self, id: &str, vector: &BinaryHV, experience_type: &str, content: &str) -> DatabaseResult<()> {
+    pub async fn store_experience(
+        &self,
+        id: &str,
+        vector: &BinaryHV,
+        experience_type: &str,
+        content: &str,
+    ) -> DatabaseResult<()> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("LanceDB".to_string()));
         }
@@ -1060,13 +1107,23 @@ impl LanceClientWrapper {
     }
 
     #[cfg(not(feature = "lance"))]
-    pub async fn store_experience(&self, _id: &str, _vector: &BinaryHV, _experience_type: &str, _content: &str) -> DatabaseResult<()> {
+    pub async fn store_experience(
+        &self,
+        _id: &str,
+        _vector: &BinaryHV,
+        _experience_type: &str,
+        _content: &str,
+    ) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotEnabled("lance".to_string()))
     }
 
     /// Retrieve experiences by similarity
     #[cfg(feature = "lance")]
-    pub async fn retrieve_experiences(&self, query: &BinaryHV, limit: usize) -> DatabaseResult<Vec<(String, BinaryHV, f32)>> {
+    pub async fn retrieve_experiences(
+        &self,
+        query: &BinaryHV,
+        limit: usize,
+    ) -> DatabaseResult<Vec<(String, BinaryHV, f32)>> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("LanceDB".to_string()));
         }
@@ -1075,7 +1132,11 @@ impl LanceClientWrapper {
     }
 
     #[cfg(not(feature = "lance"))]
-    pub async fn retrieve_experiences(&self, _query: &BinaryHV, _limit: usize) -> DatabaseResult<Vec<(String, BinaryHV, f32)>> {
+    pub async fn retrieve_experiences(
+        &self,
+        _query: &BinaryHV,
+        _limit: usize,
+    ) -> DatabaseResult<Vec<(String, BinaryHV, f32)>> {
         Err(DatabaseError::FeatureNotEnabled("lance".to_string()))
     }
 }
@@ -1099,12 +1160,15 @@ impl DatabaseClient for LanceClientWrapper {
         }
         #[cfg(not(feature = "lance"))]
         {
-            Ok(DatabaseHealth::feature_disabled(DatabaseRole::LongTermMemory))
+            Ok(DatabaseHealth::feature_disabled(
+                DatabaseRole::LongTermMemory,
+            ))
         }
     }
 
     fn close(&self) -> DatabaseResult<()> {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 }
@@ -1126,7 +1190,10 @@ impl std::fmt::Debug for DuckClientWrapper {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DuckClientWrapper")
             .field("config", &self.config)
-            .field("connected", &self.connected.load(std::sync::atomic::Ordering::SeqCst))
+            .field(
+                "connected",
+                &self.connected.load(std::sync::atomic::Ordering::SeqCst),
+            )
             .finish()
     }
 }
@@ -1147,18 +1214,26 @@ impl DuckClientWrapper {
         use duckdb::Config;
 
         let db_config = Config::default()
-            .threads(self.config.threads as u32)
-            .map_err(|e| DatabaseError::ConnectionFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+            .threads(self.config.threads as i64)
+            .map_err(|e| DatabaseError::ConnectionFailed {
+                database: "DuckDB".to_string(),
+                message: e.to_string(),
+            })?;
 
         let connection = if self.config.database_path == ":memory:" {
             duckdb::Connection::open_in_memory_with_flags(db_config)
         } else {
             duckdb::Connection::open_with_flags(&self.config.database_path, db_config)
-        }.map_err(|e| DatabaseError::ConnectionFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+        }
+        .map_err(|e| DatabaseError::ConnectionFailed {
+            database: "DuckDB".to_string(),
+            message: e.to_string(),
+        })?;
 
         // Initialize schema for Phi metrics storage
-        connection.execute(
-            "CREATE TABLE IF NOT EXISTS phi_metrics (
+        connection
+            .execute(
+                "CREATE TABLE IF NOT EXISTS phi_metrics (
                 id INTEGER PRIMARY KEY,
                 phi_value DOUBLE NOT NULL,
                 timestamp_ms BIGINT NOT NULL,
@@ -1166,11 +1241,16 @@ impl DuckClientWrapper {
                 node_count INTEGER,
                 metadata JSON
             )",
-            [],
-        ).map_err(|e| DatabaseError::ConnectionFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+                [],
+            )
+            .map_err(|e| DatabaseError::ConnectionFailed {
+                database: "DuckDB".to_string(),
+                message: e.to_string(),
+            })?;
 
-        *self.conn.lock().unwrap() = Some(connection);
-        self.connected.store(true, std::sync::atomic::Ordering::SeqCst);
+        *self.conn.lock().expect("conn Mutex poisoned") = Some(connection);
+        self.connected
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
@@ -1186,37 +1266,49 @@ impl DuckClientWrapper {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
 
-        let guard = self.conn.lock().unwrap();
-        let conn = guard.as_ref()
+        let guard = self.conn.lock().expect("conn Mutex poisoned");
+        let conn = guard
+            .as_ref()
             .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
 
-        let mut stmt = conn.prepare(sql)
-            .map_err(|e| DatabaseError::QueryFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+        let mut stmt = conn.prepare(sql).map_err(|e| DatabaseError::QueryFailed {
+            database: "DuckDB".to_string(),
+            message: e.to_string(),
+        })?;
 
         let column_count = stmt.column_count();
         let column_names: Vec<String> = (0..column_count)
-            .map(|i| stmt.column_name(i).unwrap_or("?").to_string())
+            .map(|i| {
+                stmt.column_name(i)
+                    .map(|s| s.to_string())
+                    .unwrap_or_else(|_| "?".to_string())
+            })
             .collect();
 
-        let rows = stmt.query_map([], |row| {
-            let mut map = HashMap::new();
-            for (i, name) in column_names.iter().enumerate() {
-                // Try to extract as different types
-                let value: serde_json::Value = if let Ok(v) = row.get::<_, i64>(i) {
-                    serde_json::Value::Number(v.into())
-                } else if let Ok(v) = row.get::<_, f64>(i) {
-                    serde_json::Number::from_f64(v)
-                        .map(serde_json::Value::Number)
-                        .unwrap_or(serde_json::Value::Null)
-                } else if let Ok(v) = row.get::<_, String>(i) {
-                    serde_json::Value::String(v)
-                } else {
-                    serde_json::Value::Null
-                };
-                map.insert(name.clone(), value);
-            }
-            Ok(map)
-        }).map_err(|e| DatabaseError::QueryFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+        let rows = stmt
+            .query_map([], |row| {
+                let mut map = HashMap::new();
+                for (i, name) in column_names.iter().enumerate() {
+                    // Try to extract as different types
+                    let value: serde_json::Value = if let Ok(v) = row.get::<_, i64>(i) {
+                        serde_json::Value::Number(v.into())
+                    } else if let Ok(v) = row.get::<_, f64>(i) {
+                        serde_json::Number::from_f64(v)
+                            .map(serde_json::Value::Number)
+                            .unwrap_or(serde_json::Value::Null)
+                    } else if let Ok(v) = row.get::<_, String>(i) {
+                        serde_json::Value::String(v)
+                    } else {
+                        serde_json::Value::Null
+                    };
+                    map.insert(name.clone(), value);
+                }
+                Ok(map)
+            })
+            .map_err(|e| DatabaseError::QueryFailed {
+                database: "DuckDB".to_string(),
+                message: e.to_string(),
+            })?;
 
         let results: Vec<_> = rows.filter_map(|r| r.ok()).collect();
         Ok(results)
@@ -1234,42 +1326,56 @@ impl DuckClientWrapper {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
 
-        let guard = self.conn.lock().unwrap();
-        let conn = guard.as_ref()
+        let guard = self.conn.lock().expect("conn Mutex poisoned");
+        let conn = guard
+            .as_ref()
             .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
 
-        let mut stmt = conn.prepare(
-            "SELECT
+        let mut stmt = conn
+            .prepare(
+                "SELECT
                 AVG(phi_value) as mean_phi,
                 MAX(phi_value) as max_phi,
                 MIN(phi_value) as min_phi,
                 STDDEV(phi_value) as std_phi,
                 COUNT(*) as sample_count
-             FROM phi_metrics"
-        ).map_err(|e| DatabaseError::QueryFailed { database: "DuckDB".to_string(), message: e.to_string() })?;
+             FROM phi_metrics",
+            )
+            .map_err(|e| DatabaseError::QueryFailed {
+                database: "DuckDB".to_string(),
+                message: e.to_string(),
+            })?;
 
-        let result = stmt.query_row([], |row| {
-            Ok(PhiStatistics {
-                mean_phi: row.get::<_, f64>(0).unwrap_or(0.0),
-                max_phi: row.get::<_, f64>(1).unwrap_or(0.0),
-                min_phi: row.get::<_, f64>(2).unwrap_or(0.0),
-                std_phi: row.get::<_, f64>(3).unwrap_or(0.0),
-                sample_count: row.get::<_, i64>(4).unwrap_or(0) as u64,
+        let result = stmt
+            .query_row([], |row| {
+                Ok(PhiStatistics {
+                    mean_phi: row.get::<_, f64>(0).unwrap_or(0.0),
+                    max_phi: row.get::<_, f64>(1).unwrap_or(0.0),
+                    min_phi: row.get::<_, f64>(2).unwrap_or(0.0),
+                    std_phi: row.get::<_, f64>(3).unwrap_or(0.0),
+                    sample_count: row.get::<_, i64>(4).unwrap_or(0) as u64,
+                })
             })
-        }).unwrap_or_default();
+            .unwrap_or_default();
 
         Ok(result)
     }
 
     /// Store a Phi measurement
     #[cfg(feature = "duck")]
-    pub fn store_phi_metric(&self, phi_value: f64, topology_id: Option<&str>, node_count: Option<i32>) -> DatabaseResult<()> {
+    pub fn store_phi_metric(
+        &self,
+        phi_value: f64,
+        topology_id: Option<&str>,
+        node_count: Option<i32>,
+    ) -> DatabaseResult<()> {
         if !self.connected.load(std::sync::atomic::Ordering::SeqCst) {
             return Err(DatabaseError::Unavailable("DuckDB".to_string()));
         }
 
-        let guard = self.conn.lock().unwrap();
-        let conn = guard.as_ref()
+        let guard = self.conn.lock().expect("conn Mutex poisoned");
+        let conn = guard
+            .as_ref()
             .ok_or_else(|| DatabaseError::Unavailable("DuckDB connection not open".to_string()))?;
 
         let timestamp_ms = std::time::SystemTime::now()
@@ -1286,7 +1392,12 @@ impl DuckClientWrapper {
     }
 
     #[cfg(not(feature = "duck"))]
-    pub fn store_phi_metric(&self, _phi_value: f64, _topology_id: Option<&str>, _node_count: Option<i32>) -> DatabaseResult<()> {
+    pub fn store_phi_metric(
+        &self,
+        _phi_value: f64,
+        _topology_id: Option<&str>,
+        _node_count: Option<i32>,
+    ) -> DatabaseResult<()> {
         Err(DatabaseError::FeatureNotEnabled("duck".to_string()))
     }
 
@@ -1315,12 +1426,15 @@ impl DatabaseClient for DuckClientWrapper {
         }
         #[cfg(not(feature = "duck"))]
         {
-            Ok(DatabaseHealth::feature_disabled(DatabaseRole::EpistemicAuditor))
+            Ok(DatabaseHealth::feature_disabled(
+                DatabaseRole::EpistemicAuditor,
+            ))
         }
     }
 
     fn close(&self) -> DatabaseResult<()> {
-        self.connected.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.connected
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 }
@@ -1353,7 +1467,7 @@ pub struct InMemoryFallback {
     pub experiences: parking_lot::RwLock<Vec<(String, BinaryHV, String, String)>>,
 
     /// Metrics (simulates DuckDB)
-    pub metrics: parking_lot::RwLock<Vec<(f64, u64)>>,  // (phi, timestamp)
+    pub metrics: parking_lot::RwLock<Vec<(f64, u64)>>, // (phi, timestamp)
 }
 
 impl InMemoryFallback {
@@ -1363,7 +1477,9 @@ impl InMemoryFallback {
 
     /// Store vector for similarity search
     pub fn store_vector(&self, id: &str, vector: &BinaryHV, metadata: HashMap<String, String>) {
-        self.vectors.write().insert(id.to_string(), (*vector, metadata));
+        self.vectors
+            .write()
+            .insert(id.to_string(), (*vector, metadata));
     }
 
     /// Search for similar vectors (brute force)
@@ -1380,7 +1496,8 @@ impl InMemoryFallback {
 
     /// Store a fact
     pub fn store_fact(&self, relation: &str, fact: Vec<serde_json::Value>) {
-        self.facts.write()
+        self.facts
+            .write()
             .entry(relation.to_string())
             .or_default()
             .push(fact);
@@ -1519,10 +1636,18 @@ impl SymthaeaMind {
 
         // Initialize health with feature check
         let initial_health = SystemHealth::new(vec![
-            sensory_cortex.health_check().unwrap_or_else(|_| DatabaseHealth::feature_disabled(DatabaseRole::SensoryCortex)),
-            prefrontal_cortex.health_check().unwrap_or_else(|_| DatabaseHealth::feature_disabled(DatabaseRole::PrefrontalCortex)),
-            long_term_memory.health_check().unwrap_or_else(|_| DatabaseHealth::feature_disabled(DatabaseRole::LongTermMemory)),
-            epistemic_auditor.health_check().unwrap_or_else(|_| DatabaseHealth::feature_disabled(DatabaseRole::EpistemicAuditor)),
+            sensory_cortex
+                .health_check()
+                .unwrap_or_else(|_| DatabaseHealth::feature_disabled(DatabaseRole::SensoryCortex)),
+            prefrontal_cortex.health_check().unwrap_or_else(|_| {
+                DatabaseHealth::feature_disabled(DatabaseRole::PrefrontalCortex)
+            }),
+            long_term_memory
+                .health_check()
+                .unwrap_or_else(|_| DatabaseHealth::feature_disabled(DatabaseRole::LongTermMemory)),
+            epistemic_auditor.health_check().unwrap_or_else(|_| {
+                DatabaseHealth::feature_disabled(DatabaseRole::EpistemicAuditor)
+            }),
         ]);
 
         Self {
@@ -1590,12 +1715,21 @@ impl SymthaeaMind {
     // ========================================================================
 
     /// Store perception vector (with graceful degradation)
-    pub async fn store_perception(&self, id: &str, vector: &BinaryHV, metadata: HashMap<String, String>) -> DatabaseResult<()> {
+    pub async fn store_perception(
+        &self,
+        id: &str,
+        vector: &BinaryHV,
+        metadata: HashMap<String, String>,
+    ) -> DatabaseResult<()> {
         // Try Qdrant first
         #[cfg(feature = "qdrant")]
         {
             if self.is_database_available(DatabaseRole::SensoryCortex) {
-                if let Err(e) = self.sensory_cortex.store(id, vector, metadata.clone()).await {
+                if let Err(e) = self
+                    .sensory_cortex
+                    .store(id, vector, metadata.clone())
+                    .await
+                {
                     if !self.config.graceful_degradation {
                         return Err(e);
                     }
@@ -1611,12 +1745,18 @@ impl SymthaeaMind {
             self.fallback.store_vector(id, vector, metadata);
             Ok(())
         } else {
-            Err(DatabaseError::Unavailable("Sensory Cortex (Qdrant)".to_string()))
+            Err(DatabaseError::Unavailable(
+                "Sensory Cortex (Qdrant)".to_string(),
+            ))
         }
     }
 
     /// Search for similar perceptions (with graceful degradation)
-    pub async fn search_perceptions(&self, query: &BinaryHV, limit: usize) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
+    pub async fn search_perceptions(
+        &self,
+        query: &BinaryHV,
+        limit: usize,
+    ) -> DatabaseResult<Vec<(BinaryHV, f32)>> {
         // Try Qdrant first
         #[cfg(feature = "qdrant")]
         {
@@ -1631,12 +1771,18 @@ impl SymthaeaMind {
         if self.config.graceful_degradation {
             Ok(self.fallback.search_similar(query, limit))
         } else {
-            Err(DatabaseError::Unavailable("Sensory Cortex (Qdrant)".to_string()))
+            Err(DatabaseError::Unavailable(
+                "Sensory Cortex (Qdrant)".to_string(),
+            ))
         }
     }
 
     /// Store causal relation (with graceful degradation)
-    pub fn store_causal_relation(&self, relation: &str, facts: &[Vec<serde_json::Value>]) -> DatabaseResult<()> {
+    pub fn store_causal_relation(
+        &self,
+        relation: &str,
+        facts: &[Vec<serde_json::Value>],
+    ) -> DatabaseResult<()> {
         // Try CozoDB first
         #[cfg(feature = "datalog")]
         {
@@ -1658,17 +1804,29 @@ impl SymthaeaMind {
             }
             Ok(())
         } else {
-            Err(DatabaseError::Unavailable("Prefrontal Cortex (CozoDB)".to_string()))
+            Err(DatabaseError::Unavailable(
+                "Prefrontal Cortex (CozoDB)".to_string(),
+            ))
         }
     }
 
     /// Store experience (with graceful degradation)
-    pub async fn store_experience(&self, id: &str, vector: &BinaryHV, exp_type: &str, content: &str) -> DatabaseResult<()> {
+    pub async fn store_experience(
+        &self,
+        id: &str,
+        vector: &BinaryHV,
+        exp_type: &str,
+        content: &str,
+    ) -> DatabaseResult<()> {
         // Try LanceDB first
         #[cfg(feature = "lance")]
         {
             if self.is_database_available(DatabaseRole::LongTermMemory) {
-                if let Err(e) = self.long_term_memory.store_experience(id, vector, exp_type, content).await {
+                if let Err(e) = self
+                    .long_term_memory
+                    .store_experience(id, vector, exp_type, content)
+                    .await
+                {
                     if !self.config.graceful_degradation {
                         return Err(e);
                     }
@@ -1680,10 +1838,13 @@ impl SymthaeaMind {
 
         // Fallback to in-memory
         if self.config.graceful_degradation {
-            self.fallback.store_experience(id, vector, exp_type, content);
+            self.fallback
+                .store_experience(id, vector, exp_type, content);
             Ok(())
         } else {
-            Err(DatabaseError::Unavailable("Long-Term Memory (LanceDB)".to_string()))
+            Err(DatabaseError::Unavailable(
+                "Long-Term Memory (LanceDB)".to_string(),
+            ))
         }
     }
 
@@ -1738,7 +1899,10 @@ impl SymthaeaMind {
     /// 2. Reasoning (CozoDB) - apply causal inference and meta-consciousness
     /// 3. Memory (LanceDB) - consolidate experiences into long-term storage
     /// 4. Reflection (DuckDB) - analyze consciousness metrics
-    pub async fn consciousness_cycle(&self, input: &BinaryHV) -> DatabaseResult<ConsciousnessLoopState> {
+    pub async fn consciousness_cycle(
+        &self,
+        input: &BinaryHV,
+    ) -> DatabaseResult<ConsciousnessLoopState> {
         let start = Instant::now();
 
         // Update iteration
@@ -1768,7 +1932,8 @@ impl SymthaeaMind {
 
         // 4. MEMORY: Store this experience (Long-Term Memory)
         let experience_id = format!("exp_{}", self.loop_state.read().iteration);
-        self.store_experience(&experience_id, input, "perception", "").await?;
+        self.store_experience(&experience_id, input, "perception", "")
+            .await?;
 
         // 5. REFLECTION: Compute and record Phi (Epistemic Auditor)
         let phi = self.compute_instantaneous_phi(input);
@@ -1795,7 +1960,11 @@ impl SymthaeaMind {
     /// Compute instantaneous Phi based on current perception
     fn compute_instantaneous_phi(&self, vector: &BinaryHV) -> f64 {
         // Simple Phi approximation based on bit entropy
-        let ones = vector.0.iter().map(|b| b.count_ones() as usize).sum::<usize>();
+        let ones = vector
+            .0
+            .iter()
+            .map(|b| b.count_ones() as usize)
+            .sum::<usize>();
         let total = BinaryHV::DIM;
         let p = ones as f64 / total as f64;
 
@@ -1803,7 +1972,6 @@ impl SymthaeaMind {
         if p == 0.0 || p == 1.0 {
             0.0
         } else {
-            
             -(p * p.log2() + (1.0 - p) * (1.0 - p).log2()) // Max 1.0 when p = 0.5
         }
     }
@@ -1867,8 +2035,18 @@ impl SymthaeaMind {
         report.push_str("=== SYMTHAEA MIND ARCHITECTURE ===\n\n");
 
         let health = self.current_health();
-        report.push_str(&format!("System Status: {}\n", if health.degraded { "DEGRADED" } else { "HEALTHY" }));
-        report.push_str(&format!("Consciousness Operational: {}\n\n", health.consciousness_operational));
+        report.push_str(&format!(
+            "System Status: {}\n",
+            if health.degraded {
+                "DEGRADED"
+            } else {
+                "HEALTHY"
+            }
+        ));
+        report.push_str(&format!(
+            "Consciousness Operational: {}\n\n",
+            health.consciousness_operational
+        ));
 
         for role in &[
             DatabaseRole::SensoryCortex,
@@ -1884,7 +2062,14 @@ impl SymthaeaMind {
             report.push_str(&format!("Config: {}\n", self.get_database_config(*role)));
 
             if let Some(db_health) = health.get_health(*role) {
-                report.push_str(&format!("Status: {}\n", if db_health.available { "AVAILABLE" } else { "UNAVAILABLE" }));
+                report.push_str(&format!(
+                    "Status: {}\n",
+                    if db_health.available {
+                        "AVAILABLE"
+                    } else {
+                        "UNAVAILABLE"
+                    }
+                ));
                 if let Some(latency) = db_health.latency_ms {
                     report.push_str(&format!("Latency: {}ms\n", latency));
                 }
@@ -1894,7 +2079,11 @@ impl SymthaeaMind {
             }
 
             let improvements = self.get_improvements_for_database(*role);
-            report.push_str(&format!("Improvements ({} total): {:?}\n\n", improvements.len(), improvements));
+            report.push_str(&format!(
+                "Improvements ({} total): {:?}\n\n",
+                improvements.len(),
+                improvements
+            ));
         }
 
         // Loop state
@@ -1902,7 +2091,10 @@ impl SymthaeaMind {
         report.push_str("## Consciousness Loop State ##\n");
         report.push_str(&format!("Iteration: {}\n", state.iteration));
         report.push_str(&format!("Current Phi: {:.4}\n", state.current_phi));
-        report.push_str(&format!("Consciousness Level: {:.2}%\n", state.consciousness_level * 100.0));
+        report.push_str(&format!(
+            "Consciousness Level: {:.2}%\n",
+            state.consciousness_level * 100.0
+        ));
         report.push_str(&format!("Workspace Size: {}\n", state.workspace.len()));
         report.push_str(&format!("Running: {}\n", state.running));
 
@@ -1989,19 +2181,31 @@ mod tests {
     #[test]
     fn test_all_improvements_mapped() {
         let mappings = ImprovementMapping::all_mappings();
-        assert_eq!(mappings.len(), 29);  // All 29 improvements
+        assert_eq!(mappings.len(), 29); // All 29 improvements
 
         // Check specific mappings
-        let workspace = mappings.iter().find(|m| m.improvement_number == 23).unwrap();
+        let workspace = mappings
+            .iter()
+            .find(|m| m.improvement_number == 23)
+            .unwrap();
         assert_eq!(workspace.primary_database, DatabaseRole::SensoryCortex);
 
-        let hot = mappings.iter().find(|m| m.improvement_number == 24).unwrap();
+        let hot = mappings
+            .iter()
+            .find(|m| m.improvement_number == 24)
+            .unwrap();
         assert_eq!(hot.primary_database, DatabaseRole::PrefrontalCortex);
 
-        let memory = mappings.iter().find(|m| m.improvement_number == 29).unwrap();
+        let memory = mappings
+            .iter()
+            .find(|m| m.improvement_number == 29)
+            .unwrap();
         assert_eq!(memory.primary_database, DatabaseRole::LongTermMemory);
 
-        let epistemic = mappings.iter().find(|m| m.improvement_number == 10).unwrap();
+        let epistemic = mappings
+            .iter()
+            .find(|m| m.improvement_number == 10)
+            .unwrap();
         assert_eq!(epistemic.primary_database, DatabaseRole::EpistemicAuditor);
     }
 
@@ -2018,7 +2222,9 @@ mod tests {
         assert!(sensory_improvements.len() > 0);
 
         // Check that workspace (#23) is in sensory cortex
-        assert!(sensory_improvements.iter().any(|m| m.improvement_number == 23));
+        assert!(sensory_improvements
+            .iter()
+            .any(|m| m.improvement_number == 23));
     }
 
     // ========================================================================
@@ -2028,16 +2234,16 @@ mod tests {
     #[test]
     fn test_qdrant_config() {
         let config = QdrantConfig::default_config();
-        assert_eq!(config.vector_dim, 2048);  // BinaryHV::DIM
+        assert_eq!(config.vector_dim, 2048); // BinaryHV::DIM
         assert_eq!(config.distance_metric, "Cosine");
-        assert!(config.url.contains("6333"));  // Default Qdrant port
+        assert!(config.url.contains("6333")); // Default Qdrant port
     }
 
     #[test]
     fn test_cozo_config() {
         let config = CozoDbConfig::default_config();
         assert_eq!(config.engine, "rocksdb");
-        assert_eq!(config.max_recursion_depth, 100);  // Deep reasoning
+        assert_eq!(config.max_recursion_depth, 100); // Deep reasoning
     }
 
     #[test]
@@ -2108,40 +2314,60 @@ mod tests {
         let mind = SymthaeaMind::new();
 
         let sensory = mind.get_improvements_for_database(DatabaseRole::SensoryCortex);
-        assert!(sensory.contains(&23));  // Workspace
-        assert!(sensory.contains(&25));  // Binding
-        assert!(sensory.contains(&26));  // Attention
+        assert!(sensory.contains(&23)); // Workspace
+        assert!(sensory.contains(&25)); // Binding
+        assert!(sensory.contains(&26)); // Attention
 
         let prefrontal = mind.get_improvements_for_database(DatabaseRole::PrefrontalCortex);
-        assert!(prefrontal.contains(&24));  // HOT
-        assert!(prefrontal.contains(&22));  // FEP
+        assert!(prefrontal.contains(&24)); // HOT
+        assert!(prefrontal.contains(&22)); // FEP
 
         let memory = mind.get_improvements_for_database(DatabaseRole::LongTermMemory);
-        assert!(memory.contains(&29));  // Long-term memory
+        assert!(memory.contains(&29)); // Long-term memory
 
         let auditor = mind.get_improvements_for_database(DatabaseRole::EpistemicAuditor);
-        assert!(auditor.contains(&10));  // Epistemic
-        assert!(auditor.contains(&2));   // Φ
+        assert!(auditor.contains(&10)); // Epistemic
+        assert!(auditor.contains(&2)); // Φ
     }
 
     #[test]
     fn test_get_primary_database() {
         let mind = SymthaeaMind::new();
 
-        assert_eq!(mind.get_primary_database(23), Some(DatabaseRole::SensoryCortex));
-        assert_eq!(mind.get_primary_database(24), Some(DatabaseRole::PrefrontalCortex));
-        assert_eq!(mind.get_primary_database(29), Some(DatabaseRole::LongTermMemory));
-        assert_eq!(mind.get_primary_database(10), Some(DatabaseRole::EpistemicAuditor));
+        assert_eq!(
+            mind.get_primary_database(23),
+            Some(DatabaseRole::SensoryCortex)
+        );
+        assert_eq!(
+            mind.get_primary_database(24),
+            Some(DatabaseRole::PrefrontalCortex)
+        );
+        assert_eq!(
+            mind.get_primary_database(29),
+            Some(DatabaseRole::LongTermMemory)
+        );
+        assert_eq!(
+            mind.get_primary_database(10),
+            Some(DatabaseRole::EpistemicAuditor)
+        );
     }
 
     #[test]
     fn test_database_distribution() {
         let mind = SymthaeaMind::new();
 
-        let sensory_count = mind.get_improvements_for_database(DatabaseRole::SensoryCortex).len();
-        let prefrontal_count = mind.get_improvements_for_database(DatabaseRole::PrefrontalCortex).len();
-        let memory_count = mind.get_improvements_for_database(DatabaseRole::LongTermMemory).len();
-        let auditor_count = mind.get_improvements_for_database(DatabaseRole::EpistemicAuditor).len();
+        let sensory_count = mind
+            .get_improvements_for_database(DatabaseRole::SensoryCortex)
+            .len();
+        let prefrontal_count = mind
+            .get_improvements_for_database(DatabaseRole::PrefrontalCortex)
+            .len();
+        let memory_count = mind
+            .get_improvements_for_database(DatabaseRole::LongTermMemory)
+            .len();
+        let auditor_count = mind
+            .get_improvements_for_database(DatabaseRole::EpistemicAuditor)
+            .len();
 
         // All improvements should be mapped somewhere
         // Note: Some improvements use multiple databases (primary + secondary)
@@ -2197,8 +2423,8 @@ mod tests {
 
         let system_health = SystemHealth::new(healths);
 
-        assert!(system_health.degraded);  // Some databases unavailable
-        assert!(system_health.consciousness_operational);  // Some databases available
+        assert!(system_health.degraded); // Some databases unavailable
+        assert!(system_health.consciousness_operational); // Some databases available
         assert!(system_health.is_available(DatabaseRole::SensoryCortex));
         assert!(!system_health.is_available(DatabaseRole::PrefrontalCortex));
         assert!(system_health.is_available(DatabaseRole::LongTermMemory));
@@ -2212,7 +2438,7 @@ mod tests {
 
         // Without features enabled, all should show as feature_disabled
         // which means unavailable but no error
-        assert!(health.degraded);  // All features disabled = degraded
+        assert!(health.degraded); // All features disabled = degraded
 
         // Should still be able to generate report
         let report = mind.generate_report();
@@ -2266,14 +2492,14 @@ mod tests {
     fn test_in_memory_fallback_facts() {
         let fallback = InMemoryFallback::new();
 
-        fallback.store_fact("causes", vec![
-            serde_json::json!("A"),
-            serde_json::json!("B"),
-        ]);
-        fallback.store_fact("causes", vec![
-            serde_json::json!("B"),
-            serde_json::json!("C"),
-        ]);
+        fallback.store_fact(
+            "causes",
+            vec![serde_json::json!("A"), serde_json::json!("B")],
+        );
+        fallback.store_fact(
+            "causes",
+            vec![serde_json::json!("B"), serde_json::json!("C")],
+        );
 
         let facts = fallback.facts.read();
         assert_eq!(facts.get("causes").unwrap().len(), 2);
@@ -2399,8 +2625,12 @@ mod tests {
         let v2 = BinaryHV::random(101);
 
         // Store perceptions
-        mind.store_perception("p1", &v1, HashMap::new()).await.unwrap();
-        mind.store_perception("p2", &v2, HashMap::new()).await.unwrap();
+        mind.store_perception("p1", &v1, HashMap::new())
+            .await
+            .unwrap();
+        mind.store_perception("p2", &v2, HashMap::new())
+            .await
+            .unwrap();
 
         // Search should find both
         let results = mind.search_perceptions(&v1, 10).await.unwrap();
@@ -2412,7 +2642,9 @@ mod tests {
         let mind = SymthaeaMind::for_testing();
 
         let v = BinaryHV::random(200);
-        mind.store_experience("test_exp", &v, "episodic", "test content").await.unwrap();
+        mind.store_experience("test_exp", &v, "episodic", "test content")
+            .await
+            .unwrap();
 
         // Check fallback storage
         let experiences = mind.fallback.experiences.read();
@@ -2532,7 +2764,7 @@ mod tests {
         assert!(!health.available);
         assert!(health.error_message.unwrap().contains("not enabled"));
 
-        stub.close().unwrap();  // Should not error
+        stub.close().unwrap(); // Should not error
     }
 
     #[test]
@@ -2616,7 +2848,10 @@ mod tests {
 
         let workspace = vec![BinaryHV::random(42)];
         let coherence = mind.compute_workspace_coherence(&workspace);
-        assert_eq!(coherence, 1.0, "Single vector workspace should have coherence 1.0");
+        assert_eq!(
+            coherence, 1.0,
+            "Single vector workspace should have coherence 1.0"
+        );
     }
 
     #[test]
@@ -2626,7 +2861,10 @@ mod tests {
         let v = BinaryHV::random(42);
         let workspace = vec![v, v, v];
         let coherence = mind.compute_workspace_coherence(&workspace);
-        assert!((coherence - 1.0).abs() < 0.001, "Identical vectors should have coherence ~1.0");
+        assert!(
+            (coherence - 1.0).abs() < 0.001,
+            "Identical vectors should have coherence ~1.0"
+        );
     }
 
     #[test]
@@ -2637,8 +2875,11 @@ mod tests {
         let coherence = mind.compute_workspace_coherence(&workspace);
 
         // Random vectors should have coherence around 0.5
-        assert!(coherence > 0.4 && coherence < 0.6,
-                "Random vectors should have coherence ~0.5, got {}", coherence);
+        assert!(
+            coherence > 0.4 && coherence < 0.6,
+            "Random vectors should have coherence ~0.5, got {}",
+            coherence
+        );
     }
 }
 
@@ -2647,7 +2888,12 @@ mod tests {
 // ============================================================================
 
 #[cfg(test)]
-#[cfg(all(feature = "qdrant", feature = "datalog", feature = "lance", feature = "duck"))]
+#[cfg(all(
+    feature = "qdrant",
+    feature = "datalog",
+    feature = "lance",
+    feature = "duck"
+))]
 mod integration_tests {
     use super::*;
 
@@ -2664,14 +2910,21 @@ mod integration_tests {
         for i in 0..10 {
             let input = BinaryHV::random(i as u64);
             let state = mind.consciousness_cycle(&input).await.unwrap();
-            println!("Cycle {}: Phi={:.4}, Level={:.2}%",
-                     state.iteration, state.current_phi, state.consciousness_level * 100.0);
+            println!(
+                "Cycle {}: Phi={:.4}, Level={:.2}%",
+                state.iteration,
+                state.current_phi,
+                state.consciousness_level * 100.0
+            );
         }
 
         // Verify statistics
         let stats = mind.get_phi_statistics().unwrap();
         assert_eq!(stats.sample_count, 10);
-        println!("Phi statistics: mean={:.4}, std={:.4}", stats.mean_phi, stats.std_phi);
+        println!(
+            "Phi statistics: mean={:.4}, std={:.4}",
+            stats.mean_phi, stats.std_phi
+        );
 
         // Generate report
         let report = mind.generate_report();

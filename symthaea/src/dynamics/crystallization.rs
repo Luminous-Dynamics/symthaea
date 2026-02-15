@@ -78,10 +78,10 @@ impl Default for CrystallizationConfig {
             hdc_dim: 16_384,
             window_size: 100,
             recurrence_epsilon: 0.1,
-            recurrence_threshold: 0.3,   // 30% recurrence = stable
-            novelty_threshold: 0.7,      // <70% similarity = novel
-            stability_threshold: 20,     // 20 steps in attractor
-            max_prediction_error: 0.5,   // Original threshold
+            recurrence_threshold: 0.3, // 30% recurrence = stable
+            novelty_threshold: 0.7,    // <70% similarity = novel
+            stability_threshold: 20,   // 20 steps in attractor
+            max_prediction_error: 0.5, // Original threshold
         }
     }
 }
@@ -93,12 +93,12 @@ impl CrystallizationConfig {
     pub fn aggressive() -> Self {
         Self {
             hdc_dim: 16_384,
-            window_size: 30,             // Smaller window = faster detection
-            recurrence_epsilon: 0.5,     // Larger epsilon = easier to match
-            recurrence_threshold: 0.15,  // Lower threshold = easier to trigger
-            novelty_threshold: 0.8,      // Higher = easier to be novel
-            stability_threshold: 5,      // Only 5 steps needed
-            max_prediction_error: 10.0,  // Very permissive - allow crystallization even with high surprise
+            window_size: 30,            // Smaller window = faster detection
+            recurrence_epsilon: 0.5,    // Larger epsilon = easier to match
+            recurrence_threshold: 0.15, // Lower threshold = easier to trigger
+            novelty_threshold: 0.8,     // Higher = easier to be novel
+            stability_threshold: 5,     // Only 5 steps needed
+            max_prediction_error: 10.0, // Very permissive - allow crystallization even with high surprise
         }
     }
 
@@ -111,7 +111,7 @@ impl CrystallizationConfig {
             recurrence_threshold: 0.2,
             novelty_threshold: 0.75,
             stability_threshold: 10,
-            max_prediction_error: 2.0,   // Allow some chaos
+            max_prediction_error: 2.0, // Allow some chaos
         }
     }
 }
@@ -281,16 +281,19 @@ impl ConceptCrystallizer {
     /// Add an existing concept to the codebook
     pub fn add_concept(&mut self, name: &str, hypervector: Vec<f32>) {
         let uid = format!("Known_{}", name);
-        self.concepts.insert(uid.clone(), CrystalizedConcept {
-            uid,
-            hypervector: hypervector.clone(),
-            name: Some(name.to_string()),
-            description: None,
-            crystallized_at: self.timestamp,
-            activation_count: 0,
-            attractor_signature: hypervector,
-            primitive_birth: Vec::new(), // Known concepts don't have birth certificates
-        });
+        self.concepts.insert(
+            uid.clone(),
+            CrystalizedConcept {
+                uid,
+                hypervector: hypervector.clone(),
+                name: Some(name.to_string()),
+                description: None,
+                crystallized_at: self.timestamp,
+                activation_count: 0,
+                attractor_signature: hypervector,
+                primitive_birth: Vec::new(), // Known concepts don't have birth certificates
+            },
+        );
     }
 
     /// Process a new neural state, potentially crystallizing a concept
@@ -323,7 +326,8 @@ impl ConceptCrystallizer {
         }
 
         // Check novelty against existing concepts
-        let max_similarity = self.concepts
+        let max_similarity = self
+            .concepts
             .values()
             .map(|c| cosine_similarity(&signature, &c.attractor_signature))
             .fold(0.0_f32, f32::max);
@@ -331,7 +335,8 @@ impl ConceptCrystallizer {
         if max_similarity >= self.config.novelty_threshold {
             // Matches existing concept - activate it instead
             // Find the UID first, then mutate
-            let matching_uid = self.find_matching_concept(&signature)
+            let matching_uid = self
+                .find_matching_concept(&signature)
                 .map(|c| c.uid.clone());
             if let Some(uid) = matching_uid {
                 if let Some(c) = self.concepts.get_mut(&uid) {
@@ -391,13 +396,13 @@ impl ConceptCrystallizer {
 
     /// Find the concept most similar to a signature
     pub fn find_matching_concept(&self, signature: &[f32]) -> Option<&CrystalizedConcept> {
-        self.concepts
-            .values()
-            .max_by(|a, b| {
-                let sim_a = cosine_similarity(signature, &a.attractor_signature);
-                let sim_b = cosine_similarity(signature, &b.attractor_signature);
-                sim_a.partial_cmp(&sim_b).unwrap_or(std::cmp::Ordering::Equal)
-            })
+        self.concepts.values().max_by(|a, b| {
+            let sim_a = cosine_similarity(signature, &a.attractor_signature);
+            let sim_b = cosine_similarity(signature, &b.attractor_signature);
+            sim_a
+                .partial_cmp(&sim_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Name a pending concept (human provides the name)
@@ -422,7 +427,9 @@ impl ConceptCrystallizer {
 
     /// Get a concept by name
     pub fn get_by_name(&self, name: &str) -> Option<&CrystalizedConcept> {
-        self.concepts.values().find(|c| c.name.as_deref() == Some(name))
+        self.concepts
+            .values()
+            .find(|c| c.name.as_deref() == Some(name))
     }
 
     /// Get concept hypervector by name (for HDC operations)
@@ -484,7 +491,11 @@ fn signature_to_hypervector(signature: &[f32], dim: usize) -> Vec<f32> {
         .chunks_exact(4)
         .map(|chunk| {
             let bits = u32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
-            if bits & 1 == 0 { 1.0 } else { -1.0 }
+            if bits & 1 == 0 {
+                1.0
+            } else {
+                -1.0
+            }
         })
         .collect()
 }
@@ -565,16 +576,14 @@ impl UnifiedLearningMind {
         let predicted_hv = self.world_model.predict(&state_hv, &action_hv, 1.0)?;
 
         // 3. Compute surprise (MSE)
-        let surprise = self.world_model.train_step(
-            &state_hv,
-            &action_hv,
-            &next_state_hv,
-            1.0,
-        )?;
+        let surprise = self
+            .world_model
+            .train_step(&state_hv, &action_hv, &next_state_hv, 1.0)?;
 
         // 4. Backprop through encoder (optional - can be expensive)
         // Compute gradient of loss w.r.t. encoder output
-        let grad_output: Vec<f32> = predicted_hv.iter()
+        let grad_output: Vec<f32> = predicted_hv
+            .iter()
             .zip(next_state_hv.iter())
             .map(|(p, n)| 2.0 * (p - n) / predicted_hv.len() as f32)
             .collect();
@@ -755,7 +764,9 @@ mod tests {
         }
 
         // Name it
-        crystallizer.name_concept(&uid, "Nostalgia", Some("A bittersweet longing")).unwrap();
+        crystallizer
+            .name_concept(&uid, "Nostalgia", Some("A bittersweet longing"))
+            .unwrap();
 
         // Check it's named
         let concept = crystallizer.get_by_name("Nostalgia").unwrap();

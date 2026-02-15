@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 
 use super::constants::K_BOLTZMANN;
 use super::standard_model::PHYSICS_DIM;
-use crate::hdc::ContinuousHV;
 use crate::genesis::GenesisSeed;
+use crate::hdc::ContinuousHV;
 
 /// Onsager transport coefficients matrix
 ///
@@ -306,7 +306,10 @@ impl JarzynskiEstimator {
         // Use log-sum-exp trick for numerical stability
         let min_work = work_samples.iter().cloned().fold(f64::INFINITY, f64::min);
 
-        let sum_exp: f64 = work_samples.iter().map(|&w| (-(w - min_work) * beta).exp()).sum();
+        let sum_exp: f64 = work_samples
+            .iter()
+            .map(|&w| (-(w - min_work) * beta).exp())
+            .sum();
 
         let log_avg = -min_work * beta + (sum_exp / work_samples.len() as f64).ln();
 
@@ -341,7 +344,10 @@ impl JarzynskiEstimator {
         }
 
         let mean: f64 = bootstrap_estimates.iter().sum::<f64>() / n_bootstrap as f64;
-        let variance: f64 = bootstrap_estimates.iter().map(|&x| (x - mean).powi(2)).sum::<f64>()
+        let variance: f64 = bootstrap_estimates
+            .iter()
+            .map(|&x| (x - mean).powi(2))
+            .sum::<f64>()
             / (n_bootstrap - 1) as f64;
 
         (estimate, variance.sqrt())
@@ -698,11 +704,11 @@ mod tests {
     #[test]
     fn test_irreversible_process() {
         let process = IrreversibleProcess::new(
-            100.0, // heat flux W/m²
-            0.01,  // particle flux mol/m²/s
+            100.0,  // heat flux W/m²
+            0.01,   // particle flux mol/m²/s
             1000.0, // chemical affinity J/mol
-            10.0,  // temp gradient K/m
-            100.0, // chem pot gradient J/mol/m
+            10.0,   // temp gradient K/m
+            100.0,  // chem pot gradient J/mol/m
         );
 
         let sigma = process.entropy_production(300.0);

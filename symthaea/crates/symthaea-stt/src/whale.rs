@@ -18,9 +18,9 @@
 //! Example: A "1+1+3" coda has pattern: Click...Click......Click
 //! The ICI sequence [0.5s, 1.2s] uniquely identifies this coda type.
 
+use crate::bootstrap::AdaptivePrototypeSet;
 use crate::hdc::HV16;
 use crate::ltc::{LtcCell, LtcConfig};
-use crate::bootstrap::AdaptivePrototypeSet;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -50,12 +50,12 @@ impl Default for WhaleConfig {
         Self {
             sample_rate: 44100,
             click_threshold: 0.3,
-            min_click_gap: 0.02,    // 20ms minimum between clicks
-            max_ici: 2.0,           // Codas typically <2s between clicks
-            min_coda_clicks: 3,     // Need at least 3 clicks for a coda
-            max_coda_clicks: 12,    // Codas rarely exceed 12 clicks
-            click_tau: 0.002,       // 2ms - fast transient detection
-            rhythm_tau: 0.5,        // 500ms - slow rhythm learning
+            min_click_gap: 0.02, // 20ms minimum between clicks
+            max_ici: 2.0,        // Codas typically <2s between clicks
+            min_coda_clicks: 3,  // Need at least 3 clicks for a coda
+            max_coda_clicks: 12, // Codas rarely exceed 12 clicks
+            click_tau: 0.002,    // 2ms - fast transient detection
+            rhythm_tau: 0.5,     // 500ms - slow rhythm learning
         }
     }
 }
@@ -141,7 +141,7 @@ impl WhaleSentinel {
             tau_min: config.click_tau * 0.5,
             tau_max: config.click_tau * 2.0,
             tau_init: config.click_tau,
-            tau_lr: 0.0,  // Fixed tau for consistent detection
+            tau_lr: 0.0, // Fixed tau for consistent detection
             adaptive_tau: false,
         };
 
@@ -230,7 +230,9 @@ impl WhaleSentinel {
         let teager = energy * energy - self.prev_energy * self.smoothed_energy;
 
         // Feed to click detector LTC
-        let state = self.click_detector.forward(&[teager.max(0.0)], 1.0 / self.config.sample_rate as f32);
+        let state = self
+            .click_detector
+            .forward(&[teager.max(0.0)], 1.0 / self.config.sample_rate as f32);
 
         // Threshold on LTC state magnitude
         let state_energy: f32 = state.iter().map(|x| x * x).sum::<f32>().sqrt();
@@ -346,14 +348,16 @@ impl WhaleSentinel {
 
         // Calculate coefficient of variation (CV) to measure regularity
         let mean_ici: f32 = ici_pattern.iter().sum::<f32>() / ici_pattern.len() as f32;
-        let variance: f32 = ici_pattern.iter()
+        let variance: f32 = ici_pattern
+            .iter()
             .map(|x| (x - mean_ici).powi(2))
-            .sum::<f32>() / ici_pattern.len() as f32;
+            .sum::<f32>()
+            / ici_pattern.len() as f32;
         let cv = variance.sqrt() / mean_ici;
 
         // Classify based on pattern characteristics
         let rhythm_type = if cv < 0.2 {
-            "REGULAR"  // Very consistent timing
+            "REGULAR" // Very consistent timing
         } else if cv < 0.5 {
             "MODERATE" // Some variation
         } else {
@@ -366,7 +370,11 @@ impl WhaleSentinel {
     /// Get current prototype statistics
     pub fn prototype_stats(&self) -> (usize, usize, f32) {
         let stats = self.prototypes.stats();
-        (stats.total_phonemes, stats.total_variants, stats.avg_variants_per_phoneme)
+        (
+            stats.total_phonemes,
+            stats.total_variants,
+            stats.avg_variants_per_phoneme,
+        )
     }
 
     /// Export prototypes for visualization
@@ -374,7 +382,9 @@ impl WhaleSentinel {
         let mut exports = Vec::new();
 
         for (label, proto) in &self.prototypes.prototypes {
-            for (i, (variant, count)) in proto.variants.iter()
+            for (i, (variant, count)) in proto
+                .variants
+                .iter()
                 .zip(proto.variant_counts.iter())
                 .enumerate()
             {
@@ -432,20 +442,17 @@ pub fn analyze_coda_topology(sentinel: &WhaleSentinel) -> CodaTopology {
     let mut similarities = Vec::new();
     let prototypes: Vec<_> = sentinel.prototypes.prototypes.iter().collect();
 
-    for i in 0..prototypes.len() {
-        for j in (i + 1)..prototypes.len() {
-            let (label_i, proto_i) = prototypes[i];
-            let (label_j, proto_j) = prototypes[j];
-
+    for (i, (label_i, proto_i)) in prototypes.iter().enumerate() {
+        for (label_j, proto_j) in &prototypes[i + 1..] {
             let hv_i = proto_i.get_centroid();
             let hv_j = proto_j.get_centroid();
 
             let sim = hv_i.similarity(&hv_j);
-            similarities.push((label_i.clone(), label_j.clone(), sim));
+            similarities.push((label_i.to_string(), label_j.to_string(), sim));
         }
     }
 
-    similarities.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+    similarities.sort_by(|a, b| b.2.total_cmp(&a.2));
 
     let all_sims: Vec<f32> = similarities.iter().map(|(_, _, s)| *s).collect();
     let mean_sim = if all_sims.is_empty() {

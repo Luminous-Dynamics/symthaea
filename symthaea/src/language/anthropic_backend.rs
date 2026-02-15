@@ -80,7 +80,12 @@ impl AnthropicBackend {
             .timeout(std::time::Duration::from_secs(120))
             .build()
             .unwrap_or_default();
-        Self { api_key, model, base_url, client }
+        Self {
+            api_key,
+            model,
+            base_url,
+            client,
+        }
     }
 }
 
@@ -91,12 +96,16 @@ impl LLMBackend for AnthropicBackend {
             model: &self.model,
             max_tokens: params.max_tokens,
             system: params.system_prompt.as_deref(),
-            messages: vec![Message { role: "user", content: prompt }],
+            messages: vec![Message {
+                role: "user",
+                content: prompt,
+            }],
             temperature: Some(params.temperature),
             stream: false,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/v1/messages", self.base_url))
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -112,10 +121,14 @@ impl LLMBackend for AnthropicBackend {
             anyhow::bail!("Anthropic returned {}: {}", status, text);
         }
 
-        let msg_resp: MessagesResponse = response.json().await
+        let msg_resp: MessagesResponse = response
+            .json()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to parse Anthropic response: {}", e))?;
 
-        let text = msg_resp.content.iter()
+        let text = msg_resp
+            .content
+            .iter()
             .filter(|b| b.block_type == "text")
             .filter_map(|b| b.text.as_ref())
             .cloned()
@@ -138,12 +151,16 @@ impl LLMBackend for AnthropicBackend {
             model: &self.model,
             max_tokens: params.max_tokens,
             system: params.system_prompt.as_deref(),
-            messages: vec![Message { role: "user", content: prompt }],
+            messages: vec![Message {
+                role: "user",
+                content: prompt,
+            }],
             temperature: Some(params.temperature),
             stream: true,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/v1/messages", self.base_url))
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
@@ -163,7 +180,9 @@ impl LLMBackend for AnthropicBackend {
         let mut buffer = Vec::new();
         let mut stream = response;
 
-        while let Some(chunk) = stream.chunk().await
+        while let Some(chunk) = stream
+            .chunk()
+            .await
             .map_err(|e| anyhow::anyhow!("Failed to read Anthropic stream: {}", e))?
         {
             buffer.extend_from_slice(&chunk);

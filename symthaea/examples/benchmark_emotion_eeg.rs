@@ -15,10 +15,10 @@
 //! cargo run --example benchmark_emotion_eeg --release
 //! ```
 
-use symthaea::dynamics::wavelet::{WaveletAnalyzer, DwtConfig, WaveletFamily, ExtensionMode};
 use symthaea::dynamics::phase_amplitude_coupling::{PacAnalyzer, PacConfig};
+use symthaea::dynamics::wavelet::{DwtConfig, ExtensionMode, WaveletAnalyzer, WaveletFamily};
 use symthaea::perception::physio::{
-    EmotionSentinel, EmotionSimulator, EmotionCategory, EmotionChannel,
+    EmotionCategory, EmotionChannel, EmotionSentinel, EmotionSimulator,
 };
 
 fn main() {
@@ -28,7 +28,7 @@ fn main() {
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     let sample_rate = 256.0; // Standard EEG sample rate
-    let window_sec = 4.0;     // 4-second analysis windows
+    let window_sec = 4.0; // 4-second analysis windows
 
     // ═══════════════════════════════════════════════════════════════
     // Test 1: Frontal Asymmetry → Valence
@@ -41,8 +41,16 @@ fn main() {
     let mut simulator = EmotionSimulator::new(sample_rate);
 
     // Test positive vs negative emotions
-    let positive_emotions = [EmotionCategory::Happy, EmotionCategory::Excited, EmotionCategory::Content];
-    let negative_emotions = [EmotionCategory::Sad, EmotionCategory::Angry, EmotionCategory::Afraid];
+    let positive_emotions = [
+        EmotionCategory::Happy,
+        EmotionCategory::Excited,
+        EmotionCategory::Content,
+    ];
+    let negative_emotions = [
+        EmotionCategory::Sad,
+        EmotionCategory::Angry,
+        EmotionCategory::Afraid,
+    ];
 
     let mut positive_valences = Vec::new();
     let mut negative_valences = Vec::new();
@@ -51,8 +59,12 @@ fn main() {
         let eeg = simulator.generate(emotion, window_sec);
         let state = sentinel.detect(&eeg);
         positive_valences.push(state.valence);
-        println!("  {:10} → valence = {:.3}, arousal = {:.3}",
-            emotion.name(), state.valence, state.arousal);
+        println!(
+            "  {:10} → valence = {:.3}, arousal = {:.3}",
+            emotion.name(),
+            state.valence,
+            state.arousal
+        );
     }
 
     sentinel.reset();
@@ -61,8 +73,12 @@ fn main() {
         let eeg = simulator.generate(emotion, window_sec);
         let state = sentinel.detect(&eeg);
         negative_valences.push(state.valence);
-        println!("  {:10} → valence = {:.3}, arousal = {:.3}",
-            emotion.name(), state.valence, state.arousal);
+        println!(
+            "  {:10} → valence = {:.3}, arousal = {:.3}",
+            emotion.name(),
+            state.valence,
+            state.arousal
+        );
     }
 
     let avg_positive_v = positive_valences.iter().sum::<f64>() / positive_valences.len() as f64;
@@ -118,10 +134,14 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
     let all_emotions = [
-        EmotionCategory::Excited, EmotionCategory::Happy,
-        EmotionCategory::Content, EmotionCategory::Relaxed,
-        EmotionCategory::Angry, EmotionCategory::Afraid,
-        EmotionCategory::Sad, EmotionCategory::Bored,
+        EmotionCategory::Excited,
+        EmotionCategory::Happy,
+        EmotionCategory::Content,
+        EmotionCategory::Relaxed,
+        EmotionCategory::Angry,
+        EmotionCategory::Afraid,
+        EmotionCategory::Sad,
+        EmotionCategory::Bored,
     ];
 
     let n_trials = 5;
@@ -163,8 +183,18 @@ fn main() {
     let exact_accuracy = correct as f64 / total as f64;
     let quadrant_accuracy = quadrant_correct as f64 / total as f64;
 
-    println!("  Exact classification:   {:.1}% ({}/{})", exact_accuracy * 100.0, correct, total);
-    println!("  Quadrant (V/A) match:   {:.1}% ({}/{})", quadrant_accuracy * 100.0, quadrant_correct, total);
+    println!(
+        "  Exact classification:   {:.1}% ({}/{})",
+        exact_accuracy * 100.0,
+        correct,
+        total
+    );
+    println!(
+        "  Quadrant (V/A) match:   {:.1}% ({}/{})",
+        quadrant_accuracy * 100.0,
+        quadrant_correct,
+        total
+    );
 
     // ═══════════════════════════════════════════════════════════════
     // Test 4: Spectral Analysis Quality
@@ -182,12 +212,26 @@ fn main() {
     let excited_alpha = excited_eeg.alpha_power(EmotionChannel::Fz).unwrap_or(0.0);
     let excited_beta = excited_eeg.beta_power(EmotionChannel::Fz).unwrap_or(0.0);
 
-    println!("  Relaxed: alpha={:.6}, beta={:.6}, ratio={:.3}",
-        relaxed_alpha, relaxed_beta,
-        if relaxed_alpha > 0.0 { relaxed_beta / relaxed_alpha } else { 0.0 });
-    println!("  Excited: alpha={:.6}, beta={:.6}, ratio={:.3}",
-        excited_alpha, excited_beta,
-        if excited_alpha > 0.0 { excited_beta / excited_alpha } else { 0.0 });
+    println!(
+        "  Relaxed: alpha={:.6}, beta={:.6}, ratio={:.3}",
+        relaxed_alpha,
+        relaxed_beta,
+        if relaxed_alpha > 0.0 {
+            relaxed_beta / relaxed_alpha
+        } else {
+            0.0
+        }
+    );
+    println!(
+        "  Excited: alpha={:.6}, beta={:.6}, ratio={:.3}",
+        excited_alpha,
+        excited_beta,
+        if excited_alpha > 0.0 {
+            excited_beta / excited_alpha
+        } else {
+            0.0
+        }
+    );
 
     let alpha_higher_relaxed = relaxed_alpha > excited_alpha;
     let beta_higher_excited = excited_beta > relaxed_beta;
@@ -265,7 +309,9 @@ fn main() {
             let state = sentinel.detect(&eeg);
 
             // Extract PAC features from frontal channel
-            let frontal_signal = eeg.channels.get(&EmotionChannel::Fz)
+            let frontal_signal = eeg
+                .channels
+                .get(&EmotionChannel::Fz)
                 .or_else(|| eeg.channels.get(&EmotionChannel::F3))
                 .cloned()
                 .unwrap_or_default();
@@ -315,11 +361,22 @@ fn main() {
     let pac_quadrant_accuracy = pac_quadrant_correct as f64 / pac_total as f64;
     let pac_improved = pac_quadrant_accuracy > quadrant_accuracy;
 
-    println!("  Base quadrant accuracy:     {:.1}% ({}/{})",
-        quadrant_accuracy * 100.0, quadrant_correct, total);
-    println!("  PAC-enhanced accuracy:      {:.1}% ({}/{})",
-        pac_quadrant_accuracy * 100.0, pac_quadrant_correct, pac_total);
-    println!("  PAC improvement:            {}", if pac_improved { "YES" } else { "NO" });
+    println!(
+        "  Base quadrant accuracy:     {:.1}% ({}/{})",
+        quadrant_accuracy * 100.0,
+        quadrant_correct,
+        total
+    );
+    println!(
+        "  PAC-enhanced accuracy:      {:.1}% ({}/{})",
+        pac_quadrant_accuracy * 100.0,
+        pac_quadrant_correct,
+        pac_total
+    );
+    println!(
+        "  PAC improvement:            {}",
+        if pac_improved { "YES" } else { "NO" }
+    );
 
     // ═══════════════════════════════════════════════════════════════
     // Summary
@@ -340,10 +397,16 @@ fn main() {
     let mut passed = 0;
     for (name, pass) in &checks {
         println!("║  {} {:50}   ║", if *pass { "PASS" } else { "FAIL" }, name);
-        if *pass { passed += 1; }
+        if *pass {
+            passed += 1;
+        }
     }
     println!("╟──────────────────────────────────────────────────────────────╢");
-    println!("║  Result: {}/{} tests passed                                 ║", passed, checks.len());
+    println!(
+        "║  Result: {}/{} tests passed                                 ║",
+        passed,
+        checks.len()
+    );
     println!("╚══════════════════════════════════════════════════════════════╝\n");
 
     // Save

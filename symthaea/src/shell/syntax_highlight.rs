@@ -57,11 +57,15 @@ impl TokenType {
     /// Get the ratatui style for this token type
     pub fn style(&self) -> Style {
         match self {
-            Self::Keyword => Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD),
+            Self::Keyword => Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
             Self::Builtin => Style::default().fg(Color::Cyan),
             Self::String => Style::default().fg(Color::Green),
             Self::Interpolation => Style::default().fg(Color::Yellow),
-            Self::Comment => Style::default().fg(Color::DarkGray).add_modifier(Modifier::ITALIC),
+            Self::Comment => Style::default()
+                .fg(Color::DarkGray)
+                .add_modifier(Modifier::ITALIC),
             Self::Number => Style::default().fg(Color::LightBlue),
             Self::Boolean => Style::default().fg(Color::LightYellow),
             Self::Null => Style::default().fg(Color::Red),
@@ -70,7 +74,9 @@ impl TokenType {
             Self::Bracket => Style::default().fg(Color::White),
             Self::Arrow => Style::default().fg(Color::Magenta),
             Self::Path => Style::default().fg(Color::Blue),
-            Self::Uri => Style::default().fg(Color::Blue).add_modifier(Modifier::UNDERLINED),
+            Self::Uri => Style::default()
+                .fg(Color::Blue)
+                .add_modifier(Modifier::UNDERLINED),
             Self::Identifier => Style::default().fg(Color::White),
             Self::Whitespace => Style::default(),
             Self::Plain => Style::default(),
@@ -117,14 +123,32 @@ impl NixHighlighter {
     pub fn new() -> Self {
         Self {
             keywords: vec![
-                "let", "in", "if", "then", "else", "inherit", "with",
-                "rec", "assert", "or", "and",
+                "let", "in", "if", "then", "else", "inherit", "with", "rec", "assert", "or", "and",
             ],
             builtins: vec![
-                "import", "throw", "abort", "builtins", "derivation",
-                "fetchurl", "fetchTarball", "fetchGit", "null", "true", "false",
-                "map", "filter", "fold", "head", "tail", "length",
-                "toString", "toJSON", "fromJSON", "trace", "seq", "deepSeq",
+                "import",
+                "throw",
+                "abort",
+                "builtins",
+                "derivation",
+                "fetchurl",
+                "fetchTarball",
+                "fetchGit",
+                "null",
+                "true",
+                "false",
+                "map",
+                "filter",
+                "fold",
+                "head",
+                "tail",
+                "length",
+                "toString",
+                "toJSON",
+                "fromJSON",
+                "trace",
+                "seq",
+                "deepSeq",
             ],
         }
     }
@@ -195,7 +219,9 @@ impl NixHighlighter {
             }
 
             // Path: ./... or /...
-            if chars[pos] == '/' || (chars[pos] == '.' && pos + 1 < chars.len() && chars[pos + 1] == '/') {
+            if chars[pos] == '/'
+                || (chars[pos] == '.' && pos + 1 < chars.len() && chars[pos + 1] == '/')
+            {
                 if let Some(path) = self.try_parse_path(&chars, &mut pos) {
                     tokens.push(Token::new(path, TokenType::Path));
                     continue;
@@ -409,7 +435,9 @@ impl ShellHighlighter {
         // First word is the command
         let cmd = parts[0];
         let cmd_style = if cmd.starts_with("nix") || cmd.starts_with("nixos") {
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD)
         } else if cmd.starts_with("sudo") {
             Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)
         } else {
@@ -436,7 +464,9 @@ impl ShellHighlighter {
             } else if word.starts_with('/') || word.starts_with("./") {
                 Style::default().fg(Color::Blue)
             } else if word.starts_with("http") {
-                Style::default().fg(Color::Blue).add_modifier(Modifier::UNDERLINED)
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::UNDERLINED)
             } else {
                 Style::default()
             };

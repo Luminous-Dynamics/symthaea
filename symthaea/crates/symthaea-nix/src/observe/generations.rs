@@ -53,12 +53,10 @@ impl GenerationObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nix-env --list-generations failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nix-env --list-generations failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout);
@@ -91,12 +89,10 @@ impl GenerationObserver {
             .output()?;
 
         if !output.status.success() {
-            return Err(std::io::Error::other(
-                format!(
-                    "nix store diff-closures failed: {}",
-                    String::from_utf8_lossy(&output.stderr)
-                ),
-            ));
+            return Err(std::io::Error::other(format!(
+                "nix store diff-closures failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            )));
         }
 
         let raw = String::from_utf8_lossy(&output.stdout).to_string();

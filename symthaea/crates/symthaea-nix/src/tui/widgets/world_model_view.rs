@@ -52,7 +52,10 @@ pub struct WorldModelView<'a> {
 
 impl<'a> WorldModelView<'a> {
     pub fn new(snapshot: WorldModelSnapshot) -> Self {
-        Self { snapshot, block: None }
+        Self {
+            snapshot,
+            block: None,
+        }
     }
 
     pub fn block(mut self, block: Block<'a>) -> Self {
@@ -61,9 +64,13 @@ impl<'a> WorldModelView<'a> {
     }
 
     fn error_color(error: f64) -> Color {
-        if error > 0.7 { Color::Red }
-        else if error > 0.3 { Color::Yellow }
-        else { Color::Green }
+        if error > 0.7 {
+            Color::Red
+        } else if error > 0.3 {
+            Color::Yellow
+        } else {
+            Color::Green
+        }
     }
 
     fn error_bar(error: f64, width: usize) -> String {
@@ -76,7 +83,9 @@ impl<'a> WorldModelView<'a> {
 impl Widget for WorldModelView<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let block = self.block.unwrap_or_else(|| {
-            Block::default().title(" World Model ").borders(Borders::ALL)
+            Block::default()
+                .title(" World Model ")
+                .borders(Borders::ALL)
         });
         let inner = block.inner(area);
         block.render(area, buf);
@@ -117,17 +126,26 @@ impl Widget for WorldModelView<'_> {
         // Stats
         if y < inner.y + inner.height {
             let surprise_indicator = if self.snapshot.is_surprised { "!" } else { "" };
-            let fe_color = if self.snapshot.free_energy > 0.5 { Color::Red } else { Color::Green };
+            let fe_color = if self.snapshot.free_energy > 0.5 {
+                Color::Red
+            } else {
+                Color::Green
+            };
             let stats = Line::from(vec![
                 Span::raw("FE: "),
                 Span::styled(
                     format!("{:.3}{}", self.snapshot.free_energy, surprise_indicator),
-                    Style::default().fg(fe_color).add_modifier(if self.snapshot.is_surprised { Modifier::BOLD } else { Modifier::empty() }),
+                    Style::default()
+                        .fg(fe_color)
+                        .add_modifier(if self.snapshot.is_surprised {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
                 ),
                 Span::raw(format!(
                     "  Actions: {}  Obs: {}",
-                    self.snapshot.learned_actions,
-                    self.snapshot.total_observations,
+                    self.snapshot.learned_actions, self.snapshot.total_observations,
                 )),
             ]);
             buf.set_line(x, y, &stats, inner.width.saturating_sub(1));
@@ -139,9 +157,12 @@ impl Widget for WorldModelView<'_> {
             y += 1;
             if y < inner.y + inner.height {
                 buf.set_string(
-                    x, y,
+                    x,
+                    y,
                     "Working Memory:",
-                    Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(Color::White)
+                        .add_modifier(Modifier::BOLD),
                 );
                 y += 1;
             }
@@ -150,14 +171,21 @@ impl Widget for WorldModelView<'_> {
                 if y >= inner.y + inner.height {
                     break;
                 }
-                let act_color = if *activation > 0.7 { Color::White } else { Color::DarkGray };
+                let act_color = if *activation > 0.7 {
+                    Color::White
+                } else {
+                    Color::DarkGray
+                };
                 let truncated = if label.len() > (inner.width as usize).saturating_sub(10) {
                     &label[..(inner.width as usize).saturating_sub(13)]
                 } else {
                     label.as_str()
                 };
                 let line = Line::from(vec![
-                    Span::styled(format!("[{:.1}]", activation), Style::default().fg(act_color)),
+                    Span::styled(
+                        format!("[{:.1}]", activation),
+                        Style::default().fg(act_color),
+                    ),
                     Span::raw(" "),
                     Span::styled(truncated, Style::default().fg(act_color)),
                 ]);
@@ -186,8 +214,8 @@ mod tests {
             is_surprised: false,
             ..Default::default()
         };
-        let widget = WorldModelView::new(snap)
-            .block(Block::default().title("Model").borders(Borders::ALL));
+        let widget =
+            WorldModelView::new(snap).block(Block::default().title("Model").borders(Borders::ALL));
         let area = Rect::new(0, 0, 50, 15);
         let mut buf = Buffer::empty(area);
         widget.render(area, &mut buf);

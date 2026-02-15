@@ -8,10 +8,10 @@
 //!
 //! Run with: `cargo test --test database_persistence`
 
-use symthaea::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType, SqliteMemory};
-use symthaea::hdc::binary_hv::BinaryHV;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use symthaea::databases::{ConsciousnessDatabase, MemoryRecord, MemoryType, SqliteMemory};
+use symthaea::hdc::binary_hv::BinaryHV;
 use tempfile::TempDir;
 
 // ============================================================================
@@ -27,8 +27,8 @@ fn create_memory(id: &str, seed: u64, memory_type: MemoryType, content: &str) ->
         memory_type,
         content: content.to_string(),
         valence: ((seed % 200) as f32 / 100.0) - 1.0, // -1.0 to 1.0
-        arousal: (seed % 100) as f32 / 100.0,          // 0.0 to 1.0
-        phi: (seed % 100) as f64 / 100.0,              // 0.0 to 1.0
+        arousal: (seed % 100) as f32 / 100.0,         // 0.0 to 1.0
+        phi: (seed % 100) as f64 / 100.0,             // 0.0 to 1.0
         topics: vec![format!("topic_{}", seed % 10)],
         metadata: format!(r#"{{"seed": {}}}"#, seed),
         consolidation_strength: 0.0,
@@ -79,7 +79,7 @@ mod roundtrip_tests {
         let original_encoding = BinaryHV::random(seed);
         let record = MemoryRecord {
             id: "encoding-test".to_string(),
-            encoding: original_encoding.clone(),
+            encoding: original_encoding,
             timestamp_ms: 1700000000000,
             memory_type: MemoryType::Semantic,
             content: "Testing encoding integrity".to_string(),
@@ -117,7 +117,12 @@ mod roundtrip_tests {
 
         // Store all types
         for (i, (mem_type, id)) in types.iter().enumerate() {
-            let record = create_memory(id, i as u64, *mem_type, &format!("Content for {:?}", mem_type));
+            let record = create_memory(
+                id,
+                i as u64,
+                *mem_type,
+                &format!("Content for {:?}", mem_type),
+            );
             db.store(record).await.expect("Store failed");
         }
 
@@ -142,7 +147,10 @@ mod roundtrip_tests {
         db.store(record).await.expect("Store failed");
         let retrieved = db.get("unicode-test").await.expect("Get failed").unwrap();
 
-        assert_eq!(retrieved.content, unicode_content, "Unicode content should be preserved");
+        assert_eq!(
+            retrieved.content, unicode_content,
+            "Unicode content should be preserved"
+        );
     }
 
     #[tokio::test]
@@ -163,7 +171,8 @@ mod roundtrip_tests {
         })
         .to_string();
 
-        let mut record = create_memory("large-meta", 1, MemoryType::Semantic, "Large metadata test");
+        let mut record =
+            create_memory("large-meta", 1, MemoryType::Semantic, "Large metadata test");
         record.metadata = large_metadata.clone();
 
         db.store(record).await.expect("Store failed");
@@ -308,7 +317,12 @@ mod acid_tests {
 
         // Store multiple related records
         for i in 0..10 {
-            let record = create_memory(&format!("consistent-{}", i), i as u64, MemoryType::Episodic, "Consistency test");
+            let record = create_memory(
+                &format!("consistent-{}", i),
+                i as u64,
+                MemoryType::Episodic,
+                "Consistency test",
+            );
             db.store(record).await.expect("Store failed");
         }
 
@@ -318,7 +332,9 @@ mod acid_tests {
 
         // Delete some
         for i in 0..5 {
-            db.delete(&format!("consistent-{}", i)).await.expect("Delete failed");
+            db.delete(&format!("consistent-{}", i))
+                .await
+                .expect("Delete failed");
         }
 
         // Count should be updated
@@ -327,7 +343,10 @@ mod acid_tests {
 
         // Remaining records should be intact
         for i in 5..10 {
-            let record = db.get(&format!("consistent-{}", i)).await.expect("Get failed");
+            let record = db
+                .get(&format!("consistent-{}", i))
+                .await
+                .expect("Get failed");
             assert!(record.is_some(), "Record {} should exist", i);
         }
     }
@@ -346,7 +365,12 @@ mod concurrent_tests {
 
         // Store initial data
         for i in 0..10 {
-            let record = create_memory(&format!("concurrent-read-{}", i), i as u64, MemoryType::Episodic, "Concurrent read test");
+            let record = create_memory(
+                &format!("concurrent-read-{}", i),
+                i as u64,
+                MemoryType::Episodic,
+                "Concurrent read test",
+            );
             db.store(record).await.expect("Store failed");
         }
 
@@ -379,8 +403,16 @@ mod concurrent_tests {
             handles.push(tokio::spawn(async move {
                 for i in 0..20 {
                     let id = format!("writer-{}-item-{}", writer_id, i);
-                    let record = create_memory(&id, (writer_id * 100 + i) as u64, MemoryType::Working, "Concurrent write");
-                    db_clone.store(record).await.expect("Concurrent write should succeed");
+                    let record = create_memory(
+                        &id,
+                        (writer_id * 100 + i) as u64,
+                        MemoryType::Working,
+                        "Concurrent write",
+                    );
+                    db_clone
+                        .store(record)
+                        .await
+                        .expect("Concurrent write should succeed");
                 }
             }));
         }
@@ -401,7 +433,12 @@ mod concurrent_tests {
 
         // Pre-populate
         for i in 0..50 {
-            let record = create_memory(&format!("pre-{}", i), i as u64, MemoryType::Episodic, "Pre-populated");
+            let record = create_memory(
+                &format!("pre-{}", i),
+                i as u64,
+                MemoryType::Episodic,
+                "Pre-populated",
+            );
             db.store(record).await.expect("Pre-store failed");
         }
 
@@ -425,7 +462,12 @@ mod concurrent_tests {
             handles.push(tokio::spawn(async move {
                 for i in 0..30 {
                     let id = format!("concurrent-rw-{}-{}", writer_id, i);
-                    let record = create_memory(&id, (writer_id * 100 + i) as u64, MemoryType::Working, "Concurrent RW");
+                    let record = create_memory(
+                        &id,
+                        (writer_id * 100 + i) as u64,
+                        MemoryType::Working,
+                        "Concurrent RW",
+                    );
                     let _ = db_clone.store(record).await;
                 }
             }));
@@ -447,7 +489,12 @@ mod concurrent_tests {
 
         // Pre-populate
         for i in 0..100 {
-            let record = create_memory(&format!("delete-me-{}", i), i as u64, MemoryType::Working, "To be deleted");
+            let record = create_memory(
+                &format!("delete-me-{}", i),
+                i as u64,
+                MemoryType::Working,
+                "To be deleted",
+            );
             db.store(record).await.expect("Store failed");
         }
 
@@ -483,7 +530,10 @@ mod recovery_tests {
     async fn test_get_nonexistent_record() {
         let db = SqliteMemory::in_memory().expect("Failed to create database");
 
-        let result = db.get("nonexistent-id").await.expect("Get should not error");
+        let result = db
+            .get("nonexistent-id")
+            .await
+            .expect("Get should not error");
         assert!(result.is_none(), "Nonexistent record should return None");
     }
 
@@ -491,7 +541,10 @@ mod recovery_tests {
     async fn test_delete_nonexistent_record() {
         let db = SqliteMemory::in_memory().expect("Failed to create database");
 
-        let deleted = db.delete("nonexistent-id").await.expect("Delete should not error");
+        let deleted = db
+            .delete("nonexistent-id")
+            .await
+            .expect("Delete should not error");
         assert!(!deleted, "Deleting nonexistent record should return false");
     }
 
@@ -519,7 +572,12 @@ mod recovery_tests {
 
         // Store some records
         for i in 0..5 {
-            let record = create_memory(&format!("search-test-{}", i), i as u64, MemoryType::Semantic, "Search test");
+            let record = create_memory(
+                &format!("search-test-{}", i),
+                i as u64,
+                MemoryType::Semantic,
+                "Search test",
+            );
             db.store(record).await.expect("Store failed");
         }
 
@@ -528,7 +586,10 @@ mod recovery_tests {
         let results = db.search_similar(&query, 3).await.expect("Search failed");
 
         // Should return results (even if not very similar)
-        assert!(!results.is_empty(), "Search should return results even if not highly similar");
+        assert!(
+            !results.is_empty(),
+            "Search should return results even if not highly similar"
+        );
     }
 
     #[tokio::test]
@@ -555,13 +616,17 @@ mod recovery_tests {
     async fn test_special_characters_in_content() {
         let db = SqliteMemory::in_memory().expect("Failed to create database");
 
-        let special_content = r#"Test with "quotes", 'apostrophes', \backslashes\, and <xml>tags</xml>"#;
+        let special_content =
+            r#"Test with "quotes", 'apostrophes', \backslashes\, and <xml>tags</xml>"#;
         let record = create_memory("special-chars", 1, MemoryType::Semantic, special_content);
 
         db.store(record).await.expect("Store failed");
         let retrieved = db.get("special-chars").await.expect("Get failed").unwrap();
 
-        assert_eq!(retrieved.content, special_content, "Special characters should be preserved");
+        assert_eq!(
+            retrieved.content, special_content,
+            "Special characters should be preserved"
+        );
     }
 
     #[tokio::test]
@@ -575,7 +640,11 @@ mod recovery_tests {
         db.store(record).await.expect("Store failed");
         let retrieved = db.get("long-content").await.expect("Get failed").unwrap();
 
-        assert_eq!(retrieved.content.len(), 1_000_000, "Long content should be preserved");
+        assert_eq!(
+            retrieved.content.len(),
+            1_000_000,
+            "Long content should be preserved"
+        );
     }
 
     #[tokio::test]
@@ -605,18 +674,30 @@ mod recovery_tests {
             let db = SqliteMemory::new(&db_path).expect("Failed to create database");
 
             for i in 0..1000 {
-                let record = create_memory(&format!("op-{}", i), i as u64, MemoryType::Episodic, "Many ops test");
+                let record = create_memory(
+                    &format!("op-{}", i),
+                    i as u64,
+                    MemoryType::Episodic,
+                    "Many ops test",
+                );
                 db.store(record).await.expect("Store failed");
             }
 
             // Delete half
             for i in 0..500 {
-                db.delete(&format!("op-{}", i)).await.expect("Delete failed");
+                db.delete(&format!("op-{}", i))
+                    .await
+                    .expect("Delete failed");
             }
 
             // Update some
             for i in 500..600 {
-                let record = create_memory(&format!("op-{}", i), (i + 10000) as u64, MemoryType::Semantic, "Updated");
+                let record = create_memory(
+                    &format!("op-{}", i),
+                    (i + 10000) as u64,
+                    MemoryType::Semantic,
+                    "Updated",
+                );
                 db.store(record).await.expect("Update failed");
             }
         }
@@ -649,7 +730,12 @@ mod performance_tests {
 
         let start = Instant::now();
         for i in 0..1000 {
-            let record = create_memory(&format!("perf-{}", i), i as u64, MemoryType::Working, "Performance test");
+            let record = create_memory(
+                &format!("perf-{}", i),
+                i as u64,
+                MemoryType::Working,
+                "Performance test",
+            );
             db.store(record).await.expect("Store failed");
         }
         let elapsed = start.elapsed();
@@ -670,7 +756,12 @@ mod performance_tests {
 
         // Populate
         for i in 0..1000 {
-            let record = create_memory(&format!("search-perf-{}", i), i as u64, MemoryType::Semantic, "Search performance test");
+            let record = create_memory(
+                &format!("search-perf-{}", i),
+                i as u64,
+                MemoryType::Semantic,
+                "Search performance test",
+            );
             db.store(record).await.expect("Store failed");
         }
 
@@ -689,6 +780,9 @@ mod performance_tests {
             elapsed
         );
 
-        eprintln!("[Performance] 100 searches over 1000 records completed in {:?}", elapsed);
+        eprintln!(
+            "[Performance] 100 searches over 1000 records completed in {:?}",
+            elapsed
+        );
     }
 }

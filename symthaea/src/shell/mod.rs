@@ -32,35 +32,56 @@ pub mod undo;
 pub mod whatif;
 
 // Re-export commonly used types
-pub use aliases::{AliasManager, Alias};
+pub use aliases::{Alias, AliasManager};
 pub use context::{
-    ShellContext, IntelliSenseEngine, PhiGate, GateDecision,
-    Completion, CompletionKind, ExecutionRequest, CommandClassification,
-    CompletionPreview, PreviewStep, classify_command_destructiveness,
+    classify_command_destructiveness,
+    CommandClassification,
     CommandContext as ShellCommandContext, // Renamed to avoid conflict
+    Completion,
+    CompletionKind,
+    CompletionPreview,
+    ExecutionRequest,
+    GateDecision,
+    IntelliSenseEngine,
+    PhiGate,
+    PreviewStep,
+    ShellContext,
 };
 pub use epistemic_overlay::{
-    EpistemicOverlayEngine, EpistemicOverlay, EpistemicStyle,
-    OverlayPosition, OverlayType, KnowledgeSource,
     CommandContext, // Epistemic command context (with k_index, etc.)
+    EpistemicOverlay,
+    EpistemicOverlayEngine,
+    EpistemicStyle,
+    KnowledgeSource,
+    OverlayPosition,
+    OverlayType,
 };
+pub use error_explainer::{quick_error_check, ErrorExplainer, ErrorExplanation};
+pub use flake_context::{ContextualSuggestion, FlakeContext, SuggestionSource};
 pub use ipc_client::{
-    ShellIpcClient, IpcClientConfig, ConnectionState,
-    discover_socket, MetricsSnapshot, IpcRequest, IpcResponse,
+    discover_socket,
+    ConnectionState,
+    IpcClientConfig,
+    IpcRequest,
+    IpcResponse,
+    MetricsSnapshot,
     // Wire protocol types
-    Request, Response, RequestEnvelope, ResponseEnvelope,
-    WireProtocol, ShellContextData, SafetyLevelData,
+    Request,
+    RequestEnvelope,
+    Response,
+    ResponseEnvelope,
+    SafetyLevelData,
+    ShellContextData,
+    ShellIpcClient,
+    WireProtocol,
 };
 pub use ipc_server::{
-    IpcServer, IpcServerConfig, MetricsProvider, CommandExecutor,
-    ExecutionResult, ValidationResult,
-    StubMetricsProvider, StubCommandExecutor,
+    CommandExecutor, ExecutionResult, IpcServer, IpcServerConfig, MetricsProvider,
+    StubCommandExecutor, StubMetricsProvider, ValidationResult,
 };
 pub use service_state::StateManager;
-pub use flake_context::{FlakeContext, ContextualSuggestion, SuggestionSource};
-pub use error_explainer::{ErrorExplainer, ErrorExplanation, quick_error_check};
-pub use whatif::{WhatIfSimulator, WhatIfResult};
-pub use undo::{UndoAction, ActionType, ActionData};
+pub use undo::{ActionData, ActionType, UndoAction};
+pub use whatif::{WhatIfResult, WhatIfSimulator};
 
 /// Shell configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

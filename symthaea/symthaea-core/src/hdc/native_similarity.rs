@@ -131,7 +131,8 @@ impl PackedBipolar {
     /// Hamming distance (number of differing bits)
     #[inline]
     pub fn hamming_distance(&self, other: &PackedBipolar) -> u32 {
-        self.words.iter()
+        self.words
+            .iter()
             .zip(other.words.iter())
             .map(|(a, b)| (a ^ b).count_ones())
             .sum()
@@ -156,7 +157,8 @@ impl PackedBipolar {
             let word_idx = bit_idx / 64;
             let bit_pos = bit_idx % 64;
 
-            let ones: usize = vectors.iter()
+            let ones: usize = vectors
+                .iter()
                 .filter(|v| (v.words[word_idx] >> bit_pos) & 1 == 1)
                 .count();
 
@@ -179,7 +181,9 @@ impl PackedBipolar {
     pub fn bind(&self, other: &PackedBipolar) -> PackedBipolar {
         debug_assert_eq!(self.dimension, other.dimension);
 
-        let words: Vec<u64> = self.words.iter()
+        let words: Vec<u64> = self
+            .words
+            .iter()
             .zip(other.words.iter())
             .map(|(a, b)| a ^ b)
             .collect();
@@ -255,7 +259,7 @@ impl NativeSimilarityIndex {
         }
 
         let packed = PackedBipolar::from_bipolar(pattern);
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = self.patterns.write().expect("patterns RwLock poisoned");
         patterns.insert(id.to_string(), packed);
 
         Ok(())
@@ -271,7 +275,7 @@ impl NativeSimilarityIndex {
             ));
         }
 
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = self.patterns.write().expect("patterns RwLock poisoned");
         patterns.insert(id.to_string(), pattern);
 
         Ok(())
@@ -287,9 +291,10 @@ impl NativeSimilarityIndex {
 
     /// Query with packed pattern
     pub fn query_packed(&self, query: &PackedBipolar, limit: usize) -> Vec<(String, f32)> {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
 
-        let mut matches: Vec<(String, f32)> = patterns.iter()
+        let mut matches: Vec<(String, f32)> = patterns
+            .iter()
             .map(|(id, stored)| {
                 let sim = query.xor_similarity(stored);
                 (id.clone(), sim)
@@ -307,7 +312,7 @@ impl NativeSimilarityIndex {
     /// Find exact match (similarity > 0.99)
     pub fn find_exact(&self, pattern: &[i8]) -> Option<String> {
         let query_packed = PackedBipolar::from_bipolar(pattern);
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
 
         for (id, stored) in patterns.iter() {
             if query_packed.xor_similarity(stored) > 0.99 {
@@ -320,25 +325,28 @@ impl NativeSimilarityIndex {
 
     /// Retrieve pattern by ID
     pub fn get(&self, id: &str) -> Option<Vec<i8>> {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
         patterns.get(id).map(|p| p.to_bipolar())
     }
 
     /// Get packed pattern by ID
     pub fn get_packed(&self, id: &str) -> Option<PackedBipolar> {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
         patterns.get(id).cloned()
     }
 
     /// Remove pattern by ID
     pub fn remove(&self, id: &str) -> bool {
-        let mut patterns = self.patterns.write().unwrap();
+        let mut patterns = self.patterns.write().expect("patterns RwLock poisoned");
         patterns.remove(id).is_some()
     }
 
     /// Number of stored patterns
     pub fn len(&self) -> usize {
-        self.patterns.read().unwrap().len()
+        self.patterns
+            .read()
+            .expect("patterns RwLock poisoned")
+            .len()
     }
 
     /// Check if index is empty
@@ -348,7 +356,7 @@ impl NativeSimilarityIndex {
 
     /// Total memory usage in bytes
     pub fn memory_bytes(&self) -> usize {
-        let patterns = self.patterns.read().unwrap();
+        let patterns = self.patterns.read().expect("patterns RwLock poisoned");
         patterns.values().map(|p| p.memory_bytes()).sum::<usize>()
             + patterns.keys().map(|k| k.len()).sum::<usize>()
     }
@@ -437,7 +445,9 @@ impl SequenceQuery {
             return None;
         }
 
-        let permuted: Vec<PackedBipolar> = self.elements.iter()
+        let permuted: Vec<PackedBipolar> = self
+            .elements
+            .iter()
             .enumerate()
             .map(|(i, elem)| elem.permute(i))
             .collect();
@@ -504,7 +514,10 @@ mod tests {
         let packed = PackedBipolar::from_bipolar(&vec);
 
         let sim = packed.xor_similarity(&packed);
-        assert!((sim - 1.0).abs() < 0.001, "Identical vectors should have similarity 1.0");
+        assert!(
+            (sim - 1.0).abs() < 0.001,
+            "Identical vectors should have similarity 1.0"
+        );
     }
 
     #[test]
@@ -516,7 +529,10 @@ mod tests {
         let packed_b = PackedBipolar::from_bipolar(&vec_b);
 
         let sim = packed_a.xor_similarity(&packed_b);
-        assert!((sim - 0.0).abs() < 0.001, "Opposite vectors should have similarity 0.0");
+        assert!(
+            (sim - 0.0).abs() < 0.001,
+            "Opposite vectors should have similarity 0.0"
+        );
     }
 
     #[test]
@@ -532,7 +548,11 @@ mod tests {
         let packed_b = PackedBipolar::from_bipolar(&vec_b);
 
         let sim = packed_a.xor_similarity(&packed_b);
-        assert!((sim - 0.5).abs() < 0.001, "Half-different vectors should have similarity 0.5, got {}", sim);
+        assert!(
+            (sim - 0.5).abs() < 0.001,
+            "Half-different vectors should have similarity 0.5, got {}",
+            sim
+        );
     }
 
     #[test]
@@ -549,8 +569,11 @@ mod tests {
         // XOR: (1,1)->1, (-1,1)->-1, (1,-1)->-1, (-1,-1)->1
         // But in our binary encoding: 1->1, -1->0
         // So: (1^1)=0->-1, (0^1)=1->1, (1^0)=1->1, (0^0)=0->-1
-        assert_eq!(result, vec![-1, 1, 1, -1],
-            "Bind should XOR binary representations");
+        assert_eq!(
+            result,
+            vec![-1, 1, 1, -1],
+            "Bind should XOR binary representations"
+        );
     }
 
     #[test]
@@ -568,8 +591,7 @@ mod tests {
 
     #[test]
     fn test_native_index_store_query() {
-        let index = NativeSimilarityIndex::new(64)
-            .with_threshold(0.6);
+        let index = NativeSimilarityIndex::new(64).with_threshold(0.6);
 
         let pattern_a = vec![1i8; 64];
         let pattern_b = vec![-1i8; 64];
@@ -593,15 +615,17 @@ mod tests {
         let result = permuted.to_bipolar();
 
         // Circular shift right by 2
-        assert_eq!(result, vec![1, -1, 1, -1, 1, -1, 1, -1],
-            "Permute should circular shift");
+        assert_eq!(
+            result,
+            vec![1, -1, 1, -1, 1, -1, 1, -1],
+            "Permute should circular shift"
+        );
     }
 
     #[test]
     fn test_sequence_query() {
         let dim = 64;
-        let index = NativeSimilarityIndex::new(dim)
-            .with_threshold(0.5);
+        let index = NativeSimilarityIndex::new(dim).with_threshold(0.5);
 
         // Store a known sequence encoding
         let elem_a = vec![1i8; dim];
@@ -617,7 +641,10 @@ mod tests {
         // Query should find the stored sequence
         let results = seq.execute(&index, 5);
         assert!(!results.is_empty());
-        assert!(results[0].1 > 0.8, "Should have high similarity to exact match");
+        assert!(
+            results[0].1 > 0.8,
+            "Should have high similarity to exact match"
+        );
     }
 
     #[test]

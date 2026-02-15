@@ -78,40 +78,40 @@ impl Harmony {
     /// Get a description of this harmony
     pub fn description(&self) -> &'static str {
         match self {
-            Harmony::ResonantCoherence =>
-                "Harmonious integration, luminous order, boundless creativity",
-            Harmony::PanSentientFlourishing =>
-                "Unconditional care for all sentient beings, intrinsic value, holistic well-being",
-            Harmony::IntegralWisdom =>
-                "Self-illuminating intelligence, embodied knowing, wisdom in action",
-            Harmony::InfinitePlay =>
-                "Joyful generativity, divine play, endless novelty and exploration",
-            Harmony::UniversalInterconnectedness =>
-                "Fundamental unity of all existence, empathic resonance across beings",
-            Harmony::SacredReciprocity =>
-                "Generous flow between beings, mutual upliftment, generative trust",
-            Harmony::EvolutionaryProgression =>
-                "Wise becoming through time, continuous evolution toward greater consciousness",
+            Harmony::ResonantCoherence => {
+                "Harmonious integration, luminous order, boundless creativity"
+            }
+            Harmony::PanSentientFlourishing => {
+                "Unconditional care for all sentient beings, intrinsic value, holistic well-being"
+            }
+            Harmony::IntegralWisdom => {
+                "Self-illuminating intelligence, embodied knowing, wisdom in action"
+            }
+            Harmony::InfinitePlay => {
+                "Joyful generativity, divine play, endless novelty and exploration"
+            }
+            Harmony::UniversalInterconnectedness => {
+                "Fundamental unity of all existence, empathic resonance across beings"
+            }
+            Harmony::SacredReciprocity => {
+                "Generous flow between beings, mutual upliftment, generative trust"
+            }
+            Harmony::EvolutionaryProgression => {
+                "Wise becoming through time, continuous evolution toward greater consciousness"
+            }
         }
     }
 
     /// Get the sacred question for this harmony
     pub fn sacred_question(&self) -> &'static str {
         match self {
-            Harmony::ResonantCoherence =>
-                "Does this create harmony and integration?",
-            Harmony::PanSentientFlourishing =>
-                "Does this serve the flourishing of all beings?",
-            Harmony::IntegralWisdom =>
-                "Does this arise from and cultivate wisdom?",
-            Harmony::InfinitePlay =>
-                "Does this celebrate creativity and joy?",
-            Harmony::UniversalInterconnectedness =>
-                "Does this honor our fundamental connection?",
-            Harmony::SacredReciprocity =>
-                "Does this participate in the generous flow of giving?",
-            Harmony::EvolutionaryProgression =>
-                "Does this contribute to wise evolution?",
+            Harmony::ResonantCoherence => "Does this create harmony and integration?",
+            Harmony::PanSentientFlourishing => "Does this serve the flourishing of all beings?",
+            Harmony::IntegralWisdom => "Does this arise from and cultivate wisdom?",
+            Harmony::InfinitePlay => "Does this celebrate creativity and joy?",
+            Harmony::UniversalInterconnectedness => "Does this honor our fundamental connection?",
+            Harmony::SacredReciprocity => "Does this participate in the generous flow of giving?",
+            Harmony::EvolutionaryProgression => "Does this contribute to wise evolution?",
         }
     }
 }
@@ -257,14 +257,20 @@ impl AlignmentResult {
 
     /// Get the most aligned harmony
     pub fn most_aligned(&self) -> Option<(&Harmony, &HarmonyAlignment)> {
-        self.alignments.iter()
-            .max_by(|a, b| a.1.score.partial_cmp(&b.1.score).unwrap_or(std::cmp::Ordering::Equal))
+        self.alignments.iter().max_by(|a, b| {
+            a.1.score
+                .partial_cmp(&b.1.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Get the least aligned harmony
     pub fn least_aligned(&self) -> Option<(&Harmony, &HarmonyAlignment)> {
-        self.alignments.iter()
-            .min_by(|a, b| a.1.score.partial_cmp(&b.1.score).unwrap_or(std::cmp::Ordering::Equal))
+        self.alignments.iter().min_by(|a, b| {
+            a.1.score
+                .partial_cmp(&b.1.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Get iterator over harmony alignments (for API compatibility with kosmic_song)
@@ -280,14 +286,16 @@ impl AlignmentResult {
     /// Check if action should be vetoed (strong negative alignment)
     pub fn should_veto(&self) -> bool {
         // Veto if overall score is strongly negative or any harmony is severely violated
-        self.overall_score < -0.5 ||
-            self.alignments.values().any(|a| a.score < -0.7)
+        self.overall_score < -0.5 || self.alignments.values().any(|a| a.score < -0.7)
     }
 
     /// Get the best (most aligned) harmony
     pub fn best_alignment(&self) -> Option<&HarmonyAlignment> {
-        self.alignments.values()
-            .max_by(|a, b| a.score.partial_cmp(&b.score).unwrap_or(std::cmp::Ordering::Equal))
+        self.alignments.values().max_by(|a, b| {
+            a.score
+                .partial_cmp(&b.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 }
 
@@ -403,14 +411,15 @@ impl SevenHarmonies {
                 self.keyword_score(&text_lower, &positive, &negative)
             }
             Harmony::EvolutionaryProgression => {
-                let positive = ["grow", "evolve", "improve", "progress", "develop", "upgrade"];
+                let positive = [
+                    "grow", "evolve", "improve", "progress", "develop", "upgrade",
+                ];
                 let negative = ["regress", "stagnate", "decline", "deteriorate"];
                 self.keyword_score(&text_lower, &positive, &negative)
             }
         };
 
-        HarmonyAlignment::new(harmony, score, confidence)
-            .with_evidence(evidence)
+        HarmonyAlignment::new(harmony, score, confidence).with_evidence(evidence)
     }
 
     /// Simple keyword-based scoring

@@ -10,6 +10,6 @@
 pub mod loop_integration;
 
 pub use loop_integration::{
-    CausalLoopEnhancer, CausalEnhancerConfig, CausalGraph, CausalGraphEdge,
-    CausalLoopStats, DiscoveredRelationship,
+    CausalEnhancerConfig, CausalGraph, CausalGraphEdge, CausalLoopEnhancer, CausalLoopStats,
+    DiscoveredRelationship,
 };

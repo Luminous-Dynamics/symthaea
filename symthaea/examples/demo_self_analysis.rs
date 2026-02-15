@@ -6,9 +6,9 @@
 //! Run with: cargo run --example demo_self_analysis --features code_generation
 
 use std::path::Path;
-use symthaea::meta::self_analysis::SelfAnalyzer;
-use symthaea::language::rust_parser::RustParser;
 use symthaea::language::code_parser::CodeParser;
+use symthaea::language::rust_parser::RustParser;
+use symthaea::meta::self_analysis::SelfAnalyzer;
 
 fn main() {
     println!("╔════════════════════════════════════════════════════════════════╗");
@@ -67,7 +67,10 @@ fn main() {
     println!("  • Modules: {}", self_model.module_count);
     println!("  • Functions: {}", self_model.function_count);
     println!("  • Types: {}", self_model.type_count);
-    println!("  • Codebase Coherence: {:.2}%", self_model.coherence * 100.0);
+    println!(
+        "  • Codebase Coherence: {:.2}%",
+        self_model.coherence * 100.0
+    );
 
     println!("\n════════════════════════════════════════════════════════════════");
     println!("🔍 PATTERN INTROSPECTION\n");
@@ -87,12 +90,18 @@ fn main() {
     let (most, least) = analyzer.integration_extremes();
 
     if let Some((path, score)) = most {
-        println!("Most Integrated:  {:40} (Φ ≈ {:.3})",
-            path.file_name().unwrap().to_string_lossy(), score);
+        println!(
+            "Most Integrated:  {:40} (Φ ≈ {:.3})",
+            path.file_name().unwrap().to_string_lossy(),
+            score
+        );
     }
     if let Some((path, score)) = least {
-        println!("Least Integrated: {:40} (Φ ≈ {:.3})",
-            path.file_name().unwrap().to_string_lossy(), score);
+        println!(
+            "Least Integrated: {:40} (Φ ≈ {:.3})",
+            path.file_name().unwrap().to_string_lossy(),
+            score
+        );
     }
 
     println!("\n════════════════════════════════════════════════════════════════");

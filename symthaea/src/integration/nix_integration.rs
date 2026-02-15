@@ -7,18 +7,16 @@
 use std::sync::{Arc, Mutex};
 use symthaea_core::hdc::ContinuousHV;
 
-use symthaea_nix::action::{NixOSCommand, NixOSExecutor, ExecutionResult};
-use symthaea_nix::mind::{SystemEpisode, EpisodeOutcome, HdcWorldModel};
+use symthaea_nix::action::{ExecutionResult, NixOSCommand, NixOSExecutor};
 use symthaea_nix::mind::causal_graph::NixCausalGraph;
+use symthaea_nix::mind::{EpisodeOutcome, HdcWorldModel, SystemEpisode};
 use symthaea_nix::plugin::actor_bridge::HippocampusBridge;
 use symthaea_nix::plugin::pipeline_integration::{
-    NixPipelineHook, NixPipelineResult, NixPipelineProcessor,
+    NixPipelineHook, NixPipelineProcessor, NixPipelineResult,
 };
 
-use crate::memory::hippocampus::{
-    HippocampusActor, EmotionalValence, RecallQuery,
-};
-use crate::brain::actor_model::{ActorSystem, ActorRole};
+use crate::brain::actor_model::{ActorRole, ActorSystem};
+use crate::memory::hippocampus::{EmotionalValence, HippocampusActor, RecallQuery};
 
 // =============================================================================
 // HIPPOCAMPUS BRIDGE
@@ -58,15 +56,14 @@ impl HippocampusBridge for NixHippocampusBridge {
         // or fall back to creating a new runtime if no runtime is active.
         let encode_future = hippo.encode(content, embedding, valence);
         let id = match tokio::runtime::Handle::try_current() {
-            Ok(handle) => tokio::task::block_in_place(|| {
-                handle.block_on(encode_future)
-            }),
+            Ok(handle) => tokio::task::block_in_place(|| handle.block_on(encode_future)),
             Err(_) => {
                 let rt = tokio::runtime::Runtime::new()
                     .map_err(|e| format!("Failed to create runtime: {}", e))?;
                 rt.block_on(encode_future)
             }
-        }.map_err(|e| e.to_string())?;
+        }
+        .map_err(|e| e.to_string())?;
 
         Ok(id)
     }
@@ -77,8 +74,7 @@ impl HippocampusBridge for NixHippocampusBridge {
             Err(_) => return Vec::new(),
         };
 
-        let recall_query = RecallQuery::from_embedding(query.as_slice().to_vec())
-            .with_top_k(top_k);
+        let recall_query = RecallQuery::from_embedding(query.as_slice().to_vec()).with_top_k(top_k);
 
         let recall_future = hippo.recall(recall_query);
         let result = match tokio::runtime::Handle::try_current() {
@@ -98,24 +94,28 @@ impl HippocampusBridge for NixHippocampusBridge {
 
         // Convert MemoryTrace back to SystemEpisode (best-effort reconstruction)
         let dim = query.dim();
-        result.memories.iter().map(|trace| {
-            let state_hv = if trace.embedding.len() == dim {
-                ContinuousHV::from_slice(&trace.embedding)
-            } else {
-                ContinuousHV::zero(dim)
-            };
+        result
+            .memories
+            .iter()
+            .map(|trace| {
+                let state_hv = if trace.embedding.len() == dim {
+                    ContinuousHV::from_slice(&trace.embedding)
+                } else {
+                    ContinuousHV::zero(dim)
+                };
 
-            SystemEpisode {
-                state_before: ContinuousHV::zero(dim),
-                action: trace.content.clone(),
-                state_after: state_hv,
-                outcome: EpisodeOutcome::Success,
-                phi_at_encoding: trace.phi_at_encoding.unwrap_or(0.0),
-                prediction_error: 0.0,
-                emotional_valence: trace.valence.to_f64(),
-                timestamp: trace.timestamp as i64,
-            }
-        }).collect()
+                SystemEpisode {
+                    state_before: ContinuousHV::zero(dim),
+                    action: trace.content.clone(),
+                    state_after: state_hv,
+                    outcome: EpisodeOutcome::Success,
+                    phi_at_encoding: trace.phi_at_encoding.unwrap_or(0.0),
+                    prediction_error: 0.0,
+                    emotional_valence: trace.valence.to_f64(),
+                    timestamp: trace.timestamp as i64,
+                }
+            })
+            .collect()
     }
 
     fn consolidate(&self) -> usize {
@@ -126,9 +126,9 @@ impl HippocampusBridge for NixHippocampusBridge {
 
         let consolidate_future = hippo.consolidate();
         match tokio::runtime::Handle::try_current() {
-            Ok(handle) => tokio::task::block_in_place(|| {
-                handle.block_on(consolidate_future).unwrap_or(0)
-            }),
+            Ok(handle) => {
+                tokio::task::block_in_place(|| handle.block_on(consolidate_future).unwrap_or(0))
+            }
             Err(_) => {
                 let rt = match tokio::runtime::Runtime::new() {
                     Ok(rt) => rt,
@@ -171,13 +171,12 @@ pub struct NixPipelineHookImpl {
 
 impl NixPipelineHookImpl {
     /// Create a new pipeline hook.
-    pub fn new(
-        processor: NixPipelineProcessor,
-        bridge: Arc<NixHippocampusBridge>,
-    ) -> Self {
+    pub fn new(processor: NixPipelineProcessor, bridge: Arc<NixHippocampusBridge>) -> Self {
         // Bootstrap causal graph with known NixOS patterns
         let mut causal_graph = NixCausalGraph::new(42);
-        for (cause, effect, _) in symthaea_nix::mind::causal_graph::NixOSCausalPatterns::known_patterns() {
+        for (cause, effect, _) in
+            symthaea_nix::mind::causal_graph::NixOSCausalPatterns::known_patterns()
+        {
             causal_graph.add_structural_edge(cause, effect, 0.8);
         }
 
@@ -210,18 +209,15 @@ impl NixPipelineHookImpl {
         let result = self.executor.execute(command, phi).await;
         match &result {
             ExecutionResult::Success { stdout, .. } => (true, stdout.clone()),
-            ExecutionResult::PendingConfirmation { required_phi, .. } => {
-                (false, format!("Needs Φ ≥ {:.2} (current: {:.2})", required_phi, phi))
-            }
-            ExecutionResult::RolledBack { error, .. } => {
-                (false, format!("Rolled back: {}", error))
-            }
+            ExecutionResult::PendingConfirmation { required_phi, .. } => (
+                false,
+                format!("Needs Φ ≥ {:.2} (current: {:.2})", required_phi, phi),
+            ),
+            ExecutionResult::RolledBack { error, .. } => (false, format!("Rolled back: {}", error)),
             ExecutionResult::FailedNoRollback { error, .. } => {
                 (false, format!("Failed: {}", error))
             }
-            ExecutionResult::Blocked { reason, .. } => {
-                (false, format!("Blocked: {}", reason))
-            }
+            ExecutionResult::Blocked { reason, .. } => (false, format!("Blocked: {}", reason)),
         }
     }
 
@@ -252,12 +248,7 @@ impl NixPipelineHook for NixPipelineHookImpl {
         self.current_phi
     }
 
-    fn process_nix_input(
-        &mut self,
-        input: &str,
-        phi: f64,
-        confidence: f64,
-    ) -> NixPipelineResult {
+    fn process_nix_input(&mut self, input: &str, phi: f64, confidence: f64) -> NixPipelineResult {
         // Sync Φ from the main pipeline's IIT computation
         self.current_phi = phi;
         self.processor.process(input, phi, confidence)
@@ -276,7 +267,8 @@ impl NixPipelineHook for NixPipelineHookImpl {
 
         // Hebbian causal learning: predict side effects, compare with observations
         if let Some(ref last_action) = self.last_action {
-            let predicted: Vec<String> = self.causal_graph
+            let predicted: Vec<String> = self
+                .causal_graph
                 .predict_side_effects(last_action)
                 .iter()
                 .map(|e| e.affected_variable.clone())
@@ -288,7 +280,8 @@ impl NixPipelineHook for NixPipelineHookImpl {
             if success {
                 observed.push("success");
             }
-            self.causal_graph.observe_outcome(last_action, &observed, &predicted_refs);
+            self.causal_graph
+                .observe_outcome(last_action, &observed, &predicted_refs);
         }
         self.last_action = Some(action.to_string());
 
@@ -347,7 +340,9 @@ impl NixPipelineHook for NixPipelineHookImpl {
 /// Register NixOS-specific actors in the main Symthaea actor system.
 ///
 /// Spawns 5 actors: observer, inference, planner, executor, memory.
-pub fn register_nix_actors(actor_system: &mut ActorSystem) -> Vec<crate::brain::actor_model::ActorId> {
+pub fn register_nix_actors(
+    actor_system: &mut ActorSystem,
+) -> Vec<crate::brain::actor_model::ActorId> {
     let actors = [
         ("nix.observer", ActorRole::Sensor),
         ("nix.inference", ActorRole::Processor),
@@ -461,10 +456,17 @@ mod tests {
             let mut hook = NixPipelineHookImpl::new(processor, bridge);
 
             // Dry-run search should succeed (ReadOnly safety level, low Φ required)
-            let cmd = NixOSCommand::Search { query: "vim".to_string(), json: false };
+            let cmd = NixOSCommand::Search {
+                query: "vim".to_string(),
+                json: false,
+            };
             let (success, output) = hook.execute_command(cmd).await;
             assert!(success, "Dry-run search should succeed");
-            assert!(output.contains("DRY-RUN"), "Output should indicate dry run: {}", output);
+            assert!(
+                output.contains("DRY-RUN"),
+                "Output should indicate dry run: {}",
+                output
+            );
         });
     }
 
@@ -482,14 +484,19 @@ mod tests {
 
             // 2. Create the ConsciousPipeline with the hook attached
             let config = PipelineConfig::default();
-            let mut pipeline = ConsciousPipeline::new(config).await.unwrap()
+            let mut pipeline = ConsciousPipeline::new(config)
+                .await
+                .unwrap()
                 .with_nix_hook(hook);
 
             // 3. Process an input through the full pipeline
             let result = pipeline.process("search for htop").await.unwrap();
 
             // 4. Verify the result has NixOS enrichment
-            assert!(result.nix_enrichment.is_some(), "NixOS enrichment should be present");
+            assert!(
+                result.nix_enrichment.is_some(),
+                "NixOS enrichment should be present"
+            );
             let enrichment = result.nix_enrichment.as_ref().unwrap();
             assert!(!enrichment.plan.goal.description.is_empty());
 
@@ -510,8 +517,7 @@ mod tests {
         let hippo = Arc::new(Mutex::new(HippocampusActor::new(1000)));
         let bridge = Arc::new(NixHippocampusBridge::new(hippo));
         let processor = NixPipelineProcessor::new().with_skip_observe(true);
-        let mut hook = NixPipelineHookImpl::new(processor, bridge)
-            .with_consolidation_interval(3);
+        let mut hook = NixPipelineHookImpl::new(processor, bridge).with_consolidation_interval(3);
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {

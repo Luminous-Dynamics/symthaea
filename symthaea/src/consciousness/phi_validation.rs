@@ -39,7 +39,7 @@
 //! println!("{}", report);
 //! ```
 
-use super::synthetic_states::{SyntheticStateGenerator, StateType};
+use super::synthetic_states::{StateType, SyntheticStateGenerator};
 use crate::hdc::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -233,7 +233,9 @@ impl PhiValidationFramework {
         }
 
         // Show preliminary stats for this state
-        let phi_values: Vec<f64> = self.validation_data.iter()
+        let phi_values: Vec<f64> = self
+            .validation_data
+            .iter()
             .filter(|d| d.state_type == *state_type)
             .map(|d| d.phi_value)
             .collect();
@@ -241,18 +243,20 @@ impl PhiValidationFramework {
         let mean = phi_values.iter().sum::<f64>() / phi_values.len() as f64;
         let expected = state_type.expected_phi_range();
 
-        println!("   Mean Φ: {:.3} (expected: {:.2}-{:.2})",
-                 mean, expected.0, expected.1);
+        println!(
+            "   Mean Φ: {:.3} (expected: {:.2}-{:.2})",
+            mean, expected.0, expected.1
+        );
     }
 
     /// Compute comprehensive statistical analysis
     fn compute_statistics(&self) -> ValidationResults {
-        let x: Vec<f64> = self.validation_data.iter()
+        let x: Vec<f64> = self
+            .validation_data
+            .iter()
             .map(|d| d.consciousness_level)
             .collect();
-        let y: Vec<f64> = self.validation_data.iter()
-            .map(|d| d.phi_value)
-            .collect();
+        let y: Vec<f64> = self.validation_data.iter().map(|d| d.phi_value).collect();
 
         // Core correlation metrics
         let pearson_r = Self::pearson_correlation(&x, &y);
@@ -292,7 +296,9 @@ impl PhiValidationFramework {
         let mut stats = HashMap::new();
 
         for state_type in StateType::all_ordered() {
-            let phi_values: Vec<f64> = self.validation_data.iter()
+            let phi_values: Vec<f64> = self
+                .validation_data
+                .iter()
                 .filter(|d| d.state_type == state_type)
                 .map(|d| d.phi_value)
                 .collect();
@@ -302,9 +308,8 @@ impl PhiValidationFramework {
             }
 
             let mean = phi_values.iter().sum::<f64>() / phi_values.len() as f64;
-            let variance = phi_values.iter()
-                .map(|&x| (x - mean).powi(2))
-                .sum::<f64>() / phi_values.len() as f64;
+            let variance = phi_values.iter().map(|&x| (x - mean).powi(2)).sum::<f64>()
+                / phi_values.len() as f64;
             let std = variance.sqrt();
 
             let expected_range = state_type.expected_phi_range();
@@ -340,14 +345,15 @@ impl PhiValidationFramework {
         let mean_x = x.iter().sum::<f64>() / n;
         let mean_y = y.iter().sum::<f64>() / n;
 
-        let numerator: f64 = x.iter().zip(y.iter())
+        let numerator: f64 = x
+            .iter()
+            .zip(y.iter())
             .map(|(xi, yi)| (xi - mean_x) * (yi - mean_y))
             .sum();
 
-        let denominator = (
-            x.iter().map(|xi| (xi - mean_x).powi(2)).sum::<f64>() *
-            y.iter().map(|yi| (yi - mean_y).powi(2)).sum::<f64>()
-        ).sqrt();
+        let denominator = (x.iter().map(|xi| (xi - mean_x).powi(2)).sum::<f64>()
+            * y.iter().map(|yi| (yi - mean_y).powi(2)).sum::<f64>())
+        .sqrt();
 
         if denominator == 0.0 {
             0.0
@@ -368,10 +374,8 @@ impl PhiValidationFramework {
 
     /// Convert values to ranks for Spearman correlation
     fn rank_values(values: &[f64]) -> Vec<f64> {
-        let mut indexed: Vec<(usize, f64)> = values.iter()
-            .enumerate()
-            .map(|(i, &v)| (i, v))
-            .collect();
+        let mut indexed: Vec<(usize, f64)> =
+            values.iter().enumerate().map(|(i, &v)| (i, v)).collect();
 
         indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
 
@@ -414,7 +418,9 @@ impl PhiValidationFramework {
         let sign = if x >= 0.0 { 1.0 } else { -1.0 };
         let x = x.abs();
         let t = 1.0 / (1.0 + 0.3275911 * x);
-        let poly = t * (0.254829592 + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
+        let poly = t
+            * (0.254829592
+                + t * (-0.284496736 + t * (1.421413741 + t * (-1.453152027 + t * 1.061405429))));
         sign * (1.0 - poly * (-x * x).exp())
     }
 
@@ -462,16 +468,21 @@ impl PhiValidationFramework {
 
     /// Mean absolute error
     fn mean_absolute_error(x: &[f64], y: &[f64]) -> f64 {
-        x.iter().zip(y.iter())
+        x.iter()
+            .zip(y.iter())
             .map(|(xi, yi)| (xi - yi).abs())
-            .sum::<f64>() / x.len() as f64
+            .sum::<f64>()
+            / x.len() as f64
     }
 
     /// Root mean squared error
     fn root_mean_squared_error(x: &[f64], y: &[f64]) -> f64 {
-        let mse = x.iter().zip(y.iter())
+        let mse = x
+            .iter()
+            .zip(y.iter())
             .map(|(xi, yi)| (xi - yi).powi(2))
-            .sum::<f64>() / x.len() as f64;
+            .sum::<f64>()
+            / x.len() as f64;
         mse.sqrt()
     }
 
@@ -505,27 +516,47 @@ impl PhiValidationFramework {
     /// Creates a formatted report suitable for inclusion in scientific papers,
     /// including statistical analysis, interpretation, and recommendations.
     pub fn generate_report(&self) -> String {
-        let results = self.results.as_ref().expect("No results available - run validation study first");
+        let results = self
+            .results
+            .as_ref()
+            .expect("No results available - run validation study first");
 
         let mut report = String::new();
 
         // Header
         report.push_str("# Φ Validation Study Results\n\n");
-        report.push_str(&format!("**Study Date**: {}\n", chrono::Utc::now().format("%Y-%m-%d")));
+        report.push_str(&format!(
+            "**Study Date**: {}\n",
+            chrono::Utc::now().format("%Y-%m-%d")
+        ));
         report.push_str(&format!("**Sample Size**: n = {}\n\n", results.n));
 
         // Statistical Summary
         report.push_str("## Statistical Summary\n\n");
-        report.push_str(&format!("- **Pearson correlation**: r = {:.3}, p = {:.6}\n", results.pearson_r, results.p_value));
-        report.push_str(&format!("- **Spearman correlation**: ρ = {:.3}\n", results.spearman_rho));
-        report.push_str(&format!("- **R² (variance explained)**: {:.3}\n", results.r_squared));
-        report.push_str(&format!("- **95% Confidence Interval**: ({:.3}, {:.3})\n",
-                                 results.confidence_interval.0, results.confidence_interval.1));
+        report.push_str(&format!(
+            "- **Pearson correlation**: r = {:.3}, p = {:.6}\n",
+            results.pearson_r, results.p_value
+        ));
+        report.push_str(&format!(
+            "- **Spearman correlation**: ρ = {:.3}\n",
+            results.spearman_rho
+        ));
+        report.push_str(&format!(
+            "- **R² (variance explained)**: {:.3}\n",
+            results.r_squared
+        ));
+        report.push_str(&format!(
+            "- **95% Confidence Interval**: ({:.3}, {:.3})\n",
+            results.confidence_interval.0, results.confidence_interval.1
+        ));
         report.push('\n');
 
         // Classification Performance
         report.push_str("## Classification Performance\n\n");
-        report.push_str(&format!("- **AUC (conscious vs unconscious)**: {:.3}\n", results.auc));
+        report.push_str(&format!(
+            "- **AUC (conscious vs unconscious)**: {:.3}\n",
+            results.auc
+        ));
         report.push_str(&format!("- **Mean Absolute Error**: {:.3}\n", results.mae));
         report.push_str(&format!("- **RMSE**: {:.3}\n", results.rmse));
         report.push('\n');
@@ -538,11 +569,19 @@ impl PhiValidationFramework {
         for state_type in StateType::all_ordered() {
             let key = format!("{:?}", state_type);
             if let Some(stats) = results.state_stats.get(&key) {
-                let status = if stats.in_expected_range { "✅" } else { "⚠️" };
+                let status = if stats.in_expected_range {
+                    "✅"
+                } else {
+                    "⚠️"
+                };
                 report.push_str(&format!(
                     "| {:?} | {:.3} | {:.3} | ({:.2}, {:.2}) | {} |\n",
-                    state_type, stats.mean_phi, stats.std_phi,
-                    stats.expected_range.0, stats.expected_range.1, status
+                    state_type,
+                    stats.mean_phi,
+                    stats.std_phi,
+                    stats.expected_range.0,
+                    stats.expected_range.1,
+                    status
                 ));
             }
         }
@@ -627,7 +666,8 @@ impl PhiValidationFramework {
              3. Review synthetic state generation methodology\n\
              4. Consider alternative integration measures\n\
              5. Consult IIT literature for implementation guidance"
-        }.to_string()
+        }
+        .to_string()
     }
 
     /// Export data for external analysis
@@ -667,7 +707,11 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![2.0, 4.0, 6.0, 8.0, 10.0];
         let r = PhiValidationFramework::pearson_correlation(&x, &y);
-        assert!((r - 1.0).abs() < 0.001, "Perfect positive correlation should be 1.0, got {}", r);
+        assert!(
+            (r - 1.0).abs() < 0.001,
+            "Perfect positive correlation should be 1.0, got {}",
+            r
+        );
     }
 
     #[test]
@@ -675,7 +719,11 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![10.0, 8.0, 6.0, 4.0, 2.0];
         let r = PhiValidationFramework::pearson_correlation(&x, &y);
-        assert!((r + 1.0).abs() < 0.001, "Perfect negative correlation should be -1.0, got {}", r);
+        assert!(
+            (r + 1.0).abs() < 0.001,
+            "Perfect negative correlation should be -1.0, got {}",
+            r
+        );
     }
 
     #[test]
@@ -683,7 +731,11 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![5.0, 5.0, 5.0, 5.0, 5.0];
         let r = PhiValidationFramework::pearson_correlation(&x, &y);
-        assert!(r.abs() < 0.001, "No correlation should be near 0, got {}", r);
+        assert!(
+            r.abs() < 0.001,
+            "No correlation should be near 0, got {}",
+            r
+        );
     }
 
     #[test]
@@ -691,7 +743,11 @@ mod tests {
         let x = vec![1.0, 2.0, 3.0, 4.0, 5.0];
         let y = vec![1.0, 4.0, 9.0, 16.0, 25.0]; // Non-linear but monotonic
         let rho = PhiValidationFramework::spearman_correlation(&x, &y);
-        assert!((rho - 1.0).abs() < 0.001, "Monotonic relationship should have ρ ≈ 1.0, got {}", rho);
+        assert!(
+            (rho - 1.0).abs() < 0.001,
+            "Monotonic relationship should have ρ ≈ 1.0, got {}",
+            rho
+        );
     }
 
     #[test]
@@ -707,7 +763,11 @@ mod tests {
         let x = vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0];
         let y = vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0];
         let auc = PhiValidationFramework::compute_auc(&x, &y, 0.5);
-        assert!((auc - 1.0).abs() < 0.001, "Perfect classification should have AUC = 1.0, got {}", auc);
+        assert!(
+            (auc - 1.0).abs() < 0.001,
+            "Perfect classification should have AUC = 1.0, got {}",
+            auc
+        );
     }
 
     #[test]

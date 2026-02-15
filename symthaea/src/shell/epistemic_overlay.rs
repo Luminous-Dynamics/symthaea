@@ -183,7 +183,11 @@ impl EpistemicOverlayEngine {
     }
 
     /// Generate overlays for a command input
-    pub fn generate_for_command(&mut self, command: &str, context: &CommandContext) -> Vec<EpistemicOverlay> {
+    pub fn generate_for_command(
+        &mut self,
+        command: &str,
+        context: &CommandContext,
+    ) -> Vec<EpistemicOverlay> {
         if !self.enabled || command.is_empty() {
             return Vec::new();
         }
@@ -209,7 +213,11 @@ impl EpistemicOverlayEngine {
         overlays
     }
 
-    fn create_knowledge_source_overlay(&self, _command: &str, context: &CommandContext) -> Option<EpistemicOverlay> {
+    fn create_knowledge_source_overlay(
+        &self,
+        _command: &str,
+        context: &CommandContext,
+    ) -> Option<EpistemicOverlay> {
         let style = match context.confidence {
             c if c >= 0.8 => EpistemicStyle::HighConfidence,
             c if c >= 0.5 => EpistemicStyle::MediumConfidence,
@@ -238,7 +246,11 @@ impl EpistemicOverlayEngine {
         })
     }
 
-    fn create_uncertainty_warning(&self, command: &str, context: &CommandContext) -> EpistemicOverlay {
+    fn create_uncertainty_warning(
+        &self,
+        command: &str,
+        context: &CommandContext,
+    ) -> EpistemicOverlay {
         let cmd_short = if command.len() > 20 {
             format!("{}...", &command[..20])
         } else {
@@ -267,7 +279,11 @@ impl EpistemicOverlayEngine {
         }
     }
 
-    fn create_safety_hint(&self, command: &str, context: &CommandContext) -> Option<EpistemicOverlay> {
+    fn create_safety_hint(
+        &self,
+        command: &str,
+        context: &CommandContext,
+    ) -> Option<EpistemicOverlay> {
         // Check for commands that might benefit from safety hints
         let cmd_lower = command.to_lowercase();
 
@@ -422,7 +438,9 @@ mod tests {
         let overlays = engine.generate_for_command("some-unknown-command", &context);
 
         // Should include an uncertainty warning
-        let has_warning = overlays.iter().any(|o| o.overlay_type == OverlayType::UncertaintyWarning);
+        let has_warning = overlays
+            .iter()
+            .any(|o| o.overlay_type == OverlayType::UncertaintyWarning);
         assert!(has_warning);
     }
 
@@ -434,7 +452,9 @@ mod tests {
         let overlays = engine.generate_for_command("rm -rf /some/path", &context);
 
         // Should include a safety hint
-        let has_safety = overlays.iter().any(|o| o.overlay_type == OverlayType::SafetyHint);
+        let has_safety = overlays
+            .iter()
+            .any(|o| o.overlay_type == OverlayType::SafetyHint);
         assert!(has_safety);
     }
 }

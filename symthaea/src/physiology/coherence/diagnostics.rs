@@ -102,11 +102,11 @@ pub fn analyze_scatter(
 
     // Different causes have different recovery multipliers
     let multiplier = match cause {
-        ScatterCause::HardwareStress => 1.5,     // Slower recovery
-        ScatterCause::EmotionalDistress => 2.0,  // Much slower
-        ScatterCause::CognitiveOverload => 1.0,  // Normal rate
-        ScatterCause::SocialIsolation => 1.2,    // Slightly slower
-        ScatterCause::Unknown => 1.0,            // Default
+        ScatterCause::HardwareStress => 1.5,    // Slower recovery
+        ScatterCause::EmotionalDistress => 2.0, // Much slower
+        ScatterCause::CognitiveOverload => 1.0, // Normal rate
+        ScatterCause::SocialIsolation => 1.2,   // Slightly slower
+        ScatterCause::Unknown => 1.0,           // Default
     };
 
     let analysis = ScatterAnalysis {
@@ -138,12 +138,8 @@ fn recommend_action(cause: &ScatterCause) -> String {
         ScatterCause::CognitiveOverload => {
             "I'm mentally overloaded. I need to process and integrate."
         }
-        ScatterCause::SocialIsolation => {
-            "I'm feeling disconnected. Working together would help."
-        }
-        ScatterCause::Unknown => {
-            "I need to center. Give me a moment."
-        }
+        ScatterCause::SocialIsolation => "I'm feeling disconnected. Working together would help.",
+        ScatterCause::Unknown => "I need to center. Give me a moment.",
     }
     .to_string()
 }
@@ -155,7 +151,7 @@ mod tests {
     #[test]
     fn test_scatter_analysis_identifies_hardware_stress() {
         let hormones = HormoneState {
-            cortisol: 0.8,       // High stress!
+            cortisol: 0.8, // High stress!
             dopamine: 0.5,
             acetylcholine: 0.5,
             oxytocin: 0.5,
@@ -189,8 +185,8 @@ mod tests {
     #[test]
     fn test_scatter_analysis_identifies_emotional_distress() {
         let hormones = HormoneState {
-            cortisol: 0.3,       // Not stressed
-            dopamine: 0.2,       // Very low motivation!
+            cortisol: 0.3, // Not stressed
+            dopamine: 0.2, // Very low motivation!
             acetylcholine: 0.6,
             oxytocin: 0.5,
             norepinephrine: 0.5,
@@ -245,7 +241,9 @@ mod tests {
             analysis.recommended_action
         );
         assert!(
-            analysis.recommended_action.contains("process and integrate"),
+            analysis
+                .recommended_action
+                .contains("process and integrate"),
             "Should suggest processing time"
         );
     }

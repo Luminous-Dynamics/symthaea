@@ -40,9 +40,9 @@
 
 use crate::hdc::binary_hv::BinaryHV;
 use crate::hdc::primitive_system::{PrimitiveSystem, PrimitiveTier};
-use std::collections::{HashMap, BinaryHeap};
+use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
-use serde::{Serialize, Deserialize};
+use std::collections::{BinaryHeap, HashMap};
 
 /// Activation threshold for primitive detection
 const ACTIVATION_THRESHOLD: f32 = 0.15;
@@ -106,7 +106,8 @@ impl PartialOrd for ActivatedPrimitive {
 
 impl Ord for ActivatedPrimitive {
     fn cmp(&self, other: &Self) -> Ordering {
-        self.activation.partial_cmp(&other.activation)
+        self.activation
+            .partial_cmp(&other.activation)
             .unwrap_or(Ordering::Equal)
     }
 }
@@ -129,15 +130,16 @@ impl ExpressionNode {
         match self {
             ExpressionNode::Primitive(p) => p.name.clone(),
             ExpressionNode::Composition { op, children } => {
-                let child_strs: Vec<String> = children.iter()
-                    .map(|c| c.to_string_repr())
-                    .collect();
+                let child_strs: Vec<String> = children.iter().map(|c| c.to_string_repr()).collect();
                 match op {
                     CompositionOp::Sequential => child_strs.join(" ∘ "),
                     CompositionOp::Parallel => format!("({})", child_strs.join(" ∥ ")),
                     CompositionOp::Conditional => {
                         if children.len() >= 3 {
-                            format!("({} ? {} : {})", child_strs[0], child_strs[1], child_strs[2])
+                            format!(
+                                "({} ? {} : {})",
+                                child_strs[0], child_strs[1], child_strs[2]
+                            )
                         } else {
                             child_strs.join(" ? ")
                         }
@@ -226,15 +228,16 @@ impl SemanticDecoder {
     /// Initialize composition operator encodings
     fn init_composition_operators(&mut self) {
         let ops = [
-            (CompositionOp::Sequential, 0xC0DE_5E00_u64),    // SEQ(uential)
-            (CompositionOp::Parallel, 0xC0DE_0ABA_u64),      // PAR(allel)
-            (CompositionOp::Conditional, 0xC0DE_C00D_u64),   // COND(itional)
-            (CompositionOp::FixedPoint, 0xC0DE_F100_u64),    // FIX(point)
-            (CompositionOp::HigherOrder, 0xC0DE_1611_u64),   // HIGH(er order)
+            (CompositionOp::Sequential, 0xC0DE_5E00_u64), // SEQ(uential)
+            (CompositionOp::Parallel, 0xC0DE_0ABA_u64),   // PAR(allel)
+            (CompositionOp::Conditional, 0xC0DE_C00D_u64), // COND(itional)
+            (CompositionOp::FixedPoint, 0xC0DE_F100_u64), // FIX(point)
+            (CompositionOp::HigherOrder, 0xC0DE_1611_u64), // HIGH(er order)
         ];
 
         for (op, seed) in ops {
-            self.composition_operators.insert(op, BinaryHV::random(seed));
+            self.composition_operators
+                .insert(op, BinaryHV::random(seed));
         }
     }
 
@@ -242,7 +245,8 @@ impl SemanticDecoder {
     fn cache_primitives(&mut self) {
         let system = PrimitiveSystem::global();
         for primitive in system.all_primitives() {
-            self.primitive_cache.insert(primitive.name.clone(), primitive.encoding);
+            self.primitive_cache
+                .insert(primitive.name.clone(), primitive.encoding);
         }
     }
 
@@ -364,13 +368,14 @@ impl SemanticDecoder {
         }
 
         // Sort by position (unknowns last)
-        ordered.sort_by(|a, b| {
-            match (a.position, b.position) {
-                (Some(pa), Some(pb)) => pa.cmp(&pb),
-                (Some(_), None) => Ordering::Less,
-                (None, Some(_)) => Ordering::Greater,
-                (None, None) => b.activation.partial_cmp(&a.activation).unwrap_or(Ordering::Equal),
-            }
+        ordered.sort_by(|a, b| match (a.position, b.position) {
+            (Some(pa), Some(pb)) => pa.cmp(&pb),
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => b
+                .activation
+                .partial_cmp(&a.activation)
+                .unwrap_or(Ordering::Equal),
         });
 
         ordered
@@ -398,7 +403,8 @@ impl SemanticDecoder {
 
         // If we detected a sequential operator, chain them
         if operators.contains(&CompositionOp::Sequential) {
-            let children: Vec<ExpressionNode> = primitives.iter()
+            let children: Vec<ExpressionNode> = primitives
+                .iter()
                 .map(|p| ExpressionNode::Primitive(p.clone()))
                 .collect();
 
@@ -410,7 +416,8 @@ impl SemanticDecoder {
 
         // If parallel, group them
         if operators.contains(&CompositionOp::Parallel) {
-            let children: Vec<ExpressionNode> = primitives.iter()
+            let children: Vec<ExpressionNode> = primitives
+                .iter()
                 .map(|p| ExpressionNode::Primitive(p.clone()))
                 .collect();
 
@@ -421,7 +428,8 @@ impl SemanticDecoder {
         }
 
         // Default: sequential chain of all primitives
-        let children: Vec<ExpressionNode> = primitives.iter()
+        let children: Vec<ExpressionNode> = primitives
+            .iter()
             .map(|p| ExpressionNode::Primitive(p.clone()))
             .collect();
 
@@ -438,9 +446,7 @@ impl SemanticDecoder {
         let bytes = &vector.0;
         let total_bits = BinaryHV::DIM as f32;
 
-        let ones_count = bytes.iter()
-            .map(|b| b.count_ones())
-            .sum::<u32>() as f32;
+        let ones_count = bytes.iter().map(|b| b.count_ones()).sum::<u32>() as f32;
         let zeros_count = total_bits - ones_count;
 
         // For binary vectors, "norm" is sqrt of dimension (all values are ±1)
@@ -456,10 +462,18 @@ impl SemanticDecoder {
         let p_zero = zeros_count / total_bits;
 
         let mut entropy = 0.0f32;
-        if p_one > 0.0 { entropy -= p_one * p_one.ln(); }
-        if p_zero > 0.0 { entropy -= p_zero * p_zero.ln(); }
+        if p_one > 0.0 {
+            entropy -= p_one * p_one.ln();
+        }
+        if p_zero > 0.0 {
+            entropy -= p_zero * p_zero.ln();
+        }
 
-        VectorStats { norm, sparsity, entropy }
+        VectorStats {
+            norm,
+            sparsity,
+            entropy,
+        }
     }
 
     /// Decode to a flat list of primitive names (simplified interface)
@@ -533,7 +547,11 @@ impl SemanticDecoder {
     }
 
     /// Find activated primitives with harmonic weight modulation
-    fn find_activated_primitives_weighted<F>(&self, vector: &BinaryHV, weight_fn: &F) -> Vec<ActivatedPrimitive>
+    fn find_activated_primitives_weighted<F>(
+        &self,
+        vector: &BinaryHV,
+        weight_fn: &F,
+    ) -> Vec<ActivatedPrimitive>
     where
         F: Fn(&str) -> f32,
     {
@@ -571,7 +589,11 @@ impl SemanticDecoder {
     }
 
     /// Decode to names with harmonic weighting
-    pub fn decode_to_names_with_harmonics<F>(&mut self, vector: &BinaryHV, weight_fn: F) -> Vec<String>
+    pub fn decode_to_names_with_harmonics<F>(
+        &mut self,
+        vector: &BinaryHV,
+        weight_fn: F,
+    ) -> Vec<String>
     where
         F: Fn(&str) -> f32,
     {
@@ -761,8 +783,14 @@ impl PrimitiveToText {
         }
 
         // Fallback: simple concatenation
-        let words: Vec<String> = primitives.iter()
-            .map(|p| self.name_map.get(&p.name).cloned().unwrap_or_else(|| p.name.to_lowercase()))
+        let words: Vec<String> = primitives
+            .iter()
+            .map(|p| {
+                self.name_map
+                    .get(&p.name)
+                    .cloned()
+                    .unwrap_or_else(|| p.name.to_lowercase())
+            })
             .collect();
 
         words.join(" ")
@@ -781,7 +809,11 @@ impl PrimitiveToText {
 
         for (i, name) in names.iter().enumerate() {
             let placeholder = format!("{{{}}}", i);
-            let replacement = self.name_map.get(name).cloned().unwrap_or_else(|| name.to_lowercase());
+            let replacement = self
+                .name_map
+                .get(name)
+                .cloned()
+                .unwrap_or_else(|| name.to_lowercase());
             result = result.replace(&placeholder, &replacement);
         }
 
@@ -816,9 +848,29 @@ mod tests {
 
         // Should find some primitives (random vector has some similarity)
         // Confidence might be low but should work
-        println!("Decoded {} primitives with confidence {:.3}",
-                 decoded.primitives.len(), decoded.confidence);
+        println!(
+            "Decoded {} primitives with confidence {:.3}",
+            decoded.primitives.len(),
+            decoded.confidence
+        );
         println!("Expression: {}", decoded.tree.to_string_repr());
+
+        // Confidence should be finite and in [0, 1]
+        assert!(
+            decoded.confidence.is_finite(),
+            "Decode confidence should be finite"
+        );
+        assert!(
+            decoded.confidence >= 0.0 && decoded.confidence <= 1.0,
+            "Decode confidence should be in [0, 1], got {}",
+            decoded.confidence
+        );
+
+        // Expression string should be non-empty
+        assert!(
+            !decoded.tree.to_string_repr().is_empty(),
+            "Decoded expression should not be empty"
+        );
     }
 
     #[test]
@@ -857,7 +909,11 @@ mod tests {
             ],
             confidence: 0.75,
             operators: vec![],
-            vector_stats: VectorStats { norm: 1.0, sparsity: 0.0, entropy: 1.0 },
+            vector_stats: VectorStats {
+                norm: 1.0,
+                sparsity: 0.0,
+                entropy: 1.0,
+            },
         };
 
         let text = converter.to_text(&expression);
@@ -903,12 +959,21 @@ mod tests {
             assert!(prim.activation > 0.0);
         }
 
-        println!("Neutral decode: {} primitives, confidence {:.3}",
-                 neutral_decoded.primitives.len(), neutral_decoded.confidence);
-        println!("Play-boosted: {} primitives, confidence {:.3}",
-                 play_decoded.primitives.len(), play_decoded.confidence);
-        println!("Coherence-boosted: {} primitives, confidence {:.3}",
-                 coherence_decoded.primitives.len(), coherence_decoded.confidence);
+        println!(
+            "Neutral decode: {} primitives, confidence {:.3}",
+            neutral_decoded.primitives.len(),
+            neutral_decoded.confidence
+        );
+        println!(
+            "Play-boosted: {} primitives, confidence {:.3}",
+            play_decoded.primitives.len(),
+            play_decoded.confidence
+        );
+        println!(
+            "Coherence-boosted: {} primitives, confidence {:.3}",
+            coherence_decoded.primitives.len(),
+            coherence_decoded.confidence
+        );
         println!("Neutral names: {:?}", neutral_names);
     }
 
@@ -920,9 +985,9 @@ mod tests {
         // Strong boost for a specific primitive type
         let extreme_boost = |name: &str| -> f32 {
             if name.contains("KNOW") || name == "KNOWLEDGE" {
-                2.0  // Max boost
+                2.0 // Max boost
             } else {
-                0.5  // Suppress everything else (will be clamped to 0.5)
+                0.5 // Suppress everything else (will be clamped to 0.5)
             }
         };
 

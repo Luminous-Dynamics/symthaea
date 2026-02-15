@@ -206,7 +206,8 @@ mod tests {
         assert!(
             error_novel > error_familiar,
             "Novel observation should increase surprise: familiar={:.3}, novel={:.3}",
-            error_familiar, error_novel,
+            error_familiar,
+            error_novel,
         );
     }
 

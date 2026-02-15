@@ -6,7 +6,7 @@
 //! - Predict side effects of changes
 //! - Recommend fixes based on causal structure
 
-use super::causal_discovery::{CausalDiscoveryEngine, CausalDirection};
+use super::causal_discovery::{CausalDirection, CausalDiscoveryEngine};
 use std::collections::{HashMap, HashSet};
 
 /// A NixOS configuration variable with observed values
@@ -99,10 +99,9 @@ impl NixOSCausalAnalyzer {
                 let var_a = &variables[i];
                 let var_b = &variables[j];
 
-                if let (Some(obs_a), Some(obs_b)) = (
-                    self.observations.get(var_a),
-                    self.observations.get(var_b),
-                ) {
+                if let (Some(obs_a), Some(obs_b)) =
+                    (self.observations.get(var_a), self.observations.get(var_b))
+                {
                     // Need enough observations
                     let min_len = obs_a.len().min(obs_b.len());
                     if min_len < 20 {
@@ -129,7 +128,8 @@ impl NixOSCausalAnalyzer {
                         confidence,
                     };
 
-                    self.causal_graph.insert((edge.from.clone(), edge.to.clone()), edge.clone());
+                    self.causal_graph
+                        .insert((edge.from.clone(), edge.to.clone()), edge.clone());
                     edges.push(edge);
                 }
             }
@@ -172,14 +172,20 @@ impl NixOSCausalAnalyzer {
                     confidence: edge.confidence,
                     explanation: format!(
                         "{} causally influences {} with confidence {:.1}%",
-                        edge.from, symptom, edge.confidence * 100.0
+                        edge.from,
+                        symptom,
+                        edge.confidence * 100.0
                     ),
                 });
             }
         }
 
         // Sort by confidence
-        root_causes.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        root_causes.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         RootCauseAnalysis {
             symptom: symptom.to_string(),
@@ -216,7 +222,11 @@ impl NixOSCausalAnalyzer {
         }
 
         // Sort by confidence
-        effects.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        effects.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         effects
     }
 
@@ -247,8 +257,8 @@ impl NixOSCausalAnalyzer {
     /// Encode a NixOS option path as a numeric value for causal analysis
     pub fn encode_option_value(value: &str) -> f64 {
         // Simple hash-based encoding
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
@@ -260,7 +270,11 @@ impl NixOSCausalAnalyzer {
 
     /// Encode a boolean as numeric
     pub fn encode_bool(value: bool) -> f64 {
-        if value { 1.0 } else { 0.0 }
+        if value {
+            1.0
+        } else {
+            0.0
+        }
     }
 }
 
@@ -272,12 +286,28 @@ impl NixOSCausalPatterns {
     pub fn known_patterns() -> Vec<(&'static str, &'static str, &'static str)> {
         vec![
             // (cause, effect, relationship type)
-            ("hardware.opengl.enable", "services.xserver.enable", "enables"),
-            ("services.xserver.enable", "services.displayManager", "requires"),
+            (
+                "hardware.opengl.enable",
+                "services.xserver.enable",
+                "enables",
+            ),
+            (
+                "services.xserver.enable",
+                "services.displayManager",
+                "requires",
+            ),
             ("networking.firewall.enable", "services.*", "blocks"),
-            ("boot.kernelPackages", "hardware.nvidia.package", "determines"),
+            (
+                "boot.kernelPackages",
+                "hardware.nvidia.package",
+                "determines",
+            ),
             ("nixpkgs.config.allowUnfree", "packages.*", "enables"),
-            ("hardware.nvidia.modesetting.enable", "services.xserver.videoDrivers", "affects"),
+            (
+                "hardware.nvidia.modesetting.enable",
+                "services.xserver.videoDrivers",
+                "affects",
+            ),
         ]
     }
 }

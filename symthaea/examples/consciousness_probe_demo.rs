@@ -123,18 +123,37 @@ fn main() {
     println!("================================================================\n");
 
     println!("Phenomenal Concepts (n={}):", phenomenal_stats.n);
-    println!("  Mean Unity Score: {:.4} (+/- {:.4})", phenomenal_stats.mean_unity, phenomenal_stats.std_unity);
-    println!("  Mean beta_0 (components): {:.2}", phenomenal_stats.mean_beta_0);
-    println!("  Mean beta_1 (cycles): {:.2}\n", phenomenal_stats.mean_beta_1);
+    println!(
+        "  Mean Unity Score: {:.4} (+/- {:.4})",
+        phenomenal_stats.mean_unity, phenomenal_stats.std_unity
+    );
+    println!(
+        "  Mean beta_0 (components): {:.2}",
+        phenomenal_stats.mean_beta_0
+    );
+    println!(
+        "  Mean beta_1 (cycles): {:.2}\n",
+        phenomenal_stats.mean_beta_1
+    );
 
     println!("Functional Concepts (n={}):", functional_stats.n);
-    println!("  Mean Unity Score: {:.4} (+/- {:.4})", functional_stats.mean_unity, functional_stats.std_unity);
-    println!("  Mean beta_0 (components): {:.2}", functional_stats.mean_beta_0);
-    println!("  Mean beta_1 (cycles): {:.2}\n", functional_stats.mean_beta_1);
+    println!(
+        "  Mean Unity Score: {:.4} (+/- {:.4})",
+        functional_stats.mean_unity, functional_stats.std_unity
+    );
+    println!(
+        "  Mean beta_0 (components): {:.2}",
+        functional_stats.mean_beta_0
+    );
+    println!(
+        "  Mean beta_1 (cycles): {:.2}\n",
+        functional_stats.mean_beta_1
+    );
 
     // Statistical comparison
     let observed_diff = phenomenal_stats.mean_unity - functional_stats.mean_unity;
-    let pooled_std = ((phenomenal_stats.std_unity.powi(2) + functional_stats.std_unity.powi(2)) / 2.0).sqrt();
+    let pooled_std =
+        ((phenomenal_stats.std_unity.powi(2) + functional_stats.std_unity.powi(2)) / 2.0).sqrt();
     let cohens_d = if pooled_std > 0.001 {
         observed_diff / pooled_std
     } else {
@@ -148,7 +167,10 @@ fn main() {
     println!("   STATISTICAL ANALYSIS");
     println!("================================================================\n");
 
-    println!("Observed Difference (Phenomenal - Functional): {:.4}", observed_diff);
+    println!(
+        "Observed Difference (Phenomenal - Functional): {:.4}",
+        observed_diff
+    );
     println!("Cohen's d Effect Size: {:.4}", cohens_d);
     println!("Permutation Test p-value: {:.4}\n", p_value);
 
@@ -183,7 +205,11 @@ fn main() {
     } else {
         "large"
     };
-    println!("Effect size is {} (|d| = {:.2})\n", effect_interpretation, cohens_d.abs());
+    println!(
+        "Effect size is {} (|d| = {:.2})\n",
+        effect_interpretation,
+        cohens_d.abs()
+    );
 
     // Sample individual results
     println!("================================================================");
@@ -194,14 +220,20 @@ fn main() {
     let mut sorted_phen = phenomenal_results.clone();
     sorted_phen.sort_by(|a, b| b.unity_score.partial_cmp(&a.unity_score).unwrap());
     for r in sorted_phen.iter().take(5) {
-        println!("  {} - Unity: {:.4}, beta_0: {}", r.concept_id, r.unity_score, r.betti.beta_0);
+        println!(
+            "  {} - Unity: {:.4}, beta_0: {}",
+            r.concept_id, r.unity_score, r.betti.beta_0
+        );
     }
 
     println!("\nTop 5 Functional Concepts by Unity:");
     let mut sorted_func = functional_results.clone();
     sorted_func.sort_by(|a, b| b.unity_score.partial_cmp(&a.unity_score).unwrap());
     for r in sorted_func.iter().take(5) {
-        println!("  {} - Unity: {:.4}, beta_0: {}", r.concept_id, r.unity_score, r.betti.beta_0);
+        println!(
+            "  {} - Unity: {:.4}, beta_0: {}",
+            r.concept_id, r.unity_score, r.betti.beta_0
+        );
     }
 
     println!("\n================================================================");
@@ -215,38 +247,119 @@ fn main() {
 /// Create simulated phenomenal concepts
 fn create_phenomenal_concepts() -> Vec<Concept> {
     vec![
-        Concept { id: "phen_001".into(), text: "The subjective experience of seeing red".into(), category: "qualia".into() },
-        Concept { id: "phen_002".into(), text: "What it is like to feel pain".into(), category: "qualia".into() },
-        Concept { id: "phen_003".into(), text: "The taste of sweetness on my tongue".into(), category: "qualia".into() },
-        Concept { id: "phen_004".into(), text: "Self-awareness that I am thinking".into(), category: "self_awareness".into() },
-        Concept { id: "phen_005".into(), text: "The unified field of conscious awareness".into(), category: "unity".into() },
-        Concept { id: "phen_006".into(), text: "The felt quality of intense joy".into(), category: "emotion".into() },
-        Concept { id: "phen_007".into(), text: "The mysterious gap between brain and mind".into(), category: "philosophical".into() },
-        Concept { id: "phen_008".into(), text: "The experience of deep blue in the sky".into(), category: "qualia".into() },
-        Concept { id: "phen_009".into(), text: "Awareness of my own awareness".into(), category: "self_awareness".into() },
-        Concept { id: "phen_010".into(), text: "The phenomenal present moment".into(), category: "unity".into() },
+        Concept {
+            id: "phen_001".into(),
+            text: "The subjective experience of seeing red".into(),
+            category: "qualia".into(),
+        },
+        Concept {
+            id: "phen_002".into(),
+            text: "What it is like to feel pain".into(),
+            category: "qualia".into(),
+        },
+        Concept {
+            id: "phen_003".into(),
+            text: "The taste of sweetness on my tongue".into(),
+            category: "qualia".into(),
+        },
+        Concept {
+            id: "phen_004".into(),
+            text: "Self-awareness that I am thinking".into(),
+            category: "self_awareness".into(),
+        },
+        Concept {
+            id: "phen_005".into(),
+            text: "The unified field of conscious awareness".into(),
+            category: "unity".into(),
+        },
+        Concept {
+            id: "phen_006".into(),
+            text: "The felt quality of intense joy".into(),
+            category: "emotion".into(),
+        },
+        Concept {
+            id: "phen_007".into(),
+            text: "The mysterious gap between brain and mind".into(),
+            category: "philosophical".into(),
+        },
+        Concept {
+            id: "phen_008".into(),
+            text: "The experience of deep blue in the sky".into(),
+            category: "qualia".into(),
+        },
+        Concept {
+            id: "phen_009".into(),
+            text: "Awareness of my own awareness".into(),
+            category: "self_awareness".into(),
+        },
+        Concept {
+            id: "phen_010".into(),
+            text: "The phenomenal present moment".into(),
+            category: "unity".into(),
+        },
     ]
 }
 
 /// Create simulated functional concepts
 fn create_functional_concepts() -> Vec<Concept> {
     vec![
-        Concept { id: "func_001".into(), text: "Recursive function evaluation".into(), category: "computation".into() },
-        Concept { id: "func_002".into(), text: "Memory allocation and deallocation".into(), category: "computation".into() },
-        Concept { id: "func_003".into(), text: "Binary search tree traversal".into(), category: "algorithms".into() },
-        Concept { id: "func_004".into(), text: "Matrix multiplication operations".into(), category: "mathematics".into() },
-        Concept { id: "func_005".into(), text: "Database query optimization".into(), category: "systems".into() },
-        Concept { id: "func_006".into(), text: "Graph traversal using DFS".into(), category: "algorithms".into() },
-        Concept { id: "func_007".into(), text: "Statistical hypothesis testing".into(), category: "mathematics".into() },
-        Concept { id: "func_008".into(), text: "Network packet routing".into(), category: "systems".into() },
-        Concept { id: "func_009".into(), text: "Compiler lexical analysis".into(), category: "computation".into() },
-        Concept { id: "func_010".into(), text: "Eigenvalue decomposition".into(), category: "mathematics".into() },
+        Concept {
+            id: "func_001".into(),
+            text: "Recursive function evaluation".into(),
+            category: "computation".into(),
+        },
+        Concept {
+            id: "func_002".into(),
+            text: "Memory allocation and deallocation".into(),
+            category: "computation".into(),
+        },
+        Concept {
+            id: "func_003".into(),
+            text: "Binary search tree traversal".into(),
+            category: "algorithms".into(),
+        },
+        Concept {
+            id: "func_004".into(),
+            text: "Matrix multiplication operations".into(),
+            category: "mathematics".into(),
+        },
+        Concept {
+            id: "func_005".into(),
+            text: "Database query optimization".into(),
+            category: "systems".into(),
+        },
+        Concept {
+            id: "func_006".into(),
+            text: "Graph traversal using DFS".into(),
+            category: "algorithms".into(),
+        },
+        Concept {
+            id: "func_007".into(),
+            text: "Statistical hypothesis testing".into(),
+            category: "mathematics".into(),
+        },
+        Concept {
+            id: "func_008".into(),
+            text: "Network packet routing".into(),
+            category: "systems".into(),
+        },
+        Concept {
+            id: "func_009".into(),
+            text: "Compiler lexical analysis".into(),
+            category: "computation".into(),
+        },
+        Concept {
+            id: "func_010".into(),
+            text: "Eigenvalue decomposition".into(),
+            category: "mathematics".into(),
+        },
     ]
 }
 
 /// Hash concept text to u64 for deterministic seeding
 fn hash_concept(text: &str) -> u64 {
-    text.bytes().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
+    text.bytes()
+        .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(b as u64))
 }
 
 /// Probe a set of concepts
@@ -334,7 +447,8 @@ fn permutation_test(
     let n_phen = phenomenal.len();
     let observed_diff: f64 = {
         let phen_mean: f64 = phenomenal.iter().map(|r| r.unity_score).sum::<f64>() / n_phen as f64;
-        let func_mean: f64 = functional.iter().map(|r| r.unity_score).sum::<f64>() / functional.len() as f64;
+        let func_mean: f64 =
+            functional.iter().map(|r| r.unity_score).sum::<f64>() / functional.len() as f64;
         phen_mean - func_mean
     };
 
@@ -351,7 +465,8 @@ fn permutation_test(
         }
 
         let perm_phen_mean: f64 = permuted[..n_phen].iter().sum::<f64>() / n_phen as f64;
-        let perm_func_mean: f64 = permuted[n_phen..].iter().sum::<f64>() / (all_unity.len() - n_phen) as f64;
+        let perm_func_mean: f64 =
+            permuted[n_phen..].iter().sum::<f64>() / (all_unity.len() - n_phen) as f64;
         let perm_diff = perm_phen_mean - perm_func_mean;
 
         if perm_diff.abs() >= observed_diff.abs() {

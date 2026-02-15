@@ -48,10 +48,7 @@ impl WaveletFamily {
     /// Low-pass decomposition filter coefficients (scaling function).
     pub fn lo_d(&self) -> Vec<f64> {
         match self {
-            WaveletFamily::Haar => vec![
-                1.0 / 2.0_f64.sqrt(),
-                1.0 / 2.0_f64.sqrt(),
-            ],
+            WaveletFamily::Haar => vec![1.0 / 2.0_f64.sqrt(), 1.0 / 2.0_f64.sqrt()],
             WaveletFamily::Db4 => vec![
                 0.4829629131445341,
                 0.8365163037378079,
@@ -340,7 +337,12 @@ impl WaveletAnalyzer {
             1
         };
 
-        let levels = self.config.max_level.unwrap_or(max_possible).min(max_possible).max(1);
+        let levels = self
+            .config
+            .max_level
+            .unwrap_or(max_possible)
+            .min(max_possible)
+            .max(1);
 
         let lo_d = self.config.wavelet.lo_d();
         let hi_d = self.config.wavelet.hi_d();
@@ -451,12 +453,7 @@ impl WaveletAnalyzer {
     /// Generate logarithmically spaced scales for CWT.
     ///
     /// Covers frequencies from `f_low` to `f_high` Hz with `n_scales` points.
-    pub fn log_scales(
-        &self,
-        f_low: f64,
-        f_high: f64,
-        n_scales: usize,
-    ) -> Vec<f64> {
+    pub fn log_scales(&self, f_low: f64, f_high: f64, n_scales: usize) -> Vec<f64> {
         let omega0 = 6.0;
         let dt = 1.0 / self.sample_rate;
 
@@ -579,7 +576,11 @@ impl WaveletAnalyzer {
         }
 
         if in_burst {
-            bursts.push((burst_start, energies.len() + window_samples - 2, peak_energy));
+            bursts.push((
+                burst_start,
+                energies.len() + window_samples - 2,
+                peak_energy,
+            ));
         }
 
         bursts
@@ -655,7 +656,9 @@ mod tests {
     use std::f64::consts::PI;
 
     fn sine_wave(freq: f64, sr: f64, n: usize) -> Vec<f64> {
-        (0..n).map(|i| (2.0 * PI * freq * i as f64 / sr).sin()).collect()
+        (0..n)
+            .map(|i| (2.0 * PI * freq * i as f64 / sr).sin())
+            .collect()
     }
 
     #[test]
@@ -691,7 +694,11 @@ mod tests {
         );
 
         let dot: f64 = lo.iter().zip(hi.iter()).map(|(a, b)| a * b).sum();
-        assert!(dot.abs() < 1e-6, "Db4 filters not orthogonal: dot = {}", dot);
+        assert!(
+            dot.abs() < 1e-6,
+            "Db4 filters not orthogonal: dot = {}",
+            dot
+        );
     }
 
     #[test]
@@ -791,18 +798,39 @@ mod tests {
 
         // Verify CWT structure
         assert_eq!(cwt.scalogram.len(), 20, "Should have 20 scale rows");
-        assert_eq!(cwt.scalogram[0].len(), n, "Each row should have n time samples");
+        assert_eq!(
+            cwt.scalogram[0].len(),
+            n,
+            "Each row should have n time samples"
+        );
         assert_eq!(cwt.frequencies.len(), 20, "Should have 20 frequency values");
         assert_eq!(cwt.times.len(), n, "Should have n time values");
 
         // Frequencies should be in the requested range
-        let f_min = cwt.frequencies.iter().cloned().fold(f64::INFINITY, f64::min);
-        let f_max = cwt.frequencies.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        assert!(f_min >= 4.0 && f_min <= 6.0, "Min freq should be ~5 Hz, got {}", f_min);
-        assert!(f_max >= 45.0 && f_max <= 55.0, "Max freq should be ~50 Hz, got {}", f_max);
+        let f_min = cwt
+            .frequencies
+            .iter()
+            .cloned()
+            .fold(f64::INFINITY, f64::min);
+        let f_max = cwt
+            .frequencies
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
+        assert!(
+            (4.0..=6.0).contains(&f_min),
+            "Min freq should be ~5 Hz, got {}",
+            f_min
+        );
+        assert!(
+            (45.0..=55.0).contains(&f_max),
+            "Max freq should be ~50 Hz, got {}",
+            f_max
+        );
 
         // The scale at 10 Hz should have non-zero power (signal is 10 Hz sine)
-        let closest_10hz = cwt.frequencies
+        let closest_10hz = cwt
+            .frequencies
             .iter()
             .enumerate()
             .min_by(|a, b| (a.1 - 10.0).abs().partial_cmp(&(b.1 - 10.0).abs()).unwrap())
@@ -849,10 +877,7 @@ mod tests {
         }
 
         let bursts = WaveletAnalyzer::detect_bursts(&detail, 5, 3.0);
-        assert!(
-            !bursts.is_empty(),
-            "Should detect at least one burst"
-        );
+        assert!(!bursts.is_empty(), "Should detect at least one burst");
 
         // The burst should be somewhere in the 30-50 region
         let (start, end, _) = bursts[0];

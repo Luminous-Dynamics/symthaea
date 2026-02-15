@@ -108,12 +108,11 @@ impl HardwareObserver {
         let mut core_count: usize = 0;
 
         for line in content.lines() {
-            if line.starts_with("model name")
-                && model.is_empty() {
-                    if let Some((_, value)) = line.split_once(':') {
-                        model = value.trim().to_string();
-                    }
+            if line.starts_with("model name") && model.is_empty() {
+                if let Some((_, value)) = line.split_once(':') {
+                    model = value.trim().to_string();
                 }
+            }
             if line.starts_with("processor") {
                 core_count += 1;
             }
@@ -318,7 +317,7 @@ SwapFree:        8388608 kB
     #[test]
     fn test_parse_meminfo() {
         let (total_mb, available_mb) = HardwareObserver::parse_meminfo(MOCK_MEMINFO).unwrap();
-        assert_eq!(total_mb, 32768000 / 1024);   // 32000 MiB
+        assert_eq!(total_mb, 32768000 / 1024); // 32000 MiB
         assert_eq!(available_mb, 24576000 / 1024); // 24000 MiB
     }
 

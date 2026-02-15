@@ -176,7 +176,10 @@ mod tests {
         }
     }
 
-    const DOMAINS: &[&str] = &["property", "housing", "care", "justice"];
+    const DOMAINS: &[&str] = &[
+        "property", "housing", "care", "justice",
+        "mutualaid", "water", "food", "transport",
+    ];
 
     // ---- validate_query_fields ----
 
@@ -327,6 +330,49 @@ mod tests {
         assert_eq!(e, e2);
     }
 
+    // ---- Food & transport domain validation ----
+
+    #[test]
+    fn query_food_domain_accepted() {
+        let q = make_query("food", r#"{"product":"tomatoes"}"#);
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_transport_domain_accepted() {
+        let q = make_query("transport", r#"{"route_id":"r1"}"#);
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_food_domain_accepted() {
+        let e = make_event("food", r#"{"event":"harvest_recorded"}"#);
+        assert!(validate_event_fields(&e, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn event_transport_domain_accepted() {
+        let mut e = make_event("transport", r#"{"event":"trip_logged"}"#);
+        e.related_hashes = vec!["vehicle_hash_1".into()];
+        assert!(validate_event_fields(&e, DOMAINS).is_ok());
+    }
+
+    #[test]
+    fn query_all_domains_accepted() {
+        for domain in DOMAINS {
+            let q = make_query(domain, "{}");
+            assert!(validate_query_fields(&q, DOMAINS).is_ok(), "domain '{}' should be valid", domain);
+        }
+    }
+
+    #[test]
+    fn event_all_domains_accepted() {
+        for domain in DOMAINS {
+            let e = make_event(domain, "{}");
+            assert!(validate_event_fields(&e, DOMAINS).is_ok(), "domain '{}' should be valid", domain);
+        }
+    }
+
     // ---- Empty domain list ----
 
     #[test]
@@ -336,5 +382,158 @@ mod tests {
 
         let e = make_event("property", "{}");
         assert!(validate_event_fields(&e, &[]).is_err());
+    }
+
+    // ---- Edge cases ----
+
+    #[test]
+    fn query_null_bytes_in_domain_serde_roundtrip() {
+        let q = BridgeQueryEntry {
+            domain: "prop\0erty".into(),
+            query_type: "test\0query".into(),
+            requester: fake_agent(),
+            params: r#"{"key":"val\u0000ue"}"#.into(),
+            result: None,
+            created_at: Timestamp::from_micros(0),
+            resolved_at: None,
+            success: None,
+        };
+        let bytes = serde_json::to_vec(&q).unwrap();
+        let q2: BridgeQueryEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(q, q2);
+        assert!(q2.domain.contains('\0'));
+        assert!(q2.query_type.contains('\0'));
+    }
+
+    #[test]
+    fn query_deeply_nested_json_params_roundtrip() {
+        // Build 15 levels of nesting: {"a":{"a":{"a":...true...}}}
+        let depth = 15;
+        let mut json = String::new();
+        for _ in 0..depth {
+            json.push_str(r#"{"a":"#);
+        }
+        json.push_str("true");
+        for _ in 0..depth {
+            json.push('}');
+        }
+        // Confirm the string is valid JSON
+        assert!(serde_json::from_str::<serde_json::Value>(&json).is_ok());
+
+        let q = make_query("property", &json);
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+
+        let bytes = serde_json::to_vec(&q).unwrap();
+        let q2: BridgeQueryEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(q, q2);
+        assert_eq!(q2.params, json);
+    }
+
+    #[test]
+    fn event_unicode_edge_cases_serde_roundtrip() {
+        let unicode_payload = concat!(
+            r#"{"emoji":"#, r#""🌟🔮🧘🕸️","#,           // emoji
+            r#""cjk":"你好世界","#,                        // CJK characters
+            r#""rtl":"مرحبا","#,                           // RTL Arabic text
+            r#""zwj":"a\u200Bb\u200Cc\uFEFFd","#,         // zero-width chars (ZWSP, ZWNJ, BOM)
+            r#""combining":"e\u0301""#,                    // combining accent (é as e + ◌́)
+            r#"}"#
+        );
+        // Verify the string is valid JSON before constructing the entry
+        assert!(serde_json::from_str::<serde_json::Value>(unicode_payload).is_ok());
+
+        let mut e = make_event("care", unicode_payload);
+        e.related_hashes = vec!["hash_🌟".into(), "哈希".into()];
+
+        let bytes = serde_json::to_vec(&e).unwrap();
+        let e2: BridgeEventEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(e, e2);
+        assert!(e2.payload.contains("🌟"));
+        assert!(e2.payload.contains("你好"));
+        assert!(e2.payload.contains("مرحبا"));
+    }
+
+    #[test]
+    fn query_params_exactly_at_8192_boundary() {
+        // Build valid JSON that is exactly 8192 bytes
+        // {"d":"xxx..."} = 7 wrapper chars + padding
+        let wrapper = r#"{"d":""}"#;
+        let padding_len = 8192 - wrapper.len();
+        let padding = "a".repeat(padding_len);
+        let json = format!(r#"{{"d":"{}"}}"#, padding);
+        assert_eq!(json.len(), 8192, "params must be exactly 8192 bytes");
+        assert!(serde_json::from_str::<serde_json::Value>(&json).is_ok());
+
+        let q = make_query("property", &json);
+        assert!(validate_query_fields(&q, DOMAINS).is_ok(), "exactly 8192 bytes should pass");
+
+        // One byte over the limit must fail
+        let one_over = format!(r#"{{"d":"{}"}}"#, "a".repeat(padding_len + 1));
+        assert_eq!(one_over.len(), 8193);
+        let q_over = make_query("property", &one_over);
+        assert!(validate_query_fields(&q_over, DOMAINS).is_err(), "8193 bytes should be rejected");
+    }
+
+    #[test]
+    fn event_exactly_20_related_hashes_boundary() {
+        let mut e = make_event("justice", r#"{"case":"boundary"}"#);
+        e.related_hashes = (0..20).map(|i| format!("hash_{:04}", i)).collect();
+        assert_eq!(e.related_hashes.len(), 20);
+        assert!(validate_event_fields(&e, DOMAINS).is_ok(), "exactly 20 hashes should pass");
+
+        // Serde roundtrip preserves all 20 hashes
+        let bytes = serde_json::to_vec(&e).unwrap();
+        let e2: BridgeEventEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(e2.related_hashes.len(), 20);
+        assert_eq!(e, e2);
+
+        // 21 must fail
+        let mut e_over = e.clone();
+        e_over.related_hashes.push("hash_overflow".into());
+        assert_eq!(e_over.related_hashes.len(), 21);
+        assert!(validate_event_fields(&e_over, DOMAINS).is_err(), "21 hashes should be rejected");
+    }
+
+    #[test]
+    fn query_empty_string_fields() {
+        let q = BridgeQueryEntry {
+            domain: "property".into(),
+            query_type: "".into(),
+            requester: fake_agent(),
+            params: "".into(),
+            result: None,
+            created_at: Timestamp::from_micros(0),
+            resolved_at: None,
+            success: None,
+        };
+        // Empty query_type is not checked by validate_query_fields,
+        // and empty params is explicitly allowed (skips JSON check)
+        assert!(validate_query_fields(&q, DOMAINS).is_ok());
+
+        // Serde roundtrip preserves empty strings
+        let bytes = serde_json::to_vec(&q).unwrap();
+        let q2: BridgeQueryEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(q2.query_type, "");
+        assert_eq!(q2.params, "");
+        assert_eq!(q, q2);
+    }
+
+    #[test]
+    fn query_very_long_domain_string() {
+        let long_domain = "x".repeat(1024);
+        let q = make_query(&long_domain, "{}");
+        // A 1024-char domain is not in the allowlist, so validation must reject it
+        let err = validate_query_fields(&q, DOMAINS).unwrap_err();
+        assert!(err.contains("Invalid domain"));
+
+        // But if we add it to the allowlist, it passes
+        let custom_domains: Vec<&str> = vec![&long_domain];
+        assert!(validate_query_fields(&q, &custom_domains).is_ok());
+
+        // And serde roundtrip preserves the long domain
+        let bytes = serde_json::to_vec(&q).unwrap();
+        let q2: BridgeQueryEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(q2.domain.len(), 1024);
+        assert_eq!(q, q2);
     }
 }

@@ -1,3 +1,9 @@
+#![allow(clippy::needless_range_loop)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::derivable_impls)]
+#![allow(clippy::manual_is_multiple_of)]
+#![allow(clippy::unwrap_or_default)]
+
 //! Week 12: Perception & Tool Creation - Giving Sophia Senses
 //!
 //! This module provides sensory capabilities for Sophia:
@@ -55,57 +61,58 @@
 /// Standard HDC dimension for holographic representations
 pub const HDC_DIMENSION: usize = 16_384;
 
-pub mod visual;
 pub mod code;
-pub mod semantic_vision;
-pub mod ocr;
-pub mod multi_modal;
-pub mod semantic_encoder;
 pub mod model_hub;
-// NOTE: conscious_perception requires CausalMind from main crate - disabled until architecture fixed
-// pub mod conscious_perception;
-pub mod resilience;  // NEW: Graceful degradation layer
-pub mod model_loader_actor;  // NEW: Async model loading via actor pattern
+pub mod multi_modal;
+pub mod ocr;
+pub mod semantic_encoder;
+pub mod semantic_vision;
+pub mod visual;
+// conscious_perception was removed — requires CausalMind from main crate.
 #[cfg(feature = "embeddings")]
 pub mod consciousness_bridge;
+pub mod model_loader_actor; // NEW: Async model loading via actor pattern
+pub mod resilience; // NEW: Graceful degradation layer
 
-pub use visual::{VisualCortex, VisualFeatures};
-pub use code::{CodePerceptionCortex, ProjectStructure, RustCodeSemantics, CodeQualityAnalysis};
-pub use semantic_vision::{
-    SemanticVision, ImageEmbedding, ImageCaption, VqaResponse,
-    SigLipModel, MoondreamModel, EmbeddingCache, CacheStats,
-    SIGLIP_EMBEDDING_DIM, SIGLIP_INPUT_SIZE,
+pub use code::{CodePerceptionCortex, CodeQualityAnalysis, ProjectStructure, RustCodeSemantics};
+pub use model_hub::{ModelHub, ModelSpec};
+pub use multi_modal::{
+    ModalityContribution, ModalityType, ModalityWeights, MultiModalIntegrator,
+    MultiModalPerception, QWEN3_DIM, SIGLIP_DIM,
 };
 pub use ocr::{
-    OcrSystem, OcrResult, OcrWord, OcrMethod, ImageQuality,
-    RustOcrEngine, TesseractEngine,
-};
-pub use multi_modal::{
-    MultiModalIntegrator, MultiModalPerception, ModalityContribution,
-    ModalityType, ModalityWeights, QWEN3_DIM, SIGLIP_DIM,
+    ImageQuality, OcrMethod, OcrResult, OcrSystem, OcrWord, RustOcrEngine, TesseractEngine,
 };
 pub use semantic_encoder::SemanticEncoder;
-pub use model_hub::{ModelHub, ModelSpec};
+pub use semantic_vision::{
+    CacheStats, EmbeddingCache, ImageCaption, ImageEmbedding, MoondreamModel, SemanticVision,
+    SigLipModel, VqaResponse, SIGLIP_EMBEDDING_DIM, SIGLIP_INPUT_SIZE,
+};
+pub use visual::{VisualCortex, VisualFeatures};
 // pub use conscious_perception::{
 //     ConsciousPerception, ConsciousPerceptionConfig, PerceptionResult, PerceptionStats,
 // };
+#[cfg(feature = "embeddings")]
+pub use consciousness_bridge::{BridgeConfig, BridgeStats, PerceptionBridge};
+pub use model_loader_actor::{
+    LoadingStatusSnapshot, ModelLoadResult, ModelLoaderActor, ModelLoaderConfig, ModelLoaderHandle,
+    ModelLoaderMessage,
+};
 pub use resilience::{
     // Availability tracking
-    Availability, PerceptionCapabilities,
-    // Configuration and results
-    ResilienceConfig, ResilientResult, ResilienceStats,
-    // Coherence gating
-    CoherenceGate,
+    Availability,
+    BackgroundLoader,
     // Caption fallback
     CaptionFallback,
+    // Coherence gating
+    CoherenceGate,
     // Background loading
-    LoadingStatus, BackgroundLoader,
+    LoadingStatus,
+    PerceptionCapabilities,
+    // Configuration and results
+    ResilienceConfig,
     // Unified manager
     ResilienceManager,
+    ResilienceStats,
+    ResilientResult,
 };
-pub use model_loader_actor::{
-    ModelLoaderActor, ModelLoaderConfig, ModelLoaderMessage,
-    ModelLoaderHandle, ModelLoadResult, LoadingStatusSnapshot,
-};
-#[cfg(feature = "embeddings")]
-pub use consciousness_bridge::{PerceptionBridge, BridgeConfig, BridgeStats};

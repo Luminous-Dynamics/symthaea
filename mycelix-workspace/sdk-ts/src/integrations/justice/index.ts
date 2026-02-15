@@ -132,17 +132,41 @@ export interface DisputeHistoryQuery {
 // Justice-Specific Types
 // ============================================================================
 
-/** Case phase in justice process */
-export type CasePhase = 'filing' | 'mediation' | 'arbitration' | 'appeal' | 'enforcement' | 'closed';
+/** Case phase in justice process (matches Rust CasePhase in justice-cases integrity) */
+export type CasePhase =
+  | 'Filed'
+  | 'Negotiation'
+  | 'Mediation'
+  | 'Arbitration'
+  | 'Appeal'
+  | 'Enforcement'
+  | 'Closed';
 
-/** Case status */
-export type CaseStatus = 'open' | 'in_progress' | 'resolved' | 'dismissed' | 'withdrawn';
+/** Case status (matches Rust CaseStatus in justice-cases integrity) */
+export type CaseStatus =
+  | 'Active'
+  | 'OnHold'
+  | 'AwaitingResponse'
+  | 'InDeliberation'
+  | 'DecisionRendered'
+  | 'Enforcing'
+  | 'Resolved'
+  | 'Dismissed'
+  | 'Withdrawn';
 
-/** Case category */
-export type CaseCategory = 'contract' | 'reputation' | 'property' | 'governance' | 'interpersonal' | 'other';
+/** Case category (matches Rust CaseType in justice-cases integrity) */
+export type CaseCategory =
+  | 'ContractDispute'
+  | 'ConductViolation'
+  | 'PropertyDispute'
+  | 'FinancialDispute'
+  | 'GovernanceDispute'
+  | 'IdentityDispute'
+  | 'IPDispute'
+  | 'Other';
 
-/** Decision outcome */
-export type DecisionOutcome = 'complainant_favor' | 'respondent_favor' | 'split' | 'dismissed' | 'settled';
+/** Decision outcome (matches Rust DecisionOutcome in justice-cases integrity) */
+export type DecisionOutcome = 'ForComplainant' | 'ForRespondent' | 'SplitDecision' | 'Dismissed' | 'Settled';
 
 /** Dispute case */
 export interface Case {
@@ -301,8 +325,8 @@ export class JusticeService {
       category,
       complainantId,
       respondentId,
-      phase: 'filing',
-      status: 'open',
+      phase: 'Filed',
+      status: 'Active',
       evidence: [],
       timeline: [
         {
@@ -378,8 +402,8 @@ export class JusticeService {
       throw new Error('Mediator not available');
     }
 
-    caseRecord.phase = 'mediation';
-    caseRecord.status = 'in_progress';
+    caseRecord.phase = 'Mediation';
+    caseRecord.status = 'Active';
     caseRecord.timeline.push({
       timestamp: Date.now(),
       action: 'Mediation initiated',
@@ -405,7 +429,7 @@ export class JusticeService {
       }
     }
 
-    caseRecord.phase = 'arbitration';
+    caseRecord.phase = 'Arbitration';
     caseRecord.timeline.push({
       timestamp: Date.now(),
       action: 'Escalated to arbitration',
@@ -445,7 +469,7 @@ export class JusticeService {
 
     this.decisions.set(decision.id, decision);
 
-    caseRecord.phase = 'enforcement';
+    caseRecord.phase = 'Enforcement';
     caseRecord.timeline.push({
       timestamp: Date.now(),
       action: 'Decision rendered',
@@ -738,7 +762,7 @@ export function resetJusticeBridgeClient(): void {
  * const caseRecord = await justice.cases.fileCase({
  *   title: 'Contract Breach',
  *   description: 'Vendor failed to deliver...',
- *   category: 'ContractBreach',
+ *   category: 'ContractDispute',
  *   respondent: 'did:mycelix:vendor123',
  * });
  * ```

@@ -3,9 +3,9 @@
 //! Bridge between Symthaea cognitive loop and the Multi-Factor Delegated Identity system.
 //! Provides signature verification, output signing, and assurance level gating.
 
-use ed25519_dalek::{Signature, SigningKey, VerifyingKey, Signer, Verifier};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
@@ -140,7 +140,8 @@ impl MfdiIdentity {
 
     /// Check if identity can perform a capability
     pub fn can_perform(&self, capability: CognitiveCapability) -> bool {
-        self.assurance_level.meets_requirement(capability.required_level())
+        self.assurance_level
+            .meets_requirement(capability.required_level())
     }
 
     /// Verify a signature from this identity
@@ -413,7 +414,8 @@ impl MfdiBridge {
         let window = Duration::from_secs(self.config.nonce_window_secs);
 
         // Clean old nonces
-        self.seen_nonces.retain(|_, t| t.elapsed().unwrap_or(window) < window);
+        self.seen_nonces
+            .retain(|_, t| t.elapsed().unwrap_or(window) < window);
 
         // Check if nonce was seen
         if self.seen_nonces.contains_key(&request.nonce) {
@@ -439,7 +441,12 @@ impl MfdiBridge {
         let agent_id = self.agent_id().ok_or(MfdiError::NoIdentity)?.to_string();
 
         self.cycle_counter += 1;
-        Ok(SignedOutput::new(output, signing_key, agent_id, self.cycle_counter))
+        Ok(SignedOutput::new(
+            output,
+            signing_key,
+            agent_id,
+            self.cycle_counter,
+        ))
     }
 
     /// Create a signed request
@@ -464,7 +471,11 @@ impl MfdiBridge {
             content: input.to_string(),
             agent_id: self.agent_id().map(String::from),
             assurance_level: level,
-            reputation: self.current_identity.as_ref().map(|i| i.reputation).unwrap_or(0.0),
+            reputation: self
+                .current_identity
+                .as_ref()
+                .map(|i| i.reputation)
+                .unwrap_or(0.0),
         })
     }
 
@@ -538,9 +549,16 @@ impl std::fmt::Display for MfdiError {
             MfdiError::RequestExpired => write!(f, "Request expired"),
             MfdiError::NoSigningKey => write!(f, "No signing key available"),
             MfdiError::NoIdentity => write!(f, "No identity set"),
-            MfdiError::InsufficientAssurance { required, actual, capability } => {
-                write!(f, "Insufficient assurance for {:?}: required {:?}, got {:?}",
-                    capability, required, actual)
+            MfdiError::InsufficientAssurance {
+                required,
+                actual,
+                capability,
+            } => {
+                write!(
+                    f,
+                    "Insufficient assurance for {:?}: required {:?}, got {:?}",
+                    capability, required, actual
+                )
             }
             MfdiError::IdentityExpired => write!(f, "Identity verification expired"),
         }
@@ -556,12 +574,24 @@ mod tests {
     #[test]
     fn test_assurance_level_from_score() {
         assert_eq!(AssuranceLevel::from_score(0.0), AssuranceLevel::E0Anonymous);
-        assert_eq!(AssuranceLevel::from_score(0.29), AssuranceLevel::E0Anonymous);
+        assert_eq!(
+            AssuranceLevel::from_score(0.29),
+            AssuranceLevel::E0Anonymous
+        );
         assert_eq!(AssuranceLevel::from_score(0.3), AssuranceLevel::E1Basic);
         assert_eq!(AssuranceLevel::from_score(0.5), AssuranceLevel::E2Verified);
-        assert_eq!(AssuranceLevel::from_score(0.7), AssuranceLevel::E3HighlyAssured);
-        assert_eq!(AssuranceLevel::from_score(0.9), AssuranceLevel::E4Constitutional);
-        assert_eq!(AssuranceLevel::from_score(1.0), AssuranceLevel::E4Constitutional);
+        assert_eq!(
+            AssuranceLevel::from_score(0.7),
+            AssuranceLevel::E3HighlyAssured
+        );
+        assert_eq!(
+            AssuranceLevel::from_score(0.9),
+            AssuranceLevel::E4Constitutional
+        );
+        assert_eq!(
+            AssuranceLevel::from_score(1.0),
+            AssuranceLevel::E4Constitutional
+        );
     }
 
     #[test]
@@ -632,15 +662,22 @@ mod tests {
         let bridge = MfdiBridge::with_signing_key(config, signing_key);
 
         // Default identity has score 0.5 (E2)
-        assert!(bridge.check_capability(CognitiveCapability::FullCycle).is_ok());
-        assert!(bridge.check_capability(CognitiveCapability::FederatedLearning).is_ok());
-        assert!(bridge.check_capability(CognitiveCapability::WeightUpdate).is_err());
+        assert!(bridge
+            .check_capability(CognitiveCapability::FullCycle)
+            .is_ok());
+        assert!(bridge
+            .check_capability(CognitiveCapability::FederatedLearning)
+            .is_ok());
+        assert!(bridge
+            .check_capability(CognitiveCapability::WeightUpdate)
+            .is_err());
     }
 
     #[test]
     fn test_bridge_sign_output() {
         let signing_key = MfdiBridge::generate_key();
-        let mut bridge = MfdiBridge::with_signing_key(MfdiBridgeConfig::default(), signing_key.clone());
+        let mut bridge =
+            MfdiBridge::with_signing_key(MfdiBridgeConfig::default(), signing_key.clone());
 
         let output = vec![1.0, 2.0, 3.0];
         let signed = bridge.sign_output(output.clone()).unwrap();
@@ -652,7 +689,8 @@ mod tests {
     #[test]
     fn test_replay_protection() {
         let signing_key = MfdiBridge::generate_key();
-        let mut bridge = MfdiBridge::with_signing_key(MfdiBridgeConfig::default(), signing_key.clone());
+        let mut bridge =
+            MfdiBridge::with_signing_key(MfdiBridgeConfig::default(), signing_key.clone());
 
         let request = SignedRequest::new("test", &signing_key);
 

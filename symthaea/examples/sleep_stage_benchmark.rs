@@ -27,8 +27,8 @@
 //! cargo run --example sleep_stage_benchmark --release
 //! ```
 
-use std::path::Path;
 use std::f64::consts::PI;
+use std::path::Path;
 
 // Note: These would come from the library, but we'll define inline for the example
 // In production, use: use symthaea::perception::physio::*;
@@ -93,7 +93,7 @@ impl SimpleSleepSentinel {
             frontal_state: 0.0,
             occipital_state: 0.0,
             integrator_state: 0.0,
-            tau_frontal: 0.1,    // 100ms
+            tau_frontal: 0.1, // 100ms
             tau_occipital: 0.1,
             tau_integrator: 0.2, // 200ms (slower integration)
             frontal_history: Vec::with_capacity(300),
@@ -151,9 +151,12 @@ impl SimpleSleepSentinel {
 
         // 1. Complexity (variance)
         let f_mean: f64 = self.frontal_history.iter().sum::<f64>() / n as f64;
-        let f_var: f64 = self.frontal_history.iter()
+        let f_var: f64 = self
+            .frontal_history
+            .iter()
             .map(|x| (x - f_mean).powi(2))
-            .sum::<f64>() / n as f64;
+            .sum::<f64>()
+            / n as f64;
         self.complexity = (f_var * 100.0).min(1.0);
 
         // 2. Synchrony (correlation)
@@ -180,7 +183,7 @@ impl SimpleSleepSentinel {
         // 3. Dominant frequency (zero crossings)
         let mut crossings = 0;
         for i in 1..n {
-            if (self.frontal_history[i] > 0.0) != (self.frontal_history[i-1] > 0.0) {
+            if (self.frontal_history[i] > 0.0) != (self.frontal_history[i - 1] > 0.0) {
                 crossings += 1;
             }
         }
@@ -228,7 +231,11 @@ impl SimpleSleepSentinel {
 }
 
 /// Generate synthetic EEG for testing
-fn generate_synthetic_eeg(stage: SleepStage, sample_rate: f64, duration: f64) -> (Vec<f64>, Vec<f64>) {
+fn generate_synthetic_eeg(
+    stage: SleepStage,
+    sample_rate: f64,
+    duration: f64,
+) -> (Vec<f64>, Vec<f64>) {
     let n = (sample_rate * duration) as usize;
     let mut frontal = Vec::with_capacity(n);
     let mut occipital = Vec::with_capacity(n);
@@ -249,7 +256,10 @@ fn generate_synthetic_eeg(stage: SleepStage, sample_rate: f64, duration: f64) ->
             SleepStage::N1 => {
                 // Theta
                 let theta = 40.0 * (2.0 * PI * 6.0 * t).sin();
-                (theta + 8.0 * (t * 22.0).sin(), theta * 0.8 + 10.0 * (t * 19.0).sin())
+                (
+                    theta + 8.0 * (t * 22.0).sin(),
+                    theta * 0.8 + 10.0 * (t * 19.0).sin(),
+                )
             }
             SleepStage::N2 => {
                 // Theta + spindles
@@ -269,7 +279,10 @@ fn generate_synthetic_eeg(stage: SleepStage, sample_rate: f64, duration: f64) ->
             SleepStage::REM => {
                 // Mixed, desynchronized
                 let mixed = 25.0 * (2.0 * PI * 8.0 * t).sin() + 20.0 * (2.0 * PI * 15.0 * t).sin();
-                (mixed + 18.0 * (t * 41.0).sin(), mixed * 0.5 + 25.0 * (t * 37.0).sin())
+                (
+                    mixed + 18.0 * (t * 41.0).sin(),
+                    mixed * 0.5 + 25.0 * (t * 37.0).sin(),
+                )
             }
         };
 
@@ -314,7 +327,13 @@ fn main() {
     println!("═══════════════════════════════════════════════════════════════════════\n");
 
     let mut sentinel = SimpleSleepSentinel::new();
-    let stages = [SleepStage::Wake, SleepStage::N1, SleepStage::N2, SleepStage::N3, SleepStage::REM];
+    let stages = [
+        SleepStage::Wake,
+        SleepStage::N1,
+        SleepStage::N2,
+        SleepStage::N3,
+        SleepStage::REM,
+    ];
     let epochs_per_stage = 20;
     let sample_rate = 100.0;
     let epoch_duration = 30.0;
@@ -322,7 +341,11 @@ fn main() {
     let mut confusion = vec![vec![0usize; 5]; 5]; // confusion[actual][predicted]
     let mut results: Vec<(SleepStage, SleepStage, f64, f64, f64)> = Vec::new();
 
-    println!("Testing {} epochs per stage ({} total)...\n", epochs_per_stage, epochs_per_stage * 5);
+    println!(
+        "Testing {} epochs per stage ({} total)...\n",
+        epochs_per_stage,
+        epochs_per_stage * 5
+    );
 
     for &actual in &stages {
         for epoch in 0..epochs_per_stage {
@@ -330,10 +353,17 @@ fn main() {
             let predicted = sentinel.process_epoch(&frontal, &occipital);
 
             confusion[actual.as_label()][predicted.as_label()] += 1;
-            results.push((actual, predicted, sentinel.complexity, sentinel.synchrony, sentinel.dominant_freq));
+            results.push((
+                actual,
+                predicted,
+                sentinel.complexity,
+                sentinel.synchrony,
+                sentinel.dominant_freq,
+            ));
 
             if epoch == 0 {
-                println!("  {} (sample): complexity={:.2}, synchrony={:.2}, freq={:.1}Hz → {}",
+                println!(
+                    "  {} (sample): complexity={:.2}, synchrony={:.2}, freq={:.1}Hz → {}",
                     actual.name(),
                     sentinel.complexity,
                     sentinel.synchrony,
@@ -356,7 +386,11 @@ fn main() {
         let total: usize = row.iter().sum();
         print!(" Actual {:5} │", actual.name());
         for &count in row {
-            let pct = if total > 0 { 100.0 * count as f64 / total as f64 } else { 0.0 };
+            let pct = if total > 0 {
+                100.0 * count as f64 / total as f64
+            } else {
+                0.0
+            };
             if count > 0 {
                 print!(" {:3} ({:4.0}%) │", count, pct);
             } else {
@@ -378,7 +412,10 @@ fn main() {
     println!("                         PERFORMANCE METRICS");
     println!("═══════════════════════════════════════════════════════════════════════\n");
 
-    println!("Overall Accuracy: {:.1}% ({}/{})", overall_accuracy, total_correct, total_samples);
+    println!(
+        "Overall Accuracy: {:.1}% ({}/{})",
+        overall_accuracy, total_correct, total_samples
+    );
     println!();
 
     println!("Per-Class Accuracy:");
@@ -386,9 +423,26 @@ fn main() {
         let idx = stage.as_label();
         let correct = confusion[idx][idx];
         let total: usize = confusion[idx].iter().sum();
-        let accuracy = if total > 0 { 100.0 * correct as f64 / total as f64 } else { 0.0 };
-        let status = if accuracy >= 70.0 { "✅" } else if accuracy >= 50.0 { "🔄" } else { "⚠️" };
-        println!("  {} {}: {:.1}% ({}/{})", status, stage.name(), accuracy, correct, total);
+        let accuracy = if total > 0 {
+            100.0 * correct as f64 / total as f64
+        } else {
+            0.0
+        };
+        let status = if accuracy >= 70.0 {
+            "✅"
+        } else if accuracy >= 50.0 {
+            "🔄"
+        } else {
+            "⚠️"
+        };
+        println!(
+            "  {} {}: {:.1}% ({}/{})",
+            status,
+            stage.name(),
+            accuracy,
+            correct,
+            total
+        );
     }
 
     // Binary classification (Wake vs Sleep)
@@ -401,7 +455,10 @@ fn main() {
     let binary_accuracy = 100.0 * binary_correct as f64 / total_samples as f64;
 
     println!();
-    println!("Binary Classification (Wake vs Sleep): {:.1}%", binary_accuracy);
+    println!(
+        "Binary Classification (Wake vs Sleep): {:.1}%",
+        binary_accuracy
+    );
 
     println!("\n═══════════════════════════════════════════════════════════════════════");
     println!("                           KEY INSIGHTS");

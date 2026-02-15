@@ -91,10 +91,7 @@ impl JsonLinesSink {
     /// Opens the file for appending (creates if doesn't exist).
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, TelemetryError> {
         let path = path.into();
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
         Ok(Self {
             path,
             writer: Mutex::new(BufWriter::new(file)),
@@ -106,13 +103,13 @@ impl TelemetrySink for JsonLinesSink {
     fn export(&self, event: &ReasoningEvent) -> Result<(), TelemetryError> {
         let json = serde_json::to_string(event)
             .map_err(|e| TelemetryError::Serialization(e.to_string()))?;
-        let mut writer = self.writer.lock().unwrap();
+        let mut writer = self.writer.lock().unwrap_or_else(|e| e.into_inner());
         writeln!(writer, "{}", json)?;
         Ok(())
     }
 
     fn flush(&self) -> Result<(), TelemetryError> {
-        let mut writer = self.writer.lock().unwrap();
+        let mut writer = self.writer.lock().unwrap_or_else(|e| e.into_inner());
         writer.flush()?;
         Ok(())
     }
@@ -139,10 +136,7 @@ impl CsvSink {
     /// Create a new CSV sink.
     pub fn new(path: impl Into<PathBuf>) -> Result<Self, TelemetryError> {
         let path = path.into();
-        let file = OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
+        let file = OpenOptions::new().create(true).append(true).open(&path)?;
         let header_written = file.metadata()?.len() > 0;
         Ok(Self {
             path,
@@ -161,8 +155,11 @@ impl CsvSink {
 
 impl TelemetrySink for CsvSink {
     fn export(&self, event: &ReasoningEvent) -> Result<(), TelemetryError> {
-        let mut writer = self.writer.lock().unwrap();
-        let mut header_written = self.header_written.lock().unwrap();
+        let mut writer = self.writer.lock().unwrap_or_else(|e| e.into_inner());
+        let mut header_written = self
+            .header_written
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
 
         if !*header_written {
             self.write_header(&mut writer)?;
@@ -183,14 +180,16 @@ impl TelemetrySink for CsvSink {
             event.mcts_iterations,
             event.plan_confidence,
             event.gate_decision,
-            event.risk_level.map_or("None".to_string(), |r| format!("{:?}", r)),
+            event
+                .risk_level
+                .map_or("None".to_string(), |r| format!("{:?}", r)),
         );
         writeln!(writer, "{}", row)?;
         Ok(())
     }
 
     fn flush(&self) -> Result<(), TelemetryError> {
-        let mut writer = self.writer.lock().unwrap();
+        let mut writer = self.writer.lock().unwrap_or_else(|e| e.into_inner());
         writer.flush()?;
         Ok(())
     }
@@ -264,16 +263,22 @@ impl PrometheusMetrics {
 
     /// Record a reasoning event.
     pub fn record(&self, event: &ReasoningEvent) {
-        use std::sync::atomic::Ordering::Relaxed;
         use crate::consciousness::temporal_planning::types::BudgetTier;
+        use std::sync::atomic::Ordering::Relaxed;
 
         self.cycle_count.fetch_add(1, Relaxed);
 
         // Update tier counters
         match event.budget_tier {
-            BudgetTier::Tier0 => { self.tier0_count.fetch_add(1, Relaxed); }
-            BudgetTier::Tier1 => { self.tier1_count.fetch_add(1, Relaxed); }
-            BudgetTier::Tier2 => { self.tier2_count.fetch_add(1, Relaxed); }
+            BudgetTier::Tier0 => {
+                self.tier0_count.fetch_add(1, Relaxed);
+            }
+            BudgetTier::Tier1 => {
+                self.tier1_count.fetch_add(1, Relaxed);
+            }
+            BudgetTier::Tier2 => {
+                self.tier2_count.fetch_add(1, Relaxed);
+            }
         }
 
         // Update gate counters
@@ -285,18 +290,33 @@ impl PrometheusMetrics {
 
         // Update gauges
         self.phi_eff_bits.store(event.phi_eff.to_bits(), Relaxed);
-        self.reliability_bits.store(event.reliability.to_bits(), Relaxed);
+        self.reliability_bits
+            .store(event.reliability.to_bits(), Relaxed);
         self.gamma_bits.store(event.gamma.to_bits(), Relaxed);
 
         // Update duration histogram
         let us = event.wall_time_us;
-        if us <= 100 { self.duration_bucket_100us.fetch_add(1, Relaxed); }
-        if us <= 500 { self.duration_bucket_500us.fetch_add(1, Relaxed); }
-        if us <= 1_000 { self.duration_bucket_1ms.fetch_add(1, Relaxed); }
-        if us <= 2_000 { self.duration_bucket_2ms.fetch_add(1, Relaxed); }
-        if us <= 5_000 { self.duration_bucket_5ms.fetch_add(1, Relaxed); }
-        if us <= 10_000 { self.duration_bucket_10ms.fetch_add(1, Relaxed); }
-        if us <= 20_000 { self.duration_bucket_20ms.fetch_add(1, Relaxed); }
+        if us <= 100 {
+            self.duration_bucket_100us.fetch_add(1, Relaxed);
+        }
+        if us <= 500 {
+            self.duration_bucket_500us.fetch_add(1, Relaxed);
+        }
+        if us <= 1_000 {
+            self.duration_bucket_1ms.fetch_add(1, Relaxed);
+        }
+        if us <= 2_000 {
+            self.duration_bucket_2ms.fetch_add(1, Relaxed);
+        }
+        if us <= 5_000 {
+            self.duration_bucket_5ms.fetch_add(1, Relaxed);
+        }
+        if us <= 10_000 {
+            self.duration_bucket_10ms.fetch_add(1, Relaxed);
+        }
+        if us <= 20_000 {
+            self.duration_bucket_20ms.fetch_add(1, Relaxed);
+        }
         self.duration_bucket_inf.fetch_add(1, Relaxed);
         self.duration_sum.fetch_add(us, Relaxed);
     }
@@ -310,43 +330,102 @@ impl PrometheusMetrics {
         // HELP and TYPE declarations
         out.push_str("# HELP reasoning_cycles_total Total reasoning cycles\n");
         out.push_str("# TYPE reasoning_cycles_total counter\n");
-        out.push_str(&format!("reasoning_cycles_total {}\n", self.cycle_count.load(Relaxed)));
+        out.push_str(&format!(
+            "reasoning_cycles_total {}\n",
+            self.cycle_count.load(Relaxed)
+        ));
 
         out.push_str("# HELP reasoning_tier_cycles_total Cycles per budget tier\n");
         out.push_str("# TYPE reasoning_tier_cycles_total counter\n");
-        out.push_str(&format!("reasoning_tier_cycles_total{{tier=\"0\"}} {}\n", self.tier0_count.load(Relaxed)));
-        out.push_str(&format!("reasoning_tier_cycles_total{{tier=\"1\"}} {}\n", self.tier1_count.load(Relaxed)));
-        out.push_str(&format!("reasoning_tier_cycles_total{{tier=\"2\"}} {}\n", self.tier2_count.load(Relaxed)));
+        out.push_str(&format!(
+            "reasoning_tier_cycles_total{{tier=\"0\"}} {}\n",
+            self.tier0_count.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_tier_cycles_total{{tier=\"1\"}} {}\n",
+            self.tier1_count.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_tier_cycles_total{{tier=\"2\"}} {}\n",
+            self.tier2_count.load(Relaxed)
+        ));
 
         out.push_str("# HELP reasoning_gate_decisions_total Gate decisions by result\n");
         out.push_str("# TYPE reasoning_gate_decisions_total counter\n");
-        out.push_str(&format!("reasoning_gate_decisions_total{{result=\"allowed\"}} {}\n", self.gate_allowed_count.load(Relaxed)));
-        out.push_str(&format!("reasoning_gate_decisions_total{{result=\"blocked\"}} {}\n", self.gate_blocked_count.load(Relaxed)));
+        out.push_str(&format!(
+            "reasoning_gate_decisions_total{{result=\"allowed\"}} {}\n",
+            self.gate_allowed_count.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_gate_decisions_total{{result=\"blocked\"}} {}\n",
+            self.gate_blocked_count.load(Relaxed)
+        ));
 
         out.push_str("# HELP reasoning_phi_eff Current effective phi\n");
         out.push_str("# TYPE reasoning_phi_eff gauge\n");
-        out.push_str(&format!("reasoning_phi_eff {:.4}\n", f64::from_bits(self.phi_eff_bits.load(Relaxed))));
+        out.push_str(&format!(
+            "reasoning_phi_eff {:.4}\n",
+            f64::from_bits(self.phi_eff_bits.load(Relaxed))
+        ));
 
         out.push_str("# HELP reasoning_reliability Current reliability R\n");
         out.push_str("# TYPE reasoning_reliability gauge\n");
-        out.push_str(&format!("reasoning_reliability {:.4}\n", f64::from_bits(self.reliability_bits.load(Relaxed))));
+        out.push_str(&format!(
+            "reasoning_reliability {:.4}\n",
+            f64::from_bits(self.reliability_bits.load(Relaxed))
+        ));
 
         out.push_str("# HELP reasoning_gamma Current gamma calibration\n");
         out.push_str("# TYPE reasoning_gamma gauge\n");
-        out.push_str(&format!("reasoning_gamma {:.4}\n", f64::from_bits(self.gamma_bits.load(Relaxed))));
+        out.push_str(&format!(
+            "reasoning_gamma {:.4}\n",
+            f64::from_bits(self.gamma_bits.load(Relaxed))
+        ));
 
-        out.push_str("# HELP reasoning_cycle_duration_us Cycle duration histogram (microseconds)\n");
+        out.push_str(
+            "# HELP reasoning_cycle_duration_us Cycle duration histogram (microseconds)\n",
+        );
         out.push_str("# TYPE reasoning_cycle_duration_us histogram\n");
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"100\"}} {}\n", self.duration_bucket_100us.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"500\"}} {}\n", self.duration_bucket_500us.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"1000\"}} {}\n", self.duration_bucket_1ms.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"2000\"}} {}\n", self.duration_bucket_2ms.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"5000\"}} {}\n", self.duration_bucket_5ms.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"10000\"}} {}\n", self.duration_bucket_10ms.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"20000\"}} {}\n", self.duration_bucket_20ms.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_bucket{{le=\"+Inf\"}} {}\n", self.duration_bucket_inf.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_sum {}\n", self.duration_sum.load(Relaxed)));
-        out.push_str(&format!("reasoning_cycle_duration_us_count {}\n", self.cycle_count.load(Relaxed)));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"100\"}} {}\n",
+            self.duration_bucket_100us.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"500\"}} {}\n",
+            self.duration_bucket_500us.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"1000\"}} {}\n",
+            self.duration_bucket_1ms.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"2000\"}} {}\n",
+            self.duration_bucket_2ms.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"5000\"}} {}\n",
+            self.duration_bucket_5ms.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"10000\"}} {}\n",
+            self.duration_bucket_10ms.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"20000\"}} {}\n",
+            self.duration_bucket_20ms.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_bucket{{le=\"+Inf\"}} {}\n",
+            self.duration_bucket_inf.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_sum {}\n",
+            self.duration_sum.load(Relaxed)
+        ));
+        out.push_str(&format!(
+            "reasoning_cycle_duration_us_count {}\n",
+            self.cycle_count.load(Relaxed)
+        ));
 
         out
     }
@@ -533,7 +612,9 @@ impl TelemetryConfig {
     }
 
     /// Build an exporter from this configuration.
-    pub fn build_exporter(&self) -> Result<(TelemetryExporter, Option<Arc<PrometheusMetrics>>), TelemetryError> {
+    pub fn build_exporter(
+        &self,
+    ) -> Result<(TelemetryExporter, Option<Arc<PrometheusMetrics>>), TelemetryError> {
         let mut builder = TelemetryExporter::builder();
         let mut prometheus_metrics = None;
 
@@ -617,8 +698,7 @@ mod tests {
 
     #[test]
     fn test_telemetry_exporter_builder() {
-        let (builder, metrics) = TelemetryExporter::builder()
-            .add_prometheus_sink();
+        let (builder, metrics) = TelemetryExporter::builder().add_prometheus_sink();
 
         let exporter = builder.build();
         assert_eq!(exporter.sink_names(), vec!["prometheus"]);

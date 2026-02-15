@@ -1,6 +1,6 @@
-use serde::{Serialize, Deserialize};
-use crate::hdc::binary_hv::BinaryHV;
 use super::seed_from_name;
+use crate::hdc::binary_hv::BinaryHV;
+use serde::{Deserialize, Serialize};
 
 /// Primitive tier in the hierarchy
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]

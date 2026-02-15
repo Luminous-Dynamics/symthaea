@@ -4,14 +4,6 @@
 
 // Re-export phi types from symthaea-core
 pub use symthaea_core::phi_engine::{
-    PhiEngine,
-    PhiMethod,
-    PhiResult,
-    PhiCalculator,
-    ContinuousPhiCalculator,
-    TieredPhi,
-    ApproximationTier,
-    TieredPhiConfig,
-    CachedPhiEngine,
-    CacheStats,
+    ApproximationTier, CacheStats, CachedPhiEngine, ContinuousPhiCalculator, PhiCalculator,
+    PhiEngine, PhiMethod, PhiResult, TieredPhi, TieredPhiConfig,
 };

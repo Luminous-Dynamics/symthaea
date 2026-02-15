@@ -19,8 +19,8 @@
 //! - **F2**: Related to tongue frontness/backness
 //! - **F3**: Related to lip rounding and pharyngeal constriction
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // FORMANT TARGET STRUCTURE
@@ -56,9 +56,9 @@ impl FormantTarget {
             f1,
             f2,
             f3,
-            b1: 60.0,   // Typical bandwidth for F1
-            b2: 90.0,   // Typical bandwidth for F2
-            b3: 150.0,  // Typical bandwidth for F3
+            b1: 60.0,  // Typical bandwidth for F1
+            b2: 90.0,  // Typical bandwidth for F2
+            b3: 150.0, // Typical bandwidth for F3
             duration_ms,
             is_vowel: true,
             is_voiced: true,
@@ -106,8 +106,16 @@ impl FormantTarget {
             b2: self.b2 + (other.b2 - self.b2) * t,
             b3: self.b3 + (other.b3 - self.b3) * t,
             duration_ms: self.duration_ms + (other.duration_ms - self.duration_ms) * t,
-            is_vowel: if t < 0.5 { self.is_vowel } else { other.is_vowel },
-            is_voiced: if t < 0.5 { self.is_voiced } else { other.is_voiced },
+            is_vowel: if t < 0.5 {
+                self.is_vowel
+            } else {
+                other.is_vowel
+            },
+            is_voiced: if t < 0.5 {
+                self.is_voiced
+            } else {
+                other.is_voiced
+            },
         }
     }
 
@@ -122,7 +130,7 @@ impl FormantTarget {
     pub fn with_pitch_shift(&self, semitones: f32) -> Self {
         let ratio = 2.0_f32.powf(semitones / 12.0);
         Self {
-            f1: self.f1 * ratio.powf(0.3),  // F1 shifts less than pitch
+            f1: self.f1 * ratio.powf(0.3), // F1 shifts less than pitch
             f2: self.f2 * ratio.powf(0.2),
             f3: self.f3 * ratio.powf(0.1),
             ..*self
@@ -153,122 +161,262 @@ pub fn get_formant_database() -> HashMap<String, FormantTarget> {
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Front vowels
-    db.insert("IY".into(), FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0));  // "beat"
-    db.insert("IH".into(), FormantTarget::vowel(390.0, 1990.0, 2550.0, 80.0));   // "bit"
-    db.insert("EY".into(), FormantTarget::vowel(476.0, 2089.0, 2691.0, 120.0));  // "bait" (diphthong start)
-    db.insert("EH".into(), FormantTarget::vowel(530.0, 1840.0, 2480.0, 80.0));   // "bet"
-    db.insert("AE".into(), FormantTarget::vowel(660.0, 1720.0, 2410.0, 100.0));  // "bat"
+    db.insert(
+        "IY".into(),
+        FormantTarget::vowel(270.0, 2290.0, 3010.0, 100.0),
+    ); // "beat"
+    db.insert(
+        "IH".into(),
+        FormantTarget::vowel(390.0, 1990.0, 2550.0, 80.0),
+    ); // "bit"
+    db.insert(
+        "EY".into(),
+        FormantTarget::vowel(476.0, 2089.0, 2691.0, 120.0),
+    ); // "bait" (diphthong start)
+    db.insert(
+        "EH".into(),
+        FormantTarget::vowel(530.0, 1840.0, 2480.0, 80.0),
+    ); // "bet"
+    db.insert(
+        "AE".into(),
+        FormantTarget::vowel(660.0, 1720.0, 2410.0, 100.0),
+    ); // "bat"
 
     // Central vowels
-    db.insert("AH".into(), FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0));   // "but" (stressed)
-    db.insert("AX".into(), FormantTarget::vowel(500.0, 1500.0, 2500.0, 60.0));   // schwa (unstressed)
-    db.insert("ER".into(), FormantTarget::vowel(490.0, 1350.0, 1690.0, 100.0));  // "bird" (r-colored)
-    db.insert("AXR".into(), FormantTarget::vowel(500.0, 1400.0, 1750.0, 80.0));  // unstressed r-colored
+    db.insert(
+        "AH".into(),
+        FormantTarget::vowel(520.0, 1190.0, 2390.0, 80.0),
+    ); // "but" (stressed)
+    db.insert(
+        "AX".into(),
+        FormantTarget::vowel(500.0, 1500.0, 2500.0, 60.0),
+    ); // schwa (unstressed)
+    db.insert(
+        "ER".into(),
+        FormantTarget::vowel(490.0, 1350.0, 1690.0, 100.0),
+    ); // "bird" (r-colored)
+    db.insert(
+        "AXR".into(),
+        FormantTarget::vowel(500.0, 1400.0, 1750.0, 80.0),
+    ); // unstressed r-colored
 
     // Back vowels
-    db.insert("AA".into(), FormantTarget::vowel(730.0, 1090.0, 2440.0, 100.0));  // "bot"
-    db.insert("AO".into(), FormantTarget::vowel(570.0, 840.0, 2410.0, 100.0));   // "bought"
-    db.insert("OW".into(), FormantTarget::vowel(497.0, 910.0, 2459.0, 120.0));   // "boat" (diphthong)
-    db.insert("UH".into(), FormantTarget::vowel(440.0, 1020.0, 2240.0, 80.0));   // "book"
-    db.insert("UW".into(), FormantTarget::vowel(300.0, 870.0, 2240.0, 100.0));   // "boot"
+    db.insert(
+        "AA".into(),
+        FormantTarget::vowel(730.0, 1090.0, 2440.0, 100.0),
+    ); // "bot"
+    db.insert(
+        "AO".into(),
+        FormantTarget::vowel(570.0, 840.0, 2410.0, 100.0),
+    ); // "bought"
+    db.insert(
+        "OW".into(),
+        FormantTarget::vowel(497.0, 910.0, 2459.0, 120.0),
+    ); // "boat" (diphthong)
+    db.insert(
+        "UH".into(),
+        FormantTarget::vowel(440.0, 1020.0, 2240.0, 80.0),
+    ); // "book"
+    db.insert(
+        "UW".into(),
+        FormantTarget::vowel(300.0, 870.0, 2240.0, 100.0),
+    ); // "boot"
 
     // Diphthongs
-    db.insert("AY".into(), FormantTarget::vowel(710.0, 1100.0, 2540.0, 150.0));  // "bite" (start)
-    db.insert("AW".into(), FormantTarget::vowel(698.0, 1109.0, 2459.0, 150.0));  // "bout" (start)
-    db.insert("OY".into(), FormantTarget::vowel(570.0, 840.0, 2410.0, 150.0));   // "boy" (start)
+    db.insert(
+        "AY".into(),
+        FormantTarget::vowel(710.0, 1100.0, 2540.0, 150.0),
+    ); // "bite" (start)
+    db.insert(
+        "AW".into(),
+        FormantTarget::vowel(698.0, 1109.0, 2459.0, 150.0),
+    ); // "bout" (start)
+    db.insert(
+        "OY".into(),
+        FormantTarget::vowel(570.0, 840.0, 2410.0, 150.0),
+    ); // "boy" (start)
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Stops
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Bilabial stops
-    db.insert("P".into(), FormantTarget::unvoiced_consonant(200.0, 1000.0, 2200.0, 60.0));
-    db.insert("B".into(), FormantTarget::voiced_consonant(200.0, 1000.0, 2200.0, 60.0));
+    db.insert(
+        "P".into(),
+        FormantTarget::unvoiced_consonant(200.0, 1000.0, 2200.0, 60.0),
+    );
+    db.insert(
+        "B".into(),
+        FormantTarget::voiced_consonant(200.0, 1000.0, 2200.0, 60.0),
+    );
 
     // Alveolar stops
-    db.insert("T".into(), FormantTarget::unvoiced_consonant(400.0, 1800.0, 2600.0, 50.0));
-    db.insert("D".into(), FormantTarget::voiced_consonant(400.0, 1800.0, 2600.0, 50.0));
+    db.insert(
+        "T".into(),
+        FormantTarget::unvoiced_consonant(400.0, 1800.0, 2600.0, 50.0),
+    );
+    db.insert(
+        "D".into(),
+        FormantTarget::voiced_consonant(400.0, 1800.0, 2600.0, 50.0),
+    );
 
     // Velar stops
-    db.insert("K".into(), FormantTarget::unvoiced_consonant(350.0, 1500.0, 2500.0, 70.0));
-    db.insert("G".into(), FormantTarget::voiced_consonant(350.0, 1500.0, 2500.0, 70.0));
+    db.insert(
+        "K".into(),
+        FormantTarget::unvoiced_consonant(350.0, 1500.0, 2500.0, 70.0),
+    );
+    db.insert(
+        "G".into(),
+        FormantTarget::voiced_consonant(350.0, 1500.0, 2500.0, 70.0),
+    );
 
     // Glottal stop
-    db.insert("Q".into(), FormantTarget::unvoiced_consonant(300.0, 1500.0, 2500.0, 30.0));
+    db.insert(
+        "Q".into(),
+        FormantTarget::unvoiced_consonant(300.0, 1500.0, 2500.0, 30.0),
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Fricatives
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Labiodental fricatives
-    db.insert("F".into(), FormantTarget::unvoiced_consonant(300.0, 1300.0, 2400.0, 80.0));
-    db.insert("V".into(), FormantTarget::voiced_consonant(300.0, 1300.0, 2400.0, 80.0));
+    db.insert(
+        "F".into(),
+        FormantTarget::unvoiced_consonant(300.0, 1300.0, 2400.0, 80.0),
+    );
+    db.insert(
+        "V".into(),
+        FormantTarget::voiced_consonant(300.0, 1300.0, 2400.0, 80.0),
+    );
 
     // Dental fricatives
-    db.insert("TH".into(), FormantTarget::unvoiced_consonant(300.0, 1500.0, 2500.0, 80.0));  // "think"
-    db.insert("DH".into(), FormantTarget::voiced_consonant(300.0, 1500.0, 2500.0, 60.0));    // "this"
+    db.insert(
+        "TH".into(),
+        FormantTarget::unvoiced_consonant(300.0, 1500.0, 2500.0, 80.0),
+    ); // "think"
+    db.insert(
+        "DH".into(),
+        FormantTarget::voiced_consonant(300.0, 1500.0, 2500.0, 60.0),
+    ); // "this"
 
     // Alveolar fricatives
-    db.insert("S".into(), FormantTarget::unvoiced_consonant(320.0, 1700.0, 2600.0, 100.0));
-    db.insert("Z".into(), FormantTarget::voiced_consonant(320.0, 1700.0, 2600.0, 100.0));
+    db.insert(
+        "S".into(),
+        FormantTarget::unvoiced_consonant(320.0, 1700.0, 2600.0, 100.0),
+    );
+    db.insert(
+        "Z".into(),
+        FormantTarget::voiced_consonant(320.0, 1700.0, 2600.0, 100.0),
+    );
 
     // Postalveolar fricatives
-    db.insert("SH".into(), FormantTarget::unvoiced_consonant(300.0, 1900.0, 2700.0, 100.0)); // "ship"
-    db.insert("ZH".into(), FormantTarget::voiced_consonant(300.0, 1900.0, 2700.0, 80.0));    // "measure"
+    db.insert(
+        "SH".into(),
+        FormantTarget::unvoiced_consonant(300.0, 1900.0, 2700.0, 100.0),
+    ); // "ship"
+    db.insert(
+        "ZH".into(),
+        FormantTarget::voiced_consonant(300.0, 1900.0, 2700.0, 80.0),
+    ); // "measure"
 
     // Glottal fricative
-    db.insert("HH".into(), FormantTarget::unvoiced_consonant(500.0, 1500.0, 2500.0, 60.0));
+    db.insert(
+        "HH".into(),
+        FormantTarget::unvoiced_consonant(500.0, 1500.0, 2500.0, 60.0),
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Affricates
     // ═══════════════════════════════════════════════════════════════════════════
 
-    db.insert("CH".into(), FormantTarget::unvoiced_consonant(300.0, 1800.0, 2800.0, 100.0)); // "church"
-    db.insert("JH".into(), FormantTarget::voiced_consonant(300.0, 1800.0, 2800.0, 100.0));   // "judge"
+    db.insert(
+        "CH".into(),
+        FormantTarget::unvoiced_consonant(300.0, 1800.0, 2800.0, 100.0),
+    ); // "church"
+    db.insert(
+        "JH".into(),
+        FormantTarget::voiced_consonant(300.0, 1800.0, 2800.0, 100.0),
+    ); // "judge"
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Nasals
     // ═══════════════════════════════════════════════════════════════════════════
 
-    db.insert("M".into(), FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0));
-    db.insert("N".into(), FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0));
-    db.insert("NG".into(), FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0));
+    db.insert(
+        "M".into(),
+        FormantTarget::voiced_consonant(280.0, 1000.0, 2200.0, 70.0),
+    );
+    db.insert(
+        "N".into(),
+        FormantTarget::voiced_consonant(280.0, 1500.0, 2500.0, 70.0),
+    );
+    db.insert(
+        "NG".into(),
+        FormantTarget::voiced_consonant(280.0, 1900.0, 2600.0, 70.0),
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Liquids
     // ═══════════════════════════════════════════════════════════════════════════
 
-    db.insert("L".into(), FormantTarget::voiced_consonant(350.0, 1050.0, 2750.0, 70.0));
-    db.insert("R".into(), FormantTarget::voiced_consonant(420.0, 1300.0, 1660.0, 70.0));  // Low F3 is characteristic
+    db.insert(
+        "L".into(),
+        FormantTarget::voiced_consonant(350.0, 1050.0, 2750.0, 70.0),
+    );
+    db.insert(
+        "R".into(),
+        FormantTarget::voiced_consonant(420.0, 1300.0, 1660.0, 70.0),
+    ); // Low F3 is characteristic
 
     // ═══════════════════════════════════════════════════════════════════════════
     // CONSONANTS - Semivowels/Glides
     // ═══════════════════════════════════════════════════════════════════════════
 
-    db.insert("W".into(), FormantTarget::voiced_consonant(300.0, 750.0, 2200.0, 60.0));
-    db.insert("Y".into(), FormantTarget::voiced_consonant(280.0, 2200.0, 2960.0, 60.0));
+    db.insert(
+        "W".into(),
+        FormantTarget::voiced_consonant(300.0, 750.0, 2200.0, 60.0),
+    );
+    db.insert(
+        "Y".into(),
+        FormantTarget::voiced_consonant(280.0, 2200.0, 2960.0, 60.0),
+    );
 
     // ═══════════════════════════════════════════════════════════════════════════
     // SPECIAL SYMBOLS
     // ═══════════════════════════════════════════════════════════════════════════
 
     // Silence
-    db.insert("SIL".into(), FormantTarget {
-        f1: 0.0, f2: 0.0, f3: 0.0,
-        b1: 0.0, b2: 0.0, b3: 0.0,
-        duration_ms: 100.0,
-        is_vowel: false,
-        is_voiced: false,
-    });
+    db.insert(
+        "SIL".into(),
+        FormantTarget {
+            f1: 0.0,
+            f2: 0.0,
+            f3: 0.0,
+            b1: 0.0,
+            b2: 0.0,
+            b3: 0.0,
+            duration_ms: 100.0,
+            is_vowel: false,
+            is_voiced: false,
+        },
+    );
 
     // Short pause
-    db.insert("SP".into(), FormantTarget {
-        f1: 0.0, f2: 0.0, f3: 0.0,
-        b1: 0.0, b2: 0.0, b3: 0.0,
-        duration_ms: 50.0,
-        is_vowel: false,
-        is_voiced: false,
-    });
+    db.insert(
+        "SP".into(),
+        FormantTarget {
+            f1: 0.0,
+            f2: 0.0,
+            f3: 0.0,
+            b1: 0.0,
+            b2: 0.0,
+            b3: 0.0,
+            duration_ms: 50.0,
+            is_vowel: false,
+            is_voiced: false,
+        },
+    );
 
     db
 }
@@ -322,15 +470,18 @@ impl FormantDatabase {
     pub fn scale_for_speaker(&self, scale: f32) -> Self {
         let mut scaled = HashMap::new();
         for (phoneme, target) in &self.targets {
-            scaled.insert(phoneme.clone(), FormantTarget {
-                f1: target.f1 * scale,
-                f2: target.f2 * scale,
-                f3: target.f3 * scale,
-                b1: target.b1 * scale,
-                b2: target.b2 * scale,
-                b3: target.b3 * scale,
-                ..*target
-            });
+            scaled.insert(
+                phoneme.clone(),
+                FormantTarget {
+                    f1: target.f1 * scale,
+                    f2: target.f2 * scale,
+                    f3: target.f3 * scale,
+                    b1: target.b1 * scale,
+                    b2: target.b2 * scale,
+                    b3: target.b3 * scale,
+                    ..*target
+                },
+            );
         }
         Self { targets: scaled }
     }
@@ -390,7 +541,7 @@ mod tests {
         let db = FormantDatabase::new();
 
         let iy = db.lookup("IY").expect("IY should exist");
-        assert!(iy.f1 < 400.0);  // High vowel = low F1
+        assert!(iy.f1 < 400.0); // High vowel = low F1
         assert!(iy.f2 > 2000.0); // Front vowel = high F2
         assert!(iy.is_vowel);
         assert!(iy.is_voiced);
@@ -436,10 +587,10 @@ mod tests {
     #[test]
     fn test_pitch_shift() {
         let target = FormantTarget::vowel(500.0, 1500.0, 2500.0, 100.0);
-        let higher = target.with_pitch_shift(12.0);  // One octave up
+        let higher = target.with_pitch_shift(12.0); // One octave up
 
         // Formants should shift up, but less than pitch
         assert!(higher.f1 > target.f1);
-        assert!(higher.f1 < target.f1 * 2.0);  // Less than octave
+        assert!(higher.f1 < target.f1 * 2.0); // Less than octave
     }
 }

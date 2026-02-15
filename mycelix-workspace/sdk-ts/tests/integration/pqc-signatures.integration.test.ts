@@ -585,16 +585,16 @@ describe('Integration: SignedMessageBridge', () => {
 
 describe('Integration: PQC Utility Functions', () => {
   describe('getRecommendedAlgorithm', () => {
-    it('should return Dilithium3 for standard strength', () => {
-      expect(getRecommendedAlgorithm('standard')).toBe('Dilithium3');
+    it('should return ML-DSA-65 for standard strength', () => {
+      expect(getRecommendedAlgorithm('standard')).toBe('ML-DSA-65');
     });
 
-    it('should return Dilithium5 for high strength', () => {
-      expect(getRecommendedAlgorithm('high')).toBe('Dilithium5');
+    it('should return ML-DSA-87 for high strength', () => {
+      expect(getRecommendedAlgorithm('high')).toBe('ML-DSA-87');
     });
 
-    it('should return SPHINCS+ for maximum strength', () => {
-      expect(getRecommendedAlgorithm('maximum')).toBe('SPHINCS+');
+    it('should return SLH-DSA-SHA2-128s for maximum strength', () => {
+      expect(getRecommendedAlgorithm('maximum')).toBe('SLH-DSA-SHA2-128s');
     });
   });
 
@@ -616,15 +616,15 @@ describe('Integration: PQC Utility Functions', () => {
 
   describe('estimateSignatureSize', () => {
     it('should return expected sizes for algorithms', () => {
-      expect(estimateSignatureSize('Dilithium3')).toBe(3293);
-      expect(estimateSignatureSize('Dilithium5')).toBe(4595);
-      expect(estimateSignatureSize('Falcon512')).toBe(666);
-      expect(estimateSignatureSize('SPHINCS+')).toBe(7856);
+      expect(estimateSignatureSize('ML-DSA-65')).toBe(3309);
+      expect(estimateSignatureSize('ML-DSA-87')).toBe(4627);
+      expect(estimateSignatureSize('Falcon512')).toBe(3309);
+      expect(estimateSignatureSize('SLH-DSA-SHA2-128s')).toBe(7856);
     });
 
     it('should return hybrid size for hybrid algorithm', () => {
-      const hybridSize = estimateSignatureSize('Hybrid-Ed25519-Dilithium3');
-      expect(hybridSize).toBe(64 + 3293);
+      const hybridSize = estimateSignatureSize('Hybrid-Ed25519-ML-DSA-65');
+      expect(hybridSize).toBe(64 + 3309);
     });
   });
 });

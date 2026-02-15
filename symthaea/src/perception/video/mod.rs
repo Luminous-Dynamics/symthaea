@@ -35,14 +35,14 @@
 //! - Anomaly detection (unusual temporal patterns)
 //! - Predictive perception (anticipating what comes next)
 
-pub mod source;
 pub mod frame;
-pub mod optical_flow;
-pub mod temporal_features;
 pub mod ltc_rhythm;
+pub mod optical_flow;
+pub mod source;
+pub mod temporal_features;
 
-pub use source::{VideoSource, VideoSourceConfig, WebcamSource, MockVideoSource, MockPattern};
 pub use frame::{Frame, FrameFormat};
-pub use optical_flow::{OpticalFlow, MotionVector};
-pub use temporal_features::{TemporalFeatures, TemporalFeatureExtractor};
-pub use ltc_rhythm::{LtcRhythmDetector, LtcRhythmConfig, RhythmDetection, RhythmPrototype};
+pub use ltc_rhythm::{LtcRhythmConfig, LtcRhythmDetector, RhythmDetection, RhythmPrototype};
+pub use optical_flow::{MotionVector, OpticalFlow};
+pub use source::{MockPattern, MockVideoSource, VideoSource, VideoSourceConfig, WebcamSource};
+pub use temporal_features::{TemporalFeatureExtractor, TemporalFeatures};

@@ -7,7 +7,7 @@
 //!
 //! - **Neutron Cross-Sections**: ENDF/B-VIII.0 (Evaluated Nuclear Data File)
 //!   Brown et al., Nuclear Data Sheets 148 (2018) 1-142
-//!   https://www.nndc.bnl.gov/endf/
+//!   <https://www.nndc.bnl.gov/endf/>
 //!
 //! - **Thermal Conductivity**: ASM Handbook Vol. 2 (Properties and Selection)
 //!   CRC Handbook of Chemistry and Physics, 104th ed. (2023-2024)
@@ -187,10 +187,10 @@ impl LiteratureValidation {
         // ENDF/B-VIII.0: H-1 total σ ≈ 0.69 barn at 14 MeV
         params.push(ValidatedParameter::new(
             "H-1 σ_elastic (14 MeV)",
-            0.7,    // code value from neutron_shielding.rs
-            0.69,   // ENDF/B-VIII.0
+            0.7,  // code value from neutron_shielding.rs
+            0.69, // ENDF/B-VIII.0
             "barn",
-            0.10,   // 10% tolerance
+            0.10, // 10% tolerance
             endf.clone(),
             "Hydrogen elastic scattering dominates water moderation",
         ));
@@ -199,8 +199,8 @@ impl LiteratureValidation {
         // ENDF: H-1 σ ≈ 2.2-2.8 barn at 2.45 MeV
         params.push(ValidatedParameter::new(
             "H-1 σ_elastic (2.5 MeV)",
-            2.5,    // code value
-            2.5,    // ENDF (midpoint of range)
+            2.5, // code value
+            2.5, // ENDF (midpoint of range)
             "barn",
             0.15,
             endf.clone(),
@@ -212,8 +212,8 @@ impl LiteratureValidation {
         // Our borated PE uses effective value ~767 (natural B is 20% B-10)
         params.push(ValidatedParameter::new(
             "B-10 σ_abs (thermal, nat)",
-            767.0,   // code value (natural boron effective)
-            767.0,   // 3835 * 0.2 = 767 for natural boron
+            767.0, // code value (natural boron effective)
+            767.0, // 3835 * 0.2 = 767 for natural boron
             "barn",
             0.05,
             endf.clone(),
@@ -236,10 +236,10 @@ impl LiteratureValidation {
         // ENDF: Fe-56 σ_total ≈ 2.5 barn at 14 MeV
         params.push(ValidatedParameter::new(
             "Fe-56 σ_elastic (14 MeV)",
-            2.0,    // code value
-            2.5,    // ENDF
+            2.0, // code value
+            2.5, // ENDF
             "barn",
-            0.25,   // Higher tolerance - approximation
+            0.25, // Higher tolerance - approximation
             endf.clone(),
             "Steel used for structural shielding",
         ));
@@ -252,7 +252,7 @@ impl LiteratureValidation {
             10e-12, // code value (Sv·cm²/n)
             10e-12, // ICRP/IAEA
             "Sv·cm²/n",
-            0.30,   // 30% tolerance (varies with energy)
+            0.30, // 30% tolerance (varies with energy)
             iaea,
             "Energy-averaged for 1-20 MeV neutrons",
         ));
@@ -294,8 +294,8 @@ impl LiteratureValidation {
         // Miracle & Senkov 2017: Table 3 shows 10-22 W/m·K for various HEAs
         params.push(ValidatedParameter::new(
             "HEA k (TiVZrNbPd-type)",
-            15.0,   // code value
-            15.0,   // Literature midpoint
+            15.0, // code value
+            15.0, // Literature midpoint
             "W/m·K",
             0.20,
             hea_ref.clone(),
@@ -307,8 +307,8 @@ impl LiteratureValidation {
         // Laminate effective: weighted harmonic mean ~25-35 W/m·K
         params.push(ValidatedParameter::new(
             "Zr/Nb laminate k",
-            25.0,   // code value
-            27.0,   // Estimated from pure values with interface resistance
+            25.0, // code value
+            27.0, // Estimated from pure values with interface resistance
             "W/m·K",
             0.15,
             asm.clone(),
@@ -319,8 +319,8 @@ impl LiteratureValidation {
         // Literature: 16.5 W/m·K at room temperature
         params.push(ValidatedParameter::new(
             "Galinstan k",
-            16.5,   // code value
-            16.5,   // Geratherm product data / Plevachuk 2014
+            16.5, // code value
+            16.5, // Geratherm product data / Plevachuk 2014
             "W/m·K",
             0.05,
             crc.clone(),
@@ -331,8 +331,8 @@ impl LiteratureValidation {
         // Literature: 37-43 W/m·K (Barsoum 2001)
         params.push(ValidatedParameter::new(
             "Ti3SiC2 k",
-            40.0,   // code value
-            40.0,   // Barsoum, Am. Ceramic Soc. Bull. 80 (2001)
+            40.0, // code value
+            40.0, // Barsoum, Am. Ceramic Soc. Bull. 80 (2001)
             "W/m·K",
             0.10,
             asm.clone(),
@@ -343,8 +343,8 @@ impl LiteratureValidation {
         // Literature: 0.6 W/m·K at 25°C (for comparison)
         params.push(ValidatedParameter::new(
             "Water k (reference)",
-            0.6,    // Not in code, but used as reference
-            0.598,  // CRC Handbook
+            0.6,   // Not in code, but used as reference
+            0.598, // CRC Handbook
             "W/m·K",
             0.05,
             crc.clone(),
@@ -355,8 +355,8 @@ impl LiteratureValidation {
         // Literature: 400-500 J/kg·K typical for HEAs
         params.push(ValidatedParameter::new(
             "HEA Cp",
-            450.0,  // code value
-            450.0,  // Literature typical value
+            450.0, // code value
+            450.0, // Literature typical value
             "J/kg·K",
             0.15,
             hea_ref,
@@ -386,7 +386,8 @@ impl LiteratureValidation {
 
         let was = LiteratureReference {
             key: "Was2017".to_string(),
-            citation: "Was, Fundamentals of Radiation Materials Science, 2nd ed., Springer (2017)".to_string(),
+            citation: "Was, Fundamentals of Radiation Materials Science, 2nd ed., Springer (2017)"
+                .to_string(),
             doi: Some("10.1007/978-1-4939-3438-6".to_string()),
             year: 2017,
         };
@@ -409,8 +410,8 @@ impl LiteratureValidation {
         // Literature: 800-1500 MPa for BCC refractory HEAs
         params.push(ValidatedParameter::new(
             "HEA yield strength",
-            800e6,  // code value (Pa)
-            900e6,  // Literature lower end for well-annealed
+            800e6, // code value (Pa)
+            900e6, // Literature lower end for well-annealed
             "Pa",
             0.15,
             miracle.clone(),
@@ -421,8 +422,8 @@ impl LiteratureValidation {
         // Literature: 8-12 × 10⁻⁶ /K for refractory HEAs
         params.push(ValidatedParameter::new(
             "HEA α (thermal expansion)",
-            10e-6,  // code value (1/K)
-            10e-6,  // Literature midpoint
+            10e-6, // code value (1/K)
+            10e-6, // Literature midpoint
             "1/K",
             0.20,
             miracle.clone(),
@@ -433,8 +434,8 @@ impl LiteratureValidation {
         // Literature: Ed ≈ 25 eV for most metals (Was 2017, Ch. 2)
         params.push(ValidatedParameter::new(
             "Displacement energy Ed",
-            25.0,   // code value (eV)
-            25.0,   // Standard value for metals
+            25.0, // code value (eV)
+            25.0, // Standard value for metals
             "eV",
             0.20,
             was.clone(),
@@ -446,8 +447,8 @@ impl LiteratureValidation {
         // Ferritic steels: ~100 DPA, Ni alloys: ~30 DPA
         params.push(ValidatedParameter::new(
             "Critical DPA (Fe)",
-            100.0,  // code value
-            100.0,  // Zinkle & Snead 2014
+            100.0, // code value
+            100.0, // Zinkle & Snead 2014
             "DPA",
             0.30,
             zinkle.clone(),
@@ -459,8 +460,8 @@ impl LiteratureValidation {
         // Tsai et al., Acta Materialia 61 (2013) 4887-4897
         params.push(ValidatedParameter::new(
             "HEA diffusion slowdown",
-            3.0,    // code uses 3x enhancement for sluggish diffusion healing
-            3.0,    // Literature: 2-4x slower
+            3.0, // code uses 3x enhancement for sluggish diffusion healing
+            3.0, // Literature: 2-4x slower
             "factor",
             0.25,
             miracle.clone(),
@@ -475,7 +476,8 @@ impl LiteratureValidation {
     fn validate_radiation_damage() -> ValidationResult {
         let was = LiteratureReference {
             key: "Was2017".to_string(),
-            citation: "Was, Fundamentals of Radiation Materials Science, 2nd ed., Springer (2017)".to_string(),
+            citation: "Was, Fundamentals of Radiation Materials Science, 2nd ed., Springer (2017)"
+                .to_string(),
             doi: Some("10.1007/978-1-4939-3438-6".to_string()),
             year: 2017,
         };
@@ -493,8 +495,8 @@ impl LiteratureValidation {
         // Literature: ~0.8 of PKA energy goes to atomic displacement
         params.push(ValidatedParameter::new(
             "K-P damage efficiency",
-            0.8,    // code value
-            0.8,    // Standard K-P model
+            0.8, // code value
+            0.8, // Standard K-P model
             "",
             0.05,
             was.clone(),
@@ -506,10 +508,10 @@ impl LiteratureValidation {
         // Average transfer ~0.5 * T_max
         params.push(ValidatedParameter::new(
             "PKA energy (14 MeV n on Ti)",
-            550.0,  // code gives ~580 keV
-            550.0,  // Theoretical maximum transfer
+            550.0, // code gives ~580 keV
+            550.0, // Theoretical maximum transfer
             "keV",
-            0.30,   // Higher tolerance - depends on scattering angle
+            0.30, // Higher tolerance - depends on scattering angle
             was.clone(),
             "Varies with scattering angle; code uses average",
         ));
@@ -522,7 +524,7 @@ impl LiteratureValidation {
             5000.0, // code produces ~5000-10000
             6000.0, // NRT estimate for ~600 keV PKA
             "displacements",
-            0.40,   // Wide tolerance - highly variable
+            0.40, // Wide tolerance - highly variable
             stoller.clone(),
             "NRT formula; actual cascades are complex",
         ));
@@ -531,8 +533,8 @@ impl LiteratureValidation {
         // Literature: 0.1-0.2 eV for stage I recovery (close pairs)
         params.push(ValidatedParameter::new(
             "V-I recombination E_a",
-            0.1,    // code value (eV)
-            0.15,   // Literature typical
+            0.1,  // code value (eV)
+            0.15, // Literature typical
             "eV",
             0.35,
             was.clone(),
@@ -543,8 +545,8 @@ impl LiteratureValidation {
         // Literature: 1.0-2.0 eV for vacancy migration (stage III)
         params.push(ValidatedParameter::new(
             "Thermal annealing E_a",
-            1.5,    // code value (eV)
-            1.5,    // Literature midpoint
+            1.5, // code value (eV)
+            1.5, // Literature midpoint
             "eV",
             0.20,
             was,
@@ -591,8 +593,8 @@ impl LiteratureValidation {
         // E_n = 14.07 MeV (from kinematics)
         params.push(ValidatedParameter::new(
             "D-T neutron energy",
-            14.1,   // code value (MeV)
-            14.07,  // Literature
+            14.1,  // code value (MeV)
+            14.07, // Literature
             "MeV",
             0.01,
             nrl.clone(),
@@ -604,10 +606,10 @@ impl LiteratureValidation {
         // 50/50 split → average 3.65 MeV
         params.push(ValidatedParameter::new(
             "D-D Q-value (avg)",
-            3.27,   // code value - uses neutron branch
-            3.65,   // Branch-averaged
+            3.27, // code value - uses neutron branch
+            3.65, // Branch-averaged
             "MeV",
-            0.15,   // Code uses neutron branch specifically
+            0.15, // Code uses neutron branch specifically
             nrl.clone(),
             "Code uses neutron branch (3.27 MeV) for conservatism",
         ));
@@ -616,8 +618,8 @@ impl LiteratureValidation {
         // E_n = 2.45 MeV (He3 + n branch)
         params.push(ValidatedParameter::new(
             "D-D neutron energy",
-            2.45,   // code value (MeV)
-            2.45,   // Literature
+            2.45, // code value (MeV)
+            2.45, // Literature
             "MeV",
             0.01,
             nrl.clone(),
@@ -629,10 +631,10 @@ impl LiteratureValidation {
         // But ignition can occur at lower T
         params.push(ValidatedParameter::new(
             "D-T optimal T (reactivity peak)",
-            10.0,   // code value (keV)
-            15.0,   // Literature peak
+            10.0, // code value (keV)
+            15.0, // Literature peak
             "keV",
-            0.40,   // Code uses lower value (ignition, not peak)
+            0.40, // Code uses lower value (ignition, not peak)
             iter,
             "Code uses ignition temperature, not peak reactivity",
         ));
@@ -653,7 +655,10 @@ impl LiteratureValidation {
 
         for result in &self.results {
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            println!("  {} ({}/{})", result.category, result.valid_count, result.total_count);
+            println!(
+                "  {} ({}/{})",
+                result.category, result.valid_count, result.total_count
+            );
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             println!();
 
@@ -676,7 +681,10 @@ impl LiteratureValidation {
         println!();
         println!("  Total parameters validated: {}", total_count);
         println!("  Parameters within tolerance: {}", total_valid);
-        println!("  Overall pass rate: {:.1}%", 100.0 * total_valid as f64 / total_count as f64);
+        println!(
+            "  Overall pass rate: {:.1}%",
+            100.0 * total_valid as f64 / total_count as f64
+        );
         println!();
 
         if total_valid == total_count {
@@ -716,8 +724,11 @@ mod tests {
 
         // Check each category has parameters
         for result in &validation.results {
-            assert!(!result.parameters.is_empty(),
-                    "Category {} should have parameters", result.category);
+            assert!(
+                !result.parameters.is_empty(),
+                "Category {} should have parameters",
+                result.category
+            );
         }
     }
 
@@ -795,17 +806,25 @@ mod tests {
         let fusion = LiteratureValidation::validate_fusion_parameters();
 
         // D-T neutron energy must be within 1%
-        let dt_neutron = fusion.parameters.iter()
+        let dt_neutron = fusion
+            .parameters
+            .iter()
             .find(|p| p.name == "D-T neutron energy")
             .expect("Should have D-T neutron energy");
-        assert!(dt_neutron.relative_error < 0.01,
-                "D-T neutron energy must be within 1%");
+        assert!(
+            dt_neutron.relative_error < 0.01,
+            "D-T neutron energy must be within 1%"
+        );
 
         // D-D neutron energy must be within 1%
-        let dd_neutron = fusion.parameters.iter()
+        let dd_neutron = fusion
+            .parameters
+            .iter()
             .find(|p| p.name == "D-D neutron energy")
             .expect("Should have D-D neutron energy");
-        assert!(dd_neutron.relative_error < 0.01,
-                "D-D neutron energy must be within 1%");
+        assert!(
+            dd_neutron.relative_error < 0.01,
+            "D-D neutron energy must be within 1%"
+        );
     }
 }

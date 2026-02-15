@@ -116,19 +116,19 @@ fn enroll_social_recovery_factor(did: &str, trustees: &[String]) -> ExternResult
     match response {
         ZomeCallResponse::Ok(_) => Ok(()),
         ZomeCallResponse::Unauthorized(_, _, _, _) => {
-            debug!("MFA zome unauthorized - recovery setup without MFA factor enrollment");
+            warn!("MFA zome unauthorized - recovery setup WITHOUT MFA factor enrollment");
             Ok(())
         }
         ZomeCallResponse::NetworkError(err) => {
-            debug!("MFA network error during factor enrollment: {}", err);
+            warn!("MFA network error during factor enrollment: {} - recovery setup WITHOUT MFA", err);
             Ok(())
         }
         ZomeCallResponse::CountersigningSession(err) => {
-            debug!("MFA countersigning error during factor enrollment: {}", err);
+            warn!("MFA countersigning error during factor enrollment: {} - recovery setup WITHOUT MFA", err);
             Ok(())
         }
         ZomeCallResponse::AuthenticationFailed(_, _) => {
-            debug!("MFA authentication failed during factor enrollment");
+            warn!("MFA authentication failed - recovery setup WITHOUT MFA factor enrollment");
             Ok(())
         }
     }
@@ -299,6 +299,30 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
     if input.reason.is_empty() || input.reason.len() > 2048 {
         return Err(wasm_error!(WasmErrorInner::Guest("Reason must be 1-2048 characters".into())));
     }
+
+    // Rate limit: Only 1 active (Pending/Approved/ReadyToExecute) recovery request per DID
+    let did_hash = string_to_entry_hash(&input.did);
+    let request_links = get_links(
+        LinkQuery::try_new(did_hash, LinkTypes::DidToRecoveryRequest)?,
+        GetStrategy::default(),
+    )?;
+    for link in &request_links {
+        if let Ok(action_hash) = ActionHash::try_from(link.target.clone()) {
+            if let Ok(Some(record)) = get(action_hash, GetOptions::default()) {
+                if let Ok(Some(req)) = record.entry().to_app_option::<RecoveryRequest>() {
+                    match req.status {
+                        RecoveryStatus::Pending | RecoveryStatus::Approved | RecoveryStatus::ReadyToExecute => {
+                            return Err(wasm_error!(WasmErrorInner::Guest(
+                                "An active recovery request already exists for this DID. Cancel it first.".into()
+                            )));
+                        }
+                        _ => {} // Completed/Rejected/Cancelled — allow new request
+                    }
+                }
+            }
+        }
+    }
+
     // Verify recovery config exists
     let config_record = get_recovery_config(input.did.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -333,6 +357,10 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let request_id = format!("recovery:{}:{}", input.did, now.as_micros());
 
+    // Save values for bridge event before they are moved
+    let did_for_event = input.did.clone();
+    let initiator_for_event = input.initiator_did.clone();
+
     let request = RecoveryRequest {
         id: request_id.clone(),
         did: input.did.clone(),
@@ -354,6 +382,9 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
         (),
     )?;
 
+    // Save request_id for bridge event before it's moved
+    let request_id_for_event = request_id.clone();
+
     // Create initial approval vote from initiator
     let vote = RecoveryVote {
         request_id,
@@ -371,6 +402,45 @@ pub fn initiate_recovery(input: InitiateRecoveryInput) -> ExternResult<Record> {
         LinkTypes::RequestToVotes,
         (),
     )?;
+
+    // Broadcast RecoveryInitiated event to bridge for ecosystem-wide awareness
+    {
+        #[derive(Serialize, Deserialize, Debug)]
+        struct BroadcastEventInput {
+            event_type: String,
+            subject: String,
+            payload: String,
+            source_happ: String,
+        }
+
+        let payload = serde_json::json!({
+            "did": did_for_event,
+            "initiated_by": initiator_for_event,
+            "request_id": request_id_for_event,
+            "event": "recovery_initiated",
+        })
+        .to_string();
+
+        let event_input = BroadcastEventInput {
+            event_type: "RecoveryInitiated".to_string(),
+            subject: did_for_event.to_string(),
+            payload,
+            source_happ: "mycelix-identity".to_string(),
+        };
+
+        match call(
+            CallTargetCell::Local,
+            ZomeName::new("identity_bridge"),
+            FunctionName::new("broadcast_event"),
+            None,
+            event_input,
+        ) {
+            Ok(ZomeCallResponse::Ok(_)) => {}
+            _ => {
+                debug!("Bridge notification failed for RecoveryInitiated event - non-critical");
+            }
+        }
+    }
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -400,6 +470,15 @@ pub fn vote_on_recovery(input: VoteOnRecoveryInput) -> ExternResult<Record> {
         if comment.len() > 2048 {
             return Err(wasm_error!(WasmErrorInner::Guest("Comment must be under 2048 characters".into())));
         }
+    }
+
+    // Verify caller is the claimed trustee
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.trustee_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Caller must be the claimed trustee".into()
+        )));
     }
 
     // Verify voter has sufficient MFA assurance
@@ -730,6 +809,15 @@ pub fn execute_recovery(request_id: String) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Invalid recovery request".into()
         )))?;
+
+    // Verify caller is the designated new agent or the recovery initiator
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if caller != current_request.new_agent && caller_did != current_request.initiated_by {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the designated new agent or recovery initiator can execute recovery".into()
+        )));
+    }
 
     // Verify status allows execution
     if current_request.status != RecoveryStatus::Approved

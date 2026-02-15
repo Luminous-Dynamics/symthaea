@@ -150,6 +150,9 @@ pub struct PrefrontalCortex {
     time_step: u64,
     /// Statistics
     stats: PrefrontalStats,
+    /// Items evicted with high enough activation to graduate to episodic memory.
+    /// Drained by callers via `drain_graduates()`.
+    graduation_queue: Vec<WorkingMemoryItem>,
 }
 
 /// Statistics for prefrontal operations
@@ -165,7 +168,16 @@ pub struct PrefrontalStats {
     pub tasks_completed: u64,
     /// Average working memory utilization
     pub avg_memory_utilization: f32,
+    /// Total items graduated to episodic memory
+    pub graduations: u64,
+    /// Total items evicted without graduation (below threshold)
+    pub evictions_dropped: u64,
 }
+
+/// Minimum activation level for an evicted item to graduate to episodic memory.
+/// Items below this threshold are silently dropped; those above are queued for
+/// graduation to episodic storage via the MemoryCoordinator.
+const GRADUATION_ACTIVATION_THRESHOLD: f32 = 0.3;
 
 impl PrefrontalCortex {
     /// Create a new prefrontal cortex
@@ -177,10 +189,15 @@ impl PrefrontalCortex {
             current_focus: None,
             time_step: 0,
             stats: PrefrontalStats::default(),
+            graduation_queue: Vec::new(),
         }
     }
 
-    /// Advance time and decay activations
+    /// Advance time and decay activations.
+    ///
+    /// Items that decay below the minimum threshold are evicted. If their
+    /// activation is above `GRADUATION_ACTIVATION_THRESHOLD`, they are queued
+    /// for graduation to episodic memory rather than being silently dropped.
     pub fn tick(&mut self) {
         self.time_step += 1;
 
@@ -189,17 +206,35 @@ impl PrefrontalCortex {
             item.decay(self.config.attention_decay);
         }
 
-        // Remove items with zero activation
-        self.working_memory.retain(|item| item.activation > 0.01);
+        // Partition: items below minimum activation are evicted
+        let mut kept = VecDeque::with_capacity(self.working_memory.len());
+        for item in self.working_memory.drain(..) {
+            if item.activation > 0.01 {
+                kept.push_back(item);
+            } else if item.activation >= GRADUATION_ACTIVATION_THRESHOLD || item.rehearsal_count > 0
+            {
+                // High enough residual activation or rehearsed → graduate
+                self.stats.graduations += 1;
+                self.graduation_queue.push(item);
+            } else {
+                self.stats.evictions_dropped += 1;
+            }
+        }
+        self.working_memory = kept;
 
         // Update average memory utilization
-        let utilization = self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
+        let utilization =
+            self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
         let n = (self.time_step as f32).max(1.0);
         self.stats.avg_memory_utilization =
             (self.stats.avg_memory_utilization * (n - 1.0) + utilization) / n;
     }
 
-    /// Add item to working memory
+    /// Add item to working memory.
+    ///
+    /// When at capacity, the lowest-activation item is evicted. Evicted items
+    /// with activation above `GRADUATION_ACTIVATION_THRESHOLD` are queued for
+    /// graduation to episodic memory.
     pub fn add_to_memory(&mut self, mut item: WorkingMemoryItem) -> bool {
         // Check if already in memory
         if self.working_memory.iter().any(|i| i.id == item.id) {
@@ -213,12 +248,21 @@ impl PrefrontalCortex {
         // Check capacity
         if self.working_memory.len() >= self.config.working_memory_capacity {
             // Remove lowest activation item
-            if let Some(min_idx) = self.working_memory.iter()
+            if let Some(min_idx) = self
+                .working_memory
+                .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.activation.total_cmp(&b.activation))
                 .map(|(i, _)| i)
             {
-                self.working_memory.remove(min_idx);
+                if let Some(evicted) = self.working_memory.remove(min_idx) {
+                    if evicted.activation >= GRADUATION_ACTIVATION_THRESHOLD {
+                        self.stats.graduations += 1;
+                        self.graduation_queue.push(evicted);
+                    } else {
+                        self.stats.evictions_dropped += 1;
+                    }
+                }
             }
         }
 
@@ -256,14 +300,18 @@ impl PrefrontalCortex {
         let mut inhibited = Vec::new();
 
         // Update action statuses based on dependencies
-        let completed_ids: Vec<_> = self.action_stack.iter()
+        let completed_ids: Vec<_> = self
+            .action_stack
+            .iter()
             .filter(|a| a.status == ActionStatus::Completed)
             .map(|a| a.id.clone())
             .collect();
 
         for action in self.action_stack.iter_mut() {
             if action.status == ActionStatus::Pending {
-                let deps_met = action.dependencies.iter()
+                let deps_met = action
+                    .dependencies
+                    .iter()
                     .all(|d| completed_ids.contains(d));
                 if deps_met {
                     action.status = ActionStatus::Ready;
@@ -272,14 +320,20 @@ impl PrefrontalCortex {
         }
 
         // Get ready actions
-        let ready_actions: Vec<_> = self.action_stack.iter()
+        let ready_actions: Vec<_> = self
+            .action_stack
+            .iter()
             .filter(|a| a.status == ActionStatus::Ready)
             .collect();
 
-        reasoning.push(format!("{} actions ready for execution", ready_actions.len()));
+        reasoning.push(format!(
+            "{} actions ready for execution",
+            ready_actions.len()
+        ));
 
         // Apply inhibition to low-priority actions when capacity is limited
-        let memory_utilization = self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
+        let memory_utilization =
+            self.working_memory.len() as f32 / self.config.working_memory_capacity as f32;
 
         if memory_utilization > self.config.inhibition_threshold {
             reasoning.push("Memory utilization high, applying inhibition".to_string());
@@ -294,7 +348,9 @@ impl PrefrontalCortex {
         }
 
         // Select highest priority ready action
-        let selected = self.action_stack.iter_mut()
+        let selected = self
+            .action_stack
+            .iter_mut()
             .filter(|a| a.status == ActionStatus::Ready)
             .max_by(|a, b| a.priority.total_cmp(&b.priority))
             .map(|a| {
@@ -303,7 +359,11 @@ impl PrefrontalCortex {
             });
 
         let confidence = if selected.is_some() {
-            let action = self.action_stack.iter().find(|a| Some(&a.id) == selected.as_ref()).unwrap();
+            let action = self
+                .action_stack
+                .iter()
+                .find(|a| Some(&a.id) == selected.as_ref())
+                .unwrap();
             action.priority
         } else {
             0.0
@@ -344,6 +404,14 @@ impl PrefrontalCortex {
         &self.stats
     }
 
+    /// Drain graduated items from the internal queue.
+    ///
+    /// Call this after `tick()` or `add_to_memory()` to retrieve evicted items
+    /// that are candidates for episodic memory storage.
+    pub fn drain_graduates(&mut self) -> Vec<WorkingMemoryItem> {
+        self.graduation_queue.drain(..).collect()
+    }
+
     /// Plan a sequence of actions to achieve a goal
     pub fn plan(&self, goal: &ContinuousHV, available_actions: &[PlannedAction]) -> Vec<String> {
         // Simple greedy planning: select actions that move toward goal
@@ -357,7 +425,8 @@ impl PrefrontalCortex {
             }
 
             // Find action whose expected outcome is most similar to goal
-            let best_idx = remaining_actions.iter()
+            let best_idx = remaining_actions
+                .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| {
                     let sim_a = a.expected_outcome.similarity(&current_state);
@@ -410,7 +479,10 @@ mod tests {
         let mut pfc = PrefrontalCortex::new(config);
 
         for i in 0..5 {
-            let item = WorkingMemoryItem::new(format!("item{}", i), ContinuousHV::random(512, 0xCAFE_0002 + i as u64));
+            let item = WorkingMemoryItem::new(
+                format!("item{}", i),
+                ContinuousHV::random(512, 0xCAFE_0002 + i as u64),
+            );
             pfc.add_to_memory(item);
         }
 
@@ -426,6 +498,58 @@ mod tests {
 
         assert!(pfc.set_focus("focus_test"));
         assert_eq!(pfc.current_focus(), Some("focus_test"));
+    }
+
+    #[test]
+    fn test_eviction_graduates_high_activation() {
+        let mut config = PrefrontalConfig::default();
+        config.working_memory_capacity = 2;
+        let mut pfc = PrefrontalCortex::new(config);
+
+        // Add two items
+        let mut item1 = WorkingMemoryItem::new("high", ContinuousHV::random(512, 1));
+        item1.activation = 0.8; // Above graduation threshold
+        pfc.add_to_memory(item1);
+
+        let item2 = WorkingMemoryItem::new("stay", ContinuousHV::random(512, 2));
+        pfc.add_to_memory(item2);
+
+        // Adding a third should evict the lowest-activation one
+        // item2 has activation 1.0 (fresh), item1 has 0.8 — item1 is evicted
+        let item3 = WorkingMemoryItem::new("new", ContinuousHV::random(512, 3));
+        pfc.add_to_memory(item3);
+
+        // The evicted high-activation item should be in the graduation queue
+        let graduates = pfc.drain_graduates();
+        assert_eq!(graduates.len(), 1);
+        assert_eq!(graduates[0].id, "high");
+        assert!(graduates[0].activation >= GRADUATION_ACTIVATION_THRESHOLD);
+        assert_eq!(pfc.stats.graduations, 1);
+    }
+
+    #[test]
+    fn test_eviction_drops_low_activation() {
+        let mut config = PrefrontalConfig::default();
+        config.working_memory_capacity = 2;
+        let mut pfc = PrefrontalCortex::new(config);
+
+        let mut item1 = WorkingMemoryItem::new("low", ContinuousHV::random(512, 1));
+        item1.activation = 0.1; // Below graduation threshold
+        pfc.add_to_memory(item1);
+
+        let item2 = WorkingMemoryItem::new("stay", ContinuousHV::random(512, 2));
+        pfc.add_to_memory(item2);
+
+        // Evict the low-activation item
+        let item3 = WorkingMemoryItem::new("new", ContinuousHV::random(512, 3));
+        pfc.add_to_memory(item3);
+
+        let graduates = pfc.drain_graduates();
+        assert!(
+            graduates.is_empty(),
+            "Low-activation items should not graduate"
+        );
+        assert_eq!(pfc.stats.evictions_dropped, 1);
     }
 
     #[test]

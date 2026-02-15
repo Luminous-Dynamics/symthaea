@@ -13,27 +13,23 @@
 // ============================================================================
 
 mod repl_cognitive_fep_motor_integration {
-    use symthaea::repl::{ReplSession, ReplSessionConfig};
-    use symthaea::cognitive_loop::{
-        CognitiveLoopService, CognitiveLoopConfig,
-        CycleResult,
-    };
-    use symthaea::consciousness::fep_active_inference::{
-        ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation,
-        EnhancedFEPBridge, MotorCommandType,
-    };
     use symthaea::action::{
-        ActionIR, PolicyBundle, SandboxRoot, SimpleExecutor, ExecutionMode,
-        DestructivenessLevel,
+        ActionIR, DestructivenessLevel, ExecutionMode, PolicyBundle, SandboxRoot, SimpleExecutor,
     };
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, CycleResult};
+    use symthaea::consciousness::fep_active_inference::{
+        ActiveInferenceAgent, ActiveInferenceAgentConfig, EnhancedFEPBridge, MotorCommandType,
+        Observation,
+    };
+    use symthaea::repl::{ReplSession, ReplSessionConfig};
 
     /// Test the complete perception-action cycle through the cognitive loop
     #[test]
     fn test_cognitive_loop_perception_action_cycle() {
         // Initialize cognitive loop with CfC backend
         let config = CognitiveLoopConfig::with_cfc();
-        let mut service = CognitiveLoopService::new(config)
-            .expect("Failed to create cognitive loop service");
+        let mut service =
+            CognitiveLoopService::new(config).expect("Failed to create cognitive loop service");
 
         // Process several inputs to establish a perception-action cycle
         let inputs = [
@@ -60,7 +56,10 @@ mod repl_cognitive_fep_motor_integration {
 
         // Verify consciousness metrics are being computed
         assert!(snapshot.unified_phi >= 0.0, "Phi must be non-negative");
-        assert!(snapshot.temporal_coherence >= 0.0, "Coherence must be non-negative");
+        assert!(
+            snapshot.temporal_coherence >= 0.0,
+            "Coherence must be non-negative"
+        );
 
         // Verify the cognitive loop stats
         let stats = service.stats();
@@ -80,7 +79,7 @@ mod repl_cognitive_fep_motor_integration {
         let config = ActiveInferenceAgentConfig {
             state_dim: 8,
             obs_dim: 4,
-            num_actions: 8,  // Matches MotorCommandType variants
+            num_actions: 8, // Matches MotorCommandType variants
             inference_iterations: 5,
             belief_learning_rate: 0.1,
             planning_horizon: 3,
@@ -118,16 +117,25 @@ mod repl_cognitive_fep_motor_integration {
 
             // Verify motor command type is valid
             let motor_type = MotorCommandType::from_action_index(action_result.action);
-            assert!(motor_type.to_action_index() < 8, "Motor command should be valid");
+            assert!(
+                motor_type.to_action_index() < 8,
+                "Motor command should be valid"
+            );
         }
 
         // Verify the agent learned and adapted
         let summary = agent.summary();
-        assert!(summary.total_cycles == 4, "Should have processed 4 observations");
+        assert!(
+            summary.total_cycles == 4,
+            "Should have processed 4 observations"
+        );
         assert!(!free_energies.is_empty(), "Should have free energy history");
 
         // The agent should have responded to the surprising drop
-        assert!(agent.stats.perception_cycles >= 4, "Should have recorded perception cycles");
+        assert!(
+            agent.stats.perception_cycles >= 4,
+            "Should have recorded perception cycles"
+        );
 
         println!("FEP Motor Generation Test Results:");
         println!("  Actions selected: {:?}", actions_selected);
@@ -184,13 +192,12 @@ mod repl_cognitive_fep_motor_integration {
             max_history: 50,
             temporal_backend: "cfc".to_string(),
             voice_enabled: false,
-            allow_execution: false,  // Simulated mode
+            allow_execution: false, // Simulated mode
             execution_phi_threshold: 0.5,
             ..Default::default()
         };
 
-        let mut session = ReplSession::new(config)
-            .expect("Failed to create REPL session");
+        let mut session = ReplSession::new(config).expect("Failed to create REPL session");
 
         // Warm up the cognitive loop
         session.warmup(3);
@@ -203,8 +210,7 @@ mod repl_cognitive_fep_motor_integration {
         ];
 
         for input in &inputs {
-            let result = session.process(input)
-                .expect("Failed to process input");
+            let result = session.process(input).expect("Failed to process input");
 
             // Verify response was generated
             assert!(!result.response.is_empty(), "Response should not be empty");
@@ -219,7 +225,10 @@ mod repl_cognitive_fep_motor_integration {
         // Check session statistics
         let stats = session.stats();
         assert_eq!(stats.total_interactions, 3, "Should have 3 interactions");
-        assert!(stats.total_cycles >= 9, "Should have run at least 9 cycles (3 per input)");
+        assert!(
+            stats.total_cycles >= 9,
+            "Should have run at least 9 cycles (3 per input)"
+        );
 
         // Check history
         assert_eq!(session.history().len(), 3, "History should have 3 entries");
@@ -235,8 +244,7 @@ mod repl_cognitive_fep_motor_integration {
     fn test_action_motor_cortex_execution() {
         // Create policy and sandbox
         let policy = PolicyBundle::restrictive();
-        let sandbox = SandboxRoot::new("test-motor-cortex")
-            .expect("Failed to create sandbox");
+        let sandbox = SandboxRoot::new("test-motor-cortex").expect("Failed to create sandbox");
 
         // Create executor in simulated mode
         let mut executor = SimpleExecutor::new();
@@ -261,17 +269,24 @@ mod repl_cognitive_fep_motor_integration {
         for action in &actions {
             // Check destructiveness classification
             let destructiveness = action.destructiveness();
-            assert!(matches!(
-                destructiveness,
-                DestructivenessLevel::ReadOnly | DestructivenessLevel::Reversible
-            ), "Safe commands should be classified correctly");
+            assert!(
+                matches!(
+                    destructiveness,
+                    DestructivenessLevel::ReadOnly | DestructivenessLevel::Reversible
+                ),
+                "Safe commands should be classified correctly"
+            );
 
             // Validate against policy
             let validation = action.validate(&policy, &sandbox);
-            assert!(validation.is_ok(), "Valid actions should pass policy: {:?}", validation);
+            assert!(
+                validation.is_ok(),
+                "Valid actions should pass policy: {:?}",
+                validation
+            );
 
             // In simulated mode, execution returns simulated outcome
-            let result = executor.execute(&action, &policy, &sandbox);
+            let result = executor.execute(action, &policy, &sandbox);
             assert!(result.is_ok(), "Simulated execution should succeed");
         }
 
@@ -283,8 +298,8 @@ mod repl_cognitive_fep_motor_integration {
     fn test_full_perception_to_action_integration() {
         // 1. Initialize cognitive loop
         let cognitive_config = CognitiveLoopConfig::with_cfc();
-        let mut cognitive = CognitiveLoopService::new(cognitive_config)
-            .expect("Failed to create cognitive loop");
+        let mut cognitive =
+            CognitiveLoopService::new(cognitive_config).expect("Failed to create cognitive loop");
 
         // 2. Initialize FEP agent
         let fep_config = ActiveInferenceAgentConfig {
@@ -314,8 +329,14 @@ mod repl_cognitive_fep_motor_integration {
         let action = fep_agent.select_action();
 
         // 6. Verify the complete pipeline
-        assert!(cycle_result.prediction_error.is_finite(), "Prediction error should be finite");
-        assert!(perception.free_energy.total.is_finite(), "Free energy should be finite");
+        assert!(
+            cycle_result.prediction_error.is_finite(),
+            "Prediction error should be finite"
+        );
+        assert!(
+            perception.free_energy.total.is_finite(),
+            "Free energy should be finite"
+        );
         assert!(action.action < 8, "Action should be in valid range");
 
         // Map to motor command
@@ -327,7 +348,10 @@ mod repl_cognitive_fep_motor_integration {
         println!("  Consciousness Phi: {:.4}", snapshot.unified_phi);
         println!("  Free energy: {:.4}", perception.free_energy.total);
         println!("  Selected motor command: {:?}", motor_command);
-        println!("  Action probability: {:.4}", action.action_probabilities[action.action]);
+        println!(
+            "  Action probability: {:.4}",
+            action.action_probabilities[action.action]
+        );
     }
 }
 
@@ -336,28 +360,31 @@ mod repl_cognitive_fep_motor_integration {
 // ============================================================================
 
 mod swarm_consciousness_broadcasting {
-    use symthaea::swarm::{
-        SwarmConfig, SwarmNode, PeerInfo, TrustLevel,
-        ConsciousnessVector, TensorPayload, TensorType, SwarmMessage,
-        Hyperfeel, AffectiveState,
-        HybridHandshake, HandshakeResult,
-        BootstrapConfig,
-        PeerEvent, ServiceStats,
-    };
     use std::collections::HashMap;
+    use symthaea::swarm::{
+        AffectiveState, BootstrapConfig, ConsciousnessVector, HandshakeResult, HybridHandshake,
+        Hyperfeel, PeerEvent, PeerInfo, ServiceStats, SwarmConfig, SwarmMessage, SwarmNode,
+        TensorPayload, TensorType, TrustLevel,
+    };
 
     /// Test basic swarm configuration and node creation
     #[test]
     fn test_swarm_node_initialization() {
         // Test different configuration modes
         let default_config = SwarmConfig::default();
-        assert!(default_config.enable_mdns, "mDNS should be enabled by default");
+        assert!(
+            default_config.enable_mdns,
+            "mDNS should be enabled by default"
+        );
 
         let local_config = SwarmConfig::local_only();
         assert!(!local_config.enable_derp, "DERP disabled for local-only");
 
         let prod_config = SwarmConfig::production();
-        assert_eq!(prod_config.max_peers, 100, "Production should support more peers");
+        assert_eq!(
+            prod_config.max_peers, 100,
+            "Production should support more peers"
+        );
 
         // Create node
         let node = SwarmNode::new(default_config.clone());
@@ -370,9 +397,7 @@ mod swarm_consciousness_broadcasting {
     #[test]
     fn test_consciousness_vector_broadcasting() {
         // Create consciousness vector with attention pattern
-        let attention_pattern: Vec<f32> = (0..64)
-            .map(|i| (i as f32 * 0.1).sin().abs())
-            .collect();
+        let attention_pattern: Vec<f32> = (0..64).map(|i| (i as f32 * 0.1).sin().abs()).collect();
 
         let cv = ConsciousnessVector::new(attention_pattern.clone(), 0.75);
 
@@ -398,8 +423,17 @@ mod swarm_consciousness_broadcasting {
 
         // Verify all vectors have valid structure
         for (i, v) in vectors.iter().enumerate() {
-            assert_eq!(v.attention.len(), 64, "Vector {} should have 64 attention dims", i);
-            assert!(v.phi >= 0.0 && v.phi <= 1.0, "Vector {} phi should be in range", i);
+            assert_eq!(
+                v.attention.len(),
+                64,
+                "Vector {} should have 64 attention dims",
+                i
+            );
+            assert!(
+                v.phi >= 0.0 && v.phi <= 1.0,
+                "Vector {} phi should be in range",
+                i
+            );
         }
 
         println!("Consciousness Vector Broadcasting Test: PASSED");
@@ -439,7 +473,7 @@ mod swarm_consciousness_broadcasting {
                     peer_states.insert(info.node_id.clone(), TrustLevel::Unknown);
                 }
                 PeerEvent::TrustChanged { peer_id, new, .. } => {
-                    peer_states.insert(peer_id.clone(), new.clone());
+                    peer_states.insert(peer_id.clone(), *new);
                 }
                 PeerEvent::ConsciousnessUpdate { .. } => {
                     consciousness_updates += 1;
@@ -451,7 +485,10 @@ mod swarm_consciousness_broadcasting {
             }
         }
 
-        assert_eq!(consciousness_updates, 1, "Should have 1 consciousness update");
+        assert_eq!(
+            consciousness_updates, 1,
+            "Should have 1 consciousness update"
+        );
 
         println!("Peer Event Handling Test: PASSED");
     }
@@ -467,13 +504,20 @@ mod swarm_consciousness_broadcasting {
 
         // Local-dev config
         let local_bootstrap = BootstrapConfig::local_dev();
-        assert!(local_bootstrap.enable_local_discovery, "Local discovery should be enabled");
+        assert!(
+            local_bootstrap.enable_local_discovery,
+            "Local discovery should be enabled"
+        );
 
         // Custom bootstrap nodes
-        let custom_bootstrap = BootstrapConfig::with_nodes(
-            vec!["node1-ticket".to_string(), "node2-ticket".to_string()],
+        let custom_bootstrap = BootstrapConfig::with_nodes(vec![
+            "node1-ticket".to_string(),
+            "node2-ticket".to_string(),
+        ]);
+        assert!(
+            custom_bootstrap.has_bootstrap_nodes(),
+            "Custom config should have nodes"
         );
-        assert!(custom_bootstrap.has_bootstrap_nodes(), "Custom config should have nodes");
 
         println!("Bootstrap Configuration Test: PASSED");
         println!("  Default has bootstrap: {}", has_bootstrap);
@@ -501,7 +545,11 @@ mod swarm_consciousness_broadcasting {
 
         // Check swarm state
         assert_eq!(hyperfeel.peer_count(), 3, "Should have 3 peers");
-        assert_eq!(hyperfeel.active_peer_count(), 3, "All peers should be active");
+        assert_eq!(
+            hyperfeel.active_peer_count(),
+            3,
+            "All peers should be active"
+        );
 
         // Get swarm coherence
         let coherence = hyperfeel.coherence();
@@ -509,7 +557,10 @@ mod swarm_consciousness_broadcasting {
 
         // Get swarm health status
         let status = hyperfeel.how_are_we_doing();
-        assert!(!status.message.is_empty(), "Status message should be generated");
+        assert!(
+            !status.message.is_empty(),
+            "Status message should be generated"
+        );
 
         println!("Hyperfeel Swarm Coherence Test: PASSED");
         println!("  Swarm alignment: {:.4}", coherence.alignment);
@@ -533,20 +584,23 @@ mod swarm_consciousness_broadcasting {
         }
 
         // Check pending count
-        assert_eq!(handshake.pending_count(), 1, "Should have 1 pending challenge");
+        assert_eq!(
+            handshake.pending_count(),
+            1,
+            "Should have 1 pending challenge"
+        );
 
         // Test handshake result creation
-        let success_result = HandshakeResult::success(
-            "peer-123",
-            "agent-key-123",
-            TrustLevel::Verified(0.8),
-            150,
-        );
+        let success_result =
+            HandshakeResult::success("peer-123", "agent-key-123", TrustLevel::Verified(0.8), 150);
         assert!(success_result.streaming_allowed, "Should allow streaming");
         assert_eq!(success_result.handshake_time_ms, 150);
 
         let failed_result = HandshakeResult::failed("peer-456");
-        assert!(!failed_result.streaming_allowed, "Failed handshake should not allow streaming");
+        assert!(
+            !failed_result.streaming_allowed,
+            "Failed handshake should not allow streaming"
+        );
 
         println!("Handshake Trust Verification Test: PASSED");
     }
@@ -568,7 +622,7 @@ mod swarm_consciousness_broadcasting {
             let payload = TensorPayload {
                 data: vec![0.1, 0.2, 0.3, 0.4],
                 shape: vec![2, 2],
-                tensor_type: tensor_type.clone(),
+                tensor_type: *tensor_type,
                 source: "test-layer".to_string(),
                 timestamp_ms: 12345,
             };
@@ -608,8 +662,7 @@ mod swarm_consciousness_broadcasting {
 
 mod phi_guided_architecture_search {
     use symthaea_core::hdc::phi_guided_search::{
-        PhiGuidedOptimizer, PhiOptimizationConfig,
-        ConsciousnessNetwork, InitializationStrategy,
+        ConsciousnessNetwork, InitializationStrategy, PhiGuidedOptimizer, PhiOptimizationConfig,
     };
     use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 
@@ -666,12 +719,20 @@ mod phi_guided_architecture_search {
         // Ring topology
         let mut ring_network = ConsciousnessNetwork::random(n_nodes, 256, 42);
         InitializationStrategy::Ring.apply(&mut ring_network, 0);
-        assert_eq!(ring_network.edge_count(), n_nodes, "Ring should have n edges");
+        assert_eq!(
+            ring_network.edge_count(),
+            n_nodes,
+            "Ring should have n edges"
+        );
 
         // Star topology
         let mut star_network = ConsciousnessNetwork::random(n_nodes, 256, 42);
         InitializationStrategy::Star.apply(&mut star_network, 0);
-        assert_eq!(star_network.edge_count(), n_nodes - 1, "Star should have n-1 edges");
+        assert_eq!(
+            star_network.edge_count(),
+            n_nodes - 1,
+            "Star should have n-1 edges"
+        );
 
         // Fully connected
         let mut full_network = ConsciousnessNetwork::random(n_nodes, 256, 42);
@@ -685,7 +746,10 @@ mod phi_guided_architecture_search {
         // Small-world
         let mut sw_network = ConsciousnessNetwork::random(n_nodes, 256, 42);
         InitializationStrategy::SmallWorld { rewire_prob: 0.3 }.apply(&mut sw_network, 0);
-        assert!(sw_network.edge_count() >= n_nodes, "Small-world should have at least ring edges");
+        assert!(
+            sw_network.edge_count() >= n_nodes,
+            "Small-world should have at least ring edges"
+        );
 
         println!("Initialization Strategies Test: PASSED");
     }
@@ -756,7 +820,10 @@ mod phi_guided_architecture_search {
 
         // Verify momentum is being used (edges should have momentum values after updates)
         let has_momentum = network.edges.iter().any(|e| e.momentum.abs() > 1e-10);
-        assert!(has_momentum || network.edges.is_empty(), "Momentum should be updated");
+        assert!(
+            has_momentum || network.edges.is_empty(),
+            "Momentum should be updated"
+        );
     }
 
     /// Test evolution over generations
@@ -799,11 +866,16 @@ mod phi_guided_architecture_search {
         println!("  Final Phi: {:.6}", summary.final_phi);
         println!("  Best Phi: {:.6}", summary.best_phi);
         println!("  Change: {:+.6}", phi_change);
-        println!("  Avg improvement per step: {:.8}", summary.avg_improvement_per_step());
+        println!(
+            "  Avg improvement per step: {:.8}",
+            summary.avg_improvement_per_step()
+        );
 
         // Verify best_phi is tracked correctly
-        assert!(summary.best_phi >= summary.final_phi.min(summary.initial_phi),
-            "Best Phi should be at least as good as initial or final");
+        assert!(
+            summary.best_phi >= summary.final_phi.min(summary.initial_phi),
+            "Best Phi should be at least as good as initial or final"
+        );
     }
 
     /// Test optimizer reset functionality
@@ -819,15 +891,25 @@ mod phi_guided_architecture_search {
         optimizer.optimize(&mut network, 5);
 
         // Check state before reset
-        assert!(!optimizer.history().is_empty(), "History should not be empty");
+        assert!(
+            !optimizer.history().is_empty(),
+            "History should not be empty"
+        );
         assert!(optimizer.best_phi() > 0.0 || optimizer.best_phi() == 0.0);
 
         // Reset
         optimizer.reset();
 
         // Verify reset
-        assert!(optimizer.history().is_empty(), "History should be empty after reset");
-        assert_eq!(optimizer.best_phi(), 0.0, "Best Phi should be 0 after reset");
+        assert!(
+            optimizer.history().is_empty(),
+            "History should be empty after reset"
+        );
+        assert_eq!(
+            optimizer.best_phi(),
+            0.0,
+            "Best Phi should be 0 after reset"
+        );
 
         println!("Optimizer Reset Test: PASSED");
     }
@@ -843,7 +925,7 @@ mod phi_guided_architecture_search {
         network.add_edge(2, 3, 0.6);
         network.add_edge(3, 4, 1.0);
         network.add_edge(4, 5, 0.7);
-        network.add_edge(5, 0, 0.9);  // Complete the ring
+        network.add_edge(5, 0, 0.9); // Complete the ring
 
         let representations = network.to_node_representations();
 
@@ -857,7 +939,7 @@ mod phi_guided_architecture_search {
         let calculator = ConnectivityCalculator::new();
         let phi = calculator.algebraic_connectivity(&representations);
 
-        assert!(phi >= 0.0 && phi <= 1.0, "Phi should be in [0, 1]");
+        assert!((0.0..=1.0).contains(&phi), "Phi should be in [0, 1]");
 
         println!("Node Representations Test: PASSED");
         println!("  Computed Phi: {:.6}", phi);
@@ -907,15 +989,22 @@ mod phi_guided_architecture_search {
         println!("  Best Phi achieved: {:.6}", final_phi);
 
         // Verify trajectory
-        assert_eq!(phi_trajectory.len(), generations, "Should have full trajectory");
+        assert_eq!(
+            phi_trajectory.len(),
+            generations,
+            "Should have full trajectory"
+        );
 
         // Check for convergence or improvement
         let early_avg: f64 = phi_trajectory[..5].iter().sum::<f64>() / 5.0;
-        let late_avg: f64 = phi_trajectory[generations-5..].iter().sum::<f64>() / 5.0;
+        let late_avg: f64 = phi_trajectory[generations - 5..].iter().sum::<f64>() / 5.0;
 
         println!("  Early avg Phi: {:.6}", early_avg);
         println!("  Late avg Phi: {:.6}", late_avg);
-        println!("  Evolution trajectory captured: {} points", phi_trajectory.len());
+        println!(
+            "  Evolution trajectory captured: {} points",
+            phi_trajectory.len()
+        );
 
         // The network should have evolved (edges changed)
         assert!(network.edge_count() > 0, "Network should retain some edges");
@@ -927,14 +1016,13 @@ mod phi_guided_architecture_search {
 // ============================================================================
 
 mod unified_system_integration {
-    use symthaea::cognitive_loop::{CognitiveLoopService, CognitiveLoopConfig};
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
     use symthaea::consciousness::fep_active_inference::{
-        ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation, MotorCommandType,
+        ActiveInferenceAgent, ActiveInferenceAgentConfig, MotorCommandType, Observation,
     };
     use symthaea::swarm::ConsciousnessVector;
     use symthaea_core::hdc::phi_guided_search::{
-        PhiGuidedOptimizer, PhiOptimizationConfig, ConsciousnessNetwork,
-        InitializationStrategy,
+        ConsciousnessNetwork, InitializationStrategy, PhiGuidedOptimizer, PhiOptimizationConfig,
     };
 
     /// Integration test: Cognitive loop -> FEP -> Consciousness broadcast -> Phi optimization
@@ -994,10 +1082,7 @@ mod unified_system_integration {
             })
             .collect();
 
-        let cv = ConsciousnessVector::new(
-            attention_pattern,
-            consciousness.unified_phi as f64,
-        );
+        let cv = ConsciousnessVector::new(attention_pattern, consciousness.unified_phi as f64);
         println!("    Vector Phi: {:.4}", cv.phi);
         println!("    Attention dims: {}", cv.attention.len());
         println!("    Size: {} bytes", cv.estimated_size());
@@ -1022,7 +1107,10 @@ mod unified_system_integration {
         // VERIFICATION
         println!("\n[✓] UNIFIED PIPELINE VERIFICATION");
         assert!(consciousness.unified_phi >= 0.0, "Consciousness Phi valid");
-        assert!(perception.free_energy.total.is_finite(), "Free energy finite");
+        assert!(
+            perception.free_energy.total.is_finite(),
+            "Free energy finite"
+        );
         assert!(cv.phi >= 0.0, "Swarm vector Phi valid");
         assert!(summary.final_phi >= 0.0, "Optimized Phi valid");
 

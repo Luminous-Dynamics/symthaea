@@ -14,8 +14,8 @@
 //! cargo run --example bert_validation --features neural-bridge --release
 //! ```
 
+use anyhow::{Context, Result};
 use std::time::Instant;
-use anyhow::{Result, Context};
 
 #[cfg(feature = "neural-bridge")]
 use candle_core::{DType, Device, Tensor};
@@ -24,7 +24,7 @@ use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
 
 #[cfg(feature = "neural-bridge")]
-use candle_transformers::models::bert::{Config as BertConfig, BertModel};
+use candle_transformers::models::bert::{BertModel, Config as BertConfig};
 
 #[cfg(feature = "neural-bridge")]
 use tokenizers::Tokenizer;
@@ -64,7 +64,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(50).collect();
     let functional: Vec<_> = functional.into_iter().take(50).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load BERT-base
     println!("Loading BERT-base-uncased (12 layers, 768D)...");
@@ -74,11 +78,14 @@ fn run_experiment() -> Result<()> {
     let api = Api::new()?;
     let repo = api.repo(Repo::new("bert-base-uncased".to_string(), RepoType::Model));
 
-    let tokenizer_path = repo.get("tokenizer.json")
+    let tokenizer_path = repo
+        .get("tokenizer.json")
         .context("Failed to download tokenizer")?;
-    let config_path = repo.get("config.json")
+    let config_path = repo
+        .get("config.json")
         .context("Failed to download config")?;
-    let weights_path = repo.get("model.safetensors")
+    let weights_path = repo
+        .get("model.safetensors")
         .or_else(|_| repo.get("pytorch_model.bin"))
         .context("Failed to download weights")?;
 
@@ -88,12 +95,12 @@ fn run_experiment() -> Result<()> {
     let config_str = std::fs::read_to_string(&config_path)?;
     let bert_config: BertConfig = serde_json::from_str(&config_str)?;
 
-    println!("  Config: {} layers, {} hidden dim",
-             bert_config.num_hidden_layers, bert_config.hidden_size);
+    println!(
+        "  Config: {} layers, {} hidden dim",
+        bert_config.num_hidden_layers, bert_config.hidden_size
+    );
 
-    let vb = unsafe {
-        VarBuilder::from_mmaped_safetensors(&[&weights_path], DType::F32, &device)?
-    };
+    let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[&weights_path], DType::F32, &device)? };
     let model = BertModel::load(vb, &bert_config)?;
 
     println!("  Loaded in {:.2}s\n", load_start.elapsed().as_secs_f64());
@@ -114,16 +121,22 @@ fn run_experiment() -> Result<()> {
     println!("   LAYER-WISE ANALYSIS (Final Hidden States)");
     println!("════════════════════════════════════════════════════════════════\n");
 
-    println!("Note: Using BERT's final layer output (layer {}).", bert_config.num_hidden_layers);
+    println!(
+        "Note: Using BERT's final layer output (layer {}).",
+        bert_config.num_hidden_layers
+    );
     println!("Testing with [CLS] token pooling.\n");
 
     // Extract activations for all concepts
     println!("Extracting phenomenal concept activations...");
     let mut phen_activations = Vec::new();
     for (i, concept) in phenomenal.iter().enumerate() {
-        if i % 10 == 0 { print!("  {}/{}\\r", i, phenomenal.len()); }
+        if i % 10 == 0 {
+            print!("  {}/{}\\r", i, phenomenal.len());
+        }
 
-        let encoding = tokenizer.encode(concept.as_str(), true)
+        let encoding = tokenizer
+            .encode(concept.as_str(), true)
             .map_err(|e| anyhow::anyhow!("Tokenization error: {}", e))?;
         let input_ids: Vec<u32> = encoding.get_ids().to_vec();
         let token_type_ids: Vec<u32> = vec![0; input_ids.len()];
@@ -144,9 +157,12 @@ fn run_experiment() -> Result<()> {
     println!("Extracting functional concept activations...");
     let mut func_activations = Vec::new();
     for (i, concept) in functional.iter().enumerate() {
-        if i % 10 == 0 { print!("  {}/{}\\r", i, functional.len()); }
+        if i % 10 == 0 {
+            print!("  {}/{}\\r", i, functional.len());
+        }
 
-        let encoding = tokenizer.encode(concept.as_str(), true)
+        let encoding = tokenizer
+            .encode(concept.as_str(), true)
             .map_err(|e| anyhow::anyhow!("Tokenization error: {}", e))?;
         let input_ids: Vec<u32> = encoding.get_ids().to_vec();
         let token_type_ids: Vec<u32> = vec![0; input_ids.len()];
@@ -165,14 +181,16 @@ fn run_experiment() -> Result<()> {
 
     // Compute unity scores
     println!("Computing topological unity...");
-    let phen_unity: Vec<f64> = phen_activations.iter()
+    let phen_unity: Vec<f64> = phen_activations
+        .iter()
         .map(|a| {
             let hv = activation_to_hv16(a);
             compute_unity(&hv, &topology_config)
         })
         .collect();
 
-    let func_unity: Vec<f64> = func_activations.iter()
+    let func_unity: Vec<f64> = func_activations
+        .iter()
         .map(|a| {
             let hv = activation_to_hv16(a);
             compute_unity(&hv, &topology_config)
@@ -186,7 +204,11 @@ fn run_experiment() -> Result<()> {
     let func_std = std_dev(&func_unity);
 
     let pooled_std = ((phen_std.powi(2) + func_std.powi(2)) / 2.0).sqrt();
-    let cohens_d = if pooled_std > 0.0 { (phen_mean - func_mean) / pooled_std } else { 0.0 };
+    let cohens_d = if pooled_std > 0.0 {
+        (phen_mean - func_mean) / pooled_std
+    } else {
+        0.0
+    };
     let p_value = permutation_test(&phen_unity, &func_unity, 10000);
 
     println!("\n════════════════════════════════════════════════════════════════");
@@ -206,21 +228,30 @@ fn run_experiment() -> Result<()> {
     let phen_corr = pairwise_correlation(&phen_activations);
     let func_corr = pairwise_correlation(&func_activations);
 
-    println!("  Phenomenal pairwise correlation: {:.4} ± {:.4}",
-             mean(&phen_corr), std_dev(&phen_corr));
-    println!("  Functional pairwise correlation: {:.4} ± {:.4}",
-             mean(&func_corr), std_dev(&func_corr));
+    println!(
+        "  Phenomenal pairwise correlation: {:.4} ± {:.4}",
+        mean(&phen_corr),
+        std_dev(&phen_corr)
+    );
+    println!(
+        "  Functional pairwise correlation: {:.4} ± {:.4}",
+        mean(&func_corr),
+        std_dev(&func_corr)
+    );
 
     let corr_p = permutation_test(&phen_corr, &func_corr, 5000);
-    println!("  Difference p-value: {:.4} {}", corr_p, significance_stars(corr_p));
+    println!(
+        "  Difference p-value: {:.4} {}",
+        corr_p,
+        significance_stars(corr_p)
+    );
 
     // Φ extraction attempt
     println!("\n────────────────────────────────────────────────────────────────");
     println!("Φ Extraction:");
 
-    let (phi_validated, phi_d) = extract_and_validate_phi(
-        &phen_activations, &func_activations, &topology_config
-    );
+    let (phi_validated, phi_d) =
+        extract_and_validate_phi(&phen_activations, &func_activations, &topology_config);
 
     if let Some(d) = phi_d {
         println!("  Φ loading effect size: d={:+.2}", d);
@@ -268,8 +299,11 @@ fn run_experiment() -> Result<()> {
     println!("Phen unity          │ 0.898        │ {:.3}", phen_mean);
     println!("Func unity          │ 0.700        │ {:.3}", func_mean);
     println!("Cohen's d           │ +0.69        │ {:+.2}", cohens_d);
-    println!("Significant         │ Yes (p=.002) │ {} (p={:.3})",
-             if p_value < 0.05 { "Yes" } else { "No" }, p_value);
+    println!(
+        "Significant         │ Yes (p=.002) │ {} (p={:.3})",
+        if p_value < 0.05 { "Yes" } else { "No" },
+        p_value
+    );
 
     // Relative depth analysis
     println!("\n────────────────────────────────────────────────────────────────");
@@ -311,7 +345,8 @@ fn extract_and_validate_phi(
         .collect();
 
     // Difference vector → Φ direction
-    let diff: Vec<f64> = phen_centroid.iter()
+    let diff: Vec<f64> = phen_centroid
+        .iter()
         .zip(func_centroid.iter())
         .map(|(p, f)| p - f)
         .collect();
@@ -324,11 +359,13 @@ fn extract_and_validate_phi(
     let phi: Vec<f64> = diff.iter().map(|x| x / norm).collect();
 
     // Compute Φ loadings
-    let phen_loadings: Vec<f64> = phen_acts.iter()
+    let phen_loadings: Vec<f64> = phen_acts
+        .iter()
         .map(|a| a.iter().zip(phi.iter()).map(|(x, p)| (*x as f64) * p).sum())
         .collect();
 
-    let func_loadings: Vec<f64> = func_acts.iter()
+    let func_loadings: Vec<f64> = func_acts
+        .iter()
         .map(|a| a.iter().zip(phi.iter()).map(|(x, p)| (*x as f64) * p).sum())
         .collect();
 
@@ -347,8 +384,13 @@ fn extract_and_validate_phi(
     // Subtract Φ from phenomenal and re-measure
     let mut phen_minus_phi_unity = Vec::new();
     for act in phen_acts {
-        let loading: f64 = act.iter().zip(phi.iter()).map(|(x, p)| (*x as f64) * p).sum();
-        let adjusted: Vec<f32> = act.iter()
+        let loading: f64 = act
+            .iter()
+            .zip(phi.iter())
+            .map(|(x, p)| (*x as f64) * p)
+            .sum();
+        let adjusted: Vec<f32> = act
+            .iter()
             .zip(phi.iter())
             .map(|(x, p)| (*x as f64 - loading * p) as f32)
             .collect();
@@ -375,7 +417,7 @@ fn pairwise_correlation(activations: &[Vec<f32>]) -> Vec<f64> {
     let n = activations.len();
 
     for i in 0..n {
-        for j in (i+1)..n {
+        for j in (i + 1)..n {
             let corr = pearson_correlation(&activations[i], &activations[j]);
             correlations.push(corr);
         }
@@ -411,10 +453,15 @@ fn pearson_correlation(a: &[f32], b: &[f32]) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn significance_stars(p: f64) -> &'static str {
-    if p < 0.001 { "***" }
-    else if p < 0.01 { "**" }
-    else if p < 0.05 { "*" }
-    else { "" }
+    if p < 0.001 {
+        "***"
+    } else if p < 0.01 {
+        "**"
+    } else if p < 0.05 {
+        "*"
+    } else {
+        ""
+    }
 }
 
 #[cfg(feature = "neural-bridge")]
@@ -468,13 +515,17 @@ fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / values.len() as f64;
     variance.sqrt()

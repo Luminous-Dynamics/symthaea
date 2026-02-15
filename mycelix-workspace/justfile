@@ -1041,3 +1041,19 @@ test-sweettest-commons:
 
 test-sweettest-civic:
     cd ../mycelix-civic && cargo test --release --test sweettest_integration -- --ignored --nocapture
+
+# Run Commons cluster Rust unit tests (no conductor needed)
+test-commons-unit:
+    @echo "🧪 Running mycelix-commons unit tests..."
+    @cd ../mycelix-commons && cargo test
+
+# Run Civic cluster Rust unit tests (no conductor needed)
+test-civic-unit:
+    @echo "🧪 Running mycelix-civic unit tests..."
+    @cd ../mycelix-civic && cargo test
+
+# Run all cluster tests (Rust unit + SDK TS)
+test-clusters: test-commons-unit test-civic-unit
+    @echo "🧪 Running SDK cluster integration tests..."
+    @cd sdk-ts && npx vitest run tests/cluster-integration.test.ts
+    @echo "✅ All cluster tests passed!"

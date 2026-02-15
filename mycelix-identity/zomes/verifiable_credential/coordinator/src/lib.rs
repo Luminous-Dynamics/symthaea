@@ -35,6 +35,16 @@ impl TryFrom<SerializedBytes> for SchemaMirror {
 const W3C_CREDENTIALS_V2: &str = "https://www.w3.org/ns/credentials/v2";
 const W3C_DATA_INTEGRITY: &str = "https://w3id.org/security/data-integrity/v2";
 
+/// API version for cross-zome compatibility detection.
+/// Increment when making breaking changes to extern signatures or types.
+const API_VERSION: u16 = 1;
+
+/// Returns the API version of this coordinator zome.
+#[hdk_extern]
+pub fn get_api_version(_: ()) -> ExternResult<u16> {
+    Ok(API_VERSION)
+}
+
 /// Create a deterministic entry hash from a string identifier
 fn string_to_entry_hash(s: &str) -> EntryHash {
     EntryHash::from_raw_36(
@@ -78,19 +88,34 @@ fn compute_credential_hash(vc: &VerifiableCredential) -> Vec<u8> {
     holo_hash::blake2b_256(&content).to_vec()
 }
 
+/// Schema validation outcome — tells the caller what actually happened.
+#[derive(Debug, Clone, PartialEq)]
+enum SchemaValidationStatus {
+    /// No schema was specified
+    NoSchema,
+    /// Schema zome was unavailable (not installed or unauthorized)
+    SchemaZomeUnavailable,
+    /// Schema not found in registry (may be external)
+    SchemaNotFound,
+    /// Validation was performed and all required fields are present
+    Validated { schema_name: String },
+}
+
 /// Validate credential claims against a schema's required/optional fields.
 ///
 /// Calls the credential_schema zome to fetch the schema, then checks:
 /// 1. Schema exists and is active
 /// 2. All required_fields are present in claims
 /// 3. No unknown fields (not in required or optional) if schema is strict
+///
+/// Returns the validation status so callers know whether validation was performed.
 fn validate_claims_against_schema(
     schema_id: &str,
     claims: &serde_json::Value,
-) -> ExternResult<()> {
+) -> ExternResult<SchemaValidationStatus> {
     // Skip validation if no schema specified
     if schema_id.is_empty() {
-        return Ok(());
+        return Ok(SchemaValidationStatus::NoSchema);
     }
 
     // Fetch schema via cross-zome call
@@ -111,7 +136,7 @@ fn validate_claims_against_schema(
             })?;
             let rec = match record {
                 Some(r) => r,
-                None => return Ok(()), // Schema not found — skip validation (may be external)
+                None => return Ok(SchemaValidationStatus::SchemaNotFound),
             };
             rec.entry()
                 .to_app_option()
@@ -122,8 +147,7 @@ fn validate_claims_against_schema(
         }
         ZomeCallResponse::Unauthorized(_, _, _, _)
         | ZomeCallResponse::AuthenticationFailed(_, _) => {
-            // Schema zome not accessible — skip validation
-            return Ok(());
+            return Ok(SchemaValidationStatus::SchemaZomeUnavailable);
         }
         ZomeCallResponse::NetworkError(err) => {
             return Err(wasm_error!(WasmErrorInner::Guest(format!(
@@ -149,7 +173,7 @@ fn validate_claims_against_schema(
         Some(obj) => obj,
         None => {
             // If claims is not an object (e.g., array or scalar), skip field validation
-            return Ok(());
+            return Ok(SchemaValidationStatus::Validated { schema_name: schema.name });
         }
     };
 
@@ -169,7 +193,7 @@ fn validate_claims_against_schema(
         ))));
     }
 
-    Ok(())
+    Ok(SchemaValidationStatus::Validated { schema_name: schema.name })
 }
 
 /// Issue a new verifiable credential
@@ -181,7 +205,36 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
     let now_iso = format_timestamp_iso8601(now);
 
     // Validate claims against schema if a schema is specified
-    validate_claims_against_schema(&input.schema_id, &input.claims)?;
+    let schema_validation = validate_claims_against_schema(&input.schema_id, &input.claims)?;
+    match &schema_validation {
+        SchemaValidationStatus::Validated { schema_name } => {
+            debug!("Schema validation passed for schema '{}'", schema_name);
+        }
+        SchemaValidationStatus::SchemaZomeUnavailable => {
+            if input.strict_schema {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "strict_schema: credential_schema zome is unavailable; cannot validate schema".to_string()
+                )));
+            }
+            warn!("Schema validation skipped: credential_schema zome unavailable");
+        }
+        SchemaValidationStatus::SchemaNotFound => {
+            if input.strict_schema {
+                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                    "strict_schema: schema '{}' not found in registry",
+                    input.schema_id
+                ))));
+            }
+            debug!("Schema validation skipped: schema '{}' not found (may be external)", input.schema_id);
+        }
+        SchemaValidationStatus::NoSchema => {
+            if input.strict_schema {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "strict_schema: no schema_id provided but strict_schema is enabled".to_string()
+                )));
+            }
+        }
+    }
 
     // Build credential ID
     let credential_id = format!(
@@ -241,6 +294,8 @@ pub fn issue_credential(input: IssueCredentialInput) -> ExternResult<Record> {
             proof_value: String::new(), // Will be filled
             cryptosuite: Some(AlgorithmId::Ed25519.cryptosuite().to_string()),
             algorithm: Some(AlgorithmId::Ed25519.as_u16()),
+            challenge: None,
+            domain: None,
         },
         mycelix_schema_id: input.schema_id.clone(),
         mycelix_created: now,
@@ -286,6 +341,11 @@ pub struct IssueCredentialInput {
     pub expiration_days: Option<u32>,
     /// Whether to enable revocation
     pub enable_revocation: bool,
+    /// When true, schema validation is mandatory: if the credential_schema zome
+    /// is unavailable or the schema is not found, issuance fails instead of
+    /// silently skipping validation. Default: false (backward-compatible).
+    #[serde(default)]
+    pub strict_schema: bool,
 }
 
 /// Verify a credential
@@ -303,15 +363,20 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
     let now = sys_time()?;
     let mut errors = Vec::new();
 
-    // Check expiration using ISO 8601 parsing
-    let expired = if let Some(valid_until) = &credential.valid_until {
-        parse_iso8601_expired(valid_until, now)
-    } else {
-        false
-    };
-
-    if expired {
-        errors.push("Credential has expired".to_string());
+    // Check expiration using ISO 8601 parsing (fail-closed)
+    if let Some(valid_until) = &credential.valid_until {
+        match parse_iso8601_expired(valid_until, now) {
+            ExpirationStatus::Expired => {
+                errors.push("Credential has expired".to_string());
+            }
+            ExpirationStatus::ParseError => {
+                errors.push(format!(
+                    "Credential expiration date unparseable (fail-closed): '{}'",
+                    valid_until
+                ));
+            }
+            ExpirationStatus::Valid => {}
+        }
     }
 
     // Verify ed25519 signature using HDK
@@ -397,6 +462,16 @@ pub fn get_credential(credential_id: String) -> ExternResult<Option<Record>> {
 /// Get credentials issued by a DID
 #[hdk_extern]
 pub fn get_credentials_issued_by(issuer_did: String) -> ExternResult<Vec<Record>> {
+    if issuer_did.is_empty() || issuer_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer DID must be 1-256 characters".into()
+        )));
+    }
+    if !issuer_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Issuer must be a valid DID".into()
+        )));
+    }
     let issuer_hash = string_to_entry_hash(&issuer_did);
     let links = get_links(
         LinkQuery::try_new(issuer_hash, LinkTypes::IssuerToCredential)?,
@@ -417,6 +492,16 @@ pub fn get_credentials_issued_by(issuer_did: String) -> ExternResult<Vec<Record>
 /// Get credentials about a subject DID
 #[hdk_extern]
 pub fn get_credentials_for_subject(subject_did: String) -> ExternResult<Vec<Record>> {
+    if subject_did.is_empty() || subject_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject DID must be 1-256 characters".into()
+        )));
+    }
+    if !subject_did.starts_with("did:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Subject must be a valid DID".into()
+        )));
+    }
     let subject_hash = string_to_entry_hash(&subject_did);
     let links = get_links(
         LinkQuery::try_new(subject_hash, LinkTypes::SubjectToCredential)?,
@@ -441,6 +526,30 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
     let holder_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
     let now = sys_time()?;
     let now_iso = format_timestamp_iso8601(now);
+
+    // Validate challenge/domain inputs
+    if let Some(ref challenge) = input.challenge {
+        if challenge.is_empty() || challenge.len() > 512 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Challenge must be 1-512 characters".into()
+            )));
+        }
+    }
+    if let Some(ref domain) = input.domain {
+        if domain.is_empty() || domain.len() > 256 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Domain must be 1-256 characters".into()
+            )));
+        }
+        // Domain requires a challenge (W3C Data Integrity spec: domain without
+        // challenge is meaningless since there's nothing binding the domain to
+        // a specific verification session)
+        if input.challenge.is_none() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Domain requires a challenge to be set (replay protection)".into()
+            )));
+        }
+    }
 
     // Gather credentials
     let mut credentials = Vec::new();
@@ -491,6 +600,8 @@ pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<Recor
         proof_value: tagged_sig.to_multibase(),
         cryptosuite: Some(AlgorithmId::Ed25519.cryptosuite().to_string()),
         algorithm: Some(AlgorithmId::Ed25519.as_u16()),
+        challenge: input.challenge.clone(),
+        domain: input.domain.clone(),
     };
 
     let vp = VerifiablePresentation {
@@ -525,6 +636,338 @@ pub struct CreatePresentationInput {
     pub challenge: Option<String>,
     /// Optional domain restriction
     pub domain: Option<String>,
+}
+
+/// Verify a verifiable presentation
+///
+/// Checks:
+/// 1. Holder's proof signature over the presentation content
+/// 2. Each contained credential's issuer signature
+/// 3. Each contained credential's revocation status
+/// 4. Proof purpose is "authentication"
+#[hdk_extern]
+pub fn verify_presentation(input: VerifyPresentationInput) -> ExternResult<PresentationVerificationResult> {
+    let record = get(input.presentation_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Presentation not found".into())))?;
+
+    let vp: VerifiablePresentation = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid presentation entry".into())))?;
+
+    let now = sys_time()?;
+    let mut errors = Vec::new();
+    let mut credential_results = Vec::new();
+
+    // 1. Verify proof purpose
+    if vp.proof.proof_purpose != "authentication" {
+        errors.push("Presentation proof purpose must be 'authentication'".to_string());
+    }
+
+    // 2. Validate challenge/domain binding (replay protection)
+    // If the proof was created with a challenge, the verifier MUST supply the same one.
+    // If the verifier expects a challenge but the proof has none, that's also a failure.
+    if let Some(expected) = &input.expected_challenge {
+        match &vp.proof.challenge {
+            Some(stored) if stored == expected => {} // match
+            Some(stored) => errors.push(format!(
+                "Presentation challenge mismatch: expected '{}', proof has '{}'",
+                expected, stored
+            )),
+            None => errors.push(format!(
+                "Presentation has no challenge but verifier expected '{}'",
+                expected
+            )),
+        }
+    } else if vp.proof.challenge.is_some() {
+        errors.push("Presentation has challenge but verifier did not supply expected_challenge".to_string());
+    }
+
+    if let Some(expected) = &input.expected_domain {
+        match &vp.proof.domain {
+            Some(stored) if stored == expected => {} // match
+            Some(stored) => errors.push(format!(
+                "Presentation domain mismatch: expected '{}', proof has '{}'",
+                expected, stored
+            )),
+            None => errors.push(format!(
+                "Presentation has no domain but verifier expected '{}'",
+                expected
+            )),
+        }
+    } else if vp.proof.domain.is_some() {
+        errors.push("Presentation has domain but verifier did not supply expected_domain".to_string());
+    }
+
+    // 3. Verify holder's proof signature
+    let holder_pubkey_str = vp.holder.strip_prefix("did:mycelix:");
+    if let Some(pubkey_str) = holder_pubkey_str {
+        if let Ok(holder_pubkey) = AgentPubKey::try_from(pubkey_str.to_string()) {
+            // Reconstruct the signed data (mirrors create_presentation).
+            // Use the values stored IN the proof, not from the verifier's input,
+            // since these are what was actually signed.
+            let mut presentation_data = vp.id.as_bytes().to_vec();
+            presentation_data.extend(vp.holder.as_bytes());
+            for cred in &vp.verifiable_credential {
+                presentation_data.extend(cred.id.as_bytes());
+            }
+            if let Some(challenge) = &vp.proof.challenge {
+                presentation_data.extend(challenge.as_bytes());
+            }
+            if let Some(domain) = &vp.proof.domain {
+                presentation_data.extend(domain.as_bytes());
+            }
+
+            // Try TaggedSignature first, then legacy
+            match TaggedSignature::from_multibase(&vp.proof.proof_value) {
+                Ok(tagged_sig) => {
+                    if tagged_sig.algorithm == AlgorithmId::Ed25519 && tagged_sig.signature_bytes.len() == 64 {
+                        let sig = Signature::from(
+                            <[u8; 64]>::try_from(tagged_sig.signature_bytes.as_slice())
+                                .unwrap_or([0u8; 64]),
+                        );
+                        match verify_signature(holder_pubkey, sig, presentation_data) {
+                            Ok(true) => {}
+                            Ok(false) => errors.push("Holder proof signature verification failed".to_string()),
+                            Err(e) => errors.push(format!("Holder signature verification error: {:?}", e)),
+                        }
+                    } else {
+                        errors.push(format!("Unsupported presentation proof algorithm: {:?}", tagged_sig.algorithm));
+                    }
+                }
+                Err(_) => {
+                    // Legacy multibase fallback
+                    if let Some(sig_bytes) = multibase_decode(&vp.proof.proof_value) {
+                        if sig_bytes.len() == 64 {
+                            let sig = Signature::from(
+                                <[u8; 64]>::try_from(sig_bytes.as_slice()).unwrap_or([0u8; 64]),
+                            );
+                            match verify_signature(holder_pubkey, sig, presentation_data) {
+                                Ok(true) => {}
+                                Ok(false) => errors.push("Holder proof signature verification failed (legacy)".to_string()),
+                                Err(e) => errors.push(format!("Holder signature verification error: {:?}", e)),
+                            }
+                        } else {
+                            errors.push("Invalid holder signature length".to_string());
+                        }
+                    } else {
+                        errors.push("Could not decode holder proof signature".to_string());
+                    }
+                }
+            }
+        } else {
+            errors.push("Could not parse holder's agent pub key".to_string());
+        }
+    } else {
+        errors.push("Invalid holder DID format".to_string());
+    }
+
+    // 3. Batch-check revocation for all credentials in one cross-zome call
+    //    (eliminates N+1 query pattern — single call instead of per-credential)
+    let cred_ids: Vec<String> = vp.verifiable_credential.iter().map(|c| c.id.clone()).collect();
+    let revocation_statuses = batch_check_credential_revocation_status(&cred_ids)?;
+
+    // 4. Verify each contained credential
+    for (i, cred) in vp.verifiable_credential.iter().enumerate() {
+        let mut cred_errors = Vec::new();
+
+        // Verify credential signature
+        match verify_credential_signature(cred) {
+            Ok(true) => {}
+            Ok(false) => cred_errors.push("Issuer signature invalid".to_string()),
+            Err(e) => cred_errors.push(format!("Signature error: {:?}", e)),
+        }
+
+        // Check revocation (from batch result)
+        let revocation = &revocation_statuses[i];
+        match revocation {
+            CredentialRevocationStatus::Revoked(reason) => {
+                cred_errors.push(format!("Revoked: {}", reason));
+            }
+            CredentialRevocationStatus::Suspended(reason, _) => {
+                cred_errors.push(format!("Suspended: {}", reason));
+            }
+            _ => {}
+        }
+
+        // Check expiration (fail-closed)
+        if let Some(valid_until) = &cred.valid_until {
+            match parse_iso8601_expired(valid_until, now) {
+                ExpirationStatus::Expired => {
+                    cred_errors.push("Credential expired".to_string());
+                }
+                ExpirationStatus::ParseError => {
+                    cred_errors.push(format!(
+                        "Credential expiration date unparseable (fail-closed): '{}'",
+                        valid_until
+                    ));
+                }
+                ExpirationStatus::Valid => {}
+            }
+        }
+
+        let cred_valid = cred_errors.is_empty();
+        credential_results.push(CredentialInPresentationResult {
+            credential_id: cred.id.clone(),
+            valid: cred_valid,
+            errors: cred_errors,
+        });
+    }
+
+    // If any credential is invalid, mark overall as invalid
+    if credential_results.iter().any(|r| !r.valid) {
+        errors.push("One or more contained credentials failed verification".to_string());
+    }
+
+    Ok(PresentationVerificationResult {
+        presentation_id: vp.id,
+        holder: vp.holder,
+        valid: errors.is_empty(),
+        errors,
+        credential_results,
+        verified_at: now,
+    })
+}
+
+/// Input for verifying a presentation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct VerifyPresentationInput {
+    /// Action hash of the presentation to verify
+    pub presentation_hash: ActionHash,
+    /// Expected challenge (must match what was used during creation)
+    pub expected_challenge: Option<String>,
+    /// Expected domain (must match what was used during creation)
+    pub expected_domain: Option<String>,
+}
+
+/// Result of presentation verification
+#[derive(Serialize, Deserialize, Debug)]
+pub struct PresentationVerificationResult {
+    pub presentation_id: String,
+    pub holder: String,
+    pub valid: bool,
+    pub errors: Vec<String>,
+    pub credential_results: Vec<CredentialInPresentationResult>,
+    pub verified_at: Timestamp,
+}
+
+/// Verification result for a credential within a presentation
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CredentialInPresentationResult {
+    pub credential_id: String,
+    pub valid: bool,
+    pub errors: Vec<String>,
+}
+
+// =============================================================================
+// MERKLE TREE FOR SELECTIVE DISCLOSURE
+// =============================================================================
+
+/// Hash a single claim leaf: BLAKE2b-256(key || 0x00 || json_value)
+fn hash_claim_leaf(key: &str, value: &serde_json::Value) -> Vec<u8> {
+    let mut data = key.as_bytes().to_vec();
+    data.push(0);
+    if let Ok(json) = serde_json::to_string(value) {
+        data.extend(json.as_bytes());
+    }
+    holo_hash::blake2b_256(&data).to_vec()
+}
+
+/// Build a Merkle tree from sorted claim leaves and return (root, leaves_in_order).
+///
+/// Leaves are sorted by key to ensure deterministic ordering.
+/// Internal nodes: BLAKE2b-256(left || right). Odd nodes are promoted.
+fn build_claim_merkle_tree(claims: &serde_json::Map<String, serde_json::Value>) -> (Vec<u8>, Vec<(String, Vec<u8>)>) {
+    // Sort keys for deterministic order
+    let mut keys: Vec<&String> = claims.keys().collect();
+    keys.sort();
+
+    let leaves: Vec<(String, Vec<u8>)> = keys
+        .iter()
+        .map(|k| ((*k).clone(), hash_claim_leaf(k, &claims[*k])))
+        .collect();
+
+    if leaves.is_empty() {
+        return (vec![0u8; 32], leaves);
+    }
+    if leaves.len() == 1 {
+        return (leaves[0].1.clone(), leaves);
+    }
+
+    // Build tree bottom-up
+    let mut current_level: Vec<Vec<u8>> = leaves.iter().map(|(_, h)| h.clone()).collect();
+
+    while current_level.len() > 1 {
+        let mut next_level = Vec::new();
+        let mut i = 0;
+        while i < current_level.len() {
+            if i + 1 < current_level.len() {
+                let mut combined = current_level[i].clone();
+                combined.extend(&current_level[i + 1]);
+                next_level.push(holo_hash::blake2b_256(&combined).to_vec());
+                i += 2;
+            } else {
+                // Odd node: promote
+                next_level.push(current_level[i].clone());
+                i += 1;
+            }
+        }
+        current_level = next_level;
+    }
+
+    (current_level[0].clone(), leaves)
+}
+
+/// Generate a Merkle proof (list of sibling hashes) for a leaf at the given index.
+fn generate_merkle_proof(
+    claims: &serde_json::Map<String, serde_json::Value>,
+    leaf_index: usize,
+) -> Vec<Vec<u8>> {
+    let mut keys: Vec<&String> = claims.keys().collect();
+    keys.sort();
+
+    let leaf_hashes: Vec<Vec<u8>> = keys
+        .iter()
+        .map(|k| hash_claim_leaf(k, &claims[*k]))
+        .collect();
+
+    if leaf_hashes.len() <= 1 {
+        return Vec::new(); // Single leaf = root, no proof needed
+    }
+
+    let mut proof = Vec::new();
+    let mut current_level = leaf_hashes;
+    let mut idx = leaf_index;
+
+    while current_level.len() > 1 {
+        // Sibling index
+        let sibling_idx = if idx % 2 == 0 { idx + 1 } else { idx - 1 };
+
+        if sibling_idx < current_level.len() {
+            proof.push(current_level[sibling_idx].clone());
+        }
+        // No sibling (odd node promoted) — no proof element needed
+
+        // Move to next level
+        let mut next_level = Vec::new();
+        let mut i = 0;
+        while i < current_level.len() {
+            if i + 1 < current_level.len() {
+                let mut combined = current_level[i].clone();
+                combined.extend(&current_level[i + 1]);
+                next_level.push(holo_hash::blake2b_256(&combined).to_vec());
+                i += 2;
+            } else {
+                next_level.push(current_level[i].clone());
+                i += 1;
+            }
+        }
+        current_level = next_level;
+        idx /= 2;
+    }
+
+    proof
 }
 
 /// Create a derived credential with selective disclosure
@@ -586,14 +1029,42 @@ pub fn create_derived_credential(input: CreateDerivedInput) -> ExternResult<Reco
         sign_data,
     )?;
 
-    let derivation_proof = DerivationProof {
-        proof_type: "SelectiveDisclosureProof".to_string(),
-        original_credential_hash: original_hash,
-        claim_proofs: input.selected_claims.iter().map(|key| ClaimProof {
+    // Build Merkle tree over all original claims for selective disclosure proofs
+    let original_claims_obj = original_claims.as_object();
+    let (_merkle_root, _leaves) = if let Some(obj) = original_claims_obj {
+        build_claim_merkle_tree(obj)
+    } else {
+        (vec![0u8; 32], Vec::new())
+    };
+
+    // Generate per-claim Merkle proofs for each selected claim
+    let claim_proofs: Vec<ClaimProof> = if let Some(obj) = original_claims_obj {
+        let mut sorted_keys: Vec<&String> = obj.keys().collect();
+        sorted_keys.sort();
+
+        input.selected_claims.iter().map(|key| {
+            let leaf_index = sorted_keys.iter().position(|k| *k == key);
+            let merkle_path = leaf_index.map(|idx| generate_merkle_proof(obj, idx));
+            let commitment = leaf_index.map(|_| hash_claim_leaf(key, &obj[key]));
+
+            ClaimProof {
+                claim_key: key.clone(),
+                merkle_path,
+                commitment,
+            }
+        }).collect()
+    } else {
+        input.selected_claims.iter().map(|key| ClaimProof {
             claim_key: key.clone(),
             merkle_path: None,
             commitment: None,
-        }).collect(),
+        }).collect()
+    };
+
+    let derivation_proof = DerivationProof {
+        proof_type: "SelectiveDisclosureProof".to_string(),
+        original_credential_hash: original_hash,
+        claim_proofs,
         holder_signature: holder_signature.as_ref().to_vec(),
     };
 
@@ -723,6 +1194,56 @@ pub fn verify_derived_credential(action_hash: ActionHash) -> ExternResult<Derive
                 "Claim '{}' not present in original credential",
                 claim_key
             ));
+        }
+    }
+
+    // Verify Merkle proofs if present
+    if let Some(original_obj) = original_claims.as_object() {
+        let (merkle_root, _) = build_claim_merkle_tree(original_obj);
+
+        for claim_proof in &derived.derivation_proof.claim_proofs {
+            // Verify commitment matches the actual claim value
+            if let (Some(commitment), Some(value)) = (&claim_proof.commitment, original_claims.get(&claim_proof.claim_key)) {
+                let expected_leaf = hash_claim_leaf(&claim_proof.claim_key, value);
+                if *commitment != expected_leaf {
+                    errors.push(format!(
+                        "Merkle commitment mismatch for claim '{}'",
+                        claim_proof.claim_key
+                    ));
+                    continue;
+                }
+
+                // Verify the Merkle path from leaf to root
+                if let Some(path) = &claim_proof.merkle_path {
+                    let mut sorted_keys: Vec<&String> = original_obj.keys().collect();
+                    sorted_keys.sort();
+                    if let Some(leaf_idx) = sorted_keys.iter().position(|k| *k == &claim_proof.claim_key) {
+                        let mut current_hash = expected_leaf;
+                        let mut idx = leaf_idx;
+
+                        for sibling in path {
+                            let combined = if idx % 2 == 0 {
+                                let mut c = current_hash.clone();
+                                c.extend(sibling);
+                                c
+                            } else {
+                                let mut c = sibling.clone();
+                                c.extend(&current_hash);
+                                c
+                            };
+                            current_hash = holo_hash::blake2b_256(&combined).to_vec();
+                            idx /= 2;
+                        }
+
+                        if current_hash != merkle_root {
+                            errors.push(format!(
+                                "Merkle path verification failed for claim '{}'",
+                                claim_proof.claim_key
+                            ));
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -863,6 +1384,10 @@ pub fn get_pending_requests(issuer_did: String) -> ExternResult<Vec<Record>> {
 /// Update credential request status
 #[hdk_extern]
 pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Record> {
+    // Capability guard: only the target issuer can approve/reject requests
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+
     // Find the request
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::CredentialRequest)?))
@@ -871,6 +1396,11 @@ pub fn update_request_status(input: UpdateRequestStatusInput) -> ExternResult<Re
     for record in query(filter)? {
         if let Some(req) = record.entry().to_app_option::<CredentialRequest>().ok().flatten() {
             if req.id == input.request_id {
+                if req.issuer_did != caller_did {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only the target issuer can update request status".into()
+                    )));
+                }
                 let now = sys_time()?;
                 let updated_req = CredentialRequest {
                     status: input.new_status,
@@ -940,6 +1470,15 @@ pub struct IssueCredentialWithProofInput {
 pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> ExternResult<Record> {
     let vc = input.credential;
 
+    // Capability guard: only the claimed issuer can submit pre-signed credentials
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if vc.issuer.did() != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the claimed issuer can submit pre-signed credentials".into()
+        )));
+    }
+
     // Validate basic structure
     if !vc.context.iter().any(|c| c.contains("credentials")) {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -973,7 +1512,19 @@ pub fn issue_credential_with_proof(input: IssueCredentialWithProofInput) -> Exte
     // If TaggedSignature parsing fails, it may be a legacy Ed25519 multibase — that's OK
 
     // Validate claims against schema if specified
-    validate_claims_against_schema(&vc.mycelix_schema_id, &vc.credential_subject.claims)?;
+    let schema_validation = validate_claims_against_schema(&vc.mycelix_schema_id, &vc.credential_subject.claims)?;
+    match &schema_validation {
+        SchemaValidationStatus::Validated { schema_name } => {
+            debug!("Pre-signed credential schema validation passed for '{}'", schema_name);
+        }
+        SchemaValidationStatus::SchemaZomeUnavailable => {
+            warn!("Pre-signed credential schema validation skipped: credential_schema zome unavailable");
+        }
+        SchemaValidationStatus::SchemaNotFound => {
+            debug!("Pre-signed credential schema validation skipped: schema not found");
+        }
+        SchemaValidationStatus::NoSchema => {}
+    }
 
     let action_hash = create_entry(&EntryTypes::VerifiableCredential(vc.clone()))?;
 
@@ -1050,20 +1601,34 @@ fn base58_decode(s: &str) -> Option<Vec<u8>> {
 /// - `2024-12-31T23:59:59+00:00` (with timezone offset)
 /// - `2024-12-31` (date only, assumes end of day UTC)
 ///
-/// Returns true if the datetime is in the past relative to `now`.
-fn parse_iso8601_expired(datetime_str: &str, now: Timestamp) -> bool {
-    // Try to parse the ISO 8601 string
+/// Returns the expiration status of a datetime string relative to `now`.
+///
+/// Fail-closed: if the datetime string cannot be parsed, returns
+/// `ExpirationStatus::ParseError` so callers can treat it as a verification
+/// failure rather than silently accepting a potentially expired credential.
+fn parse_iso8601_expired(datetime_str: &str, now: Timestamp) -> ExpirationStatus {
     match parse_iso8601_to_micros(datetime_str) {
         Some(expiry_micros) => {
             let now_micros = now.as_micros();
-            now_micros > expiry_micros
+            if now_micros > expiry_micros {
+                ExpirationStatus::Expired
+            } else {
+                ExpirationStatus::Valid
+            }
         }
-        None => {
-            // If parsing fails, assume not expired (fail open for usability)
-            // In production, you might want to fail closed instead
-            false
-        }
+        None => ExpirationStatus::ParseError,
     }
+}
+
+/// Result of checking a credential's expiration date.
+#[derive(Debug, Clone, PartialEq)]
+enum ExpirationStatus {
+    /// The credential has not yet expired.
+    Valid,
+    /// The credential has expired.
+    Expired,
+    /// The expiration date could not be parsed (fail-closed: treat as invalid).
+    ParseError,
 }
 
 /// Parse ISO 8601 datetime string to microseconds since Unix epoch
@@ -1369,19 +1934,23 @@ mod tests {
     #[test]
     fn expired_past_date() {
         let now = Timestamp::from_micros(1_700_000_000_000_000); // ~2023-11-14
-        assert!(parse_iso8601_expired("2020-01-01T00:00:00Z", now));
+        assert_eq!(parse_iso8601_expired("2020-01-01T00:00:00Z", now), ExpirationStatus::Expired);
     }
 
     #[test]
     fn not_expired_future_date() {
         let now = Timestamp::from_micros(1_700_000_000_000_000);
-        assert!(!parse_iso8601_expired("2030-01-01T00:00:00Z", now));
+        assert_eq!(parse_iso8601_expired("2030-01-01T00:00:00Z", now), ExpirationStatus::Valid);
     }
 
     #[test]
-    fn unparseable_defaults_not_expired() {
+    fn unparseable_fails_closed() {
         let now = Timestamp::from_micros(1_700_000_000_000_000);
-        assert!(!parse_iso8601_expired("garbage", now));
+        assert_eq!(
+            parse_iso8601_expired("garbage", now),
+            ExpirationStatus::ParseError,
+            "Unparseable dates must fail closed (ParseError), not silently pass"
+        );
     }
 
     // --- format_timestamp_iso8601 ---
@@ -1464,6 +2033,8 @@ mod tests {
                 proof_value: "zSig".into(),
                 cryptosuite: None,
                 algorithm: None,
+                challenge: None,
+                domain: None,
             },
             mycelix_schema_id: "mycelix:schema:test:v1".into(),
             mycelix_created: Timestamp::from_micros(0),
@@ -1497,6 +2068,8 @@ mod tests {
                 proof_value: "zSig".into(),
                 cryptosuite: None,
                 algorithm: None,
+                challenge: None,
+                domain: None,
             },
             mycelix_schema_id: "mycelix:schema:test:v1".into(),
             mycelix_created: Timestamp::from_micros(0),
@@ -1721,6 +2294,121 @@ mod tests {
             assert_eq!(restored, variant);
         }
     }
+
+    // --- Schema validation status ---
+
+    #[test]
+    fn schema_validation_status_equality() {
+        assert_eq!(SchemaValidationStatus::NoSchema, SchemaValidationStatus::NoSchema);
+        assert_eq!(
+            SchemaValidationStatus::Validated { schema_name: "test".into() },
+            SchemaValidationStatus::Validated { schema_name: "test".into() }
+        );
+        assert_ne!(SchemaValidationStatus::NoSchema, SchemaValidationStatus::SchemaZomeUnavailable);
+    }
+
+    // --- Merkle tree for selective disclosure ---
+
+    #[test]
+    fn merkle_tree_single_claim() {
+        let mut claims = serde_json::Map::new();
+        claims.insert("degree".into(), serde_json::json!("BSc"));
+
+        let (root, leaves) = build_claim_merkle_tree(&claims);
+        assert_eq!(root.len(), 32);
+        assert_eq!(leaves.len(), 1);
+        assert_eq!(leaves[0].0, "degree");
+        // Single leaf = root
+        assert_eq!(root, leaves[0].1);
+    }
+
+    #[test]
+    fn merkle_tree_deterministic() {
+        let mut claims = serde_json::Map::new();
+        claims.insert("name".into(), serde_json::json!("Alice"));
+        claims.insert("age".into(), serde_json::json!(30));
+        claims.insert("degree".into(), serde_json::json!("PhD"));
+
+        let (root1, _) = build_claim_merkle_tree(&claims);
+        let (root2, _) = build_claim_merkle_tree(&claims);
+        assert_eq!(root1, root2, "Merkle root must be deterministic");
+    }
+
+    #[test]
+    fn merkle_tree_different_claims_different_root() {
+        let mut claims1 = serde_json::Map::new();
+        claims1.insert("name".into(), serde_json::json!("Alice"));
+
+        let mut claims2 = serde_json::Map::new();
+        claims2.insert("name".into(), serde_json::json!("Bob"));
+
+        let (root1, _) = build_claim_merkle_tree(&claims1);
+        let (root2, _) = build_claim_merkle_tree(&claims2);
+        assert_ne!(root1, root2);
+    }
+
+    #[test]
+    fn merkle_proof_verifies_for_all_claims() {
+        let mut claims = serde_json::Map::new();
+        claims.insert("name".into(), serde_json::json!("Alice"));
+        claims.insert("age".into(), serde_json::json!(30));
+        claims.insert("degree".into(), serde_json::json!("PhD"));
+        claims.insert("university".into(), serde_json::json!("MIT"));
+
+        let (root, _) = build_claim_merkle_tree(&claims);
+        let mut sorted_keys: Vec<&String> = claims.keys().collect();
+        sorted_keys.sort();
+
+        for (idx, key) in sorted_keys.iter().enumerate() {
+            let proof = generate_merkle_proof(&claims, idx);
+            let leaf = hash_claim_leaf(key, &claims[*key]);
+
+            // Walk proof to reconstruct root
+            let mut current = leaf;
+            let mut i = idx;
+            for sibling in &proof {
+                let combined = if i % 2 == 0 {
+                    let mut c = current.clone();
+                    c.extend(sibling);
+                    c
+                } else {
+                    let mut c = sibling.clone();
+                    c.extend(&current);
+                    c
+                };
+                current = holo_hash::blake2b_256(&combined).to_vec();
+                i /= 2;
+            }
+
+            assert_eq!(current, root, "Merkle proof should verify for claim '{}'", key);
+        }
+    }
+
+    #[test]
+    fn merkle_proof_empty_for_single_claim() {
+        let mut claims = serde_json::Map::new();
+        claims.insert("only".into(), serde_json::json!(true));
+
+        let proof = generate_merkle_proof(&claims, 0);
+        assert!(proof.is_empty(), "Single claim needs no proof siblings");
+    }
+
+    #[test]
+    fn hash_claim_leaf_deterministic() {
+        let val = serde_json::json!("test_value");
+        let h1 = hash_claim_leaf("key", &val);
+        let h2 = hash_claim_leaf("key", &val);
+        assert_eq!(h1, h2);
+        assert_eq!(h1.len(), 32);
+    }
+
+    #[test]
+    fn hash_claim_leaf_different_keys() {
+        let val = serde_json::json!("same_value");
+        let h1 = hash_claim_leaf("key1", &val);
+        let h2 = hash_claim_leaf("key2", &val);
+        assert_ne!(h1, h2, "Different keys should produce different hashes");
+    }
 }
 
 /// Sign credential content using the agent's ed25519 key
@@ -1909,6 +2597,59 @@ fn check_credential_revocation_status(credential_id: &str) -> ExternResult<Crede
         ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Network error calling revocation zome: {}",
             err
+        )))),
+        ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
+            WasmErrorInner::Guest(format!("Countersigning error: {}", err))
+        )),
+    }
+}
+
+/// Batch check revocation status for multiple credentials in a single cross-zome call.
+///
+/// Falls back to individual checks if the revocation zome doesn't support batch.
+fn batch_check_credential_revocation_status(
+    credential_ids: &[String],
+) -> ExternResult<Vec<CredentialRevocationStatus>> {
+    if credential_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("revocation"),
+        FunctionName::new("batch_check_revocation"),
+        None,
+        credential_ids.to_vec(),
+    )?;
+
+    match response {
+        ZomeCallResponse::Ok(result) => {
+            let checks: Vec<RevocationCheckResult> = result.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode batch revocation response: {:?}", e
+                )))
+            })?;
+            Ok(checks
+                .into_iter()
+                .map(|check| match check.status {
+                    RevocationStatusMirror::Active => CredentialRevocationStatus::Active,
+                    RevocationStatusMirror::Revoked => CredentialRevocationStatus::Revoked(
+                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                    ),
+                    RevocationStatusMirror::Suspended => CredentialRevocationStatus::Suspended(
+                        check.reason.unwrap_or_else(|| "No reason provided".to_string()),
+                        check.checked_at.to_string(),
+                    ),
+                })
+                .collect())
+        }
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
+            // Revocation zome not accessible — return Unknown for all
+            Ok(credential_ids.iter().map(|_| CredentialRevocationStatus::Unknown).collect())
+        }
+        ZomeCallResponse::NetworkError(err) => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Network error calling batch revocation: {}", err
         )))),
         ZomeCallResponse::CountersigningSession(err) => Err(wasm_error!(
             WasmErrorInner::Guest(format!("Countersigning error: {}", err))

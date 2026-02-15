@@ -88,25 +88,25 @@ pub mod integrator;
 pub mod meta_learning;
 
 // Re-exports for ergonomic access
-pub use types::*;
+pub use extractor::{ContentExtractor, ContentMetadata, ContentType, ExtractedContent};
+pub use integrator::{IntegratorConfig, IntegratorStats, KnowledgeIntegrator};
 pub use knowledge_graph::{
-    KnowledgeGraph, KnowledgeNode, KnowledgeEdge,
-    NodeId, NodeType, EdgeType, KnowledgeSource, GraphStats,
+    EdgeType, GraphStats, KnowledgeEdge, KnowledgeGraph, KnowledgeNode, KnowledgeSource, NodeId,
+    NodeType,
 };
-pub use extractor::{ContentExtractor, ExtractedContent, ContentMetadata, ContentType};
-pub use verifier::{
-    EpistemicVerifier, VerifierConfig, VerificationContext,
-    SourceEvidence, VerificationResult,
+pub use meta_learning::{
+    EpistemicLearner, LearnerConfig, LearnerState, LearnerStats, MetaPhi, SourceCredibility,
+    VerificationStrategy,
 };
 pub use researcher::WebResearcher;
-pub use integrator::{KnowledgeIntegrator, IntegratorConfig, IntegratorStats};
-pub use meta_learning::{
-    EpistemicLearner, LearnerConfig, LearnerStats, LearnerState,
-    SourceCredibility, VerificationStrategy, MetaPhi,
+pub use types::*;
+pub use verifier::{
+    EpistemicVerifier, SourceEvidence, VerificationContext, VerificationResult, VerifierConfig,
 };
 
 /// Convenience function to create a full epistemic research system
-pub fn create_epistemic_system() -> anyhow::Result<(WebResearcher, KnowledgeIntegrator, EpistemicLearner)> {
+pub fn create_epistemic_system(
+) -> anyhow::Result<(WebResearcher, KnowledgeIntegrator, EpistemicLearner)> {
     let researcher = WebResearcher::new()?;
     let integrator = KnowledgeIntegrator::new();
     let learner = EpistemicLearner::new();
@@ -224,8 +224,11 @@ impl EpistemicConsciousness {
     fn detect_domain(&self, query: &str) -> String {
         let lower = query.to_lowercase();
 
-        if lower.contains("programming") || lower.contains("code")
-            || lower.contains("rust") || lower.contains("python") {
+        if lower.contains("programming")
+            || lower.contains("code")
+            || lower.contains("rust")
+            || lower.contains("python")
+        {
             return "programming".to_string();
         }
 
@@ -278,7 +281,7 @@ mod tests {
 
         let ec = ec.unwrap();
         assert!(!ec.should_research(0.8)); // High Phi, no research needed
-        assert!(ec.should_research(0.3));  // Low Phi, research needed
+        assert!(ec.should_research(0.3)); // Low Phi, research needed
     }
 
     #[test]

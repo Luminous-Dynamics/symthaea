@@ -17,23 +17,20 @@
 // Run: cargo test --test composition_seams --features reasoning_engine
 // ==================================================================================
 
-use symthaea::consciousness::epistemic_conflict::{
-    ConflictDetector, TheoryCalibrator, MultiTheoryMetrics,
-    phi_integration::effective_phi,
-};
-use symthaea::consciousness::tool_gate::types::ToolDescriptor;
-use symthaea::consciousness::tool_gate::classifier;
-use symthaea::consciousness::temporal_planning::types::{
-    BudgetTier, ForkedState, MctsConfig, PlannedAction, ReasoningBudget,
-};
-use symthaea::consciousness::temporal_planning::mcts::{evs, MctsPlanner};
+use std::sync::Arc;
 use symthaea::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
 };
-use symthaea::consciousness::reasoning_engine::{
-    ConsciousReasoningEngine, ReasoningContext,
+use symthaea::consciousness::epistemic_conflict::{
+    phi_integration::effective_phi, ConflictDetector, MultiTheoryMetrics, TheoryCalibrator,
 };
-use std::sync::Arc;
+use symthaea::consciousness::reasoning_engine::{ConsciousReasoningEngine, ReasoningContext};
+use symthaea::consciousness::temporal_planning::mcts::{evs, MctsPlanner};
+use symthaea::consciousness::temporal_planning::types::{
+    BudgetTier, ForkedState, MctsConfig, PlannedAction, ReasoningBudget,
+};
+use symthaea::consciousness::tool_gate::classifier;
+use symthaea::consciousness::tool_gate::types::ToolDescriptor;
 
 // ==================================================================================
 // SEAM 1: Conflict → Φ_eff → Gate (end-to-end)
@@ -47,14 +44,23 @@ fn seam_conflict_to_phi_eff_to_gate() {
 
     // Theories in severe disagreement
     let disagreeing = MultiTheoryMetrics {
-        phi: 0.9, gwt: 0.1, ast: 0.9, pp: 0.1, rpt: 0.9, embodiment: 0.1, unified: 0.5,
+        phi: 0.9,
+        gwt: 0.1,
+        ast: 0.9,
+        pp: 0.1,
+        rpt: 0.9,
+        embodiment: 0.1,
+        unified: 0.5,
     };
     let conflicts = detector.detect(&disagreeing);
     assert!(conflicts.max_magnitude() > 0.5, "Should have high conflict");
 
     let r = calibrator.reliability(&disagreeing);
     let phi_eff = effective_phi(disagreeing.phi, r, calibrator.gamma());
-    assert!(phi_eff < disagreeing.phi, "Φ_eff should be attenuated by low R");
+    assert!(
+        phi_eff < disagreeing.phi,
+        "Φ_eff should be attenuated by low R"
+    );
 
     // Try to gate a high-risk tool with the attenuated Φ_eff
     let risky_tool = ToolDescriptor::from_command("nixos-rebuild switch")
@@ -70,12 +76,21 @@ fn seam_conflict_to_phi_eff_to_gate() {
 
     // Now with agreeing theories → high R → high Φ_eff → gate allows
     let agreeing = MultiTheoryMetrics {
-        phi: 0.9, gwt: 0.9, ast: 0.9, pp: 0.9, rpt: 0.9, embodiment: 0.9, unified: 0.9,
+        phi: 0.9,
+        gwt: 0.9,
+        ast: 0.9,
+        pp: 0.9,
+        rpt: 0.9,
+        embodiment: 0.9,
+        unified: 0.9,
     };
     let _conflicts2 = detector.detect(&agreeing);
     let r2 = calibrator.reliability(&agreeing);
     let phi_eff2 = effective_phi(agreeing.phi, r2, calibrator.gamma());
-    assert!(phi_eff2 > phi_eff, "Agreeing theories should produce higher Φ_eff");
+    assert!(
+        phi_eff2 > phi_eff,
+        "Agreeing theories should produce higher Φ_eff"
+    );
 
     let gate_result2 = classifier::gate(&risky_tool, phi_eff2, 0.8);
     assert!(
@@ -92,17 +107,27 @@ fn seam_conflict_kind_drives_epistemic_action() {
 
     // PP is very low → UnreliablePrediction → Sense(SensorMeasurement)
     let pp_low = MultiTheoryMetrics {
-        phi: 0.8, gwt: 0.8, ast: 0.8, pp: 0.1, rpt: 0.8, embodiment: 0.8, unified: 0.7,
+        phi: 0.8,
+        gwt: 0.8,
+        ast: 0.8,
+        pp: 0.1,
+        rpt: 0.8,
+        embodiment: 0.8,
+        unified: 0.7,
     };
     let conflicts = detector.detect(&pp_low);
-    let pp_conflict = conflicts.conflicts.iter()
-        .find(|c| c.kind == symthaea::consciousness::epistemic_conflict::ConflictKind::UnreliablePrediction);
+    let pp_conflict = conflicts.conflicts.iter().find(|c| {
+        c.kind == symthaea::consciousness::epistemic_conflict::ConflictKind::UnreliablePrediction
+    });
     assert!(pp_conflict.is_some(), "Should detect UnreliablePrediction");
 
     // The recommended action should be Sense with a sensor anchor
     let action = pp_conflict.unwrap().recommended_action;
     assert!(
-        matches!(action, symthaea::consciousness::epistemic_conflict::EpistemicAction::Sense(_)),
+        matches!(
+            action,
+            symthaea::consciousness::epistemic_conflict::EpistemicAction::Sense(_)
+        ),
         "UnreliablePrediction should recommend Sense, got {:?}",
         action,
     );
@@ -205,7 +230,11 @@ fn seam_different_dag_different_outcome() {
 
     // DAG 1: X → Y (identifiable)
     let dag1 = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
-    let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+    let query = CausalQuery {
+        treatment: 0,
+        outcome: 1,
+        conditioning: vec![],
+    };
     let outcome1 = reasoner.query(&dag1, &query);
     assert!(matches!(outcome1, CausalQueryOutcome::Identified { .. }));
 
@@ -219,7 +248,11 @@ fn seam_different_dag_different_outcome() {
         vec!["X".into(), "M".into(), "Y".into()],
         vec![(0, 1), (1, 2), (0, 2)],
     );
-    let query3 = CausalQuery { treatment: 0, outcome: 2, conditioning: vec![] };
+    let query3 = CausalQuery {
+        treatment: 0,
+        outcome: 2,
+        conditioning: vec![],
+    };
     let outcome3 = reasoner.query(&dag3, &query3);
     // Should be identifiable (backdoor through M or empty set)
     assert!(
@@ -245,9 +278,9 @@ fn seam_calibration_converges_with_good_data() {
         );
     }
 
-    let iit_cal = calibrator.calibrations.get(
-        symthaea::consciousness::epistemic_conflict::TheoryId::IIT,
-    );
+    let iit_cal = calibrator
+        .calibrations
+        .get(symthaea::consciousness::epistemic_conflict::TheoryId::IIT);
 
     // After good predictions, reliability should increase from 0.5 default
     assert!(
@@ -278,7 +311,8 @@ fn seam_calibration_bounded_under_adversarial_input() {
         assert!(
             delta <= 0.1 + 1e-10,
             "INV-9: single-step Δγ = {} at outcome {}, must be ≤ 0.1",
-            delta, i,
+            delta,
+            i,
         );
         prev_gamma = current_gamma;
     }
@@ -291,7 +325,8 @@ fn seam_calibration_bounded_under_adversarial_input() {
         assert!(
             delta <= 0.1 + 1e-10,
             "INV-9: single-step Δγ = {} at bad outcome {}, must be ≤ 0.1",
-            delta, i,
+            delta,
+            i,
         );
         prev_gamma = current_gamma;
     }
@@ -313,8 +348,13 @@ fn seam_telemetry_complete_every_cycle() {
     for (i, &budget_us) in budgets.iter().enumerate() {
         let ctx = ReasoningContext {
             theory_metrics: MultiTheoryMetrics {
-                phi: 0.8, gwt: 0.8, ast: 0.8, pp: 0.8, rpt: 0.8,
-                embodiment: 0.8, unified: 0.8,
+                phi: 0.8,
+                gwt: 0.8,
+                ast: 0.8,
+                pp: 0.8,
+                rpt: 0.8,
+                embodiment: 0.8,
+                unified: 0.8,
             },
             phi: 0.8,
             available_budget_us: budget_us,
@@ -342,7 +382,10 @@ fn seam_telemetry_complete_every_cycle() {
         assert!(event.phi_eff > 0.0, "phi_eff must be set");
         assert!(event.gamma > 0.0, "gamma must be set");
         assert!(event.wall_time_us > 0, "wall_time must be set");
-        assert!(!event.tier_selected_reason.is_empty(), "tier reason must be set");
+        assert!(
+            !event.tier_selected_reason.is_empty(),
+            "tier reason must be set"
+        );
 
         // Theory metrics must have 6 entries
         assert_eq!(event.theory_metrics.len(), 6);
@@ -350,7 +393,11 @@ fn seam_telemetry_complete_every_cycle() {
     }
 
     // Check tier distribution
-    let tiers: Vec<_> = engine.recent_events().iter().map(|e| e.budget_tier).collect();
+    let tiers: Vec<_> = engine
+        .recent_events()
+        .iter()
+        .map(|e| e.budget_tier)
+        .collect();
     assert_eq!(tiers[0], BudgetTier::Tier0);
     // Tier 1 or 2 for the second (5ms budget, high R)
     assert!(tiers[1] == BudgetTier::Tier1 || tiers[1] == BudgetTier::Tier2);
@@ -363,8 +410,13 @@ fn seam_telemetry_includes_gate_info() {
 
     let ctx = ReasoningContext {
         theory_metrics: MultiTheoryMetrics {
-            phi: 0.8, gwt: 0.8, ast: 0.8, pp: 0.8, rpt: 0.8,
-            embodiment: 0.8, unified: 0.8,
+            phi: 0.8,
+            gwt: 0.8,
+            ast: 0.8,
+            pp: 0.8,
+            rpt: 0.8,
+            embodiment: 0.8,
+            unified: 0.8,
         },
         phi: 0.8,
         available_budget_us: 25_000,
@@ -398,8 +450,13 @@ fn seam_tier0_completes_within_budget() {
 
     let ctx = ReasoningContext {
         theory_metrics: MultiTheoryMetrics {
-            phi: 0.8, gwt: 0.8, ast: 0.8, pp: 0.8, rpt: 0.8,
-            embodiment: 0.8, unified: 0.8,
+            phi: 0.8,
+            gwt: 0.8,
+            ast: 0.8,
+            pp: 0.8,
+            rpt: 0.8,
+            embodiment: 0.8,
+            unified: 0.8,
         },
         phi: 0.8,
         available_budget_us: 1_000, // 1ms → Tier 0
@@ -430,13 +487,23 @@ fn seam_engine_composition_e2e() {
     // Cycle 1: Good conditions, full budget
     let ctx1 = ReasoningContext {
         theory_metrics: MultiTheoryMetrics {
-            phi: 0.9, gwt: 0.9, ast: 0.9, pp: 0.9, rpt: 0.9, embodiment: 0.9, unified: 0.9,
+            phi: 0.9,
+            gwt: 0.9,
+            ast: 0.9,
+            pp: 0.9,
+            rpt: 0.9,
+            embodiment: 0.9,
+            unified: 0.9,
         },
         phi: 0.9,
         available_budget_us: 25_000,
-        available_actions: vec![
-            PlannedAction { id: "a".into(), description: "Explore".into(), embedding: vec![0.5; 4], prior: 0.5, is_epistemic: true },
-        ],
+        available_actions: vec![PlannedAction {
+            id: "a".into(),
+            description: "Explore".into(),
+            embedding: vec![0.5; 4],
+            prior: 0.5,
+            is_epistemic: true,
+        }],
         tool: Some(ToolDescriptor::read_only("nix search")),
         recent_utility: 0.5,
         cycle_id: 1,
@@ -451,7 +518,13 @@ fn seam_engine_composition_e2e() {
     // Cycle 2: Bad conditions, theories disagree
     let ctx2 = ReasoningContext {
         theory_metrics: MultiTheoryMetrics {
-            phi: 0.9, gwt: 0.1, ast: 0.9, pp: 0.1, rpt: 0.9, embodiment: 0.1, unified: 0.5,
+            phi: 0.9,
+            gwt: 0.1,
+            ast: 0.9,
+            pp: 0.1,
+            rpt: 0.9,
+            embodiment: 0.1,
+            unified: 0.5,
         },
         phi: 0.9,
         available_budget_us: 25_000,
@@ -466,11 +539,17 @@ fn seam_engine_composition_e2e() {
         cycle_id: 2,
     };
     let r2 = engine.reason(&ctx2);
-    assert!(r2.phi_eff < r1.phi_eff, "Disagreeing theories should lower Φ_eff");
+    assert!(
+        r2.phi_eff < r1.phi_eff,
+        "Disagreeing theories should lower Φ_eff"
+    );
 
     // Verify posthoc was attached
     let events: Vec<_> = engine.recent_events().iter().collect();
-    assert!(events[1].posthoc_outcome.is_some(), "Posthoc should be attached to cycle 2");
+    assert!(
+        events[1].posthoc_outcome.is_some(),
+        "Posthoc should be attached to cycle 2"
+    );
 
     // Stats should reflect both cycles
     let stats = engine.stats();

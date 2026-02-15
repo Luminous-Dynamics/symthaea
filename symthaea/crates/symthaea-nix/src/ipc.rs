@@ -71,18 +71,14 @@ impl DaemonSnapshot {
     pub fn write_to(&self, path: &Path) -> Result<(), String> {
         // Ensure parent directory exists
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("create dir: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
         }
 
-        let json = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("serialize: {}", e))?;
+        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {}", e))?;
 
         let tmp_path = path.with_extension("tmp");
-        std::fs::write(&tmp_path, json.as_bytes())
-            .map_err(|e| format!("write tmp: {}", e))?;
-        std::fs::rename(&tmp_path, path)
-            .map_err(|e| format!("rename: {}", e))?;
+        std::fs::write(&tmp_path, json.as_bytes()).map_err(|e| format!("write tmp: {}", e))?;
+        std::fs::rename(&tmp_path, path).map_err(|e| format!("rename: {}", e))?;
         Ok(())
     }
 
@@ -134,12 +130,24 @@ pub struct DaemonConfig {
     pub learning_rate: f64,
 }
 
-fn default_snapshot_interval() -> u64 { 60 }
-fn default_poll_interval() -> u64 { 5 }
-fn default_surprise_threshold() -> f64 { 0.3 }
-fn default_journal_batch_size() -> usize { 50 }
-fn default_ipc_write_interval() -> u64 { 10 }
-fn default_learning_rate() -> f64 { 0.1 }
+fn default_snapshot_interval() -> u64 {
+    60
+}
+fn default_poll_interval() -> u64 {
+    5
+}
+fn default_surprise_threshold() -> f64 {
+    0.3
+}
+fn default_journal_batch_size() -> usize {
+    50
+}
+fn default_ipc_write_interval() -> u64 {
+    10
+}
+fn default_learning_rate() -> f64 {
+    0.1
+}
 
 impl Default for DaemonConfig {
     fn default() -> Self {
@@ -161,7 +169,11 @@ impl DaemonConfig {
             Ok(json) => match serde_json::from_str(&json) {
                 Ok(config) => config,
                 Err(e) => {
-                    eprintln!("nix-mind: failed to parse config {}: {}, using defaults", path.display(), e);
+                    eprintln!(
+                        "nix-mind: failed to parse config {}: {}, using defaults",
+                        path.display(),
+                        e
+                    );
                     Self::default()
                 }
             },
@@ -177,13 +189,10 @@ impl DaemonConfig {
     /// Save config to a JSON file.
     pub fn save(&self, path: &Path) -> Result<(), String> {
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("create dir: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("create dir: {}", e))?;
         }
-        let json = serde_json::to_string_pretty(self)
-            .map_err(|e| format!("serialize: {}", e))?;
-        std::fs::write(path, json)
-            .map_err(|e| format!("write: {}", e))
+        let json = serde_json::to_string_pretty(self).map_err(|e| format!("serialize: {}", e))?;
+        std::fs::write(path, json).map_err(|e| format!("write: {}", e))
     }
 }
 
@@ -192,7 +201,9 @@ pub fn default_config_path() -> PathBuf {
     if let Some(config_path) = std::env::var_os("NIX_MIND_CONFIG") {
         PathBuf::from(config_path)
     } else if let Some(config_dir) = std::env::var_os("XDG_CONFIG_HOME") {
-        PathBuf::from(config_dir).join("nix-mind").join("daemon.json")
+        PathBuf::from(config_dir)
+            .join("nix-mind")
+            .join("daemon.json")
     } else if let Some(home) = std::env::var_os("HOME") {
         PathBuf::from(home).join(".config/nix-mind/daemon.json")
     } else {
@@ -205,7 +216,9 @@ pub fn default_snapshot_path() -> PathBuf {
     if let Some(state_dir) = std::env::var_os("NIX_MIND_STATE_DIR") {
         PathBuf::from(state_dir).join("daemon_state.json")
     } else if let Some(data_dir) = std::env::var_os("XDG_DATA_HOME") {
-        PathBuf::from(data_dir).join("nix-mind").join("daemon_state.json")
+        PathBuf::from(data_dir)
+            .join("nix-mind")
+            .join("daemon_state.json")
     } else if let Some(home) = std::env::var_os("HOME") {
         PathBuf::from(home)
             .join(".local/share/nix-mind")
@@ -325,7 +338,10 @@ mod tests {
         let config: DaemonConfig = serde_json::from_str(json).unwrap();
         assert_eq!(config.snapshot_interval, 120);
         assert_eq!(config.poll_interval, 10);
-        assert!((config.surprise_threshold - 0.3).abs() < 1e-6, "Should use default");
+        assert!(
+            (config.surprise_threshold - 0.3).abs() < 1e-6,
+            "Should use default"
+        );
         assert_eq!(config.journal_batch_size, 50, "Should use default");
     }
 

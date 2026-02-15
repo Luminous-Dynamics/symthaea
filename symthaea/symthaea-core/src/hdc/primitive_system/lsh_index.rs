@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use crate::hdc::binary_hv::BinaryHV;
 use super::Primitive;
+use crate::hdc::binary_hv::BinaryHV;
+use std::collections::HashMap;
 
 /// Locality Sensitive Hashing index for fast approximate similarity search.
 ///
@@ -56,10 +56,7 @@ impl LshIndex {
         for (name, prim) in primitives {
             for (band_idx, indices) in bit_indices.iter().enumerate() {
                 let hash = Self::compute_hash(&prim.encoding, indices);
-                tables[band_idx]
-                    .entry(hash)
-                    .or_default()
-                    .push(name.clone());
+                tables[band_idx].entry(hash).or_default().push(name.clone());
             }
         }
 
@@ -105,7 +102,11 @@ impl LshIndex {
 
     /// Get statistics about the index.
     pub fn stats(&self) -> LshStats {
-        let total_entries: usize = self.tables.iter().map(|t| t.values().map(|v| v.len()).sum::<usize>()).sum();
+        let total_entries: usize = self
+            .tables
+            .iter()
+            .map(|t| t.values().map(|v| v.len()).sum::<usize>())
+            .sum();
         let total_buckets: usize = self.tables.iter().map(|t| t.len()).sum();
         let avg_bucket_size = if total_buckets > 0 {
             total_entries as f32 / total_buckets as f32

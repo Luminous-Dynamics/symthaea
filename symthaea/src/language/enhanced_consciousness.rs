@@ -48,22 +48,19 @@
 //! └─────────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use std::collections::{HashMap, VecDeque};
-use std::time::{SystemTime, Duration, Instant};
-use symthaea_core::hdc::universal_semantics::SemanticPrime;
-use crate::language::multi_theory_consciousness::{
-    MultiTheoryConsciousness, MultiTheoryMetrics, MultiTheoryResult,
-    GlobalWorkspace, SubsystemId,
-    AttentionSchema, AttentionCategory,
-    PredictiveProcessor, PredictionError,
-    ProcessingPass,
-    EmbodiedState,
-};
-use crate::language::emotional_core::{CoreEmotion, EmotionalState, EmotionalCore};
 use crate::consciousness::consciousness_unification::{
-    EmotionalBridge, UnifiedEmotionalState, ConsciousnessPhiProvider, PhiProvenance,
-    PhiSource, PhiMethod, PhiComponent,
+    ConsciousnessPhiProvider, EmotionalBridge, PhiComponent, PhiMethod, PhiProvenance, PhiSource,
+    UnifiedEmotionalState,
 };
+use crate::language::emotional_core::{CoreEmotion, EmotionalCore, EmotionalState};
+use crate::language::multi_theory_consciousness::{
+    AttentionCategory, AttentionSchema, EmbodiedState, GlobalWorkspace, MultiTheoryConsciousness,
+    MultiTheoryMetrics, MultiTheoryResult, PredictionError, PredictiveProcessor, ProcessingPass,
+    SubsystemId,
+};
+use std::collections::{HashMap, VecDeque};
+use std::time::{Duration, Instant, SystemTime};
+use symthaea_core::hdc::universal_semantics::SemanticPrime;
 
 // ============================================================================
 // A. CROSS-THEORY INTEGRATION
@@ -167,7 +164,7 @@ impl CrossTheoryIntegrator {
 
             // Record the influence
             self.record_event(
-                SubsystemId::Intent, // AST
+                SubsystemId::Intent,   // AST
                 SubsystemId::Language, // GWT
                 InfluenceType::AttentionToSalience,
                 focus.confidence * self.influences.attention_to_workspace,
@@ -209,7 +206,7 @@ impl CrossTheoryIntegrator {
     ) {
         if passes.len() >= 2 {
             // Multiple passes indicate refined understanding
-            let last_pass = passes.last().unwrap();
+            let last_pass = passes.last().expect("passes.len() >= 2 checked above");
             let improvement = last_pass.confidence;
 
             // Learn from recurrent processing
@@ -253,7 +250,13 @@ impl CrossTheoryIntegrator {
         }
     }
 
-    fn record_event(&mut self, from: SubsystemId, to: SubsystemId, influence_type: InfluenceType, strength: f64) {
+    fn record_event(
+        &mut self,
+        from: SubsystemId,
+        to: SubsystemId,
+        influence_type: InfluenceType,
+        strength: f64,
+    ) {
         if self.integration_events.len() >= self.max_history {
             self.integration_events.pop_front();
         }
@@ -272,8 +275,15 @@ impl CrossTheoryIntegrator {
             return 0.5;
         }
 
-        let recent: Vec<_> = self.integration_events.iter()
-            .filter(|e| e.timestamp.elapsed().map(|d| d.as_secs() < 60).unwrap_or(false))
+        let recent: Vec<_> = self
+            .integration_events
+            .iter()
+            .filter(|e| {
+                e.timestamp
+                    .elapsed()
+                    .map(|d| d.as_secs() < 60)
+                    .unwrap_or(false)
+            })
             .collect();
 
         if recent.is_empty() {
@@ -339,23 +349,29 @@ impl LiveSystemState {
 
     /// Record a package observation (from shell query)
     pub fn record_package(&mut self, name: &str, version: &str, installed: bool) {
-        self.installed_packages.insert(name.to_string(), PackageInfo {
-            name: name.to_string(),
-            version: version.to_string(),
-            installed,
-            queried_at: Instant::now(),
-        });
+        self.installed_packages.insert(
+            name.to_string(),
+            PackageInfo {
+                name: name.to_string(),
+                version: version.to_string(),
+                installed,
+                queried_at: Instant::now(),
+            },
+        );
         self.last_query = Some(Instant::now());
     }
 
     /// Record a service observation
     pub fn record_service(&mut self, name: &str, active: bool, enabled: bool) {
-        self.running_services.insert(name.to_string(), ServiceInfo {
-            name: name.to_string(),
-            active,
-            enabled,
-            queried_at: Instant::now(),
-        });
+        self.running_services.insert(
+            name.to_string(),
+            ServiceInfo {
+                name: name.to_string(),
+                active,
+                enabled,
+                queried_at: Instant::now(),
+            },
+        );
         self.last_query = Some(Instant::now());
     }
 
@@ -375,7 +391,10 @@ impl LiveSystemState {
     }
 
     pub fn generate_service_query(service: &str) -> String {
-        format!("systemctl is-active {} 2>/dev/null || echo 'inactive'", service)
+        format!(
+            "systemctl is-active {} 2>/dev/null || echo 'inactive'",
+            service
+        )
     }
 }
 
@@ -525,7 +544,13 @@ impl HigherOrderThought {
     }
 
     fn calculate_theory_variance(&self, metrics: &MultiTheoryMetrics) -> f64 {
-        let values = [metrics.gwt, metrics.ast, metrics.pp, metrics.rpt, metrics.embodiment];
+        let values = [
+            metrics.gwt,
+            metrics.ast,
+            metrics.pp,
+            metrics.rpt,
+            metrics.embodiment,
+        ];
         let mean = values.iter().sum::<f64>() / values.len() as f64;
         let variance = values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / values.len() as f64;
         variance.sqrt() // Standard deviation
@@ -556,7 +581,9 @@ impl HigherOrderThought {
         parts.push(awareness_desc.to_string());
 
         if !self.uncertainty_awareness.is_empty() {
-            let uncertainties: Vec<_> = self.uncertainty_awareness.iter()
+            let uncertainties: Vec<_> = self
+                .uncertainty_awareness
+                .iter()
                 .map(|u| format!("{} ({:.0}% uncertain)", u.topic, u.uncertainty * 100.0))
                 .collect();
             parts.push(format!("I'm uncertain about: {}", uncertainties.join(", ")));
@@ -703,7 +730,10 @@ impl TemporalConsciousness {
             conditions.low_surprise,
             conditions.high_integration,
             conditions.smooth_processing,
-        ].iter().filter(|&&b| b).count();
+        ]
+        .iter()
+        .filter(|&&b| b)
+        .count();
 
         let new_in_flow = condition_count >= 3;
         let flow_score = condition_count as f64 / 4.0;
@@ -802,7 +832,11 @@ impl TheoryVotingSystem {
     }
 
     /// Collect votes from all theories
-    pub fn collect_votes(&self, metrics: &MultiTheoryMetrics, attention: &AttentionSchema) -> ExecutionDecision {
+    pub fn collect_votes(
+        &self,
+        metrics: &MultiTheoryMetrics,
+        attention: &AttentionSchema,
+    ) -> ExecutionDecision {
         let mut votes = Vec::new();
 
         // IIT votes based on integration
@@ -831,7 +865,12 @@ impl TheoryVotingSystem {
 
         // AST votes based on attention focus
         let attention_vote = if attention.primary_focus.is_some() {
-            attention.primary_focus.as_ref().map(|f| f.confidence).unwrap_or(0.0) - 0.3
+            attention
+                .primary_focus
+                .as_ref()
+                .map(|f| f.confidence)
+                .unwrap_or(0.0)
+                - 0.3
         } else {
             -0.5
         };
@@ -840,8 +879,14 @@ impl TheoryVotingSystem {
             vote: attention_vote,
             confidence: metrics.ast,
             reason: if attention_vote > 0.0 {
-                format!("Clear attention focus: {}",
-                    attention.primary_focus.as_ref().map(|f| f.target.as_str()).unwrap_or("none"))
+                format!(
+                    "Clear attention focus: {}",
+                    attention
+                        .primary_focus
+                        .as_ref()
+                        .map(|f| f.target.as_str())
+                        .unwrap_or("none")
+                )
             } else {
                 "Attention is scattered or unfocused".to_string()
             },
@@ -903,7 +948,8 @@ impl TheoryVotingSystem {
         let should_dry_run = consensus > 0.0 && consensus <= self.execution_threshold;
 
         // Generate explanation
-        let explanation = self.generate_explanation(&votes, consensus, should_execute, should_clarify);
+        let explanation =
+            self.generate_explanation(&votes, consensus, should_execute, should_clarify);
 
         ExecutionDecision {
             votes,
@@ -915,18 +961,33 @@ impl TheoryVotingSystem {
         }
     }
 
-    fn generate_explanation(&self, votes: &[TheoryVote], consensus: f64, execute: bool, clarify: bool) -> String {
+    fn generate_explanation(
+        &self,
+        votes: &[TheoryVote],
+        consensus: f64,
+        execute: bool,
+        clarify: bool,
+    ) -> String {
         let supporting: Vec<_> = votes.iter().filter(|v| v.vote > 0.0).collect();
         let opposing: Vec<_> = votes.iter().filter(|v| v.vote < 0.0).collect();
 
         let mut parts = Vec::new();
 
         if execute {
-            parts.push(format!("Consensus to execute ({:.0}%)", (consensus + 1.0) * 50.0));
+            parts.push(format!(
+                "Consensus to execute ({:.0}%)",
+                (consensus + 1.0) * 50.0
+            ));
         } else if clarify {
-            parts.push(format!("Consensus to clarify ({:.0}%)", (consensus + 1.0) * 50.0));
+            parts.push(format!(
+                "Consensus to clarify ({:.0}%)",
+                (consensus + 1.0) * 50.0
+            ));
         } else {
-            parts.push(format!("Consensus to dry-run first ({:.0}%)", (consensus + 1.0) * 50.0));
+            parts.push(format!(
+                "Consensus to dry-run first ({:.0}%)",
+                (consensus + 1.0) * 50.0
+            ));
         }
 
         if !supporting.is_empty() {
@@ -1040,7 +1101,11 @@ impl PhenomenalState {
         };
 
         let clarity_desc = if self.clarity > 0.6 { "clear" } else { "hazy" };
-        let effort_desc = if self.effort > 0.6 { "effortful" } else { "effortless" };
+        let effort_desc = if self.effort > 0.6 {
+            "effortful"
+        } else {
+            "effortless"
+        };
 
         format!(
             "Feeling {} and {} with {} {} processing",
@@ -1153,10 +1218,14 @@ impl UserMentalModel {
 
     /// Update expertise estimate from behavior
     pub fn update_expertise(&mut self) {
-        let recent_errors = self.behavior_history.iter()
+        let recent_errors = self
+            .behavior_history
+            .iter()
             .filter(|b| b.behavior_type == BehaviorType::MadeError)
             .count();
-        let recent_corrections = self.behavior_history.iter()
+        let recent_corrections = self
+            .behavior_history
+            .iter()
             .filter(|b| b.behavior_type == BehaviorType::CorrectedError)
             .count();
 
@@ -1197,7 +1266,9 @@ impl UserMentalModel {
 
     /// Describe inferred user mental state
     pub fn describe(&self) -> String {
-        let goal_desc = self.goals.last()
+        let goal_desc = self
+            .goals
+            .last()
             .map(|g| format!("trying to {}", g.goal))
             .unwrap_or_else(|| "with unclear goals".to_string());
 
@@ -1300,9 +1371,14 @@ impl NarrativeEngine {
 
         // 3. Prediction state
         if metrics.pp < 0.5 {
-            let pred_desc = "I'm encountering some surprises - my predictions aren't fully matching reality.";
+            let pred_desc =
+                "I'm encountering some surprises - my predictions aren't fully matching reality.";
             parts.push(pred_desc.to_string());
-            self.record(pred_desc.to_string(), NarrativeAspect::Prediction, metrics.pp);
+            self.record(
+                pred_desc.to_string(),
+                NarrativeAspect::Prediction,
+                metrics.pp,
+            );
         }
 
         // 4. Metacognitive awareness
@@ -1319,15 +1395,23 @@ impl NarrativeEngine {
 
         // 6. User understanding
         if !user_model.goals.is_empty() {
-            let user_desc = format!("I understand that you're {}.",
-                user_model.goals.last().map(|g| g.goal.as_str()).unwrap_or("working on something"));
+            let user_desc = format!(
+                "I understand that you're {}.",
+                user_model
+                    .goals
+                    .last()
+                    .map(|g| g.goal.as_str())
+                    .unwrap_or("working on something")
+            );
             parts.push(user_desc.clone());
             self.record(user_desc, NarrativeAspect::User, user_model.trust);
         }
 
         // 7. Flow state
         if temporal.flow_state.in_flow {
-            parts.push("We're in a good flow state - processing is smooth and integrated.".to_string());
+            parts.push(
+                "We're in a good flow state - processing is smooth and integrated.".to_string(),
+            );
         }
 
         parts.join(" ")
@@ -1424,7 +1508,12 @@ impl EnhancedConsciousness {
     }
 
     /// Process input through enhanced consciousness pipeline
-    pub fn process(&mut self, input: &str, primes: &[SemanticPrime], phi: f64) -> EnhancedConsciousnessResult {
+    pub fn process(
+        &mut self,
+        input: &str,
+        primes: &[SemanticPrime],
+        phi: f64,
+    ) -> EnhancedConsciousnessResult {
         // 1. Base multi-theory processing
         let base_result = self.base.process(input, primes, phi);
 
@@ -1454,7 +1543,8 @@ impl EnhancedConsciousness {
                 (&base_result.metrics).into();
             let matrix = self.conflict_detector.detect(&ec_metrics);
             let phi_eff_result = crate::consciousness::epistemic_conflict::compute_phi_eff(
-                &ec_metrics, &self.calibrator,
+                &ec_metrics,
+                &self.calibrator,
             );
             // Feed conflict entropy into HOT as an uncertainty signal
             if matrix.total_entropy > 1.0 {
@@ -1479,13 +1569,17 @@ impl EnhancedConsciousness {
         self.temporal.record(&base_result.metrics, input);
 
         // 6. Update phenomenal state
-        self.phenomenal = PhenomenalState::from_metrics(&base_result.metrics, &self.temporal.flow_state);
+        self.phenomenal =
+            PhenomenalState::from_metrics(&base_result.metrics, &self.temporal.flow_state);
 
         // 7. Update user model
-        self.user_model.infer_goal(input, base_result.metrics.unified);
+        self.user_model
+            .infer_goal(input, base_result.metrics.unified);
 
         // 8. Collect theory votes for execution
-        let decision = self.voting.collect_votes(&base_result.metrics, &self.base.attention);
+        let decision = self
+            .voting
+            .collect_votes(&base_result.metrics, &self.base.attention);
 
         // 9. Generate narrative
         let narrative = self.narrative.generate_full_narrative(
@@ -1601,12 +1695,36 @@ impl EnhancedConsciousness {
             method: PhiMethod::TheoryVotingAggregate,
             confidence: self.integrator.integration_coherence(),
             components: vec![
-                PhiComponent { name: "GWT".to_string(), weight: 0.15, value: self.base.workspace.gwt_metric() },
-                PhiComponent { name: "AST".to_string(), weight: 0.15, value: self.base.attention.ast_metric() },
-                PhiComponent { name: "PP".to_string(), weight: 0.20, value: self.base.predictor.pp_metric() },
-                PhiComponent { name: "RPT".to_string(), weight: 0.15, value: self.base.recurrence.rpt_metric() },
-                PhiComponent { name: "4E".to_string(), weight: 0.15, value: self.base.embodiment.embodiment_metric() },
-                PhiComponent { name: "IIT".to_string(), weight: 0.20, value: phi },
+                PhiComponent {
+                    name: "GWT".to_string(),
+                    weight: 0.15,
+                    value: self.base.workspace.gwt_metric(),
+                },
+                PhiComponent {
+                    name: "AST".to_string(),
+                    weight: 0.15,
+                    value: self.base.attention.ast_metric(),
+                },
+                PhiComponent {
+                    name: "PP".to_string(),
+                    weight: 0.20,
+                    value: self.base.predictor.pp_metric(),
+                },
+                PhiComponent {
+                    name: "RPT".to_string(),
+                    weight: 0.15,
+                    value: self.base.recurrence.rpt_metric(),
+                },
+                PhiComponent {
+                    name: "4E".to_string(),
+                    weight: 0.15,
+                    value: self.base.embodiment.embodiment_metric(),
+                },
+                PhiComponent {
+                    name: "IIT".to_string(),
+                    weight: 0.20,
+                    value: phi,
+                },
             ],
         }
     }
@@ -1624,7 +1742,8 @@ impl ConsciousnessPhiProvider for EnhancedConsciousness {
         let coherence = self.integrator.integration_coherence();
 
         // Weighted combination with integration coherence as modifier
-        let raw_phi = gwt * 0.15 + ast * 0.15 + pp * 0.20 + rpt * 0.15 + e4 * 0.15 + coherence * 0.20;
+        let raw_phi =
+            gwt * 0.15 + ast * 0.15 + pp * 0.20 + rpt * 0.15 + e4 * 0.15 + coherence * 0.20;
         raw_phi.min(1.0).max(0.0)
     }
 

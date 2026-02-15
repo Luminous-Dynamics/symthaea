@@ -8,22 +8,22 @@
 //! [`SystemStateSnapshot`](crate::encoding::SystemStateSnapshot) suitable for
 //! encoding into the HDC world model.
 
-pub mod systemd;
-pub mod journal;
-pub mod store;
+pub mod flake_registry;
 pub mod generations;
 pub mod hardware;
-pub mod flake_registry;
+pub mod journal;
+pub mod store;
+pub mod systemd;
 
 // Re-export key types for ergonomic access.
-pub use generations::{GenerationObserver, GenerationInfo, GenerationDiff};
-pub use store::{StoreObserver, StoreInfo, GcRoot};
+pub use flake_registry::{FlakeInfo, FlakeRegistry};
+pub use generations::{GenerationDiff, GenerationInfo, GenerationObserver};
+pub use hardware::{DiskInfo, GpuInfo, HardwareInfo, HardwareObserver};
+pub use journal::{JournalEntry, JournalObserver};
+pub use store::{GcRoot, StoreInfo, StoreObserver};
 pub use systemd::{SystemdObserver, UnitInfo};
-pub use journal::{JournalObserver, JournalEntry};
-pub use hardware::{HardwareObserver, HardwareInfo, GpuInfo, DiskInfo};
-pub use flake_registry::{FlakeRegistry, FlakeInfo};
 
-use crate::encoding::{SystemStateSnapshot, ServiceState};
+use crate::encoding::{ServiceState, SystemStateSnapshot};
 
 /// Composite observer that builds a full system state snapshot from all
 /// sub-observers.

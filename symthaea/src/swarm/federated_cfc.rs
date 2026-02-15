@@ -798,7 +798,7 @@ mod tests {
 
         // Expected: (0.2+0.4)/2, (0.4+0.2)/2, (0.6+0.4)/2, (0.8+0.6)/2
         // = [0.3, 0.3, 0.5, 0.7]
-        let expected = vec![0.3, 0.3, 0.5, 0.7];
+        let expected = [0.3, 0.3, 0.5, 0.7];
 
         for (r, e) in result.iter().zip(expected.iter()) {
             assert!(
@@ -988,7 +988,7 @@ mod tests {
         aggregator.apply_gradient(&gradient, 1.0);
 
         // w = w - lr * g = [1.0-0.1, 2.0-0.2, 3.0-0.3, 4.0-0.4]
-        let expected = vec![0.9, 1.8, 2.7, 3.6];
+        let expected = [0.9, 1.8, 2.7, 3.6];
         for (w, e) in aggregator.local_weights().iter().zip(expected.iter()) {
             assert!((w - e).abs() < 1e-6);
         }
@@ -1058,7 +1058,7 @@ mod tests {
         aggregator.apply_weight_delta(&delta);
 
         // w = w + delta = [1.1, 2.2, 3.3, 4.4]
-        let expected = vec![1.1, 2.2, 3.3, 4.4];
+        let expected = [1.1, 2.2, 3.3, 4.4];
         for (w, e) in aggregator.local_weights().iter().zip(expected.iter()) {
             assert!((w - e).abs() < 1e-6);
         }
@@ -1079,7 +1079,7 @@ mod tests {
         assert!(updated);
 
         // Expected: [1.0, 2.0, 3.0, 4.0] + [0.2, 0.2, 0.2, 0.2] = [1.2, 2.2, 3.2, 4.2]
-        let expected = vec![1.2, 2.2, 3.2, 4.2];
+        let expected = [1.2, 2.2, 3.2, 4.2];
         for (w, e) in aggregator.local_weights().iter().zip(expected.iter()) {
             assert!(
                 (w - e).abs() < 1e-6,
@@ -1104,9 +1104,7 @@ mod tests {
 
             // Simulate 3 clients each moving 20% toward target
             for client_id in 0..3 {
-                let delta: Vec<f32> = current.iter()
-                    .map(|&w| (target - w) * 0.2)
-                    .collect();
+                let delta: Vec<f32> = current.iter().map(|&w| (target - w) * 0.2).collect();
 
                 let mut source_id = [0u8; 32];
                 source_id[0] = client_id as u8;

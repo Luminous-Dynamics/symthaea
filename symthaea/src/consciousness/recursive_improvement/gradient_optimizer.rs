@@ -28,7 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use super::core::{PerformanceMonitor, MonitorConfig, ComponentId};
+use super::core::{ComponentId, MonitorConfig, PerformanceMonitor};
 
 /// Represents an architectural parameter that can be optimized
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,7 +117,9 @@ impl ConsciousnessGradient {
         // If ∂Φ/∂θ from forward and backward differences agree, high confidence
         let forward_grad = (phi_at_plus - phi_at_current) / epsilon;
         let backward_grad = (phi_at_current - phi_at_minus) / epsilon;
-        let consistency = 1.0 - (forward_grad - backward_grad).abs() / (forward_grad.abs() + backward_grad.abs() + 1e-10);
+        let consistency = 1.0
+            - (forward_grad - backward_grad).abs()
+                / (forward_grad.abs() + backward_grad.abs() + 1e-10);
 
         Self {
             parameter_name: parameter_name.to_string(),
@@ -155,9 +157,9 @@ pub struct OptimizationObjective {
 impl Default for OptimizationObjective {
     fn default() -> Self {
         Self {
-            phi_weight: 1.0,        // Primary objective
-            latency_weight: 0.3,    // Secondary
-            accuracy_weight: 0.3,   // Secondary
+            phi_weight: 1.0,      // Primary objective
+            latency_weight: 0.3,  // Secondary
+            accuracy_weight: 0.3, // Secondary
             phi_target: 0.5,
             latency_max_ms: 100.0,
             accuracy_min: 0.85,
@@ -383,61 +385,77 @@ impl ConsciousnessGradientOptimizer {
             // Evolution parameters
             ArchitecturalParameter::new(
                 "evolution_rate",
-                0.1, 0.01, 1.0,
-                ComponentId::PrimitiveEvolution()
+                0.1,
+                0.01,
+                1.0,
+                ComponentId::PrimitiveEvolution(),
             ),
             ArchitecturalParameter::new(
                 "mutation_rate",
-                0.05, 0.001, 0.5,
-                ComponentId::PrimitiveEvolution()
+                0.05,
+                0.001,
+                0.5,
+                ComponentId::PrimitiveEvolution(),
             ),
             ArchitecturalParameter::new(
                 "population_size",
-                100.0, 10.0, 1000.0,
-                ComponentId::PrimitiveEvolution()
+                100.0,
+                10.0,
+                1000.0,
+                ComponentId::PrimitiveEvolution(),
             ),
-
             // Byzantine collective parameters
             ArchitecturalParameter::new(
                 "collective_size",
-                7.0, 3.0, 21.0,
-                ComponentId::ByzantineCollective()
+                7.0,
+                3.0,
+                21.0,
+                ComponentId::ByzantineCollective(),
             ),
             ArchitecturalParameter::new(
                 "trust_threshold",
-                0.6, 0.3, 0.95,
-                ComponentId::ByzantineCollective()
+                0.6,
+                0.3,
+                0.95,
+                ComponentId::ByzantineCollective(),
             ),
-
             // Meta-cognitive parameters
             ArchitecturalParameter::new(
                 "reflection_depth",
-                3.0, 1.0, 10.0,
-                ComponentId::MetaCognition()
+                3.0,
+                1.0,
+                10.0,
+                ComponentId::MetaCognition(),
             ),
             ArchitecturalParameter::new(
                 "attention_heads",
-                8.0, 1.0, 32.0,
-                ComponentId::MetaCognition()
+                8.0,
+                1.0,
+                32.0,
+                ComponentId::MetaCognition(),
             ),
-
             // Integration parameters
             ArchitecturalParameter::new(
                 "integration_strength",
-                0.5, 0.1, 1.0,
-                ComponentId::Integration()
+                0.5,
+                0.1,
+                1.0,
+                ComponentId::Integration(),
             ),
             ArchitecturalParameter::new(
                 "feedback_gain",
-                0.3, 0.01, 1.0,
-                ComponentId::Integration()
+                0.3,
+                0.01,
+                1.0,
+                ComponentId::Integration(),
             ),
-
             // Cache parameters
             ArchitecturalParameter::new(
                 "cache_size",
-                1000.0, 100.0, 100000.0,
-                ComponentId::Cache()
+                1000.0,
+                100.0,
+                100000.0,
+                ComponentId::Cache(),
             ),
         ]
     }
@@ -506,8 +524,7 @@ impl ConsciousnessGradientOptimizer {
         let optimal_normalized = 0.5 + param_idx as f64 * 0.03; // Each param has different optimal
         let distance_from_optimal = (param.normalized() - optimal_normalized).abs();
 
-        let phi_response = self.current_phi
-            + sensitivity * normalized_change
+        let phi_response = self.current_phi + sensitivity * normalized_change
             - 0.1 * distance_from_optimal * normalized_change.abs()
             + noise;
 
@@ -537,9 +554,8 @@ impl ConsciousnessGradientOptimizer {
         let gradients = self.compute_all_gradients();
 
         // Update gradient magnitude stats
-        let avg_magnitude = gradients.iter()
-            .map(|g| g.gradient.abs())
-            .sum::<f64>() / gradients.len() as f64;
+        let avg_magnitude =
+            gradients.iter().map(|g| g.gradient.abs()).sum::<f64>() / gradients.len() as f64;
 
         // Apply updates using Adam
         let mut updates = HashMap::new();
@@ -555,10 +571,13 @@ impl ConsciousnessGradientOptimizer {
             }
 
             // Clip gradient
-            let clipped_grad = grad.gradient.clamp(-self.config.max_gradient, self.config.max_gradient);
+            let clipped_grad = grad
+                .gradient
+                .clamp(-self.config.max_gradient, self.config.max_gradient);
 
             // Get or create Adam state
-            let adam_state = self.adam_states
+            let adam_state = self
+                .adam_states
                 .entry(self.parameters[i].name.clone())
                 .or_insert_with(AdamState::default);
 
@@ -586,7 +605,11 @@ impl ConsciousnessGradientOptimizer {
 
         // Check constraints
         if self.config.use_constraints {
-            if !self.config.objective.constraints_satisfied(phi_after, new_latency, new_accuracy) {
+            if !self
+                .config
+                .objective
+                .constraints_satisfied(phi_after, new_latency, new_accuracy)
+            {
                 self.stats.constraint_violations += 1;
                 // Reduce learning rate temporarily
             }
@@ -597,17 +620,17 @@ impl ConsciousnessGradientOptimizer {
         self.current_latency_ms = new_latency;
         self.current_accuracy = new_accuracy;
 
-        let objective_after = self.config.objective.scalarize(
-            phi_after,
-            new_latency,
-            new_accuracy,
-        );
+        let objective_after = self
+            .config
+            .objective
+            .scalarize(phi_after, new_latency, new_accuracy);
 
         // Update stats
         let phi_delta = phi_after - phi_before;
         self.stats.total_steps += 1;
-        self.stats.avg_gradient_magnitude =
-            (self.stats.avg_gradient_magnitude * (self.stats.total_steps - 1) as f64 + avg_magnitude)
+        self.stats.avg_gradient_magnitude = (self.stats.avg_gradient_magnitude
+            * (self.stats.total_steps - 1) as f64
+            + avg_magnitude)
             / self.stats.total_steps as f64;
 
         if phi_delta > 0.0 {
@@ -621,7 +644,9 @@ impl ConsciousnessGradientOptimizer {
         }
 
         // Check convergence
-        if self.stats.steps_since_improvement > 20 || avg_magnitude < self.config.convergence_threshold {
+        if self.stats.steps_since_improvement > 20
+            || avg_magnitude < self.config.convergence_threshold
+        {
             self.stats.converged = true;
         }
 
@@ -645,7 +670,8 @@ impl ConsciousnessGradientOptimizer {
     /// Simulate new Φ after parameter updates
     fn simulate_new_phi(&self, gradients: &[ConsciousnessGradient]) -> f64 {
         // Expected improvement from gradient ascent
-        let expected_improvement: f64 = gradients.iter()
+        let expected_improvement: f64 = gradients
+            .iter()
             .filter(|g| g.confidence > 0.3)
             .map(|g| {
                 let step = g.gradient * self.config.learning_rate;
@@ -661,12 +687,16 @@ impl ConsciousnessGradientOptimizer {
     /// Simulate new latency after parameter updates
     fn simulate_new_latency(&self) -> f64 {
         // Latency is affected by certain parameters
-        let cache_size = self.parameters.iter()
+        let cache_size = self
+            .parameters
+            .iter()
             .find(|p| p.name == "cache_size")
             .map(|p| p.value)
             .unwrap_or(1000.0);
 
-        let collective_size = self.parameters.iter()
+        let collective_size = self
+            .parameters
+            .iter()
             .find(|p| p.name == "collective_size")
             .map(|p| p.value)
             .unwrap_or(7.0);
@@ -682,12 +712,16 @@ impl ConsciousnessGradientOptimizer {
     /// Simulate new accuracy after parameter updates
     fn simulate_new_accuracy(&self) -> f64 {
         // Accuracy is affected by evolution and meta-cognition parameters
-        let evolution_rate = self.parameters.iter()
+        let evolution_rate = self
+            .parameters
+            .iter()
             .find(|p| p.name == "evolution_rate")
             .map(|p| p.value)
             .unwrap_or(0.1);
 
-        let reflection_depth = self.parameters.iter()
+        let reflection_depth = self
+            .parameters
+            .iter()
             .find(|p| p.name == "reflection_depth")
             .map(|p| p.value)
             .unwrap_or(3.0);
@@ -768,7 +802,8 @@ impl ConsciousnessGradientOptimizer {
             self.stats.avg_gradient_magnitude,
             self.stats.constraint_violations,
             self.stats.converged,
-            self.parameters.iter()
+            self.parameters
+                .iter()
                 .map(|p| format!("  {}: {:.4} [{:.2}, {:.2}]", p.name, p.value, p.min, p.max))
                 .collect::<Vec<_>>()
                 .join("\n")
@@ -852,7 +887,10 @@ mod tests {
         assert!(step2 > 0.0);
         // With consistent gradients, steps should converge to similar values
         // (bias correction stabilizes after a few steps)
-        assert!((step1 - step2).abs() < step1, "Steps should be similar magnitude");
+        assert!(
+            (step1 - step2).abs() < step1,
+            "Steps should be similar magnitude"
+        );
     }
 
     #[test]

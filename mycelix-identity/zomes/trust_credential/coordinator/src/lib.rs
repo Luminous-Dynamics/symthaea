@@ -12,6 +12,16 @@
 use hdk::prelude::*;
 use trust_credential_integrity::*;
 
+/// API version for cross-zome compatibility detection.
+/// Increment when making breaking changes to extern signatures or types.
+const API_VERSION: u16 = 1;
+
+/// Returns the API version of this coordinator zome.
+#[hdk_extern]
+pub fn get_api_version(_: ()) -> ExternResult<u16> {
+    Ok(API_VERSION)
+}
+
 /// Helper to get an anchor entry hash using cryptographic hashing
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let hash = holo_hash::blake2b_256(anchor_str.as_bytes());
@@ -35,10 +45,18 @@ pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<
     }
     let now = sys_time()?;
     let cred_id = format!("trust-cred:{}:{}", input.subject_did, now.as_micros());
-    let _caller = agent_info()?.agent_initial_pubkey;
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    // Verify caller is the issuer
+    let caller_did = format!("did:mycelix:{}", caller);
+    if input.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the issuer can issue trust credentials".into()
+        )));
+    }
 
     // Determine trust tier from the proven range
-    let mid_score = (input.trust_score_lower + input.trust_score_upper) / 2.0;
+    let mid_score = (input.trust_score_lower as f64 + input.trust_score_upper as f64) / 2.0;
     let trust_tier = TrustTier::from_score(mid_score);
 
     let credential = TrustCredential {
@@ -56,6 +74,7 @@ pub fn issue_trust_credential(input: IssueTrustCredentialInput) -> ExternResult<
         expires_at: input.expires_at,
         revoked: false,
         revocation_reason: None,
+        revoked_at: None,
         supersedes: input.supersedes,
     };
 
@@ -204,9 +223,20 @@ pub fn revoke_credential(input: RevokeCredentialInput) -> ExternResult<Record> {
         ))),
     };
 
+    // Verify caller is the issuer of this credential
+    let caller = agent_info()?.agent_initial_pubkey;
+    let caller_did = format!("did:mycelix:{}", caller);
+    if credential.issuer_did != caller_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the credential issuer can revoke it".into()
+        )));
+    }
+
     // Update credential as revoked
+    let now = sys_time()?;
     credential.revoked = true;
     credential.revocation_reason = Some(input.reason);
+    credential.revoked_at = Some(now);
 
     let action_hash = update_entry(original_hash, &EntryTypes::TrustCredential(credential))?;
 
@@ -428,7 +458,7 @@ pub fn fulfill_attestation(input: FulfillAttestationInput) -> ExternResult<Fulfi
     }
 
     // Verify the provided proof meets request requirements
-    let mid_score = (input.trust_score_lower + input.trust_score_upper) / 2.0;
+    let mid_score = (input.trust_score_lower as f64 + input.trust_score_upper as f64) / 2.0;
     let trust_tier = TrustTier::from_score(mid_score);
 
     if let Some(min_score) = req.min_trust_score {
@@ -725,7 +755,7 @@ pub fn verify_credential(credential_id: String) -> ExternResult<VerificationResu
         && !cred.trust_score_range.upper.is_nan();
 
     // Check tier consistency: verify tier matches the score range
-    let mid_score = (cred.trust_score_range.lower + cred.trust_score_range.upper) / 2.0;
+    let mid_score = (cred.trust_score_range.lower as f64 + cred.trust_score_range.upper as f64) / 2.0;
     let expected_tier = TrustTier::from_score(mid_score);
     let tier_consistent = range_valid && cred.trust_tier == expected_tier;
 
@@ -786,7 +816,7 @@ pub fn verify_credential_pure(
         && !trust_score_range.lower.is_nan()
         && !trust_score_range.upper.is_nan();
 
-    let mid_score = (trust_score_range.lower + trust_score_range.upper) / 2.0;
+    let mid_score = (trust_score_range.lower as f64 + trust_score_range.upper as f64) / 2.0;
     let expected_tier = TrustTier::from_score(mid_score);
     let tier_consistent = range_valid && *trust_tier == expected_tier;
 

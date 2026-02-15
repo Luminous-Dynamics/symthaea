@@ -7,9 +7,7 @@
 //! - End-to-end: text → extraction → HDC encoding → causal queries
 
 use symthaea::hdc::causal_mind::CausalMind;
-use symthaea::hdc::grounded_understanding::{
-    CausalRoleMarkers, LexicalGrounding,
-};
+use symthaea::hdc::grounded_understanding::{CausalRoleMarkers, LexicalGrounding};
 
 // ============================================================================
 // LEXICAL GROUNDING TESTS
@@ -63,11 +61,14 @@ fn test_causal_markers_because() {
 
     let first = &relations[0];
     // Effect should contain crash-related
-    assert!(first.effect.to_lowercase().contains("crash") ||
-            first.effect.to_lowercase().contains("server"));
+    assert!(
+        first.effect.to_lowercase().contains("crash")
+            || first.effect.to_lowercase().contains("server")
+    );
     // Cause should contain disk/full-related
-    assert!(first.cause.to_lowercase().contains("disk") ||
-            first.cause.to_lowercase().contains("full"));
+    assert!(
+        first.cause.to_lowercase().contains("disk") || first.cause.to_lowercase().contains("full")
+    );
 }
 
 #[test]
@@ -112,7 +113,10 @@ fn test_causal_markers_multiple() {
     let relations = markers.extract_causal_relations(text);
 
     // Should find multiple relations
-    assert!(relations.len() >= 2, "Should find multiple causal relations");
+    assert!(
+        relations.len() >= 2,
+        "Should find multiple causal relations"
+    );
 }
 
 // ============================================================================
@@ -127,8 +131,10 @@ fn test_causal_mind_learn_from_text() {
     let learning = mind.learn_from_grounded_text(text);
 
     // Should have learned something
-    assert!(learning.links_added > 0 || !learning.concepts_added.is_empty(),
-            "Should learn from causal text");
+    assert!(
+        learning.links_added > 0 || !learning.concepts_added.is_empty(),
+        "Should learn from causal text"
+    );
 }
 
 #[test]
@@ -151,10 +157,17 @@ fn test_causal_mind_multiple_sentences() {
     }
 
     // Log what we learned
-    println!("Total links: {}, concepts: {}", total_links, mind.concept_count());
+    println!(
+        "Total links: {}, concepts: {}",
+        total_links,
+        mind.concept_count()
+    );
 
     // After 4 causal sentences, the mind should have learned something
-    assert!(mind.concept_count() > 0, "Should have learned at least one concept");
+    assert!(
+        mind.concept_count() > 0,
+        "Should have learned at least one concept"
+    );
 }
 
 #[test]
@@ -172,7 +185,10 @@ fn test_causal_mind_query_why() {
     println!("Explanations for 'crash': {:?}", explanations);
     // If we found explanations, they should have non-empty explanation text
     for explanation in &explanations {
-        assert!(!explanation.explanation.is_empty(), "Explanation text should not be empty");
+        assert!(
+            !explanation.explanation.is_empty(),
+            "Explanation text should not be empty"
+        );
     }
 }
 
@@ -191,7 +207,10 @@ fn test_causal_mind_query_what_if() {
     println!("Predictions for 'rain': {:?}", predictions);
     // If we found predictions, they should have non-empty prediction text
     for prediction in &predictions {
-        assert!(!prediction.prediction.is_empty(), "Prediction text should not be empty");
+        assert!(
+            !prediction.prediction.is_empty(),
+            "Prediction text should not be empty"
+        );
     }
 }
 
@@ -209,7 +228,10 @@ fn test_causal_mind_phi_increases() {
 
     // Phi should increase with more causal structure
     // (or at least not decrease significantly)
-    println!("Initial Phi: {:.4}, Final Phi: {:.4}", initial_phi, final_phi);
+    println!(
+        "Initial Phi: {:.4}, Final Phi: {:.4}",
+        initial_phi, final_phi
+    );
     assert!(final_phi >= initial_phi,
         "Phi should not decrease after learning causal structure: {initial_phi:.4} -> {final_phi:.4}");
 }
@@ -237,8 +259,15 @@ fn test_full_text_to_causal_pipeline() {
         if !trimmed.is_empty() {
             let learning = mind.learn_from_grounded_text(trimmed);
             if learning.links_added > 0 {
-                println!("Learned {} links from: {}", learning.links_added,
-                    if trimmed.len() > 50 { &trimmed[..50] } else { trimmed });
+                println!(
+                    "Learned {} links from: {}",
+                    learning.links_added,
+                    if trimmed.len() > 50 {
+                        &trimmed[..50]
+                    } else {
+                        trimmed
+                    }
+                );
             }
         }
     }
@@ -247,7 +276,10 @@ fn test_full_text_to_causal_pipeline() {
     let concept_count = mind.concept_count();
     let link_count = mind.link_count();
 
-    println!("Final state: {} concepts, {} links", concept_count, link_count);
+    println!(
+        "Final state: {} concepts, {} links",
+        concept_count, link_count
+    );
 
     // Query the causal chain
     let timeout_causes = mind.query_why("timeout");
@@ -257,7 +289,10 @@ fn test_full_text_to_causal_pipeline() {
     println!("What if cache? {:?}", cache_effects);
 
     // After processing 5 causal sentences, the mind should have some structure
-    assert!(concept_count > 0, "Should have learned concepts from paragraph");
+    assert!(
+        concept_count > 0,
+        "Should have learned concepts from paragraph"
+    );
 }
 
 #[test]

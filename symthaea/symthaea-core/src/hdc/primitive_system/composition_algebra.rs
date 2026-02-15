@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
-use crate::hdc::binary_hv::BinaryHV;
 use super::PrimitiveSystem;
+use crate::hdc::binary_hv::BinaryHV;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Algebra for defining and evaluating named compositions.
 ///
@@ -69,7 +69,9 @@ impl CompositionAlgebra {
         system: &PrimitiveSystem,
     ) -> Result<(), CompositionAlgebraError> {
         if name.is_empty() {
-            return Err(CompositionAlgebraError::InvalidName("name cannot be empty".to_string()));
+            return Err(CompositionAlgebraError::InvalidName(
+                "name cannot be empty".to_string(),
+            ));
         }
 
         let (encoding, sources) = self.evaluate_expression(expression, system)?;
@@ -167,18 +169,22 @@ impl CompositionAlgebra {
         };
 
         if parts.len() < 2 {
-            return Err(CompositionAlgebraError::ParseError("bind requires at least 2 operands".to_string()));
+            return Err(CompositionAlgebraError::ParseError(
+                "bind requires at least 2 operands".to_string(),
+            ));
         }
 
         let mut sources = Vec::new();
         let first_name = parts[0].trim();
-        let mut result = self.get_encoding(first_name, system)
+        let mut result = self
+            .get_encoding(first_name, system)
             .ok_or_else(|| CompositionAlgebraError::NotFound(first_name.to_string()))?;
         sources.push(first_name.to_string());
 
         for part in &parts[1..] {
             let name = part.trim();
-            let enc = self.get_encoding(name, system)
+            let enc = self
+                .get_encoding(name, system)
                 .ok_or_else(|| CompositionAlgebraError::NotFound(name.to_string()))?;
             result = result.bind(&enc);
             sources.push(name.to_string());
@@ -195,7 +201,9 @@ impl CompositionAlgebra {
         let parts: Vec<&str> = expr.split('+').collect();
 
         if parts.len() < 2 {
-            return Err(CompositionAlgebraError::ParseError("bundle requires at least 2 operands".to_string()));
+            return Err(CompositionAlgebraError::ParseError(
+                "bundle requires at least 2 operands".to_string(),
+            ));
         }
 
         let mut sources = Vec::new();
@@ -203,7 +211,8 @@ impl CompositionAlgebra {
 
         for part in &parts {
             let name = part.trim();
-            let enc = self.get_encoding(name, system)
+            let enc = self
+                .get_encoding(name, system)
                 .ok_or_else(|| CompositionAlgebraError::NotFound(name.to_string()))?;
             encodings.push(enc);
             sources.push(name.to_string());
@@ -229,14 +238,16 @@ impl CompositionAlgebra {
             let kv: Vec<&str> = part.split(':').collect();
 
             let (name, weight) = if kv.len() == 2 {
-                let w: f32 = kv[1].trim().parse()
-                    .map_err(|_| CompositionAlgebraError::ParseError(format!("invalid weight: {}", kv[1])))?;
+                let w: f32 = kv[1].trim().parse().map_err(|_| {
+                    CompositionAlgebraError::ParseError(format!("invalid weight: {}", kv[1]))
+                })?;
                 (kv[0].trim(), w)
             } else {
                 (part, 1.0)
             };
 
-            let enc = self.get_encoding(name, system)
+            let enc = self
+                .get_encoding(name, system)
                 .ok_or_else(|| CompositionAlgebraError::NotFound(name.to_string()))?;
             encodings.push(enc);
             weights.push(weight);
@@ -246,7 +257,9 @@ impl CompositionAlgebra {
         // Normalize weights
         let total: f32 = weights.iter().sum();
         if total <= 0.0 {
-            return Err(CompositionAlgebraError::ParseError("weights must sum to positive value".to_string()));
+            return Err(CompositionAlgebraError::ParseError(
+                "weights must sum to positive value".to_string(),
+            ));
         }
         let weights: Vec<f32> = weights.iter().map(|w| w / total).collect();
 
@@ -284,18 +297,22 @@ impl CompositionAlgebra {
         };
 
         if parts.len() < 2 {
-            return Err(CompositionAlgebraError::ParseError("sequence requires at least 2 elements".to_string()));
+            return Err(CompositionAlgebraError::ParseError(
+                "sequence requires at least 2 elements".to_string(),
+            ));
         }
 
         let mut sources = Vec::new();
         let first_name = parts[0].trim();
-        let mut result = self.get_encoding(first_name, system)
+        let mut result = self
+            .get_encoding(first_name, system)
             .ok_or_else(|| CompositionAlgebraError::NotFound(first_name.to_string()))?;
         sources.push(first_name.to_string());
 
         for (i, part) in parts[1..].iter().enumerate() {
             let name = part.trim();
-            let enc = self.get_encoding(name, system)
+            let enc = self
+                .get_encoding(name, system)
                 .ok_or_else(|| CompositionAlgebraError::NotFound(name.to_string()))?;
             let permuted = enc.permute(i + 1);
             result = result.bind(&permuted);

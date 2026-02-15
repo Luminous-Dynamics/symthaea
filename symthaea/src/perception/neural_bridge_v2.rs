@@ -42,7 +42,6 @@
 #[cfg(feature = "neural-bridge")]
 use anyhow::{bail, Context, Result};
 
-
 #[cfg(feature = "neural-bridge")]
 use std::time::Instant;
 
@@ -172,7 +171,9 @@ impl BridgeStats {
 
     /// Average encode latency in milliseconds (excluding cache hits)
     pub fn avg_encode_ms(&self) -> f64 {
-        let uncached_calls = self.total_calls.saturating_sub(self.hdc_cache_hits + self.embedding_cache_hits);
+        let uncached_calls = self
+            .total_calls
+            .saturating_sub(self.hdc_cache_hits + self.embedding_cache_hits);
         if uncached_calls == 0 {
             0.0
         } else {
@@ -203,17 +204,13 @@ impl NeuralBridgeV2 {
     /// Load with custom configuration.
     pub fn load(config: NeuralBridgeV2Config) -> Result<Self> {
         // Load BGE-M3 encoder
-        let encoder = BgeM3::load_from_hub(&config.model_id)
-            .context("Failed to load BGE-M3 encoder")?;
+        let encoder =
+            BgeM3::load_from_hub(&config.model_id).context("Failed to load BGE-M3 encoder")?;
 
         // Load probe
-        let probe_path = config
-            .probe_path
-            .as_deref()
-            .unwrap_or(DEFAULT_PROBE_PATH);
+        let probe_path = config.probe_path.as_deref().unwrap_or(DEFAULT_PROBE_PATH);
 
-        let probe = NeuralBridge::load(probe_path)
-            .context("Failed to load probe weights")?;
+        let probe = NeuralBridge::load(probe_path).context("Failed to load probe weights")?;
 
         // Validate dimensions match
         if probe.input_dim() != encoder.dim() {
@@ -236,8 +233,7 @@ impl NeuralBridgeV2 {
 
     /// Load encoder only (no probe - useful for training new probes).
     pub fn encoder_only(model_id: &str) -> Result<Self> {
-        let encoder = BgeM3::load_from_hub(model_id)
-            .context("Failed to load BGE-M3 encoder")?;
+        let encoder = BgeM3::load_from_hub(model_id).context("Failed to load BGE-M3 encoder")?;
 
         // Create dummy identity probe (for API compatibility)
         let identity_weights = vec![0.0f32; encoder.dim() * HDC_DIMENSION];
@@ -276,12 +272,18 @@ impl NeuralBridgeV2 {
         if self.config.enable_cache {
             if self.embedding_cache.len() >= self.config.max_cache_size {
                 // Simple eviction: clear half the cache
-                let keys: Vec<_> = self.embedding_cache.keys().take(self.config.max_cache_size / 2).cloned().collect();
+                let keys: Vec<_> = self
+                    .embedding_cache
+                    .keys()
+                    .take(self.config.max_cache_size / 2)
+                    .cloned()
+                    .collect();
                 for key in keys {
                     self.embedding_cache.remove(&key);
                 }
             }
-            self.embedding_cache.insert(text.to_string(), embedding.clone());
+            self.embedding_cache
+                .insert(text.to_string(), embedding.clone());
         }
 
         self.stats.total_encode_us += start.elapsed().as_micros() as u64;
@@ -316,7 +318,12 @@ impl NeuralBridgeV2 {
         if self.config.enable_cache {
             if self.hdc_cache.len() >= self.config.max_cache_size {
                 // Simple eviction: clear half the cache
-                let keys: Vec<_> = self.hdc_cache.keys().take(self.config.max_cache_size / 2).cloned().collect();
+                let keys: Vec<_> = self
+                    .hdc_cache
+                    .keys()
+                    .take(self.config.max_cache_size / 2)
+                    .cloned()
+                    .collect();
                 for key in keys {
                     self.hdc_cache.remove(&key);
                 }

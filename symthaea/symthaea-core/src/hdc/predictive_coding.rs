@@ -253,7 +253,11 @@ impl PredictiveCoding {
     /// Generate top-down prediction from higher layer
     ///
     /// Higher-level representation generates expectation for lower level
-    fn generate_prediction(&self, higher_representation: &BinaryHV, _target_layer: usize) -> BinaryHV {
+    fn generate_prediction(
+        &self,
+        higher_representation: &BinaryHV,
+        _target_layer: usize,
+    ) -> BinaryHV {
         // In simple model: higher layer representation IS the prediction
         // (Could add learned transformations here)
         *higher_representation
@@ -684,7 +688,12 @@ mod tests {
 
         // Check early vs late free energy
         let early_avg: f64 = measurements.iter().take(10).map(|(_, e)| e).sum::<f64>() / 10.0;
-        let late_avg: f64 = measurements.iter().rev().take(10).map(|(_, e)| e).sum::<f64>()
+        let late_avg: f64 = measurements
+            .iter()
+            .rev()
+            .take(10)
+            .map(|(_, e)| e)
+            .sum::<f64>()
             / 10.0;
 
         println!("Early average FE: {:.4}", early_avg);

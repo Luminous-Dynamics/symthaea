@@ -35,7 +35,8 @@ use serde::{Deserialize, Serialize};
 /// # Examples
 ///
 /// ```ignore
-/// use symthaea::hdc::{BinaryHV, ModernHopfieldNetwork};
+/// # use symthaea_core::hdc::BinaryHV;
+/// # use symthaea_core::hdc::modern_hopfield::ModernHopfieldNetwork;
 ///
 /// let mut hopfield = ModernHopfieldNetwork::new(1.0);
 ///
@@ -49,11 +50,10 @@ use serde::{Deserialize, Serialize};
 /// hopfield.store(bird);
 ///
 /// // Add noise to cat
-/// let noisy_cat = cat.add_noise(0.2, 123);
+/// let noisy_cat = cat.add_noise(0.1, 123);
 ///
 /// // Retrieve clean pattern (2-3 iterations!)
 /// let recovered = hopfield.retrieve(&noisy_cat, 5);
-///
 /// assert!(recovered.similarity(&cat) > 0.95);
 /// ```
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -102,8 +102,8 @@ impl ModernHopfieldNetwork {
     ///   - β = 10.0: Very sharp (near hard max)
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::ModernHopfieldNetwork;
+    /// ```
+    /// # use symthaea_core::hdc::modern_hopfield::ModernHopfieldNetwork;
     /// let hopfield = ModernHopfieldNetwork::new(5.0);
     /// ```
     pub fn new(beta: f64) -> Self {
@@ -126,8 +126,9 @@ impl ModernHopfieldNetwork {
     /// No training needed - just store!
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::{BinaryHV, ModernHopfieldNetwork};
+    /// ```
+    /// # use symthaea_core::hdc::BinaryHV;
+    /// # use symthaea_core::hdc::modern_hopfield::ModernHopfieldNetwork;
     /// let mut hopfield = ModernHopfieldNetwork::new(5.0);
     /// let pattern = BinaryHV::random(42);
     /// hopfield.store(pattern);
@@ -161,8 +162,9 @@ impl ModernHopfieldNetwork {
     /// Cleaned-up pattern (nearest stored attractor)
     ///
     /// # Example
-    /// ```ignore
-    /// # use symthaea::hdc::{BinaryHV, ModernHopfieldNetwork};
+    /// ```
+    /// # use symthaea_core::hdc::BinaryHV;
+    /// # use symthaea_core::hdc::modern_hopfield::ModernHopfieldNetwork;
     /// let mut hopfield = ModernHopfieldNetwork::new(5.0);
     /// let original = BinaryHV::random(42);
     /// hopfield.store(original);
@@ -328,7 +330,10 @@ impl ModernHopfieldNetwork {
         let similarities = self.compute_similarities(state);
 
         // Energy = -log Σₖ exp(β sim(x, ξₖ))
-        let max_sim = similarities.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+        let max_sim = similarities
+            .iter()
+            .cloned()
+            .fold(f64::NEG_INFINITY, f64::max);
 
         let sum_exp: f64 = similarities
             .iter()
@@ -618,7 +623,11 @@ mod tests {
         let sim_low = pattern.similarity(&recovered_low);
         let sim_high = pattern.similarity(&recovered_high);
 
-        println!("Beta=1.0: {:.1}%, Beta=10.0: {:.1}%", sim_low * 100.0, sim_high * 100.0);
+        println!(
+            "Beta=1.0: {:.1}%, Beta=10.0: {:.1}%",
+            sim_low * 100.0,
+            sim_high * 100.0
+        );
 
         assert!(
             sim_high >= sim_low,

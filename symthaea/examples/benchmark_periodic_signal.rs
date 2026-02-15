@@ -19,7 +19,7 @@ use std::f32::consts::PI;
 use std::time::Instant;
 
 use ndarray::Array1;
-use symthaea::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig, ActivationType};
+use symthaea::dynamics::cfc::{ActivationType, CfCConfig, CfCNetwork, CfCNetworkConfig};
 use symthaea::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
 use symthaea::dynamics::stability_analysis::StabilityAnalyzer;
 
@@ -45,7 +45,10 @@ const DT: f32 = 0.1;
 ///   [sin(2π·i/period), cos(2π·i/period), sin(4π·i/period), cos(4π·i/period)]
 ///
 /// Returns (inputs, targets, dts) where target[t] = input[t+1].
-fn generate_periodic_sequence(period: usize, total_steps: usize) -> (Vec<Array1<f32>>, Vec<Array1<f32>>, Vec<f32>) {
+fn generate_periodic_sequence(
+    period: usize,
+    total_steps: usize,
+) -> (Vec<Array1<f32>>, Vec<Array1<f32>>, Vec<f32>) {
     let mut inputs = Vec::with_capacity(total_steps);
     let mut targets = Vec::with_capacity(total_steps);
     let dts = vec![DT; total_steps];
@@ -80,11 +83,7 @@ fn generate_periodic_sequence(period: usize, total_steps: usize) -> (Vec<Array1<
 ///
 /// Runs the network forward for `cycles * period` steps, then measures
 /// error in the last cycle.
-fn measure_cycle_error(
-    network: &mut CfCNetwork,
-    period: usize,
-    cycles: usize,
-) -> f32 {
+fn measure_cycle_error(network: &mut CfCNetwork, period: usize, cycles: usize) -> f32 {
     let total_steps = cycles * period;
     let (inputs, targets, _) = generate_periodic_sequence(period, total_steps);
 
@@ -117,9 +116,9 @@ fn train_baseline(period: usize) -> CfCNetwork {
     let mut network = make_network();
 
     for epoch in 0..TRAIN_EPOCHS {
-        let loss = network.train_step_bptt_optimized(
-            &inputs, &targets, &dts, LEARNING_RATE,
-        ).unwrap_or(f32::MAX);
+        let loss = network
+            .train_step_bptt_optimized(&inputs, &targets, &dts, LEARNING_RATE)
+            .unwrap_or(f32::MAX);
 
         if epoch % 10 == 0 {
             println!("    Baseline epoch {}: loss = {:.6}", epoch, loss);
@@ -140,10 +139,10 @@ fn train_multiscale(period: usize) -> CfCNetwork {
 
     // Multi-scale horizon weights
     let horizons: &[(usize, f32)] = &[
-        (1, 0.4),  // 1-step ahead (standard)
-        (2, 0.3),  // 2-step ahead
-        (4, 0.2),  // 4-step ahead
-        (8, 0.1),  // 8-step ahead
+        (1, 0.4), // 1-step ahead (standard)
+        (2, 0.3), // 2-step ahead
+        (4, 0.2), // 4-step ahead
+        (8, 0.1), // 8-step ahead
     ];
 
     for epoch in 0..TRAIN_EPOCHS {
@@ -162,19 +161,24 @@ fn train_multiscale(period: usize) -> CfCNetwork {
                 .collect();
             let shifted_dts = &dts[..shifted_len];
 
-            let loss = network.train_step_bptt_optimized(
-                shifted_inputs,
-                &shifted_targets,
-                shifted_dts,
-                LEARNING_RATE * weight,
-            ).unwrap_or(f32::MAX);
+            let loss = network
+                .train_step_bptt_optimized(
+                    shifted_inputs,
+                    &shifted_targets,
+                    shifted_dts,
+                    LEARNING_RATE * weight,
+                )
+                .unwrap_or(f32::MAX);
 
             total_loss += weight * loss;
             network.reset();
         }
 
         if epoch % 10 == 0 {
-            println!("    Multiscale epoch {}: weighted loss = {:.6}", epoch, total_loss);
+            println!(
+                "    Multiscale epoch {}: weighted loss = {:.6}",
+                epoch, total_loss
+            );
         }
     }
 
@@ -198,12 +202,7 @@ fn train_multiscale_spectral(period: usize) -> CfCNetwork {
     };
     let analyzer = SpectralAnalyzer::new(spec_config);
 
-    let horizons: &[(usize, f32)] = &[
-        (1, 0.4),
-        (2, 0.3),
-        (4, 0.2),
-        (8, 0.1),
-    ];
+    let horizons: &[(usize, f32)] = &[(1, 0.4), (2, 0.3), (4, 0.2), (8, 0.1)];
 
     for epoch in 0..TRAIN_EPOCHS {
         let mut total_loss = 0.0;
@@ -221,12 +220,14 @@ fn train_multiscale_spectral(period: usize) -> CfCNetwork {
                 .collect();
             let shifted_dts = &dts[..shifted_len];
 
-            let loss = network.train_step_bptt_optimized(
-                shifted_inputs,
-                &shifted_targets,
-                shifted_dts,
-                LEARNING_RATE * weight,
-            ).unwrap_or(f32::MAX);
+            let loss = network
+                .train_step_bptt_optimized(
+                    shifted_inputs,
+                    &shifted_targets,
+                    shifted_dts,
+                    LEARNING_RATE * weight,
+                )
+                .unwrap_or(f32::MAX);
 
             total_loss += weight * loss;
             network.reset();
@@ -254,10 +255,14 @@ fn train_multiscale_spectral(period: usize) -> CfCNetwork {
             // Compute spectral MSE
             let spectral_len = pred_psd.psd.len().min(tgt_psd.psd.len());
             let spectral_mse: f64 = if spectral_len > 0 {
-                pred_psd.psd.iter().zip(tgt_psd.psd.iter())
+                pred_psd
+                    .psd
+                    .iter()
+                    .zip(tgt_psd.psd.iter())
                     .take(spectral_len)
                     .map(|(p, t)| (p - t).powi(2))
-                    .sum::<f64>() / spectral_len as f64
+                    .sum::<f64>()
+                    / spectral_len as f64
             } else {
                 0.0
             };
@@ -267,7 +272,9 @@ fn train_multiscale_spectral(period: usize) -> CfCNetwork {
             let spectral_weight = 0.1 * (spectral_mse as f32).min(10.0);
             if spectral_weight > 0.001 {
                 let _ = network.train_step_bptt_optimized(
-                    &inputs, &targets, &dts,
+                    &inputs,
+                    &targets,
+                    &dts,
                     LEARNING_RATE * spectral_weight,
                 );
                 network.reset();
@@ -311,7 +318,10 @@ fn dominant_frequency(network: &mut CfCNetwork, period: usize) -> f64 {
     let psd = analyzer.psd(&signal);
     // Find peak frequency (skip DC at index 0)
     if psd.psd.len() > 1 {
-        let (peak_idx, _) = psd.psd.iter().enumerate()
+        let (peak_idx, _) = psd
+            .psd
+            .iter()
+            .enumerate()
             .skip(1) // skip DC
             .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
             .unwrap_or((0, &0.0));
@@ -355,26 +365,21 @@ fn analyze_stability(network: &mut CfCNetwork, period: usize) -> f64 {
         let mut best_idx = 0;
         let mut best_dist = f64::MAX;
         for (i, s) in states.iter().enumerate().take(states.len() - 1) {
-            let dist: f64 = s.iter().zip(x.iter())
-                .map(|(a, b)| (a - b).powi(2))
-                .sum();
+            let dist: f64 = s.iter().zip(x.iter()).map(|(a, b)| (a - b).powi(2)).sum();
             if dist < best_dist {
                 best_dist = dist;
                 best_idx = i;
             }
         }
         // Return approximate derivative
-        states[best_idx + 1].iter().zip(states[best_idx].iter())
+        states[best_idx + 1]
+            .iter()
+            .zip(states[best_idx].iter())
             .map(|(next, curr)| (next - curr) / DT as f64)
             .collect()
     };
 
-    let lyap = stability.lyapunov_exponents(
-        &dynamics,
-        &x0,
-        DT as f64,
-        500,
-    );
+    let lyap = stability.lyapunov_exponents(&dynamics, &x0, DT as f64, 500);
 
     lyap.max_exponent
 }
@@ -450,7 +455,11 @@ fn main() {
 
     for &period in &periods {
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        println!("Period: {} (expected freq: {:.3} Hz)", period, 1.0 / (period as f64 * DT as f64));
+        println!(
+            "Period: {} (expected freq: {:.3} Hz)",
+            period,
+            1.0 / (period as f64 * DT as f64)
+        );
         println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         let expected_freq = 1.0 / (period as f64 * DT as f64);
@@ -468,11 +477,16 @@ fn main() {
         } else {
             0.0
         };
-        println!("    Error@50c: {:.6}, Error@200c: {:.6}, Growth: {:.1}%",
-                 baseline_err_50, baseline_err_200, baseline_growth);
+        println!(
+            "    Error@50c: {:.6}, Error@200c: {:.6}, Growth: {:.1}%",
+            baseline_err_50, baseline_err_200, baseline_growth
+        );
 
         let dom_freq_baseline = dominant_frequency(&mut baseline, period);
-        println!("    Dominant freq: {:.3} Hz (expected: {:.3})", dom_freq_baseline, expected_freq);
+        println!(
+            "    Dominant freq: {:.3} Hz (expected: {:.3})",
+            dom_freq_baseline, expected_freq
+        );
 
         // 2. Multi-scale training
         println!("  [2/3] Multi-scale loss training...");
@@ -487,8 +501,10 @@ fn main() {
         } else {
             0.0
         };
-        println!("    Error@50c: {:.6}, Error@200c: {:.6}, Growth: {:.1}%",
-                 multiscale_err_50, multiscale_err_200, multiscale_growth);
+        println!(
+            "    Error@50c: {:.6}, Error@200c: {:.6}, Growth: {:.1}%",
+            multiscale_err_50, multiscale_err_200, multiscale_growth
+        );
 
         // 3. Multi-scale + spectral
         println!("  [3/3] Multi-scale + spectral regularization...");
@@ -503,23 +519,43 @@ fn main() {
         } else {
             0.0
         };
-        println!("    Error@50c: {:.6}, Error@200c: {:.6}, Growth: {:.1}%",
-                 spectral_err_50, spectral_err_200, spectral_growth);
+        println!(
+            "    Error@50c: {:.6}, Error@200c: {:.6}, Growth: {:.1}%",
+            spectral_err_50, spectral_err_200, spectral_growth
+        );
 
         let dom_freq_spectral = dominant_frequency(&mut spectral, period);
-        println!("    Dominant freq: {:.3} Hz (expected: {:.3})", dom_freq_spectral, expected_freq);
+        println!(
+            "    Dominant freq: {:.3} Hz (expected: {:.3})",
+            dom_freq_spectral, expected_freq
+        );
 
         // 4. Stability analysis on best model
         println!("  Lyapunov analysis...");
         let lyap = analyze_stability(&mut spectral, period);
-        println!("    Max Lyapunov exponent: {:.4} ({})",
-                 lyap, if lyap < 0.0 { "stable attractor" } else if lyap > 0.01 { "chaotic" } else { "neutral" });
+        println!(
+            "    Max Lyapunov exponent: {:.4} ({})",
+            lyap,
+            if lyap < 0.0 {
+                "stable attractor"
+            } else if lyap > 0.01 {
+                "chaotic"
+            } else {
+                "neutral"
+            }
+        );
 
         results.push(PeriodResult {
             period,
-            baseline_err_50, baseline_err_200, baseline_growth,
-            multiscale_err_50, multiscale_err_200, multiscale_growth,
-            spectral_err_50, spectral_err_200, spectral_growth,
+            baseline_err_50,
+            baseline_err_200,
+            baseline_growth,
+            multiscale_err_50,
+            multiscale_err_200,
+            multiscale_growth,
+            spectral_err_50,
+            spectral_err_200,
+            spectral_growth,
             dominant_freq_baseline: dom_freq_baseline,
             dominant_freq_spectral: dom_freq_spectral,
             expected_freq,
@@ -542,13 +578,15 @@ fn main() {
     println!("╟───────┼──────────────────┼──────────────────┼──────────────────┼────────────────╢");
 
     for r in &results {
-        let freq_match = (r.dominant_freq_spectral - r.expected_freq).abs() / r.expected_freq < 0.15;
-        println!("║   {:3} │ {:+7.1}%         │ {:+7.1}%         │ {:+7.1}%         │ {}             ║",
-                 r.period,
-                 r.baseline_growth,
-                 r.multiscale_growth,
-                 r.spectral_growth,
-                 if freq_match { "PASS" } else { "FAIL" },
+        let freq_match =
+            (r.dominant_freq_spectral - r.expected_freq).abs() / r.expected_freq < 0.15;
+        println!(
+            "║   {:3} │ {:+7.1}%         │ {:+7.1}%         │ {:+7.1}%         │ {}             ║",
+            r.period,
+            r.baseline_growth,
+            r.multiscale_growth,
+            r.spectral_growth,
+            if freq_match { "PASS" } else { "FAIL" },
         );
     }
     println!("╚═══════╧══════════════════╧══════════════════╧══════════════════╧════════════════╝");
@@ -566,46 +604,75 @@ fn main() {
         if r.period == 2 {
             total_tests += 1;
             let pass = r.spectral_err_200 < 0.05;
-            if pass { pass_count += 1; }
-            println!("  [{}] Period-2 error < 0.05: {:.6}",
-                     if pass { "PASS" } else { "FAIL" }, r.spectral_err_200);
+            if pass {
+                pass_count += 1;
+            }
+            println!(
+                "  [{}] Period-2 error < 0.05: {:.6}",
+                if pass { "PASS" } else { "FAIL" },
+                r.spectral_err_200
+            );
         }
 
         // Test 2: Period-4 baseline reproduces known issue (~47% growth)
         if r.period == 4 {
             total_tests += 1;
             let pass = r.baseline_growth > 10.0; // At least 10% growth (may not hit 47% with only 50 epochs)
-            if pass { pass_count += 1; }
-            println!("  [{}] Period-4 baseline growth > 10%: {:.1}%",
-                     if pass { "PASS" } else { "FAIL" }, r.baseline_growth);
+            if pass {
+                pass_count += 1;
+            }
+            println!(
+                "  [{}] Period-4 baseline growth > 10%: {:.1}%",
+                if pass { "PASS" } else { "FAIL" },
+                r.baseline_growth
+            );
         }
 
         // Test 3: Multi-scale reduces growth vs baseline
         if r.period == 4 {
             total_tests += 1;
             let pass = r.multiscale_growth < r.baseline_growth;
-            if pass { pass_count += 1; }
-            println!("  [{}] Period-4 multiscale < baseline: {:.1}% < {:.1}%",
-                     if pass { "PASS" } else { "FAIL" }, r.multiscale_growth, r.baseline_growth);
+            if pass {
+                pass_count += 1;
+            }
+            println!(
+                "  [{}] Period-4 multiscale < baseline: {:.1}% < {:.1}%",
+                if pass { "PASS" } else { "FAIL" },
+                r.multiscale_growth,
+                r.baseline_growth
+            );
         }
 
         // Test 4: Spectral further reduces growth
         if r.period == 4 {
             total_tests += 1;
             let pass = r.spectral_growth < r.multiscale_growth;
-            if pass { pass_count += 1; }
-            println!("  [{}] Period-4 spectral < multiscale: {:.1}% < {:.1}%",
-                     if pass { "PASS" } else { "FAIL" }, r.spectral_growth, r.multiscale_growth);
+            if pass {
+                pass_count += 1;
+            }
+            println!(
+                "  [{}] Period-4 spectral < multiscale: {:.1}% < {:.1}%",
+                if pass { "PASS" } else { "FAIL" },
+                r.spectral_growth,
+                r.multiscale_growth
+            );
         }
 
         // Test 5: Dominant frequency matches input period
         total_tests += 1;
         let freq_error = (r.dominant_freq_spectral - r.expected_freq).abs() / r.expected_freq;
         let pass = freq_error < 0.15;
-        if pass { pass_count += 1; }
-        println!("  [{}] Period-{} freq match (err={:.1}%): {:.3} vs {:.3} Hz",
-                 if pass { "PASS" } else { "FAIL" }, r.period,
-                 freq_error * 100.0, r.dominant_freq_spectral, r.expected_freq);
+        if pass {
+            pass_count += 1;
+        }
+        println!(
+            "  [{}] Period-{} freq match (err={:.1}%): {:.3} vs {:.3} Hz",
+            if pass { "PASS" } else { "FAIL" },
+            r.period,
+            freq_error * 100.0,
+            r.dominant_freq_spectral,
+            r.expected_freq
+        );
     }
 
     println!("\n  Score: {}/{} tests passed", pass_count, total_tests);

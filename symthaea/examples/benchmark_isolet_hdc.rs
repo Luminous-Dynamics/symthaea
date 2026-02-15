@@ -188,7 +188,8 @@ impl HdcContinuousClassifier {
                         *v /= norm;
                     }
                 }
-                self.class_prototypes[class] = Some(ContinuousHV::from_vec(accumulators[class].clone()));
+                self.class_prototypes[class] =
+                    Some(ContinuousHV::from_vec(accumulators[class].clone()));
             }
         }
 
@@ -334,10 +335,7 @@ fn main() {
         train_features.len(),
         test_features.len()
     );
-    println!(
-        "  Features: {}, Classes: {}",
-        N_FEATURES, N_CLASSES
-    );
+    println!("  Features: {}, Classes: {}", N_FEATURES, N_CLASSES);
 
     // Show class distribution
     let mut class_dist = vec![0usize; N_CLASSES];
@@ -346,10 +344,12 @@ fn main() {
             class_dist[l] += 1;
         }
     }
-    println!("  Class distribution (train): min={}, max={}, mean={:.0}",
+    println!(
+        "  Class distribution (train): min={}, max={}, mean={:.0}",
         class_dist.iter().min().unwrap_or(&0),
         class_dist.iter().max().unwrap_or(&0),
-        class_dist.iter().sum::<usize>() as f64 / N_CLASSES as f64);
+        class_dist.iter().sum::<usize>() as f64 / N_CLASSES as f64
+    );
 
     // Run at multiple configurations
     let configs = vec![
@@ -391,7 +391,10 @@ fn main() {
     println!("\n╔══════════════════════════════════════════════════════════════╗");
     println!("║                    RESULTS SUMMARY                         ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
-    println!("║ {:35} │ {:>8} │ {:>6} ║", "Configuration", "Accuracy", "Time");
+    println!(
+        "║ {:35} │ {:>8} │ {:>6} ║",
+        "Configuration", "Accuracy", "Time"
+    );
     println!("╟─────────────────────────────────────┼──────────┼────────╢");
 
     for (label, _dim, _levels, _retrain, accuracy, total_time) in &results {

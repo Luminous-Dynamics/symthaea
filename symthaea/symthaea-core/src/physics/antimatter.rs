@@ -24,10 +24,10 @@
 //! When particle meets antiparticle, they annihilate producing energy (typically photons):
 //! - e⁺ + e⁻ → 2γ (1.022 MeV total)
 
+use super::hadrons::Hadrons;
+use super::standard_model::{StandardModel, PHYSICS_DIM};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
-use super::hadrons::Hadrons;
 
 /// Antimatter encoder
 #[derive(Debug, Clone)]
@@ -199,7 +199,7 @@ impl Antimatter {
             particle: model.electron.clone(),
             antiparticle: self.positron.clone(),
             products: vec![photon1, photon2],
-            energy_mev: 1.022,  // 2 × 0.511 MeV (electron mass)
+            energy_mev: 1.022, // 2 × 0.511 MeV (electron mass)
             vector: event_vector,
         }
     }
@@ -219,7 +219,7 @@ impl Antimatter {
             particle: hadrons.proton.clone(),
             antiparticle: self.antiproton.clone(),
             products: vec![pion1, pion2, pion3],
-            energy_mev: 1876.0,  // 2 × 938 MeV (proton mass)
+            energy_mev: 1876.0, // 2 × 938 MeV (proton mass)
             vector: event_vector,
         }
     }
@@ -238,7 +238,7 @@ impl Antimatter {
             particle: photon1.clone(),
             antiparticle: photon2,
             products: vec![model.electron.clone(), self.positron.clone()],
-            energy_mev: 1.022,  // Minimum threshold
+            energy_mev: 1.022, // Minimum threshold
             vector: event_vector,
         }
     }
@@ -293,10 +293,8 @@ impl Antimatter {
 
     /// Antihelium-3: 2p̄ + n̄ + 2e⁺
     pub fn antihelium3(&self) -> Antiatom {
-        let nucleus = ContinuousHV::weighted_bundle(
-            &[&self.antiproton, &self.antineutron],
-            &[2.0, 1.0],
-        );
+        let nucleus =
+            ContinuousHV::weighted_bundle(&[&self.antiproton, &self.antineutron], &[2.0, 1.0]);
         let cloud = self.positron.scale(2.0);
         let vector = ContinuousHV::bundle(&[&nucleus, &cloud]);
 
@@ -311,10 +309,8 @@ impl Antimatter {
 
     /// Antihelium-4: 2p̄ + 2n̄ + 2e⁺
     pub fn antihelium4(&self) -> Antiatom {
-        let nucleus = ContinuousHV::weighted_bundle(
-            &[&self.antiproton, &self.antineutron],
-            &[2.0, 2.0],
-        );
+        let nucleus =
+            ContinuousHV::weighted_bundle(&[&self.antiproton, &self.antineutron], &[2.0, 2.0]);
         let cloud = self.positron.scale(2.0);
         let vector = ContinuousHV::bundle(&[&nucleus, &cloud]);
 
@@ -332,10 +328,8 @@ impl Antimatter {
         let p = antiprotons as f32;
         let n = antineutrons as f32;
 
-        let nucleus = ContinuousHV::weighted_bundle(
-            &[&self.antiproton, &self.antineutron],
-            &[p, n],
-        );
+        let nucleus =
+            ContinuousHV::weighted_bundle(&[&self.antiproton, &self.antineutron], &[p, n]);
         let cloud = self.positron.scale(p);
         let vector = ContinuousHV::bundle(&[&nucleus, &cloud]);
 
@@ -379,7 +373,8 @@ impl BaryogenesisConcepts {
             &self.baryon_violation,
             &self.cp_violation,
             &self.out_of_equilibrium,
-        ]).bind(&self.sakharov_conditions)
+        ])
+        .bind(&self.sakharov_conditions)
     }
 }
 
@@ -495,11 +490,7 @@ mod tests {
 
         // Isotopes should be similar
         let sim = anti_he3.vector.similarity(&anti_he4.vector);
-        assert!(
-            sim > 0.5,
-            "Anti-helium isotopes should be similar: {}",
-            sim
-        );
+        assert!(sim > 0.5, "Anti-helium isotopes should be similar: {}", sim);
     }
 
     #[test]

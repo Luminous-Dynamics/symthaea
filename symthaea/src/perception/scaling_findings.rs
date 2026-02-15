@@ -237,11 +237,7 @@ impl ScalingMetrics {
     /// * `phen_reps` - Phenomenal concept representations [n_phen, dim]
     /// * `func_reps` - Functional concept representations [n_func, dim]
     /// * `arch` - Architecture for quality assessment thresholds
-    pub fn compute(
-        phen_reps: &[Vec<f32>],
-        func_reps: &[Vec<f32>],
-        arch: Architecture,
-    ) -> Self {
+    pub fn compute(phen_reps: &[Vec<f32>], func_reps: &[Vec<f32>], arch: Architecture) -> Self {
         if phen_reps.is_empty() || func_reps.is_empty() {
             return Self::default_poor();
         }
@@ -353,7 +349,10 @@ impl ScalingMetrics {
         }
 
         if recs.is_empty() {
-            recs.push("Metrics are within expected ranges for good phenomenal discrimination.".to_string());
+            recs.push(
+                "Metrics are within expected ranges for good phenomenal discrimination."
+                    .to_string(),
+            );
         }
 
         recs
@@ -518,7 +517,9 @@ pub fn recommend_model(
                     model_name: "prajjwal1/bert-mini".to_string(),
                     params_millions: 11.2,
                     expected_fisher: 1.15,
-                    reasoning: "BERT-Mini offers good discrimination (F=1.15) in a very small footprint.".to_string(),
+                    reasoning:
+                        "BERT-Mini offers good discrimination (F=1.15) in a very small footprint."
+                            .to_string(),
                 }
             } else if max_params < 67.0 {
                 // DistilBERT is 66.4M params, so only recommend if we can fit it
@@ -535,7 +536,8 @@ pub fn recommend_model(
                         model_name: "prajjwal1/bert-mini".to_string(),
                         params_millions: 11.2,
                         expected_fisher: 1.15,
-                        reasoning: "BERT-Mini is the best fit within the parameter constraint.".to_string(),
+                        reasoning: "BERT-Mini is the best fit within the parameter constraint."
+                            .to_string(),
                     }
                 }
             } else {
@@ -560,7 +562,8 @@ pub fn recommend_model(
                     model_name: optimal.model_name,
                     params_millions: optimal.params_millions,
                     expected_fisher: optimal.expected_fisher,
-                    reasoning: "GPT-2 Medium is optimal for phenomenal discrimination in decoders.".to_string(),
+                    reasoning: "GPT-2 Medium is optimal for phenomenal discrimination in decoders."
+                        .to_string(),
                 }
             } else {
                 // Large models available but not recommended
@@ -572,14 +575,14 @@ pub fn recommend_model(
                 }
             }
         }
-        Architecture::EncoderDecoder => {
-            ModelRecommendation {
-                model_name: "t5-base".to_string(),
-                params_millions: 220.0,
-                expected_fisher: 1.0,
-                reasoning: "T5-base recommended (estimated). Encoder-decoder scaling not empirically tested.".to_string(),
-            }
-        }
+        Architecture::EncoderDecoder => ModelRecommendation {
+            model_name: "t5-base".to_string(),
+            params_millions: 220.0,
+            expected_fisher: 1.0,
+            reasoning:
+                "T5-base recommended (estimated). Encoder-decoder scaling not empirically tested."
+                    .to_string(),
+        },
     }
 }
 

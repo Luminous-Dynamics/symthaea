@@ -44,7 +44,9 @@ fn test_memory_batch_creation() {
 fn test_temp_test_dir() {
     let temp = TempTestDir::new().expect("Should create temp dir");
 
-    let file_path = temp.write_file("test.txt", "Hello, test!").expect("Should write file");
+    let file_path = temp
+        .write_file("test.txt", "Hello, test!")
+        .expect("Should write file");
     assert!(file_path.exists());
 
     let content = std::fs::read_to_string(&file_path).expect("Should read file");

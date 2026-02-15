@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::{PrimitiveSystem, seed_from_name};
+use crate::hdc::primitive_system::{seed_from_name, PrimitiveSystem};
 use std::cmp::Ordering;
 
 /// A rational number encoded in HDC space
@@ -46,11 +46,7 @@ fn normalize(num: i64, den: i64) -> (i64, i64) {
     }
 
     // Ensure denominator is positive
-    let (num, den) = if den < 0 {
-        (-num, -den)
-    } else {
-        (num, den)
-    };
+    let (num, den) = if den < 0 { (-num, -den) } else { (num, den) };
 
     // Handle zero numerator
     if num == 0 {
@@ -71,7 +67,11 @@ pub struct RationalOverflow {
 
 impl std::fmt::Display for RationalOverflow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Rational overflow in {}: {}", self.operation, self.detail)
+        write!(
+            f,
+            "Rational overflow in {}: {}",
+            self.operation, self.detail
+        )
     }
 }
 
@@ -180,16 +180,27 @@ impl RationalArithmeticEngine {
 
         let operation = format!(
             "{}/{} + {}/{} = {}/{}",
-            a.numerator, a.denominator,
-            b.numerator, b.denominator,
-            rational.numerator, rational.denominator
+            a.numerator,
+            a.denominator,
+            b.numerator,
+            b.denominator,
+            rational.numerator,
+            rational.denominator
         );
 
         let proof_trace = vec![
-            format!("Add: ({} × {}) + ({} × {}) = {}",
-                a.numerator, b.denominator, b.numerator, a.denominator, num),
-            format!("Denominator: {} × {} = {}", a.denominator, b.denominator, den),
-            format!("Normalized: {}/{}", rational.numerator, rational.denominator),
+            format!(
+                "Add: ({} × {}) + ({} × {}) = {}",
+                a.numerator, b.denominator, b.numerator, a.denominator, num
+            ),
+            format!(
+                "Denominator: {} × {} = {}",
+                a.denominator, b.denominator, den
+            ),
+            format!(
+                "Normalized: {}/{}",
+                rational.numerator, rational.denominator
+            ),
         ];
 
         let phi = rational.construction_phi;
@@ -211,16 +222,27 @@ impl RationalArithmeticEngine {
 
         let operation = format!(
             "{}/{} - {}/{} = {}/{}",
-            a.numerator, a.denominator,
-            b.numerator, b.denominator,
-            rational.numerator, rational.denominator
+            a.numerator,
+            a.denominator,
+            b.numerator,
+            b.denominator,
+            rational.numerator,
+            rational.denominator
         );
 
         let proof_trace = vec![
-            format!("Subtract: ({} × {}) - ({} × {}) = {}",
-                a.numerator, b.denominator, b.numerator, a.denominator, num),
-            format!("Denominator: {} × {} = {}", a.denominator, b.denominator, den),
-            format!("Normalized: {}/{}", rational.numerator, rational.denominator),
+            format!(
+                "Subtract: ({} × {}) - ({} × {}) = {}",
+                a.numerator, b.denominator, b.numerator, a.denominator, num
+            ),
+            format!(
+                "Denominator: {} × {} = {}",
+                a.denominator, b.denominator, den
+            ),
+            format!(
+                "Normalized: {}/{}",
+                rational.numerator, rational.denominator
+            ),
         ];
 
         let phi = rational.construction_phi;
@@ -242,15 +264,24 @@ impl RationalArithmeticEngine {
 
         let operation = format!(
             "{}/{} × {}/{} = {}/{}",
-            a.numerator, a.denominator,
-            b.numerator, b.denominator,
-            rational.numerator, rational.denominator
+            a.numerator,
+            a.denominator,
+            b.numerator,
+            b.denominator,
+            rational.numerator,
+            rational.denominator
         );
 
         let proof_trace = vec![
             format!("Numerator: {} × {} = {}", a.numerator, b.numerator, num),
-            format!("Denominator: {} × {} = {}", a.denominator, b.denominator, den),
-            format!("Normalized: {}/{}", rational.numerator, rational.denominator),
+            format!(
+                "Denominator: {} × {} = {}",
+                a.denominator, b.denominator, den
+            ),
+            format!(
+                "Normalized: {}/{}",
+                rational.numerator, rational.denominator
+            ),
         ];
 
         let phi = rational.construction_phi;
@@ -277,15 +308,21 @@ impl RationalArithmeticEngine {
 
         let operation = format!(
             "{}/{} ÷ {}/{} = {}/{}",
-            a.numerator, a.denominator,
-            b.numerator, b.denominator,
-            rational.numerator, rational.denominator
+            a.numerator,
+            a.denominator,
+            b.numerator,
+            b.denominator,
+            rational.numerator,
+            rational.denominator
         );
 
         let proof_trace = vec![
             format!("Numerator: {} × {} = {}", a.numerator, b.denominator, num),
             format!("Denominator: {} × {} = {}", a.denominator, b.numerator, den),
-            format!("Normalized: {}/{}", rational.numerator, rational.denominator),
+            format!(
+                "Normalized: {}/{}",
+                rational.numerator, rational.denominator
+            ),
         ];
 
         let phi = rational.construction_phi;
@@ -309,8 +346,7 @@ impl RationalArithmeticEngine {
 
         let operation = format!(
             "1 / ({}/{}) = {}/{}",
-            a.numerator, a.denominator,
-            rational.numerator, rational.denominator
+            a.numerator, a.denominator, rational.numerator, rational.denominator
         );
 
         let proof_trace = vec![
@@ -345,15 +381,24 @@ impl RationalArithmeticEngine {
 
         let operation = format!(
             "mediant({}/{}, {}/{}) = {}/{}",
-            a.numerator, a.denominator,
-            b.numerator, b.denominator,
-            rational.numerator, rational.denominator
+            a.numerator,
+            a.denominator,
+            b.numerator,
+            b.denominator,
+            rational.numerator,
+            rational.denominator
         );
 
         let proof_trace = vec![
             format!("Numerator: {} + {} = {}", a.numerator, b.numerator, num),
-            format!("Denominator: {} + {} = {}", a.denominator, b.denominator, den),
-            format!("Mediant (Stern-Brocot): {}/{}", rational.numerator, rational.denominator),
+            format!(
+                "Denominator: {} + {} = {}",
+                a.denominator, b.denominator, den
+            ),
+            format!(
+                "Mediant (Stern-Brocot): {}/{}",
+                rational.numerator, rational.denominator
+            ),
         ];
 
         let phi = rational.construction_phi;
@@ -370,7 +415,11 @@ impl RationalArithmeticEngine {
 
     /// Add two rational numbers with overflow detection.
     /// Returns Err if intermediate computation overflows i64.
-    pub fn checked_add(&self, a: &HdcRational, b: &HdcRational) -> Result<RationalResult, RationalOverflow> {
+    pub fn checked_add(
+        &self,
+        a: &HdcRational,
+        b: &HdcRational,
+    ) -> Result<RationalResult, RationalOverflow> {
         // a/b + c/d = (ad + bc) / bd
         // Pre-reduce to minimize overflow: divide by GCD of denominators
         let g = gcd(a.denominator as u64, b.denominator as u64) as i64;
@@ -382,20 +431,31 @@ impl RationalArithmeticEngine {
         let num = checked_add_i64(num_left, num_right)?;
         let den = checked_mul_i64(a_den_reduced, b.denominator)?;
 
-        Ok(self.add(&self.encode(num, den), &self.encode(0, 1)))
-            .map(|_| {
-                let rational = self.encode(num, den);
-                RationalResult {
-                    rational: rational.clone(),
-                    operation: format!("{}/{} + {}/{} = {}/{}", a.numerator, a.denominator, b.numerator, b.denominator, rational.numerator, rational.denominator),
-                    proof_trace: vec!["Checked add (overflow-safe)".to_string()],
-                    phi: rational.construction_phi,
-                }
-            })
+        Ok(self.add(&self.encode(num, den), &self.encode(0, 1))).map(|_| {
+            let rational = self.encode(num, den);
+            RationalResult {
+                rational: rational.clone(),
+                operation: format!(
+                    "{}/{} + {}/{} = {}/{}",
+                    a.numerator,
+                    a.denominator,
+                    b.numerator,
+                    b.denominator,
+                    rational.numerator,
+                    rational.denominator
+                ),
+                proof_trace: vec!["Checked add (overflow-safe)".to_string()],
+                phi: rational.construction_phi,
+            }
+        })
     }
 
     /// Multiply two rational numbers with overflow detection.
-    pub fn checked_multiply(&self, a: &HdcRational, b: &HdcRational) -> Result<RationalResult, RationalOverflow> {
+    pub fn checked_multiply(
+        &self,
+        a: &HdcRational,
+        b: &HdcRational,
+    ) -> Result<RationalResult, RationalOverflow> {
         // Pre-reduce cross-terms to minimize overflow
         let g1 = gcd(a.numerator.unsigned_abs(), b.denominator as u64) as i64;
         let g2 = gcd(b.numerator.unsigned_abs(), a.denominator as u64) as i64;
@@ -411,14 +471,26 @@ impl RationalArithmeticEngine {
         let rational = self.encode(num, den);
         Ok(RationalResult {
             rational: rational.clone(),
-            operation: format!("{}/{} × {}/{} = {}/{}", a.numerator, a.denominator, b.numerator, b.denominator, rational.numerator, rational.denominator),
+            operation: format!(
+                "{}/{} × {}/{} = {}/{}",
+                a.numerator,
+                a.denominator,
+                b.numerator,
+                b.denominator,
+                rational.numerator,
+                rational.denominator
+            ),
             proof_trace: vec!["Checked multiply (overflow-safe)".to_string()],
             phi: rational.construction_phi,
         })
     }
 
     /// Subtract two rational numbers with overflow detection.
-    pub fn checked_subtract(&self, a: &HdcRational, b: &HdcRational) -> Result<RationalResult, RationalOverflow> {
+    pub fn checked_subtract(
+        &self,
+        a: &HdcRational,
+        b: &HdcRational,
+    ) -> Result<RationalResult, RationalOverflow> {
         let g = gcd(a.denominator as u64, b.denominator as u64) as i64;
         let a_den_reduced = a.denominator / g;
         let b_den_reduced = b.denominator / g;
@@ -431,7 +503,15 @@ impl RationalArithmeticEngine {
         let rational = self.encode(num, den);
         Ok(RationalResult {
             rational: rational.clone(),
-            operation: format!("{}/{} - {}/{} = {}/{}", a.numerator, a.denominator, b.numerator, b.denominator, rational.numerator, rational.denominator),
+            operation: format!(
+                "{}/{} - {}/{} = {}/{}",
+                a.numerator,
+                a.denominator,
+                b.numerator,
+                b.denominator,
+                rational.numerator,
+                rational.denominator
+            ),
             proof_trace: vec!["Checked subtract (overflow-safe)".to_string()],
             phi: rational.construction_phi,
         })
@@ -520,7 +600,7 @@ mod tests {
         let engine = RationalArithmeticEngine::new();
         let r = engine.encode(1, 3);
         let f = engine.to_f64(&r);
-        assert!((f - 1.0/3.0).abs() < 1e-10);
+        assert!((f - 1.0 / 3.0).abs() < 1e-10);
     }
 
     #[test]
@@ -561,7 +641,10 @@ mod tests {
         let a = engine.encode(i64::MAX / 2, 1);
         let b = engine.encode(3, 1);
         let result = engine.checked_multiply(&a, &b);
-        assert!(result.is_err(), "Should detect overflow for large multiplication");
+        assert!(
+            result.is_err(),
+            "Should detect overflow for large multiplication"
+        );
     }
 
     #[test]

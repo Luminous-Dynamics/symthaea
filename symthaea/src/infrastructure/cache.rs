@@ -194,7 +194,9 @@ impl<K: Eq + Hash + Clone, V: Clone> LruCache<K, V> {
     /// Prune expired entries
     pub fn prune_expired(&mut self) {
         if let Some(ttl) = self.ttl {
-            let expired: Vec<K> = self.entries.iter()
+            let expired: Vec<K> = self
+                .entries
+                .iter()
                 .filter(|(_, e)| e.created_at.elapsed() > ttl)
                 .map(|(k, _)| k.clone())
                 .collect();
@@ -248,7 +250,8 @@ impl HdcCache {
 
     /// Cache completions for a prefix
     pub fn cache_completions(&mut self, prefix: &str, completions: Vec<String>) {
-        self.completion_cache.insert(prefix.to_string(), completions);
+        self.completion_cache
+            .insert(prefix.to_string(), completions);
     }
 
     /// Get cached completions

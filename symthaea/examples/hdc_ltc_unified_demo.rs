@@ -7,13 +7,11 @@
 //!
 //! Run with: cargo run --example hdc_ltc_unified_demo
 
-use symthaea::hdc::{
-    HdcLtcUnifiedNeuron, HdcLtcUnifiedNetwork,
-    UnifiedConfig, UnifiedNetworkConfig,
-    UnifiedActivation,
-    ContinuousHV, HDC_DIMENSION,
-};
 use std::time::Instant;
+use symthaea::hdc::{
+    ContinuousHV, HdcLtcUnifiedNetwork, HdcLtcUnifiedNeuron, UnifiedActivation, UnifiedConfig,
+    UnifiedNetworkConfig, HDC_DIMENSION,
+};
 
 fn main() {
     println!("╔═══════════════════════════════════════════════════════════════════════════════╗");
@@ -106,8 +104,14 @@ fn demo_closed_form_jumps() {
 
     // Compare results
     let similarity = neuron_euler.state().similarity(neuron_cf.state());
-    println!("\n  State similarity (Euler vs Closed-form): {:.4}", similarity);
-    println!("  Speedup: {:.1}x", euler_time.as_secs_f64() / cf_time.as_secs_f64());
+    println!(
+        "\n  State similarity (Euler vs Closed-form): {:.4}",
+        similarity
+    );
+    println!(
+        "  Speedup: {:.1}x",
+        euler_time.as_secs_f64() / cf_time.as_secs_f64()
+    );
 
     // Demonstrate O(1) property: large jumps cost same as small
     println!("\n  O(1) Property Demonstration:");
@@ -119,7 +123,7 @@ fn demo_closed_form_jumps() {
     let small_time = start.elapsed();
 
     let start = Instant::now();
-    neuron_large.evolve_closed_form(100.0, &input);  // 1000x larger!
+    neuron_large.evolve_closed_form(100.0, &input); // 1000x larger!
     let large_time = start.elapsed();
 
     println!("    dt=0.1: {:?}", small_time);
@@ -220,7 +224,10 @@ fn demo_temporal_learning() {
     let pattern_a = ContinuousHV::random_default(100);
     let pattern_b = ContinuousHV::random_default(200);
 
-    println!("  Pattern A-B similarity: {:.4}", pattern_a.similarity(&pattern_b));
+    println!(
+        "  Pattern A-B similarity: {:.4}",
+        pattern_a.similarity(&pattern_b)
+    );
 
     // Train on pattern A
     println!("\n  Training on Pattern A (50 steps + Hebbian)...");

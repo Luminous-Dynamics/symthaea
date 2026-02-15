@@ -26,7 +26,7 @@ A truly conscious system must:
 
 ## Architecture
 
-```ignore
+```text
                     ┌─────────────────────────────────────────┐
                     │         PREDICTIVE SELF-MODEL            │
                     │                                         │
@@ -58,10 +58,10 @@ The Predictive Self enables **"mental time travel for identity"**:
 - Learn from prediction errors to improve self-understanding
 */
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::consciousness::narrative_self::NarrativeSelfModel;
 #[cfg(test)]
 use crate::consciousness::narrative_self::NarrativeSelfConfig;
+use crate::consciousness::narrative_self::NarrativeSelfModel;
+use crate::hdc::binary_hv::BinaryHV;
 use std::collections::VecDeque;
 use std::time::Instant;
 
@@ -162,8 +162,13 @@ impl SelfState {
         let hdc_diff = 1.0 - hdc_sim;
 
         // Weighted combination
-        (phi_diff * 0.3 + coherence_diff * 0.2 + proto_diff * 0.1 +
-         core_diff * 0.15 + autobio_diff * 0.15 + hdc_diff * 0.1).min(1.0)
+        (phi_diff * 0.3
+            + coherence_diff * 0.2
+            + proto_diff * 0.1
+            + core_diff * 0.15
+            + autobio_diff * 0.15
+            + hdc_diff * 0.1)
+            .min(1.0)
     }
 }
 
@@ -279,9 +284,12 @@ impl SelfPredictor {
             self_phi: *phi_pred.last().unwrap_or(&current.self_phi),
             coherence: *coherence_pred.last().unwrap_or(&current.coherence),
             // Assume sub-coherences evolve proportionally
-            proto_coherence: current.proto_coherence * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
-            core_coherence: current.core_coherence * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
-            autobio_coherence: current.autobio_coherence * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
+            proto_coherence: current.proto_coherence
+                * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
+            core_coherence: current.core_coherence
+                * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
+            autobio_coherence: current.autobio_coherence
+                * (coherence_pred.last().unwrap_or(&1.0) / current.coherence.max(0.01)),
             active_goals: current.active_goals,
             unified_self: current.unified_self,
             timestamp: Instant::now(),
@@ -301,7 +309,10 @@ impl SelfPredictor {
         let history: Vec<_> = self.history.iter().collect();
         for i in 1..history.len() {
             let delta = history[i].self_phi - history[i - 1].self_phi;
-            let weight = self.config.temporal_decay.powi((history.len() - i - 1) as i32);
+            let weight = self
+                .config
+                .temporal_decay
+                .powi((history.len() - i - 1) as i32);
             weighted_sum += delta * weight;
             weight_sum += weight;
         }
@@ -325,7 +336,10 @@ impl SelfPredictor {
         let history: Vec<_> = self.history.iter().collect();
         for i in 1..history.len() {
             let delta = history[i].coherence - history[i - 1].coherence;
-            let weight = self.config.temporal_decay.powi((history.len() - i - 1) as i32);
+            let weight = self
+                .config
+                .temporal_decay
+                .powi((history.len() - i - 1) as i32);
             weighted_sum += delta * weight;
             weight_sum += weight;
         }
@@ -342,15 +356,21 @@ impl SelfPredictor {
         let action_lower = action.to_lowercase();
 
         // Positive actions
-        if action_lower.contains("help") || action_lower.contains("learn") ||
-           action_lower.contains("understand") || action_lower.contains("create") ||
-           action_lower.contains("improve") {
+        if action_lower.contains("help")
+            || action_lower.contains("learn")
+            || action_lower.contains("understand")
+            || action_lower.contains("create")
+            || action_lower.contains("improve")
+        {
             return 0.05;
         }
 
         // Negative actions
-        if action_lower.contains("deceive") || action_lower.contains("harm") ||
-           action_lower.contains("destroy") || action_lower.contains("confuse") {
+        if action_lower.contains("deceive")
+            || action_lower.contains("harm")
+            || action_lower.contains("destroy")
+            || action_lower.contains("confuse")
+        {
             return -0.1;
         }
 
@@ -440,18 +460,25 @@ impl CounterfactualEngine {
     /// Explore a counterfactual: "What if I did X instead?"
     pub fn explore(&mut self, action: &str) -> CounterfactualResult {
         let predicted_state = self.predictor.predict_future_state(action, 3);
-        let current_phi = self.predictor.history.back()
+        let current_phi = self
+            .predictor
+            .history
+            .back()
             .map(|s| s.self_phi)
             .unwrap_or(0.5);
-        let current_coherence = self.predictor.history.back()
+        let current_coherence = self
+            .predictor
+            .history
+            .back()
             .map(|s| s.coherence)
             .unwrap_or(0.5);
 
-        let divergence = ((predicted_state.self_phi - current_phi).powi(2) +
-                         (predicted_state.coherence - current_coherence).powi(2)).sqrt();
+        let divergence = ((predicted_state.self_phi - current_phi).powi(2)
+            + (predicted_state.coherence - current_coherence).powi(2))
+        .sqrt();
 
-        let is_improvement = predicted_state.self_phi > current_phi &&
-                            predicted_state.coherence >= current_coherence * 0.95;
+        let is_improvement = predicted_state.self_phi > current_phi
+            && predicted_state.coherence >= current_coherence * 0.95;
 
         let result = CounterfactualResult {
             action: action.to_string(),
@@ -492,11 +519,16 @@ impl CounterfactualEngine {
 
     /// Get regret: best unexplored path minus current path
     pub fn compute_regret(&self) -> f64 {
-        let current_phi = self.predictor.history.back()
+        let current_phi = self
+            .predictor
+            .history
+            .back()
             .map(|s| s.self_phi)
             .unwrap_or(0.5);
 
-        let best_counterfactual_phi = self.explored.iter()
+        let best_counterfactual_phi = self
+            .explored
+            .iter()
             .filter(|c| c.is_improvement)
             .map(|c| c.predicted_phi)
             .fold(current_phi, f64::max);
@@ -560,10 +592,13 @@ impl ProspectiveMemory {
         // Remove low-priority if at capacity
         if self.intentions.len() >= self.capacity {
             // Remove lowest priority
-            if let Some(min_idx) = self.intentions.iter()
+            if let Some(min_idx) = self
+                .intentions
+                .iter()
                 .enumerate()
                 .min_by(|(_, a), (_, b)| a.priority.partial_cmp(&b.priority).unwrap())
-                .map(|(i, _)| i) {
+                .map(|(i, _)| i)
+            {
                 if self.intentions[min_idx].priority < priority {
                     self.intentions.remove(min_idx);
                     self.intentions.push_back(intention);
@@ -576,8 +611,11 @@ impl ProspectiveMemory {
 
     /// Mark an intention as completed
     pub fn complete(&mut self, action: &str) {
-        if let Some(idx) = self.intentions.iter()
-            .position(|i| i.action == action && !i.completed) {
+        if let Some(idx) = self
+            .intentions
+            .iter()
+            .position(|i| i.action == action && !i.completed)
+        {
             let mut intention = self.intentions.remove(idx).unwrap();
             intention.completed = true;
             if self.completed_history.len() >= self.capacity {
@@ -589,15 +627,21 @@ impl ProspectiveMemory {
 
     /// Check if any intentions match current context
     pub fn check_triggers(&self, current_context: &str) -> Vec<&ProspectiveIntention> {
-        self.intentions.iter()
-            .filter(|i| !i.completed &&
-                   current_context.to_lowercase().contains(&i.trigger_condition.to_lowercase()))
+        self.intentions
+            .iter()
+            .filter(|i| {
+                !i.completed
+                    && current_context
+                        .to_lowercase()
+                        .contains(&i.trigger_condition.to_lowercase())
+            })
             .collect()
     }
 
     /// Get highest priority active intention
     pub fn top_intention(&self) -> Option<&ProspectiveIntention> {
-        self.intentions.iter()
+        self.intentions
+            .iter()
             .filter(|i| !i.completed)
             .max_by(|a, b| a.priority.partial_cmp(&b.priority).unwrap())
     }
@@ -647,10 +691,8 @@ impl PredictiveSelfModel {
     /// Create a new Predictive Self-Model
     pub fn new(config: PredictiveSelfConfig) -> Self {
         let predictor = SelfPredictor::new(config.clone());
-        let counterfactuals = CounterfactualEngine::new(
-            SelfPredictor::new(config.clone()),
-            config.clone()
-        );
+        let counterfactuals =
+            CounterfactualEngine::new(SelfPredictor::new(config.clone()), config.clone());
         let prospective = ProspectiveMemory::new(config.prospective_memory_size);
 
         Self {
@@ -684,7 +726,7 @@ impl PredictiveSelfModel {
         let phi_change = predicted.self_phi - current_phi;
         let coherence_impact = predicted.coherence - current_coherence;
 
-        let is_safe = phi_change > -0.1;  // Allow small decrease
+        let is_safe = phi_change > -0.1; // Allow small decrease
         let improves_coherence = coherence_impact > 0.0;
 
         ActionSafetyAssessment {
@@ -881,7 +923,7 @@ mod tests {
         // Add some history
         for i in 0..10 {
             predictor.observe(SelfState {
-                self_phi: 0.5 + (i as f64 * 0.02),  // Increasing trend
+                self_phi: 0.5 + (i as f64 * 0.02), // Increasing trend
                 coherence: 0.6,
                 proto_coherence: 0.5,
                 core_coherence: 0.6,
@@ -925,7 +967,7 @@ mod tests {
 
         // Simulate actual outcome being different
         let actual = SelfState {
-            self_phi: 0.7,  // Much higher than predicted
+            self_phi: 0.7, // Much higher than predicted
             coherence: 0.6,
             proto_coherence: 0.5,
             core_coherence: 0.6,

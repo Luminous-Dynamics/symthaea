@@ -22,7 +22,7 @@ pub struct VideoSourceConfig {
 impl Default for VideoSourceConfig {
     fn default() -> Self {
         Self {
-            width: 64,      // Small for LTC processing
+            width: 64, // Small for LTC processing
             height: 64,
             fps: 30,
             camera_index: 0,
@@ -167,8 +167,12 @@ impl VideoSource for WebcamSource {
     fn start(&mut self) -> Result<()> {
         self.active = true;
         self.last_frame_time = Some(Instant::now());
-        tracing::info!("Mock webcam started ({}x{} @ {} fps)",
-            self.config.width, self.config.height, self.config.fps);
+        tracing::info!(
+            "Mock webcam started ({}x{} @ {} fps)",
+            self.config.width,
+            self.config.height,
+            self.config.fps
+        );
         Ok(())
     }
 
@@ -221,7 +225,13 @@ impl VideoSource for WebcamSource {
         }
 
         self.sequence += 1;
-        Ok(Some(Frame::new(data, width, height, FrameFormat::Rgb24, self.sequence)))
+        Ok(Some(Frame::new(
+            data,
+            width,
+            height,
+            FrameFormat::Rgb24,
+            self.sequence,
+        )))
     }
 
     fn is_active(&self) -> bool {
@@ -266,7 +276,6 @@ pub enum MockPattern {
     Solid,
 
     // === Complex Patterns for Testing ===
-
     /// Polyrhythm: two overlapping rhythms (e.g., 3:2)
     /// Creates a complex pattern where two BPMs interfere
     Polyrhythm { bpm_a: u32, bpm_b: u32 },
@@ -277,7 +286,11 @@ pub enum MockPattern {
 
     /// Accelerando: gradually speeding up
     /// BPM increases from start_bpm over cycle_frames
-    Accelerando { start_bpm: u32, end_bpm: u32, cycle_frames: u32 },
+    Accelerando {
+        start_bpm: u32,
+        end_bpm: u32,
+        cycle_frames: u32,
+    },
 
     /// Triplet feel: 3 beats in the time of 2
     /// Creates swing/shuffle feeling
@@ -340,20 +353,23 @@ impl MockVideoSource {
                     let frames_per_beat = (fps * 60.0) / bpm as f32;
                     let beat_position = (seq as f32 % frames_per_beat) / frames_per_beat;
                     // Sharp on/off at 50% duty cycle
-                    if beat_position < 0.5 { 255 } else { 50 }
+                    if beat_position < 0.5 {
+                        255
+                    } else {
+                        50
+                    }
                 }
-                MockPattern::MovingGradient => {
-                    (seq % 256) as u8
-                }
+                MockPattern::MovingGradient => (seq % 256) as u8,
                 MockPattern::Noise => {
                     // Simple PRNG
-                    let hash = seq.wrapping_mul(0x5851F42D4C957F2D).wrapping_add(0x14057B7EF767814F);
+                    let hash = seq
+                        .wrapping_mul(0x5851F42D4C957F2D)
+                        .wrapping_add(0x14057B7EF767814F);
                     (hash % 256) as u8
                 }
                 MockPattern::Solid => 128,
 
                 // === Complex Patterns ===
-
                 MockPattern::Polyrhythm { bpm_a, bpm_b } => {
                     // Two overlapping rhythms - brightness is sum of both
                     let frames_per_beat_a = (fps * 60.0) / bpm_a as f32;
@@ -379,15 +395,19 @@ impl MockVideoSource {
                     if beat_position < 0.08 {
                         255 // LUB (strong)
                     } else if beat_position < 0.15 {
-                        80  // brief pause
+                        80 // brief pause
                     } else if beat_position < 0.22 {
                         200 // dub (weaker)
                     } else {
-                        50  // diastole rest
+                        50 // diastole rest
                     }
                 }
 
-                MockPattern::Accelerando { start_bpm, end_bpm, cycle_frames } => {
+                MockPattern::Accelerando {
+                    start_bpm,
+                    end_bpm,
+                    cycle_frames,
+                } => {
                     // BPM increases linearly over cycle_frames, then resets
                     let cycle_pos = (seq % cycle_frames as u64) as f32 / cycle_frames as f32;
                     let current_bpm = start_bpm as f32 + (end_bpm - start_bpm) as f32 * cycle_pos;
@@ -395,7 +415,11 @@ impl MockVideoSource {
                     let frames_per_beat = (fps * 60.0) / current_bpm;
                     let beat_position = (seq as f32 % frames_per_beat) / frames_per_beat;
 
-                    if beat_position < 0.5 { 255 } else { 50 }
+                    if beat_position < 0.5 {
+                        255
+                    } else {
+                        50
+                    }
                 }
 
                 MockPattern::Triplet { bpm } => {
@@ -405,7 +429,10 @@ impl MockVideoSource {
                     let beat_position = (seq as f32 % frames_per_beat) / frames_per_beat;
 
                     // Triplet subdivisions: 0%, 33%, 67% of beat
-                    if beat_position < 0.11 || (beat_position > 0.33 && beat_position < 0.44) || (beat_position > 0.67 && beat_position < 0.78) {
+                    if beat_position < 0.11
+                        || (beat_position > 0.33 && beat_position < 0.44)
+                        || (beat_position > 0.67 && beat_position < 0.78)
+                    {
                         255
                     } else {
                         50
@@ -414,7 +441,9 @@ impl MockVideoSource {
 
                 MockPattern::Burst { avg_gap_frames } => {
                     // Pseudo-random bursts using deterministic hash
-                    let hash = seq.wrapping_mul(0x5851F42D4C957F2D).wrapping_add(0x14057B7EF767814F);
+                    let hash = seq
+                        .wrapping_mul(0x5851F42D4C957F2D)
+                        .wrapping_add(0x14057B7EF767814F);
                     let gap = hash % (avg_gap_frames as u64 * 2);
 
                     // Burst when sequence aligns with hash-based timing
@@ -434,17 +463,17 @@ impl MockVideoSource {
 
                     // Simplified: dots at 0-1, 2-3, 4-5 units; dashes at 8-11, 13-16, 18-21; dots at 24-25, 26-27, 28-29
                     let in_dot = |p: u64| -> bool {
-                        (p < unit) ||
-                        (p >= 2*unit && p < 3*unit) ||
-                        (p >= 4*unit && p < 5*unit) ||
-                        (p >= 24*unit && p < 25*unit) ||
-                        (p >= 26*unit && p < 27*unit) ||
-                        (p >= 28*unit && p < 29*unit)
+                        (p < unit)
+                            || (p >= 2 * unit && p < 3 * unit)
+                            || (p >= 4 * unit && p < 5 * unit)
+                            || (p >= 24 * unit && p < 25 * unit)
+                            || (p >= 26 * unit && p < 27 * unit)
+                            || (p >= 28 * unit && p < 29 * unit)
                     };
                     let in_dash = |p: u64| -> bool {
-                        (p >= 8*unit && p < 11*unit) ||
-                        (p >= 13*unit && p < 16*unit) ||
-                        (p >= 18*unit && p < 21*unit)
+                        (p >= 8 * unit && p < 11 * unit)
+                            || (p >= 13 * unit && p < 16 * unit)
+                            || (p >= 18 * unit && p < 21 * unit)
                     };
 
                     if in_dot(pos) || in_dash(pos) {

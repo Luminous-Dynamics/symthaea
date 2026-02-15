@@ -38,7 +38,7 @@
 
 use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::consciousness_topology_generators::ConsciousnessTopology;
-use crate::hdc::phi_real::RealPhiCalculator;
+use crate::hdc::spectral_connectivity::ConnectivityCalculator;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for emergence detection
@@ -116,7 +116,7 @@ pub struct Partition {
 #[derive(Debug)]
 pub struct CausalEmergenceDetector {
     config: EmergenceConfig,
-    phi_calculator: RealPhiCalculator,
+    phi_calculator: ConnectivityCalculator,
 }
 
 impl CausalEmergenceDetector {
@@ -124,7 +124,7 @@ impl CausalEmergenceDetector {
     pub fn new(config: EmergenceConfig) -> Self {
         Self {
             config,
-            phi_calculator: RealPhiCalculator::new(),
+            phi_calculator: ConnectivityCalculator::new(),
         }
     }
 
@@ -498,9 +498,14 @@ mod tests {
         println!("Scale emergence:");
         for (scale, emergence) in &multi.scale_emergence {
             println!("  {} partitions: {:.4}", scale, emergence);
+            assert!(emergence.is_finite(), "Emergence at scale {} should be finite", scale);
         }
         println!("Optimal scale: {}", multi.optimal_scale);
         println!("Max emergence: {:.4}", multi.max_emergence);
+
+        assert!(!multi.scale_emergence.is_empty(), "Should have at least one scale");
+        assert!(multi.max_emergence.is_finite(), "Max emergence should be finite");
+        assert!(multi.optimal_scale > 0, "Optimal scale should be positive");
     }
 
     #[test]
@@ -526,5 +531,9 @@ mod tests {
 
         // Small topology should still work
         println!("Small topology Φ: {:.4}", result.phi_macro);
+
+        assert!(result.phi_macro.is_finite(), "Phi_macro should be finite");
+        assert!(result.phi_macro >= 0.0, "Phi_macro should be non-negative");
+        assert!(result.emergence_ratio.is_finite(), "Emergence ratio should be finite");
     }
 }

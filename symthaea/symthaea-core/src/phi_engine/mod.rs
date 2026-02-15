@@ -53,23 +53,23 @@
 //! - [`crate::consciousness::consciousness_equation_v2`] - Master Consciousness Equation
 //! - [`crate::hdc::unified_hv`] - Unified hypervector types
 
-use crate::hdc::unified_hv::ContinuousHV;
-use crate::hdc::phi_topology_validation::real_hv_to_hv16;
-use crate::hdc::phi_resonant::ResonantPhiCalculator;
 use crate::hdc::binary_hv::BinaryHV;
+use crate::hdc::phi_resonant::ResonantPhiCalculator;
+use crate::hdc::phi_topology_validation::real_hv_to_hv16;
+use crate::hdc::unified_hv::ContinuousHV;
 
+mod cache;
 mod calculator;
 mod result;
-mod cache;
 
 // Re-export main types
-pub use calculator::{PhiCalculator, Complexity};
+pub use cache::{CacheStats, CachedPhiEngine};
+pub use calculator::{Complexity, PhiCalculator};
 pub use result::{PhiResult, PhiUncertainty};
-pub use cache::{CachedPhiEngine, CacheStats};
 
 // Re-export specific implementations (from existing hdc module)
 pub use crate::hdc::spectral_connectivity::ConnectivityCalculator as ContinuousPhiCalculator;
-pub use crate::hdc::tiered_phi::{TieredPhi, ApproximationTier, TieredPhiConfig};
+pub use crate::hdc::tiered_phi::{ApproximationTier, TieredPhi, TieredPhiConfig};
 // Re-export resonator when available:
 // pub use crate::hdc::phi_resonant::ResonatorPhi;
 
@@ -81,8 +81,7 @@ pub struct PhiEngine {
 }
 
 /// Available Φ calculation methods
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum PhiMethod {
     /// Spectral connectivity (ContinuousHV-based, algebraic connectivity / λ₂).
     ///
@@ -102,13 +101,6 @@ pub enum PhiMethod {
     #[default]
     Auto,
 }
-
-impl PhiMethod {
-    /// Backward-compatible alias for `SpectralConnectivity`.
-    #[deprecated(since = "0.2.0", note = "Renamed to SpectralConnectivity for scientific accuracy")]
-    pub const CONTINUOUS: PhiMethod = PhiMethod::SpectralConnectivity;
-}
-
 
 impl PhiEngine {
     /// Create a new PhiEngine with specified method
@@ -276,10 +268,10 @@ impl Default for PhiEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::hdc::unified_hv::ContinuousHV;
-    use crate::hdc::phi_topology_validation::real_hv_to_hv16;
     use crate::hdc::binary_hv::BinaryHV;
     use crate::hdc::phi_resonant::ResonantPhiCalculator;
+    use crate::hdc::phi_topology_validation::real_hv_to_hv16;
+    use crate::hdc::unified_hv::ContinuousHV;
 
     #[test]
     fn test_phi_engine_creation() {
@@ -290,14 +282,35 @@ mod tests {
     #[test]
     fn test_method_suggestion() {
         // Based on 2026-01-04 benchmarks: Continuous is fastest for n≤256
-        assert!(matches!(PhiEngine::suggest_method(8), PhiMethod::SpectralConnectivity));
-        assert!(matches!(PhiEngine::suggest_method(30), PhiMethod::SpectralConnectivity));
-        assert!(matches!(PhiEngine::suggest_method(64), PhiMethod::SpectralConnectivity));
-        assert!(matches!(PhiEngine::suggest_method(100), PhiMethod::SpectralConnectivity));
-        assert!(matches!(PhiEngine::suggest_method(256), PhiMethod::SpectralConnectivity));
+        assert!(matches!(
+            PhiEngine::suggest_method(8),
+            PhiMethod::SpectralConnectivity
+        ));
+        assert!(matches!(
+            PhiEngine::suggest_method(30),
+            PhiMethod::SpectralConnectivity
+        ));
+        assert!(matches!(
+            PhiEngine::suggest_method(64),
+            PhiMethod::SpectralConnectivity
+        ));
+        assert!(matches!(
+            PhiEngine::suggest_method(100),
+            PhiMethod::SpectralConnectivity
+        ));
+        assert!(matches!(
+            PhiEngine::suggest_method(256),
+            PhiMethod::SpectralConnectivity
+        ));
         // Only for very large topologies, use Resonator (O(n log n))
-        assert!(matches!(PhiEngine::suggest_method(500), PhiMethod::Resonator));
-        assert!(matches!(PhiEngine::suggest_method(1000), PhiMethod::Resonator));
+        assert!(matches!(
+            PhiEngine::suggest_method(500),
+            PhiMethod::Resonator
+        ));
+        assert!(matches!(
+            PhiEngine::suggest_method(1000),
+            PhiMethod::Resonator
+        ));
     }
 
     #[test]

@@ -39,12 +39,12 @@
 //! }
 //! ```
 
-use serde::{Deserialize, Serialize};
-use std::time::{Duration, Instant};
-use std::sync::mpsc::{Sender, Receiver, channel};
 use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
+use std::sync::mpsc::{channel, Receiver, Sender};
+use std::time::{Duration, Instant};
 
-use super::core::{TieredPhi, ApproximationTier};
+use super::core::{ApproximationTier, TieredPhi};
 use crate::hdc::binary_hv::BinaryHV;
 
 // =============================================================================
@@ -52,8 +52,7 @@ use crate::hdc::binary_hv::BinaryHV;
 // =============================================================================
 
 /// Gradient computation precision levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum GradientPrecision {
     /// O(n): Fast centrality-based approximation
     Fast,
@@ -63,7 +62,6 @@ pub enum GradientPrecision {
     /// O(n³): High precision using leave-one-out on similarity
     High,
 }
-
 
 /// Configuration for streaming gradients
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,7 +122,8 @@ pub struct PhiGradient {
 impl PhiGradient {
     /// Get top k components that most help integration
     pub fn top_helpers(&self, k: usize) -> Vec<(usize, f64)> {
-        self.integration_helpers.iter()
+        self.integration_helpers
+            .iter()
             .take(k)
             .map(|&idx| (idx, self.component_gradients[idx]))
             .collect()
@@ -132,7 +131,8 @@ impl PhiGradient {
 
     /// Get top k components that most hurt integration
     pub fn top_hinderers(&self, k: usize) -> Vec<(usize, f64)> {
-        self.integration_hinderers.iter()
+        self.integration_hinderers
+            .iter()
             .take(k)
             .map(|&idx| (idx, self.component_gradients[idx]))
             .collect()
@@ -166,9 +166,7 @@ pub enum OptimizationAction {
         helper_template: usize,
     },
     /// Remove a hinderer component
-    RemoveHinderer {
-        hinderer: usize,
-    },
+    RemoveHinderer { hinderer: usize },
 }
 
 // =============================================================================
@@ -279,13 +277,13 @@ impl StreamingPhiGradient {
         };
 
         // Compute gradient statistics
-        let gradient_norm = (component_gradients.iter()
-            .map(|g| g * g)
-            .sum::<f64>())
-            .sqrt();
+        let gradient_norm = (component_gradients.iter().map(|g| g * g).sum::<f64>()).sqrt();
 
         let ascent_direction = if gradient_norm > 0.0 {
-            component_gradients.iter().map(|g| g / gradient_norm).collect()
+            component_gradients
+                .iter()
+                .map(|g| g / gradient_norm)
+                .collect()
         } else {
             vec![0.0; n]
         };
@@ -293,9 +291,9 @@ impl StreamingPhiGradient {
         // Rank by magnitude
         let mut gradient_ranking: Vec<usize> = (0..n).collect();
         gradient_ranking.sort_by(|&a, &b| {
-            component_gradients[b].abs()
-                .partial_cmp(&component_gradients[a].abs())
-                .unwrap()
+            component_gradients[b]
+                .abs()
+                .total_cmp(&component_gradients[a].abs())
         });
 
         // Identify helpers and hinderers
@@ -358,7 +356,8 @@ impl StreamingPhiGradient {
             let degrees = state.degrees();
             let avg_degree: f64 = degrees.iter().sum::<f64>() / n as f64;
 
-            degrees.iter()
+            degrees
+                .iter()
                 .map(|&d| {
                     // Normalize: positive if above average, negative if below
                     let normalized = (d - avg_degree) / avg_degree.max(0.01);
@@ -380,7 +379,8 @@ impl StreamingPhiGradient {
 
             let global_avg: f64 = avg_similarities.iter().sum::<f64>() / n as f64;
 
-            avg_similarities.iter()
+            avg_similarities
+                .iter()
                 .map(|&s| (s - global_avg) * base_phi * 0.1)
                 .collect()
         }
@@ -396,24 +396,27 @@ impl StreamingPhiGradient {
         if let Some(ref state) = self.phi_calc.incremental_state {
             // Approximate gradient using row/column removal effect on connectivity
             let sim_matrix = state.similarity_matrix();
-            let total_sum: f64 = sim_matrix.iter()
+            let total_sum: f64 = sim_matrix
+                .iter()
                 .map(|row: &Vec<f64>| row.iter().sum::<f64>())
                 .sum();
 
-            (0..n).map(|i| {
-                // Contribution = how much this component's connections add to total
-                let row_sum: f64 = sim_matrix[i].iter().sum::<f64>();
+            (0..n)
+                .map(|i| {
+                    // Contribution = how much this component's connections add to total
+                    let row_sum: f64 = sim_matrix[i].iter().sum::<f64>();
 
-                // Normalized contribution
-                let contribution = row_sum / total_sum.max(0.01);
+                    // Normalized contribution
+                    let contribution = row_sum / total_sum.max(0.01);
 
-                // Compare to uniform contribution (1/n)
-                let expected = 1.0 / n as f64;
-                let deviation = contribution - expected;
+                    // Compare to uniform contribution (1/n)
+                    let expected = 1.0 / n as f64;
+                    let deviation = contribution - expected;
 
-                // Scale to meaningful gradient
-                deviation * base_phi * n as f64 * 0.5
-            }).collect()
+                    // Scale to meaningful gradient
+                    deviation * base_phi * n as f64 * 0.5
+                })
+                .collect()
         } else {
             // Fall back to fast method
             self.compute_gradient_fast(components, base_phi)
@@ -428,22 +431,26 @@ impl StreamingPhiGradient {
         }
 
         // For each component, estimate gradient by computing Φ without it
-        let gradients: Vec<f64> = (0..n).into_par_iter().map(|i| {
-            // Create component list without i
-            let remaining: Vec<BinaryHV> = components.iter()
-                .enumerate()
-                .filter(|(j, _)| *j != i)
-                .map(|(_, c)| *c)
-                .collect();
+        let gradients: Vec<f64> = (0..n)
+            .into_par_iter()
+            .map(|i| {
+                // Create component list without i
+                let remaining: Vec<BinaryHV> = components
+                    .iter()
+                    .enumerate()
+                    .filter(|(j, _)| *j != i)
+                    .map(|(_, c)| *c)
+                    .collect();
 
-            // Use fresh calculator to avoid state contamination
-            let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
-            let phi_without = calc.compute(&remaining);
+                // Use fresh calculator to avoid state contamination
+                let mut calc = TieredPhi::new(ApproximationTier::SpectralConnectivity);
+                let phi_without = calc.compute(&remaining);
 
-            // Gradient = how much Φ drops when we remove this component
-            // Positive gradient means component helps, negative means it hurts
-            base_phi - phi_without
-        }).collect();
+                // Gradient = how much Φ drops when we remove this component
+                // Positive gradient means component helps, negative means it hurts
+                base_phi - phi_without
+            })
+            .collect();
 
         gradients
     }
@@ -451,7 +458,8 @@ impl StreamingPhiGradient {
     /// Emit gradient event
     fn emit_event(&mut self, gradient: &PhiGradient) {
         if let Some(ref sender) = self.event_sender {
-            let phi_delta = self.last_gradient
+            let phi_delta = self
+                .last_gradient
                 .as_ref()
                 .map(|lg| gradient.phi - lg.phi)
                 .unwrap_or(0.0);
@@ -464,11 +472,15 @@ impl StreamingPhiGradient {
                 phi: gradient.phi,
                 phi_delta,
                 gradient_norm: gradient.gradient_norm,
-                top_helpers: gradient.integration_helpers.iter()
+                top_helpers: gradient
+                    .integration_helpers
+                    .iter()
                     .take(self.config.top_k_components)
                     .cloned()
                     .collect(),
-                top_hinderers: gradient.integration_hinderers.iter()
+                top_hinderers: gradient
+                    .integration_hinderers
+                    .iter()
                     .take(self.config.top_k_components)
                     .cloned()
                     .collect(),
@@ -548,7 +560,11 @@ mod tests {
     fn test_gradient_precision_levels() {
         let components = create_test_components(10);
 
-        for precision in [GradientPrecision::Fast, GradientPrecision::Medium, GradientPrecision::High] {
+        for precision in [
+            GradientPrecision::Fast,
+            GradientPrecision::Medium,
+            GradientPrecision::High,
+        ] {
             let config = GradientConfig {
                 precision,
                 ..Default::default()
@@ -592,7 +608,10 @@ mod tests {
         // Should return some suggestion
         match gradient.optimization_suggestion() {
             OptimizationAction::Stable => {}
-            OptimizationAction::ReplaceHindererWithHelper { hinderer, helper_template } => {
+            OptimizationAction::ReplaceHindererWithHelper {
+                hinderer,
+                helper_template,
+            } => {
                 assert!(hinderer < 8);
                 assert!(helper_template < 8);
             }

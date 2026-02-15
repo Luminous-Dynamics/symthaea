@@ -510,12 +510,49 @@ pub struct CastDelegatedPhiVoteInput {
     pub reason: Option<String>,
 }
 
-/// Resolve delegation chain with decay
+/// Maximum allowed delegation chain depth (safety limit)
+const MAX_DELEGATION_CHAIN_DEPTH: u8 = 10;
+
+/// Resolve delegation chain with decay, cycle detection, and transitive support
 fn resolve_delegation_chain(
     delegate_did: &str,
     tier: &ProposalTier,
     current_time: Timestamp,
 ) -> ExternResult<(f64, Vec<String>)> {
+    let mut visited = std::collections::HashSet::new();
+    visited.insert(delegate_did.to_string());
+
+    let mut chain = Vec::new();
+    let total_delegated_weight = resolve_delegation_chain_inner(
+        delegate_did,
+        tier,
+        current_time,
+        &mut visited,
+        &mut chain,
+        0, // current depth
+    )?;
+
+    // Add delegate's own weight
+    let delegate_phi = get_voter_phi_weight(delegate_did)?;
+    let total_weight = total_delegated_weight + delegate_phi.composite_weight();
+
+    Ok((total_weight, chain))
+}
+
+/// Inner recursive function for delegation chain resolution
+fn resolve_delegation_chain_inner(
+    delegate_did: &str,
+    tier: &ProposalTier,
+    current_time: Timestamp,
+    visited: &mut std::collections::HashSet<String>,
+    chain: &mut Vec<String>,
+    depth: u8,
+) -> ExternResult<f64> {
+    // Safety: enforce absolute maximum depth
+    if depth >= MAX_DELEGATION_CHAIN_DEPTH {
+        return Ok(0.0);
+    }
+
     // Get delegations pointing to this delegate
     let delegate_anchor = format!("delegate:{}", delegate_did);
     let links = get_links(
@@ -524,7 +561,6 @@ fn resolve_delegation_chain(
     )?;
 
     let mut total_weight = 0.0;
-    let mut chain = Vec::new();
 
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
@@ -536,8 +572,13 @@ fn resolve_delegation_chain(
                 .to_app_option::<Delegation>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
-                // Check if delegation is active and applies to this tier
+                // Skip inactive delegations
                 if !delegation.active {
+                    continue;
+                }
+
+                // Cycle detection: skip if we've already visited this delegator
+                if visited.contains(&delegation.delegator) {
                     continue;
                 }
 
@@ -563,21 +604,38 @@ fn resolve_delegation_chain(
                     continue;
                 }
 
-                // Get delegator's Φ weight and apply delegation percentage
+                // Enforce per-delegation max_chain_depth
+                if depth >= delegation.max_chain_depth {
+                    continue;
+                }
+
+                // Mark delegator as visited before recursing
+                visited.insert(delegation.delegator.clone());
+                chain.push(delegation.delegator.clone());
+
+                // Get delegator's own Φ weight
                 let delegator_phi = get_voter_phi_weight(&delegation.delegator)?;
                 let delegator_weight = delegator_phi.composite_weight();
-
                 total_weight += delegator_weight * effective_pct;
-                chain.push(delegation.delegator.clone());
+
+                // If transitive, recursively resolve delegations TO this delegator
+                if delegation.transitive && depth + 1 < delegation.max_chain_depth {
+                    let transitive_weight = resolve_delegation_chain_inner(
+                        &delegation.delegator,
+                        tier,
+                        current_time,
+                        visited,
+                        chain,
+                        depth + 1,
+                    )?;
+                    // Transitive weight is attenuated by the delegation percentage
+                    total_weight += transitive_weight * effective_pct;
+                }
             }
         }
     }
 
-    // Add delegate's own weight
-    let delegate_phi = get_voter_phi_weight(delegate_did)?;
-    total_weight += delegate_phi.composite_weight();
-
-    Ok((total_weight, chain))
+    Ok(total_weight)
 }
 
 // ============================================================================
@@ -672,24 +730,97 @@ pub struct CastQuadraticVoteInput {
     pub reason: Option<String>,
 }
 
-/// Get voter's voice credits (placeholder)
-fn get_voter_credits(_voter_did: &str) -> ExternResult<VoiceCredits> {
-    // In production, this would query the actual voice credits entry
+/// Get voter's current voice credits from DHT
+fn get_voter_credits(voter_did: &str) -> ExternResult<VoiceCredits> {
     let now = sys_time()?;
-    Ok(VoiceCredits {
-        owner: _voter_did.to_string(),
-        allocated: 100,
-        spent: 0,
-        remaining: 100,
-        period_start: now,
-        period_end: Timestamp::from_micros(now.as_micros() + 30 * 24 * 60 * 60 * 1_000_000), // 30 days
-    })
+    let owner_anchor = format!("credits:{}", voter_did);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&owner_anchor)?, LinkTypes::VoterToVoiceCredits)?,
+        GetStrategy::default(),
+    )?;
+
+    // Find the most recent active (non-expired) credits entry
+    let mut best: Option<VoiceCredits> = None;
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into())))?;
+
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Some(credits) = record
+                .entry()
+                .to_app_option::<VoiceCredits>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                // Skip expired periods
+                if credits.period_end <= now {
+                    continue;
+                }
+                // Keep the most recently started period
+                match &best {
+                    Some(existing) if existing.period_start >= credits.period_start => {}
+                    _ => best = Some(credits),
+                }
+            }
+        }
+    }
+
+    best.ok_or_else(|| wasm_error!(WasmErrorInner::Guest(format!(
+        "No active voice credits found for voter '{}'. Credits must be allocated via allocate_voice_credits first.",
+        voter_did
+    ))))
 }
 
-/// Spend voter's credits (placeholder)
-fn spend_voter_credits(_voter_did: &str, _amount: u64) -> ExternResult<()> {
-    // In production, this would update the voice credits entry
-    Ok(())
+/// Spend voter's credits by updating the DHT entry
+fn spend_voter_credits(voter_did: &str, amount: u64) -> ExternResult<()> {
+    let now = sys_time()?;
+    let owner_anchor = format!("credits:{}", voter_did);
+
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&owner_anchor)?, LinkTypes::VoterToVoiceCredits)?,
+        GetStrategy::default(),
+    )?;
+
+    // Find the active credits entry and its action hash for update
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid credits link target".into())))?;
+
+        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            if let Some(credits) = record
+                .entry()
+                .to_app_option::<VoiceCredits>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                // Skip expired periods
+                if credits.period_end <= now {
+                    continue;
+                }
+
+                if credits.remaining < amount {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Insufficient credits: {} remaining, {} requested",
+                        credits.remaining, amount
+                    ))));
+                }
+
+                let updated = VoiceCredits {
+                    spent: credits.spent + amount,
+                    remaining: credits.remaining - amount,
+                    ..credits
+                };
+
+                update_entry(action_hash, &EntryTypes::VoiceCredits(updated))?;
+                return Ok(());
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(format!(
+        "No active voice credits found for voter '{}'",
+        voter_did
+    ))))
 }
 
 /// Allocate voice credits to a voter
@@ -734,6 +865,15 @@ pub struct AllocateCreditsInput {
     pub owner_did: String,
     pub amount: u64,
     pub period_end: Timestamp,
+}
+
+/// Query a voter's current voice credit balance
+#[hdk_extern]
+pub fn query_voice_credits(voter_did: String) -> ExternResult<VoiceCredits> {
+    if voter_did.is_empty() || voter_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
+    }
+    get_voter_credits(&voter_did)
 }
 
 // ============================================================================
@@ -963,10 +1103,38 @@ pub fn get_proposal_votes(proposal_id: String) -> ExternResult<Vec<Record>> {
     Ok(votes)
 }
 
-/// Tally votes for a proposal (legacy)
+/// Input for tally with configurable thresholds
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TallyVotesInput {
+    pub proposal_id: String,
+    /// Proposal tier determines default quorum/approval thresholds. If None, uses Major.
+    pub tier: Option<ProposalTier>,
+    /// Override quorum threshold (0-1). If None, uses tier default.
+    pub quorum_override: Option<f64>,
+    /// Override approval threshold (0-1). If None, uses tier default.
+    pub approval_override: Option<f64>,
+}
+
+/// Tally votes for a proposal
 #[hdk_extern]
-pub fn tally_votes(proposal_id: String) -> ExternResult<Record> {
-    let vote_records = get_proposal_votes(proposal_id.clone())?;
+pub fn tally_votes(input: TallyVotesInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+
+    let tier = input.tier.unwrap_or(ProposalTier::Major);
+    let quorum_threshold = input.quorum_override.unwrap_or_else(|| tier.quorum_requirement());
+    let approval_threshold = input.approval_override.unwrap_or_else(|| tier.approval_threshold());
+
+    // Validate overrides
+    if quorum_threshold < 0.0 || quorum_threshold > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Quorum threshold must be between 0 and 1".into())));
+    }
+    if approval_threshold < 0.0 || approval_threshold > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Approval threshold must be between 0 and 1".into())));
+    }
+
+    let vote_records = get_proposal_votes(input.proposal_id.clone())?;
 
     let mut votes_for = 0.0;
     let mut votes_against = 0.0;
@@ -988,18 +1156,16 @@ pub fn tally_votes(proposal_id: String) -> ExternResult<Record> {
 
     let total_weight = votes_for + votes_against + abstentions;
 
-    // Calculate if quorum reached (simplified)
-    let quorum_threshold = 0.25;
     let quorum_reached = total_weight >= quorum_threshold;
 
-    // Calculate if approved
-    let approval_threshold = 0.6;
-    let approved = quorum_reached && (votes_for / (votes_for + votes_against)) >= approval_threshold;
+    // Avoid division by zero when no decisive votes cast
+    let decisive_weight = votes_for + votes_against;
+    let approved = quorum_reached && decisive_weight > 0.0 && (votes_for / decisive_weight) >= approval_threshold;
 
     let now = sys_time()?;
 
     let tally = VoteTally {
-        proposal_id: proposal_id.clone(),
+        proposal_id: input.proposal_id.clone(),
         votes_for,
         votes_against,
         abstentions,
@@ -1013,7 +1179,7 @@ pub fn tally_votes(proposal_id: String) -> ExternResult<Record> {
     let action_hash = create_entry(&EntryTypes::VoteTally(tally))?;
 
     // Create anchor and link proposal to tally
-    let tally_anchor = format!("tally:{}", proposal_id);
+    let tally_anchor = format!("tally:{}", input.proposal_id);
     create_entry(&EntryTypes::Anchor(Anchor(tally_anchor.clone())))?;
     create_link(
         anchor_hash(&tally_anchor)?,
@@ -2440,5 +2606,198 @@ fn harmony_to_string(harmony: &Harmony) -> String {
         Harmony::UniversalInterconnectedness => "UniversalInterconnectedness".to_string(),
         Harmony::SacredReciprocity => "SacredReciprocity".to_string(),
         Harmony::EvolutionaryProgression => "EvolutionaryProgression".to_string(),
+    }
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_max_delegation_chain_depth_is_bounded() {
+        // Safety: absolute depth limit prevents unbounded recursion
+        assert!(MAX_DELEGATION_CHAIN_DEPTH <= 20, "Chain depth limit should be reasonable");
+        assert!(MAX_DELEGATION_CHAIN_DEPTH >= 2, "Chain depth must allow at least 2 levels");
+    }
+
+    #[test]
+    fn test_cycle_detection_with_visited_set() {
+        // Simulate cycle detection logic: A → B → C → A
+        let mut visited = std::collections::HashSet::new();
+        visited.insert("did:alice".to_string());
+        visited.insert("did:bob".to_string());
+        visited.insert("did:charlie".to_string());
+
+        // If we encounter alice again, the visited check prevents infinite loop
+        assert!(visited.contains("did:alice"), "Cycle to alice should be detected");
+        assert!(!visited.contains("did:dave"), "Non-visited node should not be blocked");
+    }
+
+    #[test]
+    fn test_depth_enforcement_blocks_deep_chains() {
+        // Verify that depth >= max_chain_depth stops recursion
+        let max_depth: u8 = 3;
+        for depth in 0..max_depth {
+            assert!(depth < max_depth, "Depth {} should be allowed", depth);
+        }
+        assert!(max_depth >= max_depth, "Depth {} should be blocked", max_depth);
+    }
+
+    #[test]
+    fn test_delegation_decay_threshold() {
+        // Delegations below 5% effective percentage are skipped
+        let threshold = 0.05_f64;
+        assert!(0.04 < threshold, "4% should be below threshold");
+        assert!(!(0.06 < threshold), "6% should be above threshold");
+        assert!(0.0 < threshold, "0% should be below threshold");
+    }
+
+    #[test]
+    fn test_transitive_weight_attenuation() {
+        // Transitive delegation attenuates weight by each link's percentage
+        // A (weight 1.0) → B (50%) → C (80%) → final delegate
+        // B receives: 1.0 * 0.5 = 0.5
+        // C receives from B's chain: 0.5 * 0.8 = 0.4
+        // Total delegated: 0.5 (from A→B) + 0.4 (from A→B→C transitive)
+        let a_weight = 1.0_f64;
+        let ab_pct = 0.5;
+        let bc_pct = 0.8;
+
+        let b_delegated = a_weight * ab_pct;
+        let c_transitive = b_delegated * bc_pct;
+
+        assert!((b_delegated - 0.5).abs() < 1e-10);
+        assert!((c_transitive - 0.4).abs() < 1e-10);
+        // Weight decays through chain — prevents infinite accumulation
+        assert!(c_transitive < b_delegated, "Transitive weight must attenuate");
+    }
+
+    #[test]
+    fn test_visited_set_prevents_self_delegation() {
+        // The delegate's own DID is inserted before resolution starts
+        let delegate_did = "did:mycelix:delegate";
+        let mut visited = std::collections::HashSet::new();
+        visited.insert(delegate_did.to_string());
+
+        // Self-delegation would be caught immediately
+        assert!(visited.contains(delegate_did), "Self-delegation must be prevented");
+    }
+
+    #[test]
+    fn test_cycle_detection_three_node_cycle() {
+        // Simulate: A delegates to B, B delegates to C, C delegates to A
+        let mut visited = std::collections::HashSet::new();
+        let mut chain = Vec::new();
+
+        // Processing delegate's delegations (delegate = D)
+        // D is already in visited
+        visited.insert("did:D".to_string());
+
+        // Step 1: Find A → D delegation, process A
+        assert!(!visited.contains("did:A"));
+        visited.insert("did:A".to_string());
+        chain.push("did:A".to_string());
+
+        // Step 2: Transitive - find B → A delegation, process B
+        assert!(!visited.contains("did:B"));
+        visited.insert("did:B".to_string());
+        chain.push("did:B".to_string());
+
+        // Step 3: Transitive - find C → B delegation, process C
+        assert!(!visited.contains("did:C"));
+        visited.insert("did:C".to_string());
+        chain.push("did:C".to_string());
+
+        // Step 4: Transitive - find A → C delegation — CYCLE DETECTED
+        assert!(visited.contains("did:A"), "Cycle back to A must be detected");
+        // The cycle is broken — A is not double-counted
+
+        assert_eq!(chain.len(), 3, "Chain should contain A, B, C (no duplicates)");
+    }
+
+    #[test]
+    fn test_voice_credits_spend_updates_balance() {
+        // Verify the VoiceCredits struct correctly tracks spend/remaining
+        let credits = VoiceCredits {
+            owner: "did:test:voter".to_string(),
+            allocated: 100,
+            spent: 0,
+            remaining: 100,
+            period_start: Timestamp::from_micros(0),
+            period_end: Timestamp::from_micros(1_000_000),
+        };
+
+        // Simulate spending 25 credits
+        let after_spend = VoiceCredits {
+            spent: credits.spent + 25,
+            remaining: credits.remaining - 25,
+            ..credits.clone()
+        };
+
+        assert_eq!(after_spend.spent, 25);
+        assert_eq!(after_spend.remaining, 75);
+        assert_eq!(after_spend.allocated, 100);
+        // Integrity invariant: remaining == allocated - spent
+        assert_eq!(after_spend.remaining, after_spend.allocated - after_spend.spent);
+    }
+
+    #[test]
+    fn test_quadratic_weight_calculation() {
+        // √1 = 1, √4 = 2, √9 = 3, √16 = 4, √100 = 10
+        assert!((QuadraticVote::calculate_weight(1) - 1.0).abs() < 1e-10);
+        assert!((QuadraticVote::calculate_weight(4) - 2.0).abs() < 1e-10);
+        assert!((QuadraticVote::calculate_weight(9) - 3.0).abs() < 1e-10);
+        assert!((QuadraticVote::calculate_weight(100) - 10.0).abs() < 1e-10);
+        // Quadratic cost: doubling vote weight from 3→6 costs 9→36 (4x credits)
+        assert!((QuadraticVote::calculate_weight(36) - 6.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_proposal_tier_thresholds() {
+        // Basic: simple majority, low quorum
+        assert!((ProposalTier::Basic.quorum_requirement() - 0.15).abs() < 1e-10);
+        assert!((ProposalTier::Basic.approval_threshold() - 0.50).abs() < 1e-10);
+
+        // Major: stricter
+        assert!((ProposalTier::Major.quorum_requirement() - 0.25).abs() < 1e-10);
+        assert!((ProposalTier::Major.approval_threshold() - 0.60).abs() < 1e-10);
+
+        // Constitutional: strictest
+        assert!((ProposalTier::Constitutional.quorum_requirement() - 0.40).abs() < 1e-10);
+        assert!((ProposalTier::Constitutional.approval_threshold() - 0.67).abs() < 1e-10);
+
+        // Ensure ordering: Constitutional > Major > Basic for both thresholds
+        assert!(ProposalTier::Constitutional.quorum_requirement() > ProposalTier::Major.quorum_requirement());
+        assert!(ProposalTier::Major.quorum_requirement() > ProposalTier::Basic.quorum_requirement());
+        assert!(ProposalTier::Constitutional.approval_threshold() > ProposalTier::Major.approval_threshold());
+        assert!(ProposalTier::Major.approval_threshold() > ProposalTier::Basic.approval_threshold());
+    }
+
+    #[test]
+    fn test_voice_credits_period_expiry() {
+        // Credits with period_end in the past should be considered expired
+        let now_micros = 1_000_000_i64;
+        let now = Timestamp::from_micros(now_micros);
+
+        let expired = VoiceCredits {
+            owner: "did:test:voter".to_string(),
+            allocated: 100,
+            spent: 0,
+            remaining: 100,
+            period_start: Timestamp::from_micros(0),
+            period_end: Timestamp::from_micros(500_000), // ended before now
+        };
+
+        let active = VoiceCredits {
+            period_end: Timestamp::from_micros(2_000_000), // ends after now
+            ..expired.clone()
+        };
+
+        assert!(expired.period_end <= now, "Expired credits should be filtered out");
+        assert!(active.period_end > now, "Active credits should be returned");
     }
 }

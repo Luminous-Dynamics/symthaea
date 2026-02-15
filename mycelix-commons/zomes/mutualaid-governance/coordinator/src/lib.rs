@@ -26,3 +26,359 @@ pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vote".into())))
 }
+
+#[cfg(test)]
+mod tests {
+    #[allow(unused_imports)]
+    use super::*;
+    use mutualaid_common::{
+        MemberRole, MemberStatus, ProposalStatus, ProposalType,
+        RuleCategory, VoteChoice, VotingMethod,
+    };
+
+    // ── Integrity enum serde roundtrip tests ──────────────────────────
+
+    #[test]
+    fn proposal_type_all_variants_serde() {
+        let variants = vec![
+            ProposalType::AddRule,
+            ProposalType::ModifyRule,
+            ProposalType::RemoveRule,
+            ProposalType::CreditLimitChange,
+            ProposalType::MemberAdmission,
+            ProposalType::MemberStatusChange,
+            ProposalType::ResourcePolicy,
+            ProposalType::GeneralDecision,
+            ProposalType::Emergency,
+            ProposalType::Custom("special".to_string()),
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: ProposalType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn voting_method_all_variants_serde() {
+        let variants = vec![
+            VotingMethod::Majority,
+            VotingMethod::Supermajority,
+            VotingMethod::Consensus,
+            VotingMethod::ConsentBased,
+            VotingMethod::ContributionWeighted,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: VotingMethod = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn proposal_status_all_variants_serde() {
+        let variants = vec![
+            ProposalStatus::Draft,
+            ProposalStatus::Discussion,
+            ProposalStatus::Voting,
+            ProposalStatus::Passed,
+            ProposalStatus::Failed,
+            ProposalStatus::Implemented,
+            ProposalStatus::Withdrawn,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: ProposalStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn vote_choice_all_variants_serde() {
+        let variants = vec![
+            VoteChoice::Yes,
+            VoteChoice::No,
+            VoteChoice::Abstain,
+            VoteChoice::Block,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: VoteChoice = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn member_role_all_variants_serde() {
+        let variants = vec![
+            MemberRole::Member,
+            MemberRole::Steward,
+            MemberRole::ResourceManager,
+            MemberRole::Treasurer,
+            MemberRole::Facilitator,
+            MemberRole::Founder,
+            MemberRole::Custom("Elder".to_string()),
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: MemberRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn member_status_all_variants_serde() {
+        let variants = vec![
+            MemberStatus::Pending,
+            MemberStatus::Active,
+            MemberStatus::Inactive,
+            MemberStatus::Suspended,
+            MemberStatus::Departed,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: MemberStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn rule_category_all_variants_serde() {
+        let variants = vec![
+            RuleCategory::Membership,
+            RuleCategory::Credits,
+            RuleCategory::Resources,
+            RuleCategory::Conduct,
+            RuleCategory::Governance,
+            RuleCategory::Disputes,
+            RuleCategory::Privacy,
+            RuleCategory::Custom("Safety".to_string()),
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: RuleCategory = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // Proposal serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn proposal_full_serde_roundtrip() {
+        let proposal = Proposal {
+            id: "prop-001".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Increase credit limit".to_string(),
+            description: "Raise the default limit to 1000".to_string(),
+            proposal_type: ProposalType::CreditLimitChange,
+            modifies_rule: Some(ActionHash::from_raw_36(vec![1u8; 36])),
+            voting_method: VotingMethod::Supermajority,
+            quorum_percent: 75,
+            threshold_percent: 66,
+            voting_starts: Timestamp::from_micros(1000000),
+            voting_ends: Timestamp::from_micros(2000000),
+            status: ProposalStatus::Voting,
+            created_at: Timestamp::from_micros(1000000),
+        };
+        let json = serde_json::to_string(&proposal).unwrap();
+        let decoded: Proposal = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "prop-001");
+        assert_eq!(decoded.proposal_type, ProposalType::CreditLimitChange);
+        assert_eq!(decoded.quorum_percent, 75);
+        assert!(decoded.modifies_rule.is_some());
+    }
+
+    #[test]
+    fn proposal_minimal_serde_roundtrip() {
+        let proposal = Proposal {
+            id: "p".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "T".to_string(),
+            description: "D".to_string(),
+            proposal_type: ProposalType::GeneralDecision,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 0,
+            threshold_percent: 0,
+            voting_starts: Timestamp::from_micros(0),
+            voting_ends: Timestamp::from_micros(0),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&proposal).unwrap();
+        let decoded: Proposal = serde_json::from_str(&json).unwrap();
+        assert!(decoded.modifies_rule.is_none());
+        assert_eq!(decoded.quorum_percent, 0);
+        assert_eq!(decoded.threshold_percent, 0);
+    }
+
+    // ========================================================================
+    // Vote serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn vote_with_reasoning_serde_roundtrip() {
+        let vote = Vote {
+            proposal_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            voter: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            vote: VoteChoice::Yes,
+            reasoning: Some("I support this change".to_string()),
+            voted_at: Timestamp::from_micros(1500000),
+        };
+        let json = serde_json::to_string(&vote).unwrap();
+        let decoded: Vote = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.vote, VoteChoice::Yes);
+        assert_eq!(decoded.reasoning, Some("I support this change".to_string()));
+    }
+
+    #[test]
+    fn vote_without_reasoning_serde_roundtrip() {
+        let vote = Vote {
+            proposal_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            voter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            vote: VoteChoice::Abstain,
+            reasoning: None,
+            voted_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&vote).unwrap();
+        let decoded: Vote = serde_json::from_str(&json).unwrap();
+        assert!(decoded.reasoning.is_none());
+        assert_eq!(decoded.vote, VoteChoice::Abstain);
+    }
+
+    // ========================================================================
+    // Clone/equality tests
+    // ========================================================================
+
+    #[test]
+    fn proposal_clone_equals_original() {
+        let proposal = Proposal {
+            id: "prop-clone".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "Clone test".to_string(),
+            description: "Test".to_string(),
+            proposal_type: ProposalType::Emergency,
+            modifies_rule: None,
+            voting_method: VotingMethod::Consensus,
+            quorum_percent: 100,
+            threshold_percent: 100,
+            voting_starts: Timestamp::from_micros(0),
+            voting_ends: Timestamp::from_micros(0),
+            status: ProposalStatus::Draft,
+            created_at: Timestamp::from_micros(0),
+        };
+        assert_eq!(proposal, proposal.clone());
+    }
+
+    #[test]
+    fn vote_clone_equals_original() {
+        let vote = Vote {
+            proposal_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            voter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            vote: VoteChoice::Block,
+            reasoning: Some("Strong objection".to_string()),
+            voted_at: Timestamp::from_micros(0),
+        };
+        assert_eq!(vote, vote.clone());
+    }
+
+    #[test]
+    fn proposal_ne_different_status() {
+        let a = Proposal {
+            id: "p".to_string(),
+            proposer: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            title: "T".to_string(),
+            description: "D".to_string(),
+            proposal_type: ProposalType::AddRule,
+            modifies_rule: None,
+            voting_method: VotingMethod::Majority,
+            quorum_percent: 50,
+            threshold_percent: 51,
+            voting_starts: Timestamp::from_micros(0),
+            voting_ends: Timestamp::from_micros(0),
+            status: ProposalStatus::Voting,
+            created_at: Timestamp::from_micros(0),
+        };
+        let mut b = a.clone();
+        b.status = ProposalStatus::Passed;
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn vote_ne_different_choice() {
+        let a = Vote {
+            proposal_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            voter: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            vote: VoteChoice::Yes,
+            reasoning: None,
+            voted_at: Timestamp::from_micros(0),
+        };
+        let mut b = a.clone();
+        b.vote = VoteChoice::No;
+        assert_ne!(a, b);
+    }
+
+    // ========================================================================
+    // Edge case tests
+    // ========================================================================
+
+    #[test]
+    fn proposal_type_custom_empty_string_serde() {
+        let pt = ProposalType::Custom("".to_string());
+        let json = serde_json::to_string(&pt).unwrap();
+        let decoded: ProposalType = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, ProposalType::Custom("".to_string()));
+    }
+
+    #[test]
+    fn proposal_type_custom_unicode_serde() {
+        let pt = ProposalType::Custom("\u{6C11}\u{4E3B}\u{7684}\u{6C7A}\u{5B9A}".to_string());
+        let json = serde_json::to_string(&pt).unwrap();
+        let decoded: ProposalType = serde_json::from_str(&json).unwrap();
+        if let ProposalType::Custom(s) = decoded {
+            assert_eq!(s, "\u{6C11}\u{4E3B}\u{7684}\u{6C7A}\u{5B9A}");
+        } else {
+            panic!("Expected Custom variant");
+        }
+    }
+
+    #[test]
+    fn member_role_custom_empty_string_serde() {
+        let mr = MemberRole::Custom("".to_string());
+        let json = serde_json::to_string(&mr).unwrap();
+        let decoded: MemberRole = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, MemberRole::Custom("".to_string()));
+    }
+
+    #[test]
+    fn rule_category_custom_empty_string_serde() {
+        let rc = RuleCategory::Custom("".to_string());
+        let json = serde_json::to_string(&rc).unwrap();
+        let decoded: RuleCategory = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, RuleCategory::Custom("".to_string()));
+    }
+
+    #[test]
+    fn vote_choice_all_variants_clone_eq() {
+        for vc in [VoteChoice::Yes, VoteChoice::No, VoteChoice::Abstain, VoteChoice::Block] {
+            assert_eq!(vc, vc.clone());
+        }
+    }
+
+    #[test]
+    fn proposal_status_all_variants_clone_eq() {
+        for ps in [
+            ProposalStatus::Draft,
+            ProposalStatus::Discussion,
+            ProposalStatus::Voting,
+            ProposalStatus::Passed,
+            ProposalStatus::Failed,
+            ProposalStatus::Implemented,
+            ProposalStatus::Withdrawn,
+        ] {
+            assert_eq!(ps, ps.clone());
+        }
+    }
+}

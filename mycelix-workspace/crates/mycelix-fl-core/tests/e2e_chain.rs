@@ -12,13 +12,13 @@
 
 use std::collections::HashMap;
 
-use mycelix_fl_core::{
-    AggregatedGradient, AggregationMethod, GradientUpdate, PipelineConfig, UnifiedPipeline,
-    convert::{gradients_to_f32, gradients_to_f64, aggregated_to_f64, update_to_f32},
-};
-use mycelix_fl_core::plugins::{ByzantinePlugin, PipelinePlugins};
-use mycelix_fl_core::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
 use mycelix_fl_core::meta_learning::MetaLearningByzantinePlugin;
+use mycelix_fl_core::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
+use mycelix_fl_core::plugins::{ByzantinePlugin, PipelinePlugins};
+use mycelix_fl_core::{
+    convert::{aggregated_to_f64, gradients_to_f32, gradients_to_f64, update_to_f32},
+    AggregatedGradient, AggregationMethod, GradientUpdate, PipelineConfig, UnifiedPipeline,
+};
 
 /// Simulates Symthaea's `GradientMessage` (the f32 + [u8;32] ID format).
 /// In real Symthaea: `swarm::federated_cfc::GradientMessage`.
@@ -75,7 +75,9 @@ fn stage2_pipeline(
     config: PipelineConfig,
 ) -> mycelix_fl_core::pipeline::PipelineResult {
     let mut pipeline = UnifiedPipeline::new(config);
-    pipeline.aggregate(updates, reps).expect("Pipeline should succeed")
+    pipeline
+        .aggregate(updates, reps)
+        .expect("Pipeline should succeed")
 }
 
 /// Stage 3: SDK f64 conversion (simulates UnifiedPipelineF64)
@@ -89,17 +91,11 @@ fn stage4_sdk_creates_updates(
     participant_ids: &[String],
     model_version: u64,
 ) -> Vec<GradientUpdate> {
-    gradients_f64.iter().zip(participant_ids.iter()).map(|(g, pid)| {
-        update_to_f32(
-            pid.clone(),
-            model_version,
-            g,
-            100,
-            0.5,
-            None,
-            0,
-        )
-    }).collect()
+    gradients_f64
+        .iter()
+        .zip(participant_ids.iter())
+        .map(|(g, pid)| update_to_f32(pid.clone(), model_version, g, 100, 0.5, None, 0))
+        .collect()
 }
 
 // === Tests ===
@@ -126,7 +122,11 @@ fn test_e2e_stage1_symthaea_conversion() {
     assert_eq!(updates.len(), 1);
     assert_eq!(updates[0].gradients, vec![0.1, 0.2, 0.3]);
     let pid = &updates[0].participant_id;
-    assert!(pid.starts_with("abcd"), "Hex ID should start with abcd, got {}", pid);
+    assert!(
+        pid.starts_with("abcd"),
+        "Hex ID should start with abcd, got {}",
+        pid
+    );
     assert_eq!(*reps.get(pid).unwrap(), 0.9);
 }
 
@@ -141,7 +141,9 @@ fn test_e2e_full_chain_honest() {
     for i in 0..n_nodes {
         let mut id = [0u8; 32];
         id[0] = i as u8;
-        let gradients: Vec<f32> = (0..dim).map(|d| 0.1 + d as f32 * 0.01 + i as f32 * 0.001).collect();
+        let gradients: Vec<f32> = (0..dim)
+            .map(|d| 0.1 + d as f32 * 0.01 + i as f32 * 0.001)
+            .collect();
         messages.push(SimulatedGradientMessage {
             sender_id: id,
             model_version: 1,
@@ -174,7 +176,12 @@ fn test_e2e_full_chain_honest() {
     assert_eq!(f64_result.len(), dim);
     for (f32_val, f64_val) in result.aggregated.gradients.iter().zip(f64_result.iter()) {
         let error = (*f32_val as f64 - f64_val).abs();
-        assert!(error < 1e-6, "f32→f64 precision loss too high: {} vs {}", f32_val, f64_val);
+        assert!(
+            error < 1e-6,
+            "f32→f64 precision loss too high: {} vs {}",
+            f32_val,
+            f64_val
+        );
     }
 }
 
@@ -203,7 +210,9 @@ fn test_e2e_full_chain_with_byzantine() {
     for i in 0..3 {
         let mut id = [0u8; 32];
         id[0] = (100 + i) as u8;
-        let gradients: Vec<f32> = (0..dim).map(|_| if i % 2 == 0 { 100.0 } else { -100.0 }).collect();
+        let gradients: Vec<f32> = (0..dim)
+            .map(|_| if i % 2 == 0 { 100.0 } else { -100.0 })
+            .collect();
         messages.push(SimulatedGradientMessage {
             sender_id: id,
             model_version: 1,
@@ -219,7 +228,11 @@ fn test_e2e_full_chain_with_byzantine() {
 
     // Byzantine should be gated out (rep 0.15 < min_rep 0.3)
     for val in &result.aggregated.gradients {
-        assert!((*val - 0.5).abs() < 1.0, "Byzantine influence leaked: {}", val);
+        assert!(
+            (*val - 0.5).abs() < 1.0,
+            "Byzantine influence leaked: {}",
+            val
+        );
     }
 }
 
@@ -227,9 +240,13 @@ fn test_e2e_full_chain_with_byzantine() {
 fn test_e2e_sdk_f64_roundtrip() {
     // Simulate SDK creating updates in f64, converting to f32 for core, getting f64 result
     let participant_ids: Vec<String> = (0..5).map(|i| format!("node_{}", i)).collect();
-    let gradients_f64: Vec<Vec<f64>> = (0..5).map(|i| {
-        (0..10).map(|d| 0.1 + d as f64 * 0.01 + i as f64 * 0.001).collect()
-    }).collect();
+    let gradients_f64: Vec<Vec<f64>> = (0..5)
+        .map(|i| {
+            (0..10)
+                .map(|d| 0.1 + d as f64 * 0.01 + i as f64 * 0.001)
+                .collect()
+        })
+        .collect();
 
     // SDK converts to f32 for core
     let updates = stage4_sdk_creates_updates(&gradients_f64, &participant_ids, 1);
@@ -270,9 +287,14 @@ fn test_e2e_sdk_f64_roundtrip() {
         } else {
             (exp - actual).abs()
         };
-        assert!(rel_err < 1e-4,
+        assert!(
+            rel_err < 1e-4,
             "Roundtrip dim {}: expected {:.8e}, got {:.8e} (rel_err={:.2e})",
-            i, exp, actual, rel_err);
+            i,
+            exp,
+            actual,
+            rel_err
+        );
     }
 }
 
@@ -292,8 +314,11 @@ fn test_e2e_with_meta_learning_plugin() {
         // 6 honest
         for i in 0..6 {
             updates.push(GradientUpdate::new(
-                format!("h{}", i), round as u64 + 1,
-                vec![0.5; dim], 100, 0.5,
+                format!("h{}", i),
+                round as u64 + 1,
+                vec![0.5; dim],
+                100,
+                0.5,
             ));
             reps.insert(format!("h{}", i), 0.9);
         }
@@ -301,8 +326,11 @@ fn test_e2e_with_meta_learning_plugin() {
         // 2 Byzantine
         for i in 0..2 {
             updates.push(GradientUpdate::new(
-                format!("byz{}", i), round as u64 + 1,
-                vec![if i == 0 { 100.0 } else { -100.0 }; dim], 100, 0.5,
+                format!("byz{}", i),
+                round as u64 + 1,
+                vec![if i == 0 { 100.0 } else { -100.0 }; dim],
+                100,
+                0.5,
             ));
             reps.insert(format!("byz{}", i), 0.15);
         }
@@ -313,21 +341,33 @@ fn test_e2e_with_meta_learning_plugin() {
             verification: None,
         };
 
-        let result = pipeline.aggregate_with_plugins(&updates, &reps, &mut plugins)
+        let result = pipeline
+            .aggregate_with_plugins(&updates, &reps, &mut plugins)
             .expect("Pipeline should succeed");
 
         // Result should be near honest mean
         for val in &result.result.aggregated.gradients {
-            assert!((*val - 0.5).abs() < 1.0, "Round {}: value {} too far from 0.5", round, val);
+            assert!(
+                (*val - 0.5).abs() < 1.0,
+                "Round {}: value {} too far from 0.5",
+                round,
+                val
+            );
         }
     }
 
     // After 5 rounds, meta plugin should have tracked participants
     let byz_profile = meta_plugin.get_participant_profile("byz0");
-    assert!(byz_profile.is_some(), "Should have tracked Byzantine participant");
+    assert!(
+        byz_profile.is_some(),
+        "Should have tracked Byzantine participant"
+    );
 
     let honest_profile = meta_plugin.get_participant_profile("h0");
-    assert!(honest_profile.is_some(), "Should have tracked honest participant");
+    assert!(
+        honest_profile.is_some(),
+        "Should have tracked honest participant"
+    );
 }
 
 #[cfg(feature = "holochain")]
@@ -342,7 +382,11 @@ mod holochain_tests {
         let mut reps = HashMap::new();
         for i in 0..5 {
             updates.push(GradientUpdate::new(
-                format!("node_{}", i), 1, vec![0.5; 10], 100, 0.5,
+                format!("node_{}", i),
+                1,
+                vec![0.5; 10],
+                100,
+                0.5,
             ));
             reps.insert(format!("node_{}", i), 0.9);
         }
@@ -354,7 +398,10 @@ mod holochain_tests {
         let training_round = ZomeTrainingRound::from_pipeline_result(&result, 1, &updates);
         assert_eq!(training_round.round_number, 1);
         assert_eq!(training_round.model_version, 1);
-        assert_eq!(training_round.participant_count as usize, result.aggregated.participant_count);
+        assert_eq!(
+            training_round.participant_count as usize,
+            result.aggregated.participant_count
+        );
 
         // Convert individual updates to gradient entries
         for update in &updates {
@@ -380,8 +427,11 @@ fn test_e2e_deterministic() {
         let mut reps = HashMap::new();
         for i in 0..5 {
             updates.push(GradientUpdate::new(
-                format!("n{}", i), 1,
-                vec![0.1 * (i as f32 + 1.0); 10], 100, 0.5,
+                format!("n{}", i),
+                1,
+                vec![0.1 * (i as f32 + 1.0); 10],
+                100,
+                0.5,
             ));
             reps.insert(format!("n{}", i), 0.85);
         }
@@ -400,7 +450,12 @@ fn test_e2e_deterministic() {
     let result1 = stage2_pipeline(&u1, &r1, config.clone());
     let result2 = stage2_pipeline(&u2, &r2, config);
 
-    assert_eq!(result1.aggregated.gradients, result2.aggregated.gradients,
-        "Same inputs should produce identical outputs");
-    assert_eq!(result1.aggregated.participant_count, result2.aggregated.participant_count);
+    assert_eq!(
+        result1.aggregated.gradients, result2.aggregated.gradients,
+        "Same inputs should produce identical outputs"
+    );
+    assert_eq!(
+        result1.aggregated.participant_count,
+        result2.aggregated.participant_count
+    );
 }

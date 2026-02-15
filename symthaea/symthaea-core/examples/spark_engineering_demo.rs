@@ -8,10 +8,7 @@
 //! Run with: cargo run --example spark_engineering_demo
 
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_core::physics::{
-    CoupledPhysicsEngine, OperatingConditions,
-    PrototypeSpecification,
-};
+use symthaea_core::physics::{CoupledPhysicsEngine, OperatingConditions, PrototypeSpecification};
 
 fn main() {
     println!("\n");
@@ -36,8 +33,14 @@ fn main() {
     println!("Target Specifications:");
     println!("  Power: {:.0} kW thermal", consumer_conditions.power_kw);
     println!("  Fuel: {:?}", consumer_conditions.reaction);
-    println!("  Lifetime: {:.0} years", consumer_conditions.target_lifetime_years);
-    println!("  Max dose rate: {:.4} mSv/hr", consumer_conditions.max_dose_rate);
+    println!(
+        "  Lifetime: {:.0} years",
+        consumer_conditions.target_lifetime_years
+    );
+    println!(
+        "  Max dose rate: {:.4} mSv/hr",
+        consumer_conditions.max_dose_rate
+    );
     println!();
 
     // Run coupled simulation
@@ -53,35 +56,75 @@ fn main() {
     println!("    Core: {}", consumer_result.core_material);
     println!();
     println!("  Thermal Profile:");
-    println!("    Max temperature: {:.0} K ({:.0}°C)",
-             consumer_result.thermal_profile.t_max,
-             consumer_result.thermal_profile.t_max - 273.15);
-    println!("    Surface temperature: {:.0} K ({:.0}°C)",
-             consumer_result.thermal_profile.t_shell_outer,
-             consumer_result.thermal_profile.t_shell_outer - 273.15);
-    println!("    Effective healing rate: {:.2e} DPA/s", consumer_result.effective_healing_rate);
+    println!(
+        "    Max temperature: {:.0} K ({:.0}°C)",
+        consumer_result.thermal_profile.t_max,
+        consumer_result.thermal_profile.t_max - 273.15
+    );
+    println!(
+        "    Surface temperature: {:.0} K ({:.0}°C)",
+        consumer_result.thermal_profile.t_shell_outer,
+        consumer_result.thermal_profile.t_shell_outer - 273.15
+    );
+    println!(
+        "    Effective healing rate: {:.2e} DPA/s",
+        consumer_result.effective_healing_rate
+    );
     println!();
     println!("  Geometry & Shielding:");
-    println!("    Core radius: {:.1} cm", consumer_result.geometry_shielding.geometry.core_radius * 100.0);
-    println!("    Total radius: {:.1} cm", consumer_result.geometry_shielding.geometry.outer_radius * 100.0);
-    println!("    Shielding: {} @ {:.1} cm",
-             consumer_result.geometry_shielding.shielding.primary_material,
-             consumer_result.geometry_shielding.shielding.thickness_m * 100.0);
-    println!("    System mass: {:.1} kg", consumer_result.geometry_shielding.total_mass_kg);
+    println!(
+        "    Core radius: {:.1} cm",
+        consumer_result.geometry_shielding.geometry.core_radius * 100.0
+    );
+    println!(
+        "    Total radius: {:.1} cm",
+        consumer_result.geometry_shielding.geometry.outer_radius * 100.0
+    );
+    println!(
+        "    Shielding: {} @ {:.1} cm",
+        consumer_result
+            .geometry_shielding
+            .shielding
+            .primary_material,
+        consumer_result.geometry_shielding.shielding.thickness_m * 100.0
+    );
+    println!(
+        "    System mass: {:.1} kg",
+        consumer_result.geometry_shielding.total_mass_kg
+    );
     println!();
     println!("  Lifetime Analysis:");
-    println!("    Operating mode: Pulsed @ {:.0}% duty",
-             consumer_result.pulse_thermal.pulse.duty_cycle * 100.0);
-    println!("    Equilibrium DPA: {:.2}", consumer_result.pulse_thermal.equilibrium_dpa);
-    println!("    Radiation lifetime: {} years",
-             format_lifetime(consumer_result.pulse_thermal.lifetime_years));
-    println!("    Fatigue lifetime: {} years",
-             format_lifetime(consumer_result.pulse_thermal.fatigue_lifetime_years));
-    println!("    Limiting factor: {:?}", consumer_result.pulse_thermal.limiting_factor);
+    println!(
+        "    Operating mode: Pulsed @ {:.0}% duty",
+        consumer_result.pulse_thermal.pulse.duty_cycle * 100.0
+    );
+    println!(
+        "    Equilibrium DPA: {:.2}",
+        consumer_result.pulse_thermal.equilibrium_dpa
+    );
+    println!(
+        "    Radiation lifetime: {} years",
+        format_lifetime(consumer_result.pulse_thermal.lifetime_years)
+    );
+    println!(
+        "    Fatigue lifetime: {} years",
+        format_lifetime(consumer_result.pulse_thermal.fatigue_lifetime_years)
+    );
+    println!(
+        "    Limiting factor: {:?}",
+        consumer_result.pulse_thermal.limiting_factor
+    );
     println!();
 
     // Assessment
-    println!("  Assessment: {}", if consumer_result.feasible { "✓ FEASIBLE" } else { "✗ NEEDS REVISION" });
+    println!(
+        "  Assessment: {}",
+        if consumer_result.feasible {
+            "✓ FEASIBLE"
+        } else {
+            "✗ NEEDS REVISION"
+        }
+    );
     if !consumer_result.limiting_factors.is_empty() {
         println!("  Issues:");
         for factor in &consumer_result.limiting_factors {
@@ -111,10 +154,19 @@ fn main() {
 
     let industrial_conditions = OperatingConditions::industrial();
     println!("Target Specifications:");
-    println!("  Power: {:.0} MW thermal", industrial_conditions.power_kw / 1000.0);
+    println!(
+        "  Power: {:.0} MW thermal",
+        industrial_conditions.power_kw / 1000.0
+    );
     println!("  Fuel: {:?}", industrial_conditions.reaction);
-    println!("  Lifetime: {:.0} years", industrial_conditions.target_lifetime_years);
-    println!("  Max dose rate: {:.4} mSv/hr (occupational)", industrial_conditions.max_dose_rate);
+    println!(
+        "  Lifetime: {:.0} years",
+        industrial_conditions.target_lifetime_years
+    );
+    println!(
+        "  Max dose rate: {:.4} mSv/hr (occupational)",
+        industrial_conditions.max_dose_rate
+    );
     println!();
 
     println!("Running coupled multi-physics simulation...");
@@ -128,33 +180,63 @@ fn main() {
     println!("    Core: {}", industrial_result.core_material);
     println!();
     println!("  Thermal Profile:");
-    println!("    Max temperature: {:.0} K ({:.0}°C)",
-             industrial_result.thermal_profile.t_max,
-             industrial_result.thermal_profile.t_max - 273.15);
-    println!("    Surface temperature: {:.0} K ({:.0}°C)",
-             industrial_result.thermal_profile.t_shell_outer,
-             industrial_result.thermal_profile.t_shell_outer - 273.15);
+    println!(
+        "    Max temperature: {:.0} K ({:.0}°C)",
+        industrial_result.thermal_profile.t_max,
+        industrial_result.thermal_profile.t_max - 273.15
+    );
+    println!(
+        "    Surface temperature: {:.0} K ({:.0}°C)",
+        industrial_result.thermal_profile.t_shell_outer,
+        industrial_result.thermal_profile.t_shell_outer - 273.15
+    );
     println!();
     println!("  Geometry & Shielding:");
-    println!("    Core radius: {:.1} m", industrial_result.geometry_shielding.geometry.core_radius);
-    println!("    Total radius: {:.1} m", industrial_result.geometry_shielding.geometry.outer_radius);
-    println!("    Shielding: {} @ {:.1} cm",
-             industrial_result.geometry_shielding.shielding.primary_material,
-             industrial_result.geometry_shielding.shielding.thickness_m * 100.0);
-    println!("    System mass: {:.0} kg ({:.1} tonnes)",
-             industrial_result.geometry_shielding.total_mass_kg,
-             industrial_result.geometry_shielding.total_mass_kg / 1000.0);
+    println!(
+        "    Core radius: {:.1} m",
+        industrial_result.geometry_shielding.geometry.core_radius
+    );
+    println!(
+        "    Total radius: {:.1} m",
+        industrial_result.geometry_shielding.geometry.outer_radius
+    );
+    println!(
+        "    Shielding: {} @ {:.1} cm",
+        industrial_result
+            .geometry_shielding
+            .shielding
+            .primary_material,
+        industrial_result.geometry_shielding.shielding.thickness_m * 100.0
+    );
+    println!(
+        "    System mass: {:.0} kg ({:.1} tonnes)",
+        industrial_result.geometry_shielding.total_mass_kg,
+        industrial_result.geometry_shielding.total_mass_kg / 1000.0
+    );
     println!();
     println!("  Lifetime Analysis:");
-    println!("    Operating mode: Pulsed @ {:.0}% duty",
-             industrial_result.pulse_thermal.pulse.duty_cycle * 100.0);
-    println!("    Radiation lifetime: {} years",
-             format_lifetime(industrial_result.pulse_thermal.lifetime_years));
-    println!("    Fatigue lifetime: {} years",
-             format_lifetime(industrial_result.pulse_thermal.fatigue_lifetime_years));
+    println!(
+        "    Operating mode: Pulsed @ {:.0}% duty",
+        industrial_result.pulse_thermal.pulse.duty_cycle * 100.0
+    );
+    println!(
+        "    Radiation lifetime: {} years",
+        format_lifetime(industrial_result.pulse_thermal.lifetime_years)
+    );
+    println!(
+        "    Fatigue lifetime: {} years",
+        format_lifetime(industrial_result.pulse_thermal.fatigue_lifetime_years)
+    );
     println!();
 
-    println!("  Assessment: {}", if industrial_result.feasible { "✓ FEASIBLE" } else { "✗ NEEDS REVISION" });
+    println!(
+        "  Assessment: {}",
+        if industrial_result.feasible {
+            "✓ FEASIBLE"
+        } else {
+            "✗ NEEDS REVISION"
+        }
+    );
     if !industrial_result.limiting_factors.is_empty() {
         println!("  Issues:");
         for factor in &industrial_result.limiting_factors {
@@ -177,48 +259,77 @@ fn main() {
     println!("║                     DESIGN COMPARISON SUMMARY                        ║");
     println!("╚══════════════════════════════════════════════════════════════════════╝");
     println!();
-    println!("{:30} {:>20} {:>20}", "Parameter", "Consumer (5 kW)", "Industrial (100 MW)");
+    println!(
+        "{:30} {:>20} {:>20}",
+        "Parameter", "Consumer (5 kW)", "Industrial (100 MW)"
+    );
     println!("{}", "─".repeat(70));
-    println!("{:30} {:>20} {:>20}",
-             "Model",
-             consumer_spec.model.full_name(),
-             industrial_spec.model.full_name());
-    println!("{:30} {:>20.1} {:>20.1}",
-             "Thermal Power (kW)",
-             consumer_spec.thermal_power_kw,
-             industrial_spec.thermal_power_kw);
-    println!("{:30} {:>20.1} {:>20.1}",
-             "Electrical Output (kW)",
-             consumer_spec.electrical_output_kw,
-             industrial_spec.electrical_output_kw);
-    println!("{:30} {:>20.1} {:>20.1}",
-             "Total Diameter (m)",
-             consumer_result.geometry_shielding.geometry.outer_radius * 2.0,
-             industrial_result.geometry_shielding.geometry.outer_radius * 2.0);
-    println!("{:30} {:>20.1} {:>20.1}",
-             "System Mass (kg)",
-             consumer_result.geometry_shielding.total_mass_kg,
-             industrial_result.geometry_shielding.total_mass_kg);
-    println!("{:30} {:>20} {:>20}",
-             "Predicted Lifetime",
-             format_lifetime(consumer_result.pulse_thermal.lifetime_years),
-             format_lifetime(industrial_result.pulse_thermal.lifetime_years));
-    println!("{:30} {:>17.0} USD {:>17.0} USD",
-             "Est. Material Cost",
-             consumer_spec.total_material_cost_usd,
-             industrial_spec.total_material_cost_usd);
-    println!("{:30} {:>17.0} USD {:>17.0} USD",
-             "Est. Total Cost",
-             consumer_spec.estimated_total_cost_usd,
-             industrial_spec.estimated_total_cost_usd);
-    println!("{:30} {:>15.0} USD/kW {:>15.0} USD/kW",
-             "Cost per kW",
-             consumer_spec.estimated_total_cost_usd / consumer_spec.thermal_power_kw,
-             industrial_spec.estimated_total_cost_usd / industrial_spec.thermal_power_kw);
-    println!("{:30} {:>20} {:>20}",
-             "Feasibility",
-             if consumer_result.feasible { "✓ YES" } else { "✗ NO" },
-             if industrial_result.feasible { "✓ YES" } else { "✗ NO" });
+    println!(
+        "{:30} {:>20} {:>20}",
+        "Model",
+        consumer_spec.model.full_name(),
+        industrial_spec.model.full_name()
+    );
+    println!(
+        "{:30} {:>20.1} {:>20.1}",
+        "Thermal Power (kW)", consumer_spec.thermal_power_kw, industrial_spec.thermal_power_kw
+    );
+    println!(
+        "{:30} {:>20.1} {:>20.1}",
+        "Electrical Output (kW)",
+        consumer_spec.electrical_output_kw,
+        industrial_spec.electrical_output_kw
+    );
+    println!(
+        "{:30} {:>20.1} {:>20.1}",
+        "Total Diameter (m)",
+        consumer_result.geometry_shielding.geometry.outer_radius * 2.0,
+        industrial_result.geometry_shielding.geometry.outer_radius * 2.0
+    );
+    println!(
+        "{:30} {:>20.1} {:>20.1}",
+        "System Mass (kg)",
+        consumer_result.geometry_shielding.total_mass_kg,
+        industrial_result.geometry_shielding.total_mass_kg
+    );
+    println!(
+        "{:30} {:>20} {:>20}",
+        "Predicted Lifetime",
+        format_lifetime(consumer_result.pulse_thermal.lifetime_years),
+        format_lifetime(industrial_result.pulse_thermal.lifetime_years)
+    );
+    println!(
+        "{:30} {:>17.0} USD {:>17.0} USD",
+        "Est. Material Cost",
+        consumer_spec.total_material_cost_usd,
+        industrial_spec.total_material_cost_usd
+    );
+    println!(
+        "{:30} {:>17.0} USD {:>17.0} USD",
+        "Est. Total Cost",
+        consumer_spec.estimated_total_cost_usd,
+        industrial_spec.estimated_total_cost_usd
+    );
+    println!(
+        "{:30} {:>15.0} USD/kW {:>15.0} USD/kW",
+        "Cost per kW",
+        consumer_spec.estimated_total_cost_usd / consumer_spec.thermal_power_kw,
+        industrial_spec.estimated_total_cost_usd / industrial_spec.thermal_power_kw
+    );
+    println!(
+        "{:30} {:>20} {:>20}",
+        "Feasibility",
+        if consumer_result.feasible {
+            "✓ YES"
+        } else {
+            "✗ NO"
+        },
+        if industrial_result.feasible {
+            "✓ YES"
+        } else {
+            "✗ NO"
+        }
+    );
     println!();
 
     // Final notes

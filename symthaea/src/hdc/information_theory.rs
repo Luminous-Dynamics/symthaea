@@ -328,10 +328,22 @@ pub fn real_hv_joint_distribution(
         return (vec![1.0 / size as f64; size], num_bins);
     }
 
-    let min_a = a.values[..len].iter().cloned().fold(f32::INFINITY, f32::min);
-    let max_a = a.values[..len].iter().cloned().fold(f32::NEG_INFINITY, f32::max);
-    let min_b = b.values[..len].iter().cloned().fold(f32::INFINITY, f32::min);
-    let max_b = b.values[..len].iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let min_a = a.values[..len]
+        .iter()
+        .cloned()
+        .fold(f32::INFINITY, f32::min);
+    let max_a = a.values[..len]
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
+    let min_b = b.values[..len]
+        .iter()
+        .cloned()
+        .fold(f32::INFINITY, f32::min);
+    let max_b = b.values[..len]
+        .iter()
+        .cloned()
+        .fold(f32::NEG_INFINITY, f32::max);
 
     let range_a = (max_a - min_a) as f64;
     let range_b = (max_b - min_b) as f64;
@@ -523,11 +535,7 @@ impl TransferEntropyEstimator {
     ///
     /// which is equivalent to:
     ///   TE = H(target_t | target_past) - H(target_t | target_past, source_past)
-    fn estimate_te(
-        &self,
-        source: &VecDeque<f64>,
-        target: &VecDeque<f64>,
-    ) -> Option<f64> {
+    fn estimate_te(&self, source: &VecDeque<f64>, target: &VecDeque<f64>) -> Option<f64> {
         let k = self.config.history_length;
         let n = source.len();
         if n < k + 1 {
@@ -753,10 +761,8 @@ mod tests {
         let ny = 5;
         // Construct an arbitrary joint distribution
         let raw = vec![
-            0.02, 0.03, 0.01, 0.04, 0.05,
-            0.06, 0.01, 0.02, 0.03, 0.02,
-            0.04, 0.05, 0.03, 0.01, 0.02,
-            0.07, 0.04, 0.08, 0.06, 0.31,
+            0.02, 0.03, 0.01, 0.04, 0.05, 0.06, 0.01, 0.02, 0.03, 0.02, 0.04, 0.05, 0.03, 0.01,
+            0.02, 0.07, 0.04, 0.08, 0.06, 0.31,
         ];
         // Verify it sums to 1
         let sum: f64 = raw.iter().sum();
@@ -782,10 +788,7 @@ mod tests {
     #[test]
     fn mi_nonnegative() {
         // MI is always >= 0
-        let joint = vec![
-            0.1, 0.05, 0.15,
-            0.2, 0.3, 0.2,
-        ];
+        let joint = vec![0.1, 0.05, 0.15, 0.2, 0.3, 0.2];
         let mi = mutual_information(&joint, 3, EPS);
         assert!(mi >= 0.0, "MI must be non-negative, got {mi}");
     }
@@ -827,7 +830,7 @@ mod tests {
         let nx = 3;
         let ny = 4;
         let px = vec![0.2, 0.5, 0.3];
-        let py = vec![0.1, 0.2, 0.3, 0.4];
+        let py = [0.1, 0.2, 0.3, 0.4];
         let mut joint = vec![0.0_f64; nx * ny];
         for x in 0..nx {
             for y in 0..ny {
@@ -867,11 +870,7 @@ mod tests {
         let ny = 3;
         let nz = 1;
         // Just a 2D joint embedded in 3D with nz=1
-        let joint_2d = vec![
-            0.15, 0.05, 0.10,
-            0.05, 0.25, 0.05,
-            0.10, 0.05, 0.20,
-        ];
+        let joint_2d = vec![0.15, 0.05, 0.10, 0.05, 0.25, 0.05, 0.10, 0.05, 0.20];
         // Same thing as a 3D joint with nz=1
         let joint_3d = joint_2d.clone(); // shape (3, 3, 1)
 
@@ -943,7 +942,10 @@ mod tests {
 
     #[test]
     fn real_hv_uniform_has_high_entropy() {
-        let config = InformationTheoryConfig { num_bins: 16, ..Default::default() };
+        let config = InformationTheoryConfig {
+            num_bins: 16,
+            ..Default::default()
+        };
         // Construct a "uniform-like" ContinuousHV by spanning [-1, 1] evenly
         let dim = 1024;
         let values: Vec<f32> = (0..dim)
@@ -971,7 +973,10 @@ mod tests {
 
     #[test]
     fn real_hv_mi_identical_equals_entropy() {
-        let config = InformationTheoryConfig { num_bins: 16, ..Default::default() };
+        let config = InformationTheoryConfig {
+            num_bins: 16,
+            ..Default::default()
+        };
         let hv = ContinuousHV::random(512, 42);
         let h = entropy_real_hv(&hv, &config);
         let mi = mi_real_hv(&hv, &hv, &config);
@@ -983,7 +988,10 @@ mod tests {
 
     #[test]
     fn real_hv_mi_symmetry() {
-        let config = InformationTheoryConfig { num_bins: 16, ..Default::default() };
+        let config = InformationTheoryConfig {
+            num_bins: 16,
+            ..Default::default()
+        };
         let a = ContinuousHV::random(256, 10);
         let b = ContinuousHV::random(256, 20);
         let mi_ab = mi_real_hv(&a, &b, &config);
@@ -1012,8 +1020,12 @@ mod tests {
         let mut y_val = 0.3_f64;
         for i in 0..2000 {
             // Independent pseudo-random walks
-            x_val = (x_val * 6364136223846793005u64 as f64 + (i as f64)).sin().abs();
-            y_val = (y_val * 1442695040888963407u64 as f64 + (i as f64 + 100.0)).cos().abs();
+            x_val = (x_val * 6364136223846793005u64 as f64 + (i as f64))
+                .sin()
+                .abs();
+            y_val = (y_val * 1442695040888963407u64 as f64 + (i as f64 + 100.0))
+                .cos()
+                .abs();
             est.observe_scalars(x_val, y_val);
         }
 
@@ -1108,9 +1120,7 @@ mod tests {
         let nx = 3;
         let ny = 4;
         let joint = vec![
-            0.05, 0.10, 0.05, 0.05,
-            0.10, 0.05, 0.10, 0.10,
-            0.05, 0.10, 0.05, 0.15,
+            0.05, 0.10, 0.05, 0.05, 0.10, 0.05, 0.10, 0.10, 0.05, 0.10, 0.05, 0.15,
         ];
         let h_xy = joint_entropy(&joint, EPS);
         let mx = marginal_row(&joint, nx, ny);

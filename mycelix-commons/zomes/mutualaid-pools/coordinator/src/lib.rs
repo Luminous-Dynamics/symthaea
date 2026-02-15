@@ -706,3 +706,320 @@ pub fn update_pool_status(input: UpdatePoolStatusInput) -> ExternResult<PoolWith
         pool,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── Input struct serde roundtrip tests ─────────────────────────────
+
+    #[test]
+    fn create_pool_input_serde_roundtrip() {
+        let input = CreatePoolInput {
+            name: "Neighborhood Fund".to_string(),
+            description: "Emergency mutual aid pool".to_string(),
+            creator_did: "did:mycelix:alice123".to_string(),
+            contribution_rules: Some(ContributionRule {
+                min_monthly: 50,
+                max_withdrawal: 500,
+                cooldown_days: 7,
+            }),
+            disbursement_rules: Some(DisbursementRule {
+                min_approvals: 2,
+                approval_threshold_percent: 60,
+                max_disbursement: 1000,
+                allow_emergency_bypass: true,
+            }),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreatePoolInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Neighborhood Fund");
+        assert_eq!(decoded.creator_did, "did:mycelix:alice123");
+        assert_eq!(decoded.contribution_rules.as_ref().unwrap().min_monthly, 50);
+        assert_eq!(decoded.disbursement_rules.as_ref().unwrap().allow_emergency_bypass, true);
+    }
+
+    #[test]
+    fn create_pool_input_no_rules() {
+        let input = CreatePoolInput {
+            name: "Simple Pool".to_string(),
+            description: "No special rules".to_string(),
+            creator_did: "did:mycelix:bob456".to_string(),
+            contribution_rules: None,
+            disbursement_rules: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreatePoolInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.contribution_rules, None);
+        assert_eq!(decoded.disbursement_rules, None);
+    }
+
+    #[test]
+    fn update_pool_rules_input_serde_roundtrip() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xAA; 36]);
+        let input = UpdatePoolRulesInput {
+            pool_hash: pool_hash.clone(),
+            contribution_rules: Some(ContributionRule {
+                min_monthly: 100,
+                max_withdrawal: 1000,
+                cooldown_days: 14,
+            }),
+            disbursement_rules: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdatePoolRulesInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.pool_hash, pool_hash);
+        assert_eq!(decoded.contribution_rules.as_ref().unwrap().cooldown_days, 14);
+        assert_eq!(decoded.disbursement_rules, None);
+    }
+
+    #[test]
+    fn add_member_input_serde_roundtrip() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        let input = AddMemberInput {
+            pool_hash: pool_hash.clone(),
+            pool_id: "pool_123".to_string(),
+            member_did: "did:mycelix:charlie789".to_string(),
+            role: MemberRole::Member,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AddMemberInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.pool_id, "pool_123");
+        assert_eq!(decoded.member_did, "did:mycelix:charlie789");
+        assert_eq!(decoded.role, MemberRole::Member);
+    }
+
+    #[test]
+    fn add_member_input_all_roles() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xBB; 36]);
+        for role in [MemberRole::Admin, MemberRole::Member, MemberRole::Observer] {
+            let input = AddMemberInput {
+                pool_hash: pool_hash.clone(),
+                pool_id: "pool_123".to_string(),
+                member_did: "did:mycelix:test".to_string(),
+                role: role.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: AddMemberInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.role, role);
+        }
+    }
+
+    #[test]
+    fn contribute_input_serde_roundtrip() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xCC; 36]);
+        let input = ContributeInput {
+            pool_hash: pool_hash.clone(),
+            pool_id: "pool_456".to_string(),
+            member_did: "did:mycelix:donor".to_string(),
+            amount: 250,
+            note: Some("Monthly contribution".to_string()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ContributeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, 250);
+        assert_eq!(decoded.note, Some("Monthly contribution".to_string()));
+    }
+
+    #[test]
+    fn contribute_input_no_note() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xCC; 36]);
+        let input = ContributeInput {
+            pool_hash: pool_hash.clone(),
+            pool_id: "pool_456".to_string(),
+            member_did: "did:mycelix:donor".to_string(),
+            amount: 100,
+            note: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: ContributeInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.note, None);
+    }
+
+    #[test]
+    fn request_disbursement_input_serde_roundtrip() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xDD; 36]);
+        let input = RequestDisbursementInput {
+            pool_hash: pool_hash.clone(),
+            pool_id: "pool_789".to_string(),
+            recipient_did: "did:mycelix:recipient".to_string(),
+            amount: 500,
+            reason: "Unexpected medical expense".to_string(),
+            is_emergency: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RequestDisbursementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.amount, 500);
+        assert_eq!(decoded.reason, "Unexpected medical expense");
+        assert_eq!(decoded.is_emergency, true);
+    }
+
+    #[test]
+    fn vote_disbursement_input_serde_roundtrip() {
+        let disbursement_hash = ActionHash::from_raw_36(vec![0xEE; 36]);
+        let input = VoteDisbursementInput {
+            disbursement_hash: disbursement_hash.clone(),
+            voter_did: "did:mycelix:voter".to_string(),
+            approve: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VoteDisbursementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.disbursement_hash, disbursement_hash);
+        assert_eq!(decoded.voter_did, "did:mycelix:voter");
+        assert_eq!(decoded.approve, true);
+    }
+
+    #[test]
+    fn vote_disbursement_input_reject() {
+        let disbursement_hash = ActionHash::from_raw_36(vec![0xEE; 36]);
+        let input = VoteDisbursementInput {
+            disbursement_hash: disbursement_hash.clone(),
+            voter_did: "did:mycelix:voter2".to_string(),
+            approve: false,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: VoteDisbursementInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.approve, false);
+    }
+
+    #[test]
+    fn update_pool_status_input_serde_roundtrip() {
+        let pool_hash = ActionHash::from_raw_36(vec![0xFF; 36]);
+        for status in [PoolStatus::Active, PoolStatus::Paused, PoolStatus::Closed] {
+            let input = UpdatePoolStatusInput {
+                pool_hash: pool_hash.clone(),
+                status: status.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: UpdatePoolStatusInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    // ── Output struct serde roundtrip tests ────────────────────────────
+
+    #[test]
+    fn pool_stats_serde_roundtrip() {
+        let stats = PoolStats {
+            total_members: 12,
+            total_contributed: 5000,
+            total_disbursed: 1500,
+            pending_disbursements: 3,
+            current_balance: 3500,
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        let decoded: PoolStats = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_members, 12);
+        assert_eq!(decoded.total_contributed, 5000);
+        assert_eq!(decoded.total_disbursed, 1500);
+        assert_eq!(decoded.pending_disbursements, 3);
+        assert_eq!(decoded.current_balance, 3500);
+    }
+
+    #[test]
+    fn pool_stats_zero_values() {
+        let stats = PoolStats {
+            total_members: 0,
+            total_contributed: 0,
+            total_disbursed: 0,
+            pending_disbursements: 0,
+            current_balance: 0,
+        };
+        let json = serde_json::to_string(&stats).unwrap();
+        let decoded: PoolStats = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_members, 0);
+        assert_eq!(decoded.current_balance, 0);
+    }
+
+    // ── Integrity enum serde roundtrip tests ──────────────────────────
+
+    #[test]
+    fn pool_status_all_variants_serde() {
+        let variants = vec![
+            PoolStatus::Active,
+            PoolStatus::Paused,
+            PoolStatus::Closed,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: PoolStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn disbursement_status_all_variants_serde() {
+        let variants = vec![
+            DisbursementStatus::Pending,
+            DisbursementStatus::Approved,
+            DisbursementStatus::Rejected,
+            DisbursementStatus::Completed,
+            DisbursementStatus::Cancelled,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: DisbursementStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    #[test]
+    fn member_role_all_variants_serde() {
+        let variants = vec![
+            MemberRole::Admin,
+            MemberRole::Member,
+            MemberRole::Observer,
+        ];
+        for variant in &variants {
+            let json = serde_json::to_string(variant).unwrap();
+            let decoded: MemberRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(&decoded, variant);
+        }
+    }
+
+    // ── Integrity struct serde roundtrip tests ────────────────────────
+
+    #[test]
+    fn contribution_rule_serde_roundtrip() {
+        let rule = ContributionRule {
+            min_monthly: 75,
+            max_withdrawal: 2000,
+            cooldown_days: 30,
+        };
+        let json = serde_json::to_string(&rule).unwrap();
+        let decoded: ContributionRule = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, rule);
+    }
+
+    #[test]
+    fn contribution_rule_default_serde() {
+        let rule = ContributionRule::default();
+        let json = serde_json::to_string(&rule).unwrap();
+        let decoded: ContributionRule = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, rule);
+        assert_eq!(decoded.min_monthly, 0);
+    }
+
+    #[test]
+    fn disbursement_rule_serde_roundtrip() {
+        let rule = DisbursementRule {
+            min_approvals: 5,
+            approval_threshold_percent: 75,
+            max_disbursement: 10000,
+            allow_emergency_bypass: false,
+        };
+        let json = serde_json::to_string(&rule).unwrap();
+        let decoded: DisbursementRule = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, rule);
+    }
+
+    #[test]
+    fn disbursement_rule_default_serde() {
+        let rule = DisbursementRule::default();
+        let json = serde_json::to_string(&rule).unwrap();
+        let decoded: DisbursementRule = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, rule);
+        assert_eq!(decoded.min_approvals, 1);
+        assert_eq!(decoded.approval_threshold_percent, 50);
+    }
+}

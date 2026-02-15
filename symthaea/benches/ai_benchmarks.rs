@@ -11,9 +11,9 @@
 //! Note: These benchmarks measure consciousness correlation with LLM performance,
 //! not direct benchmark scores (Symthaea is a consciousness measurement framework).
 
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
-use std::path::PathBuf;
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use std::fs;
+use std::path::PathBuf;
 
 /// Data directory for benchmark datasets
 fn data_dir() -> PathBuf {
@@ -104,9 +104,9 @@ fn bench_humaneval_loading(c: &mut Criterion) {
 /// This is the key benchmark for Symthaea: measuring whether higher Φ
 /// correlates with better AI performance.
 fn bench_consciousness_correlation(c: &mut Criterion) {
-    use symthaea::hdc::HDC_DIMENSION;
-    use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
     use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
+    use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
+    use symthaea::hdc::HDC_DIMENSION;
 
     let mut group = c.benchmark_group("consciousness_correlation");
 
@@ -114,7 +114,10 @@ fn bench_consciousness_correlation(c: &mut Criterion) {
     let topologies = vec![
         ("ring", ConsciousnessTopology::ring(8, HDC_DIMENSION, 42)),
         ("star", ConsciousnessTopology::star(8, HDC_DIMENSION, 42)),
-        ("random", ConsciousnessTopology::random(8, HDC_DIMENSION, 42)),
+        (
+            "random",
+            ConsciousnessTopology::random(8, HDC_DIMENSION, 42),
+        ),
     ];
 
     for (name, topology) in topologies {
@@ -123,9 +126,7 @@ fn bench_consciousness_correlation(c: &mut Criterion) {
             &topology,
             |b, topo| {
                 let calc = ConnectivityCalculator::new();
-                b.iter(|| {
-                    calc.compute(&topo.node_representations)
-                })
+                b.iter(|| calc.compute(&topo.node_representations))
             },
         );
     }
@@ -154,13 +155,9 @@ fn bench_hdc_encoding_for_ai(c: &mut Criterion) {
     let mut semantic = SemanticSpace::new(16_384).expect("Failed to create semantic space");
 
     for (name, question) in questions {
-        group.bench_with_input(
-            BenchmarkId::new("encode", name),
-            &question,
-            |b, q| {
-                b.iter(|| semantic.encode(q))
-            },
-        );
+        group.bench_with_input(BenchmarkId::new("encode", name), &question, |b, q| {
+            b.iter(|| semantic.encode(q))
+        });
     }
 
     group.finish();
@@ -195,7 +192,8 @@ fn bench_batch_processing(c: &mut Criterion) {
             &batch_size,
             |b, &size| {
                 b.iter(|| {
-                    questions.iter()
+                    questions
+                        .iter()
                         .take(size)
                         .map(|q| semantic.encode(q))
                         .collect::<Vec<_>>()
@@ -222,7 +220,11 @@ fn bench_similarity_matching(c: &mut Criterion) {
         let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
         let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
         let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-        if norm_a == 0.0 || norm_b == 0.0 { 0.0 } else { dot / (norm_a * norm_b) }
+        if norm_a == 0.0 || norm_b == 0.0 {
+            0.0
+        } else {
+            dot / (norm_a * norm_b)
+        }
     }
 
     // Sample question and candidate answers
@@ -234,14 +236,18 @@ fn bench_similarity_matching(c: &mut Criterion) {
         "The capital city is Paris.",
     ];
 
-    let question_vec = semantic.encode(question).expect("Failed to encode question");
-    let candidate_vecs: Vec<_> = candidates.iter()
+    let question_vec = semantic
+        .encode(question)
+        .expect("Failed to encode question");
+    let candidate_vecs: Vec<_> = candidates
+        .iter()
         .map(|c| semantic.encode(c).expect("Failed to encode candidate"))
         .collect();
 
     group.bench_function("find_best_match", |b| {
         b.iter(|| {
-            candidate_vecs.iter()
+            candidate_vecs
+                .iter()
                 .map(|c| cosine_similarity(&question_vec, c))
                 .enumerate()
                 .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap())

@@ -185,6 +185,54 @@ pub struct BroadcastInput {
     pub expires_at: Timestamp,
 }
 
+/// Update an emergency message
+#[hdk_extern]
+pub fn update_message(input: UpdateMessageInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::EmergencyMessage(input.updated_entry),
+    )
+}
+
+/// Input for updating a message
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateMessageInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: EmergencyMessage,
+}
+
+/// Update an emergency channel
+#[hdk_extern]
+pub fn update_channel(input: UpdateChannelInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::EmergencyChannel(input.updated_entry),
+    )
+}
+
+/// Input for updating a channel
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateChannelInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: EmergencyChannel,
+}
+
+/// Update a broadcast
+#[hdk_extern]
+pub fn update_broadcast(input: UpdateBroadcastInput) -> ExternResult<ActionHash> {
+    update_entry(
+        input.original_action_hash,
+        &EntryTypes::Broadcast(input.updated_entry),
+    )
+}
+
+/// Input for updating a broadcast
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateBroadcastInput {
+    pub original_action_hash: ActionHash,
+    pub updated_entry: Broadcast,
+}
+
 /// Get messages for a channel
 #[hdk_extern]
 pub fn get_channel_messages(channel_hash: ActionHash) -> ExternResult<Vec<Record>> {
@@ -312,4 +360,522 @@ pub fn mark_synced(message_hash: ActionHash) -> ExternResult<Record> {
     get(new_action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated message".into()
     )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // Coordinator input struct serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn send_message_input_serde_roundtrip() {
+        let input = SendMessageInput {
+            channel_hash: Some(ActionHash::from_raw_36(vec![0u8; 36])),
+            priority: MessagePriority::Flash,
+            content: "Evacuation notice for Zone A".to_string(),
+            location: Some((29.76, -95.37)),
+            ttl_hours: 24,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SendMessageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.priority, MessagePriority::Flash);
+        assert_eq!(decoded.content, "Evacuation notice for Zone A");
+        assert!(decoded.channel_hash.is_some());
+        assert_eq!(decoded.location, Some((29.76, -95.37)));
+        assert_eq!(decoded.ttl_hours, 24);
+    }
+
+    #[test]
+    fn send_message_input_minimal_serde() {
+        let input = SendMessageInput {
+            channel_hash: None,
+            priority: MessagePriority::Routine,
+            content: "Status check".to_string(),
+            location: None,
+            ttl_hours: 1,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SendMessageInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.channel_hash.is_none());
+        assert!(decoded.location.is_none());
+        assert_eq!(decoded.ttl_hours, 1);
+    }
+
+    #[test]
+    fn create_channel_input_serde_roundtrip() {
+        let input = CreateChannelInput {
+            name: "Medical Ops Channel".to_string(),
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            channel_type: ChannelType::Medical,
+            participants: vec![
+                AgentPubKey::from_raw_36(vec![1u8; 36]),
+                AgentPubKey::from_raw_36(vec![2u8; 36]),
+            ],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateChannelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Medical Ops Channel");
+        assert_eq!(decoded.channel_type, ChannelType::Medical);
+        assert_eq!(decoded.participants.len(), 2);
+    }
+
+    #[test]
+    fn broadcast_input_serde_roundtrip() {
+        let input = BroadcastInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            broadcast_type: BroadcastType::Evacuation,
+            content: "Evacuate Zone B immediately".to_string(),
+            target_area: (29.76, -95.37, 10.0),
+            expires_at: Timestamp::from_micros(1000000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: BroadcastInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.broadcast_type, BroadcastType::Evacuation);
+        assert_eq!(decoded.content, "Evacuate Zone B immediately");
+        assert_eq!(decoded.target_area.0, 29.76);
+        assert_eq!(decoded.target_area.1, -95.37);
+        assert_eq!(decoded.target_area.2, 10.0);
+    }
+
+    // ========================================================================
+    // Integrity enum serde tests (all variants)
+    // ========================================================================
+
+    #[test]
+    fn message_priority_all_variants_serde() {
+        let variants = vec![
+            MessagePriority::Flash,
+            MessagePriority::Immediate,
+            MessagePriority::Priority,
+            MessagePriority::Routine,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: MessagePriority = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn channel_type_all_variants_serde() {
+        let variants = vec![
+            ChannelType::Command,
+            ChannelType::Operations,
+            ChannelType::Logistics,
+            ChannelType::Medical,
+            ChannelType::Public,
+            ChannelType::Volunteer,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: ChannelType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    #[test]
+    fn broadcast_type_all_variants_serde() {
+        let variants = vec![
+            BroadcastType::Evacuation,
+            BroadcastType::ShelterInPlace,
+            BroadcastType::AllClear,
+            BroadcastType::ResourceDrop,
+            BroadcastType::MedicalAlert,
+            BroadcastType::WeatherWarning,
+        ];
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let decoded: BroadcastType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, variant);
+        }
+    }
+
+    // ========================================================================
+    // Entry type serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn emergency_message_full_serde_roundtrip() {
+        let msg = EmergencyMessage {
+            sender: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            channel_hash: Some(ActionHash::from_raw_36(vec![2u8; 36])),
+            priority: MessagePriority::Flash,
+            content: "Flood warning for district 5".to_string(),
+            location: Some((40.7128, -74.0060)),
+            created_at: Timestamp::from_micros(1_700_000_000),
+            ttl_hours: 48,
+            hop_count: 3,
+            synced: true,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let decoded: EmergencyMessage = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.sender, msg.sender);
+        assert_eq!(decoded.channel_hash, msg.channel_hash);
+        assert_eq!(decoded.priority, MessagePriority::Flash);
+        assert_eq!(decoded.content, "Flood warning for district 5");
+        assert_eq!(decoded.location, Some((40.7128, -74.0060)));
+        assert_eq!(decoded.ttl_hours, 48);
+        assert_eq!(decoded.hop_count, 3);
+        assert!(decoded.synced);
+    }
+
+    #[test]
+    fn emergency_message_none_options_serde() {
+        let msg = EmergencyMessage {
+            sender: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            channel_hash: None,
+            priority: MessagePriority::Routine,
+            content: "Test".to_string(),
+            location: None,
+            created_at: Timestamp::from_micros(0),
+            ttl_hours: 1,
+            hop_count: 0,
+            synced: false,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let decoded: EmergencyMessage = serde_json::from_str(&json).unwrap();
+        assert!(decoded.channel_hash.is_none());
+        assert!(decoded.location.is_none());
+        assert!(!decoded.synced);
+    }
+
+    #[test]
+    fn emergency_channel_serde_roundtrip() {
+        let channel = EmergencyChannel {
+            name: "Command Post Alpha".to_string(),
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            channel_type: ChannelType::Command,
+            participants: vec![
+                AgentPubKey::from_raw_36(vec![1u8; 36]),
+                AgentPubKey::from_raw_36(vec![2u8; 36]),
+            ],
+            created_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+        };
+        let json = serde_json::to_string(&channel).unwrap();
+        let decoded: EmergencyChannel = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "Command Post Alpha");
+        assert_eq!(decoded.channel_type, ChannelType::Command);
+        assert_eq!(decoded.participants.len(), 2);
+    }
+
+    #[test]
+    fn broadcast_entry_serde_roundtrip() {
+        let broadcast = Broadcast {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            broadcast_type: BroadcastType::WeatherWarning,
+            content: "Tornado warning for county area".to_string(),
+            target_area: (35.0, -97.0, 25.0),
+            issued_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            expires_at: Timestamp::from_micros(9_999_999),
+        };
+        let json = serde_json::to_string(&broadcast).unwrap();
+        let decoded: Broadcast = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.broadcast_type, BroadcastType::WeatherWarning);
+        assert_eq!(decoded.content, "Tornado warning for county area");
+        assert_eq!(decoded.target_area, (35.0, -97.0, 25.0));
+    }
+
+    // ========================================================================
+    // Clone/equality tests
+    // ========================================================================
+
+    #[test]
+    fn emergency_message_clone_equals_original() {
+        let msg = EmergencyMessage {
+            sender: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            channel_hash: Some(ActionHash::from_raw_36(vec![0u8; 36])),
+            priority: MessagePriority::Immediate,
+            content: "Clone test".to_string(),
+            location: Some((0.0, 0.0)),
+            created_at: Timestamp::from_micros(0),
+            ttl_hours: 1,
+            hop_count: 0,
+            synced: false,
+        };
+        let cloned = msg.clone();
+        assert_eq!(msg, cloned);
+    }
+
+    #[test]
+    fn emergency_message_ne_different_content() {
+        let a = EmergencyMessage {
+            sender: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            channel_hash: None,
+            priority: MessagePriority::Routine,
+            content: "A".to_string(),
+            location: None,
+            created_at: Timestamp::from_micros(0),
+            ttl_hours: 1,
+            hop_count: 0,
+            synced: false,
+        };
+        let mut b = a.clone();
+        b.content = "B".to_string();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn emergency_channel_clone_equals_original() {
+        let channel = EmergencyChannel {
+            name: "Test".to_string(),
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            channel_type: ChannelType::Public,
+            participants: vec![AgentPubKey::from_raw_36(vec![0u8; 36])],
+            created_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(channel, channel.clone());
+    }
+
+    #[test]
+    fn broadcast_clone_equals_original() {
+        let broadcast = Broadcast {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            broadcast_type: BroadcastType::AllClear,
+            content: "All clear".to_string(),
+            target_area: (0.0, 0.0, 1.0),
+            issued_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            expires_at: Timestamp::from_micros(0),
+        };
+        assert_eq!(broadcast, broadcast.clone());
+    }
+
+    // ========================================================================
+    // Edge case tests
+    // ========================================================================
+
+    #[test]
+    fn send_message_input_unicode_content_serde() {
+        let input = SendMessageInput {
+            channel_hash: None,
+            priority: MessagePriority::Flash,
+            content: "\u{1F6A8} \u{7D27}\u{6025}\u{901A}\u{4FE1} \u{043D}\u{0435}\u{043E}\u{0442}\u{043B}\u{043E}\u{0436}\u{043D}\u{044B}\u{0439}".to_string(),
+            location: None,
+            ttl_hours: 12,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SendMessageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.content, input.content);
+    }
+
+    #[test]
+    fn send_message_input_max_ttl_serde() {
+        let input = SendMessageInput {
+            channel_hash: None,
+            priority: MessagePriority::Routine,
+            content: "Max ttl".to_string(),
+            location: None,
+            ttl_hours: u8::MAX,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: SendMessageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.ttl_hours, u8::MAX);
+    }
+
+    #[test]
+    fn broadcast_input_negative_coordinates_serde() {
+        let input = BroadcastInput {
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            broadcast_type: BroadcastType::ShelterInPlace,
+            content: "Stay indoors".to_string(),
+            target_area: (-33.8688, 151.2093, 5.5),
+            expires_at: Timestamp::from_micros(0),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: BroadcastInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.target_area.0, -33.8688);
+        assert_eq!(decoded.target_area.1, 151.2093);
+        assert_eq!(decoded.target_area.2, 5.5);
+    }
+
+    #[test]
+    fn emergency_message_boundary_hop_count() {
+        let msg = EmergencyMessage {
+            sender: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            channel_hash: None,
+            priority: MessagePriority::Routine,
+            content: "Hop test".to_string(),
+            location: None,
+            created_at: Timestamp::from_micros(0),
+            ttl_hours: 1,
+            hop_count: u8::MAX,
+            synced: false,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let decoded: EmergencyMessage = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.hop_count, u8::MAX);
+    }
+
+    #[test]
+    fn create_channel_input_empty_name_roundtrip() {
+        // The struct itself allows empty name; validation rejects it
+        let input = CreateChannelInput {
+            name: "".to_string(),
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            channel_type: ChannelType::Volunteer,
+            participants: vec![AgentPubKey::from_raw_36(vec![0u8; 36])],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: CreateChannelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.name, "");
+    }
+
+    // ========================================================================
+    // Update input struct tests
+    // ========================================================================
+
+    #[test]
+    fn update_message_input_serde_roundtrip() {
+        let input = UpdateMessageInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            updated_entry: EmergencyMessage {
+                sender: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                channel_hash: None,
+                priority: MessagePriority::Flash,
+                content: "Updated evacuation notice".to_string(),
+                location: Some((29.76, -95.37)),
+                created_at: Timestamp::from_micros(1_000_000),
+                ttl_hours: 48,
+                hop_count: 1,
+                synced: false,
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateMessageInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xdb; 36]));
+        assert_eq!(decoded.updated_entry.priority, MessagePriority::Flash);
+        assert_eq!(decoded.updated_entry.content, "Updated evacuation notice");
+    }
+
+    #[test]
+    fn update_message_input_clone() {
+        let input = UpdateMessageInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            updated_entry: EmergencyMessage {
+                sender: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                channel_hash: None,
+                priority: MessagePriority::Routine,
+                content: "Clone test".to_string(),
+                location: None,
+                created_at: Timestamp::from_micros(0),
+                ttl_hours: 1,
+                hop_count: 0,
+                synced: false,
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.original_action_hash, input.original_action_hash);
+        assert_eq!(cloned.updated_entry.content, "Clone test");
+    }
+
+    #[test]
+    fn update_channel_input_serde_roundtrip() {
+        let input = UpdateChannelInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+            updated_entry: EmergencyChannel {
+                name: "Renamed Channel".to_string(),
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                channel_type: ChannelType::Command,
+                participants: vec![
+                    AgentPubKey::from_raw_36(vec![1u8; 36]),
+                    AgentPubKey::from_raw_36(vec![2u8; 36]),
+                    AgentPubKey::from_raw_36(vec![3u8; 36]),
+                ],
+                created_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateChannelInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xcd; 36]));
+        assert_eq!(decoded.updated_entry.name, "Renamed Channel");
+        assert_eq!(decoded.updated_entry.participants.len(), 3);
+    }
+
+    #[test]
+    fn update_channel_input_clone() {
+        let input = UpdateChannelInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: EmergencyChannel {
+                name: "Test".to_string(),
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                channel_type: ChannelType::Public,
+                participants: vec![AgentPubKey::from_raw_36(vec![0u8; 36])],
+                created_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.updated_entry.name, "Test");
+    }
+
+    #[test]
+    fn update_broadcast_input_serde_roundtrip() {
+        let input = UpdateBroadcastInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0xef; 36]),
+            updated_entry: Broadcast {
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                broadcast_type: BroadcastType::AllClear,
+                content: "All clear - danger has passed".to_string(),
+                target_area: (29.76, -95.37, 15.0),
+                issued_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                expires_at: Timestamp::from_micros(9_999_999),
+            },
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: UpdateBroadcastInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.original_action_hash, ActionHash::from_raw_36(vec![0xef; 36]));
+        assert_eq!(decoded.updated_entry.broadcast_type, BroadcastType::AllClear);
+        assert_eq!(decoded.updated_entry.content, "All clear - danger has passed");
+    }
+
+    #[test]
+    fn update_broadcast_input_clone() {
+        let input = UpdateBroadcastInput {
+            original_action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            updated_entry: Broadcast {
+                disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                broadcast_type: BroadcastType::Evacuation,
+                content: "Evacuate".to_string(),
+                target_area: (0.0, 0.0, 1.0),
+                issued_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                expires_at: Timestamp::from_micros(0),
+            },
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.updated_entry.content, "Evacuate");
+    }
+
+    #[test]
+    fn emergency_message_location_boundary_values_serde() {
+        let msg = EmergencyMessage {
+            sender: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            channel_hash: None,
+            priority: MessagePriority::Priority,
+            content: "Boundary".to_string(),
+            location: Some((-90.0, 180.0)),
+            created_at: Timestamp::from_micros(0),
+            ttl_hours: 1,
+            hop_count: 0,
+            synced: false,
+        };
+        let json = serde_json::to_string(&msg).unwrap();
+        let decoded: EmergencyMessage = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.location, Some((-90.0, 180.0)));
+    }
+
+    #[test]
+    fn emergency_channel_empty_participants_vec_serde() {
+        // Struct allows empty participants; coordinator validation rejects
+        let channel = EmergencyChannel {
+            name: "Empty".to_string(),
+            disaster_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            channel_type: ChannelType::Logistics,
+            participants: vec![],
+            created_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&channel).unwrap();
+        let decoded: EmergencyChannel = serde_json::from_str(&json).unwrap();
+        assert!(decoded.participants.is_empty());
+    }
 }

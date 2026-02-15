@@ -77,12 +77,26 @@ pub fn clip_gradient(gradient: &mut [f32], clip_norm: f32) {
 ///
 /// Uses Box-Muller transform to generate Gaussian noise without
 /// requiring external distribution crates.
+///
+/// On native targets (with `std` feature), uses `thread_rng()`.
+/// On WASM (without `std`), uses a seeded RNG based on gradient content.
 pub fn add_gaussian_noise(gradient: &mut [f32], sigma: f32) {
     if sigma <= 0.0 {
         return;
     }
 
+    #[cfg(feature = "std")]
     let mut rng = rand::thread_rng();
+
+    #[cfg(not(feature = "std"))]
+    let mut rng = {
+        use rand::SeedableRng;
+        // Derive seed from gradient content for reproducibility
+        let seed: u64 = gradient.iter().enumerate().fold(0u64, |acc, (i, &v)| {
+            acc.wrapping_add((v.to_bits() as u64).wrapping_mul(i as u64 + 1))
+        });
+        rand::rngs::SmallRng::seed_from_u64(seed)
+    };
 
     let mut i = 0;
     while i + 1 < gradient.len() {
@@ -178,8 +192,7 @@ impl RdpBudgetTracker {
             if alpha_f64 <= 1.0 {
                 continue;
             }
-            let eps = rdp
-                + (self.target_delta.ln() + (alpha_f64 - 1.0).ln()) / (alpha_f64 - 1.0)
+            let eps = rdp + (self.target_delta.ln() + (alpha_f64 - 1.0).ln()) / (alpha_f64 - 1.0)
                 - (1.0 - 1.0 / alpha_f64).ln();
             // Note: when delta is very small, log(delta) is very negative,
             // which can make eps negative. Clamp to 0.

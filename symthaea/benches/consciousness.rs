@@ -28,10 +28,8 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::ConnectivityCalculator,
-    phi_resonant::ResonantPhiCalculator,
-    HDC_DIMENSION,
+    consciousness_topology_generators::ConsciousnessTopology, phi_resonant::ResonantPhiCalculator,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
 
 // =============================================================================
@@ -47,24 +45,63 @@ fn bench_topology_19(c: &mut Criterion) {
     // Original 8 topologies
     let topologies = vec![
         ("01_Ring", ConsciousnessTopology::ring(8, HDC_DIMENSION, 42)),
-        ("02_Torus", ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, 42)),
-        ("03_Dense", ConsciousnessTopology::dense_network(8, HDC_DIMENSION, None, 42)),
-        ("04_Lattice", ConsciousnessTopology::lattice(8, HDC_DIMENSION, 42)),
-        ("05_Modular", ConsciousnessTopology::modular(8, HDC_DIMENSION, 2, 42)),
+        (
+            "02_Torus",
+            ConsciousnessTopology::torus(3, 3, HDC_DIMENSION, 42),
+        ),
+        (
+            "03_Dense",
+            ConsciousnessTopology::dense_network(8, HDC_DIMENSION, None, 42),
+        ),
+        (
+            "04_Lattice",
+            ConsciousnessTopology::lattice(8, HDC_DIMENSION, 42),
+        ),
+        (
+            "05_Modular",
+            ConsciousnessTopology::modular(8, HDC_DIMENSION, 2, 42),
+        ),
         ("06_Line", ConsciousnessTopology::line(8, HDC_DIMENSION, 42)),
-        ("07_BinaryTree", ConsciousnessTopology::binary_tree(7, HDC_DIMENSION, 42)),
+        (
+            "07_BinaryTree",
+            ConsciousnessTopology::binary_tree(7, HDC_DIMENSION, 42),
+        ),
         ("08_Star", ConsciousnessTopology::star(8, HDC_DIMENSION, 42)),
-        ("09_Random", ConsciousnessTopology::random(8, HDC_DIMENSION, 42)),
+        (
+            "09_Random",
+            ConsciousnessTopology::random(8, HDC_DIMENSION, 42),
+        ),
         // Tier 1 exotic
-        ("10_SmallWorld", ConsciousnessTopology::small_world(8, HDC_DIMENSION, 2, 0.1, 42)),
-        ("11_Mobius", ConsciousnessTopology::mobius_strip(8, HDC_DIMENSION, 42)),
+        (
+            "10_SmallWorld",
+            ConsciousnessTopology::small_world(8, HDC_DIMENSION, 2, 0.1, 42),
+        ),
+        (
+            "11_Mobius",
+            ConsciousnessTopology::mobius_strip(8, HDC_DIMENSION, 42),
+        ),
         // Tier 2 exotic
-        ("12_KleinBottle", ConsciousnessTopology::klein_bottle(3, 3, HDC_DIMENSION, 42)),
-        ("13_Hyperbolic", ConsciousnessTopology::hyperbolic(8, 3, HDC_DIMENSION, 42)),
-        ("14_ScaleFree", ConsciousnessTopology::scale_free(8, 2, HDC_DIMENSION, 42)),
+        (
+            "12_KleinBottle",
+            ConsciousnessTopology::klein_bottle(3, 3, HDC_DIMENSION, 42),
+        ),
+        (
+            "13_Hyperbolic",
+            ConsciousnessTopology::hyperbolic(8, 3, HDC_DIMENSION, 42),
+        ),
+        (
+            "14_ScaleFree",
+            ConsciousnessTopology::scale_free(8, 2, HDC_DIMENSION, 42),
+        ),
         // Tier 3 exotic (hypercubes)
-        ("15_Hypercube3D", ConsciousnessTopology::hypercube(3, HDC_DIMENSION, 42)),
-        ("16_Hypercube4D", ConsciousnessTopology::hypercube(4, HDC_DIMENSION, 42)),
+        (
+            "15_Hypercube3D",
+            ConsciousnessTopology::hypercube(3, HDC_DIMENSION, 42),
+        ),
+        (
+            "16_Hypercube4D",
+            ConsciousnessTopology::hypercube(4, HDC_DIMENSION, 42),
+        ),
     ];
 
     for (name, topo) in topologies {
@@ -89,7 +126,7 @@ fn bench_dimensional_sweep(c: &mut Criterion) {
 
     // Sweep from 2D to 7D (1D is degenerate case with n=2)
     for dim in 2..=7 {
-        let n_nodes = 1 << dim;  // 2^dim nodes
+        let n_nodes = 1 << dim; // 2^dim nodes
         group.throughput(Throughput::Elements(n_nodes as u64));
 
         group.bench_with_input(

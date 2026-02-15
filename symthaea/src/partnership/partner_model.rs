@@ -1,9 +1,7 @@
-use symthaea_core::hdc::relational_consciousness::{
-    RelationalAssessment,
-    RelationMode,
-    RelationshipStage,
-};
 use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::relational_consciousness::{
+    RelationMode, RelationalAssessment, RelationshipStage,
+};
 
 /// A lightweight model of the human partner in a dyadic relationship.
 ///
@@ -101,7 +99,9 @@ impl HumanPartnerModel {
             Awareness if self.trust > 0.2 && self.reciprocity > 0.1 => Contact,
             Contact if self.trust > 0.4 && self.reciprocity > 0.3 => Attunement,
             Attunement if self.trust > 0.6 && self.reciprocity > 0.5 => Bonding,
-            Bonding if self.trust > 0.8 && self.reciprocity > 0.7 && self.vulnerability > 0.6 => Unity,
+            Bonding if self.trust > 0.8 && self.reciprocity > 0.7 && self.vulnerability > 0.6 => {
+                Unity
+            }
             other => other,
         };
 
@@ -157,7 +157,10 @@ mod tests {
         let event = make_event(0.8, 0.9, 0.7);
         model.update_on_interaction(&event);
 
-        assert!(model.trust > 0.0, "Trust should increase after positive interaction");
+        assert!(
+            model.trust > 0.0,
+            "Trust should increase after positive interaction"
+        );
         assert!(model.vulnerability > 0.0, "Vulnerability should increase");
         assert!(model.reciprocity > 0.0, "Reciprocity should increase");
         assert_eq!(model.interactions_count, 1);
@@ -177,8 +180,14 @@ mod tests {
             });
         }
         assert!(model.trust <= 1.0, "Trust must be clamped to 1.0");
-        assert!(model.vulnerability <= 1.0, "Vulnerability must be clamped to 1.0");
-        assert!(model.reciprocity <= 1.0, "Reciprocity must be clamped to 1.0");
+        assert!(
+            model.vulnerability <= 1.0,
+            "Vulnerability must be clamped to 1.0"
+        );
+        assert!(
+            model.reciprocity <= 1.0,
+            "Reciprocity must be clamped to 1.0"
+        );
     }
 
     #[test]
@@ -262,6 +271,10 @@ mod tests {
         model.interactions_count = u64::MAX;
         let event = make_event(0.5, 0.5, 0.5);
         model.update_on_interaction(&event);
-        assert_eq!(model.interactions_count, u64::MAX, "Count should saturate, not wrap");
+        assert_eq!(
+            model.interactions_count,
+            u64::MAX,
+            "Count should saturate, not wrap"
+        );
     }
 }

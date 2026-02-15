@@ -8,9 +8,9 @@
 
 use std::io::{self, BufRead, Write};
 
-use crate::mind::active_inference::NixActiveInference;
-use crate::action::executor::NixOSExecutor;
 use super::commands::OutputFormat;
+use crate::action::executor::NixOSExecutor;
+use crate::mind::active_inference::NixActiveInference;
 
 /// Consciousness quadrant based on Φ and Confidence.
 #[derive(Debug, Clone, Copy)]
@@ -225,7 +225,10 @@ impl ConsciousRepl {
                 })
             }).collect::<Vec<_>>(),
         });
-        println!("{}", serde_json::to_string_pretty(&response).unwrap_or_default());
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
     }
 
     /// Print minimal response (just the action).
@@ -249,9 +252,7 @@ impl ConsciousRepl {
         for item in wm.items() {
             println!(
                 "    [{:.2}] {:?}: {}",
-                item.activation,
-                item.source,
-                item.label,
+                item.activation, item.source, item.label,
             );
         }
         println!();

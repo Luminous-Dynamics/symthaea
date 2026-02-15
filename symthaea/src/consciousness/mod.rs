@@ -17,9 +17,10 @@
 // ============================================================================
 // Core consciousness modules (self-contained, verified working)
 // ============================================================================
-pub mod compositionality;
 pub mod affective_consciousness;
 pub mod autopoietic_consciousness;
+pub mod code_primitives;
+pub mod compositionality;
 pub mod consciousness_unification;
 pub mod cross_modal_binding;
 pub mod fep_active_inference;
@@ -33,7 +34,6 @@ pub mod primitive_discovery;
 pub mod primitive_evolution;
 pub mod primitive_lattice;
 pub mod primitive_reasoning;
-pub mod code_primitives;
 pub mod semantic_value_embedder;
 pub mod seven_harmonies;
 pub mod value_feedback_loop;
@@ -245,7 +245,11 @@ pub mod empathic_unification {
         }
 
         /// Process input and generate empathic response
-        pub fn process(&mut self, _input: &str, _context: crate::user_state_inference::ContextKind) -> EmpathicResponse {
+        pub fn process(
+            &mut self,
+            _input: &str,
+            _context: crate::user_state_inference::ContextKind,
+        ) -> EmpathicResponse {
             EmpathicResponse {
                 tone_guidance: self.tone,
                 compassion: 0.5,
@@ -336,78 +340,91 @@ pub mod recursive_improvement;
 pub mod unified_value_evaluator;
 
 // Re-export key types
-pub use seven_harmonies::{SevenHarmonies, Harmony, HarmonyAlignment, AlignmentResult};
-pub use affective_consciousness::{CoreAffect, EmotionCategory, AffectiveConsciousnessAnalyzer};
-pub use primitive_reasoning::{PrimitiveReasoner, ReasoningResult};
-pub use primitive_evolution::{PrimitiveEvolver, EvolutionResult};
-pub use cross_modal_binding::{CrossModalBinder, BindingResult};
+pub use affective_consciousness::{AffectiveConsciousnessAnalyzer, CoreAffect, EmotionCategory};
 pub use autopoietic_consciousness::{AutopoieticConsciousness, AutopoieticState};
-pub use phi_architecture_search::{
-    PhiArchitectureSearch, SearchConfig, SearchStrategy, SearchResult,
-    ArchitectureGenome, DecodedArchitecture, PhiGradient,
-    TopologyGene, BundlingGene, Individual, ArchitectureStats, SearchStats,
-};
-pub use master_consciousness_equation::{
-    MasterConsciousnessEquation, MasterEquationConfig, ConsciousnessInputs,
-    ConsciousnessResult, ComponentWeights,
-    EmbodimentFactor, NarrativeCoherence, SocialEmbedding,
-    NarrativeEpisode, FutureScenario, AgentModel, SelfModel,
-};
-pub use fep_active_inference::{
-    ActiveInferenceAgent, ActiveInferenceAgentConfig, ActiveInferenceAgentStats,
-    CognitiveLoopFEPBridge, CognitiveLoopFEPResult,
-    GenerativeModel, FreeEnergyCalculator, FreeEnergyComponents,
-    PrecisionEstimator, ExpectedFreeEnergyComputer, ExpectedFreeEnergyResult,
-    Observation, HiddenState, PerceptionResult, ActionSelectionResult,
-    ActiveInferenceSummary,
-    // Temporal Difference Learning types
-    TemporalDifferenceLearner, TemporalDifferenceLearningConfig, TemporalDifferenceLearningStats,
-    EligibilityTraces, ModelConfidenceTracker, StateTransition,
-};
 pub use cincinnati_consciousness::{
-    CincinnatiConsciousnessConfig, CincinnatiConsciousnessBridge,
-    CincinnatiConsciousNode, ConsciousnessProcessResult, EthicalLearningStats,
-    HarmonyFeedback, ConsciousnessBuddingEvent, BuddingReason,
-};
-pub use dream::{
-    DreamEngine, DreamEngineConfig, DreamEngineStats,
-    DreamEvent, DreamResult, Wisdom,
-};
-pub use neuro_bridge::{NeuroAutopoieticBridge, BridgeState};
-pub use contextual_weights::{
-    ActionType, ActionDomain, ContextualWeights, HarmonyWeightProfile, DomainClassifier,
-};
-pub use multi_modal_integration::{
-    MultiModalIntegrator, IntegrationConfig, IntegrationResult,
-    ModalInput, IntegrationEvent, IntegrationEventType,
-};
-pub use primitive_consciousness::{
-    PrimitiveConsciousnessState, ActivePrimitive, ActivationReason,
-    PrimitiveBinding, ConsciousnessPrimitiveProcessor, ProcessorStats,
-    ConsciousnessDecomposer, PrimitiveBindingEngine,
-};
-pub use primitive_belief_bridge::{PrimitiveBeliefBridge, PrimitivePredictionError};
-pub use stability_regime::{
-    StabilityRegimeType, StabilityRegimeConfig, RegimeParams,
-    CfCPrimitive, StabilityRegimeProcessor,
-};
-pub use primitive_reasoning::{
-    ReasoningChain, TransformationType, TaskType, TierAwareConfig,
-    AdaptivePrimitiveSelector, PrimitiveAffinityGraph, PrimitiveExecution,
+    BuddingReason, CincinnatiConsciousNode, CincinnatiConsciousnessBridge,
+    CincinnatiConsciousnessConfig, ConsciousnessBuddingEvent, ConsciousnessProcessResult,
+    EthicalLearningStats, HarmonyFeedback,
 };
 pub use compositionality::{
-    CompositionalityEngine, CompositionalityConfig, ComposedPrimitive,
-    CompositionType, CompositionResult, CompositionStats, CompositionMetadata,
+    ComposedPrimitive, CompositionMetadata, CompositionResult, CompositionStats, CompositionType,
+    CompositionalityConfig, CompositionalityEngine,
+};
+pub use contextual_weights::{
+    ActionDomain, ActionType, ContextualWeights, DomainClassifier, HarmonyWeightProfile,
+};
+pub use cross_modal_binding::{BindingResult, CrossModalBinder};
+pub use dream::{
+    DreamEngine, DreamEngineConfig, DreamEngineStats, DreamEvent, DreamResult, Wisdom,
+};
+pub use fep_active_inference::{
+    ActionSelectionResult,
+    ActiveInferenceAgent,
+    ActiveInferenceAgentConfig,
+    ActiveInferenceAgentStats,
+    ActiveInferenceSummary,
+    CognitiveLoopFEPBridge,
+    CognitiveLoopFEPResult,
+    EligibilityTraces,
+    ExpectedFreeEnergyComputer,
+    ExpectedFreeEnergyResult,
+    FreeEnergyCalculator,
+    FreeEnergyComponents,
+    GenerativeModel,
+    HiddenState,
+    ModelConfidenceTracker,
+    Observation,
+    PerceptionResult,
+    PrecisionEstimator,
+    StateTransition,
+    // Temporal Difference Learning types
+    TemporalDifferenceLearner,
+    TemporalDifferenceLearningConfig,
+    TemporalDifferenceLearningStats,
+};
+pub use master_consciousness_equation::{
+    AgentModel, ComponentWeights, ConsciousnessInputs, ConsciousnessResult, EmbodimentFactor,
+    FutureScenario, MasterConsciousnessEquation, MasterEquationConfig, NarrativeCoherence,
+    NarrativeEpisode, SelfModel, SocialEmbedding,
+};
+pub use multi_modal_integration::{
+    IntegrationConfig, IntegrationEvent, IntegrationEventType, IntegrationResult, ModalInput,
+    MultiModalIntegrator,
+};
+pub use neuro_bridge::{BridgeState, NeuroAutopoieticBridge};
+pub use phi_architecture_search::{
+    ArchitectureGenome, ArchitectureStats, BundlingGene, DecodedArchitecture, Individual,
+    PhiArchitectureSearch, PhiGradient, SearchConfig, SearchResult, SearchStats, SearchStrategy,
+    TopologyGene,
+};
+pub use primitive_belief_bridge::{PrimitiveBeliefBridge, PrimitivePredictionError};
+pub use primitive_consciousness::{
+    ActivationReason, ActivePrimitive, ConsciousnessDecomposer, ConsciousnessPrimitiveProcessor,
+    PrimitiveBinding, PrimitiveBindingEngine, PrimitiveConsciousnessState, ProcessorStats,
+};
+pub use primitive_evolution::{EvolutionResult, PrimitiveEvolver};
+pub use primitive_reasoning::{
+    AdaptivePrimitiveSelector, PrimitiveAffinityGraph, PrimitiveExecution, ReasoningChain,
+    TaskType, TierAwareConfig, TransformationType,
+};
+pub use primitive_reasoning::{PrimitiveReasoner, ReasoningResult};
+pub use seven_harmonies::{AlignmentResult, Harmony, HarmonyAlignment, SevenHarmonies};
+pub use stability_regime::{
+    CfCPrimitive, RegimeParams, StabilityRegimeConfig, StabilityRegimeProcessor,
+    StabilityRegimeType,
 };
 
 // ── Ported Tier 1 re-exports ──────────────────────────────────────────────
-pub use hierarchical_ltc::{HierarchicalLTC, HierarchicalConfig};
-pub use narrative_self::{NarrativeSelfModel, NarrativeSelfConfig, ProtoSelf, CoreSelf, AutobiographicalSelf};
-pub use attention_schema::{AttentionSchema, AttentionState, AttentionSchemaConfig};
+pub use attention_schema::{AttentionSchema, AttentionSchemaConfig, AttentionState};
 pub use consciousness_thermodynamics::{ConsciousnessThermodynamicsAnalyzer, ThermodynamicsConfig};
-pub use epistemic_tiers::{EpistemicCoordinate, EmpiricalTier, NormativeTier, MaterialityTier};
-pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
+pub use epistemic_tiers::{EmpiricalTier, EpistemicCoordinate, MaterialityTier, NormativeTier};
 pub use harmonics::{FiduciaryHarmonic, HarmonicField, HarmonicResolver};
+pub use hierarchical_ltc::{HierarchicalConfig, HierarchicalLTC};
+pub use metacognitive_monitoring::{MetacognitiveMonitor, MonitoringResult};
+pub use narrative_self::{
+    AutobiographicalSelf, CoreSelf, NarrativeSelfConfig, NarrativeSelfModel, ProtoSelf,
+};
 
 // ============================================================================
 // Ported from crates/symthaea-consciousness (2026-02-06) — Tiers 2–5
@@ -423,10 +440,10 @@ pub mod temporal_primitives;
 pub mod primitive_validation;
 
 // ── Tier 3: Consciousness Integration ──────────────────────────────────────
-pub mod compositionality_primitives;
-pub mod consciousness_signatures;
 pub mod causal_calculus;
 pub mod causal_emergence;
+pub mod compositionality_primitives;
+pub mod consciousness_signatures;
 pub mod factor_graph;
 
 pub mod dimension_synergies;
@@ -440,16 +457,16 @@ pub mod consciousness_field_dynamics;
 pub mod consciousness_holography;
 pub mod consciousness_resonance;
 pub mod consciousness_topology;
-/// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
-/// analysis, and Hodge decomposition of higher-order neural interaction signals
-pub mod hodge_laplacian;
 pub mod dissipative_consciousness;
 pub mod embodied_cognition;
 pub mod enactive_cognition;
+pub mod hierarchical_free_energy;
+/// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
+/// analysis, and Hodge decomposition of higher-order neural interaction signals
+pub mod hodge_laplacian;
 pub mod meta_cognitive_optimizer;
 pub mod phenomenal_binding;
 pub mod predictive_processing;
-pub mod hierarchical_free_energy;
 pub mod predictive_self;
 pub mod quantum_coherence;
 pub mod sensorimotor_contingencies;

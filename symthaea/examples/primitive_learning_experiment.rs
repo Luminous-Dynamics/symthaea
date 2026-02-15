@@ -9,8 +9,7 @@
 //! This bridges HDC's instant pattern matching with LTC's temporal learning.
 
 use symthaea::benchmarks::{
-    PrimitiveLearningGate, PrimitiveLearningConfig, PrimitiveLearningResults,
-    PrimitiveTask,
+    PrimitiveLearningConfig, PrimitiveLearningGate, PrimitiveLearningResults, PrimitiveTask,
 };
 
 fn main() -> anyhow::Result<()> {
@@ -53,13 +52,20 @@ fn print_results(results: &[PrimitiveLearningResults]) {
     let mut total_improvement = 0.0;
 
     for result in results {
-        let status = if result.passed { "✓ PASS" } else { "✗ FAIL" };
+        let status = if result.passed {
+            "✓ PASS"
+        } else {
+            "✗ FAIL"
+        };
 
         println!("┌─────────────────────────────────────────────────────────────┐");
         println!("│ Task: {:<40} {:>8} │", result.task_name, status);
         println!("├─────────────────────────────────────────────────────────────┤");
         println!("│ {}  │", result.reasoning);
-        println!("│ Time: {}ms                                              │", result.total_time_ms);
+        println!(
+            "│ Time: {}ms                                              │",
+            result.total_time_ms
+        );
         println!("└─────────────────────────────────────────────────────────────┘");
         println!();
 
@@ -72,30 +78,39 @@ fn print_results(results: &[PrimitiveLearningResults]) {
     let avg_improvement = total_improvement / results.len() as f32;
 
     println!("╔══════════════════════════════════════════════════════════════╗");
-    println!("║ OVERALL: {}/5 tasks passed ({:.1}%)                          ║",
-             passed_count, passed_count as f32 / 5.0 * 100.0);
-    println!("║ Average Accuracy Improvement: {:.1}%                          ║", avg_improvement);
+    println!(
+        "║ OVERALL: {}/5 tasks passed ({:.1}%)                          ║",
+        passed_count,
+        passed_count as f32 / 5.0 * 100.0
+    );
+    println!(
+        "║ Average Accuracy Improvement: {:.1}%                          ║",
+        avg_improvement
+    );
     println!("╚══════════════════════════════════════════════════════════════╝");
     println!();
 
     // Print learning curves for best performing task
     if let Some(best) = results.iter().max_by(|a, b| {
-        a.accuracy_improvement.partial_cmp(&b.accuracy_improvement).unwrap()
+        a.accuracy_improvement
+            .partial_cmp(&b.accuracy_improvement)
+            .unwrap()
     }) {
         println!("╔══════════════════════════════════════════════════════════════╗");
-        println!("║  LEARNING CURVE: {}                          ║", best.task_name);
+        println!(
+            "║  LEARNING CURVE: {}                          ║",
+            best.task_name
+        );
         println!("╚══════════════════════════════════════════════════════════════╝");
         println!();
         println!("Episode | Train Loss | Test Loss  | Accuracy   | Tau Mean");
         println!("--------|------------|------------|------------|----------");
 
         for ep in &best.episodes {
-            println!("  {:>3}   |   {:.4}   |   {:.4}   |  {:.1}%     |  {:.2}",
-                     ep.episode,
-                     ep.train_loss,
-                     ep.test_loss,
-                     ep.completion_accuracy,
-                     ep.tau_mean);
+            println!(
+                "  {:>3}   |   {:.4}   |   {:.4}   |  {:.1}%     |  {:.2}",
+                ep.episode, ep.train_loss, ep.test_loss, ep.completion_accuracy, ep.tau_mean
+            );
         }
     }
 }

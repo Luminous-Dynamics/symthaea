@@ -14,9 +14,9 @@
 //!                  └───────── Feedback Loop ───────────┘
 //! ```
 
+use crate::audio::{AudioConfig, AudioFrontend};
 use crate::hdc::HV16;
 use crate::ltc::{LtcCell, LtcConfig};
-use crate::audio::{AudioConfig, AudioFrontend};
 use crate::phoneme::PhonemeResonator;
 use std::collections::VecDeque;
 
@@ -43,9 +43,9 @@ impl Default for StreamConfig {
     fn default() -> Self {
         Self {
             sample_rate: 16000,
-            frame_duration: 0.025,   // 25ms frames
-            hop_duration: 0.010,     // 10ms hop -> 10ms latency
-            buffer_duration: 2.0,    // 2 second buffer
+            frame_duration: 0.025, // 25ms frames
+            hop_duration: 0.010,   // 10ms hop -> 10ms latency
+            buffer_duration: 2.0,  // 2 second buffer
             n_mels: 40,
             min_frames: 3,
             smoothing_window: 3,
@@ -57,7 +57,7 @@ impl StreamConfig {
     /// Low-latency configuration (faster but less accurate)
     pub fn low_latency() -> Self {
         Self {
-            hop_duration: 0.005,     // 5ms hop
+            hop_duration: 0.005, // 5ms hop
             min_frames: 2,
             smoothing_window: 2,
             ..Default::default()
@@ -67,8 +67,8 @@ impl StreamConfig {
     /// High-quality configuration (more accurate but higher latency)
     pub fn high_quality() -> Self {
         Self {
-            frame_duration: 0.030,   // 30ms frames
-            hop_duration: 0.015,     // 15ms hop
+            frame_duration: 0.030, // 30ms frames
+            hop_duration: 0.015,   // 15ms hop
             min_frames: 5,
             smoothing_window: 5,
             ..Default::default()
@@ -110,7 +110,14 @@ impl AudioRingBuffer {
             return None;
         }
 
-        Some(self.buffer.iter().skip(start).take(length).copied().collect())
+        Some(
+            self.buffer
+                .iter()
+                .skip(start)
+                .take(length)
+                .copied()
+                .collect(),
+        )
     }
 
     /// Number of available samples
@@ -248,13 +255,18 @@ impl StreamProcessor {
     /// Process a single frame
     fn process_frame(&mut self) -> Option<StreamFrame> {
         // Get audio frame
-        let audio = self.buffer.read_frame(self.next_sample, self.samples_per_frame)?;
+        let audio = self
+            .buffer
+            .read_frame(self.next_sample, self.samples_per_frame)?;
 
         // Extract features (simplified - would use mel spectrogram)
         let features = self.extract_simple_features(&audio);
 
         // Process through LTC
-        let state = self.ltc.forward(&features, self.config.hop_duration).to_vec();
+        let state = self
+            .ltc
+            .forward(&features, self.config.hop_duration)
+            .to_vec();
         let salience = self.ltc.compute_salience(&self.prev_state);
 
         // Convert state to hypervector
@@ -263,7 +275,9 @@ impl StreamProcessor {
         // Decode phoneme
         let (phoneme, confidence) = if !self.resonator.is_empty() {
             let results = self.resonator.query(&hv, 1);
-            results.into_iter().next()
+            results
+                .into_iter()
+                .next()
                 .map(|(p, c)| (Some(p), c))
                 .unwrap_or((None, 0.0))
         } else {
@@ -304,9 +318,11 @@ impl StreamProcessor {
         features[0] = energy;
 
         // Zero crossing rate
-        let zcr = audio.windows(2)
+        let zcr = audio
+            .windows(2)
             .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
-            .count() as f32 / audio.len() as f32;
+            .count() as f32
+            / audio.len() as f32;
         features[1] = zcr;
 
         // Simple spectral features (band energies)
@@ -314,9 +330,8 @@ impl StreamProcessor {
         for band in 2..self.config.n_mels.min(10) {
             let start = band * frame_len / 10;
             let end = (band + 1) * frame_len / 10;
-            features[band] = audio[start..end].iter()
-                .map(|x| x.abs())
-                .sum::<f32>() / (end - start) as f32;
+            features[band] =
+                audio[start..end].iter().map(|x| x.abs()).sum::<f32>() / (end - start) as f32;
         }
 
         features
@@ -352,7 +367,8 @@ impl StreamProcessor {
             }
         }
 
-        votes.into_iter()
+        votes
+            .into_iter()
             .max_by_key(|(_, count)| *count)
             .map(|(phoneme, _)| phoneme)
     }
@@ -391,8 +407,8 @@ impl StreamProcessor {
     /// Get current latency in milliseconds
     pub fn latency_ms(&self) -> f32 {
         (self.samples_per_frame as f32 / self.config.sample_rate as f32
-         + self.config.min_frames as f32 * self.config.hop_duration)
-         * 1000.0
+            + self.config.min_frames as f32 * self.config.hop_duration)
+            * 1000.0
     }
 
     /// Get current frame count

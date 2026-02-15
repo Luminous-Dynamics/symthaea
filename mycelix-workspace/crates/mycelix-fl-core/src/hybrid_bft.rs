@@ -143,8 +143,7 @@ pub fn hybrid_trimmed_mean(
             .enumerate()
             .map(|(i, &s)| (i, s))
             .collect();
-        indexed_scores
-            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        indexed_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         let trimmed_local_indices: Vec<usize> = indexed_scores
             .iter()
@@ -215,10 +214,8 @@ pub fn effective_byzantine_fraction(
 ) -> f32 {
     let honest_nodes = total_nodes - byzantine_nodes;
 
-    let byz_power =
-        byzantine_nodes as f32 * avg_byzantine_reputation.powf(reputation_exponent);
-    let honest_power =
-        honest_nodes as f32 * avg_honest_reputation.powf(reputation_exponent);
+    let byz_power = byzantine_nodes as f32 * avg_byzantine_reputation.powf(reputation_exponent);
+    let honest_power = honest_nodes as f32 * avg_honest_reputation.powf(reputation_exponent);
 
     let total_power = byz_power + honest_power;
     if total_power <= 0.0 {
@@ -345,19 +342,11 @@ mod tests {
         }
         for i in 0..20 {
             let val = if i % 2 == 0 { 100.0 } else { -100.0 };
-            contributions.push(make_rep_gradient(
-                &format!("bg{}", i),
-                vec![val; 10],
-                0.15,
-            ));
+            contributions.push(make_rep_gradient(&format!("bg{}", i), vec![val; 10], 0.15));
         }
         for i in 0..14 {
             let val = if i % 2 == 0 { 100.0 } else { -100.0 };
-            contributions.push(make_rep_gradient(
-                &format!("bt{}", i),
-                vec![val; 10],
-                0.4,
-            ));
+            contributions.push(make_rep_gradient(&format!("bt{}", i), vec![val; 10], 0.4));
         }
 
         let config = HybridBftConfig {

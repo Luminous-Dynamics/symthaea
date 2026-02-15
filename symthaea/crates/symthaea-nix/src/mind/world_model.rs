@@ -12,9 +12,9 @@
 //!
 //! Phase 2: CfC neural model (auto-activates after ~50 episodes).
 
+use super::predictive_hierarchy::PredictiveHierarchy;
 use std::collections::HashMap;
 use symthaea_core::hdc::ContinuousHV;
-use super::predictive_hierarchy::PredictiveHierarchy;
 
 /// Action categories for the transition model.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -151,12 +151,13 @@ impl NixWorldModel {
     ) {
         let observed_delta = state_after.subtract(state_before);
 
-        let entry = self.delta_vectors.entry(action).or_insert_with(|| {
-            DeltaEntry {
+        let entry = self
+            .delta_vectors
+            .entry(action)
+            .or_insert_with(|| DeltaEntry {
                 delta: ContinuousHV::zero(self.dim),
                 observation_count: 0,
-            }
-        });
+            });
 
         entry.observation_count += 1;
         let n = entry.observation_count as f32;
@@ -231,12 +232,16 @@ impl NixWorldModel {
 
     /// Total observations across all action categories.
     pub fn total_observations(&self) -> usize {
-        self.delta_vectors.values().map(|e| e.observation_count).sum()
+        self.delta_vectors
+            .values()
+            .map(|e| e.observation_count)
+            .sum()
     }
 
     /// Whether the transition model has enough data for a specific action.
     pub fn has_learned(&self, action: &ActionCategory) -> bool {
-        self.delta_vectors.get(action)
+        self.delta_vectors
+            .get(action)
             .map(|e| e.observation_count >= 3)
             .unwrap_or(false)
     }
@@ -296,7 +301,8 @@ mod tests {
         assert!(
             fe_close < fe_far,
             "Free energy should be lower when at goal: far={:.3}, close={:.3}",
-            fe_far, fe_close,
+            fe_far,
+            fe_close,
         );
     }
 
@@ -336,10 +342,7 @@ mod tests {
 
         wm.observe(before);
 
-        let trajectory = wm.predict_trajectory(&[
-            ActionCategory::Install,
-            ActionCategory::Install,
-        ]);
+        let trajectory = wm.predict_trajectory(&[ActionCategory::Install, ActionCategory::Install]);
 
         // Should have 3 states: initial + 2 steps
         assert_eq!(trajectory.len(), 3);

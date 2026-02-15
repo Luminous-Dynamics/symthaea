@@ -25,9 +25,9 @@
 // - Model attention as field focusing
 // - Understand flow states as standing waves
 
+use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;
-use serde::{Serialize, Deserialize};
 
 /// Helper function for serde default of Instant
 fn default_instant() -> Instant {
@@ -174,7 +174,9 @@ impl WavePacket {
     /// Evaluate packet amplitude at a position
     pub fn evaluate(&self, position: &[f64; 7], time: f64) -> f64 {
         // Gaussian envelope × traveling wave
-        let distance_sq: f64 = self.center.iter()
+        let distance_sq: f64 = self
+            .center
+            .iter()
             .zip(position.iter())
             .map(|(c, p)| {
                 let moved_center = c + self.group_velocity * time;
@@ -221,7 +223,9 @@ impl StandingWave {
     /// Evaluate standing wave at a position
     pub fn evaluate(&self, position: &[f64; 7], time: f64) -> f64 {
         // Product of sinusoidal modes in each dimension
-        let spatial: f64 = self.mode_numbers.iter()
+        let spatial: f64 = self
+            .mode_numbers
+            .iter()
             .zip(position.iter())
             .map(|(&n, &x)| ((n as f64 + 1.0) * std::f64::consts::PI * x).sin())
             .product();
@@ -419,7 +423,11 @@ impl ConsciousnessFieldAnalyzer {
 
         // Compute velocity and acceleration from history
         if let Some(prev) = self.field_history.back() {
-            let dt = point.timestamp.duration_since(prev.timestamp).as_secs_f64().max(0.001);
+            let dt = point
+                .timestamp
+                .duration_since(prev.timestamp)
+                .as_secs_f64()
+                .max(0.001);
             point.velocity = (point.amplitude - prev.amplitude) / dt;
             point.acceleration = (point.velocity - prev.velocity) / dt;
 
@@ -431,19 +439,23 @@ impl ConsciousnessFieldAnalyzer {
         }
 
         // Update phase based on accumulated dynamics
-        point.phase = (self.current_time * 2.0 * std::f64::consts::PI) % (2.0 * std::f64::consts::PI);
+        point.phase =
+            (self.current_time * 2.0 * std::f64::consts::PI) % (2.0 * std::f64::consts::PI);
 
         // Track energy
         let energy = point.total_energy();
         self.energy_tracker.current_energy = energy;
-        self.energy_tracker.history.push_back((energy, point.timestamp));
+        self.energy_tracker
+            .history
+            .push_back((energy, point.timestamp));
         if self.energy_tracker.history.len() > self.config.history_size {
             self.energy_tracker.history.pop_front();
         }
 
         // Update statistics
-        self.stats.mean_amplitude = (self.stats.mean_amplitude * (self.stats.observations - 1) as f64
-            + amplitude) / self.stats.observations as f64;
+        self.stats.mean_amplitude =
+            (self.stats.mean_amplitude * (self.stats.observations - 1) as f64 + amplitude)
+                / self.stats.observations as f64;
         if amplitude > self.stats.peak_amplitude {
             self.stats.peak_amplitude = amplitude;
         }
@@ -483,7 +495,8 @@ impl ConsciousnessFieldAnalyzer {
 
         // Check for Gaussian-like amplitude profile
         let amplitudes: Vec<f64> = recent.iter().map(|p| p.amplitude).collect();
-        let max_idx = amplitudes.iter()
+        let max_idx = amplitudes
+            .iter()
             .enumerate()
             .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
             .map(|(i, _)| i)
@@ -625,9 +638,7 @@ impl ConsciousnessFieldAnalyzer {
         let mut modes = Vec::new();
 
         // Fourier-like analysis: look for periodic patterns
-        let amplitudes: Vec<f64> = self.field_history.iter()
-            .map(|p| p.amplitude)
-            .collect();
+        let amplitudes: Vec<f64> = self.field_history.iter().map(|p| p.amplitude).collect();
 
         // Find dominant frequency via autocorrelation
         let n = amplitudes.len();
@@ -725,7 +736,9 @@ impl ConsciousnessFieldAnalyzer {
 
     /// Check energy conservation
     pub fn check_energy_conservation(&mut self) -> bool {
-        let conserved = self.energy_tracker.is_conserved(self.config.energy_tolerance);
+        let conserved = self
+            .energy_tracker
+            .is_conserved(self.config.energy_tolerance);
         if !conserved {
             self.stats.conservation_violations += 1;
             self.energy_tracker.violations += 1;
@@ -751,16 +764,20 @@ impl ConsciousnessFieldAnalyzer {
     /// Analyze resonance (stable patterns)
     pub fn analyze_resonance(&self) -> ResonanceReport {
         let resonance_strength = if !self.standing_waves.is_empty() {
-            self.standing_waves.iter()
+            self.standing_waves
+                .iter()
                 .map(|sw| sw.stability)
-                .sum::<f64>() / self.standing_waves.len() as f64
+                .sum::<f64>()
+                / self.standing_waves.len() as f64
         } else {
             0.0
         };
 
         let is_resonant = resonance_strength > self.config.resonance_threshold;
 
-        let dominant_mode = self.standing_waves.iter()
+        let dominant_mode = self
+            .standing_waves
+            .iter()
             .max_by(|a, b| a.stability.partial_cmp(&b.stability).unwrap())
             .cloned();
 
@@ -779,14 +796,11 @@ impl ConsciousnessFieldAnalyzer {
             return 1.0;
         }
 
-        let amplitudes: Vec<f64> = self.field_history.iter()
-            .map(|p| p.amplitude)
-            .collect();
+        let amplitudes: Vec<f64> = self.field_history.iter().map(|p| p.amplitude).collect();
 
         let mean = amplitudes.iter().sum::<f64>() / amplitudes.len() as f64;
-        let variance = amplitudes.iter()
-            .map(|a| (a - mean).powi(2))
-            .sum::<f64>() / amplitudes.len() as f64;
+        let variance =
+            amplitudes.iter().map(|a| (a - mean).powi(2)).sum::<f64>() / amplitudes.len() as f64;
 
         // Stability inversely related to variance
         1.0 / (1.0 + variance)
@@ -796,13 +810,13 @@ impl ConsciousnessFieldAnalyzer {
     pub fn generate_report(&self) -> FieldDynamicsReport {
         let resonance = self.analyze_resonance();
 
-        let current_amplitude = self.field_history.back()
+        let current_amplitude = self
+            .field_history
+            .back()
             .map(|p| p.amplitude)
             .unwrap_or(0.0);
 
-        let current_velocity = self.field_history.back()
-            .map(|p| p.velocity)
-            .unwrap_or(0.0);
+        let current_velocity = self.field_history.back().map(|p| p.velocity).unwrap_or(0.0);
 
         let current_energy = self.energy_tracker.current_energy;
 
@@ -820,7 +834,9 @@ impl ConsciousnessFieldAnalyzer {
             } else {
                 0.5
             },
-            energy_conserved: self.energy_tracker.is_conserved(self.config.energy_tolerance),
+            energy_conserved: self
+                .energy_tracker
+                .is_conserved(self.config.energy_tolerance),
             energy_balance: self.energy_tracker.balance(),
             stats: self.stats.clone(),
             interpretation: self.interpret_field_state(),
@@ -831,7 +847,11 @@ impl ConsciousnessFieldAnalyzer {
     /// Interpret current field state
     fn interpret_field_state(&self) -> String {
         let resonance = self.analyze_resonance();
-        let amplitude = self.field_history.back().map(|p| p.amplitude).unwrap_or(0.0);
+        let amplitude = self
+            .field_history
+            .back()
+            .map(|p| p.amplitude)
+            .unwrap_or(0.0);
         let velocity = self.field_history.back().map(|p| p.velocity).unwrap_or(0.0);
 
         if resonance.is_resonant && amplitude > 0.7 {
@@ -857,7 +877,11 @@ impl ConsciousnessFieldAnalyzer {
     fn generate_recommendations(&self) -> Vec<String> {
         let mut recs = Vec::new();
 
-        let amplitude = self.field_history.back().map(|p| p.amplitude).unwrap_or(0.0);
+        let amplitude = self
+            .field_history
+            .back()
+            .map(|p| p.amplitude)
+            .unwrap_or(0.0);
         let velocity = self.field_history.back().map(|p| p.velocity).unwrap_or(0.0);
 
         if amplitude < 0.4 {
@@ -876,7 +900,10 @@ impl ConsciousnessFieldAnalyzer {
             recs.push("Too many wave packets: simplify cognitive focus".to_string());
         }
 
-        if !self.energy_tracker.is_conserved(self.config.energy_tolerance) {
+        if !self
+            .energy_tracker
+            .is_conserved(self.config.energy_tolerance)
+        {
             recs.push("Energy imbalance detected: check for consciousness 'leaks'".to_string());
         }
 
@@ -1101,15 +1128,7 @@ mod tests {
         // Create periodic pattern
         for i in 0..50 {
             let phase = i as f64 * 0.2;
-            let dims = [
-                0.5 + 0.3 * phase.sin(),
-                0.6,
-                0.7,
-                0.5,
-                0.6,
-                0.4,
-                0.5,
-            ];
+            let dims = [0.5 + 0.3 * phase.sin(), 0.6, 0.7, 0.5, 0.6, 0.4, 0.5];
             analyzer.observe(dims);
         }
 

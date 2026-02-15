@@ -14,15 +14,15 @@
 
 #[cfg(test)]
 mod calibration_tests {
-    use crate::consciousness::seven_harmonies::{SevenHarmonies, Harmony};
-    use crate::consciousness::unified_value_evaluator::{
-        UnifiedValueEvaluator, EvaluationContext, ActionType,
-        Decision, AffectiveSystemsState, VetoReason,
-    };
-    use crate::consciousness::mycelix_bridge::{
-        MycelixBridge, ConsciousnessSnapshot, Proposal, ProposalType, BridgeError,
-    };
     use crate::consciousness::affective_consciousness::CoreAffect;
+    use crate::consciousness::mycelix_bridge::{
+        BridgeError, ConsciousnessSnapshot, MycelixBridge, Proposal, ProposalType,
+    };
+    use crate::consciousness::seven_harmonies::{Harmony, SevenHarmonies};
+    use crate::consciousness::unified_value_evaluator::{
+        ActionType, AffectiveSystemsState, Decision, EvaluationContext, UnifiedValueEvaluator,
+        VetoReason,
+    };
 
     // ========================================================================
     // SEVEN HARMONIES CALIBRATION
@@ -36,7 +36,7 @@ mod calibration_tests {
 
     #[test]
     fn test_harmony_names() {
-        let expected = vec![
+        let expected = [
             "Resonant Coherence",
             "Pan-Sentient Flourishing",
             "Integral Wisdom",
@@ -53,7 +53,7 @@ mod calibration_tests {
         for harmony in all_harmonies {
             let name = harmony.name();
             assert!(
-                expected.iter().any(|e| *e == name),
+                expected.contains(&name),
                 "Harmony name '{}' should be in expected list",
                 name
             );
@@ -178,8 +178,7 @@ mod calibration_tests {
             assert!(
                 is_restricted,
                 "Harmful action '{}' should be restricted, got {:?}",
-                action,
-                result.decision
+                action, result.decision
             );
         }
     }
@@ -200,7 +199,10 @@ mod calibration_tests {
 
         let result = evaluator.evaluate("propose amendment", low_consciousness_context);
         assert!(
-            matches!(result.decision, Decision::Veto(VetoReason::InsufficientConsciousness { .. })),
+            matches!(
+                result.decision,
+                Decision::Veto(VetoReason::InsufficientConsciousness { .. })
+            ),
             "Constitutional action with low consciousness should be vetoed"
         );
 
@@ -243,13 +245,28 @@ mod calibration_tests {
         // Test consciousness thresholds
         let snapshot = ConsciousnessSnapshot::new(0.5, 0.6, 0.7, 0.8, 0.5, 0.6);
 
-        assert!(snapshot.is_adequate_for(ActionType::Basic), "0.5 should be adequate for Basic");
-        assert!(snapshot.is_adequate_for(ActionType::Governance), "0.5 should be adequate for Governance");
-        assert!(snapshot.is_adequate_for(ActionType::Voting), "0.5 should be adequate for Voting");
-        assert!(!snapshot.is_adequate_for(ActionType::Constitutional), "0.5 should NOT be adequate for Constitutional");
+        assert!(
+            snapshot.is_adequate_for(ActionType::Basic),
+            "0.5 should be adequate for Basic"
+        );
+        assert!(
+            snapshot.is_adequate_for(ActionType::Governance),
+            "0.5 should be adequate for Governance"
+        );
+        assert!(
+            snapshot.is_adequate_for(ActionType::Voting),
+            "0.5 should be adequate for Voting"
+        );
+        assert!(
+            !snapshot.is_adequate_for(ActionType::Constitutional),
+            "0.5 should NOT be adequate for Constitutional"
+        );
 
         let high_snapshot = ConsciousnessSnapshot::new(0.8, 0.7, 0.8, 0.9, 0.6, 0.7);
-        assert!(high_snapshot.is_adequate_for(ActionType::Constitutional), "0.8 should be adequate for Constitutional");
+        assert!(
+            high_snapshot.is_adequate_for(ActionType::Constitutional),
+            "0.8 should be adequate for Constitutional"
+        );
     }
 
     #[test]
@@ -278,7 +295,10 @@ mod calibration_tests {
         };
 
         let result = bridge.evaluate_proposal(&proposal, consciousness, affective);
-        assert!(result.is_ok(), "Positive proposal should evaluate successfully");
+        assert!(
+            result.is_ok(),
+            "Positive proposal should evaluate successfully"
+        );
     }
 
     #[test]
@@ -318,11 +338,19 @@ mod calibration_tests {
             0.6,
         );
 
-        assert_eq!(bridge.stats().pending_updates, 1, "Should have 1 pending update");
+        assert_eq!(
+            bridge.stats().pending_updates,
+            1,
+            "Should have 1 pending update"
+        );
 
         let updates = bridge.flush_learning_updates();
         assert_eq!(updates.len(), 1, "Should flush 1 update");
-        assert_eq!(bridge.stats().pending_updates, 0, "Should have 0 pending after flush");
+        assert_eq!(
+            bridge.stats().pending_updates,
+            0,
+            "Should have 0 pending after flush"
+        );
     }
 
     // ========================================================================
@@ -351,7 +379,10 @@ mod calibration_tests {
 
         let result = evaluator.evaluate("", context);
         // Empty action should not crash and should have some default behavior
-        assert!(result.overall_score >= 0.0, "Empty action should have non-negative score");
+        assert!(
+            result.overall_score >= 0.0,
+            "Empty action should have non-negative score"
+        );
     }
 
     #[test]
@@ -388,17 +419,20 @@ mod calibration_tests {
 
         // Test with various Unicode characters
         let unicode_actions = vec![
-            "помогать сообществу",  // Russian
-            "帮助社区",              // Chinese
-            "مساعدة المجتمع",        // Arabic
-            "🌍 global love 💚",    // Emoji
+            "помогать сообществу", // Russian
+            "帮助社区",            // Chinese
+            "مساعدة المجتمع",      // Arabic
+            "🌍 global love 💚",   // Emoji
         ];
 
         for action in unicode_actions {
             let result = evaluator.evaluate(action, context.clone());
             // Should not crash with Unicode
-            assert!(result.overall_score >= -1.0 && result.overall_score <= 1.0,
-                "Unicode action '{}' should have valid score", action);
+            assert!(
+                result.overall_score >= -1.0 && result.overall_score <= 1.0,
+                "Unicode action '{}' should have valid score",
+                action
+            );
         }
     }
 
@@ -430,6 +464,9 @@ mod calibration_tests {
         evaluator.evaluate("share knowledge", context.clone());
 
         let stats = evaluator.stats();
-        assert_eq!(stats.total_evaluations, 3, "Should have 3 total evaluations");
+        assert_eq!(
+            stats.total_evaluations, 3,
+            "Should have 3 total evaluations"
+        );
     }
 }

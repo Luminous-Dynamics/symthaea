@@ -44,9 +44,9 @@
 // Performance: O(n log n) for encoding/decoding via FFT
 // Space: O(n) for holographic representation
 
-use std::f64::consts::PI;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use serde::{Serialize, Deserialize};
+use std::f64::consts::PI;
 
 /// Configuration for holographic consciousness
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -212,8 +212,10 @@ impl HolographicField {
 
         for i in 0..dim {
             // Complex multiplication in polar form
-            let (obj_amp, obj_phase) = self.to_polar(object_wave[i * 2], object_wave[i * 2 + 1].min(0.0));
-            let (ref_amp, ref_phase) = self.to_polar(reference_wave[i * 2], reference_wave[i * 2 + 1].min(0.0));
+            let (obj_amp, obj_phase) =
+                self.to_polar(object_wave[i * 2], object_wave[i * 2 + 1].min(0.0));
+            let (ref_amp, ref_phase) =
+                self.to_polar(reference_wave[i * 2], reference_wave[i * 2 + 1].min(0.0));
 
             spectrum[i] = obj_amp * ref_amp;
             phases[i] = obj_phase - ref_phase; // Conjugate of reference
@@ -262,7 +264,8 @@ impl HolographicField {
 
         for i in 0..dim {
             let (holo_amp, holo_phase) = (self.amplitude[i], self.phase[i]);
-            let (ref_amp, ref_phase) = self.to_polar(reference_wave[i * 2], reference_wave[i * 2 + 1].min(0.0));
+            let (ref_amp, ref_phase) =
+                self.to_polar(reference_wave[i * 2], reference_wave[i * 2 + 1].min(0.0));
 
             let amp = holo_amp * ref_amp;
             let phase = holo_phase + ref_phase;
@@ -339,7 +342,10 @@ impl HolographicField {
             let mut real = 0.0;
             let mut imag = 0.0;
 
-            for (k, (&freq, &phase)) in self.reference.frequencies.iter()
+            for (k, (&freq, &phase)) in self
+                .reference
+                .frequencies
+                .iter()
                 .zip(self.reference.phases.iter())
                 .enumerate()
             {
@@ -478,9 +484,11 @@ impl HolographicMemory {
     fn compute_reconstruction_quality(&self, content: &[f64]) -> f64 {
         // Quality based on signal-to-noise ratio and coherence
         let signal_strength: f64 = content.iter().map(|x| x.abs()).sum();
-        let noise_estimate: f64 = content.iter()
+        let noise_estimate: f64 = content
+            .iter()
             .map(|x| (x - signal_strength / content.len() as f64).abs())
-            .sum::<f64>() / content.len() as f64;
+            .sum::<f64>()
+            / content.len() as f64;
 
         let snr = if noise_estimate > 0.0 {
             signal_strength / (noise_estimate * content.len() as f64)
@@ -549,7 +557,8 @@ impl HolographicBinder {
             phase_offsets.push(mean_phase);
 
             // Update bindings
-            let labels: Vec<String> = features.iter()
+            let labels: Vec<String> = features
+                .iter()
                 .filter(|(l, _)| *l != *label)
                 .map(|(l, _)| l.to_string())
                 .collect();
@@ -570,7 +579,8 @@ impl HolographicBinder {
 
     /// Check if features are bound together
     pub fn are_bound(&self, feature1: &str, feature2: &str) -> bool {
-        self.bindings.get(feature1)
+        self.bindings
+            .get(feature1)
             .map(|v| v.contains(&feature2.to_string()))
             .unwrap_or(false)
     }
@@ -758,7 +768,7 @@ mod tests {
 
         // Field should still be coherent
         let coherence = field.coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]
@@ -791,7 +801,7 @@ mod tests {
 
         let binding_strength = binder.bind(&features);
 
-        assert!(binding_strength >= 0.0 && binding_strength <= 1.0);
+        assert!((0.0..=1.0).contains(&binding_strength));
         assert!(binder.are_bound("red", "circle"));
     }
 
@@ -858,7 +868,7 @@ mod tests {
 
         // Empty field should have some coherence
         let coherence = field.coherence();
-        assert!(coherence >= 0.0 && coherence <= 1.0);
+        assert!((0.0..=1.0).contains(&coherence));
     }
 
     #[test]

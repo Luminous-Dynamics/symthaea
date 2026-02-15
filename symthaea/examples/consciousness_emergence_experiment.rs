@@ -30,12 +30,9 @@
 //! ```
 
 use symthaea_core::genesis::GenesisSeed;
-use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable,
-    PhysicsConsciousnessBridge,
-};
-use symthaea_core::physics::chemistry::Chemistry;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
+use symthaea_core::physics::chemistry::Chemistry;
+use symthaea_core::physics::{Hadrons, PeriodicTable, PhysicsConsciousnessBridge, StandardModel};
 
 fn main() {
     println!("\n");
@@ -71,18 +68,21 @@ fn main() {
     println!("\nEmergence Gradient: {:+.4} per level", gradient);
 
     let emergence = analysis.shows_emergence();
-    println!("\nH1 Result: {}", if emergence {
-        "SUPPORTED - Phenomenal character increases with complexity"
-    } else {
-        "NOT SUPPORTED - No clear emergence pattern"
-    });
+    println!(
+        "\nH1 Result: {}",
+        if emergence {
+            "SUPPORTED - Phenomenal character increases with complexity"
+        } else {
+            "NOT SUPPORTED - No clear emergence pattern"
+        }
+    );
 
     // Detailed breakdown
     println!("\nDetailed Analysis:");
-    let quark_phen = bridge.phenomenal_index(&model.up_quark);
-    let electron_phen = bridge.phenomenal_index(&model.electron);
-    let proton_phen = bridge.phenomenal_index(&hadrons.proton);
-    let neutron_phen = bridge.phenomenal_index(&hadrons.neutron);
+    let quark_phen = bridge.estimate_phenomenal_index(&model.up_quark);
+    let electron_phen = bridge.estimate_phenomenal_index(&model.electron);
+    let proton_phen = bridge.estimate_phenomenal_index(&hadrons.proton);
+    let neutron_phen = bridge.estimate_phenomenal_index(&hadrons.neutron);
 
     let h = table.element(1).unwrap();
     let c = table.element(6).unwrap();
@@ -93,10 +93,22 @@ fn main() {
     println!("  Electron:    {:+.4}", electron_phen);
     println!("  Proton:      {:+.4}", proton_phen);
     println!("  Neutron:     {:+.4}", neutron_phen);
-    println!("  Hydrogen:    {:+.4}", bridge.phenomenal_index(&h.vector));
-    println!("  Carbon:      {:+.4}", bridge.phenomenal_index(&c.vector));
-    println!("  Oxygen:      {:+.4}", bridge.phenomenal_index(&o.vector));
-    println!("  Water:       {:+.4}", bridge.phenomenal_index(&water.vector));
+    println!(
+        "  Hydrogen:    {:+.4}",
+        bridge.estimate_phenomenal_index(&h.vector)
+    );
+    println!(
+        "  Carbon:      {:+.4}",
+        bridge.estimate_phenomenal_index(&c.vector)
+    );
+    println!(
+        "  Oxygen:      {:+.4}",
+        bridge.estimate_phenomenal_index(&o.vector)
+    );
+    println!(
+        "  Water:       {:+.4}",
+        bridge.estimate_phenomenal_index(&water.vector)
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("EXPERIMENT 2: BINDING vs BUNDLING");
@@ -112,8 +124,10 @@ fn main() {
         ("Carbon", &c.vector, "Oxygen", &o.vector),
     ];
 
-    println!("{:<24} {:>12} {:>12} {:>10}",
-             "Pair", "Bind Unity", "Bundle Unity", "Δ Bind-Bundle");
+    println!(
+        "{:<24} {:>12} {:>12} {:>10}",
+        "Pair", "Bind Unity", "Bundle Unity", "Δ Bind-Bundle"
+    );
     println!("{}", "-".repeat(60));
 
     let mut total_advantage = 0.0;
@@ -122,11 +136,13 @@ fn main() {
     for (name_a, vec_a, name_b, vec_b) in &test_pairs {
         let result = bridge.binding_unity_test(vec_a, vec_b);
 
-        println!("{:<24} {:>12.4} {:>12.4} {:>+10.4}",
-                 format!("{} + {}", name_a, name_b),
-                 result.bound_unity,
-                 result.bundled_unity,
-                 result.binding_advantage);
+        println!(
+            "{:<24} {:>12.4} {:>12.4} {:>+10.4}",
+            format!("{} + {}", name_a, name_b),
+            result.bound_unity,
+            result.bundled_unity,
+            result.binding_advantage
+        );
 
         total_advantage += result.binding_advantage;
         count += 1;
@@ -135,11 +151,14 @@ fn main() {
     let avg_advantage = total_advantage / count as f32;
     println!("\nMean Binding Advantage: {:+.4}", avg_advantage);
 
-    println!("\nH2 Result: {}", if avg_advantage > 0.0 {
-        "SUPPORTED - Binding produces higher unity than bundling"
-    } else {
-        "NOT SUPPORTED - Bundling produces equal or higher unity"
-    });
+    println!(
+        "\nH2 Result: {}",
+        if avg_advantage > 0.0 {
+            "SUPPORTED - Binding produces higher unity than bundling"
+        } else {
+            "NOT SUPPORTED - Bundling produces equal or higher unity"
+        }
+    );
 
     // Integration comparison
     println!("\nIntegration Analysis (Bound vs Bundled):");
@@ -164,8 +183,10 @@ fn main() {
         ("Water", &water.vector),
     ];
 
-    println!("{:<12} {:>14} {:>14} {:>12}",
-             "Substrate", "Bare Phen", "Embodied Phen", "Δ Embodied");
+    println!(
+        "{:<12} {:>14} {:>14} {:>12}",
+        "Substrate", "Bare Phen", "Embodied Phen", "Δ Embodied"
+    );
     println!("{}", "-".repeat(54));
 
     let mut total_delta = 0.0;
@@ -173,16 +194,20 @@ fn main() {
     let mut test_count = 0;
 
     for (name, vec) in &substrates {
-        let bare_phen = bridge.phenomenal_index(vec);
+        let bare_phen = bridge.estimate_phenomenal_index(vec);
         let embodied = bridge.embody_qualia(vec);
-        let embodied_phen = bridge.phenomenal_index(&embodied);
+        let embodied_phen = bridge.estimate_phenomenal_index(&embodied);
         let delta = embodied_phen - bare_phen;
 
-        println!("{:<12} {:>+14.4} {:>+14.4} {:>+12.4}",
-                 name, bare_phen, embodied_phen, delta);
+        println!(
+            "{:<12} {:>+14.4} {:>+14.4} {:>+12.4}",
+            name, bare_phen, embodied_phen, delta
+        );
 
         total_delta += delta;
-        if delta > 0.0 { positive_count += 1; }
+        if delta > 0.0 {
+            positive_count += 1;
+        }
         test_count += 1;
     }
 
@@ -190,11 +215,14 @@ fn main() {
     println!("\nMean Embodiment Effect: {:+.4}", avg_delta);
     println!("Positive Effects: {}/{}", positive_count, test_count);
 
-    println!("\nH3 Result: {}", if avg_delta > 0.0 && positive_count > test_count / 2 {
-        "SUPPORTED - Embodiment increases phenomenal character"
-    } else {
-        "NOT SUPPORTED - Embodiment does not reliably increase phenomenal character"
-    });
+    println!(
+        "\nH3 Result: {}",
+        if avg_delta > 0.0 && positive_count > test_count / 2 {
+            "SUPPORTED - Embodiment increases phenomenal character"
+        } else {
+            "NOT SUPPORTED - Embodiment does not reliably increase phenomenal character"
+        }
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("EXPERIMENT 4: PHENOMENAL vs FUNCTIONAL DISCRIMINATION");
@@ -223,18 +251,48 @@ fn main() {
 
     println!("\nIndividual Phenomenal Indices:");
     println!("\n  Phenomenal Concepts:");
-    println!("    Qualia:     {:+.4}", bridge.phenomenal_index(&bridge.qualia));
-    println!("    Awareness:  {:+.4}", bridge.phenomenal_index(&bridge.awareness));
-    println!("    Subjective: {:+.4}", bridge.phenomenal_index(&bridge.subjective));
-    println!("    Experience: {:+.4}", bridge.phenomenal_index(&bridge.experience));
-    println!("    Unity:      {:+.4}", bridge.phenomenal_index(&bridge.unity));
+    println!(
+        "    Qualia:     {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.qualia)
+    );
+    println!(
+        "    Awareness:  {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.awareness)
+    );
+    println!(
+        "    Subjective: {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.subjective)
+    );
+    println!(
+        "    Experience: {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.experience)
+    );
+    println!(
+        "    Unity:      {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.unity)
+    );
 
     println!("\n  Functional Concepts:");
-    println!("    Computation: {:+.4}", bridge.phenomenal_index(&bridge.computation));
-    println!("    Information: {:+.4}", bridge.phenomenal_index(&bridge.information));
-    println!("    Processing:  {:+.4}", bridge.phenomenal_index(&bridge.processing));
-    println!("    Algorithm:   {:+.4}", bridge.phenomenal_index(&bridge.algorithm));
-    println!("    Function:    {:+.4}", bridge.phenomenal_index(&bridge.function));
+    println!(
+        "    Computation: {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.computation)
+    );
+    println!(
+        "    Information: {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.information)
+    );
+    println!(
+        "    Processing:  {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.processing)
+    );
+    println!(
+        "    Algorithm:   {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.algorithm)
+    );
+    println!(
+        "    Function:    {:+.4}",
+        bridge.estimate_phenomenal_index(&bridge.function)
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("EXPERIMENT 5: CROSS-DOMAIN ANALYSIS");
@@ -244,8 +302,10 @@ fn main() {
 
     // Physics to consciousness similarity
     println!("Physics → Consciousness Similarity Matrix:\n");
-    println!("{:<12} {:>10} {:>10} {:>10} {:>10}",
-             "Physics", "Qualia", "Unity", "Computa", "Info");
+    println!(
+        "{:<12} {:>10} {:>10} {:>10} {:>10}",
+        "Physics", "Qualia", "Unity", "Computa", "Info"
+    );
     println!("{}", "-".repeat(52));
 
     let physics_concepts: Vec<(&str, &ContinuousHV)> = vec![
@@ -256,36 +316,68 @@ fn main() {
     ];
 
     for (name, vec) in &physics_concepts {
-        println!("{:<12} {:>10.4} {:>10.4} {:>10.4} {:>10.4}",
-                 name,
-                 vec.similarity(&bridge.qualia),
-                 vec.similarity(&bridge.unity),
-                 vec.similarity(&bridge.computation),
-                 vec.similarity(&bridge.information));
+        println!(
+            "{:<12} {:>10.4} {:>10.4} {:>10.4} {:>10.4}",
+            name,
+            vec.similarity(&bridge.qualia),
+            vec.similarity(&bridge.unity),
+            vec.similarity(&bridge.computation),
+            vec.similarity(&bridge.information)
+        );
     }
 
     // Emergence concept similarities
     println!("\nBridge Concepts:");
-    println!("  Embodiment ↔ Qualia:      {:.4}", bridge.embodiment.similarity(&bridge.qualia));
-    println!("  Embodiment ↔ Computation: {:.4}", bridge.embodiment.similarity(&bridge.computation));
-    println!("  Emergence ↔ Unity:        {:.4}", bridge.emergence.similarity(&bridge.unity));
-    println!("  Integration ↔ Unity:      {:.4}", bridge.integration.similarity(&bridge.unity));
+    println!(
+        "  Embodiment ↔ Qualia:      {:.4}",
+        bridge.embodiment.similarity(&bridge.qualia)
+    );
+    println!(
+        "  Embodiment ↔ Computation: {:.4}",
+        bridge.embodiment.similarity(&bridge.computation)
+    );
+    println!(
+        "  Emergence ↔ Unity:        {:.4}",
+        bridge.emergence.similarity(&bridge.unity)
+    );
+    println!(
+        "  Integration ↔ Unity:      {:.4}",
+        bridge.integration.similarity(&bridge.unity)
+    );
 
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     println!("SUMMARY");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     println!("Hypothesis Results:\n");
-    println!("  H1 (Compositional Emergence):  {:>10}",
-             if emergence { "SUPPORTED" } else { "NOT SUPPORTED" });
+    println!(
+        "  H1 (Compositional Emergence):  {:>10}",
+        if emergence {
+            "SUPPORTED"
+        } else {
+            "NOT SUPPORTED"
+        }
+    );
     println!("      Emergence gradient: {:+.4}/level", gradient);
 
-    println!("\n  H2 (Binding > Bundling):       {:>10}",
-             if avg_advantage > 0.0 { "SUPPORTED" } else { "NOT SUPPORTED" });
+    println!(
+        "\n  H2 (Binding > Bundling):       {:>10}",
+        if avg_advantage > 0.0 {
+            "SUPPORTED"
+        } else {
+            "NOT SUPPORTED"
+        }
+    );
     println!("      Mean binding advantage: {:+.4}", avg_advantage);
 
-    println!("\n  H3 (Embodiment Effect):        {:>10}",
-             if avg_delta > 0.0 { "SUPPORTED" } else { "NOT SUPPORTED" });
+    println!(
+        "\n  H3 (Embodiment Effect):        {:>10}",
+        if avg_delta > 0.0 {
+            "SUPPORTED"
+        } else {
+            "NOT SUPPORTED"
+        }
+    );
     println!("      Mean embodiment delta: {:+.4}", avg_delta);
 
     println!("\n  Phenomenal/Functional Discrimination: {:.4}", fisher);

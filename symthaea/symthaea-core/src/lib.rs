@@ -14,7 +14,7 @@
 //! | [`ContinuousHV`](hdc::ContinuousHV) | `Vec<f32>`, configurable dimension | Gradients, phi computation, learning |
 //! | [`HV`](hdc::HV) | Enum wrapping both | Unified API across representations |
 //!
-//! Backward-compatible aliases `HV16` and `RealHV` are available but new code should
+//! Backward-compatible alias `RealHV` is available but new code should
 //! use `BinaryHV` and `ContinuousHV` directly.
 //!
 //! ## Modules
@@ -28,16 +28,38 @@
 //! - **[`genesis`]** — System bootstrap and initialization
 //! - **[`observability`]** — Metrics, tracing, and introspection
 
+#![warn(missing_docs)]
 #![allow(clippy::needless_range_loop)]
+#![allow(clippy::manual_clamp)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::wrong_self_convention)]
+#![allow(clippy::if_same_then_else)]
+#![allow(clippy::manual_memcpy)]
+#![allow(clippy::only_used_in_recursion)]
+#![allow(clippy::redundant_guards)]
+#![allow(clippy::unwrap_or_default)]
+#![allow(clippy::duplicated_attributes)]
 // Suppress test-harness-generated deprecated warnings for phi_real module tests.
 // phi_real is #![deprecated] (renamed to spectral_connectivity), but the linter
 // hook restores its tests; the test harness references deprecated test constants
 // at crate level which cannot be suppressed locally.
 #![cfg_attr(test, allow(deprecated))]
 
+/// Core consciousness state types and configuration.
+#[allow(missing_docs)]
 pub mod core;
+/// System bootstrap and initialization.
+#[allow(missing_docs)]
 pub mod genesis;
+/// Hyperdimensional computing: vector types, encoding, binding, bundling, similarity, and consciousness topology.
+#[allow(missing_docs)]
 pub mod hdc;
+/// Metrics, tracing, and introspection.
+#[allow(missing_docs)]
 pub mod observability;
+/// Integrated Information (Phi) calculation engine.
+#[allow(missing_docs)]
 pub mod phi_engine;
+/// Physics-grounded modeling: periodic table, emergence, kinetics, IIT, and thermodynamics.
+#[allow(missing_docs)]
 pub mod physics;

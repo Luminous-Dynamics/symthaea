@@ -22,9 +22,9 @@
 //! - Cartesian, polar, spherical
 //! - Generalized coordinates q_i and momenta p_i
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// Mechanical system type
@@ -42,20 +42,20 @@ pub enum SystemType {
 /// Constraint type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConstraintType {
-    Holonomic,      // f(q, t) = 0
-    NonHolonomic,   // f(q, dq, t) = 0, not integrable
-    Scleronomous,   // Time-independent
-    Rheonomous,     // Time-dependent
+    Holonomic,    // f(q, t) = 0
+    NonHolonomic, // f(q, dq, t) = 0, not integrable
+    Scleronomous, // Time-independent
+    Rheonomous,   // Time-dependent
 }
 
 /// Symmetry type for Noether's theorem
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SymmetryType {
-    TimeTranslation,    // → Energy conservation
-    SpaceTranslation,   // → Momentum conservation
-    Rotation,           // → Angular momentum conservation
-    GalileanBoost,      // → Center of mass motion
-    Scaling,            // → Virial theorem
+    TimeTranslation,  // → Energy conservation
+    SpaceTranslation, // → Momentum conservation
+    Rotation,         // → Angular momentum conservation
+    GalileanBoost,    // → Center of mass motion
+    Scaling,          // → Virial theorem
 }
 
 impl SymmetryType {
@@ -184,7 +184,10 @@ impl ClassicalMechanicsEncoder {
     /// Kinetic energy: T = ½mv²
     pub fn kinetic_energy(&self, mass: f64, velocity: f64) -> ContinuousHV {
         let t = 0.5 * mass * velocity * velocity;
-        self.kinetic.bind(&self.mass).bind(&self.velocity).scale(t as f32)
+        self.kinetic
+            .bind(&self.mass)
+            .bind(&self.velocity)
+            .scale(t as f32)
     }
 
     /// Momentum: p = mv
@@ -194,7 +197,9 @@ impl ClassicalMechanicsEncoder {
 
     /// Angular momentum: L = r × p
     pub fn angular_momentum_vector(&self) -> ContinuousHV {
-        self.angular_momentum.bind(&self.position).bind(&self.momentum)
+        self.angular_momentum
+            .bind(&self.position)
+            .bind(&self.momentum)
     }
 
     // ============================================================
@@ -203,8 +208,7 @@ impl ClassicalMechanicsEncoder {
 
     /// Lagrangian: L = T - V
     pub fn lagrangian_form(&self) -> ContinuousHV {
-        ContinuousHV::bundle(&[&self.kinetic, &self.potential.scale(-1.0)])
-            .bind(&self.lagrangian)
+        ContinuousHV::bundle(&[&self.kinetic, &self.potential.scale(-1.0)]).bind(&self.lagrangian)
     }
 
     /// Action: S = ∫L dt
@@ -225,8 +229,7 @@ impl ClassicalMechanicsEncoder {
 
     /// Hamiltonian: H = Σ(p·q̇) - L = T + V (for natural systems)
     pub fn hamiltonian_form(&self) -> ContinuousHV {
-        ContinuousHV::bundle(&[&self.kinetic, &self.potential])
-            .bind(&self.hamiltonian)
+        ContinuousHV::bundle(&[&self.kinetic, &self.potential]).bind(&self.hamiltonian)
     }
 
     /// Hamilton's equations via Poisson bracket
@@ -293,9 +296,7 @@ impl ClassicalMechanicsEncoder {
 
         let symmetries = self.infer_symmetries(system_type);
 
-        let vector = base
-            .bind(&self.lagrangian)
-            .scale(dof as f32);
+        let vector = base.bind(&self.lagrangian).scale(dof as f32);
 
         MechanicalSystem {
             name: name.to_string(),
@@ -315,19 +316,10 @@ impl ClassicalMechanicsEncoder {
                 SymmetryType::Rotation,
                 SymmetryType::GalileanBoost,
             ],
-            SystemType::HarmonicOscillator => vec![
-                SymmetryType::TimeTranslation,
-            ],
-            SystemType::CentralForce => vec![
-                SymmetryType::TimeTranslation,
-                SymmetryType::Rotation,
-            ],
-            SystemType::RigidBody => vec![
-                SymmetryType::TimeTranslation,
-            ],
-            SystemType::Pendulum => vec![
-                SymmetryType::TimeTranslation,
-            ],
+            SystemType::HarmonicOscillator => vec![SymmetryType::TimeTranslation],
+            SystemType::CentralForce => vec![SymmetryType::TimeTranslation, SymmetryType::Rotation],
+            SystemType::RigidBody => vec![SymmetryType::TimeTranslation],
+            SystemType::Pendulum => vec![SymmetryType::TimeTranslation],
             SystemType::TwoBody => vec![
                 SymmetryType::TimeTranslation,
                 SymmetryType::SpaceTranslation,
@@ -343,7 +335,8 @@ impl ClassicalMechanicsEncoder {
 
     /// Simple harmonic oscillator: H = p²/2m + ½kx²
     pub fn harmonic_oscillator(&self, omega: f64) -> MechanicalSystem {
-        let sho = self.oscillator
+        let sho = self
+            .oscillator
             .bind(&self.kinetic)
             .bind(&self.potential)
             .scale(omega as f32);
@@ -361,19 +354,14 @@ impl ClassicalMechanicsEncoder {
     /// Kepler problem (1/r potential)
     pub fn kepler_problem(&self) -> MechanicalSystem {
         let inverse_r = self.genesis.hv("potential::inverse_r", PHYSICS_DIM);
-        let kepler = self.central_force
-            .bind(&inverse_r)
-            .bind(&self.hamiltonian);
+        let kepler = self.central_force.bind(&inverse_r).bind(&self.hamiltonian);
 
         MechanicalSystem {
             name: "Kepler Problem".to_string(),
             system_type: SystemType::CentralForce,
             degrees_of_freedom: 3,
             constraints: vec![],
-            symmetries: vec![
-                SymmetryType::TimeTranslation,
-                SymmetryType::Rotation,
-            ],
+            symmetries: vec![SymmetryType::TimeTranslation, SymmetryType::Rotation],
             vector: kepler,
         }
     }
@@ -381,7 +369,8 @@ impl ClassicalMechanicsEncoder {
     /// Rigid body rotation
     pub fn rigid_body_rotation(&self, inertia_tensor: [f64; 3]) -> MechanicalSystem {
         let i_total = inertia_tensor.iter().sum::<f64>();
-        let rigid = self.rigid_body
+        let rigid = self
+            .rigid_body
             .bind(&self.angular_momentum)
             .bind(&self.rotation_symmetry)
             .scale(i_total as f32);
@@ -413,7 +402,7 @@ impl ClassicalMechanicsEncoder {
         }
     }
 
-    /// Encode the virial theorem: 2<T> = -<r·∇V> for bound systems
+    /// Encode the virial theorem: `2<T> = -<r·∇V>` for bound systems
     pub fn virial_theorem(&self) -> ContinuousHV {
         let bound_state = self.genesis.hv("state::bound", PHYSICS_DIM);
         self.kinetic

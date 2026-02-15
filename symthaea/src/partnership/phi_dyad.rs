@@ -1,6 +1,6 @@
 use crate::core::{ContinuousHV, HDC_DIMENSION};
-use symthaea_core::hdc::relational_consciousness::{RelationalAssessment, RelationMode};
 use crate::phi_engine::PhiEngine;
+use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationalAssessment};
 
 use super::HumanPartnerModel;
 
@@ -144,11 +144,7 @@ impl PhiDyadCalculator {
         input: &DyadInput<'_>,
         relational_hv: &ContinuousHV,
     ) -> Vec<ContinuousHV> {
-        let n = input
-            .ai_states
-            .len()
-            .min(input.human_states.len())
-            .min(8); // keep it small for performance
+        let n = input.ai_states.len().min(input.human_states.len()).min(8); // keep it small for performance
 
         let mut joint_states = Vec::with_capacity(n);
 
@@ -173,4 +169,3 @@ impl PhiDyadCalculator {
         joint_states
     }
 }
-

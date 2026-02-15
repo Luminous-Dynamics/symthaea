@@ -196,7 +196,10 @@ pub enum PhiAssessment {
 impl PhiAssessment {
     /// Whether this assessment indicates a problem
     pub fn is_concerning(&self) -> bool {
-        matches!(self, Self::SignificantDecrease | Self::CriticalDrop | Self::BelowThreshold)
+        matches!(
+            self,
+            Self::SignificantDecrease | Self::CriticalDrop | Self::BelowThreshold
+        )
     }
 }
 
@@ -420,10 +423,7 @@ impl PhiMonitor {
             .map(|op| op.start_time.elapsed())
             .unwrap_or_default();
 
-        let pre_phi = operation
-            .as_ref()
-            .map(|op| op.pre_phi)
-            .unwrap_or(post_phi);
+        let pre_phi = operation.as_ref().map(|op| op.pre_phi).unwrap_or(post_phi);
 
         // Record post-generation measurement
         let measurement = PhiMeasurement {
@@ -526,14 +526,22 @@ impl PhiMonitor {
         // Simple linear regression for trend
         let sum_x: f32 = (0..n).map(|i| i as f32).sum();
         let sum_y: f32 = measurements.iter().sum();
-        let sum_xy: f32 = measurements.iter().enumerate().map(|(i, &y)| i as f32 * y).sum();
+        let sum_xy: f32 = measurements
+            .iter()
+            .enumerate()
+            .map(|(i, &y)| i as f32 * y)
+            .sum();
         let sum_xx: f32 = (0..n).map(|i| (i * i) as f32).sum();
 
         let slope = (n as f32 * sum_xy - sum_x * sum_y) / (n as f32 * sum_xx - sum_x * sum_x);
 
         // Calculate variance for stability check
         let mean = sum_y / n as f32;
-        let variance: f32 = measurements.iter().map(|&y| (y - mean).powi(2)).sum::<f32>() / n as f32;
+        let variance: f32 = measurements
+            .iter()
+            .map(|&y| (y - mean).powi(2))
+            .sum::<f32>()
+            / n as f32;
         let std_dev = variance.sqrt();
 
         if std_dev > 0.1 {
@@ -585,7 +593,9 @@ impl PhiMonitor {
         }
 
         if delta_phi < -0.1 && self.stats.total_generations > 5 {
-            recs.push("Consistent Φ drops suggest this interaction pattern is draining".to_string());
+            recs.push(
+                "Consistent Φ drops suggest this interaction pattern is draining".to_string(),
+            );
         }
 
         recs
@@ -612,8 +622,7 @@ impl PhiMonitor {
 
         // Update average delta
         let n = self.stats.total_generations as f32;
-        self.stats.avg_delta_phi =
-            (self.stats.avg_delta_phi * (n - 1.0) + analysis.delta_phi) / n;
+        self.stats.avg_delta_phi = (self.stats.avg_delta_phi * (n - 1.0) + analysis.delta_phi) / n;
     }
 
     /// Maybe adjust thresholds based on performance
@@ -633,8 +642,8 @@ impl PhiMonitor {
         }
 
         // Check if adjustment needed
-        let total = self.adaptive_state.successful_at_current
-            + self.adaptive_state.failed_at_current;
+        let total =
+            self.adaptive_state.successful_at_current + self.adaptive_state.failed_at_current;
 
         if total < 10 {
             return;
@@ -666,12 +675,14 @@ impl PhiMonitor {
 
         if let Some(new) = new_threshold {
             self.config.min_phi_threshold = new;
-            self.adaptive_state.adjustment_history.push(ThresholdAdjustment {
-                from: old_threshold,
-                to: new,
-                reason,
-                timestamp: std::time::SystemTime::now(),
-            });
+            self.adaptive_state
+                .adjustment_history
+                .push(ThresholdAdjustment {
+                    from: old_threshold,
+                    to: new,
+                    reason,
+                    timestamp: std::time::SystemTime::now(),
+                });
             self.adaptive_state.last_adjustment = Some(Instant::now());
             self.adaptive_state.successful_at_current = 0;
             self.adaptive_state.failed_at_current = 0;
@@ -801,7 +812,10 @@ mod tests {
     fn test_assessment() {
         assert_eq!(assess_phi_change(0.6, 0.7), PhiAssessment::Enhanced);
         assert_eq!(assess_phi_change(0.6, 0.58), PhiAssessment::Maintained);
-        assert_eq!(assess_phi_change(0.6, 0.45), PhiAssessment::SignificantDecrease);
+        assert_eq!(
+            assess_phi_change(0.6, 0.45),
+            PhiAssessment::SignificantDecrease
+        );
         assert_eq!(assess_phi_change(0.5, 0.2), PhiAssessment::BelowThreshold);
     }
 

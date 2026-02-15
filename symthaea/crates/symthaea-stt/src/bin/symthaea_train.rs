@@ -23,7 +23,7 @@ use console::{style, Emoji};
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
 use std::collections::HashMap;
 use std::fs::{self, File};
-use std::io::{Read, Write, BufReader};
+use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::Instant;
@@ -203,7 +203,9 @@ impl HV16 {
     }
 
     fn similarity(&self, other: &Self) -> f32 {
-        let matching: u32 = self.0.iter()
+        let matching: u32 = self
+            .0
+            .iter()
             .zip(other.0.iter())
             .map(|(a, b)| (!(a ^ b)).count_ones())
             .sum();
@@ -327,7 +329,13 @@ impl TrainedPrototypes {
             let mean_duration_ms = f32::from_le_bytes(buf4);
 
             prototypes.insert(label.clone(), HV16(hv_bytes));
-            stats.insert(label, PhonemeStats { sample_count, mean_duration_ms });
+            stats.insert(
+                label,
+                PhonemeStats {
+                    sample_count,
+                    mean_duration_ms,
+                },
+            );
         }
 
         Ok(Self { prototypes, stats })
@@ -391,7 +399,8 @@ impl ProgressCallback {
     }
 
     fn on_phoneme_sample(&mut self, phoneme: &str, count: usize) {
-        self.stats.samples_per_phoneme
+        self.stats
+            .samples_per_phoneme
             .entry(phoneme.to_string())
             .and_modify(|c| *c = count)
             .or_insert(count);
@@ -425,14 +434,23 @@ fn run_bootstrap(
     // Header
     if !quiet {
         println!("\n{}", style("═".repeat(70)).cyan());
-        println!("{}", style("                  SYMTHAEA BOOTSTRAP PROTOCOL").cyan().bold());
+        println!(
+            "{}",
+            style("                  SYMTHAEA BOOTSTRAP PROTOCOL")
+                .cyan()
+                .bold()
+        );
         println!("{}", style("═".repeat(70)).cyan());
         println!();
     }
 
     // Step 1: Ensure dataset
     if !quiet {
-        println!("{}{}Ensuring dataset presence...", PACKAGE, style("Step 1/4: ").bold());
+        println!(
+            "{}{}Ensuring dataset presence...",
+            PACKAGE,
+            style("Step 1/4: ").bold()
+        );
     }
 
     let dataset_path = data_dir.join("LibriSpeech").join(subset);
@@ -448,15 +466,31 @@ fn run_bootstrap(
 
     // Step 2: Scan dataset
     if !quiet {
-        println!("\n{}{}Scanning dataset...", SEARCH, style("Step 2/4: ").bold());
+        println!(
+            "\n{}{}Scanning dataset...",
+            SEARCH,
+            style("Step 2/4: ").bold()
+        );
     }
 
     let utterances = scan_librispeech(&dataset_path)?;
-    let total = if limit > 0 { limit.min(utterances.len()) } else { utterances.len() };
+    let total = if limit > 0 {
+        limit.min(utterances.len())
+    } else {
+        utterances.len()
+    };
 
     if !quiet {
-        println!("  {}Found {} utterances ({} speakers)", CHECK, utterances.len(),
-            utterances.iter().map(|u| &u.speaker_id).collect::<std::collections::HashSet<_>>().len());
+        println!(
+            "  {}Found {} utterances ({} speakers)",
+            CHECK,
+            utterances.len(),
+            utterances
+                .iter()
+                .map(|u| &u.speaker_id)
+                .collect::<std::collections::HashSet<_>>()
+                .len()
+        );
         if limit > 0 {
             println!("  {}Limited to {} utterances", WARN, limit);
         }
@@ -464,7 +498,11 @@ fn run_bootstrap(
 
     // Step 3: Training
     if !quiet {
-        println!("\n{}{}Training prototypes...", BRAIN, style("Step 3/4: ").bold());
+        println!(
+            "\n{}{}Training prototypes...",
+            BRAIN,
+            style("Step 3/4: ").bold()
+        );
         println!("  {}LTC temporal dynamics engaged", WAVE);
         println!("  {}Salience threshold: {}", LIGHTNING, salience_threshold);
         println!();
@@ -552,7 +590,11 @@ fn run_bootstrap(
 
     // Step 4: Save
     if !quiet {
-        println!("\n{}{}Saving prototypes...", SAVE, style("Step 4/4: ").bold());
+        println!(
+            "\n{}{}Saving prototypes...",
+            SAVE,
+            style("Step 4/4: ").bold()
+        );
     }
 
     fs::create_dir_all(output_dir)?;
@@ -565,10 +607,13 @@ fn run_bootstrap(
         if instances.len() >= min_samples {
             let proto = bundle(instances);
             prototypes.insert(phoneme.clone(), proto);
-            stats.insert(phoneme.clone(), PhonemeStats {
-                sample_count: instances.len(),
-                mean_duration_ms: 80.0, // Placeholder
-            });
+            stats.insert(
+                phoneme.clone(),
+                PhonemeStats {
+                    sample_count: instances.len(),
+                    mean_duration_ms: 80.0, // Placeholder
+                },
+            );
         }
     }
 
@@ -599,23 +644,46 @@ fn run_bootstrap(
 
     // Summary
     if !quiet {
-        let duration = callback.as_ref().map(|c| c.start_time.elapsed()).unwrap_or_default();
+        let duration = callback
+            .as_ref()
+            .map(|c| c.start_time.elapsed())
+            .unwrap_or_default();
         let total_samples: usize = accumulators.values().map(|v| v.len()).sum();
 
         println!("\n{}", style("═".repeat(70)).green());
-        println!("{}", style("                      TRAINING COMPLETE").green().bold());
+        println!(
+            "{}",
+            style("                      TRAINING COMPLETE")
+                .green()
+                .bold()
+        );
         println!("{}", style("═".repeat(70)).green());
         println!();
         println!("  {}Duration:      {:?}", CHART, duration);
-        println!("  {}Utterances:    {}", EAR, callback.as_ref().map(|c| c.stats.utterances_processed).unwrap_or(0));
+        println!(
+            "  {}Utterances:    {}",
+            EAR,
+            callback
+                .as_ref()
+                .map(|c| c.stats.utterances_processed)
+                .unwrap_or(0)
+        );
         println!("  {}Phonemes:      {}", BRAIN, trained.prototypes.len());
         println!("  {}Total samples: {}", CHART, total_samples);
-        println!("  {}Errors:        {}", WARN, callback.as_ref().map(|c| c.stats.alignment_errors).unwrap_or(0));
+        println!(
+            "  {}Errors:        {}",
+            WARN,
+            callback
+                .as_ref()
+                .map(|c| c.stats.alignment_errors)
+                .unwrap_or(0)
+        );
         println!();
 
         // Per-phoneme summary
         println!("  {}Phoneme coverage:", CHART);
-        let mut sorted: Vec<_> = accumulators.iter()
+        let mut sorted: Vec<_> = accumulators
+            .iter()
             .filter(|(_, v)| v.len() >= min_samples)
             .collect();
         sorted.sort_by_key(|(k, _)| *k);
@@ -623,7 +691,12 @@ fn run_bootstrap(
         for (phoneme, instances) in sorted.iter().take(20) {
             let bar_len = (instances.len() as f32 / 100.0).min(30.0) as usize;
             let bar = "█".repeat(bar_len);
-            println!("    /{:4}/ {:>5} {}", phoneme, instances.len(), style(bar).cyan());
+            println!(
+                "    /{:4}/ {:>5} {}",
+                phoneme,
+                instances.len(),
+                style(bar).cyan()
+            );
         }
 
         if sorted.len() > 20 {
@@ -647,15 +720,25 @@ fn run_inspect(
     detailed: bool,
     export_json: Option<PathBuf>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    println!("\n{}{}Inspecting model: {:?}", SEARCH, style("").bold(), model);
+    println!(
+        "\n{}{}Inspecting model: {:?}",
+        SEARCH,
+        style("").bold(),
+        model
+    );
     println!();
 
     let trained = TrainedPrototypes::load_binary(model)?;
 
     println!("  {}Phonemes: {}", BRAIN, trained.prototypes.len());
-    println!("  {}Total samples: {}",
+    println!(
+        "  {}Total samples: {}",
         CHART,
-        trained.stats.values().map(|s| s.sample_count).sum::<usize>()
+        trained
+            .stats
+            .values()
+            .map(|s| s.sample_count)
+            .sum::<usize>()
     );
     println!();
 
@@ -701,16 +784,25 @@ fn run_inspect(
         avg_sim /= count as f32;
     }
 
-    println!("    Cross-similarity: min={:.3} avg={:.3} max={:.3}", min_sim, avg_sim, max_sim);
+    println!(
+        "    Cross-similarity: min={:.3} avg={:.3} max={:.3}",
+        min_sim, avg_sim, max_sim
+    );
     println!("    (Lower is better - phonemes should be distinct)");
     println!();
 
     if avg_sim < 0.55 {
         println!("  {}Quality: GOOD - prototypes are well-separated", CHECK);
     } else if avg_sim < 0.65 {
-        println!("  {}Quality: ACCEPTABLE - some overlap between phonemes", WARN);
+        println!(
+            "  {}Quality: ACCEPTABLE - some overlap between phonemes",
+            WARN
+        );
     } else {
-        println!("  {}Quality: POOR - prototypes are too similar, need more training data", ERROR);
+        println!(
+            "  {}Quality: POOR - prototypes are too similar, need more training data",
+            ERROR
+        );
     }
 
     if let Some(json_path) = export_json {
@@ -728,7 +820,12 @@ fn run_inspect(
 
 fn run_info() {
     println!("\n{}", style("═".repeat(70)).cyan());
-    println!("{}", style("                    SYMTHAEA SYSTEM INFORMATION").cyan().bold());
+    println!(
+        "{}",
+        style("                    SYMTHAEA SYSTEM INFORMATION")
+            .cyan()
+            .bold()
+    );
     println!("{}", style("═".repeat(70)).cyan());
     println!();
 
@@ -763,8 +860,22 @@ fn run_info() {
     let ffmpeg_ok = Command::new("ffmpeg").arg("-version").output().is_ok();
     let curl_ok = Command::new("curl").arg("--version").output().is_ok();
 
-    println!("    • ffmpeg: {}", if ffmpeg_ok { style("✓ found").green() } else { style("✗ not found").red() });
-    println!("    • curl:   {}", if curl_ok { style("✓ found").green() } else { style("✗ not found").red() });
+    println!(
+        "    • ffmpeg: {}",
+        if ffmpeg_ok {
+            style("✓ found").green()
+        } else {
+            style("✗ not found").red()
+        }
+    );
+    println!(
+        "    • curl:   {}",
+        if curl_ok {
+            style("✓ found").green()
+        } else {
+            style("✗ not found").red()
+        }
+    );
     println!();
 }
 
@@ -838,7 +949,11 @@ fn scan_librispeech(path: &PathBuf) -> Result<Vec<LibriUtterance>, std::io::Erro
 }
 
 /// Download LibriSpeech subset
-fn download_librispeech(data_dir: &PathBuf, subset: &str, quiet: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn download_librispeech(
+    data_dir: &PathBuf,
+    subset: &str,
+    quiet: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     fs::create_dir_all(data_dir)?;
 
     let url = format!("https://www.openslr.org/resources/12/{}.tar.gz", subset);
@@ -867,7 +982,12 @@ fn download_librispeech(data_dir: &PathBuf, subset: &str, quiet: bool) -> Result
     }
 
     Command::new("tar")
-        .args(["-xzf", archive.to_str().unwrap(), "-C", data_dir.to_str().unwrap()])
+        .args([
+            "-xzf",
+            archive.to_str().unwrap(),
+            "-C",
+            data_dir.to_str().unwrap(),
+        ])
         .status()?;
 
     if !quiet {
@@ -885,12 +1005,14 @@ fn load_wav(path: &PathBuf) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
         let spec = reader.spec();
 
         let samples: Vec<f32> = if spec.bits_per_sample == 16 {
-            reader.into_samples::<i16>()
+            reader
+                .into_samples::<i16>()
                 .filter_map(|s| s.ok())
                 .map(|s| s as f32 / 32768.0)
                 .collect()
         } else {
-            reader.into_samples::<i32>()
+            reader
+                .into_samples::<i32>()
                 .filter_map(|s| s.ok())
                 .map(|s| s as f32 / 2147483648.0)
                 .collect()
@@ -902,12 +1024,17 @@ fn load_wav(path: &PathBuf) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
     // Use ffmpeg for FLAC
     let output = Command::new("ffmpeg")
         .args([
-            "-i", path.to_str().unwrap(),
-            "-f", "f32le",
-            "-acodec", "pcm_f32le",
-            "-ar", "16000",
-            "-ac", "1",
-            "-"
+            "-i",
+            path.to_str().unwrap(),
+            "-f",
+            "f32le",
+            "-acodec",
+            "pcm_f32le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            "-",
         ])
         .output()?;
 
@@ -915,7 +1042,8 @@ fn load_wav(path: &PathBuf) -> Result<Vec<f32>, Box<dyn std::error::Error>> {
         return Err("ffmpeg failed".into());
     }
 
-    let samples: Vec<f32> = output.stdout
+    let samples: Vec<f32> = output
+        .stdout
         .chunks_exact(4)
         .map(|c| f32::from_le_bytes([c[0], c[1], c[2], c[3]]))
         .collect();
@@ -939,9 +1067,8 @@ fn mock_ltc_project(audio: &[f32]) -> (Vec<HV16>, Vec<f32>, Vec<f32>) {
         let end = (start + frame_samples).min(audio.len());
 
         // Frame energy
-        let energy: f32 = audio[start..end].iter()
-            .map(|s| s * s)
-            .sum::<f32>() / frame_samples as f32;
+        let energy: f32 =
+            audio[start..end].iter().map(|s| s * s).sum::<f32>() / frame_samples as f32;
 
         // Generate HV from content
         let seed = format!("frame:{}:{:.6}", i, energy);
@@ -962,14 +1089,15 @@ fn mock_ltc_project(audio: &[f32]) -> (Vec<HV16>, Vec<f32>, Vec<f32>) {
 /// Detect boundaries from salience
 fn detect_boundaries(salience: &[f32], timestamps: &[f32], threshold: f32) -> Vec<(f32, usize)> {
     let mean: f32 = salience.iter().sum::<f32>() / salience.len() as f32;
-    let std: f32 = (salience.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / salience.len() as f32).sqrt();
+    let std: f32 =
+        (salience.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / salience.len() as f32).sqrt();
     let thresh = mean + std * threshold;
 
     let mut boundaries = vec![(0.0, 0)];
     let mut last_time = -0.030f32;
 
     for i in 1..salience.len() - 1 {
-        let is_peak = salience[i] > salience[i-1] && salience[i] > salience[i+1];
+        let is_peak = salience[i] > salience[i - 1] && salience[i] > salience[i + 1];
         if is_peak && salience[i] > thresh && timestamps[i] - last_time > 0.020 {
             boundaries.push((timestamps[i], i));
             last_time = timestamps[i];
@@ -1003,23 +1131,29 @@ fn align_phonemes(
     let total_frames = boundaries.last().unwrap().1;
     let frames_per_phoneme = total_frames / phonemes.len();
 
-    phonemes.iter().enumerate().map(|(i, p)| {
-        let start = i * frames_per_phoneme;
-        let end = ((i + 1) * frames_per_phoneme).min(total_frames);
+    phonemes
+        .iter()
+        .enumerate()
+        .map(|(i, p)| {
+            let start = i * frames_per_phoneme;
+            let end = ((i + 1) * frames_per_phoneme).min(total_frames);
 
-        AlignedPhoneme {
-            ipa: p.clone(),
-            start_frame: start,
-            end_frame: end,
-            confidence: 0.5,
-        }
-    }).collect()
+            AlignedPhoneme {
+                ipa: p.clone(),
+                start_frame: start,
+                end_frame: end,
+                confidence: 0.5,
+            }
+        })
+        .collect()
 }
 
 /// Get phoneme durations
 fn get_phoneme_durations() -> HashMap<String, f32> {
     let mut d = HashMap::new();
-    for v in &["ɑ", "æ", "ʌ", "ɔ", "ɛ", "ɝ", "ɪ", "i", "ʊ", "u", "ə", "e", "o"] {
+    for v in &[
+        "ɑ", "æ", "ʌ", "ɔ", "ɛ", "ɝ", "ɪ", "i", "ʊ", "u", "ə", "e", "o",
+    ] {
         d.insert(v.to_string(), 0.10);
     }
     for c in &["p", "b", "t", "d", "k", "g"] {
@@ -1040,27 +1174,90 @@ impl TextToPhonemes {
 
         // Core vocabulary
         let entries = [
-            ("the", "ðə"), ("a", "ə"), ("and", "ænd"), ("to", "tu"),
-            ("of", "əv"), ("in", "ɪn"), ("is", "ɪz"), ("it", "ɪt"),
-            ("you", "ju"), ("that", "ðæt"), ("he", "hi"), ("was", "wɑz"),
-            ("for", "fɔɹ"), ("on", "ɑn"), ("are", "ɑɹ"), ("with", "wɪð"),
-            ("they", "ðe"), ("be", "bi"), ("at", "æt"), ("one", "wʌn"),
-            ("have", "hæv"), ("this", "ðɪs"), ("from", "fɹʌm"), ("by", "baɪ"),
-            ("not", "nɑt"), ("but", "bʌt"), ("what", "wʌt"), ("all", "ɔl"),
-            ("were", "wɝ"), ("we", "wi"), ("when", "wɛn"), ("your", "jɔɹ"),
-            ("can", "kæn"), ("said", "sɛd"), ("there", "ðɛɹ"), ("use", "juz"),
-            ("each", "itʃ"), ("which", "wɪtʃ"), ("do", "du"), ("how", "haʊ"),
-            ("their", "ðɛɹ"), ("if", "ɪf"), ("will", "wɪl"), ("up", "ʌp"),
-            ("other", "ʌðɚ"), ("about", "əbaʊt"), ("out", "aʊt"), ("many", "mɛni"),
-            ("then", "ðɛn"), ("them", "ðɛm"), ("so", "so"), ("some", "sʌm"),
-            ("would", "wʊd"), ("make", "mek"), ("like", "laɪk"), ("time", "taɪm"),
-            ("has", "hæz"), ("look", "lʊk"), ("two", "tu"), ("more", "mɔɹ"),
-            ("go", "go"), ("see", "si"), ("no", "no"), ("way", "we"),
-            ("could", "kʊd"), ("people", "pipəl"), ("my", "maɪ"), ("than", "ðæn"),
-            ("first", "fɝst"), ("been", "bɪn"), ("who", "hu"), ("its", "ɪts"),
-            ("now", "naʊ"), ("find", "faɪnd"), ("long", "lɔŋ"), ("down", "daʊn"),
-            ("day", "de"), ("did", "dɪd"), ("get", "gɛt"), ("come", "kʌm"),
-            ("made", "med"), ("may", "me"), ("cat", "kæt"), ("dog", "dɔg"),
+            ("the", "ðə"),
+            ("a", "ə"),
+            ("and", "ænd"),
+            ("to", "tu"),
+            ("of", "əv"),
+            ("in", "ɪn"),
+            ("is", "ɪz"),
+            ("it", "ɪt"),
+            ("you", "ju"),
+            ("that", "ðæt"),
+            ("he", "hi"),
+            ("was", "wɑz"),
+            ("for", "fɔɹ"),
+            ("on", "ɑn"),
+            ("are", "ɑɹ"),
+            ("with", "wɪð"),
+            ("they", "ðe"),
+            ("be", "bi"),
+            ("at", "æt"),
+            ("one", "wʌn"),
+            ("have", "hæv"),
+            ("this", "ðɪs"),
+            ("from", "fɹʌm"),
+            ("by", "baɪ"),
+            ("not", "nɑt"),
+            ("but", "bʌt"),
+            ("what", "wʌt"),
+            ("all", "ɔl"),
+            ("were", "wɝ"),
+            ("we", "wi"),
+            ("when", "wɛn"),
+            ("your", "jɔɹ"),
+            ("can", "kæn"),
+            ("said", "sɛd"),
+            ("there", "ðɛɹ"),
+            ("use", "juz"),
+            ("each", "itʃ"),
+            ("which", "wɪtʃ"),
+            ("do", "du"),
+            ("how", "haʊ"),
+            ("their", "ðɛɹ"),
+            ("if", "ɪf"),
+            ("will", "wɪl"),
+            ("up", "ʌp"),
+            ("other", "ʌðɚ"),
+            ("about", "əbaʊt"),
+            ("out", "aʊt"),
+            ("many", "mɛni"),
+            ("then", "ðɛn"),
+            ("them", "ðɛm"),
+            ("so", "so"),
+            ("some", "sʌm"),
+            ("would", "wʊd"),
+            ("make", "mek"),
+            ("like", "laɪk"),
+            ("time", "taɪm"),
+            ("has", "hæz"),
+            ("look", "lʊk"),
+            ("two", "tu"),
+            ("more", "mɔɹ"),
+            ("go", "go"),
+            ("see", "si"),
+            ("no", "no"),
+            ("way", "we"),
+            ("could", "kʊd"),
+            ("people", "pipəl"),
+            ("my", "maɪ"),
+            ("than", "ðæn"),
+            ("first", "fɝst"),
+            ("been", "bɪn"),
+            ("who", "hu"),
+            ("its", "ɪts"),
+            ("now", "naʊ"),
+            ("find", "faɪnd"),
+            ("long", "lɔŋ"),
+            ("down", "daʊn"),
+            ("day", "de"),
+            ("did", "dɪd"),
+            ("get", "gɛt"),
+            ("come", "kʌm"),
+            ("made", "med"),
+            ("may", "me"),
+            ("cat", "kæt"),
+            ("dog", "dɔg"),
         ];
 
         for (word, ipa) in entries {
@@ -1077,7 +1274,8 @@ impl TextToPhonemes {
         phonemes.push("sil".to_string());
 
         for word in text.split_whitespace() {
-            let word_clean: String = word.chars()
+            let word_clean: String = word
+                .chars()
                 .filter(|c| c.is_alphabetic())
                 .collect::<String>()
                 .to_lowercase();
@@ -1124,25 +1322,30 @@ fn main() {
             no_download,
             resume,
             format,
+        } => run_bootstrap(
+            &data_dir,
+            &output_dir,
+            &subset,
+            limit,
+            min_samples,
+            salience_threshold,
+            no_download,
+            resume,
+            format,
+            cli.verbose,
+            cli.quiet,
+        ),
+        Commands::Inspect {
+            model,
+            detailed,
+            export_json,
+        } => run_inspect(&model, detailed, export_json),
+        Commands::Validate {
+            model,
+            audio,
+            expected,
+            show_alignment,
         } => {
-            run_bootstrap(
-                &data_dir,
-                &output_dir,
-                &subset,
-                limit,
-                min_samples,
-                salience_threshold,
-                no_download,
-                resume,
-                format,
-                cli.verbose,
-                cli.quiet,
-            )
-        }
-        Commands::Inspect { model, detailed, export_json } => {
-            run_inspect(&model, detailed, export_json)
-        }
-        Commands::Validate { model, audio, expected, show_alignment } => {
             println!("{}Validate command not yet implemented", WARN);
             println!("  Model: {:?}", model);
             println!("  Audio: {:?}", audio);
@@ -1155,8 +1358,7 @@ fn main() {
             Ok(())
         }
         Commands::Download { data_dir, subset } => {
-            download_librispeech(&data_dir, &subset, cli.quiet)
-                .map_err(|e| e)
+            download_librispeech(&data_dir, &subset, cli.quiet).map_err(|e| e)
         }
         Commands::Info => {
             run_info();

@@ -5,8 +5,8 @@
 //! weighted consolidation pattern). Enables learning from past experience:
 //! "last time this pattern led to failure."
 
-use symthaea_core::hdc::ContinuousHV;
 use crate::action::executor::NixOSCommand;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Outcome of a system episode.
 #[derive(Debug, Clone, PartialEq)]
@@ -127,7 +127,8 @@ impl NixEpisodicMemory {
     /// Returns episodes whose before-state is similar to the query,
     /// sorted by similarity (most similar first).
     pub fn retrieve_similar(&self, query: &ContinuousHV, limit: usize) -> Vec<&SystemEpisode> {
-        let mut scored: Vec<(f64, &SystemEpisode)> = self.episodes
+        let mut scored: Vec<(f64, &SystemEpisode)> = self
+            .episodes
             .iter()
             .map(|ep| {
                 let sim = ep.state_before.similarity(query) as f64;
@@ -136,10 +137,7 @@ impl NixEpisodicMemory {
             .collect();
 
         scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
-        scored.into_iter()
-            .take(limit)
-            .map(|(_, ep)| ep)
-            .collect()
+        scored.into_iter().take(limit).map(|(_, ep)| ep).collect()
     }
 
     /// Retrieve episodes involving a specific action pattern.
@@ -168,7 +166,8 @@ impl NixEpisodicMemory {
             return 0.0; // No prior experience
         }
 
-        let total_weight: f64 = similar.iter()
+        let total_weight: f64 = similar
+            .iter()
             .map(|ep| ep.state_before.similarity(state).max(0.0) as f64)
             .sum();
 
@@ -176,7 +175,8 @@ impl NixEpisodicMemory {
             return 0.0;
         }
 
-        let weighted_valence: f64 = similar.iter()
+        let weighted_valence: f64 = similar
+            .iter()
             .map(|ep| {
                 let sim = ep.state_before.similarity(state).max(0.0) as f64;
                 sim * ep.emotional_valence
@@ -211,7 +211,8 @@ impl NixEpisodicMemory {
 
     /// Total number of failure episodes.
     pub fn failure_count(&self) -> usize {
-        self.episodes.iter()
+        self.episodes
+            .iter()
             .filter(|ep| matches!(ep.outcome, EpisodeOutcome::Failure(_)))
             .count()
     }
@@ -285,8 +286,16 @@ mod tests {
     fn test_failures() {
         let mut mem = NixEpisodicMemory::new();
         mem.record(make_episode(1, EpisodeOutcome::Success, 0.5));
-        mem.record(make_episode(2, EpisodeOutcome::Failure("build failed".into()), 0.5));
-        mem.record(make_episode(3, EpisodeOutcome::Failure("hash mismatch".into()), 0.5));
+        mem.record(make_episode(
+            2,
+            EpisodeOutcome::Failure("build failed".into()),
+            0.5,
+        ));
+        mem.record(make_episode(
+            3,
+            EpisodeOutcome::Failure("hash mismatch".into()),
+            0.5,
+        ));
 
         assert_eq!(mem.failure_count(), 2);
         assert_eq!(mem.failures().len(), 2);
@@ -303,7 +312,11 @@ mod tests {
 
         // Record failures near seed 100
         for i in 0..5 {
-            mem.record(make_episode(100 + i, EpisodeOutcome::Failure("err".into()), 0.5));
+            mem.record(make_episode(
+                100 + i,
+                EpisodeOutcome::Failure("err".into()),
+                0.5,
+            ));
         }
 
         // Query near seed 1 should predict positive valence

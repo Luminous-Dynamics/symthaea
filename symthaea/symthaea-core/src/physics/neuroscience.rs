@@ -22,12 +22,12 @@
 //!
 //! Neurons connect in circuits with specific functions (sensory, motor, memory, etc.)
 
+use super::consciousness_bridge::PhysicsConsciousnessBridge;
+use super::hadrons::Hadrons;
+use super::periodic_table::PeriodicTable;
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
-use super::consciousness_bridge::PhysicsConsciousnessBridge;
-use super::periodic_table::PeriodicTable;
-use super::hadrons::Hadrons;
 use serde::{Deserialize, Serialize};
 
 /// Ion type
@@ -250,7 +250,8 @@ impl NeuroEncoder {
 
     /// Voltage-gated sodium channel (Nav)
     pub fn nav_channel(&self) -> IonChannel {
-        let vector = self.na_ion
+        let vector = self
+            .na_ion
             .bind(&self.voltage_sensor)
             .bind(&self.selectivity_filter)
             .bind(&self.voltage_gating);
@@ -267,7 +268,8 @@ impl NeuroEncoder {
 
     /// Voltage-gated potassium channel (Kv)
     pub fn kv_channel(&self) -> IonChannel {
-        let vector = self.k_ion
+        let vector = self
+            .k_ion
             .bind(&self.voltage_sensor)
             .bind(&self.selectivity_filter)
             .bind(&self.voltage_gating);
@@ -284,10 +286,11 @@ impl NeuroEncoder {
 
     /// NMDA receptor (ligand + voltage gated, Ca2+ permeable)
     pub fn nmda_receptor(&self) -> IonChannel {
-        let vector = self.glutamate
+        let vector = self
+            .glutamate
             .bind(&self.ca_ion)
             .bind(&self.ligand_gating)
-            .bind(&self.voltage_gating);  // Mg2+ block is voltage-dependent
+            .bind(&self.voltage_gating); // Mg2+ block is voltage-dependent
 
         IonChannel {
             name: "NMDAR".to_string(),
@@ -301,9 +304,7 @@ impl NeuroEncoder {
 
     /// AMPA receptor (fast glutamate)
     pub fn ampa_receptor(&self) -> IonChannel {
-        let vector = self.glutamate
-            .bind(&self.na_ion)
-            .bind(&self.ligand_gating);
+        let vector = self.glutamate.bind(&self.na_ion).bind(&self.ligand_gating);
 
         IonChannel {
             name: "AMPAR".to_string(),
@@ -317,9 +318,7 @@ impl NeuroEncoder {
 
     /// GABA_A receptor (inhibitory)
     pub fn gabaa_receptor(&self) -> IonChannel {
-        let vector = self.gaba
-            .bind(&self.cl_ion)
-            .bind(&self.ligand_gating);
+        let vector = self.gaba.bind(&self.cl_ion).bind(&self.ligand_gating);
 
         IonChannel {
             name: "GABA_A".to_string(),
@@ -369,7 +368,8 @@ impl NeuroEncoder {
         let depol = nav.vector.bind(&self.channel_open);
 
         // Repolarization: Nav inactivates, Kv opens → K+ efflux
-        let repol = kv.vector
+        let repol = kv
+            .vector
             .bind(&self.channel_open)
             .bind(&nav.vector.bind(&self.channel_inactivated));
 
@@ -458,9 +458,7 @@ impl NeuroEncoder {
     /// Create glutamatergic excitatory synapse
     pub fn excitatory_synapse(&self, pre: &ContinuousHV, post: &ContinuousHV) -> Synapse {
         let nt_vec = self.neurotransmitter_vector(Neurotransmitter::Glutamate);
-        let vector = pre.bind(post)
-            .bind(&self.synapse)
-            .bind(nt_vec);
+        let vector = pre.bind(post).bind(&self.synapse).bind(nt_vec);
 
         Synapse {
             presynaptic: pre.clone(),
@@ -479,15 +477,13 @@ impl NeuroEncoder {
     /// Create GABAergic inhibitory synapse
     pub fn inhibitory_synapse(&self, pre: &ContinuousHV, post: &ContinuousHV) -> Synapse {
         let nt_vec = self.neurotransmitter_vector(Neurotransmitter::GABA);
-        let vector = pre.bind(post)
-            .bind(&self.synapse)
-            .bind(nt_vec);
+        let vector = pre.bind(post).bind(&self.synapse).bind(nt_vec);
 
         Synapse {
             presynaptic: pre.clone(),
             postsynaptic: post.clone(),
             neurotransmitter: Neurotransmitter::GABA,
-            strength: -1.0,  // Inhibitory
+            strength: -1.0, // Inhibitory
             plasticity: PlasticityState {
                 ltp_factor: 1.0,
                 ltd_factor: 1.0,
@@ -511,7 +507,7 @@ impl NeuroEncoder {
         let dt = post_time_ms - pre_time_ms;
 
         if dt.abs() > synapse.plasticity.stdp_window_ms {
-            return;  // Outside STDP window
+            return; // Outside STDP window
         }
 
         if dt > 0.0 {
@@ -659,8 +655,8 @@ impl NeuroEncoder {
 
         let neurons = vec![sensory.clone(), inter.clone(), motor.clone()];
         let connectivity = vec![
-            (0, 1, 1.0),  // sensory → interneuron
-            (1, 2, 1.0),  // interneuron → motor
+            (0, 1, 1.0), // sensory → interneuron
+            (1, 2, 1.0), // interneuron → motor
         ];
 
         let vector = ContinuousHV::bundle(&[&sensory.vector, &inter.vector, &motor.vector]);
@@ -682,13 +678,13 @@ impl NeuroEncoder {
 
         let neurons = vec![ca3.clone(), ca1.clone(), interneuron.clone()];
         let connectivity = vec![
-            (0, 1, 1.0),   // CA3 → CA1 (Schaffer collateral)
-            (2, 0, -1.0),  // Interneuron → CA3 (inhibitory)
-            (2, 1, -1.0),  // Interneuron → CA1 (inhibitory)
+            (0, 1, 1.0),  // CA3 → CA1 (Schaffer collateral)
+            (2, 0, -1.0), // Interneuron → CA3 (inhibitory)
+            (2, 1, -1.0), // Interneuron → CA1 (inhibitory)
         ];
 
-        let vector = ContinuousHV::bundle(&[&ca3.vector, &ca1.vector, &interneuron.vector])
-            .bind(&self.ltp);  // Memory circuit associated with LTP
+        let vector =
+            ContinuousHV::bundle(&[&ca3.vector, &ca1.vector, &interneuron.vector]).bind(&self.ltp); // Memory circuit associated with LTP
 
         NeuralCircuit {
             name: "Hippocampal CA3-CA1".to_string(),
@@ -716,10 +712,10 @@ impl NeuroEncoder {
         ];
 
         let connectivity = vec![
-            (0, 1, 1.0),   // Cortex → Striatum (excitatory)
-            (1, 2, -1.0),  // Striatum → GPe (inhibitory)
-            (2, 3, -1.0),  // GPe → STN (inhibitory)
-            (4, 1, 1.0),   // SNc → Striatum (dopamine modulation)
+            (0, 1, 1.0),  // Cortex → Striatum (excitatory)
+            (1, 2, -1.0), // Striatum → GPe (inhibitory)
+            (2, 3, -1.0), // GPe → STN (inhibitory)
+            (4, 1, 1.0),  // SNc → Striatum (dopamine modulation)
         ];
 
         let refs: Vec<&ContinuousHV> = neurons.iter().map(|n| &n.vector).collect();
@@ -801,7 +797,11 @@ impl NeuroEncoder {
     }
 
     /// Does circuit Φ increase with connectivity?
-    pub fn phi_increases_with_connectivity(&self, genesis: &GenesisSeed, bridge: &PhysicsConsciousnessBridge) -> bool {
+    pub fn phi_increases_with_connectivity(
+        &self,
+        genesis: &GenesisSeed,
+        bridge: &PhysicsConsciousnessBridge,
+    ) -> bool {
         let simple = self.reflex_arc(genesis);
         let complex = self.cortical_column(genesis);
 
@@ -830,7 +830,7 @@ mod tests {
 
         assert_eq!(nav.ion, IonType::Sodium);
         assert_eq!(nav.gating, GatingType::Voltage);
-        assert!(nav.reversal_mv > 0.0);  // Na+ has positive reversal potential
+        assert!(nav.reversal_mv > 0.0); // Na+ has positive reversal potential
     }
 
     #[test]
@@ -840,7 +840,7 @@ mod tests {
         let kv = encoder.kv_channel();
 
         assert_eq!(kv.ion, IonType::Potassium);
-        assert!(kv.reversal_mv < 0.0);  // K+ has negative reversal potential
+        assert!(kv.reversal_mv < 0.0); // K+ has negative reversal potential
     }
 
     #[test]
@@ -869,7 +869,10 @@ mod tests {
         // Pre fires before post → LTP
         encoder.stdp_update(&mut synapse, 0.0, 5.0);
 
-        assert!(synapse.strength > initial_strength, "Pre-before-post should cause LTP");
+        assert!(
+            synapse.strength > initial_strength,
+            "Pre-before-post should cause LTP"
+        );
     }
 
     #[test]
@@ -885,7 +888,10 @@ mod tests {
         // Post fires before pre → LTD
         encoder.stdp_update(&mut synapse, 5.0, 0.0);
 
-        assert!(synapse.strength < initial_strength, "Post-before-pre should cause LTD");
+        assert!(
+            synapse.strength < initial_strength,
+            "Post-before-pre should cause LTD"
+        );
     }
 
     #[test]
@@ -932,7 +938,7 @@ mod tests {
         let hippo = encoder.hippocampal_circuit(&genesis);
 
         assert_eq!(hippo.function, CircuitFunction::Memory);
-        assert!(hippo.connectivity.iter().any(|(_, _, w)| *w < 0.0));  // Has inhibition
+        assert!(hippo.connectivity.iter().any(|(_, _, w)| *w < 0.0)); // Has inhibition
     }
 
     #[test]

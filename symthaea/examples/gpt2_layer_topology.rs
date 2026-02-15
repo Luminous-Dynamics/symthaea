@@ -15,8 +15,8 @@
 //! cargo run --example gpt2_layer_topology --features neural-bridge --release
 //! ```
 
+use anyhow::{Context, Result};
 use std::time::Instant;
-use anyhow::{Result, Context};
 
 #[cfg(feature = "neural-bridge")]
 use candle_core::{DType, Device, Tensor};
@@ -66,7 +66,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(50).collect();
     let functional: Vec<_> = functional.into_iter().take(50).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load GPT-2
     println!("Loading GPT-2 medium (24 layers)...");
@@ -74,13 +78,19 @@ fn run_experiment() -> Result<()> {
 
     let device = Device::Cpu;
     let api = Api::new()?;
-    let repo = api.repo(Repo::new("openai-community/gpt2-medium".to_string(), RepoType::Model));
+    let repo = api.repo(Repo::new(
+        "openai-community/gpt2-medium".to_string(),
+        RepoType::Model,
+    ));
 
-    let tokenizer_path = repo.get("tokenizer.json")
+    let tokenizer_path = repo
+        .get("tokenizer.json")
         .context("Failed to download tokenizer")?;
-    let config_path = repo.get("config.json")
+    let config_path = repo
+        .get("config.json")
         .context("Failed to download config")?;
-    let weights_path = repo.get("model.safetensors")
+    let weights_path = repo
+        .get("model.safetensors")
         .or_else(|_| repo.get("pytorch_model.bin"))
         .context("Failed to download weights")?;
 
@@ -99,11 +109,12 @@ fn run_experiment() -> Result<()> {
         ..Default::default()
     };
 
-    println!("  Config: {} layers, {} hidden dim", gpt2_config.n_layer, gpt2_config.n_embd);
+    println!(
+        "  Config: {} layers, {} hidden dim",
+        gpt2_config.n_layer, gpt2_config.n_embd
+    );
 
-    let vb = unsafe {
-        VarBuilder::from_mmaped_safetensors(&[&weights_path], DType::F32, &device)?
-    };
+    let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[&weights_path], DType::F32, &device)? };
     let model = GPT2::load(vb, &gpt2_config)?;
 
     println!("  Loaded in {:.2}s\n", load_start.elapsed().as_secs_f64());
@@ -128,9 +139,12 @@ fn run_experiment() -> Result<()> {
     println!("Processing phenomenal concepts...");
     let mut phen_unity = Vec::new();
     for (i, concept) in phenomenal.iter().enumerate() {
-        if i % 10 == 0 { print!("  {}/{}\r", i, phenomenal.len()); }
+        if i % 10 == 0 {
+            print!("  {}/{}\r", i, phenomenal.len());
+        }
 
-        let encoding = tokenizer.encode(concept.as_str(), true)
+        let encoding = tokenizer
+            .encode(concept.as_str(), true)
             .map_err(|e| anyhow::anyhow!("Tokenization error: {}", e))?;
         let input_ids: Vec<u32> = encoding.get_ids().to_vec();
         let input = Tensor::new(&input_ids[..], &device)?.unsqueeze(0)?;
@@ -151,9 +165,12 @@ fn run_experiment() -> Result<()> {
     println!("Processing functional concepts...");
     let mut func_unity = Vec::new();
     for (i, concept) in functional.iter().enumerate() {
-        if i % 10 == 0 { print!("  {}/{}\r", i, functional.len()); }
+        if i % 10 == 0 {
+            print!("  {}/{}\r", i, functional.len());
+        }
 
-        let encoding = tokenizer.encode(concept.as_str(), true)
+        let encoding = tokenizer
+            .encode(concept.as_str(), true)
             .map_err(|e| anyhow::anyhow!("Tokenization error: {}", e))?;
         let input_ids: Vec<u32> = encoding.get_ids().to_vec();
         let input = Tensor::new(&input_ids[..], &device)?.unsqueeze(0)?;
@@ -179,7 +196,11 @@ fn run_experiment() -> Result<()> {
     let phen_std = std_dev(&phen_unity);
     let func_std = std_dev(&func_unity);
     let pooled_std = ((phen_std.powi(2) + func_std.powi(2)) / 2.0).sqrt();
-    let cohens_d = if pooled_std > 0.0 { diff / pooled_std } else { 0.0 };
+    let cohens_d = if pooled_std > 0.0 {
+        diff / pooled_std
+    } else {
+        0.0
+    };
 
     let p_value = permutation_test(&phen_unity, &func_unity, 10000);
 
@@ -187,7 +208,11 @@ fn run_experiment() -> Result<()> {
     println!("Functional Unity: {:.4} (std: {:.4})", func_mean, func_std);
     println!("Difference: {:+.4}", diff);
     println!("Cohen's d: {:+.4}", cohens_d);
-    println!("p-value: {:.4} {}", p_value, if p_value < 0.05 { "*" } else { "" });
+    println!(
+        "p-value: {:.4} {}",
+        p_value,
+        if p_value < 0.05 { "*" } else { "" }
+    );
 
     // Interpretation
     println!("\n================================================================");

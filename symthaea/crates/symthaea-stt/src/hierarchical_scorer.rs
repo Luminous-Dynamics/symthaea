@@ -34,7 +34,7 @@
 //!
 //! The acoustic model already predicts Manner class → use it to route!
 
-use crate::hdc::{HV16, BundleAccumulator, HDC_DIM};
+use crate::hdc::{BundleAccumulator, HDC_DIM, HV16};
 use std::collections::HashMap;
 
 /// Number of Manner classes (Stop, Fricative, Affricate, Nasal, Liquid, Glide, Vowel)
@@ -80,11 +80,9 @@ impl HierarchicalScorer {
         // Initialize phoneme basis (same seeds as HolographicScorer for compatibility)
         let mut phoneme_basis = HashMap::new();
         let phonemes = [
-            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH",
-            "EH", "ER", "EY", "F", "G", "HH", "IH", "IY", "JH", "K",
-            "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH",
-            "T", "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH",
-            "SIL", "UNK",
+            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH", "EH", "ER", "EY", "F", "G",
+            "HH", "IH", "IY", "JH", "K", "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH", "T",
+            "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH", "SIL", "UNK",
         ];
 
         for phoneme in phonemes.iter() {
@@ -93,14 +91,11 @@ impl HierarchicalScorer {
         }
 
         // Initialize hierarchical memories with unique seeds
-        let manner_memories = std::array::from_fn(|i| {
-            HV16::random(&format!("manner_memory_{}", i))
-        });
+        let manner_memories =
+            std::array::from_fn(|i| HV16::random(&format!("manner_memory_{}", i)));
 
         let manner_place_memories = std::array::from_fn(|m| {
-            std::array::from_fn(|p| {
-                HV16::random(&format!("manner_place_memory_{}_{}", m, p))
-            })
+            std::array::from_fn(|p| HV16::random(&format!("manner_place_memory_{}_{}", m, p)))
         });
 
         // Build phoneme → features mapping
@@ -126,19 +121,19 @@ impl HierarchicalScorer {
         // Place indices: 0=Bilabial, 1=Labiodental, 2=Dental, 3=Alveolar, 4=Palatal, 5=Velar, 6=Glottal, 7=Front, 8=Central, 9=Back
 
         // Stops (manner=0)
-        map.insert("P".into(), (0, 0));  // Bilabial
+        map.insert("P".into(), (0, 0)); // Bilabial
         map.insert("B".into(), (0, 0));
-        map.insert("T".into(), (0, 3));  // Alveolar
+        map.insert("T".into(), (0, 3)); // Alveolar
         map.insert("D".into(), (0, 3));
-        map.insert("K".into(), (0, 5));  // Velar
+        map.insert("K".into(), (0, 5)); // Velar
         map.insert("G".into(), (0, 5));
 
         // Fricatives (manner=1)
-        map.insert("F".into(), (1, 1));  // Labiodental
+        map.insert("F".into(), (1, 1)); // Labiodental
         map.insert("V".into(), (1, 1));
         map.insert("TH".into(), (1, 2)); // Dental
         map.insert("DH".into(), (1, 2));
-        map.insert("S".into(), (1, 3));  // Alveolar
+        map.insert("S".into(), (1, 3)); // Alveolar
         map.insert("Z".into(), (1, 3));
         map.insert("SH".into(), (1, 4)); // Palatal
         map.insert("ZH".into(), (1, 4));
@@ -149,17 +144,17 @@ impl HierarchicalScorer {
         map.insert("JH".into(), (2, 4));
 
         // Nasals (manner=3)
-        map.insert("M".into(), (3, 0));  // Bilabial
-        map.insert("N".into(), (3, 3));  // Alveolar
+        map.insert("M".into(), (3, 0)); // Bilabial
+        map.insert("N".into(), (3, 3)); // Alveolar
         map.insert("NG".into(), (3, 5)); // Velar
 
         // Liquids (manner=4)
-        map.insert("L".into(), (4, 3));  // Alveolar
+        map.insert("L".into(), (4, 3)); // Alveolar
         map.insert("R".into(), (4, 3));
 
         // Glides (manner=5)
-        map.insert("W".into(), (5, 0));  // Bilabial
-        map.insert("Y".into(), (5, 4));  // Palatal
+        map.insert("W".into(), (5, 0)); // Bilabial
+        map.insert("Y".into(), (5, 4)); // Palatal
 
         // Vowels (manner=6)
         map.insert("IY".into(), (6, 7)); // Front
@@ -197,14 +192,16 @@ impl HierarchicalScorer {
 
     /// Get phoneme basis vector
     fn get_basis(&self, phoneme: &str) -> HV16 {
-        self.phoneme_basis.get(phoneme)
+        self.phoneme_basis
+            .get(phoneme)
             .copied()
             .unwrap_or_else(|| *self.phoneme_basis.get("UNK").unwrap())
     }
 
     /// Get articulatory features for a phoneme
     fn get_features(&self, phoneme: &str) -> (usize, usize) {
-        self.phoneme_features.get(phoneme)
+        self.phoneme_features
+            .get(phoneme)
             .copied()
             .unwrap_or((6, 8)) // Default to vowel/central
     }
@@ -243,9 +240,8 @@ impl HierarchicalScorer {
         }
 
         // Collect context vectors per cluster
-        let mut manner_accums: Vec<BundleAccumulator> = (0..NUM_MANNER)
-            .map(|_| BundleAccumulator::new())
-            .collect();
+        let mut manner_accums: Vec<BundleAccumulator> =
+            (0..NUM_MANNER).map(|_| BundleAccumulator::new()).collect();
         let mut manner_place_accums: Vec<Vec<BundleAccumulator>> = (0..NUM_MANNER)
             .map(|_| (0..NUM_PLACE).map(|_| BundleAccumulator::new()).collect())
             .collect();
@@ -287,7 +283,7 @@ impl HierarchicalScorer {
                     if self.manner_place_counts[m][p] > 0 {
                         combined.add_weighted(
                             &self.manner_place_memories[m][p],
-                            self.manner_place_counts[m][p] as f32
+                            self.manner_place_counts[m][p] as f32,
                         );
                     }
                     let new_patterns = manner_place_accums[m][p].finalize();
@@ -310,13 +306,17 @@ impl HierarchicalScorer {
     /// Get statistics about cluster usage
     pub fn stats(&self) -> HierarchicalStats {
         let total_manner: usize = self.manner_counts.iter().sum();
-        let total_mp: usize = self.manner_place_counts.iter()
+        let total_mp: usize = self
+            .manner_place_counts
+            .iter()
             .flat_map(|row| row.iter())
             .sum();
 
         // Count non-empty clusters
         let active_manner = self.manner_counts.iter().filter(|&&c| c > 0).count();
-        let active_mp = self.manner_place_counts.iter()
+        let active_mp = self
+            .manner_place_counts
+            .iter()
             .flat_map(|row| row.iter())
             .filter(|&&c| c > 0)
             .count();
@@ -335,9 +335,12 @@ impl HierarchicalScorer {
         };
 
         // Compute average density
-        let manner_density: f32 = self.manner_memories.iter()
+        let manner_density: f32 = self
+            .manner_memories
+            .iter()
             .map(|m| m.popcount() as f32 / HDC_DIM as f32)
-            .sum::<f32>() / NUM_MANNER as f32;
+            .sum::<f32>()
+            / NUM_MANNER as f32;
 
         HierarchicalStats {
             total_patterns: total_manner,
@@ -410,8 +413,12 @@ mod tests {
         println!("Different 'SEIZE': {:.4}", diff_score);
 
         // Trained pattern should score higher
-        assert!(trained_score > diff_score,
-            "Expected trained > different: {:.4} vs {:.4}", trained_score, diff_score);
+        assert!(
+            trained_score > diff_score,
+            "Expected trained > different: {:.4} vs {:.4}",
+            trained_score,
+            diff_score
+        );
     }
 
     #[test]
@@ -420,10 +427,10 @@ mod tests {
 
         // Train on stop-vowel-stop patterns (CVC)
         let cvc_patterns = [
-            ["P", "AE", "T"],  // pat
-            ["K", "AE", "T"],  // cat
-            ["B", "IH", "T"],  // bit
-            ["D", "AA", "G"],  // dog
+            ["P", "AE", "T"], // pat
+            ["K", "AE", "T"], // cat
+            ["B", "IH", "T"], // bit
+            ["D", "AA", "G"], // dog
         ];
 
         for pattern in &cvc_patterns {
@@ -473,7 +480,11 @@ mod tests {
         println!("Stop pattern (untrained): {:.4}", stop_score);
 
         // Fricative should score much higher due to cluster isolation
-        assert!(fric_score > stop_score + 0.05,
-            "Expected strong cluster isolation: {:.4} vs {:.4}", fric_score, stop_score);
+        assert!(
+            fric_score > stop_score + 0.05,
+            "Expected strong cluster isolation: {:.4} vs {:.4}",
+            fric_score,
+            stop_score
+        );
     }
 }

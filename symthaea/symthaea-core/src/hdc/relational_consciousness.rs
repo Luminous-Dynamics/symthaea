@@ -420,7 +420,11 @@ pub struct RelationalConsciousness {
 
 impl RelationalConsciousness {
     /// Create new relational consciousness tracker
-    pub fn new(agent_a: impl Into<String>, agent_b: impl Into<String>, config: RelationalConfig) -> Self {
+    pub fn new(
+        agent_a: impl Into<String>,
+        agent_b: impl Into<String>,
+        config: RelationalConfig,
+    ) -> Self {
         Self {
             config,
             agent_a: agent_a.into(),
@@ -432,7 +436,13 @@ impl RelationalConsciousness {
     }
 
     /// Record interaction
-    pub fn interact(&mut self, time: f64, state_a: BinaryHV, state_b: BinaryHV, active_agent: Option<impl Into<String>>) {
+    pub fn interact(
+        &mut self,
+        time: f64,
+        state_a: BinaryHV,
+        state_b: BinaryHV,
+        active_agent: Option<impl Into<String>>,
+    ) {
         if self.interactions.is_empty() {
             self.start_time = time;
         }
@@ -460,9 +470,8 @@ impl RelationalConsciousness {
         let num_interactions = self.interactions.len();
 
         // Average synchrony
-        let synchrony = self.interactions.iter()
-            .map(|i| i.synchrony)
-            .sum::<f64>() / num_interactions as f64;
+        let synchrony =
+            self.interactions.iter().map(|i| i.synchrony).sum::<f64>() / num_interactions as f64;
 
         // Turn-taking quality
         let turn_taking_quality = self.compute_turn_taking_quality();
@@ -475,8 +484,8 @@ impl RelationalConsciousness {
         };
 
         // Relational Φ = f(synchrony, turn-taking, mutual_info, time)
-        let phi_relation = (synchrony * 0.5 + turn_taking_quality * 0.3 + mutual_information * 0.2)
-            .min(1.0);
+        let phi_relation =
+            (synchrony * 0.5 + turn_taking_quality * 0.3 + mutual_information * 0.2).min(1.0);
 
         // Classify stage
         let stage = RelationshipStage::from_phi(phi_relation);
@@ -493,13 +502,8 @@ impl RelationalConsciousness {
         let relationship_age = latest.time - self.start_time;
 
         // Generate explanation
-        let explanation = self.generate_explanation(
-            phi_relation,
-            stage,
-            synchrony,
-            turn_taking_quality,
-            mode,
-        );
+        let explanation =
+            self.generate_explanation(phi_relation, stage, synchrony, turn_taking_quality, mode);
 
         RelationalAssessment {
             agent_a: self.agent_a.clone(),
@@ -529,7 +533,8 @@ impl RelationalConsciousness {
         let mut alternations = 0;
         for i in 1..recent.len() {
             if let (Some(ref prev_active), Some(ref curr_active)) =
-                (&recent[i-1].active_agent, &recent[i].active_agent) {
+                (&recent[i - 1].active_agent, &recent[i].active_agent)
+            {
                 if prev_active != curr_active {
                     alternations += 1;
                 }
@@ -618,10 +623,19 @@ mod tests {
 
     #[test]
     fn test_relationship_stages() {
-        assert_eq!(RelationshipStage::from_phi(0.0), RelationshipStage::NoRelation);
-        assert_eq!(RelationshipStage::from_phi(0.1), RelationshipStage::Awareness);
+        assert_eq!(
+            RelationshipStage::from_phi(0.0),
+            RelationshipStage::NoRelation
+        );
+        assert_eq!(
+            RelationshipStage::from_phi(0.1),
+            RelationshipStage::Awareness
+        );
         assert_eq!(RelationshipStage::from_phi(0.3), RelationshipStage::Contact);
-        assert_eq!(RelationshipStage::from_phi(0.5), RelationshipStage::Attunement);
+        assert_eq!(
+            RelationshipStage::from_phi(0.5),
+            RelationshipStage::Attunement
+        );
         assert_eq!(RelationshipStage::from_phi(0.7), RelationshipStage::Bonding);
         assert_eq!(RelationshipStage::from_phi(0.9), RelationshipStage::Unity);
     }
@@ -635,7 +649,8 @@ mod tests {
 
     #[test]
     fn test_interaction() {
-        let mut relational = RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
+        let mut relational =
+            RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
 
         let state_a = BinaryHV::random(1000);
         let state_b = BinaryHV::random(2000);
@@ -646,7 +661,8 @@ mod tests {
 
     #[test]
     fn test_no_relation_assessment() {
-        let mut relational = RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
+        let mut relational =
+            RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
 
         let assessment = relational.assess();
 
@@ -656,11 +672,12 @@ mod tests {
 
     #[test]
     fn test_synchrony() {
-        let mut relational = RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
+        let mut relational =
+            RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
 
         // Similar states = high synchrony
         let state_a = BinaryHV::random(1000);
-        let state_b = BinaryHV::random(1001);  // Similar seed
+        let state_b = BinaryHV::random(1001); // Similar seed
         relational.interact(0.0, state_a, state_b, Some("Alice"));
 
         let assessment = relational.assess();
@@ -671,7 +688,8 @@ mod tests {
 
     #[test]
     fn test_turn_taking() {
-        let mut relational = RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
+        let mut relational =
+            RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
 
         // Alternating interactions
         for i in 0..10 {
@@ -689,7 +707,8 @@ mod tests {
 
     #[test]
     fn test_relationship_development() {
-        let mut relational = RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
+        let mut relational =
+            RelationalConsciousness::new("Alice", "Bob", RelationalConfig::default());
 
         // Simulate developing relationship
         for i in 0..20 {
@@ -716,13 +735,16 @@ mod tests {
 
         // High similarity = I-Thou
         let state_a = BinaryHV::random(1000);
-        let state_b = BinaryHV::random(1000);  // Same seed = high similarity
+        let state_b = BinaryHV::random(1000); // Same seed = high similarity
         relational.interact(0.0, state_a, state_b, Some("Alice"));
 
         let assessment = relational.assess();
 
         // Mode depends on actual synchrony value
-        assert!(matches!(assessment.mode, RelationMode::IThou | RelationMode::IIt));
+        assert!(matches!(
+            assessment.mode,
+            RelationMode::IThou | RelationMode::IIt
+        ));
     }
 
     #[test]

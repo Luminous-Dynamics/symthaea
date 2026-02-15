@@ -19,7 +19,7 @@ use anyhow::Result;
 use symthaea::perception::bge_m3::BgeM3;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -48,8 +48,14 @@ fn run_experiment() -> Result<()> {
     let separate: Vec<_> = pairs.iter().filter(|p| p.pair_type == "separate").collect();
 
     println!("Loaded concept pairs:");
-    println!("  Unified pairs: {} (e.g., red+apple→'red apple')", unified.len());
-    println!("  Separate pairs: {} (e.g., red+mailbox→'red mailbox')\n", separate.len());
+    println!(
+        "  Unified pairs: {} (e.g., red+apple→'red apple')",
+        unified.len()
+    );
+    println!(
+        "  Separate pairs: {} (e.g., red+mailbox→'red mailbox')\n",
+        separate.len()
+    );
 
     // Load BGE-M3 encoder
     println!("Loading BGE-M3 encoder...");
@@ -74,7 +80,10 @@ fn run_experiment() -> Result<()> {
         let result = analyze_pair(&encoder, pair)?;
         unified_results.push(result);
     }
-    println!("  Completed in {:.1}s", unified_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed in {:.1}s",
+        unified_start.elapsed().as_secs_f64()
+    );
 
     // Process separate pairs
     println!("Processing separate pairs...");
@@ -89,7 +98,10 @@ fn run_experiment() -> Result<()> {
         let result = analyze_pair(&encoder, pair)?;
         separate_results.push(result);
     }
-    println!("  Completed in {:.1}s\n", separate_start.elapsed().as_secs_f64());
+    println!(
+        "  Completed in {:.1}s\n",
+        separate_start.elapsed().as_secs_f64()
+    );
 
     // Compute statistics
     println!("================================================================");
@@ -98,9 +110,15 @@ fn run_experiment() -> Result<()> {
 
     // Extract similarity metrics
     let unified_bind_sim: Vec<f64> = unified_results.iter().map(|r| r.bind_similarity).collect();
-    let unified_bundle_sim: Vec<f64> = unified_results.iter().map(|r| r.bundle_similarity).collect();
+    let unified_bundle_sim: Vec<f64> = unified_results
+        .iter()
+        .map(|r| r.bundle_similarity)
+        .collect();
     let separate_bind_sim: Vec<f64> = separate_results.iter().map(|r| r.bind_similarity).collect();
-    let separate_bundle_sim: Vec<f64> = separate_results.iter().map(|r| r.bundle_similarity).collect();
+    let separate_bundle_sim: Vec<f64> = separate_results
+        .iter()
+        .map(|r| r.bundle_similarity)
+        .collect();
 
     let mean_unified_bind = mean(&unified_bind_sim);
     let mean_unified_bundle = mean(&unified_bundle_sim);
@@ -108,26 +126,53 @@ fn run_experiment() -> Result<()> {
     let mean_separate_bundle = mean(&separate_bundle_sim);
 
     println!("Mean Similarity to Combined Phrase:");
-    println!("                    Unified (n={})    Separate (n={})", unified.len(), separate.len());
-    println!("  Bind:             {:.4}              {:.4}", mean_unified_bind, mean_separate_bind);
-    println!("  Bundle:           {:.4}              {:.4}\n", mean_unified_bundle, mean_separate_bundle);
+    println!(
+        "                    Unified (n={})    Separate (n={})",
+        unified.len(),
+        separate.len()
+    );
+    println!(
+        "  Bind:             {:.4}              {:.4}",
+        mean_unified_bind, mean_separate_bind
+    );
+    println!(
+        "  Bundle:           {:.4}              {:.4}\n",
+        mean_unified_bundle, mean_separate_bundle
+    );
 
     // Binding advantage (bind - bundle similarity)
-    let unified_advantage: Vec<f64> = unified_results.iter().map(|r| r.bind_similarity - r.bundle_similarity).collect();
-    let separate_advantage: Vec<f64> = separate_results.iter().map(|r| r.bind_similarity - r.bundle_similarity).collect();
+    let unified_advantage: Vec<f64> = unified_results
+        .iter()
+        .map(|r| r.bind_similarity - r.bundle_similarity)
+        .collect();
+    let separate_advantage: Vec<f64> = separate_results
+        .iter()
+        .map(|r| r.bind_similarity - r.bundle_similarity)
+        .collect();
 
     let mean_unified_adv = mean(&unified_advantage);
     let mean_separate_adv = mean(&separate_advantage);
 
     println!("Binding Advantage (bind_sim - bundle_sim):");
-    println!("  Unified pairs: {:+.4} (std: {:.4})", mean_unified_adv, std_dev(&unified_advantage));
-    println!("  Separate pairs: {:+.4} (std: {:.4})\n", mean_separate_adv, std_dev(&separate_advantage));
+    println!(
+        "  Unified pairs: {:+.4} (std: {:.4})",
+        mean_unified_adv,
+        std_dev(&unified_advantage)
+    );
+    println!(
+        "  Separate pairs: {:+.4} (std: {:.4})\n",
+        mean_separate_adv,
+        std_dev(&separate_advantage)
+    );
 
     // Interaction effect
     let interaction = mean_unified_adv - mean_separate_adv;
     println!("Interaction Effect:");
     println!("  (Bind advantage for unified) - (Bind advantage for separate)");
-    println!("  = {:+.4} - {:+.4} = {:+.4}\n", mean_unified_adv, mean_separate_adv, interaction);
+    println!(
+        "  = {:+.4} - {:+.4} = {:+.4}\n",
+        mean_unified_adv, mean_separate_adv, interaction
+    );
 
     // Statistical tests
     let p_unified = permutation_test(&unified_bind_sim, &unified_bundle_sim, 10000);
@@ -135,9 +180,21 @@ fn run_experiment() -> Result<()> {
     let p_interaction = permutation_test(&unified_advantage, &separate_advantage, 10000);
 
     println!("Statistical Significance (Permutation Tests, n=10000):");
-    println!("  Binding advantage (unified): p = {:.4} {}", p_unified, if p_unified < 0.05 { "*" } else { "" });
-    println!("  Binding advantage (separate): p = {:.4} {}", p_separate, if p_separate < 0.05 { "*" } else { "" });
-    println!("  Interaction effect: p = {:.4} {}\n", p_interaction, if p_interaction < 0.05 { "*" } else { "" });
+    println!(
+        "  Binding advantage (unified): p = {:.4} {}",
+        p_unified,
+        if p_unified < 0.05 { "*" } else { "" }
+    );
+    println!(
+        "  Binding advantage (separate): p = {:.4} {}",
+        p_separate,
+        if p_separate < 0.05 { "*" } else { "" }
+    );
+    println!(
+        "  Interaction effect: p = {:.4} {}\n",
+        p_interaction,
+        if p_interaction < 0.05 { "*" } else { "" }
+    );
 
     // Effect sizes
     let d_unified = cohens_d(&unified_bind_sim, &unified_bundle_sim);
@@ -178,7 +235,10 @@ fn run_experiment() -> Result<()> {
     println!("================================================================\n");
 
     // Sort by binding advantage
-    let mut all_results: Vec<_> = unified_results.iter().chain(separate_results.iter()).collect();
+    let mut all_results: Vec<_> = unified_results
+        .iter()
+        .chain(separate_results.iter())
+        .collect();
     all_results.sort_by(|a, b| {
         let adv_a = a.bind_similarity - a.bundle_similarity;
         let adv_b = b.bind_similarity - b.bundle_similarity;
@@ -188,15 +248,19 @@ fn run_experiment() -> Result<()> {
     println!("Top 5 pairs where BINDING better captures meaning:");
     for r in all_results.iter().take(5) {
         let adv = r.bind_similarity - r.bundle_similarity;
-        println!("  '{}' ({}): bind={:.3}, bundle={:.3}, adv={:+.3}",
-                 r.combined, r.pair_type, r.bind_similarity, r.bundle_similarity, adv);
+        println!(
+            "  '{}' ({}): bind={:.3}, bundle={:.3}, adv={:+.3}",
+            r.combined, r.pair_type, r.bind_similarity, r.bundle_similarity, adv
+        );
     }
 
     println!("\nTop 5 pairs where BUNDLING better captures meaning:");
     for r in all_results.iter().rev().take(5) {
         let adv = r.bind_similarity - r.bundle_similarity;
-        println!("  '{}' ({}): bind={:.3}, bundle={:.3}, adv={:+.3}",
-                 r.combined, r.pair_type, r.bind_similarity, r.bundle_similarity, adv);
+        println!(
+            "  '{}' ({}): bind={:.3}, bundle={:.3}, adv={:+.3}",
+            r.combined, r.pair_type, r.bind_similarity, r.bundle_similarity, adv
+        );
     }
 
     // Also show raw embedding similarity between parts
@@ -205,14 +269,21 @@ fn run_experiment() -> Result<()> {
     println!("================================================================\n");
 
     let unified_part_sim: Vec<f64> = unified_results.iter().map(|r| r.parts_similarity).collect();
-    let separate_part_sim: Vec<f64> = separate_results.iter().map(|r| r.parts_similarity).collect();
+    let separate_part_sim: Vec<f64> = separate_results
+        .iter()
+        .map(|r| r.parts_similarity)
+        .collect();
 
     println!("Mean similarity between concept parts (embed(a) · embed(b)):");
     println!("  Unified pairs: {:.4}", mean(&unified_part_sim));
     println!("  Separate pairs: {:.4}", mean(&separate_part_sim));
 
     let p_parts = permutation_test(&unified_part_sim, &separate_part_sim, 10000);
-    println!("  p-value: {:.4} {}", p_parts, if p_parts < 0.05 { "*" } else { "" });
+    println!(
+        "  p-value: {:.4} {}",
+        p_parts,
+        if p_parts < 0.05 { "*" } else { "" }
+    );
 
     if mean(&unified_part_sim) > mean(&separate_part_sim) && p_parts < 0.05 {
         println!("\n  → Unified pairs have more semantically related parts (as expected)");
@@ -253,17 +324,15 @@ fn load_concept_pairs(path: &str) -> Result<Vec<ConceptPair>> {
 
     let mut pairs = Vec::new();
 
-    let pair_keys = [
-        ("unified_pairs", "unified"),
-        ("separate_pairs", "separate"),
-    ];
+    let pair_keys = [("unified_pairs", "unified"), ("separate_pairs", "separate")];
 
     for (json_key, pair_type) in pair_keys {
         if let Some(items) = json[json_key].as_array() {
             for item in items {
                 let concept_a = item["concept_a"].as_str().unwrap_or("").to_string();
                 let concept_b = item["concept_b"].as_str().unwrap_or("").to_string();
-                let combined = item["combined"].as_str()
+                let combined = item["combined"]
+                    .as_str()
                     .map(|s| s.to_string())
                     .unwrap_or_else(|| format!("{} {}", concept_a, concept_b));
 
@@ -338,21 +407,33 @@ fn hv_similarity(a: &BinaryHV, b: &BinaryHV) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
-    let dot: f64 = a.iter().zip(b.iter()).map(|(x, y)| (*x as f64) * (*y as f64)).sum();
+    let dot: f64 = a
+        .iter()
+        .zip(b.iter())
+        .map(|(x, y)| (*x as f64) * (*y as f64))
+        .sum();
     let norm_a: f64 = a.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
     let norm_b: f64 = b.iter().map(|x| (*x as f64).powi(2)).sum::<f64>().sqrt();
-    if norm_a > 0.0 && norm_b > 0.0 { dot / (norm_a * norm_b) } else { 0.0 }
+    if norm_a > 0.0 && norm_b > 0.0 {
+        dot / (norm_a * norm_b)
+    } else {
+        0.0
+    }
 }
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     variance.sqrt()
@@ -362,7 +443,11 @@ fn std_dev(values: &[f64]) -> f64 {
 fn cohens_d(group_a: &[f64], group_b: &[f64]) -> f64 {
     let mean_diff = mean(group_a) - mean(group_b);
     let pooled_std = ((std_dev(group_a).powi(2) + std_dev(group_b).powi(2)) / 2.0).sqrt();
-    if pooled_std > 0.0 { mean_diff / pooled_std } else { 0.0 }
+    if pooled_std > 0.0 {
+        mean_diff / pooled_std
+    } else {
+        0.0
+    }
 }
 
 #[cfg(feature = "neural-bridge")]

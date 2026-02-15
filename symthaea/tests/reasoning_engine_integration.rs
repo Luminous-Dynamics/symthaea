@@ -9,23 +9,20 @@
 // Run: cargo test --test reasoning_engine_integration --features reasoning_engine
 // ==================================================================================
 
-use symthaea::consciousness::epistemic_conflict::{
-    TheoryCalibrator, MultiTheoryMetrics, TheoryId,
-    phi_integration::thresholds,
-};
-use symthaea::consciousness::tool_gate::types::{ToolDescriptor, RiskLevel};
-use symthaea::consciousness::tool_gate::classifier;
-use symthaea::consciousness::temporal_planning::types::{
-    BudgetTier, ForkedState, PlannedAction, ReasoningBudget,
-};
-use symthaea::consciousness::temporal_planning::mcts::{evs, MctsPlanner};
+use std::sync::Arc;
 use symthaea::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CausalQueryOutcome, CounterfactualReasoner,
 };
-use symthaea::consciousness::reasoning_engine::{
-    ConsciousReasoningEngine, ReasoningContext,
+use symthaea::consciousness::epistemic_conflict::{
+    phi_integration::thresholds, MultiTheoryMetrics, TheoryCalibrator, TheoryId,
 };
-use std::sync::Arc;
+use symthaea::consciousness::reasoning_engine::{ConsciousReasoningEngine, ReasoningContext};
+use symthaea::consciousness::temporal_planning::mcts::{evs, MctsPlanner};
+use symthaea::consciousness::temporal_planning::types::{
+    BudgetTier, ForkedState, PlannedAction, ReasoningBudget,
+};
+use symthaea::consciousness::tool_gate::classifier;
+use symthaea::consciousness::tool_gate::types::{RiskLevel, ToolDescriptor};
 
 fn make_context(phi: f64, consensus: f64, budget_us: u64) -> ReasoningContext {
     ReasoningContext {
@@ -78,7 +75,13 @@ fn inv1_monotonic_caution() {
     let mut engine2 = ConsciousReasoningEngine::new();
     let mut ctx_low = make_context(0.8, 0.9, 25_000);
     ctx_low.theory_metrics = MultiTheoryMetrics {
-        phi: 0.8, gwt: 0.2, ast: 0.8, pp: 0.2, rpt: 0.8, embodiment: 0.2, unified: 0.5,
+        phi: 0.8,
+        gwt: 0.2,
+        ast: 0.8,
+        pp: 0.2,
+        rpt: 0.8,
+        embodiment: 0.2,
+        unified: 0.5,
     };
     let r_low = engine2.reason(&ctx_low);
 
@@ -86,7 +89,9 @@ fn inv1_monotonic_caution() {
         assert!(
             r_high.phi_eff >= r_low.phi_eff - 1e-10,
             "INV-1: higher R ({:.3}) should produce higher Φ_eff ({:.3} vs {:.3})",
-            r_high.reliability, r_high.phi_eff, r_low.phi_eff,
+            r_high.reliability,
+            r_high.phi_eff,
+            r_low.phi_eff,
         );
     }
 }
@@ -94,8 +99,8 @@ fn inv1_monotonic_caution() {
 #[test]
 fn inv2_rollback_safety() {
     // INV-2: All non-ReadOnly tools must have rollback OR be Critical.
-    let non_readonly_no_rollback = ToolDescriptor::from_command("some-command")
-        .with_domain("unknown");
+    let non_readonly_no_rollback =
+        ToolDescriptor::from_command("some-command").with_domain("unknown");
     let risk = classifier::classify(&non_readonly_no_rollback);
     assert_eq!(
         risk,
@@ -128,8 +133,14 @@ fn inv3_deterministic_reasoning() {
     let r2 = e2.reason(&ctx);
 
     assert_eq!(r1.tier, r2.tier);
-    assert!((r1.phi_eff - r2.phi_eff).abs() < 1e-10, "Φ_eff should be identical");
-    assert!((r1.reliability - r2.reliability).abs() < 1e-10, "R should be identical");
+    assert!(
+        (r1.phi_eff - r2.phi_eff).abs() < 1e-10,
+        "Φ_eff should be identical"
+    );
+    assert!(
+        (r1.reliability - r2.reliability).abs() < 1e-10,
+        "R should be identical"
+    );
     assert!((r1.gamma - r2.gamma).abs() < 1e-10, "γ should be identical");
     assert_eq!(r1.conflicts.conflicts.len(), r2.conflicts.conflicts.len());
 }
@@ -142,10 +153,7 @@ fn inv4_planner_consistency() {
 
     // Low Φ_eff but available actions include a risky tool
     let mut ctx = make_context(0.3, 0.3, 25_000);
-    ctx.tool = Some(
-        ToolDescriptor::from_command("nix-collect-garbage -d")
-            .with_domain("nixos"),
-    );
+    ctx.tool = Some(ToolDescriptor::from_command("nix-collect-garbage -d").with_domain("nixos"));
 
     let result = engine.reason(&ctx);
 
@@ -174,14 +182,28 @@ fn inv5_epistemic_dominance() {
         [42u8; 32],
     );
     let actions = vec![
-        PlannedAction { id: "non_ep".into(), description: "Non-epistemic".into(),
-            embedding: vec![1.0; 4], prior: 0.8, is_epistemic: false },
-        PlannedAction { id: "ep".into(), description: "Epistemic".into(),
-            embedding: vec![0.5; 4], prior: 0.5, is_epistemic: true },
+        PlannedAction {
+            id: "non_ep".into(),
+            description: "Non-epistemic".into(),
+            embedding: vec![1.0; 4],
+            prior: 0.8,
+            is_epistemic: false,
+        },
+        PlannedAction {
+            id: "ep".into(),
+            description: "Epistemic".into(),
+            embedding: vec![0.5; 4],
+            prior: 0.5,
+            is_epistemic: true,
+        },
     ];
     let budget = ReasoningBudget::new(10_000, 0.8);
     let result = MctsPlanner::epistemic_rollout(&state, &actions, &budget);
-    assert_eq!(result.best_action_idx, Some(1), "INV-5: Should prefer epistemic action");
+    assert_eq!(
+        result.best_action_idx,
+        Some(1),
+        "INV-5: Should prefer epistemic action"
+    );
 }
 
 #[test]
@@ -208,14 +230,22 @@ fn inv7_no_silent_irreversibility() {
     // INV-7: Missing rollback → automatic escalation to Critical.
     let tool = ToolDescriptor::from_command("dangerous-unknown-command");
     let risk = classifier::classify(&tool);
-    assert_eq!(risk, RiskLevel::Critical, "INV-7: Missing rollback must be Critical");
+    assert_eq!(
+        risk,
+        RiskLevel::Critical,
+        "INV-7: Missing rollback must be Critical"
+    );
 
     // Even with a known domain, missing rollback → Critical
     let tool2 = ToolDescriptor::from_command("custom-deploy")
         .with_domain("deployment")
         .with_calibration_count(100);
     let risk2 = classifier::classify(&tool2);
-    assert_eq!(risk2, RiskLevel::Critical, "INV-7: Known domain but no rollback → Critical");
+    assert_eq!(
+        risk2,
+        RiskLevel::Critical,
+        "INV-7: Known domain but no rollback → Critical"
+    );
 }
 
 #[test]
@@ -236,7 +266,10 @@ fn inv8_confidence_action_alignment() {
 
     // High Φ_eff, high confidence → allowed
     let result2 = classifier::gate(&tool, 0.95, 0.9);
-    assert!(result2.is_allowed(), "Should be allowed with sufficient Φ_eff and confidence");
+    assert!(
+        result2.is_allowed(),
+        "Should be allowed with sufficient Φ_eff and confidence"
+    );
 }
 
 #[test]
@@ -274,12 +307,18 @@ fn inv10_anchor_kind_required() {
         let action = kind.recommended_action();
         match action {
             EpistemicAction::Verify(anchor) => {
-                assert!(!anchor.description().is_empty(),
-                    "INV-10: Verify anchor should have non-empty description for {:?}", kind);
+                assert!(
+                    !anchor.description().is_empty(),
+                    "INV-10: Verify anchor should have non-empty description for {:?}",
+                    kind
+                );
             }
             EpistemicAction::Sense(anchor) => {
-                assert!(!anchor.description().is_empty(),
-                    "INV-10: Sense anchor should have non-empty description for {:?}", kind);
+                assert!(
+                    !anchor.description().is_empty(),
+                    "INV-10: Sense anchor should have non-empty description for {:?}",
+                    kind
+                );
             }
             _ => {} // Ask, Simulate, Defer, Summarize don't need anchors
         }
@@ -308,14 +347,21 @@ fn fm2_all_theories_disagree() {
     let mut engine = ConsciousReasoningEngine::new();
     let mut ctx = make_context(0.8, 0.8, 25_000);
     ctx.theory_metrics = MultiTheoryMetrics {
-        phi: 0.9, gwt: 0.1, ast: 0.9, pp: 0.1, rpt: 0.9, embodiment: 0.1, unified: 0.5,
+        phi: 0.9,
+        gwt: 0.1,
+        ast: 0.9,
+        pp: 0.1,
+        rpt: 0.9,
+        embodiment: 0.1,
+        unified: 0.5,
     };
     let result = engine.reason(&ctx);
 
     assert!(
         result.phi_eff < ctx.phi * 0.5,
         "FM-2: Φ_eff ({:.3}) should be significantly below raw Φ ({:.3})",
-        result.phi_eff, ctx.phi,
+        result.phi_eff,
+        ctx.phi,
     );
 }
 
@@ -324,7 +370,11 @@ fn fm3_causal_query_unidentifiable() {
     // FM-3: Causal query unidentifiable → return Unidentified(reason) + no action.
     let engine = ConsciousReasoningEngine::new();
     let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![]); // no edges
-    let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+    let query = CausalQuery {
+        treatment: 0,
+        outcome: 1,
+        conditioning: vec![],
+    };
     let outcome = engine.analyze_counterfactual(&dag, &query);
 
     assert!(
@@ -351,15 +401,31 @@ fn fm5_no_available_actions() {
 fn fm6_calibration_data_cold() {
     // FM-6: Cold calibration → use conservative defaults.
     let calibrator = TheoryCalibrator::new();
-    assert!(calibrator.calibrations.any_cold(), "Fresh calibrator should be cold");
-    assert_eq!(calibrator.gamma(), 2.0, "FM-6: Cold start should use default γ=2.0");
+    assert!(
+        calibrator.calibrations.any_cold(),
+        "Fresh calibrator should be cold"
+    );
+    assert_eq!(
+        calibrator.gamma(),
+        2.0,
+        "FM-6: Cold start should use default γ=2.0"
+    );
 
     // Reliability should still work with conservative priors
     let metrics = MultiTheoryMetrics {
-        phi: 0.8, gwt: 0.8, ast: 0.8, pp: 0.8, rpt: 0.8, embodiment: 0.8, unified: 0.8,
+        phi: 0.8,
+        gwt: 0.8,
+        ast: 0.8,
+        pp: 0.8,
+        rpt: 0.8,
+        embodiment: 0.8,
+        unified: 0.8,
     };
     let r = calibrator.reliability(&metrics);
-    assert!(r > 0.0 && r <= 1.0, "FM-6: Cold reliability should still be valid");
+    assert!(
+        r > 0.0 && r <= 1.0,
+        "FM-6: Cold reliability should still be valid"
+    );
 }
 
 #[test]
@@ -373,7 +439,10 @@ fn fm7_harness_match_rate_low() {
     // The default harness should pass with our reasoner
     let result = harness.validate(&reasoner);
     assert!(
-        matches!(result, symthaea::consciousness::counterfactual::identification::HarnessResult::Passed),
+        matches!(
+            result,
+            symthaea::consciousness::counterfactual::identification::HarnessResult::Passed
+        ),
         "FM-7: Default harness should pass with our reasoner"
     );
 }
@@ -396,8 +465,14 @@ fn test_d_separation_basic() {
     let empty: HashSet<usize> = HashSet::new();
     let m_set: HashSet<usize> = [1].iter().copied().collect();
 
-    assert!(!dag.is_d_separated(0, 2, &empty), "X-Y should be d-connected without conditioning");
-    assert!(dag.is_d_separated(0, 2, &m_set), "X-Y should be d-separated given M");
+    assert!(
+        !dag.is_d_separated(0, 2, &empty),
+        "X-Y should be d-connected without conditioning"
+    );
+    assert!(
+        dag.is_d_separated(0, 2, &m_set),
+        "X-Y should be d-separated given M"
+    );
 }
 
 #[test]
@@ -413,8 +488,14 @@ fn test_d_separation_collider() {
     let empty: HashSet<usize> = HashSet::new();
     let b_set: HashSet<usize> = [1].iter().copied().collect();
 
-    assert!(dag.is_d_separated(0, 2, &empty), "A-C should be d-separated (collider blocks)");
-    assert!(!dag.is_d_separated(0, 2, &b_set), "A-C should be d-connected given B (collider opened)");
+    assert!(
+        dag.is_d_separated(0, 2, &empty),
+        "A-C should be d-separated (collider blocks)"
+    );
+    assert!(
+        !dag.is_d_separated(0, 2, &b_set),
+        "A-C should be d-connected given B (collider opened)"
+    );
 }
 
 #[test]
@@ -427,7 +508,11 @@ fn test_rule2_instrument_variable() {
     );
 
     let reasoner = CounterfactualReasoner::new();
-    let query = CausalQuery { treatment: 1, outcome: 2, conditioning: vec![] };
+    let query = CausalQuery {
+        treatment: 1,
+        outcome: 2,
+        conditioning: vec![],
+    };
     let result = reasoner.query(&dag, &query);
 
     // Should be identified (via backdoor, frontdoor, or Rule 2)
@@ -447,7 +532,11 @@ fn test_rule3_irrelevant_intervention() {
     );
 
     let reasoner = CounterfactualReasoner::new();
-    let query = CausalQuery { treatment: 0, outcome: 1, conditioning: vec![] };
+    let query = CausalQuery {
+        treatment: 0,
+        outcome: 1,
+        conditioning: vec![],
+    };
     let result = reasoner.query(&dag, &query);
 
     // Simple X→Y should be identifiable
@@ -492,7 +581,11 @@ fn test_extended_harness() {
     let mut harness = CausalReferenceHarness::new();
 
     // Should have at least 6 test cases now (including Rule 2-3 cases)
-    assert!(harness.test_count() >= 6, "Harness should have ≥6 test cases, got {}", harness.test_count());
+    assert!(
+        harness.test_count() >= 6,
+        "Harness should have ≥6 test cases, got {}",
+        harness.test_count()
+    );
 
     let _result = harness.validate(&reasoner);
     assert!(
@@ -704,14 +797,14 @@ mod proptest_counterfactual {
 #[cfg(feature = "counterfactual")]
 mod sensitivity_analysis_tests {
     use symthaea::consciousness::counterfactual::{
-        RobustEstimate, IdentificationMethod, SensitivityAnalysis,
+        IdentificationMethod, RobustEstimate, SensitivityAnalysis,
     };
 
     #[test]
     fn test_e_value_basic() {
         // E-value should be > 1 for positive effects
         let estimate = RobustEstimate {
-            effect: 0.5,  // Moderate effect
+            effect: 0.5, // Moderate effect
             regression_estimate: 0.5,
             ipw_estimate: 0.5,
             dr_estimate: 0.5,
@@ -721,7 +814,10 @@ mod sensitivity_analysis_tests {
 
         let e_value = estimate.e_value();
         assert!(e_value > 1.0, "E-value should be > 1 for non-null effect");
-        assert!(e_value < 10.0, "E-value should be reasonable for moderate effect");
+        assert!(
+            e_value < 10.0,
+            "E-value should be reasonable for moderate effect"
+        );
     }
 
     #[test]
@@ -737,7 +833,10 @@ mod sensitivity_analysis_tests {
         };
 
         let e_value = estimate.e_value();
-        assert!((e_value - 1.0).abs() < 0.01, "E-value should be ~1 for null effect");
+        assert!(
+            (e_value - 1.0).abs() < 0.01,
+            "E-value should be ~1 for null effect"
+        );
     }
 
     #[test]
@@ -797,7 +896,10 @@ mod sensitivity_analysis_tests {
 
         // CI crosses null (-0.1 to 0.3)
         let e_value_ci = estimate.e_value_ci(-0.1, 0.3);
-        assert!((e_value_ci - 1.0).abs() < 0.01, "E-value_CI should be 1 when CI crosses null");
+        assert!(
+            (e_value_ci - 1.0).abs() < 0.01,
+            "E-value_CI should be 1 when CI crosses null"
+        );
     }
 }
 
@@ -807,9 +909,7 @@ mod sensitivity_analysis_tests {
 
 #[cfg(feature = "counterfactual")]
 mod causal_discovery_tests {
-    use symthaea::consciousness::counterfactual::{
-        PCAlgorithm, ObservationalData,
-    };
+    use symthaea::consciousness::counterfactual::{ObservationalData, PCAlgorithm};
 
     fn generate_chain_data() -> ObservationalData {
         // X → Y → Z (chain structure)
@@ -877,7 +977,10 @@ mod causal_discovery_tests {
         let result = pc.discover(&data);
 
         // Should have performed some independence tests
-        assert!(result.independence_tests > 0, "Should perform independence tests");
+        assert!(
+            result.independence_tests > 0,
+            "Should perform independence tests"
+        );
     }
 
     #[test]
@@ -945,7 +1048,9 @@ mod mediation_tests {
         let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
 
         match analysis.is_identified() {
-            MediationIdentification::Identified { has_direct_effect, .. } => {
+            MediationIdentification::Identified {
+                has_direct_effect, ..
+            } => {
                 assert!(has_direct_effect, "DAG has X → Y direct path");
             }
             other => panic!("Expected Identified, got {:?}", other),
@@ -957,7 +1062,7 @@ mod mediation_tests {
         // X → Y with M unconnected
         let dag = CausalDAG::new(
             vec!["X".into(), "M".into(), "Y".into()],
-            vec![(0, 2)],  // Only X → Y, M is isolated
+            vec![(0, 2)], // Only X → Y, M is isolated
         );
         let analysis = MediationAnalysis::new(&dag, 0, 1, 2);
 
@@ -981,13 +1086,16 @@ mod mediation_tests {
         let sum = result.natural_direct_effect + result.natural_indirect_effect;
         assert!(
             (result.total_effect - sum).abs() < 0.1,
-            "Total = NDE + NIE (got {} vs {})", result.total_effect, sum
+            "Total = NDE + NIE (got {} vs {})",
+            result.total_effect,
+            sum
         );
 
         // Proportion mediated should be between 0 and 1
         assert!(
             result.proportion_mediated >= 0.0 && result.proportion_mediated <= 1.0,
-            "Proportion mediated out of range: {}", result.proportion_mediated
+            "Proportion mediated out of range: {}",
+            result.proportion_mediated
         );
     }
 
@@ -1018,11 +1126,16 @@ mod mediation_tests {
             let fully = result.is_fully_mediated();
             let partially = result.is_partially_mediated();
             // Cannot be both fully and partially mediated (mutually exclusive ranges)
-            assert!(!(fully && partially),
-                "Cannot be both fully (>80%) and partially (20-80%) mediated");
+            assert!(
+                !(fully && partially),
+                "Cannot be both fully (>80%) and partially (20-80%) mediated"
+            );
             // Proportion should be in valid range
-            assert!(result.proportion_mediated >= 0.0 && result.proportion_mediated <= 1.0,
-                "Proportion mediated should be in [0,1], got {}", result.proportion_mediated);
+            assert!(
+                result.proportion_mediated >= 0.0 && result.proportion_mediated <= 1.0,
+                "Proportion mediated should be in [0,1], got {}",
+                result.proportion_mediated
+            );
         }
     }
 }
@@ -1043,7 +1156,11 @@ mod effect_estimation_tests {
 
         for i in 0..500 {
             let z = (i % 5) as f64 / 4.0;
-            let x = if z + 0.1 * (i % 3) as f64 / 3.0 > 0.4 { 1.0 } else { 0.0 };
+            let x = if z + 0.1 * (i % 3) as f64 / 3.0 > 0.4 {
+                1.0
+            } else {
+                0.0
+            };
             let y = 1.5 * x + 0.8 * z + 0.05 * (i % 7) as f64 / 7.0;
             data.add_observation(vec![x, y, z]);
         }
@@ -1055,7 +1172,7 @@ mod effect_estimation_tests {
     fn test_effect_estimator_backdoor() {
         let dag = CausalDAG::new(
             vec!["X".into(), "Y".into(), "Z".into()],
-            vec![(0, 1), (2, 0), (2, 1)],  // Z → X → Y, Z → Y
+            vec![(0, 1), (2, 0), (2, 1)], // Z → X → Y, Z → Y
         );
 
         let data = create_backdoor_data();
@@ -1069,11 +1186,15 @@ mod effect_estimation_tests {
         let result = estimator.estimate(&dag, &query, &data);
 
         match result {
-            symthaea::consciousness::counterfactual::CausalQueryOutcome::Identified { estimand, .. } => {
+            symthaea::consciousness::counterfactual::CausalQueryOutcome::Identified {
+                estimand,
+                ..
+            } => {
                 // Effect should be approximately 1.5 (the true X → Y coefficient)
                 assert!(
                     (estimand.effect - 1.5).abs() < 0.5,
-                    "Effect estimate {} should be ~1.5", estimand.effect
+                    "Effect estimate {} should be ~1.5",
+                    estimand.effect
                 );
             }
             _ => panic!("Expected identified outcome"),
@@ -1114,7 +1235,8 @@ mod effect_estimation_tests {
             regression_estimate: 1.0,
             ipw_estimate: 1.05,
             dr_estimate: 1.02,
-            method: symthaea::consciousness::counterfactual::IdentificationMethod::BackdoorAdjustment,
+            method:
+                symthaea::consciousness::counterfactual::IdentificationMethod::BackdoorAdjustment,
             is_identified: true,
         };
 
@@ -1132,8 +1254,8 @@ mod effect_estimation_tests {
 #[cfg(feature = "counterfactual")]
 mod edge_case_tests {
     use symthaea::consciousness::counterfactual::{
-        CausalDAG, CausalQuery, CounterfactualReasoner, ObservationalData,
-        PCAlgorithm, EffectEstimator,
+        CausalDAG, CausalQuery, CounterfactualReasoner, EffectEstimator, ObservationalData,
+        PCAlgorithm,
     };
 
     #[test]
@@ -1183,13 +1305,13 @@ mod edge_case_tests {
         // Test with a moderately large DAG
         let n = 20;
         let nodes: Vec<String> = (0..n).map(|i| format!("X{}", i)).collect();
-        let edges: Vec<(usize, usize)> = (0..n-1).map(|i| (i, i+1)).collect();
+        let edges: Vec<(usize, usize)> = (0..n - 1).map(|i| (i, i + 1)).collect();
 
         let dag = CausalDAG::new(nodes, edges);
 
         assert_eq!(dag.num_nodes(), n);
-        assert!(dag.has_path(0, n-1));
-        assert!(!dag.has_path(n-1, 0));
+        assert!(dag.has_path(0, n - 1));
+        assert!(!dag.has_path(n - 1, 0));
     }
 
     #[test]
@@ -1197,7 +1319,7 @@ mod edge_case_tests {
         // Two disconnected components
         let dag = CausalDAG::new(
             vec!["A".into(), "B".into(), "C".into(), "D".into()],
-            vec![(0, 1), (2, 3)],  // A→B and C→D, disconnected
+            vec![(0, 1), (2, 3)], // A→B and C→D, disconnected
         );
 
         assert!(!dag.has_path(0, 2));
@@ -1244,7 +1366,10 @@ mod edge_case_tests {
         }
 
         let cov = data.covariance(0, 1);
-        assert!(cov > 0.0, "Covariance should be positive for positively related vars");
+        assert!(
+            cov > 0.0,
+            "Covariance should be positive for positively related vars"
+        );
     }
 }
 
@@ -1263,7 +1388,7 @@ mod iv_tests {
         // Z is the instrument
         CausalDAG::new(
             vec!["Z".into(), "X".into(), "Y".into()],
-            vec![(0, 1), (1, 2)],  // Z → X → Y (U is latent)
+            vec![(0, 1), (1, 2)], // Z → X → Y (U is latent)
         )
     }
 
@@ -1272,7 +1397,7 @@ mod iv_tests {
 
         for i in 0..200 {
             let z = (i % 2) as f64;
-            let u = (i % 5) as f64 / 5.0;  // Unobserved confounder
+            let u = (i % 5) as f64 / 5.0; // Unobserved confounder
             let x = 0.5 * z + 0.3 * u + 0.05 * (i % 7) as f64 / 7.0;
             let y = 1.5 * x + 0.4 * u + 0.05 * (i % 11) as f64 / 11.0;
             data.add_observation(vec![z, x, y]);
@@ -1294,7 +1419,7 @@ mod iv_tests {
         // Z is not connected to X
         let dag = CausalDAG::new(
             vec!["Z".into(), "X".into(), "Y".into()],
-            vec![(1, 2)],  // Only X → Y
+            vec![(1, 2)], // Only X → Y
         );
 
         let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
@@ -1306,7 +1431,7 @@ mod iv_tests {
         // Z → Y directly (violates exclusion)
         let dag = CausalDAG::new(
             vec!["Z".into(), "X".into(), "Y".into()],
-            vec![(0, 1), (0, 2), (1, 2)],  // Z → X, Z → Y, X → Y
+            vec![(0, 1), (0, 2), (1, 2)], // Z → X, Z → Y, X → Y
         );
 
         let validity = IVEstimator::is_valid_instrument(&dag, 0, 1, 2);
@@ -1334,10 +1459,7 @@ mod iv_tests {
         let effect = IVEstimator::estimate_wald(&data, 0, 1, 2);
 
         // Wald estimate should also be near 1.5
-        assert!(
-            !effect.is_nan(),
-            "Wald estimate should be computable"
-        );
+        assert!(!effect.is_nan(), "Wald estimate should be computable");
     }
 
     #[test]
@@ -1347,7 +1469,7 @@ mod iv_tests {
 
         for i in 0..100 {
             let z = (i % 2) as f64;
-            let x = 0.01 * z + (i % 10) as f64 / 10.0;  // Very weak Z → X
+            let x = 0.01 * z + (i % 10) as f64 / 10.0; // Very weak Z → X
             let y = x + (i % 7) as f64 / 7.0;
             data.add_observation(vec![z, x, y]);
         }
@@ -1365,9 +1487,7 @@ mod iv_tests {
 
 #[cfg(feature = "counterfactual")]
 mod time_series_tests {
-    use symthaea::consciousness::counterfactual::{
-        TimeSeriesCausalDiscovery, TimeSeriesData,
-    };
+    use symthaea::consciousness::counterfactual::{TimeSeriesCausalDiscovery, TimeSeriesData};
 
     #[test]
     fn test_granger_basic() {
@@ -1375,7 +1495,12 @@ mod time_series_tests {
 
         // X causes Y with lag 1
         let x: Vec<f64> = (0..100).map(|i| (i as f64).sin()).collect();
-        let y: Vec<f64> = x.iter().skip(1).chain(std::iter::once(&0.0)).map(|&v| v * 0.8).collect();
+        let y: Vec<f64> = x
+            .iter()
+            .skip(1)
+            .chain(std::iter::once(&0.0))
+            .map(|&v| v * 0.8)
+            .collect();
 
         let result = discovery.granger_test(&x, &y, 1);
 
@@ -1462,19 +1587,19 @@ mod transportability_tests {
     #[test]
     fn test_directly_transportable() {
         // Same DAG in both populations, no selection
-        let dag = CausalDAG::new(
-            vec!["X".into(), "Y".into()],
-            vec![(0, 1)],
-        );
+        let dag = CausalDAG::new(vec!["X".into(), "Y".into()], vec![(0, 1)]);
 
         let analyzer = TransportabilityAnalyzer::new(
             dag.clone(),
             dag,
-            vec![],  // No selection nodes
+            vec![], // No selection nodes
         );
 
         let result = analyzer.is_transportable(0, 1);
-        assert!(matches!(result, TransportabilityResult::DirectlyTransportable { .. }));
+        assert!(matches!(
+            result,
+            TransportabilityResult::DirectlyTransportable { .. }
+        ));
     }
 
     #[test]
@@ -1482,7 +1607,7 @@ mod transportability_tests {
         // Selection affects a confounding path
         let source_dag = CausalDAG::new(
             vec!["X".into(), "Y".into(), "Z".into(), "S".into()],
-            vec![(0, 1), (2, 0), (2, 1), (3, 2)],  // S → Z → X,Y
+            vec![(0, 1), (2, 0), (2, 1), (3, 2)], // S → Z → X,Y
         );
 
         let target_dag = source_dag.clone();
@@ -1490,7 +1615,7 @@ mod transportability_tests {
         let analyzer = TransportabilityAnalyzer::new(
             source_dag,
             target_dag,
-            vec![3],  // S is a selection node
+            vec![3], // S is a selection node
         );
 
         let result = analyzer.is_transportable(0, 1);

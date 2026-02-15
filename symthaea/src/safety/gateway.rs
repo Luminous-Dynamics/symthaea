@@ -15,8 +15,8 @@ consistent, structured way for callers to ask:
 
 use std::path::Path;
 
+use super::{AmygdalaActor, ForbiddenCategory, SafetyGuardrails};
 use crate::action::ActionIR;
-use super::{AmygdalaActor, SafetyGuardrails, ForbiddenCategory};
 
 /// What kind of thing is being checked for safety
 #[derive(Debug)]
@@ -72,23 +72,15 @@ const FORBIDDEN_PATHS: &[&str] = &[
 ];
 
 /// Programs that should never be executed without careful review
-const DANGEROUS_PROGRAMS: &[&str] = &[
-    "rm",
-    "dd",
-    "mkfs",
-    "fdisk",
-    "parted",
-    "shred",
-    "wipefs",
-];
+const DANGEROUS_PROGRAMS: &[&str] = &["rm", "dd", "mkfs", "fdisk", "parted", "shred", "wipefs"];
 
 /// Check if a path is within a forbidden system path
 fn is_forbidden_path(path: &Path) -> bool {
     let normalized = normalize_path(path);
     let path_str = normalized.to_string_lossy();
-    FORBIDDEN_PATHS.iter().any(|forbidden| {
-        path_str.starts_with(forbidden)
-    })
+    FORBIDDEN_PATHS
+        .iter()
+        .any(|forbidden| path_str.starts_with(forbidden))
 }
 
 fn normalize_path(path: &Path) -> std::path::PathBuf {
@@ -167,7 +159,10 @@ impl SafetyGateway {
         let hv = self.encode_text_to_hv(text);
         if let Some(category) = self.guardrails.check(&hv) {
             return SafetyDecision::blocked(
-                format!("Blocked: Semantic content matches forbidden category {:?}", category),
+                format!(
+                    "Blocked: Semantic content matches forbidden category {:?}",
+                    category
+                ),
                 Some(category),
             );
         }
@@ -217,7 +212,10 @@ impl SafetyGateway {
                 // Check the program name
                 if is_dangerous_program(program) {
                     return SafetyDecision::blocked(
-                        format!("Blocked: Dangerous program '{}' requires explicit approval", program),
+                        format!(
+                            "Blocked: Dangerous program '{}' requires explicit approval",
+                            program
+                        ),
                         Some(ForbiddenCategory::DangerousCommand),
                     );
                 }
@@ -371,8 +369,13 @@ mod tests {
     fn test_gateway_blocks_dangerous_sequence() {
         let mut gw = SafetyGateway::new();
         let action = ActionIR::Sequence(vec![
-            ActionIR::ReadFile { path: "/tmp/safe.txt".into(), encoding: None },
-            ActionIR::DeleteFile { path: "/boot/vmlinuz".into() },
+            ActionIR::ReadFile {
+                path: "/tmp/safe.txt".into(),
+                encoding: None,
+            },
+            ActionIR::DeleteFile {
+                path: "/boot/vmlinuz".into(),
+            },
         ]);
         let decision = gw.check(SafetyCheck::Action(&action));
         assert!(!decision.allowed);
@@ -388,7 +391,8 @@ mod tests {
     #[test]
     fn test_gateway_hv_check_blocks_prototype() {
         let gw = SafetyGateway::new();
-        let proto = gw.guardrails()
+        let proto = gw
+            .guardrails()
             .prototype(ForbiddenCategory::DangerousCommand)
             .unwrap()
             .to_vec();

@@ -2,25 +2,25 @@
 //!
 //! Extracted from physics_numerical_validation.rs for manageability.
 
-use super::physics_test_helpers::assert_relative_eq;
-use super::classical_mechanics::{ClassicalMechanicsEncoder, SymmetryType};
-use super::statistical_mechanics::StatMechEncoder;
-use super::neutron_shielding::NeutronCrossSection;
-use super::radiation_damage::FusionReaction;
-use super::chemical_kinetics::{KineticsEncoder, ReactionType, ReactionOrder};
-use super::phonon_dynamics::CrystalStructure;
-use super::geophysics::{GeophysicsEncoder, EarthLayer};
-use super::economics::{FuelCosts, CapitalCosts, EconomicEngine};
 use super::antimatter::Antimatter;
-use super::phase_transitions::PhaseEncoder;
-use super::high_entropy_alloys::HEADesigner;
-use super::qft::QEDEncoder;
 use super::biophysics::{BiophysicsEncoder, MotorType};
-use super::molecular_biology::{DNABase, RNABase};
-use super::derived_laws::LawsDerivationEngine;
-use super::uncertainty::{UncertainParameter, ParameterUncertainties, UncertaintyDistribution};
+use super::chemical_kinetics::{KineticsEncoder, ReactionOrder, ReactionType};
+use super::classical_mechanics::{ClassicalMechanicsEncoder, SymmetryType};
+use super::constants::{ALPHA, E_CHARGE, K_BOLTZMANN};
 use super::coupled_physics::OperatingConditions;
-use super::constants::{K_BOLTZMANN, E_CHARGE, ALPHA};
+use super::derived_laws::LawsDerivationEngine;
+use super::economics::{CapitalCosts, EconomicEngine, FuelCosts};
+use super::geophysics::{EarthLayer, GeophysicsEncoder};
+use super::high_entropy_alloys::HEADesigner;
+use super::molecular_biology::{DNABase, RNABase};
+use super::neutron_shielding::NeutronCrossSection;
+use super::phase_transitions::PhaseEncoder;
+use super::phonon_dynamics::CrystalStructure;
+use super::physics_test_helpers::assert_relative_eq;
+use super::qft::QEDEncoder;
+use super::radiation_damage::FusionReaction;
+use super::statistical_mechanics::StatMechEncoder;
+use super::uncertainty::{ParameterUncertainties, UncertainParameter, UncertaintyDistribution};
 use crate::genesis::GenesisSeed;
 
 // =========================================================================
@@ -43,8 +43,10 @@ fn classical_harmonic_frequency() {
     let genesis = GenesisSeed::from_phrase("r7_harmonic");
     let encoder = ClassicalMechanicsEncoder::from_genesis(&genesis);
     let sho = encoder.harmonic_oscillator(2.0);
-    assert!(sho.symmetries.contains(&SymmetryType::TimeTranslation),
-        "Harmonic oscillator should have time translation symmetry");
+    assert!(
+        sho.symmetries.contains(&SymmetryType::TimeTranslation),
+        "Harmonic oscillator should have time translation symmetry"
+    );
 }
 
 #[test]
@@ -60,9 +62,14 @@ fn classical_kepler_third_law() {
     let genesis = GenesisSeed::from_phrase("r7_kepler");
     let encoder = ClassicalMechanicsEncoder::from_genesis(&genesis);
     let kepler = encoder.kepler_problem();
-    assert!(kepler.symmetries.contains(&SymmetryType::Rotation),
-        "Kepler problem should have rotation symmetry");
-    assert!(kepler.vector.norm() > 0.0, "Kepler vector should be nonzero");
+    assert!(
+        kepler.symmetries.contains(&SymmetryType::Rotation),
+        "Kepler problem should have rotation symmetry"
+    );
+    assert!(
+        kepler.vector.norm() > 0.0,
+        "Kepler vector should be nonzero"
+    );
 }
 
 #[test]
@@ -74,12 +81,18 @@ fn classical_noether_time_energy() {
 
 #[test]
 fn classical_noether_space_momentum() {
-    assert_eq!(SymmetryType::SpaceTranslation.conserved_quantity(), "Linear Momentum");
+    assert_eq!(
+        SymmetryType::SpaceTranslation.conserved_quantity(),
+        "Linear Momentum"
+    );
 }
 
 #[test]
 fn classical_noether_rotation_angular() {
-    assert_eq!(SymmetryType::Rotation.conserved_quantity(), "Angular Momentum");
+    assert_eq!(
+        SymmetryType::Rotation.conserved_quantity(),
+        "Angular Momentum"
+    );
 }
 
 #[test]
@@ -87,7 +100,10 @@ fn classical_virial_harmonic() {
     let genesis = GenesisSeed::from_phrase("r7_virial");
     let encoder = ClassicalMechanicsEncoder::from_genesis(&genesis);
     let virial = encoder.virial_theorem();
-    assert!(virial.norm() > 0.0, "Virial theorem vector should be nonzero");
+    assert!(
+        virial.norm() > 0.0,
+        "Virial theorem vector should be nonzero"
+    );
 }
 
 // =========================================================================
@@ -125,7 +141,10 @@ fn statmech_ideal_gas_pressure() {
     let genesis = GenesisSeed::from_phrase("r7_ideal_gas");
     let encoder = StatMechEncoder::from_genesis(&genesis);
     let gas = encoder.ideal_gas_system(1000, 300.0, 0.001);
-    assert!(gas.vector.norm() > 0.0, "Ideal gas vector should be nonzero");
+    assert!(
+        gas.vector.norm() > 0.0,
+        "Ideal gas vector should be nonzero"
+    );
 }
 
 #[test]
@@ -135,7 +154,10 @@ fn statmech_boltzmann_ratio() {
     let ising = encoder.ising_model(2, 1.0, 0.0);
     let m_low = encoder.ising_magnetization(&ising, 1.0);
     let m_high = encoder.ising_magnetization(&ising, 2.0);
-    assert!(m_low > m_high, "Magnetization should be higher at lower T: m(1.0)={m_low} > m(2.0)={m_high}");
+    assert!(
+        m_low > m_high,
+        "Magnetization should be higher at lower T: m(1.0)={m_low} > m(2.0)={m_high}"
+    );
 }
 
 #[test]
@@ -144,8 +166,10 @@ fn statmech_entropy_extensive() {
     let encoder = StatMechEncoder::from_genesis(&genesis);
     let gas_small = encoder.ideal_gas_system(100, 300.0, 0.001);
     let gas_large = encoder.ideal_gas_system(1000, 300.0, 0.01);
-    assert!(gas_large.vector.norm() > gas_small.vector.norm(),
-        "Larger system should have larger vector norm");
+    assert!(
+        gas_large.vector.norm() > gas_small.vector.norm(),
+        "Larger system should have larger vector norm"
+    );
 }
 
 #[test]
@@ -153,7 +177,10 @@ fn statmech_helmholtz_neg_ktz() {
     let genesis = GenesisSeed::from_phrase("r7_helmholtz");
     let encoder = StatMechEncoder::from_genesis(&genesis);
     let hfe = encoder.helmholtz_free_energy();
-    assert!(hfe.norm() > 0.0, "Helmholtz free energy vector should be nonzero");
+    assert!(
+        hfe.norm() > 0.0,
+        "Helmholtz free energy vector should be nonzero"
+    );
 }
 
 #[test]
@@ -161,7 +188,10 @@ fn statmech_partition_two_level() {
     let genesis = GenesisSeed::from_phrase("r7_partition");
     let encoder = StatMechEncoder::from_genesis(&genesis);
     let z = encoder.partition_function_form();
-    assert!(z.norm() > 0.0, "Partition function vector should be nonzero");
+    assert!(
+        z.norm() > 0.0,
+        "Partition function vector should be nonzero"
+    );
 }
 
 // =========================================================================
@@ -172,9 +202,13 @@ fn statmech_partition_two_level() {
 fn neutron_hvl_formula() {
     let xs = NeutronCrossSection {
         name: "B-10".to_string(),
-        z: 5, a: 10.0, density: 2340.0,
-        sigma_elastic_14mev: 1.0, sigma_elastic_2mev: 2.0,
-        sigma_abs_thermal: 767.0, inelastic_threshold: 1.0,
+        z: 5,
+        a: 10.0,
+        density: 2340.0,
+        sigma_elastic_14mev: 1.0,
+        sigma_elastic_2mev: 2.0,
+        sigma_abs_thermal: 767.0,
+        inelastic_threshold: 1.0,
     };
     let sigma_macro = xs.macro_cross_section(1.0);
     let hvl = xs.hvl(1.0);
@@ -186,9 +220,13 @@ fn neutron_hvl_formula() {
 fn neutron_tvl_formula() {
     let xs = NeutronCrossSection {
         name: "B-10".to_string(),
-        z: 5, a: 10.0, density: 2340.0,
-        sigma_elastic_14mev: 1.0, sigma_elastic_2mev: 2.0,
-        sigma_abs_thermal: 767.0, inelastic_threshold: 1.0,
+        z: 5,
+        a: 10.0,
+        density: 2340.0,
+        sigma_elastic_14mev: 1.0,
+        sigma_elastic_2mev: 2.0,
+        sigma_abs_thermal: 767.0,
+        inelastic_threshold: 1.0,
     };
     let sigma_macro = xs.macro_cross_section(1.0);
     let tvl = xs.tvl(1.0);
@@ -200,9 +238,13 @@ fn neutron_tvl_formula() {
 fn neutron_tvl_hvl_ratio() {
     let xs = NeutronCrossSection {
         name: "B-10".to_string(),
-        z: 5, a: 10.0, density: 2340.0,
-        sigma_elastic_14mev: 1.0, sigma_elastic_2mev: 2.0,
-        sigma_abs_thermal: 767.0, inelastic_threshold: 1.0,
+        z: 5,
+        a: 10.0,
+        density: 2340.0,
+        sigma_elastic_14mev: 1.0,
+        sigma_elastic_2mev: 2.0,
+        sigma_abs_thermal: 767.0,
+        inelastic_threshold: 1.0,
     };
     let hvl = xs.hvl(1.0);
     let tvl = xs.tvl(1.0);
@@ -214,9 +256,13 @@ fn neutron_tvl_hvl_ratio() {
 fn neutron_mfp_inverse_macro() {
     let xs = NeutronCrossSection {
         name: "B-10".to_string(),
-        z: 5, a: 10.0, density: 2340.0,
-        sigma_elastic_14mev: 1.0, sigma_elastic_2mev: 2.0,
-        sigma_abs_thermal: 767.0, inelastic_threshold: 1.0,
+        z: 5,
+        a: 10.0,
+        density: 2340.0,
+        sigma_elastic_14mev: 1.0,
+        sigma_elastic_2mev: 2.0,
+        sigma_abs_thermal: 767.0,
+        inelastic_threshold: 1.0,
     };
     let sigma_macro = xs.macro_cross_section(1.0);
     let mfp = xs.mean_free_path(1.0);
@@ -227,9 +273,13 @@ fn neutron_mfp_inverse_macro() {
 fn neutron_number_density() {
     let xs = NeutronCrossSection {
         name: "B-10".to_string(),
-        z: 5, a: 10.0, density: 2340.0,
-        sigma_elastic_14mev: 1.0, sigma_elastic_2mev: 2.0,
-        sigma_abs_thermal: 767.0, inelastic_threshold: 1.0,
+        z: 5,
+        a: 10.0,
+        density: 2340.0,
+        sigma_elastic_14mev: 1.0,
+        sigma_elastic_2mev: 2.0,
+        sigma_abs_thermal: 767.0,
+        inelastic_threshold: 1.0,
     };
     let n = xs.number_density();
     let na = 6.022_140_76e23;
@@ -241,9 +291,13 @@ fn neutron_number_density() {
 fn neutron_hydrogen_energy_loss() {
     let xs_h = NeutronCrossSection {
         name: "H-1".to_string(),
-        z: 1, a: 1.0, density: 70.0,
-        sigma_elastic_14mev: 20.0, sigma_elastic_2mev: 20.0,
-        sigma_abs_thermal: 0.332, inelastic_threshold: 0.0,
+        z: 1,
+        a: 1.0,
+        density: 70.0,
+        sigma_elastic_14mev: 20.0,
+        sigma_elastic_2mev: 20.0,
+        sigma_abs_thermal: 0.332,
+        inelastic_threshold: 0.0,
     };
     let xi = xs_h.avg_energy_loss();
     assert_relative_eq(xi, 1.0, 0.01, "Hydrogen ξ ≈ 1.0");
@@ -253,22 +307,32 @@ fn neutron_hydrogen_energy_loss() {
 fn neutron_collisions_thermal() {
     let xs_h = NeutronCrossSection {
         name: "H-1".to_string(),
-        z: 1, a: 1.0, density: 70.0,
-        sigma_elastic_14mev: 20.0, sigma_elastic_2mev: 20.0,
-        sigma_abs_thermal: 0.332, inelastic_threshold: 0.0,
+        z: 1,
+        a: 1.0,
+        density: 70.0,
+        sigma_elastic_14mev: 20.0,
+        sigma_elastic_2mev: 20.0,
+        sigma_abs_thermal: 0.332,
+        inelastic_threshold: 0.0,
     };
     let n = xs_h.collisions_to_thermal(2.0);
-    assert!(n > 15.0 && n < 25.0,
-        "H collisions to thermal from 2MeV should be ~18, got {n}");
+    assert!(
+        n > 15.0 && n < 25.0,
+        "H collisions to thermal from 2MeV should be ~18, got {n}"
+    );
 }
 
 #[test]
 fn neutron_b10_absorption() {
     let xs = NeutronCrossSection {
         name: "B-10".to_string(),
-        z: 5, a: 10.0, density: 2340.0,
-        sigma_elastic_14mev: 1.0, sigma_elastic_2mev: 2.0,
-        sigma_abs_thermal: 767.0, inelastic_threshold: 1.0,
+        z: 5,
+        a: 10.0,
+        density: 2340.0,
+        sigma_elastic_14mev: 1.0,
+        sigma_elastic_2mev: 2.0,
+        sigma_abs_thermal: 767.0,
+        inelastic_threshold: 1.0,
     };
     assert_relative_eq(xs.sigma_abs_thermal, 767.0, 1e-10, "B-10 σ_abs = 767 barns");
 }
@@ -298,13 +362,19 @@ fn fusion_dd_total_energy() {
 #[test]
 fn fusion_dt_optimal_temp() {
     let t = FusionReaction::DT.optimal_temp_kev();
-    assert!(t > 30.0 && t < 100.0, "DT optimal temp should be ~60 keV, got {t}");
+    assert!(
+        t > 30.0 && t < 100.0,
+        "DT optimal temp should be ~60 keV, got {t}"
+    );
 }
 
 #[test]
 fn fusion_dd_optimal_temp() {
     let t = FusionReaction::DD.optimal_temp_kev();
-    assert!(t > 5.0 && t < 40.0, "DD optimal temp should be ~14 keV, got {t}");
+    assert!(
+        t > 5.0 && t < 40.0,
+        "DD optimal temp should be ~14 keV, got {t}"
+    );
 }
 
 #[test]
@@ -326,8 +396,11 @@ fn fusion_energy_conservation() {
     for reaction in [FusionReaction::DT, FusionReaction::DD, FusionReaction::DHe3] {
         let total = reaction.total_energy_mev();
         let neutron = reaction.neutron_energy_mev().unwrap_or(0.0);
-        assert!(total >= neutron,
-            "Total ({total}) should ≥ neutron ({neutron}) for {:?}", reaction);
+        assert!(
+            total >= neutron,
+            "Total ({total}) should ≥ neutron ({neutron}) for {:?}",
+            reaction
+        );
     }
 }
 
@@ -339,7 +412,14 @@ fn fusion_energy_conservation() {
 fn kinetics_arrhenius_300k() {
     let genesis = GenesisSeed::from_phrase("r7_arrhenius");
     let encoder = KineticsEncoder::from_genesis(&genesis);
-    let reaction = encoder.create_reaction("test", 80.0, 1e13, -50.0, ReactionType::Elementary, ReactionOrder::First);
+    let reaction = encoder.create_reaction(
+        "test",
+        80.0,
+        1e13,
+        -50.0,
+        ReactionType::Elementary,
+        ReactionOrder::First,
+    );
     let k = reaction.rate_constant(300.0);
     let expected = 1e13_f64 * (-80000.0_f64 / (8.314_462_618 * 300.0)).exp();
     assert_relative_eq(k, expected, 1e-10, "Arrhenius at 300K");
@@ -349,12 +429,21 @@ fn kinetics_arrhenius_300k() {
 fn kinetics_temp_doubles_rate() {
     let genesis = GenesisSeed::from_phrase("r7_temp_double");
     let encoder = KineticsEncoder::from_genesis(&genesis);
-    let reaction = encoder.create_reaction("test", 53.0, 1e13, -50.0, ReactionType::Elementary, ReactionOrder::First);
+    let reaction = encoder.create_reaction(
+        "test",
+        53.0,
+        1e13,
+        -50.0,
+        ReactionType::Elementary,
+        ReactionOrder::First,
+    );
     let k1 = reaction.rate_constant(300.0);
     let k2 = reaction.rate_constant(310.0);
     let ratio = k2 / k1;
-    assert!(ratio > 1.5 && ratio < 4.0,
-        "Rate should roughly double with +10K: ratio={ratio}");
+    assert!(
+        ratio > 1.5 && ratio < 4.0,
+        "Rate should roughly double with +10K: ratio={ratio}"
+    );
 }
 
 #[test]
@@ -371,7 +460,14 @@ fn kinetics_first_order_half_life() {
 fn kinetics_rate_positive() {
     let genesis = GenesisSeed::from_phrase("r7_rate_pos");
     let encoder = KineticsEncoder::from_genesis(&genesis);
-    let reaction = encoder.create_reaction("test", 80.0, 1e13, -50.0, ReactionType::Elementary, ReactionOrder::First);
+    let reaction = encoder.create_reaction(
+        "test",
+        80.0,
+        1e13,
+        -50.0,
+        ReactionType::Elementary,
+        ReactionOrder::First,
+    );
     for &t in &[100.0, 300.0, 500.0, 1000.0, 5000.0] {
         let k = reaction.rate_constant(t);
         assert!(k > 0.0, "Rate constant should be > 0 at T={t}, got {k}");
@@ -382,7 +478,14 @@ fn kinetics_rate_positive() {
 fn kinetics_ea_positive() {
     let genesis = GenesisSeed::from_phrase("r7_ea_pos");
     let encoder = KineticsEncoder::from_genesis(&genesis);
-    let reaction = encoder.create_reaction("test", 80.0, 1e13, -50.0, ReactionType::Elementary, ReactionOrder::First);
+    let reaction = encoder.create_reaction(
+        "test",
+        80.0,
+        1e13,
+        -50.0,
+        ReactionType::Elementary,
+        ReactionOrder::First,
+    );
     assert!(reaction.activation_energy_kj > 0.0, "Ea should be positive");
 }
 
@@ -390,7 +493,14 @@ fn kinetics_ea_positive() {
 fn kinetics_zero_ea_equals_prefactor() {
     let genesis = GenesisSeed::from_phrase("r7_zero_ea");
     let encoder = KineticsEncoder::from_genesis(&genesis);
-    let reaction = encoder.create_reaction("test", 0.0, 1e13, 0.0, ReactionType::Elementary, ReactionOrder::First);
+    let reaction = encoder.create_reaction(
+        "test",
+        0.0,
+        1e13,
+        0.0,
+        ReactionType::Elementary,
+        ReactionOrder::First,
+    );
     let k = reaction.rate_constant(300.0);
     assert_relative_eq(k, 1e13, 1e-10, "k(Ea=0) should equal A");
 }
@@ -430,12 +540,20 @@ fn phonon_max_phonon_consistency() {
 
 #[test]
 fn phonon_fcc_coordination() {
-    assert_eq!(CrystalStructure::FCC.coordination(), 12, "FCC coordination = 12");
+    assert_eq!(
+        CrystalStructure::FCC.coordination(),
+        12,
+        "FCC coordination = 12"
+    );
 }
 
 #[test]
 fn phonon_bcc_coordination() {
-    assert_eq!(CrystalStructure::BCC.coordination(), 8, "BCC coordination = 8");
+    assert_eq!(
+        CrystalStructure::BCC.coordination(),
+        8,
+        "BCC coordination = 8"
+    );
 }
 
 // =========================================================================
@@ -487,8 +605,12 @@ fn geo_layers_contiguous() {
     for i in 0..layers.len() - 1 {
         let (_, end) = layers[i].depth_range_km();
         let (start, _) = layers[i + 1].depth_range_km();
-        assert_relative_eq(end, start, 1e-6,
-            &format!("{:?} end should equal {:?} start", layers[i], layers[i + 1]));
+        assert_relative_eq(
+            end,
+            start,
+            1e-6,
+            &format!("{:?} end should equal {:?} start", layers[i], layers[i + 1]),
+        );
     }
 }
 
@@ -522,16 +644,20 @@ fn econ_dd_fuel_cheap() {
 fn econ_consumer_capital() {
     let cap = CapitalCosts::consumer_5kw();
     let total = cap.total();
-    assert!(total > 100_000.0 && total < 500_000.0,
-        "Consumer 5kW total should be ~$275k, got ${total}");
+    assert!(
+        total > 100_000.0 && total < 500_000.0,
+        "Consumer 5kW total should be ~$275k, got ${total}"
+    );
 }
 
 #[test]
 fn econ_industrial_cost_per_kw() {
     let cap = CapitalCosts::industrial_100mw();
     let cost_per_kw = cap.cost_per_kw(100_000.0);
-    assert!(cost_per_kw > 500.0 && cost_per_kw < 5000.0,
-        "Industrial $/kW should be ~$1650, got ${cost_per_kw}");
+    assert!(
+        cost_per_kw > 500.0 && cost_per_kw < 5000.0,
+        "Industrial $/kW should be ~$1650, got ${cost_per_kw}"
+    );
 }
 
 #[test]
@@ -545,15 +671,22 @@ fn econ_higher_cf_lower_lcoe() {
     let om = super::economics::OmCosts::consumer();
     let lcoe1 = engine1.calculate_lcoe(&cap, &om, &fuel);
     let lcoe2 = engine2.calculate_lcoe(&cap, &om, &fuel);
-    assert!(lcoe2.lcoe_usd_mwh < lcoe1.lcoe_usd_mwh,
-        "Higher CF should give lower LCOE: {:.1} < {:.1}", lcoe2.lcoe_usd_mwh, lcoe1.lcoe_usd_mwh);
+    assert!(
+        lcoe2.lcoe_usd_mwh < lcoe1.lcoe_usd_mwh,
+        "Higher CF should give lower LCOE: {:.1} < {:.1}",
+        lcoe2.lcoe_usd_mwh,
+        lcoe1.lcoe_usd_mwh
+    );
 }
 
 #[test]
 fn econ_grid_benchmark() {
     let grid = super::economics::EnergyComparison::grid_electricity();
-    assert!(grid.lcoe_usd_mwh > 50.0 && grid.lcoe_usd_mwh < 300.0,
-        "Grid electricity LCOE should be ~$120/MWh, got ${}", grid.lcoe_usd_mwh);
+    assert!(
+        grid.lcoe_usd_mwh > 50.0 && grid.lcoe_usd_mwh < 300.0,
+        "Grid electricity LCOE should be ~$120/MWh, got ${}",
+        grid.lcoe_usd_mwh
+    );
 }
 
 // =========================================================================
@@ -567,7 +700,10 @@ fn antimatter_cpt_self_inverse() {
     let conj = Antimatter::conjugate(&v);
     let double = Antimatter::conjugate(&conj);
     let sim = v.similarity(&double);
-    assert!(sim > 0.99, "CPT self-inverse: similarity = {sim}, expected > 0.99");
+    assert!(
+        sim > 0.99,
+        "CPT self-inverse: similarity = {sim}, expected > 0.99"
+    );
 }
 
 #[test]
@@ -615,8 +751,11 @@ fn antimatter_antihydrogen_composition() {
     let hadrons = super::hadrons::Hadrons::from_model(&model, &genesis);
     let antimatter = Antimatter::from_model(&model, &hadrons, &genesis);
     let anti_h = antimatter.antihydrogen();
-    assert_eq!(anti_h.positrons, anti_h.antiprotons,
-        "Anti-H should be charge neutral: positrons={}, antiprotons={}", anti_h.positrons, anti_h.antiprotons);
+    assert_eq!(
+        anti_h.positrons, anti_h.antiprotons,
+        "Anti-H should be charge neutral: positrons={}, antiprotons={}",
+        anti_h.positrons, anti_h.antiprotons
+    );
 }
 
 // =========================================================================
@@ -628,7 +767,12 @@ fn phase_water_freezing_temp() {
     let genesis = GenesisSeed::from_phrase("r7_phase_water");
     let encoder = PhaseEncoder::from_genesis(&genesis);
     let water = encoder.water_freezing();
-    assert_relative_eq(water.critical_temperature_k, 273.15, 1e-6, "Water freezing Tc");
+    assert_relative_eq(
+        water.critical_temperature_k,
+        273.15,
+        1e-6,
+        "Water freezing Tc",
+    );
 }
 
 #[test]
@@ -636,8 +780,11 @@ fn phase_water_first_order() {
     let genesis = GenesisSeed::from_phrase("r7_phase_water_order");
     let encoder = PhaseEncoder::from_genesis(&genesis);
     let water = encoder.water_freezing();
-    assert_eq!(water.order, super::phase_transitions::PhaseTransitionOrder::First,
-        "Water freezing should be first order");
+    assert_eq!(
+        water.order,
+        super::phase_transitions::PhaseTransitionOrder::First,
+        "Water freezing should be first order"
+    );
 }
 
 #[test]
@@ -645,8 +792,11 @@ fn phase_ferromagnetic_second() {
     let genesis = GenesisSeed::from_phrase("r7_phase_ferro");
     let encoder = PhaseEncoder::from_genesis(&genesis);
     let ferro = encoder.ferromagnetic_transition(1043.0);
-    assert_eq!(ferro.order, super::phase_transitions::PhaseTransitionOrder::Second,
-        "Ferromagnetic transition should be second order");
+    assert_eq!(
+        ferro.order,
+        super::phase_transitions::PhaseTransitionOrder::Second,
+        "Ferromagnetic transition should be second order"
+    );
 }
 
 #[test]
@@ -667,24 +817,37 @@ fn phase_superconductor_gap() {
 fn hea_cantor_entropy() {
     let genesis = GenesisSeed::from_phrase("r7_hea_cantor");
     let designer = HEADesigner::from_genesis(&genesis);
-    let cantor = designer.alloys.iter()
+    let cantor = designer
+        .alloys
+        .iter()
         .find(|a| a.name.contains("Cantor"))
         .expect("Cantor alloy should exist");
     let expected = 8.314_462_618 * 5.0_f64.ln();
-    assert_relative_eq(cantor.entropy_j_mol_k, expected, 0.01, "Cantor entropy = R·ln(5)");
+    assert_relative_eq(
+        cantor.entropy_j_mol_k,
+        expected,
+        0.01,
+        "Cantor entropy = R·ln(5)",
+    );
 }
 
 #[test]
 fn hea_cantor_equiatomic() {
     let genesis = GenesisSeed::from_phrase("r7_hea_equi");
     let designer = HEADesigner::from_genesis(&genesis);
-    let cantor = designer.alloys.iter()
+    let cantor = designer
+        .alloys
+        .iter()
         .find(|a| a.name.contains("Cantor"))
         .expect("Cantor alloy should exist");
     assert_eq!(cantor.elements.len(), 5, "Cantor should have 5 elements");
     for elem in &cantor.elements {
-        assert_relative_eq(elem.fraction, 0.2, 1e-6,
-            &format!("Element {} should be at 0.2 fraction", elem.symbol));
+        assert_relative_eq(
+            elem.fraction,
+            0.2,
+            1e-6,
+            &format!("Element {} should be at 0.2 fraction", elem.symbol),
+        );
     }
 }
 
@@ -692,20 +855,32 @@ fn hea_cantor_equiatomic() {
 fn hea_cantor_fcc() {
     let genesis = GenesisSeed::from_phrase("r7_hea_fcc");
     let designer = HEADesigner::from_genesis(&genesis);
-    let cantor = designer.alloys.iter()
+    let cantor = designer
+        .alloys
+        .iter()
         .find(|a| a.name.contains("Cantor"))
         .expect("Cantor alloy should exist");
-    assert_eq!(cantor.structure, CrystalStructure::FCC, "Cantor should be FCC");
+    assert_eq!(
+        cantor.structure,
+        CrystalStructure::FCC,
+        "Cantor should be FCC"
+    );
 }
 
 #[test]
 fn hea_refractory_bcc() {
     let genesis = GenesisSeed::from_phrase("r7_hea_bcc");
     let designer = HEADesigner::from_genesis(&genesis);
-    let refractory = designer.alloys.iter()
+    let refractory = designer
+        .alloys
+        .iter()
         .find(|a| a.name.contains("Refractory"))
         .expect("Refractory alloy should exist");
-    assert_eq!(refractory.structure, CrystalStructure::BCC, "Refractory should be BCC");
+    assert_eq!(
+        refractory.structure,
+        CrystalStructure::BCC,
+        "Refractory should be BCC"
+    );
 }
 
 // =========================================================================
@@ -727,7 +902,12 @@ fn qft_vertex_coupling() {
     let qed = QEDEncoder::from_genesis(&genesis, &model);
     let vertex = qed.vertex();
     let expected = qed.fine_structure.sqrt();
-    assert_relative_eq(vertex.coupling as f64, expected, 1e-6, "QED vertex coupling = √α");
+    assert_relative_eq(
+        vertex.coupling as f64,
+        expected,
+        1e-6,
+        "QED vertex coupling = √α",
+    );
 }
 
 #[test]
@@ -736,8 +916,14 @@ fn qft_compton_amplitude() {
     let model = super::standard_model::StandardModel::from_genesis(&genesis);
     let qed = QEDEncoder::from_genesis(&genesis, &model);
     let compton = qed.compton_scattering();
-    assert!(compton.amplitude_estimate > 0.0, "Compton amplitude should be positive");
-    assert!(compton.amplitude_estimate < 1.0, "Compton amplitude should be < 1");
+    assert!(
+        compton.amplitude_estimate > 0.0,
+        "Compton amplitude should be positive"
+    );
+    assert!(
+        compton.amplitude_estimate < 1.0,
+        "Compton amplitude should be < 1"
+    );
 }
 
 #[test]
@@ -746,8 +932,14 @@ fn qft_pair_production_amplitude() {
     let model = super::standard_model::StandardModel::from_genesis(&genesis);
     let qed = QEDEncoder::from_genesis(&genesis, &model);
     let pair = qed.pair_production();
-    assert!(pair.amplitude_estimate > 0.0, "Pair production amplitude should be positive");
-    assert!(pair.amplitude_estimate < 1.0, "Pair production amplitude should be < 1");
+    assert!(
+        pair.amplitude_estimate > 0.0,
+        "Pair production amplitude should be positive"
+    );
+    assert!(
+        pair.amplitude_estimate < 1.0,
+        "Pair production amplitude should be < 1"
+    );
 }
 
 // =========================================================================
@@ -773,7 +965,12 @@ fn biophysics_kinesin_stall() {
     let genesis = GenesisSeed::from_phrase("r7_kinesin_stall");
     let encoder = BiophysicsEncoder::from_genesis(&genesis);
     let kinesin = encoder.create_motor(MotorType::Kinesin);
-    assert_relative_eq(kinesin.stall_force_pn, 6.0, 1e-6, "Kinesin stall force = 6 pN");
+    assert_relative_eq(
+        kinesin.stall_force_pn,
+        6.0,
+        1e-6,
+        "Kinesin stall force = 6 pN",
+    );
 }
 
 #[test]
@@ -781,7 +978,10 @@ fn biophysics_motor_efficiency() {
     let genesis = GenesisSeed::from_phrase("r7_motor_eta");
     let encoder = BiophysicsEncoder::from_genesis(&genesis);
     let eta = encoder.motor_efficiency(5.0, 8.0);
-    assert!(eta >= 0.0 && eta <= 1.0, "Motor efficiency should be in [0,1], got {eta}");
+    assert!(
+        eta >= 0.0 && eta <= 1.0,
+        "Motor efficiency should be in [0,1], got {eta}"
+    );
 }
 
 // =========================================================================
@@ -790,19 +990,36 @@ fn biophysics_motor_efficiency() {
 
 #[test]
 fn molbio_watson_crick_a_t() {
-    assert_eq!(DNABase::Adenine.complement(), DNABase::Thymine, "A pairs with T");
+    assert_eq!(
+        DNABase::Adenine.complement(),
+        DNABase::Thymine,
+        "A pairs with T"
+    );
 }
 
 #[test]
 fn molbio_watson_crick_g_c() {
-    assert_eq!(DNABase::Guanine.complement(), DNABase::Cytosine, "G pairs with C");
+    assert_eq!(
+        DNABase::Guanine.complement(),
+        DNABase::Cytosine,
+        "G pairs with C"
+    );
 }
 
 #[test]
 fn molbio_complement_involution() {
-    for base in [DNABase::Adenine, DNABase::Thymine, DNABase::Guanine, DNABase::Cytosine] {
+    for base in [
+        DNABase::Adenine,
+        DNABase::Thymine,
+        DNABase::Guanine,
+        DNABase::Cytosine,
+    ] {
         let double = base.complement().complement();
-        assert_eq!(double, base, "comp(comp({:?})) should equal {:?}", base, base);
+        assert_eq!(
+            double, base,
+            "comp(comp({:?})) should equal {:?}",
+            base, base
+        );
     }
 }
 
@@ -811,7 +1028,8 @@ fn molbio_transcription_t_to_u() {
     let rna = RNABase::from_dna_template(DNABase::Thymine);
     assert!(
         rna == RNABase::Adenine || rna == RNABase::Uracil,
-        "Transcription from DNA T should give valid RNA base, got {:?}", rna
+        "Transcription from DNA T should give valid RNA base, got {:?}",
+        rna
     );
 }
 
@@ -824,7 +1042,12 @@ fn derived_energy_conservation_confidence() {
     let genesis = GenesisSeed::from_phrase("r7_derived_energy");
     let engine = LawsDerivationEngine::from_genesis(&genesis);
     let energy = engine.derive_energy_conservation();
-    assert_relative_eq(energy.confidence, 1.0, 1e-10, "Energy conservation confidence = 1.0");
+    assert_relative_eq(
+        energy.confidence,
+        1.0,
+        1e-10,
+        "Energy conservation confidence = 1.0",
+    );
 }
 
 #[test]
@@ -832,8 +1055,11 @@ fn derived_e_mc2_equation() {
     let genesis = GenesisSeed::from_phrase("r7_derived_emc2");
     let engine = LawsDerivationEngine::from_genesis(&genesis);
     let law = engine.derive_mass_energy_equivalence();
-    assert!(law.equation.contains("mc") || law.equation.contains("E") || law.equation.contains("mass"),
-        "E=mc² law should reference mass-energy, got: {}", law.equation);
+    assert!(
+        law.equation.contains("mc") || law.equation.contains("E") || law.equation.contains("mass"),
+        "E=mc² law should reference mass-energy, got: {}",
+        law.equation
+    );
 }
 
 #[test]
@@ -841,7 +1067,12 @@ fn derived_all_laws_count() {
     let genesis = GenesisSeed::from_phrase("r7_derived_all");
     let engine = LawsDerivationEngine::from_genesis(&genesis);
     let laws = engine.derive_all_laws();
-    assert_eq!(laws.len(), 18, "Should derive 18 fundamental laws, got {}", laws.len());
+    assert_eq!(
+        laws.len(),
+        18,
+        "Should derive 18 fundamental laws, got {}",
+        laws.len()
+    );
 }
 
 // =========================================================================
@@ -867,7 +1098,9 @@ fn uncertainty_uniform_range() {
     let param = UncertainParameter {
         name: "test".to_string(),
         nominal: 100.0,
-        distribution: UncertaintyDistribution::Uniform { range_fraction: 0.20 },
+        distribution: UncertaintyDistribution::Uniform {
+            range_fraction: 0.20,
+        },
         units: "".to_string(),
         source: "test".to_string(),
     };
@@ -886,14 +1119,21 @@ fn uncertainty_lognormal_positive() {
         source: "test".to_string(),
     };
     let (lo, _) = param.confidence_interval_95();
-    assert!(lo > 0.0, "LogNormal CI95 lower bound should be > 0, got {lo}");
+    assert!(
+        lo > 0.0,
+        "LogNormal CI95 lower bound should be > 0, got {lo}"
+    );
 }
 
 #[test]
 fn uncertainty_spark_10_params() {
     let params = ParameterUncertainties::default_spark_engine();
-    assert_eq!(params.parameters.len(), 10,
-        "Default Spark engine should have 10 uncertain parameters, got {}", params.parameters.len());
+    assert_eq!(
+        params.parameters.len(),
+        10,
+        "Default Spark engine should have 10 uncertain parameters, got {}",
+        params.parameters.len()
+    );
 }
 
 // =========================================================================
@@ -909,7 +1149,12 @@ fn coupled_consumer_5kw() {
 #[test]
 fn coupled_industrial_100mw() {
     let oc = OperatingConditions::industrial();
-    assert_relative_eq(oc.power_kw, 100_000.0, 1e-10, "Industrial power = 100 MW = 100000 kW");
+    assert_relative_eq(
+        oc.power_kw,
+        100_000.0,
+        1e-10,
+        "Industrial power = 100 MW = 100000 kW",
+    );
 }
 
 #[test]

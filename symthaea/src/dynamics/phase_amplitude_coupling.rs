@@ -39,7 +39,12 @@ fn complex_ifft(spectrum: &[Complex]) -> Vec<Complex> {
     let mut buf: Vec<Complex> = spectrum.iter().map(|z| z.conj()).collect();
     fft_radix2(&mut buf);
     let inv = 1.0 / n as f64;
-    buf.iter().map(|z| Complex { re: z.re * inv, im: -z.im * inv }).collect()
+    buf.iter()
+        .map(|z| Complex {
+            re: z.re * inv,
+            im: -z.im * inv,
+        })
+        .collect()
 }
 
 /// In-place Cooley-Tukey radix-2 DIT FFT for complex data.
@@ -125,7 +130,7 @@ impl Default for PacConfig {
     fn default() -> Self {
         Self {
             sample_rate: 256.0,
-            n_phase_bins: 18,    // 20° bins
+            n_phase_bins: 18, // 20° bins
             n_surrogates: 200,
             significance_level: 0.05,
             filter_order: 256,
@@ -284,11 +289,7 @@ impl PacAnalyzer {
     ///
     /// where P is the distribution of mean amplitude per phase bin, and U is
     /// the uniform distribution. MI ∈ [0, 1].
-    fn modulation_index_from_signals(
-        &self,
-        phase: &[f64],
-        amplitude: &[f64],
-    ) -> (f64, f64) {
+    fn modulation_index_from_signals(&self, phase: &[f64], amplitude: &[f64]) -> (f64, f64) {
         let n_bins = self.config.n_phase_bins;
         let bin_width = 2.0 * PI / n_bins as f64;
 
@@ -437,12 +438,7 @@ impl PacAnalyzer {
     /// Shuffles the amplitude time series relative to the phase time series
     /// by random circular shifts, computing MI for each surrogate. The p-value
     /// is the fraction of surrogates with MI >= observed MI.
-    fn surrogate_test(
-        &self,
-        phase: &[f64],
-        amplitude: &[f64],
-        observed_mi: f64,
-    ) -> f64 {
+    fn surrogate_test(&self, phase: &[f64], amplitude: &[f64], observed_mi: f64) -> f64 {
         let len = phase.len().min(amplitude.len());
         if len < 10 {
             return 1.0;
@@ -453,7 +449,9 @@ impl PacAnalyzer {
 
         for _ in 0..self.config.n_surrogates {
             // Simple LCG for deterministic pseudo-random shifts
-            rng_state = rng_state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng_state = rng_state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let shift = (rng_state >> 33) as usize % (len - 2) + 1;
 
             // Circular shift amplitude
@@ -540,10 +538,10 @@ impl PacAnalyzer {
     /// Returns PAC for: theta-gamma, alpha-gamma, delta-beta, delta-gamma.
     pub fn consciousness_pac(&self, signal: &[f64]) -> Vec<PacResult> {
         vec![
-            self.compute_pac(signal, (4.0, 8.0), (30.0, 80.0)),   // Theta-Gamma
-            self.compute_pac(signal, (8.0, 13.0), (30.0, 80.0)),  // Alpha-Gamma
-            self.compute_pac(signal, (0.5, 4.0), (13.0, 30.0)),   // Delta-Beta
-            self.compute_pac(signal, (0.5, 4.0), (30.0, 80.0)),   // Delta-Gamma
+            self.compute_pac(signal, (4.0, 8.0), (30.0, 80.0)), // Theta-Gamma
+            self.compute_pac(signal, (8.0, 13.0), (30.0, 80.0)), // Alpha-Gamma
+            self.compute_pac(signal, (0.5, 4.0), (13.0, 30.0)), // Delta-Beta
+            self.compute_pac(signal, (0.5, 4.0), (30.0, 80.0)), // Delta-Gamma
         ]
     }
 }
@@ -652,11 +650,7 @@ mod tests {
         let amplitude = vec![1.0; 1000];
 
         let mvl = PacAnalyzer::mean_vector_length(&phase, &amplitude);
-        assert!(
-            mvl < 0.3,
-            "Random phases should give low MVL, got {}",
-            mvl
-        );
+        assert!(mvl < 0.3, "Random phases should give low MVL, got {}", mvl);
     }
 
     #[test]
@@ -675,11 +669,7 @@ mod tests {
         let result = analyzer.compute_pac(&coupled, (4.0, 8.0), (30.0, 50.0));
 
         if let Some(p) = result.p_value {
-            assert!(
-                p < 0.2,
-                "Strong coupling should be significant, p = {}",
-                p
-            );
+            assert!(p < 0.2, "Strong coupling should be significant, p = {}", p);
         }
     }
 
@@ -729,15 +719,15 @@ mod tests {
         let comod = analyzer.comodulogram(
             &signal,
             (2.0, 12.0),  // Phase range
-            2.0,           // Phase step
-            4.0,           // Phase bandwidth
-            (20.0, 60.0),  // Amp range
-            10.0,          // Amp step
-            10.0,          // Amp bandwidth
+            2.0,          // Phase step
+            4.0,          // Phase bandwidth
+            (20.0, 60.0), // Amp range
+            10.0,         // Amp step
+            10.0,         // Amp bandwidth
         );
 
         assert_eq!(comod.phase_frequencies.len(), 6); // 2,4,6,8,10,12
-        assert_eq!(comod.amp_frequencies.len(), 5);   // 20,30,40,50,60
+        assert_eq!(comod.amp_frequencies.len(), 5); // 20,30,40,50,60
         assert_eq!(comod.mi_matrix.len(), 6);
         assert_eq!(comod.mi_matrix[0].len(), 5);
     }

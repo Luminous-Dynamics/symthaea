@@ -20,78 +20,78 @@
 //! - Integration with PlasmaHdcEncoder for Phi monitoring
 //! - Synthetic data generation for testing
 
-pub mod plasma_hdc_encoder;
-pub mod plasma_control;
 pub mod cmod_adapter;
+pub mod plasma_control;
+pub mod plasma_hdc_encoder;
 
 pub use plasma_hdc_encoder::{
-    // Sensor types
-    PlasmaSensorType,
-    PlasmaReading,
-    PlasmaState,
-    // Encoder
-    PlasmaHdcEncoder,
-    PlasmaEncoderConfig,
-    // Streaming
-    PlasmaStateBuffer,
     // Phi integration
     DisruptionAlert,
-    PlasmaPhiThresholds,
+    PlasmaEncoderConfig,
+    // Encoder
+    PlasmaHdcEncoder,
     PlasmaPhiMonitor,
+    PlasmaPhiThresholds,
+    PlasmaReading,
+    // Sensor types
+    PlasmaSensorType,
+    PlasmaState,
+    // Streaming
+    PlasmaStateBuffer,
     StabilityAssessment,
 };
 
 pub use plasma_control::{
-    // Configuration
-    PlasmaControlConfig,
+    DisruptionScenario,
+    GasSpecies,
     // Actions and control
     PlasmaControlAction,
+    // Configuration
+    PlasmaControlConfig,
     PlasmaControlLoop,
-    PlasmaStabilityAssessment,
     // State types
     PlasmaControlState,
-    GasSpecies,
-    TrendDirection,
-    StabilityRegime,
+    PlasmaControlStats,
     // Simulation
     PlasmaSimulator,
-    DisruptionScenario,
-    PlasmaControlStats,
+    PlasmaStabilityAssessment,
+    StabilityRegime,
+    TrendDirection,
 };
 
 pub use cmod_adapter::{
-    // Core data structures
-    CModSample,
-    CModShot,
-    // Labels
-    DisruptionLabel,
-    LabelConfig,
-    label_samples,
-    // Statistics
-    SensorStats,
-    SensorNormalizer,
-    DatasetStats,
+    benchmark_encoding,
     compute_statistics,
+    example_pipeline,
+    fill_missing_values,
+    generate_synthetic_data,
+    label_samples,
     // File loading
     load_csv,
     load_hdf5,
-    // Missing value handling
-    MissingValueStrategy,
-    fill_missing_values,
-    // Streaming
-    CModStream,
-    // HDC integration
-    CModPlasmaSample,
-    CModHdcEncoder,
-    CModPhiMonitor,
     to_cmod_plasma_sample,
     // Benchmarking
     BenchmarkResult,
-    benchmark_encoding,
-    // Synthetic data
-    SyntheticConfig,
-    generate_synthetic_data,
+    CModHdcEncoder,
+    CModPhiMonitor,
+    // HDC integration
+    CModPlasmaSample,
+    // Core data structures
+    CModSample,
+    CModShot,
+    // Streaming
+    CModStream,
+    DatasetStats,
+    // Labels
+    DisruptionLabel,
+    LabelConfig,
+    // Missing value handling
+    MissingValueStrategy,
     // Pipeline
     PipelineResults,
-    example_pipeline,
+    SensorNormalizer,
+    // Statistics
+    SensorStats,
+    // Synthetic data
+    SyntheticConfig,
 };

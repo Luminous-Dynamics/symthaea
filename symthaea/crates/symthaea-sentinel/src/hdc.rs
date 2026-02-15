@@ -32,7 +32,9 @@ pub struct HV {
 
 impl HV {
     pub fn zero() -> Self {
-        Self { values: vec![0.0; HDC_DIM] }
+        Self {
+            values: vec![0.0; HDC_DIM],
+        }
     }
 
     pub fn random_seeded(seed: u64) -> Self {
@@ -55,7 +57,12 @@ impl HV {
     }
 
     pub fn similarity(&self, other: &HV) -> f32 {
-        let dot: f32 = self.values.iter().zip(&other.values).map(|(a, b)| a * b).sum();
+        let dot: f32 = self
+            .values
+            .iter()
+            .zip(&other.values)
+            .map(|(a, b)| a * b)
+            .sum();
         let mag_a: f32 = self.values.iter().map(|x| x * x).sum::<f32>().sqrt();
         let mag_b: f32 = other.values.iter().map(|x| x * x).sum::<f32>().sqrt();
         if mag_a > 1e-6 && mag_b > 1e-6 {
@@ -67,20 +74,30 @@ impl HV {
 
     pub fn add(&self, other: &HV) -> HV {
         HV {
-            values: self.values.iter().zip(&other.values).map(|(a, b)| a + b).collect()
+            values: self
+                .values
+                .iter()
+                .zip(&other.values)
+                .map(|(a, b)| a + b)
+                .collect(),
         }
     }
 
     pub fn scale(&self, s: f32) -> HV {
         HV {
-            values: self.values.iter().map(|v| v * s).collect()
+            values: self.values.iter().map(|v| v * s).collect(),
         }
     }
 
     /// Binding operation (element-wise multiply) - creates association
     pub fn bind(&self, other: &HV) -> HV {
         HV {
-            values: self.values.iter().zip(&other.values).map(|(a, b)| a * b).collect()
+            values: self
+                .values
+                .iter()
+                .zip(&other.values)
+                .map(|(a, b)| a * b)
+                .collect(),
         }
     }
 
@@ -121,9 +138,12 @@ impl HV {
     /// XOR-like binding for binary vectors (element-wise multiply)
     pub fn xor_bind(&self, other: &HV) -> HV {
         HV {
-            values: self.values.iter().zip(&other.values)
+            values: self
+                .values
+                .iter()
+                .zip(&other.values)
                 .map(|(a, b)| a * b)
-                .collect()
+                .collect(),
         }
     }
 }
@@ -148,7 +168,10 @@ impl SparseProjector {
             codebook.push(HV::random_binary_seeded(seed_base + i as u64));
         }
 
-        Self { num_features, codebook }
+        Self {
+            num_features,
+            codebook,
+        }
     }
 
     /// Project continuous features [0.0, 1.0] to a sparse binary HDC vector
@@ -242,7 +265,8 @@ impl RffProjector {
             let u2 = hasher2.finish() as f64 / u64::MAX as f64;
 
             // Box-Muller transform
-            let gaussian = ((-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()) as f32;
+            let gaussian =
+                ((-2.0 * u1.ln()).sqrt() * (2.0 * std::f64::consts::PI * u2).cos()) as f32;
             weights.push(gaussian * gamma);
         }
 
@@ -266,8 +290,12 @@ impl RffProjector {
 
     /// Project a continuous state vector into HDC space
     pub fn project(&self, input: &[f32]) -> HV {
-        assert!(input.len() <= self.input_dim,
-            "Input dimension {} exceeds projector dimension {}", input.len(), self.input_dim);
+        assert!(
+            input.len() <= self.input_dim,
+            "Input dimension {} exceeds projector dimension {}",
+            input.len(),
+            self.input_dim
+        );
 
         let mut values = vec![0.0f32; HDC_DIM];
 
@@ -317,8 +345,16 @@ mod tests {
         let sim_to_a = bound.similarity(&a);
         let sim_to_b = bound.similarity(&b);
         // Bound vector should not be too similar to originals
-        assert!(sim_to_a.abs() < 0.5, "Bound vector should be dissimilar to a, got {}", sim_to_a);
-        assert!(sim_to_b.abs() < 0.5, "Bound vector should be dissimilar to b, got {}", sim_to_b);
+        assert!(
+            sim_to_a.abs() < 0.5,
+            "Bound vector should be dissimilar to a, got {}",
+            sim_to_a
+        );
+        assert!(
+            sim_to_b.abs() < 0.5,
+            "Bound vector should be dissimilar to b, got {}",
+            sim_to_b
+        );
     }
 
     #[test]

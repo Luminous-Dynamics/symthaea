@@ -60,14 +60,14 @@ This module is organized into several submodules:
 - **diagnostics** - Week 9 Phase 4: Scatter analysis and recovery planning
 */
 
-mod types;
 mod core;
+mod diagnostics;
 mod learning;
 mod patterns;
-mod diagnostics;
+mod types;
 
-pub use types::*;
 pub use core::*;
+pub use diagnostics::*;
 pub use learning::*;
 pub use patterns::*;
-pub use diagnostics::*;
+pub use types::*;

@@ -18,40 +18,43 @@ pub mod phi_monitor;
 pub mod semantic_intent;
 
 // Domain plugins
+pub mod code_assistant_plugin;
+pub mod general_assistant_plugin;
 pub mod math_plugin;
 pub mod nixos_plugin;
 pub mod programming_plugin;
-pub mod general_assistant_plugin;
-pub mod code_assistant_plugin;
 pub mod research_plugin;
 
+// Narrative prompt compiler (CfC Ghost Signal → LLM writing instructions)
+pub mod narrative_compiler;
+
 // LLM provider backends
-pub mod openai_backend;
 pub mod anthropic_backend;
+pub mod openai_backend;
 
 // Code understanding & generation (Phase: Consciousness-Aware Code)
+#[cfg(feature = "code_generation")]
+pub mod code_domain_plugin;
+#[cfg(feature = "code_generation")]
+pub mod code_generator;
+#[cfg(feature = "code_generation")]
+pub mod code_intent;
 #[cfg(feature = "code_understanding")]
 pub mod code_parser;
-#[cfg(feature = "code_understanding")]
-pub mod rust_parser;
-#[cfg(feature = "code_understanding")]
-pub mod python_parser;
+#[cfg(feature = "code_generation")]
+pub mod code_verifier;
+#[cfg(feature = "code_generation")]
+pub mod emitters;
+#[cfg(feature = "code_generation")]
+pub mod epistemic_generation;
 #[cfg(feature = "code_understanding")]
 pub mod nix_code_parser;
 #[cfg(feature = "code_understanding")]
 pub mod parser_registry;
-#[cfg(feature = "code_generation")]
-pub mod code_intent;
-#[cfg(feature = "code_generation")]
-pub mod code_generator;
-#[cfg(feature = "code_generation")]
-pub mod emitters;
-#[cfg(feature = "code_generation")]
-pub mod code_verifier;
-#[cfg(feature = "code_generation")]
-pub mod epistemic_generation;
-#[cfg(feature = "code_generation")]
-pub mod code_domain_plugin;
+#[cfg(feature = "code_understanding")]
+pub mod python_parser;
+#[cfg(feature = "code_understanding")]
+pub mod rust_parser;
 #[cfg(feature = "code_generation")]
 pub mod triune_intent;
 
@@ -72,21 +75,36 @@ pub mod multi_theory_consciousness;
 pub mod semantic_enrichment;
 
 // Re-exports
-pub use domain_plugin::{DomainPlugin, Entity, RiskLevel, ErrorLocation, IntentPrototypes, DomainPrompts, ValidationResult, PluginRegistry, GenericPlugin};
 pub use domain_plugin::ErrorDiagnosis as DomainErrorDiagnosis;
+pub use domain_plugin::{
+    DomainPlugin, DomainPrompts, Entity, ErrorLocation, GenericPlugin, IntentPrototypes,
+    PluginRegistry, RiskLevel, ValidationResult,
+};
+pub use emotional_core::{
+    EmotionalAnalysis, EmotionalCore, EmotionalCoreConfig, EmotionalResponse,
+};
+pub use llm_organ::{
+    ConversationMessage, LLMGenerationResult, LLMOrgan, LLMOrganConfig, LLMQuery, MessageRole,
+    QueryType, TRANSLATION_SYSTEM_PROMPT,
+};
 pub use math_plugin::MathPlugin;
+pub use nix_parser::{NixConfig, NixOption, NixParser, NixValue};
 pub use nixos_plugin::NixOsPlugin;
 pub use programming_plugin::ProgrammingPlugin;
-pub use semantic_intent::{SemanticIntentClassifier, IntentCategory, IntentClassification};
-pub use emotional_core::{EmotionalCore, EmotionalCoreConfig, EmotionalAnalysis, EmotionalResponse};
-pub use llm_organ::{LLMOrgan, LLMOrganConfig, ConversationMessage, MessageRole, LLMGenerationResult, LLMQuery, QueryType, TRANSLATION_SYSTEM_PROMPT};
-pub use nix_parser::{NixParser, NixConfig, NixOption, NixValue};
+pub use semantic_intent::{IntentCategory, IntentClassification, SemanticIntentClassifier};
 // Export backend module for creating custom backends
-pub use llm_backend::{OllamaBackend, SimulatedBackend, LLMBackend, default_backend, simulated_backend, create_backend_from_env, GenerationParams};
-pub use openai_backend::OpenAiBackend;
 pub use anthropic_backend::AnthropicBackend;
-pub use general_assistant_plugin::GeneralAssistantPlugin;
 pub use code_assistant_plugin::CodeAssistantPlugin;
+pub use general_assistant_plugin::GeneralAssistantPlugin;
+pub use llm_backend::{
+    create_backend_from_env, default_backend, simulated_backend, GenerationParams, LLMBackend,
+    OllamaBackend, SimulatedBackend,
+};
+pub use narrative_compiler::{
+    generate_narrative, NarrativeCompiler, NarrativeOutput, NarrativeThought,
+    NARRATIVE_SYSTEM_PROMPT,
+};
+pub use openai_backend::OpenAiBackend;
 pub use research_plugin::ResearchPlugin;
 
 // ============================================================================
@@ -241,37 +259,41 @@ impl NixErrorDiagnoser {
     pub fn new() -> Self {
         let patterns = vec![
             ErrorPattern {
-                regex: regex::Regex::new(r"error: syntax error, unexpected").unwrap(),
+                regex: regex::Regex::new(r"error: syntax error, unexpected")
+                    .expect("valid regex literal"),
                 category: NixErrorCategory::Evaluation,
                 explanation_template: "Syntax error in Nix expression".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"undefined variable '(\w+)'").unwrap(),
+                regex: regex::Regex::new(r"undefined variable '(\w+)'")
+                    .expect("valid regex literal"),
                 category: NixErrorCategory::Evaluation,
                 explanation_template: "Variable is not defined in scope".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"attribute '(\w+)' missing").unwrap(),
+                regex: regex::Regex::new(r"attribute '(\w+)' missing")
+                    .expect("valid regex literal"),
                 category: NixErrorCategory::Evaluation,
                 explanation_template: "Required attribute is missing".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"error: hash mismatch").unwrap(),
+                regex: regex::Regex::new(r"error: hash mismatch").expect("valid regex literal"),
                 category: NixErrorCategory::Build,
                 explanation_template: "Downloaded file hash doesn't match expected".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"builder.*failed").unwrap(),
+                regex: regex::Regex::new(r"builder.*failed").expect("valid regex literal"),
                 category: NixErrorCategory::Build,
                 explanation_template: "Package build process failed".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"permission denied").unwrap(),
+                regex: regex::Regex::new(r"permission denied").expect("valid regex literal"),
                 category: NixErrorCategory::Permission,
                 explanation_template: "Insufficient permissions for this operation".to_string(),
             },
             ErrorPattern {
-                regex: regex::Regex::new(r"flake.*error|error.*flake").unwrap(),
+                regex: regex::Regex::new(r"flake.*error|error.*flake")
+                    .expect("valid regex literal"),
                 category: NixErrorCategory::Flake,
                 explanation_template: "Flake configuration error".to_string(),
             },
@@ -286,7 +308,9 @@ impl NixErrorDiagnoser {
             if pattern.regex.is_match(error_text) {
                 return ErrorDiagnosis {
                     category: pattern.category,
-                    error_type: NixErrorType::Other(error_text.lines().next().unwrap_or("").to_string()),
+                    error_type: NixErrorType::Other(
+                        error_text.lines().next().unwrap_or("").to_string(),
+                    ),
                     explanation: pattern.explanation_template.clone(),
                     likely_causes: vec!["See error message for details".to_string()],
                     fixes: vec![],
@@ -300,7 +324,13 @@ impl NixErrorDiagnoser {
         // Default unknown error
         ErrorDiagnosis {
             category: NixErrorCategory::Unknown,
-            error_type: NixErrorType::Other(error_text.lines().next().unwrap_or("Unknown error").to_string()),
+            error_type: NixErrorType::Other(
+                error_text
+                    .lines()
+                    .next()
+                    .unwrap_or("Unknown error")
+                    .to_string(),
+            ),
             explanation: "Could not automatically diagnose this error".to_string(),
             likely_causes: vec!["Error pattern not recognized".to_string()],
             fixes: vec![],
@@ -895,10 +925,8 @@ impl ConsciousnessLanguageCore {
         };
 
         // Determine consciousness quadrant based on Φ and confidence
-        let (quadrant, strategy) = self.determine_quadrant_and_strategy(
-            self.current_phi,
-            confidence as f64,
-        );
+        let (quadrant, strategy) =
+            self.determine_quadrant_and_strategy(self.current_phi, confidence as f64);
 
         self.last_quadrant = quadrant;
         self.current_confidence = confidence as f64;
@@ -908,7 +936,11 @@ impl ConsciousnessLanguageCore {
             vec![ClarifyingQuestion {
                 question: format!("Could you clarify what you'd like to do with '{}'?", input),
                 rationale: "The intent wasn't clear from the input".to_string(),
-                options: vec!["Install".to_string(), "Remove".to_string(), "Search".to_string()],
+                options: vec![
+                    "Install".to_string(),
+                    "Remove".to_string(),
+                    "Search".to_string(),
+                ],
                 priority: 1,
                 default: None,
             }]
@@ -954,29 +986,29 @@ impl ConsciousnessLanguageCore {
 
         match classification.category {
             IntentCategory::NixOS => {
-                tiers.push("Strategic".to_string());      // Planning, goal-directed action
-                tiers.push("Compositional".to_string());  // System composition
-                tiers.push("Temporal".to_string());        // Sequencing (build steps)
+                tiers.push("Strategic".to_string()); // Planning, goal-directed action
+                tiers.push("Compositional".to_string()); // System composition
+                tiers.push("Temporal".to_string()); // Sequencing (build steps)
             }
             IntentCategory::Programming => {
-                tiers.push("Strategic".to_string());      // Problem decomposition
-                tiers.push("Compositional".to_string());  // Code composition
-                tiers.push("Mathematical".to_string());   // Logic, algorithms
-                tiers.push("MetaCognitive".to_string());  // Debugging, reflection
+                tiers.push("Strategic".to_string()); // Problem decomposition
+                tiers.push("Compositional".to_string()); // Code composition
+                tiers.push("Mathematical".to_string()); // Logic, algorithms
+                tiers.push("MetaCognitive".to_string()); // Debugging, reflection
             }
             IntentCategory::Math => {
-                tiers.push("Mathematical".to_string());   // Core math primitives
-                tiers.push("Physical".to_string());       // Quantities, units
-                tiers.push("Geometric".to_string());      // Spatial reasoning
+                tiers.push("Mathematical".to_string()); // Core math primitives
+                tiers.push("Physical".to_string()); // Quantities, units
+                tiers.push("Geometric".to_string()); // Spatial reasoning
             }
             IntentCategory::SystemAdmin => {
-                tiers.push("Strategic".to_string());      // System management
-                tiers.push("Temporal".to_string());        // Process sequencing
-                tiers.push("Physical".to_string());       // Hardware, resources
+                tiers.push("Strategic".to_string()); // System management
+                tiers.push("Temporal".to_string()); // Process sequencing
+                tiers.push("Physical".to_string()); // Hardware, resources
             }
             IntentCategory::General => {
-                tiers.push("MetaCognitive".to_string());  // General reasoning
-                tiers.push("Consciousness".to_string());  // Awareness, understanding
+                tiers.push("MetaCognitive".to_string()); // General reasoning
+                tiers.push("Consciousness".to_string()); // Awareness, understanding
             }
         }
 
@@ -989,19 +1021,32 @@ impl ConsciousnessLanguageCore {
     }
 
     /// Determine consciousness quadrant and execution strategy based on Φ and confidence
-    fn determine_quadrant_and_strategy(&self, phi: f64, confidence: f64) -> (ConsciousnessQuadrant, ExecutionStrategy) {
+    fn determine_quadrant_and_strategy(
+        &self,
+        phi: f64,
+        confidence: f64,
+    ) -> (ConsciousnessQuadrant, ExecutionStrategy) {
         const PHI_THRESHOLD: f64 = 0.5;
         const CONF_THRESHOLD: f64 = 0.5;
 
         if phi >= PHI_THRESHOLD && confidence >= CONF_THRESHOLD {
             // High Φ + High Confidence: Confident
-            (ConsciousnessQuadrant::Analytical, ExecutionStrategy::confident())
+            (
+                ConsciousnessQuadrant::Analytical,
+                ExecutionStrategy::confident(),
+            )
         } else if phi < PHI_THRESHOLD && confidence >= CONF_THRESHOLD {
             // Low Φ + High Confidence: Autopilot
-            (ConsciousnessQuadrant::Intuitive, ExecutionStrategy::autopilot())
+            (
+                ConsciousnessQuadrant::Intuitive,
+                ExecutionStrategy::autopilot(),
+            )
         } else if phi >= PHI_THRESHOLD && confidence < CONF_THRESHOLD {
             // High Φ + Low Confidence: Curious
-            (ConsciousnessQuadrant::Emotional, ExecutionStrategy::safe_default())
+            (
+                ConsciousnessQuadrant::Emotional,
+                ExecutionStrategy::safe_default(),
+            )
         } else {
             // Low Φ + Low Confidence: Lost
             (ConsciousnessQuadrant::Somatic, ExecutionStrategy::lost())
@@ -1045,7 +1090,13 @@ impl ConsciousnessLanguageCore {
     fn extract_entities(&self, text: &str) -> Vec<String> {
         // Simple word extraction - would use NLP in production
         text.split_whitespace()
-            .filter(|w| w.len() > 2 && !["the", "and", "for", "with", "from", "install", "remove", "search"].contains(w))
+            .filter(|w| {
+                w.len() > 2
+                    && ![
+                        "the", "and", "for", "with", "from", "install", "remove", "search",
+                    ]
+                    .contains(w)
+            })
             .map(|s| s.to_string())
             .collect()
     }
@@ -1136,3 +1187,169 @@ impl Default for ConsciousnessLanguageCore {
 
 // Note: Types defined above are automatically public since they're
 // declared with `pub`. No need for re-export.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // NixErrorDiagnoser tests
+    // ========================================================================
+
+    #[test]
+    fn nix_error_diagnoser_new_creates_successfully() {
+        let diagnoser = NixErrorDiagnoser::new();
+        // The diagnoser should have compiled its regex patterns without panicking.
+        // Default impl should also work identically.
+        let _default = NixErrorDiagnoser::default();
+        assert!(!diagnoser.patterns.is_empty());
+    }
+
+    #[test]
+    fn diagnose_classifies_missing_attribute() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser
+            .diagnose("error: attribute 'foo' missing at /etc/nixos/configuration.nix:42:5");
+        assert_eq!(diagnosis.category, NixErrorCategory::Evaluation);
+        assert!(diagnosis.confidence > 0.0 && diagnosis.confidence.is_finite());
+        assert!(!diagnosis.explanation.is_empty());
+        // Location extraction should pick up the file path
+        assert!(diagnosis.location.is_some());
+        let loc = diagnosis.location.unwrap();
+        assert!(loc.contains("/etc/nixos/configuration.nix"));
+    }
+
+    #[test]
+    fn diagnose_classifies_undefined_variable() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("error: undefined variable 'pkgs'");
+        assert_eq!(diagnosis.category, NixErrorCategory::Evaluation);
+        assert!(diagnosis.confidence >= 0.5);
+    }
+
+    #[test]
+    fn diagnose_classifies_build_failure() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis =
+            diagnoser.diagnose("builder for '/nix/store/abc-pkg.drv' failed with exit code 1");
+        assert_eq!(diagnosis.category, NixErrorCategory::Build);
+    }
+
+    #[test]
+    fn diagnose_classifies_permission_error() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("error: permission denied while accessing /nix/store");
+        assert_eq!(diagnosis.category, NixErrorCategory::Permission);
+    }
+
+    #[test]
+    fn diagnose_returns_unknown_for_unrecognised_text() {
+        let diagnoser = NixErrorDiagnoser::new();
+        let diagnosis = diagnoser.diagnose("something completely unrelated happened");
+        assert_eq!(diagnosis.category, NixErrorCategory::Unknown);
+        // Unknown errors should have low confidence
+        assert!(diagnosis.confidence < 0.5);
+        assert!(!diagnosis.explanation.is_empty());
+    }
+
+    // ========================================================================
+    // ConsciousnessLanguageCore tests
+    // ========================================================================
+
+    #[test]
+    fn consciousness_language_core_default_construction() {
+        let core = ConsciousnessLanguageCore::default();
+        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Active);
+        assert!(core.phi().is_finite());
+        assert!(core.phi() >= 0.0 && core.phi() <= 1.0);
+    }
+
+    #[test]
+    fn consciousness_state_get_and_set() {
+        let mut core = ConsciousnessLanguageCore::default();
+        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Active);
+
+        core.set_consciousness_state(ConsciousnessStateLevel::Reflective);
+        assert_eq!(
+            core.consciousness_state(),
+            ConsciousnessStateLevel::Reflective
+        );
+
+        core.set_consciousness_state(ConsciousnessStateLevel::Dormant);
+        assert_eq!(core.consciousness_state(), ConsciousnessStateLevel::Dormant);
+    }
+
+    #[test]
+    fn phi_get_set_and_clamping() {
+        let mut core = ConsciousnessLanguageCore::default();
+        let initial_phi = core.phi();
+        assert!(initial_phi.is_finite());
+
+        core.set_phi(0.8);
+        assert!((core.phi() - 0.8).abs() < f64::EPSILON);
+
+        // Values above 1.0 should clamp to 1.0
+        core.set_phi(5.0);
+        assert!((core.phi() - 1.0).abs() < f64::EPSILON);
+
+        // Values below 0.0 should clamp to 0.0
+        core.set_phi(-2.0);
+        assert!(core.phi().abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn understand_produces_finite_confidence() {
+        let mut core = ConsciousnessLanguageCore::default();
+        let result = core.understand("install firefox on NixOS");
+
+        assert!(result.confidence.is_finite());
+        assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
+        assert!(result.epistemic_confidence.is_finite());
+        assert!(result.consciousness_phi.is_finite());
+        assert!(result.unified_free_energy.is_finite());
+
+        // An install-related query should be classified as Install
+        assert_eq!(result.nixos.intent, NixOSIntent::Install);
+        assert!(!result.nixos.description.is_empty());
+    }
+
+    #[test]
+    fn understand_unknown_input_yields_low_confidence_and_clarifying_questions() {
+        let mut core = ConsciousnessLanguageCore::default();
+        // Gibberish that does not match any NixOS keyword
+        let result = core.understand("xyzzy plugh");
+
+        assert_eq!(result.nixos.intent, NixOSIntent::Unknown);
+        // Unknown intent produces confidence 0.3, which is below the default
+        // confidence_threshold (0.6), so clarifying questions should be generated.
+        assert!(!result.clarifying_questions.is_empty());
+    }
+
+    #[test]
+    fn create_feedback_from_execution_produces_valid_feedback() {
+        let mut core = ConsciousnessLanguageCore::default();
+        // Run understand first so last_input / last_quadrant are populated
+        let _result = core.understand("build my flake");
+
+        let feedback = core.create_feedback_from_execution(true, 0.7, None, false);
+        assert!(feedback.is_some());
+        let fb = feedback.unwrap();
+        assert!(fb.action_succeeded);
+        assert!(fb.success);
+        assert!(!fb.was_dry_run);
+        assert!(fb.error_message.is_none());
+        assert!(fb.errors.is_empty());
+        assert!((fb.phi_after - 0.7).abs() < f64::EPSILON);
+        // original_input should reflect the last understand() call
+        assert!(fb.original_input.contains("build my flake"));
+
+        // Also test failure case
+        let feedback_err =
+            core.create_feedback_from_execution(false, 0.3, Some("boom".to_string()), true);
+        let fb_err = feedback_err.unwrap();
+        assert!(!fb_err.action_succeeded);
+        assert!(fb_err.was_dry_run);
+        assert_eq!(fb_err.error_message.as_deref(), Some("boom"));
+        assert_eq!(fb_err.errors, vec!["boom".to_string()]);
+    }
+}

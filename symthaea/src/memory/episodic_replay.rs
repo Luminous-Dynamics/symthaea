@@ -67,8 +67,8 @@
 
 use ndarray::Array1;
 use serde::{Deserialize, Serialize};
-use std::collections::BinaryHeap;
 use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 use crate::dynamics::cfc::CfCNetwork;
 use symthaea_core::hdc::unified_hv::ContinuousHV;
@@ -249,7 +249,9 @@ impl PartialOrd for PrioritizedEpisode {
 impl Ord for PrioritizedEpisode {
     fn cmp(&self, other: &Self) -> Ordering {
         // Reverse order for max-heap (higher score = higher priority)
-        self.score.partial_cmp(&other.score).unwrap_or(Ordering::Equal)
+        self.score
+            .partial_cmp(&other.score)
+            .unwrap_or(Ordering::Equal)
     }
 }
 
@@ -296,14 +298,14 @@ impl Default for EpisodicReplayConfig {
     fn default() -> Self {
         Self {
             capacity: 1000,
-            phi_threshold: 0.3,          // Only store episodes with Phi > 0.3
-            replay_interval: 100,        // Replay every 100 cycles
-            batch_size: 8,               // 8 episodes per replay session
-            recency_weight: 0.2,         // Moderate recency preference
+            phi_threshold: 0.3,   // Only store episodes with Phi > 0.3
+            replay_interval: 100, // Replay every 100 cycles
+            batch_size: 8,        // 8 episodes per replay session
+            recency_weight: 0.2,  // Moderate recency preference
             replay_learning_rate_multiplier: 0.5, // Half the normal learning rate
-            replay_dt: 0.02,             // Same as cognitive loop default
+            replay_dt: 0.02,      // Same as cognitive loop default
             phi_weighted_sampling: true, // Sample high-Phi episodes more often
-            sampling_temperature: 1.0,   // Normal temperature
+            sampling_temperature: 1.0, // Normal temperature
             min_episodes_for_replay: 10, // Need at least 10 episodes
         }
     }
@@ -375,6 +377,12 @@ pub struct EpisodicMemory {
 
     /// Sum of replay losses (for tracking)
     sum_replay_loss: f64,
+
+    /// Demand-driven replay trigger flag (cleared after replay session)
+    demand_replay_triggered: bool,
+
+    /// Number of demand-driven replays performed
+    demand_replay_count: u64,
 }
 
 impl EpisodicMemory {
@@ -391,6 +399,8 @@ impl EpisodicMemory {
             average_phi: 0.0,
             min_phi_in_buffer: f64::MAX,
             sum_replay_loss: 0.0,
+            demand_replay_triggered: false,
+            demand_replay_count: 0,
         }
     }
 
@@ -431,10 +441,23 @@ impl EpisodicMemory {
         true
     }
 
-    /// Check if we should perform a replay session this cycle
+    /// Check if we should perform a replay session this cycle.
+    ///
+    /// Returns true when enough cycles have passed since the last replay
+    /// or when an on-demand trigger has been set (e.g., prediction error spike).
     pub fn should_replay(&self) -> bool {
-        self.cycles_since_replay >= self.config.replay_interval
-            && self.episodes.len() >= self.config.min_episodes_for_replay
+        let periodic = self.cycles_since_replay >= self.config.replay_interval;
+        let triggered = self.demand_replay_triggered;
+        (periodic || triggered) && self.episodes.len() >= self.config.min_episodes_for_replay
+    }
+
+    /// Trigger an immediate consolidation replay.
+    ///
+    /// Called by the cognitive loop when a demand-driven condition is detected
+    /// (e.g., prediction error spike > 2x average, or semantic retrieval miss).
+    pub fn trigger_demand_replay(&mut self) {
+        self.demand_replay_triggered = true;
+        self.demand_replay_count += 1;
     }
 
     /// Sample a batch of episodes for replay, prioritized by Phi
@@ -586,8 +609,9 @@ impl EpisodicMemory {
             total_phi += episode.phi;
         }
 
-        // Reset replay counter
+        // Reset replay counter and demand trigger
         self.cycles_since_replay = 0;
+        self.demand_replay_triggered = false;
 
         // Increment replay counts and reconsolidate sampled episodes
         // (This requires mutable access to episodes, which we'll handle by rebuilding)
@@ -599,9 +623,7 @@ impl EpisodicMemory {
             // Check if this episode was in the batch
             // Simple approximation: increment if Phi matches any batch episode
             for be in &batch {
-                if (pe.episode.phi - be.phi).abs() < 0.001
-                    && pe.episode.timestamp == be.timestamp
-                {
+                if (pe.episode.phi - be.phi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
                     pe.episode.replay_count += 1;
                     pe.episode.reconsolidate(current_phi);
                     break;
@@ -642,6 +664,7 @@ impl EpisodicMemory {
             },
             cycles_since_replay: self.cycles_since_replay,
             replay_interval: self.config.replay_interval,
+            demand_replay_count: self.demand_replay_count,
         }
     }
 
@@ -734,6 +757,9 @@ pub struct EpisodicMemoryStats {
 
     /// Replay interval setting
     pub replay_interval: usize,
+
+    /// Number of demand-driven (non-periodic) replays performed
+    pub demand_replay_count: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -974,7 +1000,7 @@ mod tests {
             memory.store_if_significant(episode);
         }
 
-        assert!(memory.len() > 0);
+        assert!(!memory.is_empty());
 
         memory.clear();
 

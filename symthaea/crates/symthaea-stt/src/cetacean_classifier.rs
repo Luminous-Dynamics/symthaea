@@ -16,12 +16,12 @@
 //!                                              → [Place Head]  → Upsweep/Downsweep/Flat
 //! ```
 
-use crate::cetacean_scorer::{CetaceanUnit, CetaceanManner, CetaceanPlace};
-use crate::ltc::{LtcCell, LtcConfig};
 use crate::audio::AudioFrontend;
-use rustfft::{FftPlanner, num_complex::Complex};
-use std::sync::Arc;
+use crate::cetacean_scorer::{CetaceanManner, CetaceanPlace, CetaceanUnit};
+use crate::ltc::{LtcCell, LtcConfig};
+use rustfft::{num_complex::Complex, FftPlanner};
 use std::path::Path;
+use std::sync::Arc;
 
 /// Configuration for cetacean acoustic analysis
 #[derive(Debug, Clone)]
@@ -50,11 +50,11 @@ impl Default for CetaceanConfig {
     fn default() -> Self {
         Self {
             sample_rate: 44100,
-            frame_duration: 0.02,     // 20ms frames
-            hop_duration: 0.01,       // 10ms hop
-            n_fft: 2048,              // High resolution for frequency tracking
-            f_min: 100.0,             // Whale vocalizations start low
-            f_max: 20000.0,           // But can go quite high
+            frame_duration: 0.02, // 20ms frames
+            hop_duration: 0.01,   // 10ms hop
+            n_fft: 2048,          // High resolution for frequency tracking
+            f_min: 100.0,         // Whale vocalizations start low
+            f_max: 20000.0,       // But can go quite high
             transient_threshold: 0.5,
             harmonicity_threshold: 0.4,
             fm_slope_threshold: 500.0, // Hz/frame
@@ -143,7 +143,9 @@ impl CetaceanClassifier {
     /// Create Hann window
     fn hann_window(size: usize) -> Vec<f32> {
         (0..size)
-            .map(|i| 0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos()))
+            .map(|i| {
+                0.5 * (1.0 - (2.0 * std::f32::consts::PI * i as f32 / (size - 1) as f32).cos())
+            })
             .collect()
     }
 
@@ -188,7 +190,8 @@ impl CetaceanClassifier {
     /// Extract acoustic features from a frame
     fn extract_features(&mut self, frame: &[f32], time: f32) -> CetaceanFrame {
         // Apply window
-        let windowed: Vec<f32> = frame.iter()
+        let windowed: Vec<f32> = frame
+            .iter()
             .zip(self.window.iter())
             .map(|(s, w)| s * w)
             .collect();
@@ -200,7 +203,8 @@ impl CetaceanClassifier {
         let transient = self.compute_transient(&windowed);
 
         // Compute spectrum
-        let mut fft_buffer: Vec<Complex<f32>> = windowed.iter()
+        let mut fft_buffer: Vec<Complex<f32>> = windowed
+            .iter()
             .map(|&x| Complex::new(x, 0.0))
             .chain(std::iter::repeat(Complex::new(0.0, 0.0)))
             .take(self.config.n_fft)
@@ -249,7 +253,7 @@ impl CetaceanClassifier {
 
         let mut teager_sum = 0.0;
         for i in 1..samples.len() - 1 {
-            let tk = samples[i] * samples[i] - samples[i-1] * samples[i+1];
+            let tk = samples[i] * samples[i] - samples[i - 1] * samples[i + 1];
             teager_sum += tk.abs();
         }
 
@@ -280,11 +284,16 @@ impl CetaceanClassifier {
 
     /// Compute spectral flux
     fn compute_flux(&self, spectrum: &[f32]) -> f32 {
-        spectrum.iter()
+        spectrum
+            .iter()
             .zip(self.prev_spectrum.iter())
             .map(|(curr, prev)| {
                 let diff = curr - prev;
-                if diff > 0.0 { diff * diff } else { 0.0 }
+                if diff > 0.0 {
+                    diff * diff
+                } else {
+                    0.0
+                }
             })
             .sum::<f32>()
             .sqrt()
@@ -352,17 +361,17 @@ impl CetaceanClassifier {
         let _state = self.cfc.forward(&input, self.config.hop_duration);
 
         // Classify Manner based on acoustic properties
-        let manner = if features.transient > self.config.transient_threshold
-                       && features.harmonicity < 0.3 {
-            // High transient, low harmonicity = Click
-            CetaceanManner::Click
-        } else if features.harmonicity > self.config.harmonicity_threshold {
-            // High harmonicity = Whistle (tonal)
-            CetaceanManner::Whistle
-        } else {
-            // Everything else = Burst (broadband)
-            CetaceanManner::Burst
-        };
+        let manner =
+            if features.transient > self.config.transient_threshold && features.harmonicity < 0.3 {
+                // High transient, low harmonicity = Click
+                CetaceanManner::Click
+            } else if features.harmonicity > self.config.harmonicity_threshold {
+                // High harmonicity = Whistle (tonal)
+                CetaceanManner::Whistle
+            } else {
+                // Everything else = Burst (broadband)
+                CetaceanManner::Burst
+            };
 
         // Classify Place based on frequency modulation
         let place = if features.fm_slope > self.config.fm_slope_threshold {
@@ -377,7 +386,10 @@ impl CetaceanClassifier {
     }
 
     /// Load and classify a whale audio file
-    pub fn classify_file<P: AsRef<Path>>(&mut self, path: P) -> std::io::Result<Vec<(f32, CetaceanUnit)>> {
+    pub fn classify_file<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+    ) -> std::io::Result<Vec<(f32, CetaceanUnit)>> {
         let (samples, sample_rate) = AudioFrontend::load_audio(path)?;
 
         // Resample if needed (simple linear for now)
@@ -414,7 +426,9 @@ impl CetaceanClassifier {
 }
 
 /// Collapse consecutive identical CAUs into segments
-pub fn collapse_to_segments(classifications: &[(f32, CetaceanUnit)]) -> Vec<(f32, f32, CetaceanUnit)> {
+pub fn collapse_to_segments(
+    classifications: &[(f32, CetaceanUnit)],
+) -> Vec<(f32, f32, CetaceanUnit)> {
     if classifications.is_empty() {
         return Vec::new();
     }
@@ -483,7 +497,8 @@ mod tests {
         let results = classifier.classify_audio(&samples);
 
         // Should classify as whistle with upsweep
-        let whistles: Vec<_> = results.iter()
+        let whistles: Vec<_> = results
+            .iter()
             .filter(|(_, u)| u.manner == CetaceanManner::Whistle)
             .collect();
 
@@ -493,11 +508,26 @@ mod tests {
     #[test]
     fn test_collapse_segments() {
         let classifications = vec![
-            (0.0, CetaceanUnit::new(CetaceanManner::Click, CetaceanPlace::Flat)),
-            (0.01, CetaceanUnit::new(CetaceanManner::Click, CetaceanPlace::Flat)),
-            (0.02, CetaceanUnit::new(CetaceanManner::Whistle, CetaceanPlace::Upsweep)),
-            (0.03, CetaceanUnit::new(CetaceanManner::Whistle, CetaceanPlace::Upsweep)),
-            (0.04, CetaceanUnit::new(CetaceanManner::Whistle, CetaceanPlace::Upsweep)),
+            (
+                0.0,
+                CetaceanUnit::new(CetaceanManner::Click, CetaceanPlace::Flat),
+            ),
+            (
+                0.01,
+                CetaceanUnit::new(CetaceanManner::Click, CetaceanPlace::Flat),
+            ),
+            (
+                0.02,
+                CetaceanUnit::new(CetaceanManner::Whistle, CetaceanPlace::Upsweep),
+            ),
+            (
+                0.03,
+                CetaceanUnit::new(CetaceanManner::Whistle, CetaceanPlace::Upsweep),
+            ),
+            (
+                0.04,
+                CetaceanUnit::new(CetaceanManner::Whistle, CetaceanPlace::Upsweep),
+            ),
         ];
 
         let segments = collapse_to_segments(&classifications);

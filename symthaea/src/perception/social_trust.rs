@@ -5,10 +5,10 @@
 //!
 //! "Feeling the trust of the community."
 
-use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 /// A raw signal from the social organism (Mycelix)
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,8 +42,8 @@ impl TrustPercept {
 
         // 2. Generate concept vectors for "Trust" vs "Distrust"
         // Fixed seeds for consistent concept vectors across all uses
-        const TRUST_SEED: u64 = 0x5452555354;       // "TRUST" in hex
-        const DISTRUST_SEED: u64 = 0x4449535452;    // "DISTR" in hex
+        const TRUST_SEED: u64 = 0x5452555354; // "TRUST" in hex
+        const DISTRUST_SEED: u64 = 0x4449535452; // "DISTR" in hex
         let trust_concept = ContinuousHV::random(HDC_DIMENSION, TRUST_SEED);
         let distrust_concept = ContinuousHV::random(HDC_DIMENSION, DISTRUST_SEED);
 

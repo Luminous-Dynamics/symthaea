@@ -2,20 +2,23 @@ name: Symthaea CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**', 'bugfix/**']
     paths:
       - 'symthaea/**'
+      - 'symthaea-core/**'
       - '.github/workflows/symthaea-ci.yml'
       - '.github/workflows/symthaea-nightly.yml'
   pull_request:
     branches: [main]
     paths:
       - 'symthaea/**'
+      - 'symthaea-core/**'
       - '.github/workflows/symthaea-ci.yml'
       - '.github/workflows/symthaea-nightly.yml'
 
 env:
   CARGO_TERM_COLOR: always
+  RUST_TOOLCHAIN: '1.92.0'
 
 jobs:
   fmt:
@@ -28,6 +31,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: rustfmt
       - name: Check formatting
         run: cargo fmt --all --check
@@ -55,6 +59,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
           components: clippy
       - name: Cache cargo registry & build
         uses: actions/cache@v4
@@ -78,6 +83,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Cache cargo registry & build
         uses: actions/cache@v4
         with:
@@ -96,6 +103,34 @@ jobs:
         run: cargo test --workspace --lib
         env:
           RUST_BACKTRACE: 1
+      - name: Run doc tests
+        run: cargo test --workspace --doc
+
+  docs:
+    name: Documentation Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-doc-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-doc-
+      - name: Build documentation
+        run: cargo doc --workspace --no-deps --lib
+        env:
+          RUSTDOCFLAGS: -D warnings --allow rustdoc::broken-intra-doc-links
 
   features:
     name: Feature Matrix
@@ -120,12 +155,19 @@ jobs:
           # Consciousness stack features
           - full_consciousness
           - reasoning_engine
+          # Feature groups (test combinations)
+          - epistemic_conflict
+          - temporal_planning
+          - consciousness_code
+          - api_module
     defaults:
       run:
         working-directory: symthaea
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
       - name: Cache cargo registry & build
         uses: actions/cache@v4
         with:
@@ -142,3 +184,31 @@ jobs:
         run: cargo test --lib --features ${{ matrix.features }}
         env:
           RUST_BACKTRACE: 1
+
+  no-default-features:
+    name: Minimal Build (no default features)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-minimal-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-minimal-
+      - name: Check with no default features
+        run: cargo check --workspace --lib --no-default-features
+      - name: Check symthaea-core features individually
+        run: |
+          cargo check -p symthaea-core --no-default-features --features simd
+          cargo check -p symthaea-core --no-default-features --features duck

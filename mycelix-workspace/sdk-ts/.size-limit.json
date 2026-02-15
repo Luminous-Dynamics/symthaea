@@ -1,0 +1,82 @@
+[
+  {
+    "name": "Core (index)",
+    "path": "dist/index.js",
+    "limit": "100 KB"
+  },
+  {
+    "name": "MATL only",
+    "path": "dist/matl/index.js",
+    "limit": "15 KB"
+  },
+  {
+    "name": "Epistemic only",
+    "path": "dist/epistemic/index.js",
+    "limit": "25 KB"
+  },
+  {
+    "name": "Bridge only",
+    "path": "dist/bridge/index.js",
+    "limit": "30 KB"
+  },
+  {
+    "name": "FL only",
+    "path": "dist/fl/index.js",
+    "limit": "20 KB"
+  },
+  {
+    "name": "Security only",
+    "path": "dist/security/index.js",
+    "limit": "30 KB"
+  },
+  {
+    "name": "Client only",
+    "path": "dist/client/index.js",
+    "limit": "35 KB"
+  },
+  {
+    "name": "Utils only",
+    "path": "dist/utils/index.js",
+    "limit": "60 KB"
+  },
+  {
+    "name": "Validation only",
+    "path": "dist/validation/index.js",
+    "limit": "20 KB"
+  },
+  {
+    "name": "Config only",
+    "path": "dist/config/index.js",
+    "limit": "15 KB"
+  },
+  {
+    "name": "DAO module",
+    "path": "dist/dao/index.js",
+    "limit": "50 KB"
+  },
+  {
+    "name": "Errors module",
+    "path": "dist/errors.js",
+    "limit": "25 KB"
+  },
+  {
+    "name": "Storage (index)",
+    "path": "dist/storage/index.js",
+    "limit": "5 KB"
+  },
+  {
+    "name": "Storage (epistemic-storage)",
+    "path": "dist/storage/epistemic-storage.js",
+    "limit": "30 KB"
+  },
+  {
+    "name": "Storage (CRDT)",
+    "path": "dist/storage/crdt.js",
+    "limit": "20 KB"
+  },
+  {
+    "name": "Storage (router)",
+    "path": "dist/storage/router.js",
+    "limit": "10 KB"
+  }
+]

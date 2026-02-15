@@ -27,7 +27,7 @@
 //! ## Author: Symthaea Theory Validation
 
 use symthaea::hdc::binary_hv::BinaryHV;
-use symthaea::hdc::tiered_phi::{TieredPhi, ApproximationTier};
+use symthaea::hdc::tiered_phi::{ApproximationTier, TieredPhi};
 
 /// Generate a star topology: one hub connected to all spokes
 /// Hub is highly similar to all spokes, spokes are dissimilar to each other
@@ -36,7 +36,7 @@ fn generate_star_topology(n: usize) -> Vec<BinaryHV> {
 
     // Hub: random hypervector
     let hub = BinaryHV::random(42);
-    components.push(hub.clone());
+    components.push(hub);
 
     // Spokes: each similar to hub but dissimilar to each other
     for i in 1..n {
@@ -45,10 +45,10 @@ fn generate_star_topology(n: usize) -> Vec<BinaryHV> {
         // Mix hub with pattern to create similarity gradient
         // More hub = more similar to hub
         let spoke = if i % 2 == 0 {
-            hub.bind(&pattern)  // ~0.5 similarity to hub
+            hub.bind(&pattern) // ~0.5 similarity to hub
         } else {
             // Bundle hub with pattern for higher similarity
-            BinaryHV::bundle(&[hub.clone(), pattern])
+            BinaryHV::bundle(&[hub, pattern])
         };
         components.push(spoke);
     }
@@ -63,22 +63,22 @@ fn generate_ring_topology(n: usize) -> Vec<BinaryHV> {
 
     // Start with random base
     let mut prev = BinaryHV::random(200);
-    components.push(prev.clone());
+    components.push(prev);
 
     // Each subsequent node is derived from previous (neighbor similarity)
     for i in 1..n {
         let noise = BinaryHV::random(200 + i as u64);
         // Bundle with previous to create neighbor similarity
-        let current = BinaryHV::bundle(&[prev.clone(), noise]);
-        components.push(current.clone());
+        let current = BinaryHV::bundle(&[prev, noise]);
+        components.push(current);
         prev = current;
     }
 
     // Connect last to first (ring closure)
     if n > 2 {
-        let first = components[0].clone();
+        let first = components[0];
         let last_idx = n - 1;
-        components[last_idx] = BinaryHV::bundle(&[components[last_idx].clone(), first]);
+        components[last_idx] = BinaryHV::bundle(&[components[last_idx], first]);
     }
 
     components
@@ -98,14 +98,14 @@ fn generate_modular_topology(n: usize) -> Vec<BinaryHV> {
     let cluster_a_base = BinaryHV::random(400);
     for i in 0..half {
         let noise = BinaryHV::random(410 + i as u64);
-        components.push(BinaryHV::bundle(&[cluster_a_base.clone(), noise]));
+        components.push(BinaryHV::bundle(&[cluster_a_base, noise]));
     }
 
     // Cluster B: all similar to cluster_b_base (different from A)
     let cluster_b_base = BinaryHV::random(500);
     for i in half..n {
         let noise = BinaryHV::random(510 + i as u64);
-        components.push(BinaryHV::bundle(&[cluster_b_base.clone(), noise]));
+        components.push(BinaryHV::bundle(&[cluster_b_base, noise]));
     }
 
     components
@@ -173,7 +173,7 @@ fn test_heuristic_vs_exact_correlation() {
     // Test configurations
     let sizes = [4, 5, 6, 7, 8];
     let topologies = ["star", "ring", "random", "modular"];
-    let trials_per_config = 3;  // Multiple trials for stability
+    let trials_per_config = 3; // Multiple trials for stability
 
     println!("Configuration:");
     println!("  Sizes: {:?}", sizes);
@@ -181,8 +181,10 @@ fn test_heuristic_vs_exact_correlation() {
     println!("  Trials per config: {}", trials_per_config);
     println!();
 
-    println!("{:<10} {:<8} {:<8} {:<10} {:<10} {:<10}",
-             "Topology", "Size", "Trial", "Exact", "Heuristic", "Spectral");
+    println!(
+        "{:<10} {:<8} {:<8} {:<10} {:<10} {:<10}",
+        "Topology", "Size", "Trial", "Exact", "Heuristic", "Spectral"
+    );
     println!("{}", "-".repeat(60));
 
     for &n in &sizes {
@@ -206,8 +208,10 @@ fn test_heuristic_vs_exact_correlation() {
                 heuristic_values.push(phi_heuristic);
                 spectral_values.push(phi_spectral);
 
-                println!("{:<10} {:<8} {:<8} {:<10.4} {:<10.4} {:<10.4}",
-                         topology, n, trial, phi_exact, phi_heuristic, phi_spectral);
+                println!(
+                    "{:<10} {:<8} {:<8} {:<10.4} {:<10.4} {:<10.4}",
+                    topology, n, trial, phi_exact, phi_heuristic, phi_spectral
+                );
             }
         }
     }
@@ -251,11 +255,25 @@ fn test_heuristic_vs_exact_correlation() {
     println!("VALIDATION RESULTS");
     println!("========================================\n");
 
-    println!("Heuristic Tier: {}", if heuristic_validated { "✅ VALIDATED" } else { "❌ NOT VALIDATED" });
+    println!(
+        "Heuristic Tier: {}",
+        if heuristic_validated {
+            "✅ VALIDATED"
+        } else {
+            "❌ NOT VALIDATED"
+        }
+    );
     println!("  (Threshold: r > 0.70 or ρ > 0.70)");
     println!();
 
-    println!("Spectral Tier:  {}", if spectral_validated { "✅ VALIDATED" } else { "❌ NOT VALIDATED (as expected)" });
+    println!(
+        "Spectral Tier:  {}",
+        if spectral_validated {
+            "✅ VALIDATED"
+        } else {
+            "❌ NOT VALIDATED (as expected)"
+        }
+    );
     println!("  (Spectral measures λ₂ mixing time, NOT IIT Φ)");
     println!();
 
@@ -275,8 +293,8 @@ fn test_heuristic_vs_exact_correlation() {
             })
             .collect();
 
-        let mean: f64 = indices.iter().map(|&i| exact_values[i]).sum::<f64>()
-            / indices.len() as f64;
+        let mean: f64 =
+            indices.iter().map(|&i| exact_values[i]).sum::<f64>() / indices.len() as f64;
         topology_means.push((topology, mean));
     }
 
@@ -296,7 +314,14 @@ fn test_heuristic_vs_exact_correlation() {
 
     // Check if star has highest Φ (IIT prediction)
     let star_highest = topology_means[0].0 == "star";
-    println!("Star has highest Φ: {}", if star_highest { "✅ YES (matches IIT)" } else { "❌ NO" });
+    println!(
+        "Star has highest Φ: {}",
+        if star_highest {
+            "✅ YES (matches IIT)"
+        } else {
+            "❌ NO"
+        }
+    );
 
     // Phase 4.4: Tightened threshold from r > 0.30 to r > 0.70
     // HDC-based Φ should meaningfully correlate with exact IIT Φ.
@@ -305,7 +330,8 @@ fn test_heuristic_vs_exact_correlation() {
         heuristic_pearson > 0.70 || heuristic_spearman > 0.70,
         "Heuristic tier shows insufficient correlation with Exact (r={:.4}, ρ={:.4}). \
          Expected at least r > 0.70 for a meaningful approximation.",
-        heuristic_pearson, heuristic_spearman
+        heuristic_pearson,
+        heuristic_spearman
     );
 
     println!("\n========================================");
@@ -323,7 +349,7 @@ fn test_exact_tier_topology_discrimination() {
     // according to IIT predictions (Star > Ring for integration)
 
     let mut calc = TieredPhi::new(ApproximationTier::ExhaustivePartition);
-    let n = 6;  // Small enough for exact computation
+    let n = 6; // Small enough for exact computation
 
     // Generate multiple trials
     let trials = 10;
@@ -347,8 +373,16 @@ fn test_exact_tier_topology_discrimination() {
     println!("Mean Exact Φ over {} trials (n={}):", trials, n);
     println!("  Star:    {:.4} ± {:.4}", star_mean, std_dev(&star_phis));
     println!("  Ring:    {:.4} ± {:.4}", ring_mean, std_dev(&ring_phis));
-    println!("  Random:  {:.4} ± {:.4}", random_mean, std_dev(&random_phis));
-    println!("  Modular: {:.4} ± {:.4}", modular_mean, std_dev(&modular_phis));
+    println!(
+        "  Random:  {:.4} ± {:.4}",
+        random_mean,
+        std_dev(&random_phis)
+    );
+    println!(
+        "  Modular: {:.4} ± {:.4}",
+        modular_mean,
+        std_dev(&modular_phis)
+    );
     println!();
 
     // The exact tier should show SOME discrimination between topologies
@@ -454,12 +488,14 @@ fn test_exact_tier_produces_positive_phi_for_standard_topologies() {
         assert!(
             phi > 0.0,
             "Topology '{}' should have Phi > 0 (got {})",
-            name, phi
+            name,
+            phi
         );
         assert!(
             phi <= 1.0,
             "Topology '{}' Phi should be <= 1.0 (got {})",
-            name, phi
+            name,
+            phi
         );
         println!("  {}: Φ = {:.4}", name, phi);
     }
@@ -476,11 +512,13 @@ fn test_topology_ordering_star_vs_modular() {
 
     let star_mean: f64 = (0..trials)
         .map(|_| calc.compute(&generate_star_topology(n)))
-        .sum::<f64>() / trials as f64;
+        .sum::<f64>()
+        / trials as f64;
 
     let modular_mean: f64 = (0..trials)
         .map(|_| calc.compute(&generate_modular_topology(n)))
-        .sum::<f64>() / trials as f64;
+        .sum::<f64>()
+        / trials as f64;
 
     println!("Star Φ = {:.4}, Modular Φ = {:.4}", star_mean, modular_mean);
 
@@ -507,8 +545,14 @@ fn test_phi_within_known_analytical_range() {
     let phi_star = calc.compute(&star_8);
     let phi_ring = calc.compute(&ring_8);
 
-    println!("8-node Star Φ (spectral) = {:.4} (expected ~0.4553)", phi_star);
-    println!("8-node Ring Φ (spectral) = {:.4} (expected ~0.4954)", phi_ring);
+    println!(
+        "8-node Star Φ (spectral) = {:.4} (expected ~0.4553)",
+        phi_star
+    );
+    println!(
+        "8-node Ring Φ (spectral) = {:.4} (expected ~0.4954)",
+        phi_ring
+    );
 
     // Wide tolerance: HDC spectral approximation uses different math than
     // exact IIT. We just check values are in a reasonable range [0, 1]
@@ -536,6 +580,10 @@ fn test_all_tiers_agree_on_trivial_cases() {
         assert_eq!(phi_empty, 0.0, "{:?} should return 0 for empty input", tier);
 
         let phi_single = calc.compute(&[BinaryHV::random(42)]);
-        assert_eq!(phi_single, 0.0, "{:?} should return 0 for single component", tier);
+        assert_eq!(
+            phi_single, 0.0,
+            "{:?} should return 0 for single component",
+            tier
+        );
     }
 }

@@ -14,13 +14,13 @@
 //
 // ==================================================================================
 
-use symthaea::hdc::{TextEncoder, TextEncoderConfig};
-use symthaea::hdc::primitive_system::PrimitiveSystem;
-use symthaea::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
 use symthaea::benchmarks::{
-    CausalBenchmarkSuite, SymthaeaSolver, CausalGraph,
-    CausalQuery, CausalAnswer, CausalBenchmark, CausalCategory,
+    CausalAnswer, CausalBenchmark, CausalBenchmarkSuite, CausalCategory, CausalGraph, CausalQuery,
+    SymthaeaSolver,
 };
+use symthaea::hdc::primitive_system::PrimitiveSystem;
+use symthaea::hdc::{TextEncoder, TextEncoderConfig};
+use symthaea::learnable_ltc::{LearnableLTC, LearnableLTCConfig};
 
 /// Test 1: Text to HDC encoding with primitive grounding
 #[test]
@@ -32,7 +32,8 @@ fn test_text_to_hdc_encoding() {
 
     // Test encoding a sentence with primitives
     let text = "Causation implies correlation but not vice versa";
-    let encoded = encoder.encode_with_primitives(text, &primitives)
+    let encoded = encoder
+        .encode_with_primitives(text, &primitives)
         .expect("Should encode text successfully");
 
     // Verify dimensionality
@@ -44,13 +45,20 @@ fn test_text_to_hdc_encoding() {
 
     // Test that different texts produce different encodings
     let text2 = "Correlation does not imply causation";
-    let encoded2 = encoder.encode_with_primitives(text2, &primitives)
+    let encoded2 = encoder
+        .encode_with_primitives(text2, &primitives)
         .expect("Should encode second text");
 
     // Compute cosine similarity (should be moderate - related but different)
     let similarity = cosine_similarity_i8(&encoded, &encoded2);
-    assert!(similarity < 0.9, "Different sentences should have distinct encodings");
-    assert!(similarity > -0.5, "Related sentences should not be orthogonal");
+    assert!(
+        similarity < 0.9,
+        "Different sentences should have distinct encodings"
+    );
+    assert!(
+        similarity > -0.5,
+        "Related sentences should not be orthogonal"
+    );
 
     println!("Text encoding test passed!");
     println!("  Similarity between related sentences: {:.3}", similarity);
@@ -61,20 +69,22 @@ fn test_text_to_hdc_encoding() {
 fn test_hdc_through_ltc() {
     // Create a small LTC network using default config with modifications
     let mut config = LearnableLTCConfig::default();
-    config.input_dim = 64;    // Downsampled HDC
+    config.input_dim = 64; // Downsampled HDC
     config.num_neurons = 32;
     config.output_dim = 16;
-    config.num_steps = 10;    // Fewer steps for test speed
+    config.num_steps = 10; // Fewer steps for test speed
 
     let mut ltc = LearnableLTC::new(config).expect("Should create LTC");
 
     // Create a sequence of HDC-like inputs (simulating encoded text over time)
-    let sequence: Vec<Vec<f32>> = (0..10).map(|t| {
-        // Simulated HDC input that changes over time
-        (0..64).map(|i| {
-            ((i as f32 + t as f32 * 0.1).sin() * 0.5) as f32
-        }).collect()
-    }).collect();
+    let sequence: Vec<Vec<f32>> = (0..10)
+        .map(|t| {
+            // Simulated HDC input that changes over time
+            (0..64)
+                .map(|i| ((i as f32 + t as f32 * 0.1).sin() * 0.5) as f32)
+                .collect()
+        })
+        .collect();
 
     // Process sequence through LTC
     let mut outputs = Vec::new();
@@ -91,15 +101,22 @@ fn test_hdc_through_ltc() {
     // (later outputs should be different from earlier ones)
     let first_output = &outputs[0];
     let last_output = &outputs[9];
-    let temporal_difference: f32 = first_output.iter()
+    let temporal_difference: f32 = first_output
+        .iter()
         .zip(last_output.iter())
         .map(|(a, b)| (a - b).abs())
         .sum();
 
-    assert!(temporal_difference > 0.001, "LTC should show temporal dynamics");
+    assert!(
+        temporal_difference > 0.001,
+        "LTC should show temporal dynamics"
+    );
 
     println!("HDC -> LTC pipeline test passed!");
-    println!("  Temporal difference (first vs last): {:.4}", temporal_difference);
+    println!(
+        "  Temporal difference (first vs last): {:.4}",
+        temporal_difference
+    );
 }
 
 /// Test 3: LTC output through causal reasoning
@@ -167,7 +184,10 @@ fn test_causal_reasoning_integration() {
     let answer3 = solver.solve(&benchmark, &query3);
     match answer3 {
         CausalAnswer::Range { expected, .. } => {
-            assert!(expected > 0.0, "Improving mood should increase productivity");
+            assert!(
+                expected > 0.0,
+                "Improving mood should increase productivity"
+            );
         }
         _ => panic!("Expected range answer"),
     }
@@ -187,10 +207,11 @@ fn test_full_pipeline() {
     let statements = vec![
         "Smoking causes cancer",
         "Exercise improves health",
-        "Ice cream sales correlate with drowning",  // Spurious!
+        "Ice cream sales correlate with drowning", // Spurious!
     ];
 
-    let encodings: Vec<Vec<i8>> = statements.iter()
+    let encodings: Vec<Vec<i8>> = statements
+        .iter()
         .map(|s| encoder.encode_with_primitives(s, &primitives).unwrap())
         .collect();
 
@@ -210,7 +231,10 @@ fn test_full_pipeline() {
     let mut solver = SymthaeaSolver::new();
     let results = suite.run(|benchmark, query| solver.solve(benchmark, query));
 
-    println!("  Causal benchmark accuracy: {:.1}%", results.accuracy() * 100.0);
+    println!(
+        "  Causal benchmark accuracy: {:.1}%",
+        results.accuracy() * 100.0
+    );
 
     // Symthaea should significantly beat random chance
     assert!(results.accuracy() > 0.5, "Should beat 50% random baseline");
@@ -218,7 +242,10 @@ fn test_full_pipeline() {
     // Step 4: Verify the full system is coherent
     let stats = solver.stats();
     assert!(stats.queries_solved > 0, "Should have solved queries");
-    assert!(stats.causal_detections > 0, "Should have detected causal relationships");
+    assert!(
+        stats.causal_detections > 0,
+        "Should have detected causal relationships"
+    );
 
     println!("Full pipeline test passed!");
     println!("  Total queries solved: {}", stats.queries_solved);
@@ -228,17 +255,19 @@ fn test_full_pipeline() {
 /// Test 5: Consciousness metrics through pipeline
 #[test]
 fn test_consciousness_metrics() {
-    use symthaea::hdc::integrated_information::IntegratedInformation;
     use symthaea::hdc::binary_hv::BinaryHV;
+    use symthaea::hdc::integrated_information::IntegratedInformation;
 
     // Create IIT calculator
     let mut phi_calculator = IntegratedInformation::new();
 
     // Generate random HDC vectors representing conscious components
-    let components: Vec<BinaryHV> = (0..8).map(|i| {
-        // Create random vectors with unique seeds
-        BinaryHV::random(42 + i as u64)
-    }).collect();
+    let components: Vec<BinaryHV> = (0..8)
+        .map(|i| {
+            // Create random vectors with unique seeds
+            BinaryHV::random(42 + i as u64)
+        })
+        .collect();
 
     // Compute Phi for these components
     let phi = phi_calculator.compute_phi(&components);
@@ -260,7 +289,8 @@ fn test_consciousness_metrics() {
 fn cosine_similarity_i8(a: &[i8], b: &[i8]) -> f32 {
     assert_eq!(a.len(), b.len(), "Vectors must have same length");
 
-    let dot: i32 = a.iter()
+    let dot: i32 = a
+        .iter()
         .zip(b.iter())
         .map(|(&x, &y)| x as i32 * y as i32)
         .sum();

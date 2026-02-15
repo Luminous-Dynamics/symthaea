@@ -63,7 +63,7 @@ use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 
 // Re-export core types for HDC integration
-use symthaea_core::hdc::{HDC_DIMENSION, ContinuousHV};
+use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
 
 // Import existing plasma types for integration
 use super::plasma_hdc_encoder::PlasmaState;
@@ -157,8 +157,7 @@ impl CModSample {
     /// Get all sensor values as a vector (for encoding)
     pub fn to_feature_vector(&self) -> Vec<f32> {
         vec![
-            self.ip, self.ne, self.te, self.prad,
-            self.vloop, self.q95, self.wmhd, self.beta,
+            self.ip, self.ne, self.te, self.prad, self.vloop, self.q95, self.wmhd, self.beta,
         ]
     }
 
@@ -186,21 +185,25 @@ impl CModSample {
 
         // Handle NaN values by replacing with typical defaults
         let safe_value = |v: f32, default: f64| -> f64 {
-            if v.is_nan() { default } else { v as f64 }
+            if v.is_nan() {
+                default
+            } else {
+                v as f64
+            }
         };
 
         PlasmaState::new(
             timestamp_s,
-            safe_value(self.ip, 1.0),       // MA
-            safe_value(self.ne, 1.5),       // 10^20 m^-3
-            safe_value(self.te, 3.0),       // keV
-            safe_value(self.prad, 1.0),     // MW
-            safe_value(self.vloop, 1.0),    // V
-            5.0,                             // Bt (T) - default for C-Mod
-            0.5,                             // Bp (T) - default for C-Mod
-            safe_value(self.q95, 3.5),      // q95
-            safe_value(self.wmhd, 0.1),     // MJ
-            safe_value(self.beta, 1.0),     // %
+            safe_value(self.ip, 1.0),    // MA
+            safe_value(self.ne, 1.5),    // 10^20 m^-3
+            safe_value(self.te, 3.0),    // keV
+            safe_value(self.prad, 1.0),  // MW
+            safe_value(self.vloop, 1.0), // V
+            5.0,                         // Bt (T) - default for C-Mod
+            0.5,                         // Bp (T) - default for C-Mod
+            safe_value(self.q95, 3.5),   // q95
+            safe_value(self.wmhd, 0.1),  // MJ
+            safe_value(self.beta, 1.0),  // %
         )
     }
 }
@@ -240,8 +243,16 @@ impl CModShot {
         if self.samples.is_empty() {
             return 0.0;
         }
-        let first = self.samples.first().unwrap().time_ms;
-        let last = self.samples.last().unwrap().time_ms;
+        let first = self
+            .samples
+            .first()
+            .expect("samples checked non-empty above")
+            .time_ms;
+        let last = self
+            .samples
+            .last()
+            .expect("samples checked non-empty above")
+            .time_ms;
         last - first
     }
 
@@ -256,8 +267,7 @@ impl CModShot {
 
     /// Sort samples by time
     pub fn sort_by_time(&mut self) {
-        self.samples
-            .sort_by(|a, b| a.time_ms.partial_cmp(&b.time_ms).unwrap());
+        self.samples.sort_by(|a, b| a.time_ms.total_cmp(&b.time_ms));
     }
 
     /// Get sample count
@@ -396,8 +406,8 @@ impl SensorStats {
         let sum: f32 = valid.iter().sum();
         let mean = sum / valid.len() as f32;
 
-        let variance: f32 = valid.iter().map(|v| (v - mean).powi(2)).sum::<f32>()
-            / valid.len() as f32;
+        let variance: f32 =
+            valid.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / valid.len() as f32;
         let std_dev = variance.sqrt();
 
         Self {
@@ -436,14 +446,14 @@ impl Default for SensorNormalizer {
     fn default() -> Self {
         // Default ranges based on typical C-Mod operating parameters
         Self {
-            ip_range: (0.0, 1.5),        // MA
-            ne_range: (0.0, 5.0),        // 10^20 m^-3
-            te_range: (0.0, 6.0),        // keV
-            prad_range: (0.0, 15.0),     // MW
-            vloop_range: (-1.0, 5.0),    // V
-            q95_range: (1.5, 10.0),      // dimensionless
-            wmhd_range: (0.0, 0.5),      // MJ
-            beta_range: (0.0, 3.0),      // dimensionless
+            ip_range: (0.0, 1.5),     // MA
+            ne_range: (0.0, 5.0),     // 10^20 m^-3
+            te_range: (0.0, 6.0),     // keV
+            prad_range: (0.0, 15.0),  // MW
+            vloop_range: (-1.0, 5.0), // V
+            q95_range: (1.5, 10.0),   // dimensionless
+            wmhd_range: (0.0, 0.5),   // MJ
+            beta_range: (0.0, 3.0),   // dimensionless
         }
     }
 }
@@ -641,7 +651,7 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
             q95: parse_f32(7),
             wmhd: parse_f32(8),
             beta: parse_f32(9),
-            is_disruption: false, // Will be set by shot
+            is_disruption: false,        // Will be set by shot
             time_to_disruption_ms: None, // Will be computed
         };
 
@@ -651,9 +661,7 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
             .map(|s| s == "1" || s.to_lowercase() == "true")
             .unwrap_or(false);
 
-        let disruption_time_ms: Option<f64> = record
-            .get(11)
-            .and_then(|s| s.parse::<f64>().ok());
+        let disruption_time_ms: Option<f64> = record.get(11).and_then(|s| s.parse::<f64>().ok());
 
         // Add to shot
         let shot = shots_map.entry(shot_id).or_insert_with(|| {
@@ -681,8 +689,7 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
 pub fn load_hdf5(path: &Path) -> Result<Vec<CModShot>> {
     use hdf5::File;
 
-    let file = File::open(path)
-        .map_err(|e| anyhow!("Failed to open HDF5 file: {}", e))?;
+    let file = File::open(path).map_err(|e| anyhow!("Failed to open HDF5 file: {}", e))?;
 
     let mut shots = Vec::new();
 
@@ -691,10 +698,7 @@ pub fn load_hdf5(path: &Path) -> Result<Vec<CModShot>> {
         let shot_group = file.group(&shot_name)?;
 
         // Parse shot_id from group name
-        let shot_id: u32 = shot_name
-            .trim_start_matches("shot_")
-            .parse()
-            .unwrap_or(0);
+        let shot_id: u32 = shot_name.trim_start_matches("shot_").parse().unwrap_or(0);
 
         let mut shot = CModShot::new(shot_id);
 
@@ -748,7 +752,9 @@ pub fn load_hdf5(path: &Path) -> Result<Vec<CModShot>> {
 /// Stub for HDF5 loading when feature is disabled
 #[cfg(not(feature = "hdf5"))]
 pub fn load_hdf5(_path: &Path) -> Result<Vec<CModShot>> {
-    Err(anyhow!("HDF5 support not enabled. Compile with --features hdf5"))
+    Err(anyhow!(
+        "HDF5 support not enabled. Compile with --features hdf5"
+    ))
 }
 
 // =============================================================================
@@ -771,7 +777,11 @@ pub enum MissingValueStrategy {
 }
 
 /// Fill missing values in a shot using the specified strategy
-pub fn fill_missing_values(shot: &mut CModShot, strategy: MissingValueStrategy, stats: &DatasetStats) {
+pub fn fill_missing_values(
+    shot: &mut CModShot,
+    strategy: MissingValueStrategy,
+    stats: &DatasetStats,
+) {
     match strategy {
         MissingValueStrategy::Zero => fill_with_value(shot, 0.0),
         MissingValueStrategy::Mean => fill_with_mean(shot, stats),
@@ -783,27 +793,59 @@ pub fn fill_missing_values(shot: &mut CModShot, strategy: MissingValueStrategy, 
 
 fn fill_with_value(shot: &mut CModShot, value: f32) {
     for sample in &mut shot.samples {
-        if sample.ip.is_nan() { sample.ip = value; }
-        if sample.ne.is_nan() { sample.ne = value; }
-        if sample.te.is_nan() { sample.te = value; }
-        if sample.prad.is_nan() { sample.prad = value; }
-        if sample.vloop.is_nan() { sample.vloop = value; }
-        if sample.q95.is_nan() { sample.q95 = value; }
-        if sample.wmhd.is_nan() { sample.wmhd = value; }
-        if sample.beta.is_nan() { sample.beta = value; }
+        if sample.ip.is_nan() {
+            sample.ip = value;
+        }
+        if sample.ne.is_nan() {
+            sample.ne = value;
+        }
+        if sample.te.is_nan() {
+            sample.te = value;
+        }
+        if sample.prad.is_nan() {
+            sample.prad = value;
+        }
+        if sample.vloop.is_nan() {
+            sample.vloop = value;
+        }
+        if sample.q95.is_nan() {
+            sample.q95 = value;
+        }
+        if sample.wmhd.is_nan() {
+            sample.wmhd = value;
+        }
+        if sample.beta.is_nan() {
+            sample.beta = value;
+        }
     }
 }
 
 fn fill_with_mean(shot: &mut CModShot, stats: &DatasetStats) {
     for sample in &mut shot.samples {
-        if sample.ip.is_nan() { sample.ip = stats.ip_stats.mean; }
-        if sample.ne.is_nan() { sample.ne = stats.ne_stats.mean; }
-        if sample.te.is_nan() { sample.te = stats.te_stats.mean; }
-        if sample.prad.is_nan() { sample.prad = stats.prad_stats.mean; }
-        if sample.vloop.is_nan() { sample.vloop = stats.vloop_stats.mean; }
-        if sample.q95.is_nan() { sample.q95 = stats.q95_stats.mean; }
-        if sample.wmhd.is_nan() { sample.wmhd = stats.wmhd_stats.mean; }
-        if sample.beta.is_nan() { sample.beta = stats.beta_stats.mean; }
+        if sample.ip.is_nan() {
+            sample.ip = stats.ip_stats.mean;
+        }
+        if sample.ne.is_nan() {
+            sample.ne = stats.ne_stats.mean;
+        }
+        if sample.te.is_nan() {
+            sample.te = stats.te_stats.mean;
+        }
+        if sample.prad.is_nan() {
+            sample.prad = stats.prad_stats.mean;
+        }
+        if sample.vloop.is_nan() {
+            sample.vloop = stats.vloop_stats.mean;
+        }
+        if sample.q95.is_nan() {
+            sample.q95 = stats.q95_stats.mean;
+        }
+        if sample.wmhd.is_nan() {
+            sample.wmhd = stats.wmhd_stats.mean;
+        }
+        if sample.beta.is_nan() {
+            sample.beta = stats.beta_stats.mean;
+        }
     }
 }
 
@@ -869,14 +911,46 @@ fn forward_fill(shot: &mut CModShot) {
     let mut last_beta = 0.0f32;
 
     for sample in &mut shot.samples {
-        if sample.ip.is_nan() { sample.ip = last_ip; } else { last_ip = sample.ip; }
-        if sample.ne.is_nan() { sample.ne = last_ne; } else { last_ne = sample.ne; }
-        if sample.te.is_nan() { sample.te = last_te; } else { last_te = sample.te; }
-        if sample.prad.is_nan() { sample.prad = last_prad; } else { last_prad = sample.prad; }
-        if sample.vloop.is_nan() { sample.vloop = last_vloop; } else { last_vloop = sample.vloop; }
-        if sample.q95.is_nan() { sample.q95 = last_q95; } else { last_q95 = sample.q95; }
-        if sample.wmhd.is_nan() { sample.wmhd = last_wmhd; } else { last_wmhd = sample.wmhd; }
-        if sample.beta.is_nan() { sample.beta = last_beta; } else { last_beta = sample.beta; }
+        if sample.ip.is_nan() {
+            sample.ip = last_ip;
+        } else {
+            last_ip = sample.ip;
+        }
+        if sample.ne.is_nan() {
+            sample.ne = last_ne;
+        } else {
+            last_ne = sample.ne;
+        }
+        if sample.te.is_nan() {
+            sample.te = last_te;
+        } else {
+            last_te = sample.te;
+        }
+        if sample.prad.is_nan() {
+            sample.prad = last_prad;
+        } else {
+            last_prad = sample.prad;
+        }
+        if sample.vloop.is_nan() {
+            sample.vloop = last_vloop;
+        } else {
+            last_vloop = sample.vloop;
+        }
+        if sample.q95.is_nan() {
+            sample.q95 = last_q95;
+        } else {
+            last_q95 = sample.q95;
+        }
+        if sample.wmhd.is_nan() {
+            sample.wmhd = last_wmhd;
+        } else {
+            last_wmhd = sample.wmhd;
+        }
+        if sample.beta.is_nan() {
+            sample.beta = last_beta;
+        } else {
+            last_beta = sample.beta;
+        }
     }
 }
 
@@ -1018,7 +1092,11 @@ pub struct CModPlasmaSample {
 }
 
 /// Convert C-Mod sample to CModPlasmaSample for HDC encoding
-pub fn to_cmod_plasma_sample(cmod: &CModSample, normalizer: &SensorNormalizer, label: DisruptionLabel) -> CModPlasmaSample {
+pub fn to_cmod_plasma_sample(
+    cmod: &CModSample,
+    normalizer: &SensorNormalizer,
+    label: DisruptionLabel,
+) -> CModPlasmaSample {
     CModPlasmaSample {
         sensors: cmod.to_normalized_vector(normalizer),
         time_ms: cmod.time_ms,
@@ -1051,9 +1129,8 @@ impl CModHdcEncoder {
     /// Number of sensor channels in C-Mod data
     pub const NUM_SENSORS: usize = 8;
     /// Sensor names
-    pub const SENSOR_NAMES: [&'static str; 8] = [
-        "ip", "ne", "te", "prad", "vloop", "q95", "wmhd", "beta"
-    ];
+    pub const SENSOR_NAMES: [&'static str; 8] =
+        ["ip", "ne", "te", "prad", "vloop", "q95", "wmhd", "beta"];
 
     /// Create a new C-Mod encoder
     pub fn new(dimension: usize, num_levels: usize) -> Self {
@@ -1212,9 +1289,16 @@ impl CModPhiMonitor {
             return false;
         }
 
-        let recent: Vec<f64> = self.history.iter().rev().take(10).map(|(_, p)| *p).collect();
+        let recent: Vec<f64> = self
+            .history
+            .iter()
+            .rev()
+            .take(10)
+            .map(|(_, p)| *p)
+            .collect();
         let mean_recent = recent.iter().sum::<f64>() / recent.len() as f64;
-        let mean_older: f64 = self.history
+        let mean_older: f64 = self
+            .history
             .iter()
             .rev()
             .skip(10)
@@ -1245,7 +1329,11 @@ pub struct BenchmarkResult {
 }
 
 /// Benchmark encoding throughput
-pub fn benchmark_encoding(encoder: &CModHdcEncoder, samples: &[CModPlasmaSample], iterations: usize) -> BenchmarkResult {
+pub fn benchmark_encoding(
+    encoder: &CModHdcEncoder,
+    samples: &[CModPlasmaSample],
+    iterations: usize,
+) -> BenchmarkResult {
     let start = Instant::now();
 
     for _ in 0..iterations {
@@ -1428,8 +1516,10 @@ pub struct PipelineResults {
 pub fn example_pipeline(shots: &[CModShot]) -> Result<PipelineResults> {
     // Compute statistics
     let stats = compute_statistics(shots);
-    println!("Dataset: {} shots ({} disrupted), {} total samples",
-        stats.total_shots, stats.disrupted_shots, stats.total_samples);
+    println!(
+        "Dataset: {} shots ({} disrupted), {} total samples",
+        stats.total_shots, stats.disrupted_shots, stats.total_samples
+    );
 
     // Create normalizer and encoder
     let normalizer = SensorNormalizer::from_stats(&stats);
@@ -1526,7 +1616,9 @@ mod tests {
         // warning_window = 100ms, critical_window = 20ms
         // disruption at t=200ms
         // Logic: ttd <= critical (20) -> Critical, ttd <= warning (100) -> Warning, else Normal
-        for t in [0.0, 50.0, 100.0, 150.0, 175.0, 180.0, 190.0, 195.0, 200.0, 210.0] {
+        for t in [
+            0.0, 50.0, 100.0, 150.0, 175.0, 180.0, 190.0, 195.0, 200.0, 210.0,
+        ] {
             let mut sample = CModSample::new(1, t);
             sample.time_to_disruption_ms = Some(200.0 - t);
             shot.samples.push(sample);
@@ -1535,15 +1627,15 @@ mod tests {
         let labels = label_samples(&shot, 100.0, 20.0);
 
         // ttd values: 200, 150, 100, 50, 25, 20, 10, 5, 0, -10
-        assert_eq!(labels[0], DisruptionLabel::Normal);         // t=0, ttd=200 (> 100 = Normal)
-        assert_eq!(labels[1], DisruptionLabel::Normal);         // t=50, ttd=150 (> 100 = Normal)
-        assert_eq!(labels[2], DisruptionLabel::Warning);        // t=100, ttd=100 (<= 100 warning)
-        assert_eq!(labels[3], DisruptionLabel::Warning);        // t=150, ttd=50 (<= 100 warning)
-        assert_eq!(labels[4], DisruptionLabel::Warning);        // t=175, ttd=25 (25 > 20, so Warning)
-        assert_eq!(labels[5], DisruptionLabel::Critical);       // t=180, ttd=20 (<= 20 critical)
-        assert_eq!(labels[6], DisruptionLabel::Critical);       // t=190, ttd=10 (<= 20 critical)
-        assert_eq!(labels[7], DisruptionLabel::Critical);       // t=195, ttd=5 (<= 20 critical)
-        assert_eq!(labels[8], DisruptionLabel::Critical);       // t=200, ttd=0 (<= 20 critical)
+        assert_eq!(labels[0], DisruptionLabel::Normal); // t=0, ttd=200 (> 100 = Normal)
+        assert_eq!(labels[1], DisruptionLabel::Normal); // t=50, ttd=150 (> 100 = Normal)
+        assert_eq!(labels[2], DisruptionLabel::Warning); // t=100, ttd=100 (<= 100 warning)
+        assert_eq!(labels[3], DisruptionLabel::Warning); // t=150, ttd=50 (<= 100 warning)
+        assert_eq!(labels[4], DisruptionLabel::Warning); // t=175, ttd=25 (25 > 20, so Warning)
+        assert_eq!(labels[5], DisruptionLabel::Critical); // t=180, ttd=20 (<= 20 critical)
+        assert_eq!(labels[6], DisruptionLabel::Critical); // t=190, ttd=10 (<= 20 critical)
+        assert_eq!(labels[7], DisruptionLabel::Critical); // t=195, ttd=5 (<= 20 critical)
+        assert_eq!(labels[8], DisruptionLabel::Critical); // t=200, ttd=0 (<= 20 critical)
         assert_eq!(labels[9], DisruptionLabel::PostDisruption); // t=210, ttd=-10 (< 0 = post)
     }
 
@@ -1717,11 +1809,19 @@ mod tests {
 
         // Identical inputs produce identical encodings
         let sim_identical = enc1.similarity(&enc1_copy);
-        assert!((sim_identical - 1.0).abs() < 0.001, "Identical inputs should have ~1.0 similarity, got {}", sim_identical);
+        assert!(
+            (sim_identical - 1.0).abs() < 0.001,
+            "Identical inputs should have ~1.0 similarity, got {}",
+            sim_identical
+        );
 
         // Different inputs should have lower similarity
         let sim_different = enc1.similarity(&enc2);
-        assert!(sim_different < 0.9, "Different inputs should have <0.9 similarity, got {}", sim_different);
+        assert!(
+            sim_different < 0.9,
+            "Different inputs should have <0.9 similarity, got {}",
+            sim_different
+        );
     }
 
     #[test]
@@ -1739,7 +1839,10 @@ mod tests {
         assert_eq!(stats.total_shots, 20);
         assert!(stats.disrupted_shots > 0);
         assert!(stats.non_disrupted_shots > 0);
-        assert_eq!(stats.total_samples, shots.iter().map(|s| s.len()).sum::<usize>());
+        assert_eq!(
+            stats.total_samples,
+            shots.iter().map(|s| s.len()).sum::<usize>()
+        );
 
         // Sensor stats should be valid
         assert!(stats.ip_stats.min < stats.ip_stats.max);

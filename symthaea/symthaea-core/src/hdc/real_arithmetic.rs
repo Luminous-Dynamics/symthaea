@@ -1,8 +1,8 @@
 #![allow(dead_code)]
 
 use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::primitive_system::seed_from_name;
+use crate::hdc::unified_hv::ContinuousHV;
 
 /// Real number representation with both rational and floating-point components,
 /// along with HDC encodings for symbolic reasoning.
@@ -57,43 +57,23 @@ pub struct MathConstants;
 impl MathConstants {
     /// Pi (π) using rational approximation 355/113.
     pub fn pi() -> HdcReal {
-        HdcReal::new(
-            355,
-            113,
-            std::f64::consts::PI,
-            seed_from_name("PI"),
-        )
+        HdcReal::new(355, 113, std::f64::consts::PI, seed_from_name("PI"))
     }
 
     /// Euler's number (e) using rational approximation 2721/1001.
     pub fn e() -> HdcReal {
-        HdcReal::new(
-            2721,
-            1001,
-            std::f64::consts::E,
-            seed_from_name("E"),
-        )
+        HdcReal::new(2721, 1001, std::f64::consts::E, seed_from_name("E"))
     }
 
     /// Golden ratio (φ) using Fibonacci approximation 987/610.
     pub fn phi_golden() -> HdcReal {
         let exact_phi = (1.0 + 5.0_f64.sqrt()) / 2.0;
-        HdcReal::new(
-            987,
-            610,
-            exact_phi,
-            seed_from_name("PHI"),
-        )
+        HdcReal::new(987, 610, exact_phi, seed_from_name("PHI"))
     }
 
     /// Square root of 2 using rational approximation 1393/985.
     pub fn sqrt2() -> HdcReal {
-        HdcReal::new(
-            1393,
-            985,
-            std::f64::consts::SQRT_2,
-            seed_from_name("SQRT2"),
-        )
+        HdcReal::new(1393, 985, std::f64::consts::SQRT_2, seed_from_name("SQRT2"))
     }
 }
 
@@ -204,11 +184,13 @@ impl PeanoPhysicsBridge {
         };
 
         // Create encodings for both exact and approximate results
-        let approx_encoding = BinaryHV::random(seed_from_name(&format!("APPROX_{}", approximate_value)));
+        let approx_encoding =
+            BinaryHV::random(seed_from_name(&format!("APPROX_{}", approximate_value)));
 
         let coherence = if let Some((num, den)) = exact_value {
             let exact_result_value = num as f64 / den as f64;
-            let exact_encoding = BinaryHV::random(seed_from_name(&format!("EXACT_{}_{}", num, den)));
+            let exact_encoding =
+                BinaryHV::random(seed_from_name(&format!("EXACT_{}_{}", num, den)));
 
             // Measure coherence as similarity between exact and approximate encodings
             let similarity = exact_encoding.similarity(&approx_encoding);
@@ -257,7 +239,7 @@ mod tests {
     #[test]
     fn test_f64_to_rational_third() {
         let bridge = PeanoPhysicsBridge::new();
-        let (num, den) = bridge.f64_to_rational(1.0/3.0, 1000);
+        let (num, den) = bridge.f64_to_rational(1.0 / 3.0, 1000);
         assert_eq!(num, 1);
         assert_eq!(den, 3);
     }

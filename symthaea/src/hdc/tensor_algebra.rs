@@ -742,7 +742,7 @@ impl Multivector {
     /// Extract the grade-k part of a multivector.
     ///
     /// Returns a new multivector with only the grade-k components nonzero.
-    /// This is the projection <M>_k.
+    /// This is the projection `<M>_k`.
     pub fn grade(&self, k: usize) -> Multivector {
         let mut result = Multivector::zero(&self.algebra);
         if k > self.algebra.dimension {
@@ -1009,17 +1009,11 @@ impl TensorNetwork {
             "From node {} does not exist",
             from.0
         );
-        assert!(
-            to.0 < self.nodes.len(),
-            "To node {} does not exist",
-            to.0
-        );
+        assert!(to.0 < self.nodes.len(), "To node {} does not exist", to.0);
         assert_eq!(
-            self.nodes[from.0].tensor.shape[from.1],
-            self.nodes[to.0].tensor.shape[to.1],
+            self.nodes[from.0].tensor.shape[from.1], self.nodes[to.0].tensor.shape[to.1],
             "Connected axes must have same size: {} vs {}",
-            self.nodes[from.0].tensor.shape[from.1],
-            self.nodes[to.0].tensor.shape[to.1],
+            self.nodes[from.0].tensor.shape[from.1], self.nodes[to.0].tensor.shape[to.1],
         );
         self.edges.push(TensorEdge { from, to });
     }
@@ -1060,14 +1054,20 @@ impl TensorNetwork {
 
             if from_id == to_id {
                 // Both endpoints are in the same tensor: do a trace contraction
-                let t = tensors[from_id].take().unwrap();
+                let t = tensors[from_id]
+                    .take()
+                    .expect("tensor node must not be consumed twice");
                 let result = t.contract((edge.from.1, edge.to.1));
                 tensors[from_id] = Some(result);
                 continue;
             }
 
-            let t_from = tensors[from_id].take().unwrap();
-            let t_to = tensors[to_id].take().unwrap();
+            let t_from = tensors[from_id]
+                .take()
+                .expect("tensor node must not be consumed twice");
+            let t_to = tensors[to_id]
+                .take()
+                .expect("tensor node must not be consumed twice");
 
             // Compute the tensor product, then contract the appropriate axes
             let product = t_from.tensor_product(&t_to);
@@ -1410,8 +1410,7 @@ mod tests {
         let bv_rev = bv.reverse();
         for &blade in &bv.grade_offsets[2] {
             assert_eq!(
-                bv_rev.components[blade],
-                -bv.components[blade],
+                bv_rev.components[blade], -bv.components[blade],
                 "Bivector reversion should negate"
             );
         }
@@ -1454,8 +1453,7 @@ mod tests {
 
         // e1 should map to a bivector (grade 2)
         // Specifically, *(e1) = e2e3 (up to sign, depending on convention)
-        let grade2_norm_sq: f64 = dual
-            .grade_offsets[2]
+        let grade2_norm_sq: f64 = dual.grade_offsets[2]
             .iter()
             .map(|&b| dual.components[b] * dual.components[b])
             .sum();

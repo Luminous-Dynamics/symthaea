@@ -10,14 +10,12 @@
 
 use std::time::Instant;
 
+use symthaea::dynamics::cfc::{CfCConfig, CfCNetwork, CfCNetworkConfig};
 use symthaea::hdc::{
-    consciousness_topology_generators::ConsciousnessTopology,
-    spectral_connectivity::RealPhiCalculator,
-    real_hv::RealHV,
-    HDC_DIMENSION,
+    consciousness_topology_generators::ConsciousnessTopology, real_hv::RealHV,
+    spectral_connectivity::ConnectivityCalculator, HDC_DIMENSION,
 };
-use symthaea::dynamics::cfc::{CfCNetwork, CfCNetworkConfig, CfCConfig};
-use symthaea::inference::{StreamingInference, StreamingConfig};
+use symthaea::inference::{StreamingConfig, StreamingInference};
 use symthaea::perception::semantic_encoder::SemanticEncoder;
 
 // =============================================================================
@@ -28,7 +26,7 @@ use symthaea::perception::semantic_encoder::SemanticEncoder;
 fn test_parallel_phi_100_topologies() {
     use rayon::prelude::*;
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
     let topologies: Vec<_> = (0..100)
         .map(|i| ConsciousnessTopology::random(8, HDC_DIMENSION, i))
         .collect();
@@ -36,7 +34,7 @@ fn test_parallel_phi_100_topologies() {
     let start = Instant::now();
     let results: Vec<f64> = topologies
         .par_iter()
-        .map(|topo| calc.compute(&topo.node_representations))
+        .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
         .collect();
     let elapsed = start.elapsed();
 
@@ -53,7 +51,7 @@ fn test_parallel_phi_100_topologies() {
 fn test_parallel_phi_scaling_10_50_200() {
     use rayon::prelude::*;
 
-    let calc = RealPhiCalculator::new();
+    let calc = ConnectivityCalculator::new();
 
     for count in [10, 50, 200] {
         let topologies: Vec<_> = (0..count)
@@ -63,7 +61,7 @@ fn test_parallel_phi_scaling_10_50_200() {
         let start = Instant::now();
         let results: Vec<f64> = topologies
             .par_iter()
-            .map(|topo| calc.compute(&topo.node_representations))
+            .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
             .collect();
         let elapsed = start.elapsed();
 
@@ -171,10 +169,7 @@ fn test_concurrent_cfc_scaling_1_2_4_8() {
         }
 
         let elapsed = start.elapsed();
-        eprintln!(
-            "  {} thread(s), 200 fwd each: {:?}",
-            n_threads, elapsed
-        );
+        eprintln!("  {} thread(s), 200 fwd each: {:?}", n_threads, elapsed);
     }
 }
 
@@ -211,8 +206,7 @@ fn test_concurrent_streaming_pipelines() {
 
                 let mut output_count = 0usize;
                 for i in 0..100 {
-                    let input =
-                        ndarray::Array1::from_shape_fn(32, |j| ((j + i) as f32).cos());
+                    let input = ndarray::Array1::from_shape_fn(32, |j| ((j + i) as f32).cos());
                     streamer.push(input);
                     while let Some(_) = streamer.poll() {
                         output_count += 1;
@@ -292,7 +286,7 @@ fn test_streaming_throughput_under_load() {
 // =============================================================================
 
 #[test]
-#[ignore] // Performance test — run in release mode: cargo test --test scaling --release -- --ignored
+#[ignore = "benchmark: encodes 10K strings, run in release mode for meaningful results"]
 fn test_hdc_encoding_throughput() {
     let mut encoder = SemanticEncoder::default();
     let texts: Vec<String> = (0..10_000)
@@ -310,7 +304,11 @@ fn test_hdc_encoding_throughput() {
     );
 
     // Debug builds are significantly slower than release; adjust threshold accordingly
-    let threshold = if cfg!(debug_assertions) { 100.0 } else { 1000.0 };
+    let threshold = if cfg!(debug_assertions) {
+        100.0
+    } else {
+        1000.0
+    };
     assert!(
         throughput > threshold,
         "Should encode >{:.0} strings/sec, got {:.0}",
@@ -415,8 +413,7 @@ fn test_federated_byzantine_3_of_10() {
 
     // Create aggregator with Byzantine tolerance
     let initial_weights = vec![0.0f32; 100];
-    let mut aggregator = FederatedAggregator::new(initial_weights)
-        .with_byzantine_tolerance(0.3);
+    let mut aggregator = FederatedAggregator::new(initial_weights).with_byzantine_tolerance(0.3);
 
     // 7 honest nodes send similar gradients
     for i in 0..7u8 {
@@ -532,9 +529,8 @@ fn test_mixed_concurrent_workload() {
                 };
                 let mut network = CfCNetwork::new(config);
                 for i in 0..100 {
-                    let input = ndarray::Array1::from_shape_fn(32, |j| {
-                        ((j + i + t * 100) as f32).sin()
-                    });
+                    let input =
+                        ndarray::Array1::from_shape_fn(32, |j| ((j + i + t * 100) as f32).sin());
                     let _ = network.forward(&input, 0.02);
                 }
             })
@@ -557,13 +553,13 @@ fn test_mixed_concurrent_workload() {
     // Thread 5: Phi computation
     let phi_handle = thread::spawn(|| {
         use rayon::prelude::*;
-        let calc = RealPhiCalculator::new();
+        let calc = ConnectivityCalculator::new();
         let topologies: Vec<_> = (0..20)
             .map(|i| ConsciousnessTopology::ring(8, HDC_DIMENSION, i))
             .collect();
         let _results: Vec<f64> = topologies
             .par_iter()
-            .map(|topo| calc.compute(&topo.node_representations))
+            .map(|topo| calc.algebraic_connectivity(&topo.node_representations))
             .collect();
     });
 
@@ -594,11 +590,10 @@ fn test_memory_stability_concurrent_allocation() {
             thread::spawn(move || {
                 for i in 0..50 {
                     // Create a topology (allocates HDC_DIMENSION-sized vectors)
-                    let topo =
-                        ConsciousnessTopology::random(8, HDC_DIMENSION, (t * 50 + i) as u64);
+                    let topo = ConsciousnessTopology::random(8, HDC_DIMENSION, (t * 50 + i) as u64);
                     // Do a computation so optimizer doesn't elide
-                    let calc = RealPhiCalculator::new();
-                    let result: f64 = calc.compute(&topo.node_representations);
+                    let calc = ConnectivityCalculator::new();
+                    let result: f64 = calc.algebraic_connectivity(&topo.node_representations);
                     assert!(result >= 0.0);
                     // topo is dropped here, releasing memory
                 }

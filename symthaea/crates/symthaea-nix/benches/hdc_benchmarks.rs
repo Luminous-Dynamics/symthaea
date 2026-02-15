@@ -3,7 +3,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use symthaea_nix::encoding::{NixCodebook, OptionEncoder, UserInputEncoder};
-use symthaea_nix::mind::{NixActiveInference, causal_graph::NixCausalGraph};
+use symthaea_nix::mind::{causal_graph::NixCausalGraph, NixActiveInference};
 
 /// Benchmark encoding a NixOS option path into HDC space.
 /// Target: <1μs
@@ -37,14 +37,14 @@ fn bench_causal_query(c: &mut Criterion) {
     let mut graph = NixCausalGraph::new(42);
 
     // Seed with structural edges
-    for (cause, effect, _) in symthaea_nix::mind::causal_graph::NixOSCausalPatterns::known_patterns() {
+    for (cause, effect, _) in
+        symthaea_nix::mind::causal_graph::NixOSCausalPatterns::known_patterns()
+    {
         graph.add_structural_edge(cause, effect, 0.8);
     }
 
     c.bench_function("causal_query", |b| {
-        b.iter(|| {
-            graph.predict_side_effects(black_box("services.nginx.enable"))
-        })
+        b.iter(|| graph.predict_side_effects(black_box("services.nginx.enable")))
     });
 }
 
@@ -54,9 +54,7 @@ fn bench_full_cognition_cycle(c: &mut Criterion) {
     let mut engine = NixActiveInference::new();
 
     c.bench_function("full_cognition_cycle", |b| {
-        b.iter(|| {
-            engine.process_input(black_box("install firefox"))
-        })
+        b.iter(|| engine.process_input(black_box("install firefox")))
     });
 }
 
@@ -67,11 +65,41 @@ fn bench_lsh_search(c: &mut Criterion) {
 
     // Pre-populate codebook with many option-like tokens to exceed LSH_MIN_ENTRIES (32)
     let services = [
-        "nginx", "postgresql", "mysql", "redis", "mongodb", "openssh", "fail2ban",
-        "grafana", "prometheus", "caddy", "apache", "nextcloud", "gitea", "syncthing",
-        "tor", "tailscale", "k3s", "xrdp", "dovecot2", "postfix", "printing", "avahi",
-        "cron", "logrotate", "dnsmasq", "resolved", "flatpak", "udisks2", "gvfs",
-        "blueman", "pipewire", "xserver", "ntp", "chrony", "timesyncd",
+        "nginx",
+        "postgresql",
+        "mysql",
+        "redis",
+        "mongodb",
+        "openssh",
+        "fail2ban",
+        "grafana",
+        "prometheus",
+        "caddy",
+        "apache",
+        "nextcloud",
+        "gitea",
+        "syncthing",
+        "tor",
+        "tailscale",
+        "k3s",
+        "xrdp",
+        "dovecot2",
+        "postfix",
+        "printing",
+        "avahi",
+        "cron",
+        "logrotate",
+        "dnsmasq",
+        "resolved",
+        "flatpak",
+        "udisks2",
+        "gvfs",
+        "blueman",
+        "pipewire",
+        "xserver",
+        "ntp",
+        "chrony",
+        "timesyncd",
     ];
     for svc in &services {
         // Encode as option paths to create diverse tokens
@@ -83,9 +111,7 @@ fn bench_lsh_search(c: &mut Criterion) {
     let query_hv = codebook.get_or_create("nginx").clone();
 
     c.bench_function("lsh_search_200_entries", |b| {
-        b.iter(|| {
-            codebook.search_similar(black_box(&query_hv), 5)
-        })
+        b.iter(|| codebook.search_similar(black_box(&query_hv), 5))
     });
 }
 
@@ -96,17 +122,27 @@ fn bench_semantic_search(c: &mut Criterion) {
 
     let mut codebook = NixCodebook::new();
     let paths = [
-        "services.nginx.enable", "services.postgresql.enable",
-        "services.openssh.enable", "networking.firewall.enable",
-        "hardware.opengl.enable", "boot.loader.grub.enable",
-        "users.users.admin.extraGroups", "environment.systemPackages",
-        "programs.zsh.enable", "security.polkit.enable",
+        "services.nginx.enable",
+        "services.postgresql.enable",
+        "services.openssh.enable",
+        "networking.firewall.enable",
+        "hardware.opengl.enable",
+        "boot.loader.grub.enable",
+        "users.users.admin.extraGroups",
+        "environment.systemPackages",
+        "programs.zsh.enable",
+        "security.polkit.enable",
     ];
     let path_refs: Vec<&str> = paths.iter().copied().collect();
 
     c.bench_function("semantic_search_10_paths", |b| {
         b.iter(|| {
-            search_options(black_box("enable nginx web server"), &mut codebook, &path_refs, 5)
+            search_options(
+                black_box("enable nginx web server"),
+                &mut codebook,
+                &path_refs,
+                5,
+            )
         })
     });
 }

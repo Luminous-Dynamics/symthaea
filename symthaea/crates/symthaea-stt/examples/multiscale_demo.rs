@@ -26,25 +26,25 @@ fn main() {
     // Training patterns - diverse phonotactics
     let training_patterns: Vec<Vec<&str>> = vec![
         // Voiceless stops
-        vec!["P", "AE", "T"],   // pat
-        vec!["K", "AE", "T"],   // cat
-        vec!["T", "AO", "P"],   // top
+        vec!["P", "AE", "T"], // pat
+        vec!["K", "AE", "T"], // cat
+        vec!["T", "AO", "P"], // top
         // Voiced stops
-        vec!["B", "AE", "D"],   // bad
-        vec!["D", "AO", "G"],   // dog
-        vec!["G", "AH", "T"],   // gut
+        vec!["B", "AE", "D"], // bad
+        vec!["D", "AO", "G"], // dog
+        vec!["G", "AH", "T"], // gut
         // Fricatives (voiceless)
-        vec!["S", "IH", "T"],   // sit
-        vec!["F", "AE", "T"],   // fat
+        vec!["S", "IH", "T"], // sit
+        vec!["F", "AE", "T"], // fat
         // Fricatives (voiced)
         vec!["Z", "IY", "R", "OW"], // zero
-        vec!["V", "AE", "N"],   // van
+        vec!["V", "AE", "N"],       // van
         // Nasals
-        vec!["M", "AE", "N"],   // man
-        vec!["N", "OW"],        // no (will pad with SIL)
+        vec!["M", "AE", "N"], // man
+        vec!["N", "OW"],      // no (will pad with SIL)
         // Liquids
-        vec!["L", "AY", "T"],   // light
-        vec!["R", "EH", "D"],   // red
+        vec!["L", "AY", "T"], // light
+        vec!["R", "EH", "D"], // red
     ];
 
     separator('-', 70);
@@ -52,7 +52,10 @@ fn main() {
     separator('-', 70);
     println!();
 
-    println!("  Training on {} patterns (30 reps each)...", training_patterns.len());
+    println!(
+        "  Training on {} patterns (30 reps each)...",
+        training_patterns.len()
+    );
 
     for pattern in &training_patterns {
         for _ in 0..30 {
@@ -67,19 +70,30 @@ fn main() {
 
     println!();
     println!("  Hierarchical (2-level):");
-    println!("    Active M×P clusters:  {} / 70", h_stats.active_mp_clusters);
-    println!("    Memory density:       {:.3}", h_stats.avg_manner_density);
+    println!(
+        "    Active M×P clusters:  {} / 70",
+        h_stats.active_mp_clusters
+    );
+    println!(
+        "    Memory density:       {:.3}",
+        h_stats.avg_manner_density
+    );
 
     println!();
     println!("  Multi-Scale (3-level):");
-    println!("    Active L3 clusters:   {} / 140", m_stats.active_l3_clusters);
+    println!(
+        "    Active L3 clusters:   {} / 140",
+        m_stats.active_l3_clusters
+    );
     println!("    L1 density:           {:.3}", m_stats.avg_l1_density);
     println!("    L2 density:           {:.3}", m_stats.avg_l2_density);
     println!("    L3 density:           {:.3}", m_stats.avg_l3_density);
-    println!("    Weights (L1/L2/L3):   {:.1}/{:.1}/{:.1}",
+    println!(
+        "    Weights (L1/L2/L3):   {:.1}/{:.1}/{:.1}",
         m_stats.scale_weights[0] * 100.0,
         m_stats.scale_weights[1] * 100.0,
-        m_stats.scale_weights[2] * 100.0);
+        m_stats.scale_weights[2] * 100.0
+    );
     println!();
 
     // Discrimination tests
@@ -89,8 +103,8 @@ fn main() {
     println!();
 
     // Test 1: Trained vs completely different
-    let trained = vec!["K", "AE", "T"];       // cat (trained)
-    let different = vec!["S", "IY", "Z"];     // seize (different manner)
+    let trained = vec!["K", "AE", "T"]; // cat (trained)
+    let different = vec!["S", "IY", "Z"]; // seize (different manner)
 
     hierarchical.set_level(2);
     let h_trained = hierarchical.score_sequence(&trained);
@@ -107,8 +121,8 @@ fn main() {
     println!();
 
     // Test 2: Voicing minimal pair
-    let voiceless = vec!["P", "AE", "T"];     // pat (voiceless, trained)
-    let voiced = vec!["B", "AE", "D"];        // bad (voiced, also trained)
+    let voiceless = vec!["P", "AE", "T"]; // pat (voiceless, trained)
+    let voiced = vec!["B", "AE", "D"]; // bad (voiced, also trained)
     let voiced_untrained = vec!["B", "AE", "T"]; // bat (voiced, NOT trained)
 
     let h_vl = hierarchical.score_sequence(&voiceless);
@@ -133,10 +147,10 @@ fn main() {
     // Test 3: Same manner, different voicing (maximal contrast)
     // Train heavy on voiceless, test voiced
     let voiceless_heavy = [
-        vec!["P", "IH", "K"],   // pick
-        vec!["T", "IH", "K"],   // tick
-        vec!["K", "IH", "K"],   // kick
-        vec!["S", "IH", "K"],   // sick
+        vec!["P", "IH", "K"], // pick
+        vec!["T", "IH", "K"], // tick
+        vec!["K", "IH", "K"], // kick
+        vec!["S", "IH", "K"], // sick
     ];
 
     for pattern in &voiceless_heavy {
@@ -146,7 +160,7 @@ fn main() {
     }
 
     let test_voiceless = vec!["P", "AE", "K"]; // pack
-    let test_voiced = vec!["B", "AE", "G"];    // bag
+    let test_voiced = vec!["B", "AE", "G"]; // bag
 
     let l1_vl = multiscale.score_at_level(&test_voiceless, 1);
     let l1_vd = multiscale.score_at_level(&test_voiced, 1);
@@ -176,12 +190,21 @@ fn main() {
     println!("  Scorer Architecture     | Clusters | Best Discrimination");
     println!("  ----------------------- | -------- | -------------------");
     println!("  Original Holographic    |     1    |  +0.010 (baseline)");
-    println!("  Hierarchical L2         |    70    |  {:+.4}", h_disc1.max(h_disc2));
-    println!("  Multi-Scale (L3+vote)   |   140    |  {:+.4}", (l3_vl - l3_vd).max(m_disc1));
+    println!(
+        "  Hierarchical L2         |    70    |  {:+.4}",
+        h_disc1.max(h_disc2)
+    );
+    println!(
+        "  Multi-Scale (L3+vote)   |   140    |  {:+.4}",
+        (l3_vl - l3_vd).max(m_disc1)
+    );
     println!();
 
     let improvement = ((l3_vl - l3_vd).max(m_disc1) / 0.010).round();
-    println!("  Improvement over baseline: {}× better discrimination!", improvement as i32);
+    println!(
+        "  Improvement over baseline: {}× better discrimination!",
+        improvement as i32
+    );
     println!();
 
     if l3_vl - l3_vd > h_disc1 {

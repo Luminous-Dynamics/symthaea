@@ -1,0 +1,47 @@
+---
+# Mycelix Unified hApp Bundle
+# Combines Commons + Civic DNAs for cross-cluster communication.
+#
+# When both DNAs are installed as separate roles within the same hApp,
+# zomes can call between clusters using:
+#   call(CallTargetCell::OtherRole("commons"/"civic"), zome, fn, None, payload)
+#
+# This is the deployment manifest for environments that need
+# cross-cluster integration (e.g., justice enforcement freezing
+# property transfers, emergency querying housing capacity).
+#
+# For standalone deployments where only one cluster is needed,
+# use the individual happ.yaml files in happs/commons/ or happs/civic/.
+
+manifest_version: "0"
+name: mycelix-unified
+description: |
+  Unified Mycelix platform combining universal resource coordination (Commons)
+  with civic operations (Civic). Enables cross-cluster calls between domains:
+  - Justice enforcement ↔ Property registry
+  - Emergency coordination ↔ Housing capacity
+  - Media fact-checking ↔ Care credential verification
+  - Water stewardship ↔ Emergency disaster awareness
+
+roles:
+  - name: commons
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./commons/dna/mycelix_commons.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: civic
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./civic/dna/mycelix_civic.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

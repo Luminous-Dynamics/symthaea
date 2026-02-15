@@ -57,7 +57,7 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```rust,ignore
 //! use mycelix_sdk::zkproof::{GradientProver, ProverMode};
 //!
 //! let prover = GradientProver::for_federated_learning();
@@ -80,6 +80,7 @@ mod circuit;
 mod gradient_proof;
 pub mod proof_system;
 mod risc0_integration;
+#[cfg(any(feature = "simulation", feature = "risc0"))]
 mod risc0_prover;
 pub mod trust_proof_system;
 pub mod trust_risc0;
@@ -90,9 +91,13 @@ pub use gradient_proof::{
     compute_commitment, hash_gradient, verify_gradient_quality, GradientConstraints,
     GradientProofInput, GradientProofOutput, GradientQualityResult, Risc0ProofConfig,
 };
+#[cfg(any(feature = "simulation", feature = "risc0"))]
 pub use risc0_prover::{
-    BatchGradientProver, GradientProofReceipt, GradientProver, ProverError, SimulationProofMarker,
+    BatchGradientProver, GradientProver, ProverError, SimulationProofMarker,
 };
+
+#[cfg(any(feature = "simulation", feature = "risc0"))]
+pub use risc0_prover::GradientProofReceipt;
 pub use types::{GradientProof, ProofMetadata, PublicInputs};
 
 // Export prover mode only when features are enabled

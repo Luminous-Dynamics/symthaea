@@ -21,11 +21,11 @@
 //! ```
 
 use symthaea::dynamics::{
-    CfCNetworkConfig, CfCConfig, ActivationType,
-    GpuCfcNetwork, GpuCfcConfig, GpuBackend,
+    ActivationType, CfCConfig, CfCNetworkConfig, GpuBackend, GpuCfcConfig, GpuCfcNetwork,
 };
 
 /// Tolerance for floating-point comparisons
+#[allow(dead_code)]
 const TOLERANCE: f32 = 1e-4;
 
 /// Extended tolerance for accumulated operations
@@ -55,42 +55,54 @@ fn approx_equal(a: &[f32], b: &[f32], tolerance: f32) -> bool {
 
 fn test_configs() -> Vec<(&'static str, GpuCfcConfig)> {
     vec![
-        ("tiny", GpuCfcConfig {
-            input_dim: 8,
-            hidden_dim: 16,
-            num_layers: 1,
-            output_dim: 4,
-            use_backbone: false,
-            ..Default::default()
-        }),
-        ("small_no_backbone", GpuCfcConfig {
-            input_dim: 32,
-            hidden_dim: 64,
-            num_layers: 2,
-            output_dim: 16,
-            use_backbone: false,
-            ..Default::default()
-        }),
-        ("small_with_backbone", GpuCfcConfig {
-            input_dim: 32,
-            hidden_dim: 64,
-            num_layers: 2,
-            output_dim: 16,
-            use_backbone: true,
-            backbone_layers: 2,
-            backbone_dim: 48,
-            ..Default::default()
-        }),
-        ("medium", GpuCfcConfig {
-            input_dim: 64,
-            hidden_dim: 128,
-            num_layers: 3,
-            output_dim: 32,
-            use_backbone: true,
-            backbone_layers: 2,
-            backbone_dim: 96,
-            ..Default::default()
-        }),
+        (
+            "tiny",
+            GpuCfcConfig {
+                input_dim: 8,
+                hidden_dim: 16,
+                num_layers: 1,
+                output_dim: 4,
+                use_backbone: false,
+                ..Default::default()
+            },
+        ),
+        (
+            "small_no_backbone",
+            GpuCfcConfig {
+                input_dim: 32,
+                hidden_dim: 64,
+                num_layers: 2,
+                output_dim: 16,
+                use_backbone: false,
+                ..Default::default()
+            },
+        ),
+        (
+            "small_with_backbone",
+            GpuCfcConfig {
+                input_dim: 32,
+                hidden_dim: 64,
+                num_layers: 2,
+                output_dim: 16,
+                use_backbone: true,
+                backbone_layers: 2,
+                backbone_dim: 48,
+                ..Default::default()
+            },
+        ),
+        (
+            "medium",
+            GpuCfcConfig {
+                input_dim: 64,
+                hidden_dim: 128,
+                num_layers: 3,
+                output_dim: 32,
+                use_backbone: true,
+                backbone_layers: 2,
+                backbone_dim: 96,
+                ..Default::default()
+            },
+        ),
     ]
 }
 
@@ -156,7 +168,9 @@ fn test_forward_output_is_finite() {
             assert!(
                 v.is_finite(),
                 "Config '{}': Output[{}] = {} is not finite",
-                name, i, v
+                name,
+                i,
+                v
             );
         }
     }
@@ -183,7 +197,12 @@ fn test_forward_with_extreme_inputs() {
         ("large", vec![10.0f32; 16]),
         ("small", vec![1e-6f32; 16]),
         ("negative", vec![-1.0f32; 16]),
-        ("mixed", (0..16).map(|i| if i % 2 == 0 { 1.0 } else { -1.0 }).collect()),
+        (
+            "mixed",
+            (0..16)
+                .map(|i| if i % 2 == 0 { 1.0 } else { -1.0 })
+                .collect(),
+        ),
     ];
 
     for (case_name, input) in test_cases {
@@ -194,12 +213,16 @@ fn test_forward_with_extreme_inputs() {
             assert!(
                 v.is_finite(),
                 "Case '{}': Output[{}] = {} is not finite",
-                case_name, i, v
+                case_name,
+                i,
+                v
             );
             assert!(
                 v.abs() < 100.0,
                 "Case '{}': Output[{}] = {} is unreasonably large",
-                case_name, i, v
+                case_name,
+                i,
+                v
             );
         }
     }
@@ -238,19 +261,28 @@ fn test_batch_forward_consistency() {
     let batch_outputs = gpu_network.forward_batch(&inputs, &dts).unwrap();
 
     // Verify batch outputs are valid
-    assert_eq!(batch_outputs.len(), batch_size, "Batch should return {} outputs", batch_size);
+    assert_eq!(
+        batch_outputs.len(),
+        batch_size,
+        "Batch should return {} outputs",
+        batch_size
+    );
     for (i, output) in batch_outputs.iter().enumerate() {
         assert_eq!(output.len(), 16, "Batch item {} should have 16 outputs", i);
         for (j, &v) in output.iter().enumerate() {
             assert!(
                 v.is_finite(),
                 "Batch item {}, output[{}] = {} is not finite",
-                i, j, v
+                i,
+                j,
+                v
             );
             assert!(
                 v.abs() < 100.0,
                 "Batch item {}, output[{}] = {} is unreasonably large",
-                i, j, v
+                i,
+                j,
+                v
             );
         }
     }
@@ -265,7 +297,9 @@ fn test_batch_forward_consistency() {
         assert!(
             diff < TOLERANCE,
             "Batch item {}: max_diff = {} exceeds tolerance {} (non-deterministic batch)",
-            i, diff, TOLERANCE
+            i,
+            diff,
+            TOLERANCE
         );
     }
 }
@@ -302,7 +336,9 @@ fn test_sequence_processing() {
             assert!(
                 v.is_finite(),
                 "Sequence step {}, output[{}] = {} is not finite",
-                i, j, v
+                i,
+                j,
+                v
             );
         }
     }
@@ -334,18 +370,23 @@ fn test_reset_clears_state() {
 
     // State should be non-zero
     let state_before = gpu_network.state();
-    let magnitude_before: f32 = state_before.iter()
+    let magnitude_before: f32 = state_before
+        .iter()
         .flat_map(|s| s.iter())
         .map(|&x| x.abs())
         .sum();
-    assert!(magnitude_before > 0.0, "State should be non-zero after forward passes");
+    assert!(
+        magnitude_before > 0.0,
+        "State should be non-zero after forward passes"
+    );
 
     // Reset
     gpu_network.reset();
 
     // State should be zero
     let state_after = gpu_network.state();
-    let magnitude_after: f32 = state_after.iter()
+    let magnitude_after: f32 = state_after
+        .iter()
         .flat_map(|s| s.iter())
         .map(|&x| x.abs())
         .sum();
@@ -390,7 +431,10 @@ fn test_state_save_restore() {
             assert!(
                 (s - r).abs() < 1e-6,
                 "Layer {}, element {}: saved={}, restored={}",
-                i, j, s, r
+                i,
+                j,
+                s,
+                r
             );
         }
     }
@@ -429,15 +473,13 @@ fn test_long_sequence_stability() {
     // Check that outputs remain stable throughout
     for (i, output) in outputs.iter().enumerate() {
         for (j, &v) in output.iter().enumerate() {
-            assert!(
-                v.is_finite(),
-                "Step {}, output[{}] = {} diverged",
-                i, j, v
-            );
+            assert!(v.is_finite(), "Step {}, output[{}] = {} diverged", i, j, v);
             assert!(
                 v.abs() < 20.0, // CfC should clamp to [-10, 10] but output projection might scale
                 "Step {}, output[{}] = {} grew too large",
-                i, j, v
+                i,
+                j,
+                v
             );
         }
     }
@@ -461,11 +503,11 @@ fn test_varying_dt_stability() {
 
     // Test with varying time steps
     let test_dts = vec![
-        0.001,  // Very small
-        0.01,   // Small
-        0.1,    // Normal
-        1.0,    // Large
-        10.0,   // Very large
+        0.001, // Very small
+        0.01,  // Small
+        0.1,   // Normal
+        1.0,   // Large
+        10.0,  // Very large
     ];
 
     let input = vec![0.5; 16];
@@ -478,7 +520,9 @@ fn test_varying_dt_stability() {
             assert!(
                 v.is_finite(),
                 "dt={}: output[{}] = {} is not finite",
-                dt, i, v
+                dt,
+                i,
+                v
             );
         }
     }
@@ -503,19 +547,15 @@ fn test_training_reduces_loss() {
         .expect("Failed to create GPU network");
 
     // Simple training data
-    let inputs: Vec<Vec<f32>> = vec![
-        vec![1.0; 16],
-        vec![0.0; 16],
-    ];
-    let targets: Vec<Vec<f32>> = vec![
-        vec![1.0; 8],
-        vec![0.0; 8],
-    ];
+    let inputs: Vec<Vec<f32>> = vec![vec![1.0; 16], vec![0.0; 16]];
+    let targets: Vec<Vec<f32>> = vec![vec![1.0; 8], vec![0.0; 8]];
     let dts = vec![0.1, 0.1];
 
     // Get initial loss
     gpu_network.reset();
-    let initial_loss = gpu_network.train_step(&inputs, &targets, &dts, 0.01).unwrap();
+    let initial_loss = gpu_network
+        .train_step(&inputs, &targets, &dts, 0.01)
+        .unwrap();
 
     // Train for several steps
     for _ in 0..50 {
@@ -525,7 +565,9 @@ fn test_training_reduces_loss() {
 
     // Get final loss
     gpu_network.reset();
-    let final_loss = gpu_network.train_step(&inputs, &targets, &dts, 0.01).unwrap();
+    let final_loss = gpu_network
+        .train_step(&inputs, &targets, &dts, 0.01)
+        .unwrap();
 
     println!("Initial loss: {}, Final loss: {}", initial_loss, final_loss);
 
@@ -571,11 +613,17 @@ fn test_different_activations() {
             assert!(
                 v.is_finite(),
                 "Activation {:?}: output[{}] = {} is not finite",
-                activation, i, v
+                activation,
+                i,
+                v
             );
         }
 
-        println!("Activation {:?}: output = {:?}", activation, &output[..3.min(output.len())]);
+        println!(
+            "Activation {:?}: output = {:?}",
+            activation,
+            &output[..3.min(output.len())]
+        );
     }
 }
 
@@ -602,7 +650,10 @@ fn test_parameter_count() {
     let params = gpu_network.num_parameters();
 
     // Sanity check: should have significant number of parameters
-    assert!(params > 1000, "Network should have more than 1000 parameters");
+    assert!(
+        params > 1000,
+        "Network should have more than 1000 parameters"
+    );
 
     println!("Network has {} parameters", params);
 }
@@ -647,18 +698,25 @@ fn test_statistics_tracking() {
 #[test]
 fn test_backend_auto_selection() {
     let backend = GpuBackend::Auto.resolve();
-    println!("Auto-selected backend: {:?} - {}", backend, backend.description());
+    println!(
+        "Auto-selected backend: {:?} - {}",
+        backend,
+        backend.description()
+    );
 
     // Should resolve to something valid
-    assert!(matches!(
-        backend,
-        GpuBackend::Cpu | GpuBackend::Wgpu
-    ) || {
-        #[cfg(feature = "cuda")]
-        { matches!(backend, GpuBackend::Cuda) }
-        #[cfg(not(feature = "cuda"))]
-        { false }
-    });
+    assert!(
+        matches!(backend, GpuBackend::Cpu | GpuBackend::Wgpu) || {
+            #[cfg(feature = "cuda")]
+            {
+                matches!(backend, GpuBackend::Cuda)
+            }
+            #[cfg(not(feature = "cuda"))]
+            {
+                false
+            }
+        }
+    );
 }
 
 #[test]

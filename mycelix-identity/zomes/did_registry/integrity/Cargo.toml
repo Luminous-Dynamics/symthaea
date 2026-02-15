@@ -16,3 +16,5 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 rmp-serde = "1"
+proptest = "1"
+bs58 = "0.5"

@@ -7,21 +7,39 @@
 //! so the gap between current state and encoded input IS the free energy
 //! that drives action selection.
 
-use symthaea_core::hdc::ContinuousHV;
 use super::codebook::NixCodebook;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Known NixOS action verbs and their semantic clusters.
 const ACTION_VERBS: &[(&str, &[&str])] = &[
     ("install", &["install", "add", "get", "setup", "enable"]),
-    ("remove", &["remove", "uninstall", "delete", "disable", "drop"]),
+    (
+        "remove",
+        &["remove", "uninstall", "delete", "disable", "drop"],
+    ),
     ("search", &["search", "find", "look", "query", "locate"]),
     ("update", &["update", "upgrade", "refresh", "sync"]),
-    ("rebuild", &["rebuild", "switch", "build", "deploy", "apply"]),
+    (
+        "rebuild",
+        &["rebuild", "switch", "build", "deploy", "apply"],
+    ),
     ("rollback", &["rollback", "revert", "undo", "restore"]),
-    ("diagnose", &["why", "diagnose", "debug", "error", "fail", "broken"]),
-    ("optimize", &["optimize", "faster", "speed", "performance", "slow"]),
-    ("configure", &["configure", "config", "set", "change", "modify"]),
-    ("clean", &["clean", "gc", "garbage", "free", "space", "disk"]),
+    (
+        "diagnose",
+        &["why", "diagnose", "debug", "error", "fail", "broken"],
+    ),
+    (
+        "optimize",
+        &["optimize", "faster", "speed", "performance", "slow"],
+    ),
+    (
+        "configure",
+        &["configure", "config", "set", "change", "modify"],
+    ),
+    (
+        "clean",
+        &["clean", "gc", "garbage", "free", "space", "disk"],
+    ),
 ];
 
 /// Encodes user text input into the system-state HDC space.
@@ -86,9 +104,13 @@ impl<'a> UserInputEncoder<'a> {
     }
 
     /// Detect action verbs and encode them.
+    ///
+    /// Iterates tokens in input order so that earlier words (which tend to
+    /// express the user's primary intent) take priority over later words
+    /// that might incidentally match a different action category.
     fn encode_action_intent(&mut self, tokens: &[&str]) -> Option<ContinuousHV> {
-        for (canonical, synonyms) in ACTION_VERBS {
-            for token in tokens {
+        for token in tokens {
+            for (canonical, synonyms) in ACTION_VERBS {
                 if synonyms.contains(token) {
                     return Some(self.codebook.get_or_create(canonical).clone());
                 }
@@ -100,12 +122,11 @@ impl<'a> UserInputEncoder<'a> {
     /// Extract and encode entity tokens (non-stopwords, non-verbs).
     fn encode_entities(&mut self, tokens: &[&str]) -> ContinuousHV {
         let stopwords = [
-            "i", "my", "me", "the", "a", "an", "is", "are", "was", "it",
-            "do", "does", "did", "can", "could", "would", "should", "will",
-            "to", "for", "in", "on", "at", "of", "with", "by", "from",
-            "how", "what", "why", "when", "where", "please", "want", "need",
-            "like", "make", "help", "up", "out", "not", "don't", "this",
-            "that", "some", "all", "very", "too", "also", "just", "about",
+            "i", "my", "me", "the", "a", "an", "is", "are", "was", "it", "do", "does", "did",
+            "can", "could", "would", "should", "will", "to", "for", "in", "on", "at", "of", "with",
+            "by", "from", "how", "what", "why", "when", "where", "please", "want", "need", "like",
+            "make", "help", "up", "out", "not", "don't", "this", "that", "some", "all", "very",
+            "too", "also", "just", "about",
         ];
 
         // Also exclude known action verbs
@@ -117,11 +138,7 @@ impl<'a> UserInputEncoder<'a> {
         let entities: Vec<&str> = tokens
             .iter()
             .copied()
-            .filter(|t| {
-                t.len() > 1
-                    && !stopwords.contains(t)
-                    && !action_words.contains(t)
-            })
+            .filter(|t| t.len() > 1 && !stopwords.contains(t) && !action_words.contains(t))
             .collect();
 
         if entities.is_empty() {
@@ -143,10 +160,26 @@ impl<'a> UserInputEncoder<'a> {
     }
 
     /// Encode remaining content tokens (lower weight, contextual).
+    ///
+    /// Filters out stopwords and known action verbs to avoid duplicating
+    /// signal already captured by `encode_action_intent` and `encode_entities`.
     fn encode_content_tokens(&mut self, tokens: &[&str]) -> ContinuousHV {
+        let stopwords = [
+            "i", "my", "me", "the", "a", "an", "is", "are", "was", "it", "do", "does", "did",
+            "can", "could", "would", "should", "will", "to", "for", "in", "on", "at", "of", "with",
+            "by", "from", "how", "what", "why", "when", "where", "please", "want", "need", "like",
+            "make", "help", "up", "out", "not", "don't", "this", "that", "some", "all", "very",
+            "too", "also", "just", "about",
+        ];
+
+        let action_words: Vec<&str> = ACTION_VERBS
+            .iter()
+            .flat_map(|(_, synonyms)| synonyms.iter().copied())
+            .collect();
+
         let encoded: Vec<ContinuousHV> = tokens
             .iter()
-            .filter(|t| t.len() > 2)
+            .filter(|t| t.len() > 2 && !stopwords.contains(t) && !action_words.contains(t))
             .take(10)
             .map(|tok| self.codebook.get_or_create(tok).clone())
             .collect();
@@ -189,7 +222,8 @@ mod tests {
         assert!(
             sim_install > sim_cross,
             "Similar intents ({:.3}) should have higher similarity than different ({:.3})",
-            sim_install, sim_cross,
+            sim_install,
+            sim_cross,
         );
     }
 
@@ -217,7 +251,8 @@ mod tests {
         assert!(
             sim_nginx > sim_different,
             "Same target ({:.3}) should have higher similarity than different target ({:.3})",
-            sim_nginx, sim_different,
+            sim_nginx,
+            sim_different,
         );
     }
 
@@ -244,7 +279,8 @@ mod tests {
         assert!(
             sim_diag > sim_cross,
             "Diagnostic intents ({:.3}) should be more similar than install ({:.3})",
-            sim_diag, sim_cross,
+            sim_diag,
+            sim_cross,
         );
     }
 

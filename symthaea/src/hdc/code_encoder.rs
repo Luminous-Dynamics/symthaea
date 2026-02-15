@@ -24,7 +24,7 @@ use std::collections::HashMap;
 
 use symthaea_core::hdc::ContinuousHV;
 
-use crate::language::code_parser::{CodeEntity, EntityKind, ParsedCode, Relation, CodeRelation};
+use crate::language::code_parser::{CodeEntity, CodeRelation, EntityKind, ParsedCode, Relation};
 
 /// Encoder that converts AST structure into hypervectors
 pub struct CodeHDEncoder {
@@ -106,7 +106,8 @@ impl CodeHDEncoder {
         for (i, kind) in kinds.iter().enumerate() {
             // Deterministic seed: role index * large prime
             let seed = (i as u64 + 1) * 2_654_435_761;
-            self.role_vectors.insert(*kind, ContinuousHV::random(self.dim, seed));
+            self.role_vectors
+                .insert(*kind, ContinuousHV::random(self.dim, seed));
         }
     }
 
@@ -125,7 +126,8 @@ impl CodeHDEncoder {
 
         for (i, rel) in relations.iter().enumerate() {
             let seed = (i as u64 + 100) * 3_141_592_653;
-            self.relation_vectors.insert(*rel, ContinuousHV::random(self.dim, seed));
+            self.relation_vectors
+                .insert(*rel, ContinuousHV::random(self.dim, seed));
         }
     }
 
@@ -133,7 +135,8 @@ impl CodeHDEncoder {
     fn init_position_vectors(&mut self) {
         for i in 0..self.max_positions {
             let seed = (i as u64 + 1000) * 1_618_033_989;
-            self.position_vectors.push(ContinuousHV::random(self.dim, seed));
+            self.position_vectors
+                .push(ContinuousHV::random(self.dim, seed));
         }
     }
 
@@ -152,23 +155,33 @@ impl CodeHDEncoder {
 
         // Character-level encoding with position sensitivity
         for (i, byte) in name_lower.bytes().enumerate() {
-            let idx = ((byte as usize).wrapping_mul(31).wrapping_add(i.wrapping_mul(7))) % self.dim;
+            let idx = ((byte as usize)
+                .wrapping_mul(31)
+                .wrapping_add(i.wrapping_mul(7)))
+                % self.dim;
             values[idx] += 1.0;
         }
 
         // Bigram encoding for richer name representation
         let bytes: Vec<u8> = name_lower.bytes().collect();
         for window in bytes.windows(2) {
-            let idx = ((window[0] as usize).wrapping_mul(127)
-                .wrapping_add(window[1] as usize).wrapping_mul(131)) % self.dim;
+            let idx = ((window[0] as usize)
+                .wrapping_mul(127)
+                .wrapping_add(window[1] as usize)
+                .wrapping_mul(131))
+                % self.dim;
             values[idx] += 0.5;
         }
 
         // Trigram encoding
         for window in bytes.windows(3) {
-            let idx = ((window[0] as usize).wrapping_mul(251)
-                .wrapping_add(window[1] as usize).wrapping_mul(257)
-                .wrapping_add(window[2] as usize).wrapping_mul(263)) % self.dim;
+            let idx = ((window[0] as usize)
+                .wrapping_mul(251)
+                .wrapping_add(window[1] as usize)
+                .wrapping_mul(257)
+                .wrapping_add(window[2] as usize)
+                .wrapping_mul(263))
+                % self.dim;
             values[idx] += 0.25;
         }
 
@@ -189,7 +202,9 @@ impl CodeHDEncoder {
 
     /// Encode a single code entity: bind(role, name, position)
     pub fn encode_entity(&self, entity: &CodeEntity) -> ContinuousHV {
-        let role_hv = self.role_vectors.get(&entity.kind)
+        let role_hv = self
+            .role_vectors
+            .get(&entity.kind)
             .cloned()
             .unwrap_or_else(|| ContinuousHV::zero(self.dim));
         let name_hv = self.encode_name(&entity.name);
@@ -206,7 +221,9 @@ impl CodeHDEncoder {
         }
 
         // Bundle children
-        let child_hvs: Vec<ContinuousHV> = entity.children.iter()
+        let child_hvs: Vec<ContinuousHV> = entity
+            .children
+            .iter()
             .enumerate()
             .map(|(i, child)| {
                 let child_hv = self.encode_entity(child);
@@ -269,7 +286,9 @@ impl CodeHDEncoder {
         }
 
         // Encode each entity with position binding
-        let entity_hvs: Vec<ContinuousHV> = parsed.entities.iter()
+        let entity_hvs: Vec<ContinuousHV> = parsed
+            .entities
+            .iter()
             .enumerate()
             .map(|(i, entity)| {
                 let entity_hv = match entity.kind {
@@ -298,7 +317,8 @@ impl CodeHDEncoder {
             return ContinuousHV::zero(self.dim);
         }
 
-        let hvs: Vec<ContinuousHV> = relations.iter()
+        let hvs: Vec<ContinuousHV> = relations
+            .iter()
             .map(|rel| self.encode_relationship_triple(&rel.source, rel.relation, &rel.target))
             .collect();
 
@@ -306,9 +326,16 @@ impl CodeHDEncoder {
     }
 
     /// Encode a single relationship triple: bind(source, relation, target)
-    pub fn encode_relationship_triple(&self, source: &str, relation: Relation, target: &str) -> ContinuousHV {
+    pub fn encode_relationship_triple(
+        &self,
+        source: &str,
+        relation: Relation,
+        target: &str,
+    ) -> ContinuousHV {
         let src_hv = self.encode_name(source);
-        let rel_hv = self.relation_vectors.get(&relation)
+        let rel_hv = self
+            .relation_vectors
+            .get(&relation)
             .cloned()
             .unwrap_or_else(|| ContinuousHV::zero(self.dim));
         let tgt_hv = self.encode_name(target);
@@ -376,9 +403,12 @@ mod tests {
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
@@ -401,8 +431,12 @@ mod tests {
         // Similar names should be more similar than dissimilar names
         let sim_similar = hello.similarity(&hello2);
         let sim_different = hello.similarity(&goodbye);
-        assert!(sim_similar > sim_different,
-            "Similar names should have higher similarity: {} vs {}", sim_similar, sim_different);
+        assert!(
+            sim_similar > sim_different,
+            "Similar names should have higher similarity: {} vs {}",
+            sim_similar,
+            sim_different
+        );
     }
 
     #[test]
@@ -451,8 +485,12 @@ mod tests {
         // Two functions should be more similar to each other than to a struct
         let sim_fns = hv1.similarity(&hv2);
         let sim_fn_struct = hv1.similarity(&hv3);
-        assert!(sim_fns > sim_fn_struct,
-            "Functions should be more similar: {} vs {}", sim_fns, sim_fn_struct);
+        assert!(
+            sim_fns > sim_fn_struct,
+            "Functions should be more similar: {} vs {}",
+            sim_fns,
+            sim_fn_struct
+        );
     }
 
     #[test]
@@ -460,8 +498,12 @@ mod tests {
         let encoder = CodeHDEncoder::new(512);
 
         let mut parsed = ParsedCode::new("fn a() {} fn b() {}", "rust");
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
 
         let module_hv = encoder.encode_module(&parsed);
         assert_eq!(module_hv.values.len(), 512);
@@ -480,7 +522,11 @@ mod tests {
         // Different relationships should produce different vectors
         let hv2 = encoder.encode_relationship_triple("Dog", Relation::Extends, "Animal");
         let sim = hv.similarity(&hv2);
-        assert!(sim < 0.95, "Different relations should produce different vectors: sim={}", sim);
+        assert!(
+            sim < 0.95,
+            "Different relations should produce different vectors: sim={}",
+            sim
+        );
     }
 
     #[test]
@@ -488,11 +534,14 @@ mod tests {
         let encoder = CodeHDEncoder::new(512);
 
         let mut old = ParsedCode::new("fn a() {}", "rust");
-        old.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        old.entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
 
         let mut new = ParsedCode::new("fn a() {} fn b() {}", "rust");
-        new.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
-        new.entities.push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+        new.entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        new.entities
+            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
 
         let diff_hv = encoder.encode_diff(&old, &new);
         assert_eq!(diff_hv.values.len(), 512);
@@ -511,6 +560,10 @@ mod tests {
 
         // Random high-dimensional vectors should be nearly orthogonal
         let sim = fn_role.similarity(struct_role).abs();
-        assert!(sim < 0.2, "Role vectors should be nearly orthogonal: sim={}", sim);
+        assert!(
+            sim < 0.2,
+            "Role vectors should be nearly orthogonal: sim={}",
+            sim
+        );
     }
 }

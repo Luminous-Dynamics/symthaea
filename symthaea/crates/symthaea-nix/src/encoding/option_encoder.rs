@@ -19,8 +19,8 @@
 //!   than to `boot.loader.grub.enable` (shared top-level category)
 //! - Values can be bound to option paths for full binding encoding
 
-use symthaea_core::hdc::ContinuousHV;
 use super::codebook::NixCodebook;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Encodes NixOS option paths and values into hypervectors.
 pub struct OptionEncoder<'a> {
@@ -137,7 +137,8 @@ mod tests {
         assert!(
             sim_nginx > sim_cross,
             "Expected nginx siblings ({:.3}) > cross-domain ({:.3})",
-            sim_nginx, sim_cross,
+            sim_nginx,
+            sim_cross,
         );
     }
 
@@ -165,7 +166,8 @@ mod tests {
         assert!(
             sim_services > sim_cross,
             "Expected same-category ({:.3}) > cross-category ({:.3})",
-            sim_services, sim_cross,
+            sim_services,
+            sim_cross,
         );
     }
 
@@ -200,7 +202,11 @@ mod tests {
 
         // Binding should be different from just the path
         let sim = path_hv.similarity(&binding_hv);
-        assert!(sim < 0.5, "Path and binding should differ, got similarity {}", sim);
+        assert!(
+            sim < 0.5,
+            "Path and binding should differ, got similarity {}",
+            sim
+        );
     }
 
     #[test]
@@ -217,6 +223,10 @@ mod tests {
         };
 
         let sim = enable_true.similarity(&enable_false);
-        assert!(sim < 0.5, "Different values should produce different bindings, got {}", sim);
+        assert!(
+            sim < 0.5,
+            "Different values should produce different bindings, got {}",
+            sim
+        );
     }
 }

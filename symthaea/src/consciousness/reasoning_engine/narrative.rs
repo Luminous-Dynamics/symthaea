@@ -5,10 +5,10 @@
 //! Tier 2 when remaining budget > 3ms, and is always deferred if
 //! budget is tight.
 
-use crate::consciousness::epistemic_conflict::{ConflictKind, ConflictMatrix};
-use crate::consciousness::tool_gate::types::GateResult;
-use crate::consciousness::temporal_planning::types::MctsResult;
 use crate::consciousness::counterfactual::CausalQueryOutcome;
+use crate::consciousness::epistemic_conflict::{ConflictKind, ConflictMatrix};
+use crate::consciousness::temporal_planning::types::MctsResult;
+use crate::consciousness::tool_gate::types::GateResult;
 
 /// Generate a narrative from reasoning components.
 ///
@@ -33,7 +33,10 @@ pub fn generate_narrative(
     } else {
         "Very low reliability: theories in severe disagreement. Epistemic caution engaged."
     };
-    parts.push(format!("Φ_eff={:.3} (R={:.2}). {}", phi_eff, reliability, state_desc));
+    parts.push(format!(
+        "Φ_eff={:.3} (R={:.2}). {}",
+        phi_eff, reliability, state_desc
+    ));
 
     // Dominant conflict
     if let Some(kind) = conflicts.dominant_kind {
@@ -73,13 +76,24 @@ pub fn generate_narrative(
     // Counterfactual
     if let Some(cf) = counterfactual {
         let cf_desc = match cf {
-            CausalQueryOutcome::Identified { ref method, confidence, .. } => {
-                format!("Causal effect identified via {:?} (conf={:.2}).", method, confidence)
+            CausalQueryOutcome::Identified {
+                ref method,
+                confidence,
+                ..
+            } => {
+                format!(
+                    "Causal effect identified via {:?} (conf={:.2}).",
+                    method, confidence
+                )
             }
             CausalQueryOutcome::Unidentified { ref reason, .. } => {
                 format!("Causal effect unidentifiable: {:?}.", reason)
             }
-            CausalQueryOutcome::AssumptionRequired { ref assumption, plausibility, .. } => {
+            CausalQueryOutcome::AssumptionRequired {
+                ref assumption,
+                plausibility,
+                ..
+            } => {
                 format!(
                     "Causal effect requires assumption '{}' (plausibility={:.2}).",
                     assumption.condition, plausibility,
@@ -102,18 +116,10 @@ fn conflict_kind_narrative(kind: ConflictKind) -> &'static str {
         ConflictKind::IntegrationCollapse => {
             "Integration collapse — information integration has broken down."
         }
-        ConflictKind::NoBroadcast => {
-            "No broadcast — global workspace is inactive."
-        }
-        ConflictKind::AttentionalInstability => {
-            "Attentional instability — focus is scattered."
-        }
-        ConflictKind::UnreliablePrediction => {
-            "Unreliable prediction — high surprise rate."
-        }
-        ConflictKind::ShallowRecurrence => {
-            "Shallow recurrence — processing depth insufficient."
-        }
+        ConflictKind::NoBroadcast => "No broadcast — global workspace is inactive.",
+        ConflictKind::AttentionalInstability => "Attentional instability — focus is scattered.",
+        ConflictKind::UnreliablePrediction => "Unreliable prediction — high surprise rate.",
+        ConflictKind::ShallowRecurrence => "Shallow recurrence — processing depth insufficient.",
         ConflictKind::UngroundedRepresentation => {
             "Ungrounded representation — lacking embodied context."
         }

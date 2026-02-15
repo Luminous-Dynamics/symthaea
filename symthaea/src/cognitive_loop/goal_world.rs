@@ -3,7 +3,7 @@
 //! - `GoalSystemBridge`: Goal-directed attention with priority-based weighting
 //! - `WorldModelBridge`: Hierarchical world model predictions with multi-level state
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Goal representation for the cognitive loop
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,7 +68,9 @@ impl GoalSystemBridge {
         if self.goals.is_empty() {
             return 1.0;
         }
-        let active_weight: f32 = self.goals.iter()
+        let active_weight: f32 = self
+            .goals
+            .iter()
             .filter(|g| g.is_active)
             .map(|g| g.attention_weight)
             .sum();
@@ -92,9 +94,11 @@ impl GoalSystemBridge {
 
     /// Get highest priority active goal
     pub fn top_goal(&self) -> Option<&CognitiveGoal> {
-        self.goals.iter()
-            .filter(|g| g.is_active)
-            .max_by(|a, b| a.priority.partial_cmp(&b.priority).unwrap_or(std::cmp::Ordering::Equal))
+        self.goals.iter().filter(|g| g.is_active).max_by(|a, b| {
+            a.priority
+                .partial_cmp(&b.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Clear completed goals
@@ -144,7 +148,8 @@ impl WorldModelBridge {
     pub fn update_sensory(&mut self, input: &[f32]) {
         if input.len() >= self.level_dims[0] {
             // Compute prediction error at level 0
-            let error: f32 = self.level_states[0].iter()
+            let error: f32 = self.level_states[0]
+                .iter()
                 .zip(input.iter().take(self.level_dims[0]))
                 .map(|(pred, actual)| (pred - actual).powi(2))
                 .sum::<f32>()
@@ -161,7 +166,8 @@ impl WorldModelBridge {
 
             self.total_predictions += 1;
             // Safe division: use max(1) to prevent division by zero
-            self.avg_error = self.level_errors.iter().sum::<f32>() / self.level_errors.len().max(1) as f32;
+            self.avg_error =
+                self.level_errors.iter().sum::<f32>() / self.level_errors.len().max(1) as f32;
         }
     }
 
@@ -200,7 +206,10 @@ impl WorldModelBridge {
 
     /// Get abstract level state (highest level - for planning)
     pub fn abstract_state(&self) -> &[f32] {
-        self.level_states.last().map(|v| v.as_slice()).unwrap_or(&[])
+        self.level_states
+            .last()
+            .map(|v| v.as_slice())
+            .unwrap_or(&[])
     }
 
     /// Reset the world model
@@ -323,13 +332,17 @@ impl CausalGoalAnalyzer {
         };
 
         // Stratum 1: high attention
-        let high_attn: Vec<(f64, f64)> = self.observations.iter()
+        let high_attn: Vec<(f64, f64)> = self
+            .observations
+            .iter()
             .filter(|o| o.1 >= attn_median)
             .map(|o| (o.0, o.2))
             .collect();
 
         // Stratum 2: low attention
-        let low_attn: Vec<(f64, f64)> = self.observations.iter()
+        let low_attn: Vec<(f64, f64)> = self
+            .observations
+            .iter()
             .filter(|o| o.1 < attn_median)
             .map(|o| (o.0, o.2))
             .collect();
@@ -391,7 +404,8 @@ fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
 
 /// Compute E[error | priority > threshold] within a stratum.
 fn stratum_effect(obs: &[(f64, f64)], threshold: f64) -> f64 {
-    let high_priority: Vec<f64> = obs.iter()
+    let high_priority: Vec<f64> = obs
+        .iter()
         .filter(|(p, _)| *p > threshold)
         .map(|(_, e)| *e)
         .collect();
@@ -439,9 +453,6 @@ mod tests {
 
         // Causal effect should differ from observational (confounder present)
         // The direct causal effect of priority on error is much smaller than correlation
-        assert!(
-            result.goal_id == "test_goal",
-            "Goal ID should match"
-        );
+        assert!(result.goal_id == "test_goal", "Goal ID should match");
     }
 }

@@ -34,7 +34,10 @@ async fn test_continuous_mind_has_unified_mind() {
     // Should have access to unified mind with SQLite persistence by default
     let unified = mind.unified_mind();
     // ContinuousMind uses SQLite for persistent storage
-    assert!(unified.status().sensory_real, "Should use SQLite databases by default");
+    assert!(
+        unified.status().sensory_real,
+        "Should use SQLite databases by default"
+    );
 }
 
 #[tokio::test]
@@ -46,10 +49,14 @@ async fn test_continuous_mind_remember_working_memory() {
     let record = create_test_memory("working-1", 100, MemoryType::Working);
     let encoding = record.encoding.clone();
 
-    mind.remember(record).await.expect("Should store working memory");
+    mind.remember(record)
+        .await
+        .expect("Should store working memory");
 
     // Recall it
-    let results = mind.recall_working(&encoding, 1).await
+    let results = mind
+        .recall_working(&encoding, 1)
+        .await
         .expect("Should recall working memory");
 
     assert_eq!(results.len(), 1, "Should find the stored memory");
@@ -65,10 +72,14 @@ async fn test_continuous_mind_remember_episodic_memory() {
     let record = create_test_memory("episodic-1", 200, MemoryType::Episodic);
     let encoding = record.encoding.clone();
 
-    mind.remember(record).await.expect("Should store episodic memory");
+    mind.remember(record)
+        .await
+        .expect("Should store episodic memory");
 
     // Recall from long-term
-    let results = mind.recall_long_term(&encoding, 1).await
+    let results = mind
+        .recall_long_term(&encoding, 1)
+        .await
         .expect("Should recall long-term memory");
 
     assert_eq!(results.len(), 1, "Should find the stored memory");
@@ -100,9 +111,15 @@ async fn test_continuous_mind_memory_statistics() {
     let mind = ContinuousMind::new(config);
 
     // Store some memories
-    mind.remember(create_test_memory("m1", 1, MemoryType::Working)).await.unwrap();
-    mind.remember(create_test_memory("m2", 2, MemoryType::Episodic)).await.unwrap();
-    mind.remember(create_test_memory("m3", 3, MemoryType::Semantic)).await.unwrap();
+    mind.remember(create_test_memory("m1", 1, MemoryType::Working))
+        .await
+        .unwrap();
+    mind.remember(create_test_memory("m2", 2, MemoryType::Episodic))
+        .await
+        .unwrap();
+    mind.remember(create_test_memory("m3", 3, MemoryType::Semantic))
+        .await
+        .unwrap();
 
     let stats = mind.memory_statistics().await.unwrap();
 

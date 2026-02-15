@@ -268,9 +268,14 @@ fn validate_create_alert(
     _action: Create,
     alert: ContaminationAlert,
 ) -> ExternResult<ValidateCallbackResult> {
-    if alert.contaminant.is_empty() {
+    if alert.contaminant.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Contaminant name cannot be empty".into(),
+        ));
+    }
+    if alert.contaminant.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contaminant name must be 256 characters or fewer".into(),
         ));
     }
     if alert.measured_value < 0.0 {
@@ -294,10 +299,14 @@ fn validate_create_alert(
 
 fn validate_update_alert(
     _action: Update,
-    _alert: ContaminationAlert,
+    alert: ContaminationAlert,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Allow updates (e.g., marking as resolved)
+    if alert.contaminant.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Contaminant name must be 256 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -305,9 +314,19 @@ fn validate_create_remediation(
     _action: Create,
     remediation: Remediation,
 ) -> ExternResult<ValidateCallbackResult> {
-    if remediation.method.is_empty() {
+    if remediation.method.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Remediation method cannot be empty".into(),
+        ));
+    }
+    if remediation.method.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation method must be 4096 characters or fewer".into(),
+        ));
+    }
+    if remediation.notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation notes must be 4096 characters or fewer".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -315,8 +334,747 @@ fn validate_create_remediation(
 
 fn validate_update_remediation(
     _action: Update,
-    _remediation: Remediation,
+    remediation: Remediation,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
+    if remediation.method.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation method must be 4096 characters or fewer".into(),
+        ));
+    }
+    if remediation.notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Remediation notes must be 4096 characters or fewer".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // HELPERS
+    // ========================================================================
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_agent_2() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_entry_hash() -> EntryHash {
+        EntryHash::from_raw_36(vec![0u8; 36])
+    }
+
+    fn fake_create() -> Create {
+        Create {
+            author: fake_agent(),
+            timestamp: Timestamp::from_micros(0),
+            action_seq: 0,
+            prev_action: fake_action_hash(),
+            entry_type: EntryType::App(AppEntryDef::new(
+                EntryDefIndex(0),
+                ZomeIndex(0),
+                EntryVisibility::Public,
+            )),
+            entry_hash: fake_entry_hash(),
+            weight: EntryRateWeight::default(),
+        }
+    }
+
+    fn is_valid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Valid))
+    }
+
+    fn is_invalid(result: &ExternResult<ValidateCallbackResult>) -> bool {
+        matches!(result, Ok(ValidateCallbackResult::Invalid(_)))
+    }
+
+    fn invalid_msg(result: &ExternResult<ValidateCallbackResult>) -> String {
+        match result {
+            Ok(ValidateCallbackResult::Invalid(msg)) => msg.clone(),
+            _ => panic!("Expected Invalid, got {:?}", result),
+        }
+    }
+
+    fn make_quality_reading() -> QualityReading {
+        QualityReading {
+            source_hash: fake_action_hash(),
+            sampler: fake_agent(),
+            timestamp: Timestamp::from_micros(0),
+            temperature_celsius: Some(20.0),
+            turbidity_ntu: Some(1.5),
+            ph: Some(7.0),
+            tds_ppm: Some(150.0),
+            dissolved_oxygen_mg_l: Some(8.0),
+            nitrates_mg_l: Some(5.0),
+            arsenic_ug_l: Some(1.0),
+            lead_ug_l: Some(0.5),
+            total_coliform_cfu: Some(0),
+            e_coli_cfu: Some(0),
+            chlorine_mg_l: Some(0.5),
+            potability_score: 0.95,
+            meets_who_standards: true,
+            meets_epa_standards: true,
+        }
+    }
+
+    fn make_contamination_alert() -> ContaminationAlert {
+        ContaminationAlert {
+            source_hash: fake_action_hash(),
+            severity: AlertSeverity::Warning,
+            contaminant: "Lead".into(),
+            measured_value: 20.0,
+            threshold_value: 15.0,
+            alert_type: AlertType::Chemical,
+            reported_by: fake_agent(),
+            reported_at: Timestamp::from_micros(0),
+            resolved_at: None,
+            remediation_hash: None,
+        }
+    }
+
+    fn make_remediation() -> Remediation {
+        Remediation {
+            alert_hash: fake_action_hash(),
+            method: "Activated carbon filtration".into(),
+            started_at: Timestamp::from_micros(0),
+            completed_at: None,
+            verified_by: None,
+            post_treatment_reading: None,
+            cost_estimate: Some(5000),
+            notes: "Initial treatment phase".into(),
+        }
+    }
+
+    // ========================================================================
+    // SERDE ROUNDTRIP TESTS
+    // ========================================================================
+
+    #[test]
+    fn serde_roundtrip_alert_severity() {
+        for variant in [
+            AlertSeverity::Advisory,
+            AlertSeverity::Warning,
+            AlertSeverity::Emergency,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: AlertSeverity = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_alert_type() {
+        for variant in [
+            AlertType::Chemical,
+            AlertType::Biological,
+            AlertType::Physical,
+            AlertType::Radiological,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: AlertType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    // ========================================================================
+    // QUALITY READING VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_quality_reading_passes() {
+        let result = validate_create_reading(fake_create(), make_quality_reading());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_potability_score_negative_rejected() {
+        let mut reading = make_quality_reading();
+        reading.potability_score = -0.1;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Potability score must be between 0.0 and 1.0"
+        );
+    }
+
+    #[test]
+    fn quality_reading_potability_score_over_one_rejected() {
+        let mut reading = make_quality_reading();
+        reading.potability_score = 1.1;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Potability score must be between 0.0 and 1.0"
+        );
+    }
+
+    #[test]
+    fn quality_reading_potability_score_zero_accepted() {
+        let mut reading = make_quality_reading();
+        reading.potability_score = 0.0;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_potability_score_one_accepted() {
+        let mut reading = make_quality_reading();
+        reading.potability_score = 1.0;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_potability_score_mid_range_accepted() {
+        let mut reading = make_quality_reading();
+        reading.potability_score = 0.5;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_ph_negative_rejected() {
+        let mut reading = make_quality_reading();
+        reading.ph = Some(-0.1);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "pH must be between 0 and 14");
+    }
+
+    #[test]
+    fn quality_reading_ph_over_14_rejected() {
+        let mut reading = make_quality_reading();
+        reading.ph = Some(14.1);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "pH must be between 0 and 14");
+    }
+
+    #[test]
+    fn quality_reading_ph_zero_accepted() {
+        let mut reading = make_quality_reading();
+        reading.ph = Some(0.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_ph_14_accepted() {
+        let mut reading = make_quality_reading();
+        reading.ph = Some(14.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_ph_neutral_accepted() {
+        let mut reading = make_quality_reading();
+        reading.ph = Some(7.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_ph_none_accepted() {
+        let mut reading = make_quality_reading();
+        reading.ph = None;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_temperature_under_neg50_rejected() {
+        let mut reading = make_quality_reading();
+        reading.temperature_celsius = Some(-50.1);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Temperature must be between -50 and 100 Celsius"
+        );
+    }
+
+    #[test]
+    fn quality_reading_temperature_over_100_rejected() {
+        let mut reading = make_quality_reading();
+        reading.temperature_celsius = Some(100.1);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Temperature must be between -50 and 100 Celsius"
+        );
+    }
+
+    #[test]
+    fn quality_reading_temperature_neg50_accepted() {
+        let mut reading = make_quality_reading();
+        reading.temperature_celsius = Some(-50.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_temperature_100_accepted() {
+        let mut reading = make_quality_reading();
+        reading.temperature_celsius = Some(100.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_temperature_zero_accepted() {
+        let mut reading = make_quality_reading();
+        reading.temperature_celsius = Some(0.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_temperature_none_accepted() {
+        let mut reading = make_quality_reading();
+        reading.temperature_celsius = None;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_turbidity_negative_rejected() {
+        let mut reading = make_quality_reading();
+        reading.turbidity_ntu = Some(-0.1);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Turbidity cannot be negative");
+    }
+
+    #[test]
+    fn quality_reading_turbidity_zero_accepted() {
+        let mut reading = make_quality_reading();
+        reading.turbidity_ntu = Some(0.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_turbidity_positive_accepted() {
+        let mut reading = make_quality_reading();
+        reading.turbidity_ntu = Some(100.0);
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_turbidity_none_accepted() {
+        let mut reading = make_quality_reading();
+        reading.turbidity_ntu = None;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_all_fields_none_accepted() {
+        let mut reading = make_quality_reading();
+        reading.temperature_celsius = None;
+        reading.turbidity_ntu = None;
+        reading.ph = None;
+        reading.tds_ppm = None;
+        reading.dissolved_oxygen_mg_l = None;
+        reading.nitrates_mg_l = None;
+        reading.arsenic_ug_l = None;
+        reading.lead_ug_l = None;
+        reading.total_coliform_cfu = None;
+        reading.e_coli_cfu = None;
+        reading.chlorine_mg_l = None;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_meets_who_false_accepted() {
+        let mut reading = make_quality_reading();
+        reading.meets_who_standards = false;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_meets_epa_false_accepted() {
+        let mut reading = make_quality_reading();
+        reading.meets_epa_standards = false;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn quality_reading_both_standards_false_accepted() {
+        let mut reading = make_quality_reading();
+        reading.meets_who_standards = false;
+        reading.meets_epa_standards = false;
+        let result = validate_create_reading(fake_create(), reading);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // CONTAMINATION ALERT VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_contamination_alert_passes() {
+        let result = validate_create_alert(fake_create(), make_contamination_alert());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn contamination_alert_empty_contaminant_rejected() {
+        let mut alert = make_contamination_alert();
+        alert.contaminant = "".into();
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Contaminant name cannot be empty"
+        );
+    }
+
+    #[test]
+    fn contamination_alert_measured_value_negative_rejected() {
+        let mut alert = make_contamination_alert();
+        alert.measured_value = -0.1;
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Measured value cannot be negative"
+        );
+    }
+
+    #[test]
+    fn contamination_alert_threshold_value_negative_rejected() {
+        let mut alert = make_contamination_alert();
+        alert.threshold_value = -0.1;
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Threshold value cannot be negative"
+        );
+    }
+
+    #[test]
+    fn contamination_alert_measured_equals_threshold_rejected() {
+        let mut alert = make_contamination_alert();
+        alert.measured_value = 10.0;
+        alert.threshold_value = 10.0;
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Measured value must exceed threshold to raise an alert"
+        );
+    }
+
+    #[test]
+    fn contamination_alert_measured_below_threshold_rejected() {
+        let mut alert = make_contamination_alert();
+        alert.measured_value = 5.0;
+        alert.threshold_value = 10.0;
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Measured value must exceed threshold to raise an alert"
+        );
+    }
+
+    #[test]
+    fn contamination_alert_measured_slightly_above_threshold_accepted() {
+        let mut alert = make_contamination_alert();
+        alert.measured_value = 10.1;
+        alert.threshold_value = 10.0;
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn contamination_alert_measured_far_above_threshold_accepted() {
+        let mut alert = make_contamination_alert();
+        alert.measured_value = 100.0;
+        alert.threshold_value = 10.0;
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn contamination_alert_zero_threshold_accepted() {
+        let mut alert = make_contamination_alert();
+        alert.measured_value = 0.1;
+        alert.threshold_value = 0.0;
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn contamination_alert_all_severities_accepted() {
+        for severity in [
+            AlertSeverity::Advisory,
+            AlertSeverity::Warning,
+            AlertSeverity::Emergency,
+        ] {
+            let mut alert = make_contamination_alert();
+            alert.severity = severity;
+            let result = validate_create_alert(fake_create(), alert);
+            assert!(is_valid(&result));
+        }
+    }
+
+    #[test]
+    fn contamination_alert_all_types_accepted() {
+        for alert_type in [
+            AlertType::Chemical,
+            AlertType::Biological,
+            AlertType::Physical,
+            AlertType::Radiological,
+        ] {
+            let mut alert = make_contamination_alert();
+            alert.alert_type = alert_type;
+            let result = validate_create_alert(fake_create(), alert);
+            assert!(is_valid(&result));
+        }
+    }
+
+    #[test]
+    fn contamination_alert_with_resolved_at_accepted() {
+        let mut alert = make_contamination_alert();
+        alert.resolved_at = Some(Timestamp::from_micros(1000));
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn contamination_alert_with_remediation_hash_accepted() {
+        let mut alert = make_contamination_alert();
+        alert.remediation_hash = Some(fake_action_hash());
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // REMEDIATION VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn valid_remediation_passes() {
+        let result = validate_create_remediation(fake_create(), make_remediation());
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_empty_method_rejected() {
+        let mut remediation = make_remediation();
+        remediation.method = "".into();
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Remediation method cannot be empty"
+        );
+    }
+
+    #[test]
+    fn remediation_with_completed_at_accepted() {
+        let mut remediation = make_remediation();
+        remediation.completed_at = Some(Timestamp::from_micros(1000));
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_with_verified_by_accepted() {
+        let mut remediation = make_remediation();
+        remediation.verified_by = Some(fake_agent_2());
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_with_post_treatment_reading_accepted() {
+        let mut remediation = make_remediation();
+        remediation.post_treatment_reading = Some(fake_action_hash());
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_with_cost_estimate_accepted() {
+        let mut remediation = make_remediation();
+        remediation.cost_estimate = Some(10_000);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_zero_cost_accepted() {
+        let mut remediation = make_remediation();
+        remediation.cost_estimate = Some(0);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_no_cost_accepted() {
+        let mut remediation = make_remediation();
+        remediation.cost_estimate = None;
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_empty_notes_accepted() {
+        let mut remediation = make_remediation();
+        remediation.notes = "".into();
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_notes_exactly_4096_accepted() {
+        let mut remediation = make_remediation();
+        remediation.notes = "A".repeat(4096);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_notes_4097_rejected() {
+        let mut remediation = make_remediation();
+        remediation.notes = "A".repeat(4097);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Remediation notes must be 4096 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // UPDATE VALIDATION TESTS
+    // ========================================================================
+
+    #[test]
+    fn update_alert_always_valid() {
+        let alert = make_contamination_alert();
+        let result = validate_update_alert(
+            Update {
+                author: fake_agent(),
+                timestamp: Timestamp::from_micros(1000),
+                action_seq: 1,
+                prev_action: fake_action_hash(),
+                original_action_address: fake_action_hash(),
+                original_entry_address: fake_entry_hash(),
+                entry_type: EntryType::App(AppEntryDef::new(
+                    EntryDefIndex(0),
+                    ZomeIndex(0),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: fake_entry_hash(),
+                weight: EntryRateWeight::default(),
+            },
+            alert,
+            fake_action_hash(),
+        );
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn update_remediation_always_valid() {
+        let remediation = make_remediation();
+        let result = validate_update_remediation(
+            Update {
+                author: fake_agent(),
+                timestamp: Timestamp::from_micros(1000),
+                action_seq: 1,
+                prev_action: fake_action_hash(),
+                original_action_address: fake_action_hash(),
+                original_entry_address: fake_entry_hash(),
+                entry_type: EntryType::App(AppEntryDef::new(
+                    EntryDefIndex(0),
+                    ZomeIndex(0),
+                    EntryVisibility::Public,
+                )),
+                entry_hash: fake_entry_hash(),
+                weight: EntryRateWeight::default(),
+            },
+            remediation,
+            fake_action_hash(),
+        );
+        assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS - CONTAMINATION ALERT
+    // ========================================================================
+
+    #[test]
+    fn contamination_alert_contaminant_exactly_256_accepted() {
+        let mut alert = make_contamination_alert();
+        alert.contaminant = "x".repeat(256);
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn contamination_alert_contaminant_257_rejected() {
+        let mut alert = make_contamination_alert();
+        alert.contaminant = "x".repeat(257);
+        let result = validate_create_alert(fake_create(), alert);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Contaminant name must be 256 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // STRING LENGTH LIMIT TESTS - REMEDIATION
+    // ========================================================================
+
+    #[test]
+    fn remediation_method_exactly_4096_accepted() {
+        let mut remediation = make_remediation();
+        remediation.method = "x".repeat(4096);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_valid(&result));
+    }
+
+    #[test]
+    fn remediation_method_4097_rejected() {
+        let mut remediation = make_remediation();
+        remediation.method = "x".repeat(4097);
+        let result = validate_create_remediation(fake_create(), remediation);
+        assert!(is_invalid(&result));
+        assert_eq!(
+            invalid_msg(&result),
+            "Remediation method must be 4096 characters or fewer"
+        );
+    }
+
+    // ========================================================================
+    // NOTE: Quality readings are immutable (no update validation function)
+    // ========================================================================
 }

@@ -22,12 +22,12 @@
 //! 3. **Compositional Consciousness**: Can consciousness primitives
 //!    be composed like physics primitives?
 
-use crate::genesis::GenesisSeed;
-use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::{StandardModel, PHYSICS_DIM};
+use super::chemistry::Chemistry;
 use super::hadrons::Hadrons;
 use super::periodic_table::PeriodicTable;
-use super::chemistry::Chemistry;
+use super::standard_model::{StandardModel, PHYSICS_DIM};
+use crate::genesis::GenesisSeed;
+use crate::hdc::unified_hv::ContinuousHV;
 use serde::{Deserialize, Serialize};
 
 /// Consciousness concept categories
@@ -94,8 +94,8 @@ pub struct PhysicsConsciousnessBridge {
     pub function: ContinuousHV,
 
     // Bridge concepts
-    pub embodiment: ContinuousHV,  // Link between physical and phenomenal
-    pub emergence: ContinuousHV,   // How macro arises from micro
+    pub embodiment: ContinuousHV, // Link between physical and phenomenal
+    pub emergence: ContinuousHV,  // How macro arises from micro
     pub integration: ContinuousHV, // IIT-style integration
 }
 
@@ -119,34 +119,28 @@ impl PhysicsConsciousnessBridge {
         }
     }
 
-    /// Measure phenomenal character of a vector
+    /// Estimate phenomenal character of a vector via concept similarity.
     ///
-    /// How similar is this vector to phenomenal vs functional concepts?
+    /// Computes how similar this vector is to phenomenal vs functional concepts.
+    /// Range: -1 (fully functional) to +1 (fully phenomenal).
     ///
-    /// Note: This measures similarity to labeled concept vectors (qualia, awareness, etc.)
-    /// which is somewhat circular. For a more rigorous measure based on Shannon entropy
-    /// and information integration, use `EmergenceChain::phenomenal_index_rigorous()`.
-    #[deprecated(
-        since = "0.6.0",
-        note = "Use EmergenceChain::phenomenal_index_rigorous() for entropy-based computation. \
-                This method relies on concept vector similarity which may be circular."
-    )]
-    pub fn phenomenal_index(&self, vector: &ContinuousHV) -> f32 {
-        let phenomenal_sim = (
-            vector.similarity(&self.qualia)
+    /// This is a fast heuristic based on labeled concept vector similarity.
+    /// For rigorous measurement based on Shannon entropy and information
+    /// integration, use `EmergenceChain::phenomenal_index_rigorous()`.
+    pub fn estimate_phenomenal_index(&self, vector: &ContinuousHV) -> f32 {
+        let phenomenal_sim = (vector.similarity(&self.qualia)
             + vector.similarity(&self.awareness)
             + vector.similarity(&self.subjective)
             + vector.similarity(&self.experience)
-            + vector.similarity(&self.unity)
-        ) / 5.0;
+            + vector.similarity(&self.unity))
+            / 5.0;
 
-        let functional_sim = (
-            vector.similarity(&self.computation)
+        let functional_sim = (vector.similarity(&self.computation)
             + vector.similarity(&self.information)
             + vector.similarity(&self.processing)
             + vector.similarity(&self.algorithm)
-            + vector.similarity(&self.function)
-        ) / 5.0;
+            + vector.similarity(&self.function))
+            / 5.0;
 
         // Range: -1 (fully functional) to +1 (fully phenomenal)
         phenomenal_sim - functional_sim
@@ -159,11 +153,7 @@ impl PhysicsConsciousnessBridge {
     /// - bundle(a, b): Creates superposition
     ///
     /// Unity hypothesis: bind creates more "unified" representation
-    pub fn binding_unity_test(
-        &self,
-        a: &ContinuousHV,
-        b: &ContinuousHV,
-    ) -> BindingUnityResult {
+    pub fn binding_unity_test(&self, a: &ContinuousHV, b: &ContinuousHV) -> BindingUnityResult {
         let bound = a.bind(b);
         let bundled = ContinuousHV::bundle(&[a, b]);
 
@@ -289,7 +279,10 @@ impl PhysicsConsciousnessBridge {
                 phi: 0.0,
                 system_ei: 0.0,
                 mip_ei: 0.0,
-                mip: super::true_phi::TruePartition { part_a: vec![], part_b: vec![] },
+                mip: super::true_phi::TruePartition {
+                    part_a: vec![],
+                    part_b: vec![],
+                },
                 component_entropies: vec![],
                 mutual_information_matrix: vec![],
             }
@@ -307,7 +300,10 @@ impl PhysicsConsciousnessBridge {
                 phi: 0.0,
                 system_ei: 0.0,
                 mip_ei: 0.0,
-                mip: super::true_phi::TruePartition { part_a: vec![], part_b: vec![] },
+                mip: super::true_phi::TruePartition {
+                    part_a: vec![],
+                    part_b: vec![],
+                },
                 component_entropies: vec![],
                 mutual_information_matrix: vec![],
             }
@@ -333,7 +329,12 @@ impl PhysicsConsciousnessBridge {
     pub fn embody_qualia(&self, physical_substrate: &ContinuousHV) -> ContinuousHV {
         // Bundle physical with phenomenal concepts, weighting phenomenal higher
         ContinuousHV::weighted_bundle(
-            &[physical_substrate, &self.qualia, &self.embodiment, &self.experience],
+            &[
+                physical_substrate,
+                &self.qualia,
+                &self.embodiment,
+                &self.experience,
+            ],
             &[1.0, 2.0, 1.5, 1.0],
         )
     }
@@ -347,12 +348,14 @@ impl PhysicsConsciousnessBridge {
         }
 
         // Split by class
-        let phenomenal: Vec<&ContinuousHV> = vectors.iter()
+        let phenomenal: Vec<&ContinuousHV> = vectors
+            .iter()
             .filter(|(_, is_phen)| *is_phen)
             .map(|(v, _)| *v)
             .collect();
 
-        let functional: Vec<&ContinuousHV> = vectors.iter()
+        let functional: Vec<&ContinuousHV> = vectors
+            .iter()
             .filter(|(_, is_phen)| !*is_phen)
             .map(|(v, _)| *v)
             .collect();
@@ -370,13 +373,17 @@ impl PhysicsConsciousnessBridge {
         let centroid_dist = diff.norm();
 
         // Compute within-class variance
-        let phen_var: f32 = phenomenal.iter()
+        let phen_var: f32 = phenomenal
+            .iter()
             .map(|v| v.subtract(&phen_centroid).norm())
-            .sum::<f32>() / phenomenal.len() as f32;
+            .sum::<f32>()
+            / phenomenal.len() as f32;
 
-        let func_var: f32 = functional.iter()
+        let func_var: f32 = functional
+            .iter()
             .map(|v| v.subtract(&func_centroid).norm())
-            .sum::<f32>() / functional.len() as f32;
+            .sum::<f32>()
+            / functional.len() as f32;
 
         let avg_within = (phen_var + func_var) / 2.0;
 
@@ -547,10 +554,8 @@ impl PhysicsConsciousnessBridge {
         let calc = TemporalPhiCalculator::new();
 
         // Create temporal transition
-        let transition = TemporalTransition::new(
-            past_state.state.clone(),
-            current_state.state.clone(),
-        );
+        let transition =
+            TemporalTransition::new(past_state.state.clone(), current_state.state.clone());
 
         // Compute cause-effect information
         let ce_info = calc.compute_cause_effect(&transition);
@@ -614,9 +619,12 @@ impl PhysicsConsciousnessBridge {
     }
 
     /// Create a temporal consciousness state from a physical vector
-    #[allow(deprecated)]
-    pub fn create_conscious_state(&self, physical: &ContinuousHV, time: f64) -> TemporalConsciousnessState {
-        let phenomenal_index = self.phenomenal_index(physical);
+    pub fn create_conscious_state(
+        &self,
+        physical: &ContinuousHV,
+        time: f64,
+    ) -> TemporalConsciousnessState {
+        let phenomenal_index = self.estimate_phenomenal_index(physical);
         TemporalConsciousnessState {
             state: physical.clone(),
             time,
@@ -655,7 +663,14 @@ impl PhysicsConsciousnessBridge {
 mod tests {
     use super::*;
 
-    fn setup() -> (StandardModel, Hadrons, PeriodicTable, Chemistry, PhysicsConsciousnessBridge, GenesisSeed) {
+    fn setup() -> (
+        StandardModel,
+        Hadrons,
+        PeriodicTable,
+        Chemistry,
+        PhysicsConsciousnessBridge,
+        GenesisSeed,
+    ) {
         let genesis = GenesisSeed::from_phrase("consciousness bridge test");
         let model = StandardModel::from_genesis(&genesis);
         let hadrons = Hadrons::from_model(&model, &genesis);
@@ -674,20 +689,20 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_phenomenal_index() {
         let (_, _, _, _, bridge, _) = setup();
 
         // Qualia should have high phenomenal index
-        let qualia_index = bridge.phenomenal_index(&bridge.qualia);
+        let qualia_index = bridge.estimate_phenomenal_index(&bridge.qualia);
 
         // Computation should have low phenomenal index
-        let comp_index = bridge.phenomenal_index(&bridge.computation);
+        let comp_index = bridge.estimate_phenomenal_index(&bridge.computation);
 
         assert!(
             qualia_index > comp_index,
             "Qualia should be more phenomenal: {} vs {}",
-            qualia_index, comp_index
+            qualia_index,
+            comp_index
         );
     }
 
@@ -707,9 +722,8 @@ mod tests {
     fn test_compositional_analysis() {
         let (model, hadrons, table, chemistry, bridge, _) = setup();
 
-        let analysis = bridge.compositional_phenomenal_analysis(
-            &model, &hadrons, &table, &chemistry
-        );
+        let analysis =
+            bridge.compositional_phenomenal_analysis(&model, &hadrons, &table, &chemistry);
 
         // All levels should have valid values
         assert!(!analysis.level_0_quarks.is_nan());
@@ -730,7 +744,6 @@ mod tests {
     }
 
     #[test]
-    #[allow(deprecated)]
     fn test_embody_qualia() {
         let (model, _, _, _, bridge, _) = setup();
 
@@ -745,14 +758,15 @@ mod tests {
         );
 
         // Should have some phenomenal character
-        let phen_index = bridge.phenomenal_index(&embodied);
-        let electron_index = bridge.phenomenal_index(&model.electron);
+        let phen_index = bridge.estimate_phenomenal_index(&embodied);
+        let electron_index = bridge.estimate_phenomenal_index(&model.electron);
 
         // Embodiment should increase phenomenal index
         assert!(
             phen_index > electron_index,
             "Embodiment should increase phenomenal index: {} vs {}",
-            phen_index, electron_index
+            phen_index,
+            electron_index
         );
     }
 
@@ -783,23 +797,36 @@ mod tests {
     fn test_compositional_phi_analysis() {
         let (model, hadrons, table, chemistry, bridge, _) = setup();
 
-        let analysis = bridge.compositional_phi_analysis(
-            &model, &hadrons, &table, &chemistry
-        );
+        let analysis = bridge.compositional_phi_analysis(&model, &hadrons, &table, &chemistry);
 
         // All levels should have non-negative Φ
-        assert!(analysis.level_0_quarks_phi >= 0.0,
-            "Quark Φ should be non-negative: {:.4}", analysis.level_0_quarks_phi);
-        assert!(analysis.level_1_hadrons_phi >= 0.0,
-            "Hadron Φ should be non-negative: {:.4}", analysis.level_1_hadrons_phi);
-        assert!(analysis.level_2_atoms_phi >= 0.0,
-            "Atom Φ should be non-negative: {:.4}", analysis.level_2_atoms_phi);
-        assert!(analysis.level_3_molecules_phi >= 0.0,
-            "Molecule Φ should be non-negative: {:.4}", analysis.level_3_molecules_phi);
+        assert!(
+            analysis.level_0_quarks_phi >= 0.0,
+            "Quark Φ should be non-negative: {:.4}",
+            analysis.level_0_quarks_phi
+        );
+        assert!(
+            analysis.level_1_hadrons_phi >= 0.0,
+            "Hadron Φ should be non-negative: {:.4}",
+            analysis.level_1_hadrons_phi
+        );
+        assert!(
+            analysis.level_2_atoms_phi >= 0.0,
+            "Atom Φ should be non-negative: {:.4}",
+            analysis.level_2_atoms_phi
+        );
+        assert!(
+            analysis.level_3_molecules_phi >= 0.0,
+            "Molecule Φ should be non-negative: {:.4}",
+            analysis.level_3_molecules_phi
+        );
 
         // EI should be non-negative
-        assert!(analysis.level_0_quarks_ei >= 0.0,
-            "Quark EI should be non-negative: {:.4}", analysis.level_0_quarks_ei);
+        assert!(
+            analysis.level_0_quarks_ei >= 0.0,
+            "Quark EI should be non-negative: {:.4}",
+            analysis.level_0_quarks_ei
+        );
 
         // Compute gradient
         let gradient = analysis.phi_gradient();
@@ -818,12 +845,8 @@ mod tests {
         let (model, hadrons, table, chemistry, bridge, _) = setup();
 
         // Both methods should complete without error
-        let legacy = bridge.compositional_phenomenal_analysis(
-            &model, &hadrons, &table, &chemistry
-        );
-        let rigorous = bridge.compositional_phi_analysis(
-            &model, &hadrons, &table, &chemistry
-        );
+        let legacy = bridge.compositional_phenomenal_analysis(&model, &hadrons, &table, &chemistry);
+        let rigorous = bridge.compositional_phi_analysis(&model, &hadrons, &table, &chemistry);
 
         // They measure different things but should both be valid
         assert!(!legacy.level_0_quarks.is_nan());

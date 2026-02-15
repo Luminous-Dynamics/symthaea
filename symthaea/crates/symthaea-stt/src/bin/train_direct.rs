@@ -12,11 +12,9 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 use symthaea_stt::{
-    AudioFrontend, AudioConfig,
-    LtcCell, LtcConfig,
-    DirectClassifier, DirectClassifierConfig, DirectAccumulator, RandomProjection, RFActivation,
-    CrystalReservoir,
-    load_alignments, id_to_audio_path,
+    id_to_audio_path, load_alignments, AudioConfig, AudioFrontend, CrystalReservoir,
+    DirectAccumulator, DirectClassifier, DirectClassifierConfig, LtcCell, LtcConfig, RFActivation,
+    RandomProjection,
 };
 
 #[derive(Parser)]
@@ -102,7 +100,11 @@ struct Cli {
 
 /// Stack multiple frames together for temporal context
 fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> Vec<f32> {
-    let n_dims = if features.is_empty() { 0 } else { features[0].len() };
+    let n_dims = if features.is_empty() {
+        0
+    } else {
+        features[0].len()
+    };
     let half = context_frames / 2;
     let mut stacked = Vec::with_capacity(n_dims * context_frames);
 
@@ -118,10 +120,24 @@ fn stack_frames(features: &[Vec<f32>], center: usize, context_frames: usize) -> 
 fn main() {
     let cli = Cli::parse();
 
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("    DIRECT CLASSIFIER TRAINING                             ").bold().cyan());
-    println!("{}", style("    Reservoir Computing + Ridge Regression (No HDC)        ").cyan());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("    DIRECT CLASSIFIER TRAINING                             ")
+            .bold()
+            .cyan()
+    );
+    println!(
+        "{}",
+        style("    Reservoir Computing + Ridge Regression (No HDC)        ").cyan()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!();
     println!("  Architecture: Mel+Δ+ΔΔ -> Context Stack -> LTC Reservoir -> Linear Classifier");
     println!("  Training: Ridge Regression (closed-form, no backprop)");
@@ -130,11 +146,19 @@ fn main() {
 
     // Check paths
     if !cli.alignments.exists() {
-        eprintln!("{} Alignments file not found: {:?}", style("ERROR:").red().bold(), cli.alignments);
+        eprintln!(
+            "{} Alignments file not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.alignments
+        );
         std::process::exit(1);
     }
     if !cli.audio_dir.exists() {
-        eprintln!("{} Audio directory not found: {:?}", style("ERROR:").red().bold(), cli.audio_dir);
+        eprintln!(
+            "{} Audio directory not found: {:?}",
+            style("ERROR:").red().bold(),
+            cli.audio_dir
+        );
         std::process::exit(1);
     }
 
@@ -143,7 +167,11 @@ fn main() {
     let alignments = match load_alignments(&cli.alignments) {
         Ok(a) => a,
         Err(e) => {
-            eprintln!("{} Failed to load alignments: {}", style("ERROR:").red().bold(), e);
+            eprintln!(
+                "{} Failed to load alignments: {}",
+                style("ERROR:").red().bold(),
+                e
+            );
             std::process::exit(1);
         }
     };
@@ -188,8 +216,17 @@ fn main() {
         let n_filters = cli.random_features.max(4096);
         (n_filters, None)
     } else if cli.random_features > 0 {
-        let base_dim = if cli.skip_reservoir { input_size } else { cli.reservoir_size };
-        let proj = RandomProjection::with_activation(base_dim, cli.random_features, 42, rf_activation.clone());
+        let base_dim = if cli.skip_reservoir {
+            input_size
+        } else {
+            cli.reservoir_size
+        };
+        let proj = RandomProjection::with_activation(
+            base_dim,
+            cli.random_features,
+            42,
+            rf_activation.clone(),
+        );
         (cli.random_features, Some(proj))
     } else if cli.skip_reservoir {
         (input_size, None)
@@ -211,22 +248,44 @@ fn main() {
     if cli.use_gabor {
         let n_filters = cli.random_features.max(4096);
         println!("    Mode: GABOR STRF (Crystal Reservoir)");
-        println!("    Input: {} dims → Gabor filters → {} dims", input_size, n_filters);
+        println!(
+            "    Input: {} dims → Gabor filters → {} dims",
+            input_size, n_filters
+        );
     } else if cli.random_features > 0 {
-        let base = if cli.skip_reservoir { input_size } else { cli.reservoir_size };
-        let act_name = match rf_activation { RFActivation::ReLU => "ReLU", _ => "tanh" };
+        let base = if cli.skip_reservoir {
+            input_size
+        } else {
+            cli.reservoir_size
+        };
+        let act_name = match rf_activation {
+            RFActivation::ReLU => "ReLU",
+            _ => "tanh",
+        };
         println!("    Mode: RANDOM FEATURES (ELM)");
-        println!("    Base input: {} dims → random {} → {} dims", base, act_name, cli.random_features);
+        println!(
+            "    Base input: {} dims → random {} → {} dims",
+            base, act_name, cli.random_features
+        );
     } else if cli.skip_reservoir {
         println!("    Mode: DIRECT (no reservoir)");
-        println!("    Classifier input: {} dims (raw stacked features)", input_size);
+        println!(
+            "    Classifier input: {} dims (raw stacked features)",
+            input_size
+        );
     } else {
         println!("    Mode: RESERVOIR");
         println!("    Reservoir size: {}", cli.reservoir_size);
         println!("    Spectral radius: {}", cli.spectral_radius);
     }
-    println!("    Feature dim: {} (mel={}, deltas={})", feature_dim, n_mels, cli.use_deltas);
-    println!("    Context frames: {} -> {} input dims", cli.context_frames, input_size);
+    println!(
+        "    Feature dim: {} (mel={}, deltas={})",
+        feature_dim, n_mels, cli.use_deltas
+    );
+    println!(
+        "    Context frames: {} -> {} input dims",
+        cli.context_frames, input_size
+    );
     println!("    Ridge lambda: {}", cli.ridge_lambda);
     println!("    CMN: {}", cli.cmn);
     println!("    Phoneme classes: {}", phonemes.len());
@@ -239,7 +298,12 @@ fn main() {
     let mut reservoir = if !cli.skip_reservoir {
         let mut ltc_config = LtcConfig::default();
         ltc_config.hidden_size = cli.reservoir_size;
-        Some(LtcCell::new_reservoir(input_size, ltc_config, cli.spectral_radius, 1.0))
+        Some(LtcCell::new_reservoir(
+            input_size,
+            ltc_config,
+            cli.spectral_radius,
+            1.0,
+        ))
     } else {
         None
     };
@@ -262,10 +326,12 @@ fn main() {
     println!("\n  Processing {} utterances...", total);
 
     let pb = ProgressBar::new(total as u64);
-    pb.set_style(ProgressStyle::default_bar()
-        .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
-        .unwrap()
-        .progress_chars("#>-"));
+    pb.set_style(
+        ProgressStyle::default_bar()
+            .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} ({eta}) {msg}")
+            .unwrap()
+            .progress_chars("#>-"),
+    );
 
     let mut processed = 0;
     let mut skipped = 0;
@@ -359,13 +425,15 @@ fn main() {
             states
         } else {
             // Use raw stacked features directly
-            (0..features.len()).map(|frame_idx| {
-                if cli.context_frames > 1 {
-                    stack_frames(&features, frame_idx, cli.context_frames)
-                } else {
-                    features[frame_idx].clone()
-                }
-            }).collect()
+            (0..features.len())
+                .map(|frame_idx| {
+                    if cli.context_frames > 1 {
+                        stack_frames(&features, frame_idx, cli.context_frames)
+                    } else {
+                        features[frame_idx].clone()
+                    }
+                })
+                .collect()
         };
 
         // For each phoneme segment, add center frames to accumulator
@@ -382,8 +450,12 @@ fn main() {
             // Use center portion of segment
             let segment_len = end_frame.saturating_sub(start_frame);
             let margin = segment_len / 4;
-            let center_start = (start_frame + margin).min(frame_representations.len().saturating_sub(1));
-            let center_end = end_frame.saturating_sub(margin).min(frame_representations.len()).max(center_start + 1);
+            let center_start =
+                (start_frame + margin).min(frame_representations.len().saturating_sub(1));
+            let center_end = end_frame
+                .saturating_sub(margin)
+                .min(frame_representations.len())
+                .max(center_start + 1);
 
             for frame_idx in center_start..center_end {
                 if frame_idx < frame_representations.len() {
@@ -397,7 +469,9 @@ fn main() {
                         // No projection
                         frame_representations[frame_idx].clone()
                     };
-                    for &v in &feature { batch_f64.push(v as f64); }
+                    for &v in &feature {
+                        batch_f64.push(v as f64);
+                    }
                     batch_targets.push(target_idx);
                     total_samples += 1;
                     if batch_targets.len() >= BATCH_SIZE {
@@ -431,7 +505,13 @@ fn main() {
     // Solve Ridge Regression
     println!("\n  Solving Ridge Regression...");
     println!("    Computing W = (X^T X + λI)^{{-1}} X^T Y");
-    println!("    Matrix: {}x{} -> {}x{}", classifier_dim, classifier_dim, phonemes.len(), classifier_dim);
+    println!(
+        "    Matrix: {}x{} -> {}x{}",
+        classifier_dim,
+        classifier_dim,
+        phonemes.len(),
+        classifier_dim
+    );
 
     let weights = accumulator.solve(cli.ridge_lambda);
     classifier.set_weights(weights);
@@ -441,7 +521,10 @@ fn main() {
 
     // Set log priors for Bayesian debiasing at inference time
     classifier.set_log_priors(accumulator.class_counts(), cli.prior_scale);
-    println!("  ✓ Weight matrix computed (prior_scale={})", cli.prior_scale);
+    println!(
+        "  ✓ Weight matrix computed (prior_scale={})",
+        cli.prior_scale
+    );
 
     // Show class distribution
     if cli.verbose {
@@ -529,13 +612,15 @@ fn main() {
                 }
                 s
             } else {
-                (0..features.len()).map(|frame_idx| {
-                    if cli.context_frames > 1 {
-                        stack_frames(&features, frame_idx, cli.context_frames)
-                    } else {
-                        features[frame_idx].clone()
-                    }
-                }).collect()
+                (0..features.len())
+                    .map(|frame_idx| {
+                        if cli.context_frames > 1 {
+                            stack_frames(&features, frame_idx, cli.context_frames)
+                        } else {
+                            features[frame_idx].clone()
+                        }
+                    })
+                    .collect()
             };
 
             for segment in alignment.phonemes.iter().take(10) {
@@ -561,7 +646,10 @@ fn main() {
 
         if total_test > 0 {
             let accuracy = correct as f32 / total_test as f32 * 100.0;
-            println!("    Frame accuracy: {:.1}% ({}/{})", accuracy, correct, total_test);
+            println!(
+                "    Frame accuracy: {:.1}% ({}/{})",
+                accuracy, correct, total_test
+            );
         }
     }
 
@@ -579,8 +667,19 @@ fn main() {
 
     println!("  ✓ Saved Direct Classifier");
 
-    println!("\n{}", style("═══════════════════════════════════════════════════════════").cyan());
-    println!("{}", style("         DIRECT CLASSIFIER TRAINING COMPLETE               ").bold().green());
-    println!("{}", style("═══════════════════════════════════════════════════════════").cyan());
+    println!(
+        "\n{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
+    println!(
+        "{}",
+        style("         DIRECT CLASSIFIER TRAINING COMPLETE               ")
+            .bold()
+            .green()
+    );
+    println!(
+        "{}",
+        style("═══════════════════════════════════════════════════════════").cyan()
+    );
     println!("\n  Next: eval-direct --classifier {:?}", cli.output);
 }

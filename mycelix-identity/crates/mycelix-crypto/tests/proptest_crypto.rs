@@ -109,9 +109,9 @@ proptest! {
 }
 
 // SLH-DSA-SHA2-128s: sign→verify succeeds + tamper detection
-// Very slow (~1s/sign) so only 2 cases each
+// Slow (~1s/sign) so limited cases
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(2))]
+    #![proptest_config(ProptestConfig::with_cases(4))]
 
     #[test]
     fn slhdsa_sign_verify_roundtrip(msg in prop::collection::vec(any::<u8>(), 0..512)) {
@@ -291,6 +291,46 @@ proptest! {
 }
 
 // ============================================================================
+// KEM: tampered ciphertext and wrong recipient detection
+// ============================================================================
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(4))]
+
+    #[test]
+    fn kem_tampered_ciphertext_rejected(flip_idx in 0usize..1088) {
+        let recipient = MlKem768KeyPair::generate();
+        let sender = MlKem768KeyPair::generate();
+        let recipient_pk = recipient.public_key();
+        let (mut ciphertext, sender_secret) = sender.encapsulate(&recipient_pk).unwrap();
+        // Flip a bit in the ciphertext
+        let idx = flip_idx % ciphertext.len();
+        ciphertext[idx] ^= 0x01;
+        // ML-KEM implicit rejection: always returns a secret, but it must differ
+        match recipient.decapsulate(&ciphertext) {
+            Ok(tampered_secret) => prop_assert_ne!(tampered_secret, sender_secret,
+                "Tampered KEM ciphertext must produce different shared secret"),
+            Err(_) => {} // Error is also acceptable
+        }
+    }
+
+    #[test]
+    fn kem_wrong_recipient_rejected(_seed in 0u64..100) {
+        let recipient = MlKem768KeyPair::generate();
+        let wrong_recipient = MlKem768KeyPair::generate();
+        let sender = MlKem768KeyPair::generate();
+        let recipient_pk = recipient.public_key();
+        let (ciphertext, sender_secret) = sender.encapsulate(&recipient_pk).unwrap();
+        // Decapsulate with wrong keypair
+        match wrong_recipient.decapsulate(&ciphertext) {
+            Ok(wrong_secret) => prop_assert_ne!(wrong_secret, sender_secret,
+                "Wrong recipient must derive different shared secret"),
+            Err(_) => {} // Error is also acceptable
+        }
+    }
+}
+
+// ============================================================================
 // AEAD encrypt/decrypt round-trip
 // ============================================================================
 
@@ -315,6 +355,39 @@ proptest! {
         // Same plaintext, different nonces → different ciphertexts
         prop_assert_ne!(env1.ciphertext, env2.ciphertext,
             "Same plaintext should produce different ciphertexts (random nonce)");
+    }
+}
+
+// ============================================================================
+// AEAD tamper detection
+// ============================================================================
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(16))]
+
+    #[test]
+    fn aead_tampered_ciphertext_rejected(
+        plaintext in prop::collection::vec(any::<u8>(), 1..1024),
+        flip_idx in 0usize..1024,
+    ) {
+        let key = [42u8; 32];
+        let encryptor = XChaCha20Encryptor::from_raw_key(&key);
+        let mut envelope = encryptor.encrypt(&plaintext, b"", "test-key").unwrap();
+        let idx = flip_idx % envelope.ciphertext.len();
+        envelope.ciphertext[idx] ^= 0x01;
+        let result = encryptor.decrypt(&envelope, b"");
+        prop_assert!(result.is_err(), "Tampered AEAD ciphertext must be rejected");
+    }
+
+    #[test]
+    fn aead_wrong_key_rejected(plaintext in prop::collection::vec(any::<u8>(), 1..256)) {
+        let key1 = [42u8; 32];
+        let key2 = [99u8; 32];
+        let encryptor1 = XChaCha20Encryptor::from_raw_key(&key1);
+        let encryptor2 = XChaCha20Encryptor::from_raw_key(&key2);
+        let envelope = encryptor1.encrypt(&plaintext, b"", "k").unwrap();
+        let result = encryptor2.decrypt(&envelope, b"");
+        prop_assert!(result.is_err(), "Wrong key must reject AEAD ciphertext");
     }
 }
 

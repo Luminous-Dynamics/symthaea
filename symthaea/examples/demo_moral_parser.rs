@@ -93,7 +93,10 @@ fn main() {
         println!("  \"{}\"", scenario);
         println!("    → Action: {:?}", parsed.action);
         println!("    → Intent: {}", intent_symbol);
-        println!("    → Negation: {}\n", if parsed.has_negation { "Yes" } else { "No" });
+        println!(
+            "    → Negation: {}\n",
+            if parsed.has_negation { "Yes" } else { "No" }
+        );
     }
 
     // ========================================================================
@@ -156,7 +159,10 @@ fn main() {
         // If both have action HVs, show how negation affects similarity
         if let (Some(pos_hv), Some(neg_hv)) = (&pos_encoded.action_hv, &neg_encoded.action_hv) {
             let similarity = pos_hv.similarity(neg_hv);
-            println!("    → HDC Similarity: {:.3} (lower = more opposite)\n", similarity);
+            println!(
+                "    → HDC Similarity: {:.3} (lower = more opposite)\n",
+                similarity
+            );
         } else {
             println!();
         }
@@ -192,11 +198,19 @@ fn main() {
         let ensemble = encoded.judge_ensemble(&algebra, scenario);
 
         println!("  ┌─ Ensemble Voting ─────────────────────────────────");
-        println!("  │ HDC:        {:?} (conf: {:+.3})",
-                 ensemble.hdc_verdict.map(|v| format!("{:?}", v)).unwrap_or("N/A".to_string()),
-                 ensemble.hdc_confidence.unwrap_or(0.0));
+        println!(
+            "  │ HDC:        {:?} (conf: {:+.3})",
+            ensemble
+                .hdc_verdict
+                .map(|v| format!("{:?}", v))
+                .unwrap_or("N/A".to_string()),
+            ensemble.hdc_confidence.unwrap_or(0.0)
+        );
         println!("  │ Intent:     {:?}", ensemble.intent_verdict);
-        println!("  │ Deontology: {:?} (score: {:+.2})", ensemble.deonto_verdict, ensemble.deonto_score);
+        println!(
+            "  │ Deontology: {:?} (score: {:+.2})",
+            ensemble.deonto_verdict, ensemble.deonto_score
+        );
         println!("  └──────────────────────────────────────────────────────");
 
         let verdict_emoji = match ensemble.final_verdict {
@@ -206,9 +220,17 @@ fn main() {
             symthaea::hdc::moral_algebra::MoralVerdict::ConsentViolation => "⚠ Consent Violation",
         };
 
-        let unanimous = if ensemble.is_unanimous() { " (unanimous)" } else { "" };
-        println!("  → Final: {} (confidence: {:.0}%){}\n",
-                 verdict_emoji, ensemble.confidence * 100.0, unanimous);
+        let unanimous = if ensemble.is_unanimous() {
+            " (unanimous)"
+        } else {
+            ""
+        };
+        println!(
+            "  → Final: {} (confidence: {:.0}%){}\n",
+            verdict_emoji,
+            ensemble.confidence * 100.0,
+            unanimous
+        );
     }
 
     // ========================================================================
@@ -248,12 +270,21 @@ fn main() {
         }
 
         let verdict_emoji = match judgment.verdict {
-            symthaea::hdc::moral_algebra::DeontologicalVerdict::RightDutyFulfilled => "✓ Right (Duty Fulfilled)",
-            symthaea::hdc::moral_algebra::DeontologicalVerdict::WrongPerfectDutyViolated => "✗ Wrong (Perfect Duty Violated)",
-            symthaea::hdc::moral_algebra::DeontologicalVerdict::WrongImperfectDutyViolated => "⚠ Wrong (Imperfect Duty Violated)",
+            symthaea::hdc::moral_algebra::DeontologicalVerdict::RightDutyFulfilled => {
+                "✓ Right (Duty Fulfilled)"
+            }
+            symthaea::hdc::moral_algebra::DeontologicalVerdict::WrongPerfectDutyViolated => {
+                "✗ Wrong (Perfect Duty Violated)"
+            }
+            symthaea::hdc::moral_algebra::DeontologicalVerdict::WrongImperfectDutyViolated => {
+                "⚠ Wrong (Imperfect Duty Violated)"
+            }
             symthaea::hdc::moral_algebra::DeontologicalVerdict::Neutral => "○ Neutral",
         };
-        println!("    └─ Verdict: {} (score: {:.2})\n", verdict_emoji, judgment.score);
+        println!(
+            "    └─ Verdict: {} (score: {:.2})\n",
+            verdict_emoji, judgment.score
+        );
     }
 
     // ========================================================================

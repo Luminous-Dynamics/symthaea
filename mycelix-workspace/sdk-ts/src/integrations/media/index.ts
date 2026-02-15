@@ -26,11 +26,35 @@ import { MediaValidators } from '../../utils/validation.js';
 // Media-Specific Types
 // ============================================================================
 
-/** Content type categories */
-export type ContentType = 'article' | 'image' | 'video' | 'audio' | 'dataset' | 'software' | 'mixed';
+/** Content type categories (matches Rust ContentType in media-publication integrity) */
+export type ContentType =
+  | 'Article'
+  | 'Opinion'
+  | 'Investigation'
+  | 'Review'
+  | 'Analysis'
+  | 'Interview'
+  | 'Report'
+  | 'Editorial'
+  | 'Other';
 
-/** License type */
-export type LicenseType = 'cc0' | 'cc-by' | 'cc-by-sa' | 'cc-by-nc' | 'proprietary' | 'custom';
+/** License type (matches Rust LicenseType in media-publication integrity) */
+export type LicenseType =
+  | 'CC0'
+  | 'CCBY'
+  | 'CCBYSA'
+  | 'CCBYNC'
+  | 'CCBYNCSA'
+  | 'AllRightsReserved'
+  | 'Custom';
+
+/** License record (matches Rust License struct in media-publication integrity) */
+export interface LicenseRecord {
+  license_type: LicenseType;
+  attribution_required: boolean;
+  commercial_use: boolean;
+  derivative_works: boolean;
+}
 
 /** Content status */
 export type ContentStatus = 'draft' | 'published' | 'flagged' | 'hidden' | 'archived';
@@ -148,7 +172,7 @@ export class MediaService {
     description: string,
     contentHash: string,
     storageRef: string,
-    license: LicenseType = 'cc-by',
+    license: LicenseType = 'CCBY',
     tags: string[] = []
   ): Content {
     // Validate title and description are not empty
@@ -575,15 +599,15 @@ const BRIDGE_ZOME = 'civic_bridge';
  * // Query CC-licensed content
  * const content = await mediaClient.queryContent({
  *   source_happ: 'my-blog',
- *   license_types: ['cc-by', 'cc-by-sa'],
- *   content_type: 'article',
+ *   license_types: ['CCBY', 'CCBYSA'],
+ *   content_type: 'Article',
  * });
  *
  * // Request license for use in another hApp
  * const license = await mediaClient.requestLicense({
  *   content_id: content[0].id,
  *   licensee_did: 'did:mycelix:alice',
- *   license_type: 'cc-by',
+ *   license_type: 'CCBY',
  *   purpose: 'Educational use in course materials',
  * });
  * ```

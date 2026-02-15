@@ -35,9 +35,9 @@
 //! adaptive τ (time constant) naturally tracks the dominant frequency,
 //! and cross-channel coherence emerges from the integrator dynamics.
 
-use crate::unified_ltc::{UnifiedLTC, UnifiedLTCConfig, LearningAlgorithm};
 use super::SleepStage;
-use std::collections::{VecDeque, HashMap};
+use crate::unified_ltc::{LearningAlgorithm, UnifiedLTC, UnifiedLTCConfig};
+use std::collections::{HashMap, VecDeque};
 
 // ============================================================================
 // Adaptive Threshold System
@@ -100,9 +100,9 @@ impl Default for PopulationNorms {
             // Calibrated from Sleep-EDF feature analysis:
             // - Complexity varies widely across stages (0.1 - 0.6)
             // - Synchrony is typically 0.4 - 0.7 depending on stage
-            complexity: (0.35, 0.20),  // Allow wider range
-            synchrony: (0.55, 0.15),   // Center on moderate synchrony
-            phi_proxy: (0.4, 0.15),    // Phi tends to be lower in real data
+            complexity: (0.35, 0.20),      // Allow wider range
+            synchrony: (0.55, 0.15),       // Center on moderate synchrony
+            phi_proxy: (0.4, 0.15),        // Phi tends to be lower in real data
             frequency_bounds: (8.0, 12.0), // Hz boundaries for alpha band
         }
     }
@@ -223,11 +223,17 @@ impl SubjectBaseline {
     }
 
     /// Update baseline with new observation
-    pub fn update(&mut self, metrics: &IntegrationMetrics, stage: Option<SleepStage>, ema_alpha: f32) {
+    pub fn update(
+        &mut self,
+        metrics: &IntegrationMetrics,
+        stage: Option<SleepStage>,
+        ema_alpha: f32,
+    ) {
         self.complexity_stats.update(metrics.complexity, ema_alpha);
         self.synchrony_stats.update(metrics.synchrony, ema_alpha);
         self.phi_stats.update(metrics.phi_proxy, ema_alpha);
-        self.frequency_stats.update(metrics.dominant_freq_hz, ema_alpha);
+        self.frequency_stats
+            .update(metrics.dominant_freq_hz, ema_alpha);
 
         if let Some(stage) = stage {
             self.stage_complexity
@@ -370,7 +376,8 @@ impl AdaptiveThreshold {
         if self.config.calibration_epochs == 0 {
             1.0
         } else {
-            (self.calibration_epochs_collected as f32 / self.config.calibration_epochs as f32).min(1.0)
+            (self.calibration_epochs_collected as f32 / self.config.calibration_epochs as f32)
+                .min(1.0)
         }
     }
 
@@ -427,7 +434,8 @@ impl AdaptiveThreshold {
         was_correct: bool,
     ) {
         // Always update baseline statistics
-        self.baseline.update(metrics, Some(actual), self.config.ema_alpha);
+        self.baseline
+            .update(metrics, Some(actual), self.config.ema_alpha);
 
         if was_correct {
             self.baseline.correct_predictions += 1;
@@ -476,8 +484,8 @@ impl AdaptiveThreshold {
         // Determine which thresholds need adjustment based on the error type
         let actual_state = match actual {
             SleepStage::Wake => ConsciousnessState::Awake,
-            SleepStage::N1 => ConsciousnessState::Transitional,  // N1 = Transitional
-            SleepStage::N2 => ConsciousnessState::LightSleep,    // N2 = LightSleep
+            SleepStage::N1 => ConsciousnessState::Transitional, // N1 = Transitional
+            SleepStage::N2 => ConsciousnessState::LightSleep,   // N2 = LightSleep
             SleepStage::N3 => ConsciousnessState::DeepSleep,
             SleepStage::REM => ConsciousnessState::REM,
             _ => return, // Don't adapt for unknown/movement
@@ -584,12 +592,23 @@ impl AdaptiveThreshold {
         let z_thresh = self.config.anomaly_z_threshold;
 
         // Check each metric against baseline
-        let complexity_anomaly = self.baseline.complexity_stats.count >= self.config.min_samples_for_adaptation
-            && self.baseline.complexity_stats.is_anomaly(metrics.complexity, z_thresh);
-        let synchrony_anomaly = self.baseline.synchrony_stats.count >= self.config.min_samples_for_adaptation
-            && self.baseline.synchrony_stats.is_anomaly(metrics.synchrony, z_thresh);
+        let complexity_anomaly = self.baseline.complexity_stats.count
+            >= self.config.min_samples_for_adaptation
+            && self
+                .baseline
+                .complexity_stats
+                .is_anomaly(metrics.complexity, z_thresh);
+        let synchrony_anomaly = self.baseline.synchrony_stats.count
+            >= self.config.min_samples_for_adaptation
+            && self
+                .baseline
+                .synchrony_stats
+                .is_anomaly(metrics.synchrony, z_thresh);
         let phi_anomaly = self.baseline.phi_stats.count >= self.config.min_samples_for_adaptation
-            && self.baseline.phi_stats.is_anomaly(metrics.phi_proxy, z_thresh);
+            && self
+                .baseline
+                .phi_stats
+                .is_anomaly(metrics.phi_proxy, z_thresh);
 
         complexity_anomaly || synchrony_anomaly || phi_anomaly
     }
@@ -678,7 +697,10 @@ impl AdaptiveThreshold {
             complexity: self.baseline.complexity_stats.z_score(metrics.complexity),
             synchrony: self.baseline.synchrony_stats.z_score(metrics.synchrony),
             phi_proxy: self.baseline.phi_stats.z_score(metrics.phi_proxy),
-            dominant_freq_hz: self.baseline.frequency_stats.z_score(metrics.dominant_freq_hz),
+            dominant_freq_hz: self
+                .baseline
+                .frequency_stats
+                .z_score(metrics.dominant_freq_hz),
             // Keep causal influence as-is (relative measures)
             frontal_to_occipital: metrics.frontal_to_occipital,
             occipital_to_frontal: metrics.occipital_to_frontal,
@@ -826,20 +848,20 @@ pub struct SleepSentinelConfig {
 impl Default for SleepSentinelConfig {
     fn default() -> Self {
         Self {
-            local_neurons: 64,      // Small but sufficient
-            global_neurons: 128,    // Larger for integration
-            dt_ms: 10.0,            // 100 Hz effective rate
+            local_neurons: 64,       // Small but sufficient
+            global_neurons: 128,     // Larger for integration
+            dt_ms: 10.0,             // 100 Hz effective rate
             integration_window: 300, // 3 seconds at 100 Hz
-            tau_base: 100.0,        // 100ms base (10 Hz sensitivity)
-            tau_min: 10.0,          // 10ms min (100 Hz - gamma)
-            tau_max: 1000.0,        // 1s max (1 Hz - delta)
+            tau_base: 100.0,         // 100ms base (10 Hz sensitivity)
+            tau_min: 10.0,           // 10ms min (100 Hz - gamma)
+            tau_max: 1000.0,         // 1s max (1 Hz - delta)
             learning_rate: 0.001,
-            steps_per_epoch: 3000,  // 30 seconds at 100 Hz
+            steps_per_epoch: 3000, // 30 seconds at 100 Hz
             // Thresholds calibrated for real EEG:
             // - Real signals have lower variance than idealized synthetic
             // - These values represent the median, allowing scoring to work in both directions
-            complexity_threshold: 0.35,  // Lowered from 0.6 - real EEG has lower variance
-            synchrony_threshold: 0.55,   // Lowered from 0.7 - correlation varies more
+            complexity_threshold: 0.35, // Lowered from 0.6 - real EEG has lower variance
+            synchrony_threshold: 0.55,  // Lowered from 0.7 - correlation varies more
             enable_adaptive_thresholds: true,
             adaptive_config: AdaptiveThresholdConfig::default(),
             use_spectral_analysis: false,
@@ -994,7 +1016,12 @@ fn compute_band_powers(signal: &[f32], sample_rate: f32) -> (f32, f32, f32, f32)
 
     // Normalize to sum to 1 (relative power)
     let total = delta_power + theta_power + alpha_power + beta_power + 1e-10;
-    (delta_power / total, theta_power / total, alpha_power / total, beta_power / total)
+    (
+        delta_power / total,
+        theta_power / total,
+        alpha_power / total,
+        beta_power / total,
+    )
 }
 
 /// Simple moving average filter
@@ -1018,7 +1045,10 @@ fn moving_average(signal: &[f32], window: usize) -> Vec<f32> {
 ///
 /// Returns (delta, theta, alpha, beta, gamma, spectral_entropy) as normalized ratios.
 /// This is more accurate than the moving-average approximation in `compute_band_powers`.
-fn compute_band_powers_spectral(signal: &[f32], sample_rate: f32) -> (f32, f32, f32, f32, f32, f32) {
+fn compute_band_powers_spectral(
+    signal: &[f32],
+    sample_rate: f32,
+) -> (f32, f32, f32, f32, f32, f32) {
     use crate::dynamics::spectral_analysis::{SpectralAnalyzer, SpectralConfig, WindowType};
 
     if signal.len() < 32 {
@@ -1099,7 +1129,7 @@ impl SleepSentinel {
         // Create frontal LTC (tracks Fpz-Cz dynamics)
         let mut frontal_config = UnifiedLTCConfig::scalar(
             config.local_neurons,
-            1,  // Single channel input
+            1,                    // Single channel input
             config.local_neurons, // Full state output
         );
         frontal_config.dt = config.dt_ms / 1000.0;
@@ -1124,8 +1154,10 @@ impl SleepSentinel {
         integrator_config.learning = LearningAlgorithm::None;
 
         let frontal_ltc = UnifiedLTC::new(frontal_config).expect("Failed to create frontal LTC");
-        let occipital_ltc = UnifiedLTC::new(occipital_config).expect("Failed to create occipital LTC");
-        let integrator_ltc = UnifiedLTC::new(integrator_config).expect("Failed to create integrator LTC");
+        let occipital_ltc =
+            UnifiedLTC::new(occipital_config).expect("Failed to create occipital LTC");
+        let integrator_ltc =
+            UnifiedLTC::new(integrator_config).expect("Failed to create integrator LTC");
 
         // Initialize adaptive threshold if enabled
         let adaptive_threshold = if config.enable_adaptive_thresholds {
@@ -1157,10 +1189,8 @@ impl SleepSentinel {
     pub fn new_for_subject(config: SleepSentinelConfig, subject_id: impl Into<String>) -> Self {
         let mut sentinel = Self::new(config.clone());
         if config.enable_adaptive_thresholds {
-            sentinel.adaptive_threshold = Some(AdaptiveThreshold::new(
-                config.adaptive_config,
-                subject_id,
-            ));
+            sentinel.adaptive_threshold =
+                Some(AdaptiveThreshold::new(config.adaptive_config, subject_id));
         }
         sentinel
     }
@@ -1184,17 +1214,24 @@ impl SleepSentinel {
         let occipital_norm = (occipital / 100.0).clamp(-1.0, 1.0);
 
         // Step frontal LTC
-        let (frontal_out, _) = self.frontal_ltc.forward(&[frontal_norm])
+        let (frontal_out, _) = self
+            .frontal_ltc
+            .forward(&[frontal_norm])
             .expect("Frontal forward failed");
 
         // Step occipital LTC
-        let (occipital_out, _) = self.occipital_ltc.forward(&[occipital_norm])
+        let (occipital_out, _) = self
+            .occipital_ltc
+            .forward(&[occipital_norm])
             .expect("Occipital forward failed");
 
         // Combine states for integrator
         let mut combined = Vec::with_capacity(self.config.local_neurons * 2);
-        combined.extend_from_slice(&frontal_out[..self.config.local_neurons.min(frontal_out.len())]);
-        combined.extend_from_slice(&occipital_out[..self.config.local_neurons.min(occipital_out.len())]);
+        combined
+            .extend_from_slice(&frontal_out[..self.config.local_neurons.min(frontal_out.len())]);
+        combined.extend_from_slice(
+            &occipital_out[..self.config.local_neurons.min(occipital_out.len())],
+        );
 
         // Pad if necessary
         while combined.len() < self.config.local_neurons * 2 {
@@ -1202,14 +1239,17 @@ impl SleepSentinel {
         }
 
         // Step integrator
-        let (integrator_out, _) = self.integrator_ltc.forward(&combined)
+        let (integrator_out, _) = self
+            .integrator_ltc
+            .forward(&combined)
             .expect("Integrator forward failed");
 
         // Record history
         self.frontal_history.push_back(frontal_out);
         self.occipital_history.push_back(occipital_out);
         self.integrator_history.push_back(integrator_out);
-        self.raw_input_history.push_back((frontal_norm, occipital_norm));
+        self.raw_input_history
+            .push_back((frontal_norm, occipital_norm));
 
         // Trim history
         while self.frontal_history.len() > self.config.integration_window {
@@ -1247,12 +1287,16 @@ impl SleepSentinel {
         let raw_frontal_mean: f32 = raw_frontal.iter().sum::<f32>() / n as f32;
         let raw_occipital_mean: f32 = raw_occipital.iter().sum::<f32>() / n as f32;
 
-        let raw_frontal_var: f32 = raw_frontal.iter()
+        let raw_frontal_var: f32 = raw_frontal
+            .iter()
             .map(|x| (x - raw_frontal_mean).powi(2))
-            .sum::<f32>() / n as f32;
-        let raw_occipital_var: f32 = raw_occipital.iter()
+            .sum::<f32>()
+            / n as f32;
+        let raw_occipital_var: f32 = raw_occipital
+            .iter()
             .map(|x| (x - raw_occipital_mean).powi(2))
-            .sum::<f32>() / n as f32;
+            .sum::<f32>()
+            / n as f32;
 
         // Combined variance as complexity measure (inputs in [-1, 1], variance max ~0.33)
         let combined_variance = (raw_frontal_var + raw_occipital_var) / 2.0;
@@ -1307,7 +1351,8 @@ impl SleepSentinel {
 
         // 4. Compute Φ proxy (integration = synchrony * bidirectional causality)
         let bidirectional = (self.current_metrics.frontal_to_occipital
-            + self.current_metrics.occipital_to_frontal) / 2.0;
+            + self.current_metrics.occipital_to_frontal)
+            / 2.0;
         self.current_metrics.phi_proxy = self.current_metrics.synchrony * bidirectional;
 
         // 5. Estimate dominant frequency from zero crossings (around mean)
@@ -1374,7 +1419,7 @@ impl SleepSentinel {
         let phi_score = (m.phi_proxy - phi_thresh) / phi_thresh.max(0.1);
 
         // Frequency scores: how far from the alpha band (8-12 Hz)?
-        let freq_low = freq_bounds.0;  // 8 Hz
+        let freq_low = freq_bounds.0; // 8 Hz
         let freq_high = freq_bounds.1; // 12 Hz
 
         // low_freq_score: positive when frequency is low (delta/theta range)
@@ -1394,29 +1439,47 @@ impl SleepSentinel {
         // Adaptive threshold multipliers for Welch PSD
         // With PSD: delta_ratio for N3 needs ~3.5 (vs 2.0 for moving-avg)
         // With PSD: fast_ratio for Wake needs ~0.25 (vs 0.6 for moving-avg)
-        let (n3_delta_thresh, n3_delta_strong, _n3_delta_mid, n3_delta_low,
-             wake_fast_high, wake_fast_mid, wake_beta_thresh, wake_activity_thresh,
-             rem_theta_delta_thresh, rem_delta_ratio_thresh, rem_activity_thresh,
-             n2_delta_upper, n2_delta_mid, n2_delta_border,
-             n1_theta_thresh, n1_alpha_ceil) = if spectral {
+        let (
+            n3_delta_thresh,
+            n3_delta_strong,
+            _n3_delta_mid,
+            n3_delta_low,
+            wake_fast_high,
+            wake_fast_mid,
+            wake_beta_thresh,
+            wake_activity_thresh,
+            rem_theta_delta_thresh,
+            rem_delta_ratio_thresh,
+            rem_activity_thresh,
+            n2_delta_upper,
+            n2_delta_mid,
+            n2_delta_border,
+            n1_theta_thresh,
+            n1_alpha_ceil,
+        ) = if spectral {
             // Welch PSD thresholds: delta always dominates, use tighter ratios
-            (3.5, 3.0, 2.5, 2.0,  // N3 delta_ratio thresholds (raised) - 4 values
-             0.25, 0.15, 0.03, 0.05, // Wake fast thresholds (lowered: alpha+beta/delta)
-             0.30, 2.8, 0.08,  // REM thresholds (adjusted for PSD)
-             3.0, 2.8, 3.5,    // N2 delta_ratio upper bounds (raised)
-             0.08, 0.20)       // N1 theta/alpha thresholds (lowered)
+            (
+                3.5, 3.0, 2.5, 2.0, // N3 delta_ratio thresholds (raised) - 4 values
+                0.25, 0.15, 0.03, 0.05, // Wake fast thresholds (lowered: alpha+beta/delta)
+                0.30, 2.8, 0.08, // REM thresholds (adjusted for PSD)
+                3.0, 2.8, 3.5, // N2 delta_ratio upper bounds (raised)
+                0.08, 0.20,
+            ) // N1 theta/alpha thresholds (lowered)
         } else {
             // Moving-average thresholds: original values
-            (2.0, 1.8, 1.5, 1.2,  // N3 - 4 values
-             0.6, 0.4, 0.06, 0.12,
-             0.50, 1.6, 0.12,
-             2.0, 1.8, 2.5,
-             0.12, 0.25)
+            (
+                2.0, 1.8, 1.5, 1.2, // N3 - 4 values
+                0.6, 0.4, 0.06, 0.12, 0.50, 1.6, 0.12, 2.0, 1.8, 2.5, 0.12, 0.25,
+            )
         };
 
         // Wake: High complexity, high frequency (alpha/beta), lowest delta ratio
         let fast_activity = m.alpha_power + m.beta_power;
-        let fast_ratio = if m.delta_power > 0.01 { fast_activity / m.delta_power } else { 2.0 };
+        let fast_ratio = if m.delta_power > 0.01 {
+            fast_activity / m.delta_power
+        } else {
+            2.0
+        };
         // Spectral entropy boost for Wake: high entropy = more complex/awake signal
         let entropy_wake_boost = if spectral && m.spectral_entropy > 0.7 {
             0.20
@@ -1434,15 +1497,19 @@ impl SleepSentinel {
         } else {
             0.0
         };
-        let wake_score =
-            complexity_score.max(0.0) * 0.18 +
-            high_freq_score.max(0.0) * 0.15 +
-            (-synchrony_score) * 0.15 +
-            wake_boost + entropy_wake_boost;
+        let wake_score = complexity_score.max(0.0) * 0.18
+            + high_freq_score.max(0.0) * 0.15
+            + (-synchrony_score) * 0.15
+            + wake_boost
+            + entropy_wake_boost;
 
         // N3 (Deep Sleep): Delta OVERWHELMINGLY dominates + high synchrony
         let faster_power = m.theta_power + m.alpha_power + m.beta_power;
-        let delta_ratio = if faster_power > 0.01 { m.delta_power / faster_power } else { 2.0 };
+        let delta_ratio = if faster_power > 0.01 {
+            m.delta_power / faster_power
+        } else {
+            2.0
+        };
         let strong_delta = delta_ratio > n3_delta_thresh;
         // Spectral entropy boost for N3: low entropy = simple/deep-sleep signal
         let entropy_deep_boost = if spectral && m.spectral_entropy < 0.3 {
@@ -1461,16 +1528,21 @@ impl SleepSentinel {
         } else {
             0.0
         };
-        let deep_score =
-            synchrony_score.max(0.0) * 0.25 +
-            low_freq_score.max(0.0) * 0.20 +
-            phi_score.max(0.0) * 0.22 +
-            delta_boost + entropy_deep_boost;
+        let deep_score = synchrony_score.max(0.0) * 0.25
+            + low_freq_score.max(0.0) * 0.20
+            + phi_score.max(0.0) * 0.22
+            + delta_boost
+            + entropy_deep_boost;
 
         // REM: Theta/alpha mix without extreme delta dominance (the paradox)
         let rem_active = m.theta_power + m.alpha_power;
-        let theta_to_delta = if m.delta_power > 0.01 { m.theta_power / m.delta_power } else { 2.0 };
-        let is_rem_pattern = theta_to_delta > rem_theta_delta_thresh && delta_ratio < rem_delta_ratio_thresh;
+        let theta_to_delta = if m.delta_power > 0.01 {
+            m.theta_power / m.delta_power
+        } else {
+            2.0
+        };
+        let is_rem_pattern =
+            theta_to_delta > rem_theta_delta_thresh && delta_ratio < rem_delta_ratio_thresh;
         let rem_paradox_boost = if is_rem_pattern && rem_active > rem_activity_thresh {
             0.75
         } else if rem_active > rem_activity_thresh && delta_ratio < rem_delta_ratio_thresh * 1.125 {
@@ -1480,11 +1552,10 @@ impl SleepSentinel {
         } else {
             0.0
         };
-        let rem_score =
-            complexity_score.max(0.0) * 0.10 +
-            (-phi_score).max(0.0) * 0.05 +
-            (-synchrony_score).max(0.0) * 0.03 +
-            rem_paradox_boost;
+        let rem_score = complexity_score.max(0.0) * 0.10
+            + (-phi_score).max(0.0) * 0.05
+            + (-synchrony_score).max(0.0) * 0.03
+            + rem_paradox_boost;
 
         // N2 (Light Sleep): Moderate synchrony, delta present but not overwhelming
         let rem_penalty = if is_rem_pattern { 0.15 } else { 0.0 };
@@ -1497,27 +1568,29 @@ impl SleepSentinel {
         } else {
             0.0
         };
-        let n2_score =
-            synchrony_score.max(0.0) * 0.28 +
-            phi_score.max(0.0) * 0.20 +
-            low_freq_score.max(0.0) * 0.24 +
-            n2_boost -
-            rem_penalty;
+        let n2_score = synchrony_score.max(0.0) * 0.28
+            + phi_score.max(0.0) * 0.20
+            + low_freq_score.max(0.0) * 0.24
+            + n2_boost
+            - rem_penalty;
 
         // N1 (Transitional): Lower complexity than wake, theta appearing
-        let n1_boost = if m.theta_power > n1_theta_thresh && m.alpha_power < n1_alpha_ceil { 0.15 } else { 0.0 };
-        let n1_score =
-            (-complexity_score).max(0.0) * 0.30 +
-            synchrony_score.max(0.0) * 0.25 +
-            low_freq_score.max(0.0) * 0.30 +
-            n1_boost;
+        let n1_boost = if m.theta_power > n1_theta_thresh && m.alpha_power < n1_alpha_ceil {
+            0.15
+        } else {
+            0.0
+        };
+        let n1_score = (-complexity_score).max(0.0) * 0.30
+            + synchrony_score.max(0.0) * 0.25
+            + low_freq_score.max(0.0) * 0.30
+            + n1_boost;
 
         // Find the state with highest score
         let scores = [
             (wake_score, ConsciousnessState::Awake),
-            (n1_score, ConsciousnessState::Transitional),  // N1
-            (n2_score, ConsciousnessState::LightSleep),    // N2
-            (deep_score, ConsciousnessState::DeepSleep),   // N3
+            (n1_score, ConsciousnessState::Transitional), // N1
+            (n2_score, ConsciousnessState::LightSleep),   // N2
+            (deep_score, ConsciousnessState::DeepSleep),  // N3
             (rem_score, ConsciousnessState::REM),
         ];
 
@@ -1608,7 +1681,9 @@ impl SleepSentinel {
             adaptive.update_with_feedback(&metrics, predicted_state, actual_stage, correct);
 
             // Check if we should enable fallback due to poor performance
-            if adaptive.should_enable_fallback(recent_accuracy, 0.4) && !adaptive.is_using_fallback() {
+            if adaptive.should_enable_fallback(recent_accuracy, 0.4)
+                && !adaptive.is_using_fallback()
+            {
                 adaptive.enable_fallback();
             }
         }
@@ -1622,7 +1697,8 @@ impl SleepSentinel {
         if recent.is_empty() {
             return 0.0;
         }
-        let correct = recent.iter()
+        let correct = recent
+            .iter()
             .filter(|(pred, actual)| pred.to_sleep_stage() == *actual)
             .count();
         correct as f32 / recent.len() as f32
@@ -1698,7 +1774,9 @@ impl SleepSentinel {
 
     /// Export calibration data for persistence
     pub fn export_calibration(&self) -> Option<CalibrationData> {
-        self.adaptive_threshold.as_ref().map(|a| a.export_calibration())
+        self.adaptive_threshold
+            .as_ref()
+            .map(|a| a.export_calibration())
     }
 
     /// Import calibration data from persistence
@@ -1706,10 +1784,8 @@ impl SleepSentinel {
         if let Some(ref mut adaptive) = self.adaptive_threshold {
             adaptive.import_calibration(data);
         } else if self.config.enable_adaptive_thresholds {
-            let mut adaptive = AdaptiveThreshold::new(
-                self.config.adaptive_config.clone(),
-                &data.subject_id,
-            );
+            let mut adaptive =
+                AdaptiveThreshold::new(self.config.adaptive_config.clone(), &data.subject_id);
             adaptive.import_calibration(data);
             self.adaptive_threshold = Some(adaptive);
         }
@@ -1726,7 +1802,11 @@ impl SleepSentinel {
                 );
             }
         }
-        (self.config.complexity_threshold, self.config.synchrony_threshold, 0.5)
+        (
+            self.config.complexity_threshold,
+            self.config.synchrony_threshold,
+            0.5,
+        )
     }
 
     /// Get z-score normalized metrics for current subject
@@ -1743,7 +1823,10 @@ impl SleepSentinel {
             return 0.0;
         }
 
-        let correct = self.stats.predictions.iter()
+        let correct = self
+            .stats
+            .predictions
+            .iter()
             .filter(|(pred, actual)| pred.to_sleep_stage() == *actual)
             .count();
 
@@ -1760,23 +1843,30 @@ impl SleepSentinel {
             SleepStage::REM,
         ];
 
-        stages.iter().map(|&stage| {
-            let samples: Vec<_> = self.stats.predictions.iter()
-                .filter(|(_, actual)| *actual == stage)
-                .collect();
+        stages
+            .iter()
+            .map(|&stage| {
+                let samples: Vec<_> = self
+                    .stats
+                    .predictions
+                    .iter()
+                    .filter(|(_, actual)| *actual == stage)
+                    .collect();
 
-            let correct = samples.iter()
-                .filter(|(pred, _)| pred.to_sleep_stage() == stage)
-                .count();
+                let correct = samples
+                    .iter()
+                    .filter(|(pred, _)| pred.to_sleep_stage() == stage)
+                    .count();
 
-            let accuracy = if samples.is_empty() {
-                0.0
-            } else {
-                correct as f32 / samples.len() as f32
-            };
+                let accuracy = if samples.is_empty() {
+                    0.0
+                } else {
+                    correct as f32 / samples.len() as f32
+                };
 
-            (stage, accuracy, samples.len())
-        }).collect()
+                (stage, accuracy, samples.len())
+            })
+            .collect()
     }
 
     /// Reset all state (preserves adaptive thresholds and calibration)
@@ -1826,9 +1916,12 @@ impl SleepSentinel {
                  Bounds violations: {}\n\
                  Anomalies detected: {}",
                 adaptive.calibration_state(),
-                c, adaptive.baseline().complexity_stats.mean,
-                s, adaptive.baseline().synchrony_stats.mean,
-                p, adaptive.baseline().phi_stats.mean,
+                c,
+                adaptive.baseline().complexity_stats.mean,
+                s,
+                adaptive.baseline().synchrony_stats.mean,
+                p,
+                adaptive.baseline().phi_stats.mean,
                 adaptive.learning_rate(),
                 adaptive.session_count(),
                 adaptive.bounds_violations(),
@@ -1847,7 +1940,8 @@ impl SleepSentinel {
             self.stats.epochs_processed,
             self.stats.samples_processed,
             self.accuracy() * 100.0,
-            self.per_class_accuracy().iter()
+            self.per_class_accuracy()
+                .iter()
                 .map(|(stage, acc, n)| format!("  {}: {:.1}% (n={})", stage.name(), acc * 100.0, n))
                 .collect::<Vec<_>>()
                 .join("\n"),
@@ -1894,8 +1988,8 @@ mod tests {
                 }
                 SleepStage::REM => {
                     // High activity but desynchronized (like wake but different)
-                    let mixed = 25.0 * (2.0 * PI * 8.0 * t).sin()
-                        + 20.0 * (2.0 * PI * 15.0 * t).sin();
+                    let mixed =
+                        25.0 * (2.0 * PI * 8.0 * t).sin() + 20.0 * (2.0 * PI * 15.0 * t).sin();
                     // Very different between channels
                     (
                         mixed + 15.0 * (t * 47.1).sin(),
@@ -1931,11 +2025,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks for EEG processing"]
     fn test_wake_detection() {
         // Use default config with reduced steps for faster test
         let mut config = SleepSentinelConfig::default();
-        config.steps_per_epoch = 500;    // Reduced from 3000 for faster test
+        config.steps_per_epoch = 500; // Reduced from 3000 for faster test
 
         let mut sentinel = SleepSentinel::new(config);
 
@@ -1944,20 +2038,26 @@ mod tests {
         let (state, metrics) = sentinel.process_epoch(&frontal, &occipital);
 
         println!("Wake detection: {:?}", state);
-        println!("Metrics: complexity={:.2}, synchrony={:.2}, phi={:.2}, freq={:.1}Hz",
-            metrics.complexity, metrics.synchrony, metrics.phi_proxy, metrics.dominant_freq_hz);
+        println!(
+            "Metrics: complexity={:.2}, synchrony={:.2}, phi={:.2}, freq={:.1}Hz",
+            metrics.complexity, metrics.synchrony, metrics.phi_proxy, metrics.dominant_freq_hz
+        );
 
         // Wake should have meaningful complexity (non-zero signal variance)
         // Threshold set to 0.1 based on synthetic EEG amplitude (~50uV normalized to 0.5)
-        assert!(metrics.complexity > 0.1, "Wake should have complexity > 0.1, got {}", metrics.complexity);
+        assert!(
+            metrics.complexity > 0.1,
+            "Wake should have complexity > 0.1, got {}",
+            metrics.complexity
+        );
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks for EEG processing"]
     fn test_deep_sleep_detection() {
         // Use default config with reduced steps for faster test
         let mut config = SleepSentinelConfig::default();
-        config.steps_per_epoch = 500;    // Reduced from 3000 for faster test
+        config.steps_per_epoch = 500; // Reduced from 3000 for faster test
 
         let mut sentinel = SleepSentinel::new(config);
 
@@ -1966,20 +2066,26 @@ mod tests {
         let (state, metrics) = sentinel.process_epoch(&frontal, &occipital);
 
         println!("Deep sleep detection: {:?}", state);
-        println!("Metrics: complexity={:.2}, synchrony={:.2}, phi={:.2}, freq={:.1}Hz",
-            metrics.complexity, metrics.synchrony, metrics.phi_proxy, metrics.dominant_freq_hz);
+        println!(
+            "Metrics: complexity={:.2}, synchrony={:.2}, phi={:.2}, freq={:.1}Hz",
+            metrics.complexity, metrics.synchrony, metrics.phi_proxy, metrics.dominant_freq_hz
+        );
 
         // Deep sleep has synchronized delta waves - check for higher synchrony than wake
         // The N3 synthetic signal has highly correlated frontal/occipital channels
-        assert!(metrics.synchrony > 0.4, "Deep sleep should have synchrony > 0.4, got {}", metrics.synchrony);
+        assert!(
+            metrics.synchrony > 0.4,
+            "Deep sleep should have synchrony > 0.4, got {}",
+            metrics.synchrony
+        );
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks for EEG processing"]
     fn test_rem_paradox() {
         // Use default config with reduced steps for faster test
         let mut config = SleepSentinelConfig::default();
-        config.steps_per_epoch = 500;    // Reduced from 3000 for faster test
+        config.steps_per_epoch = 500; // Reduced from 3000 for faster test
 
         let mut sentinel = SleepSentinel::new(config);
 
@@ -1987,16 +2093,22 @@ mod tests {
         let (frontal, occipital) = generate_synthetic_eeg(SleepStage::REM, 100.0, 10.0);
         let (_state, metrics) = sentinel.process_epoch(&frontal, &occipital);
 
-        println!("REM detection: complexity={:.2}, synchrony={:.2}, phi={:.2}",
-            metrics.complexity, metrics.synchrony, metrics.phi_proxy);
+        println!(
+            "REM detection: complexity={:.2}, synchrony={:.2}, phi={:.2}",
+            metrics.complexity, metrics.synchrony, metrics.phi_proxy
+        );
 
         // REM paradox: active brain (complexity > 0) but less synchronized than deep sleep
         // This is what makes it interesting - activity without integration
-        assert!(metrics.complexity > 0.05, "REM should have some complexity, got {}", metrics.complexity);
+        assert!(
+            metrics.complexity > 0.05,
+            "REM should have some complexity, got {}",
+            metrics.complexity
+        );
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks, tests stage discrimination across Wake/N3/REM"]
     fn test_discrimination() {
         let config = SleepSentinelConfig::default();
         let mut sentinel = SleepSentinel::new(config);
@@ -2009,19 +2121,38 @@ mod tests {
             sentinel.reset();
             let (frontal, occipital) = generate_synthetic_eeg(*stage, 100.0, 30.0);
             let (_, metrics) = sentinel.process_epoch(&frontal, &occipital);
-            results.push((*stage, metrics.complexity, metrics.synchrony, metrics.phi_proxy));
+            results.push((
+                *stage,
+                metrics.complexity,
+                metrics.synchrony,
+                metrics.phi_proxy,
+            ));
         }
 
         println!("\nStage Discrimination:");
         for (stage, c, s, p) in &results {
-            println!("  {:?}: complexity={:.2}, synchrony={:.2}, phi={:.2}", stage, c, s, p);
+            println!(
+                "  {:?}: complexity={:.2}, synchrony={:.2}, phi={:.2}",
+                stage, c, s, p
+            );
         }
 
         // Verify stages are distinguishable
         // Deep sleep should have highest synchrony
-        let n3_sync = results.iter().find(|(s, _, _, _)| *s == SleepStage::N3).unwrap().2;
-        let wake_sync = results.iter().find(|(s, _, _, _)| *s == SleepStage::Wake).unwrap().2;
-        assert!(n3_sync > wake_sync, "Deep sleep should have higher synchrony than wake");
+        let n3_sync = results
+            .iter()
+            .find(|(s, _, _, _)| *s == SleepStage::N3)
+            .unwrap()
+            .2;
+        let wake_sync = results
+            .iter()
+            .find(|(s, _, _, _)| *s == SleepStage::Wake)
+            .unwrap()
+            .2;
+        assert!(
+            n3_sync > wake_sync,
+            "Deep sleep should have higher synchrony than wake"
+        );
     }
 
     // ========================================================================
@@ -2038,13 +2169,25 @@ mod tests {
         }
 
         // Mean should be 3.0
-        assert!((stats.mean - 3.0).abs() < 0.01, "Mean should be 3.0, got {}", stats.mean);
+        assert!(
+            (stats.mean - 3.0).abs() < 0.01,
+            "Mean should be 3.0, got {}",
+            stats.mean
+        );
 
         // Variance should be 2.5 (sample variance)
-        assert!((stats.variance() - 2.5).abs() < 0.01, "Variance should be 2.5, got {}", stats.variance());
+        assert!(
+            (stats.variance() - 2.5).abs() < 0.01,
+            "Variance should be 2.5, got {}",
+            stats.variance()
+        );
 
         // Std should be sqrt(2.5) ≈ 1.58
-        assert!((stats.std() - 1.58).abs() < 0.1, "Std should be ~1.58, got {}", stats.std());
+        assert!(
+            (stats.std() - 1.58).abs() < 0.1,
+            "Std should be ~1.58, got {}",
+            stats.std()
+        );
 
         // Z-score of 5.0 should be (5-3)/1.58 ≈ 1.26
         let z = stats.z_score(5.0);
@@ -2107,12 +2250,18 @@ mod tests {
         }
 
         // Should auto-complete calibration
-        assert!(adaptive.is_calibrated(), "Should be calibrated after enough epochs");
+        assert!(
+            adaptive.is_calibrated(),
+            "Should be calibrated after enough epochs"
+        );
         assert_eq!(adaptive.calibration_state(), CalibrationState::Calibrated);
 
         // Thresholds should have adapted from baseline
         let baseline_complexity = adaptive.baseline().complexity_stats.mean;
-        assert!((baseline_complexity - 0.54).abs() < 0.1, "Baseline complexity should be ~0.54");
+        assert!(
+            (baseline_complexity - 0.54).abs() < 0.1,
+            "Baseline complexity should be ~0.54"
+        );
     }
 
     #[test]
@@ -2161,7 +2310,12 @@ mod tests {
                 phi_proxy: 0.5,
                 ..Default::default()
             };
-            adaptive.update_with_feedback(&metrics, ConsciousnessState::LightSleep, SleepStage::N2, true);
+            adaptive.update_with_feedback(
+                &metrics,
+                ConsciousnessState::LightSleep,
+                SleepStage::N2,
+                true,
+            );
         }
 
         let initial_complexity = adaptive.complexity_threshold();
@@ -2176,8 +2330,8 @@ mod tests {
             };
             adaptive.update_with_feedback(
                 &metrics,
-                ConsciousnessState::Awake,     // Predicted
-                SleepStage::N3,                // Actual (wrong)
+                ConsciousnessState::Awake, // Predicted
+                SleepStage::N3,            // Actual (wrong)
                 false,
             );
         }
@@ -2190,7 +2344,10 @@ mod tests {
         assert!(final_complexity <= 1.0, "Threshold should stay <= 1.0");
 
         // Should have recorded bounds violations
-        assert!(adaptive.bounds_violations() > 0, "Should have bounds violations");
+        assert!(
+            adaptive.bounds_violations() > 0,
+            "Should have bounds violations"
+        );
 
         println!("Initial complexity threshold: {}", initial_complexity);
         println!("Final complexity threshold: {}", final_complexity);
@@ -2216,7 +2373,12 @@ mod tests {
                 phi_proxy: 0.5,
                 ..Default::default()
             };
-            adaptive.update_with_feedback(&metrics, ConsciousnessState::Awake, SleepStage::Wake, true);
+            adaptive.update_with_feedback(
+                &metrics,
+                ConsciousnessState::Awake,
+                SleepStage::Wake,
+                true,
+            );
         }
 
         let threshold_after_calibration = adaptive.complexity_threshold();
@@ -2229,7 +2391,10 @@ mod tests {
             threshold_after_calibration
         );
 
-        println!("Threshold converged to: {} (from population mean 0.6)", threshold_after_calibration);
+        println!(
+            "Threshold converged to: {} (from population mean 0.6)",
+            threshold_after_calibration
+        );
     }
 
     #[test]
@@ -2256,7 +2421,10 @@ mod tests {
         }
 
         // Should not go below min
-        assert!(adaptive.learning_rate() >= 0.01, "Learning rate should not go below min");
+        assert!(
+            adaptive.learning_rate() >= 0.01,
+            "Learning rate should not go below min"
+        );
     }
 
     #[test]
@@ -2276,7 +2444,12 @@ mod tests {
                 phi_proxy: 0.6,
                 ..Default::default()
             };
-            adaptive.update_with_feedback(&metrics, ConsciousnessState::DeepSleep, SleepStage::N3, true);
+            adaptive.update_with_feedback(
+                &metrics,
+                ConsciousnessState::DeepSleep,
+                SleepStage::N3,
+                true,
+            );
         }
 
         // Thresholds should be adapted
@@ -2313,7 +2486,12 @@ mod tests {
                 phi_proxy: 0.55,
                 ..Default::default()
             };
-            adaptive.update_with_feedback(&metrics, ConsciousnessState::LightSleep, SleepStage::N2, true);
+            adaptive.update_with_feedback(
+                &metrics,
+                ConsciousnessState::LightSleep,
+                SleepStage::N2,
+                true,
+            );
         }
 
         // Export calibration
@@ -2326,8 +2504,12 @@ mod tests {
         // Verify imported data
         assert_eq!(new_adaptive.baseline().subject_id, "subject_001");
         assert!(new_adaptive.is_calibrated());
-        assert!((new_adaptive.complexity_threshold() - adaptive.complexity_threshold()).abs() < 0.001);
-        assert!((new_adaptive.synchrony_threshold() - adaptive.synchrony_threshold()).abs() < 0.001);
+        assert!(
+            (new_adaptive.complexity_threshold() - adaptive.complexity_threshold()).abs() < 0.001
+        );
+        assert!(
+            (new_adaptive.synchrony_threshold() - adaptive.synchrony_threshold()).abs() < 0.001
+        );
     }
 
     #[test]
@@ -2348,7 +2530,12 @@ mod tests {
                 dominant_freq_hz: 10.0,
                 ..Default::default()
             };
-            adaptive.update_with_feedback(&metrics, ConsciousnessState::LightSleep, SleepStage::N2, true);
+            adaptive.update_with_feedback(
+                &metrics,
+                ConsciousnessState::LightSleep,
+                SleepStage::N2,
+                true,
+            );
         }
 
         // Get normalized metrics for a value at the mean
@@ -2363,12 +2550,18 @@ mod tests {
         let normalized = adaptive.normalize_metrics(&at_mean);
 
         // Z-scores at the mean should be close to 0
-        assert!(normalized.complexity.abs() < 0.1, "Z-score at mean should be ~0");
-        assert!(normalized.synchrony.abs() < 0.1, "Z-score at mean should be ~0");
+        assert!(
+            normalized.complexity.abs() < 0.1,
+            "Z-score at mean should be ~0"
+        );
+        assert!(
+            normalized.synchrony.abs() < 0.1,
+            "Z-score at mean should be ~0"
+        );
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks with adaptive threshold calibration"]
     fn test_sentinel_with_adaptive_thresholds() {
         let mut config = SleepSentinelConfig::default();
         config.enable_adaptive_thresholds = true;
@@ -2392,16 +2585,25 @@ mod tests {
 
         // Get current thresholds
         let (c, s, p) = sentinel.current_thresholds();
-        println!("Adapted thresholds: complexity={:.3}, synchrony={:.3}, phi={:.3}", c, s, p);
+        println!(
+            "Adapted thresholds: complexity={:.3}, synchrony={:.3}, phi={:.3}",
+            c, s, p
+        );
 
         // Summary should include adaptive info
         let summary = sentinel.summary();
-        assert!(summary.contains("Adaptive Thresholds"), "Summary should include adaptive info");
-        assert!(summary.contains("Calibrated"), "Summary should show calibrated state");
+        assert!(
+            summary.contains("Adaptive Thresholds"),
+            "Summary should include adaptive info"
+        );
+        assert!(
+            summary.contains("Calibrated"),
+            "Summary should show calibrated state"
+        );
     }
 
     #[test]
-    #[ignore] // Slow (~60s): trains LTC networks. Run with `cargo test -- --ignored`
+    #[ignore = "slow ~60s: trains LTC networks, tests calibration export/import"]
     fn test_sentinel_calibration_persistence() {
         let mut config = SleepSentinelConfig::default();
         config.enable_adaptive_thresholds = true;
@@ -2418,7 +2620,9 @@ mod tests {
         }
 
         // Export
-        let calibration_data = sentinel.export_calibration().expect("Should have calibration data");
+        let calibration_data = sentinel
+            .export_calibration()
+            .expect("Should have calibration data");
 
         // Create new sentinel and import
         let mut new_sentinel = SleepSentinel::new(config);
@@ -2450,7 +2654,12 @@ mod tests {
                 phi_proxy: 0.5,
                 ..Default::default()
             };
-            adaptive.update_with_feedback(&metrics, ConsciousnessState::LightSleep, SleepStage::N2, true);
+            adaptive.update_with_feedback(
+                &metrics,
+                ConsciousnessState::LightSleep,
+                SleepStage::N2,
+                true,
+            );
         }
 
         let threshold_before = adaptive.complexity_threshold();
@@ -2481,7 +2690,10 @@ mod tests {
         );
 
         // Should have detected anomalies
-        assert!(adaptive.anomalies_detected() > 0, "Should have detected anomalies");
+        assert!(
+            adaptive.anomalies_detected() > 0,
+            "Should have detected anomalies"
+        );
         println!("Anomalies detected: {}", adaptive.anomalies_detected());
     }
 }

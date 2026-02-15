@@ -73,7 +73,7 @@ function createMockContent(overrides: Partial<Content> = {}): Content {
     description: 'An exploration of how decentralized systems can transform journalism',
     content_hash: 'sha256:abc123def456',
     storage_uri: 'ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-    license: 'CC-BY' as LicenseType,
+    license: 'CCBY' as LicenseType,
     tags: ['media', 'decentralization', 'journalism'],
     verification_status: 'Verified' as VerificationStatus,
     views: 1250,
@@ -183,7 +183,7 @@ describe('PublicationClient', () => {
         description: 'An exploration...',
         content_hash: 'sha256:abc123',
         storage_uri: 'ipfs://QmTest',
-        license: 'CC-BY',
+        license: 'CCBY',
         tags: ['media', 'decentralization'],
       });
 
@@ -199,7 +199,7 @@ describe('PublicationClient', () => {
     });
 
     it('should publish with all content types', async () => {
-      const types: ContentType[] = ['Article', 'Video', 'Audio', 'Image', 'Document', 'Data', 'Other'];
+      const types: ContentType[] = ['Article', 'Opinion', 'Investigation', 'Review', 'Analysis', 'Interview', 'Other'];
 
       for (const type_ of types) {
         const result = await client.publish({
@@ -216,10 +216,10 @@ describe('PublicationClient', () => {
     it('should publish with all license types', async () => {
       const licenses: LicenseType[] = [
         'CC0',
-        'CC-BY',
-        'CC-BY-SA',
-        'CC-BY-NC',
-        'CC-BY-NC-SA',
+        'CCBY',
+        'CCBYSA',
+        'CCBYNC',
+        'CCBYNCSA',
         'AllRightsReserved',
         'Custom',
       ];
@@ -641,7 +641,7 @@ describe('Integration Patterns', () => {
       title: 'Test Article',
       content_hash: 'sha256:test',
       storage_uri: 'ipfs://test',
-      license: 'CC-BY',
+      license: 'CCBY',
     });
     expect(content.entry.Present.id).toBeDefined();
 
@@ -826,7 +826,7 @@ describe('ValidatedPublicationClient', () => {
         title: 'Test Article',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result.entry.Present?.id).toBe('content-123');
     });
@@ -838,7 +838,7 @@ describe('ValidatedPublicationClient', () => {
           title: '',
           content_hash: 'sha256:abcdef1234567890abcdef1234567890',
           storage_uri: 'ipfs://test',
-          license: 'CC-BY',
+          license: 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -850,7 +850,7 @@ describe('ValidatedPublicationClient', () => {
           title: 'x'.repeat(501),
           content_hash: 'sha256:abcdef1234567890abcdef1234567890',
           storage_uri: 'ipfs://test',
-          license: 'CC-BY',
+          license: 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -862,7 +862,7 @@ describe('ValidatedPublicationClient', () => {
           title: 'Test',
           content_hash: 'sha256:abcdef1234567890abcdef1234567890',
           storage_uri: 'ipfs://test',
-          license: 'CC-BY',
+          license: 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -874,7 +874,7 @@ describe('ValidatedPublicationClient', () => {
           title: 'Test',
           content_hash: 'sha256:abcdef1234567890abcdef1234567890',
           storage_uri: 'ipfs://test',
-          license: 'InvalidLicense' as 'CC-BY',
+          license: 'InvalidLicense' as 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -1303,7 +1303,7 @@ describe('Media Validation Schema Boundary Tests', () => {
   });
 
   describe('ContentType enum validation', () => {
-    const validTypes: ContentType[] = ['Article', 'Video', 'Audio', 'Image', 'Document', 'Data', 'Other'];
+    const validTypes: ContentType[] = ['Article', 'Opinion', 'Investigation', 'Review', 'Analysis', 'Interview', 'Report', 'Editorial', 'Other'];
 
     it.each(validTypes)('accepts valid content type: %s', async (type_) => {
       const client = new ValidatedPublicationClient(mockClient);
@@ -1312,12 +1312,12 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test Content',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://QmTest',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
 
-    it.each(['article', 'VIDEO', 'invalid', '', 'Podcast', 'Stream', 'Unknown'])(
+    it.each(['article', 'VIDEO', 'invalid', '', 'Video', 'Image', 'Unknown'])(
       'rejects invalid content type: %s',
       async (type_) => {
         const client = new ValidatedPublicationClient(mockClient);
@@ -1327,7 +1327,7 @@ describe('Media Validation Schema Boundary Tests', () => {
             title: 'Test',
             content_hash: 'sha256:abcdef1234567890abcdef1234567890',
             storage_uri: 'ipfs://test',
-            license: 'CC-BY',
+            license: 'CCBY',
           })
         ).rejects.toThrow('Validation failed');
       }
@@ -1337,10 +1337,10 @@ describe('Media Validation Schema Boundary Tests', () => {
   describe('LicenseType enum validation', () => {
     const validLicenses: LicenseType[] = [
       'CC0',
-      'CC-BY',
-      'CC-BY-SA',
-      'CC-BY-NC',
-      'CC-BY-NC-SA',
+      'CCBY',
+      'CCBYSA',
+      'CCBYNC',
+      'CCBYNCSA',
       'AllRightsReserved',
       'Custom',
     ];
@@ -1442,7 +1442,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'A',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1454,7 +1454,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'x'.repeat(500),
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1467,7 +1467,7 @@ describe('Media Validation Schema Boundary Tests', () => {
           title: 'x'.repeat(501),
           content_hash: 'sha256:abcdef1234567890abcdef1234567890',
           storage_uri: 'ipfs://test',
-          license: 'CC-BY',
+          license: 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -1481,7 +1481,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test',
         content_hash: 'a'.repeat(32),
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1493,7 +1493,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test',
         content_hash: 'sha256:' + 'a'.repeat(64),
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1506,7 +1506,7 @@ describe('Media Validation Schema Boundary Tests', () => {
           title: 'Test',
           content_hash: 'a'.repeat(31),
           storage_uri: 'ipfs://test',
-          license: 'CC-BY',
+          license: 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -1519,7 +1519,7 @@ describe('Media Validation Schema Boundary Tests', () => {
           title: 'Test',
           content_hash: '',
           storage_uri: 'ipfs://test',
-          license: 'CC-BY',
+          license: 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -1533,7 +1533,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'x',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1546,7 +1546,7 @@ describe('Media Validation Schema Boundary Tests', () => {
           title: 'Test',
           content_hash: 'sha256:abcdef1234567890abcdef1234567890',
           storage_uri: '',
-          license: 'CC-BY',
+          license: 'CCBY',
         })
       ).rejects.toThrow('Validation failed');
     });
@@ -1961,7 +1961,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1974,7 +1974,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         description: 'A test article',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1986,7 +1986,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });
@@ -1998,7 +1998,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
         tags: ['tag1', 'tag2'],
       });
       expect(result).toBeDefined();
@@ -2011,7 +2011,7 @@ describe('Media Validation Schema Boundary Tests', () => {
         title: 'Test',
         content_hash: 'sha256:abcdef1234567890abcdef1234567890',
         storage_uri: 'ipfs://test',
-        license: 'CC-BY',
+        license: 'CCBY',
       });
       expect(result).toBeDefined();
     });

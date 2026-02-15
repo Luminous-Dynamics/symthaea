@@ -47,8 +47,8 @@
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
+use super::zk_proofs::{ZKEIGRangeProof, ZKTopicCommitment};
 use super::GISError;
-use super::zk_proofs::{ZKTopicCommitment, ZKEIGRangeProof};
 
 // HDC imports for semantic encoding
 use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
@@ -96,7 +96,7 @@ impl HdcSemanticEncoder {
         let lowered = text.to_lowercase();
         let words: Vec<&str> = lowered
             .split(|c: char| !c.is_alphanumeric())
-            .filter(|w| w.len() > 1)  // Skip single chars
+            .filter(|w| w.len() > 1) // Skip single chars
             .collect();
 
         if words.is_empty() {
@@ -112,7 +112,11 @@ impl HdcSemanticEncoder {
             let mut hasher = Hasher::new();
             hasher.update(word.as_bytes());
             let hash = hasher.finalize();
-            let word_seed = u64::from_le_bytes(hash.as_bytes()[0..8].try_into().unwrap());
+            let word_seed = u64::from_le_bytes(
+                hash.as_bytes()[0..8]
+                    .try_into()
+                    .expect("8-byte slice fits [u8; 8]"),
+            );
 
             // Generate word vector (deterministic from seed)
             let word_hv = ContinuousHV::random(self.dimension, word_seed);
@@ -145,7 +149,9 @@ impl HdcSemanticEncoder {
         let category_encoding = self.encode(category);
 
         // Blend: 80% text, 20% category
-        let blended = text_encoding.scale(0.8_f32).add(&category_encoding.scale(0.2_f32));
+        let blended = text_encoding
+            .scale(0.8_f32)
+            .add(&category_encoding.scale(0.2_f32));
         blended.normalize()
     }
 
@@ -263,12 +269,11 @@ impl EncryptedEmbedding {
     /// category keys.
     pub fn encrypt(embedding: &[f32], category: &str) -> Self {
         let key = Self::derive_category_key(category);
-        let plaintext: Vec<u8> = embedding.iter()
-            .flat_map(|f| f.to_le_bytes())
-            .collect();
+        let plaintext: Vec<u8> = embedding.iter().flat_map(|f| f.to_le_bytes()).collect();
 
         let keystream = Self::generate_keystream(&key, plaintext.len());
-        let ciphertext: Vec<u8> = plaintext.iter()
+        let ciphertext: Vec<u8> = plaintext
+            .iter()
             .zip(keystream.iter())
             .map(|(p, k)| p ^ k)
             .collect();
@@ -288,14 +293,19 @@ impl EncryptedEmbedding {
 
         let key = Self::derive_category_key(category);
         let keystream = Self::generate_keystream(&key, self.ciphertext.len());
-        let plaintext: Vec<u8> = self.ciphertext.iter()
+        let plaintext: Vec<u8> = self
+            .ciphertext
+            .iter()
             .zip(keystream.iter())
             .map(|(c, k)| c ^ k)
             .collect();
 
-        let floats: Vec<f32> = plaintext.chunks_exact(4)
+        let floats: Vec<f32> = plaintext
+            .chunks_exact(4)
             .map(|chunk| {
-                let arr: [u8; 4] = chunk.try_into().unwrap();
+                let arr: [u8; 4] = chunk
+                    .try_into()
+                    .expect("chunks_exact(4) guarantees 4-byte slices");
                 f32::from_le_bytes(arr)
             })
             .collect();
@@ -435,9 +445,7 @@ impl DarkSpotDHT {
         // 5. Create Bulletproofs-style EIG range proof
         // Proves 0 ≤ EIG ≤ 1 without revealing exact value
         let eig_range_proof = ZKEIGRangeProof::create(eig)
-            .ok_or_else(|| GISError::CryptoError(
-                format!("EIG {} out of range [0, 1]", eig)
-            ))?;
+            .ok_or_else(|| GISError::CryptoError(format!("EIG {} out of range [0, 1]", eig)))?;
 
         // 6. Generate nonce for uniqueness
         let mut nonce = [0u8; 16];
@@ -472,7 +480,7 @@ impl DarkSpotDHT {
         // 1. Validate EIG range proof (Bulletproofs verification)
         if !signature.eig_range_proof.verify() {
             return Err(GISError::CryptoError(
-                "Invalid EIG range proof: failed Bulletproof verification".to_string()
+                "Invalid EIG range proof: failed Bulletproof verification".to_string(),
             ));
         }
 
@@ -480,12 +488,13 @@ impl DarkSpotDHT {
         // The ZKTopicCommitment includes a Schnorr-based validity proof
         if !signature.topic_commitment.verify(&signature.category) {
             return Err(GISError::CryptoError(
-                "Invalid topic commitment: failed validity proof verification".to_string()
+                "Invalid topic commitment: failed validity proof verification".to_string(),
             ));
         }
 
         // 3. Store in DHT (local for demo)
-        self.local_store.insert(signature.id.clone(), signature.clone());
+        self.local_store
+            .insert(signature.id.clone(), signature.clone());
 
         Ok(())
     }
@@ -518,25 +527,38 @@ impl DarkSpotDHT {
         }
 
         // Sort by similarity
-        matches.sort_by(|a, b| b.similarity.partial_cmp(&a.similarity).unwrap_or(std::cmp::Ordering::Equal));
+        matches.sort_by(|a, b| {
+            b.similarity
+                .partial_cmp(&a.similarity)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         matches
     }
 
     /// Add local knowledge (for matching against others' ignorance)
-    pub fn add_knowledge(&mut self, id: String, content: String, category: String, reputation: f32) {
+    pub fn add_knowledge(
+        &mut self,
+        id: String,
+        content: String,
+        category: String,
+        reputation: f32,
+    ) {
         // Create HDC semantic embedding for the knowledge content
         let hdc_encoding = self.hdc_encoder.encode_with_category(&content, &category);
 
         // Compress for storage (matches query compression)
         let embedding = self.hdc_encoder.compress(&hdc_encoding, 256);
 
-        self.local_knowledge.insert(id.clone(), LocalClaim {
-            id,
-            content,
-            category,
-            embedding,
-            reputation,
-        });
+        self.local_knowledge.insert(
+            id.clone(),
+            LocalClaim {
+                id,
+                content,
+                category,
+                embedding,
+                reputation,
+            },
+        );
     }
 
     /// Get blind spots (clustered ignorance signatures)
@@ -546,7 +568,10 @@ impl DarkSpotDHT {
         // Group by category
         let mut by_category: HashMap<String, Vec<&ZKIgnoranceSignature>> = HashMap::new();
         for sig in self.local_store.values() {
-            by_category.entry(sig.category.clone()).or_default().push(sig);
+            by_category
+                .entry(sig.category.clone())
+                .or_default()
+                .push(sig);
         }
 
         // Detect clusters
@@ -558,12 +583,14 @@ impl DarkSpotDHT {
                     signature_count: sigs.len(),
                     // Note: In ZK mode, we cannot extract exact EIG values
                     // Instead we use the verified range midpoint
-                    average_eig: sigs.iter()
+                    average_eig: sigs
+                        .iter()
                         .map(|s| {
                             let (min, max) = s.eig_range_proof.range();
-                            (min + max) / 2.0  // Use range midpoint
+                            (min + max) / 2.0 // Use range midpoint
                         })
-                        .sum::<f32>() / sigs.len() as f32,
+                        .sum::<f32>()
+                        / sigs.len() as f32,
                     topic_revealed: false,
                     detected_at: SystemTime::now(),
                 });
@@ -574,7 +601,11 @@ impl DarkSpotDHT {
     }
 
     /// Reveal a blind spot (requires threshold participation)
-    pub fn reveal_blind_spot(&mut self, blind_spot_id: &str, _participants: usize) -> Option<RevealedBlindSpot> {
+    pub fn reveal_blind_spot(
+        &mut self,
+        blind_spot_id: &str,
+        _participants: usize,
+    ) -> Option<RevealedBlindSpot> {
         // Find the blind spot
         let blind_spots = self.detect_blind_spots();
         let blind_spot = blind_spots.iter().find(|b| b.id == blind_spot_id)?;
@@ -690,7 +721,8 @@ impl SemanticTopicHasher {
         let primary = (hasher.finish() as usize) % self.num_buckets;
 
         // Generate secondary buckets via word hashes
-        let secondary: Vec<usize> = topic.split_whitespace()
+        let secondary: Vec<usize> = topic
+            .split_whitespace()
             .take(4)
             .map(|word| {
                 let mut h = DefaultHasher::new();
@@ -712,10 +744,16 @@ impl SemanticTopicHasher {
             0.7
         } else {
             // Check secondary overlap
-            let overlap = a.secondary_buckets.iter()
+            let overlap = a
+                .secondary_buckets
+                .iter()
                 .filter(|x| b.secondary_buckets.contains(x))
                 .count();
-            let total = a.secondary_buckets.len().max(b.secondary_buckets.len()).max(1);
+            let total = a
+                .secondary_buckets
+                .len()
+                .max(b.secondary_buckets.len())
+                .max(1);
             (overlap as f32 / total as f32) * 0.5
         }
     }
@@ -754,7 +792,10 @@ impl CuriosityEngine {
     }
 
     /// Queue a detection for resolution
-    pub fn queue_resolution(&mut self, detection: &super::IgnoranceDetection) -> Result<ResolutionRequest, GISError> {
+    pub fn queue_resolution(
+        &mut self,
+        detection: &super::IgnoranceDetection,
+    ) -> Result<ResolutionRequest, GISError> {
         let item = ResolutionQueueItem {
             query: detection.query.clone(),
             eig: detection.eig,
@@ -773,7 +814,11 @@ impl CuriosityEngine {
         self.queue.push(item);
 
         // Sort by priority (EIG)
-        self.queue.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal));
+        self.queue.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(request)
     }
@@ -808,7 +853,11 @@ impl CuriosityEngine {
         self.queue.push(item);
 
         // Sort by priority (harmonic EIG)
-        self.queue.sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap_or(std::cmp::Ordering::Equal));
+        self.queue.sort_by(|a, b| {
+            b.priority
+                .partial_cmp(&a.priority)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         Ok(request)
     }
@@ -827,7 +876,9 @@ impl CuriosityEngine {
         harmonic_ignorance: &super::HarmonicIgnorance,
         context: &HarmonicContext,
     ) -> f32 {
-        let harmonic_weight: f32 = harmonic_ignorance.affected_harmonies.iter()
+        let harmonic_weight: f32 = harmonic_ignorance
+            .affected_harmonies
+            .iter()
             .map(|(harmony, impact)| {
                 let base_weight = harmony.base_weight();
                 let relevance = context.harmony_relevance(*harmony);
@@ -850,9 +901,10 @@ impl CuriosityEngine {
     /// Get next with minimum harmonic EIG threshold
     pub fn next_if_harmonic(&mut self, min_h_eig: f32) -> Option<ResolutionQueueItem> {
         // Find first item meeting threshold
-        let idx = self.queue.iter().position(|item| {
-            item.harmonic_eig.unwrap_or(item.eig) >= min_h_eig
-        });
+        let idx = self
+            .queue
+            .iter()
+            .position(|item| item.harmonic_eig.unwrap_or(item.eig) >= min_h_eig);
 
         idx.map(|i| self.queue.remove(i))
     }
@@ -864,7 +916,8 @@ impl CuriosityEngine {
 
     /// Get high-priority items (harmonic EIG > threshold)
     pub fn high_priority_items(&self, threshold: f32) -> Vec<&ResolutionQueueItem> {
-        self.queue.iter()
+        self.queue
+            .iter()
             .filter(|item| item.priority >= threshold)
             .collect()
     }
@@ -873,7 +926,8 @@ impl CuriosityEngine {
     pub fn items_affecting_harmony(&self, _harmony: super::Harmony) -> Vec<&ResolutionQueueItem> {
         // In full implementation, would filter by affected harmonies
         // For now, return all with harmonic EIG
-        self.queue.iter()
+        self.queue
+            .iter()
             .filter(|item| item.harmonic_eig.is_some())
             .collect()
     }
@@ -919,7 +973,8 @@ impl HarmonicContext {
     /// Set harmony relevance override
     pub fn set_harmony_relevance(&mut self, harmony: super::Harmony, relevance: f32) {
         let idx = Self::harmony_to_index(harmony);
-        self.harmony_overrides.insert(idx, relevance.clamp(0.0, 2.0));
+        self.harmony_overrides
+            .insert(idx, relevance.clamp(0.0, 2.0));
     }
 
     /// Get relevance for a harmony
@@ -1068,11 +1123,9 @@ mod tests {
     fn test_zk_signature_creation() {
         let dht = DarkSpotDHT::new();
 
-        let sig = dht.create_signature(
-            "What is dark matter?",
-            "physics",
-            0.8,
-        ).unwrap();
+        let sig = dht
+            .create_signature("What is dark matter?", "physics", 0.8)
+            .unwrap();
 
         assert_eq!(sig.category, "physics");
 
@@ -1091,17 +1144,16 @@ mod tests {
         // Add some knowledge
         dht.add_knowledge(
             "claim_1".to_string(),
-            "Dark matter is a form of matter thought to account for gravitational effects".to_string(),
+            "Dark matter is a form of matter thought to account for gravitational effects"
+                .to_string(),
             "physics".to_string(),
             0.9,
         );
 
         // Create and publish ignorance
-        let sig = dht.create_signature(
-            "What is dark matter?",
-            "physics",
-            0.8,
-        ).unwrap();
+        let sig = dht
+            .create_signature("What is dark matter?", "physics", 0.8)
+            .unwrap();
 
         dht.publish(&sig).unwrap();
 
@@ -1133,11 +1185,9 @@ mod tests {
 
         // Publish multiple ignorance signatures in same category
         for i in 0..5 {
-            let sig = dht.create_signature(
-                &format!("Question {} about physics", i),
-                "physics",
-                0.7,
-            ).unwrap();
+            let sig = dht
+                .create_signature(&format!("Question {} about physics", i), "physics", 0.7)
+                .unwrap();
             dht.publish(&sig).unwrap();
         }
 
@@ -1174,7 +1224,7 @@ mod tests {
 
     #[test]
     fn test_harmonic_eig_basic() {
-        use super::super::{HarmonicIgnorance, IgnoranceType, Harmony};
+        use super::super::{HarmonicIgnorance, Harmony, IgnoranceType};
 
         let config = CuriosityConfig::default();
         let engine = CuriosityEngine::new(config);
@@ -1190,12 +1240,17 @@ mod tests {
         let h_eig = engine.harmonic_eig(base_eig, &hi, &context);
 
         // H-EIG should be higher than base due to PSF weight (0.20)
-        assert!(h_eig > base_eig, "H-EIG {} should be > base EIG {}", h_eig, base_eig);
+        assert!(
+            h_eig > base_eig,
+            "H-EIG {} should be > base EIG {}",
+            h_eig,
+            base_eig
+        );
     }
 
     #[test]
     fn test_harmonic_eig_multiple_harmonies() {
-        use super::super::{HarmonicIgnorance, IgnoranceType, Harmony};
+        use super::super::{HarmonicIgnorance, Harmony, IgnoranceType};
 
         let config = CuriosityConfig::default();
         let engine = CuriosityEngine::new(config);
@@ -1212,12 +1267,16 @@ mod tests {
 
         // Should have significant boost (0.20 + 0.15 + 0.20 = 0.55)
         // H-EIG = 0.5 * (1 + 0.55) = 0.775
-        assert!(h_eig > 0.7, "H-EIG {} should be > 0.7 with multiple harmonies", h_eig);
+        assert!(
+            h_eig > 0.7,
+            "H-EIG {} should be > 0.7 with multiple harmonies",
+            h_eig
+        );
     }
 
     #[test]
     fn test_harmonic_eig_context_relevance() {
-        use super::super::{HarmonicIgnorance, IgnoranceType, Harmony};
+        use super::super::{HarmonicIgnorance, Harmony, IgnoranceType};
 
         let config = CuriosityConfig::default();
         let engine = CuriosityEngine::new(config);
@@ -1236,13 +1295,19 @@ mod tests {
         let h_eig_general = engine.harmonic_eig(base_eig, &hi, &general_context);
 
         // Technology context should give higher EIG for truth-knowing
-        assert!(h_eig_tech > h_eig_general,
-            "Tech H-EIG {} should be > general H-EIG {}", h_eig_tech, h_eig_general);
+        assert!(
+            h_eig_tech > h_eig_general,
+            "Tech H-EIG {} should be > general H-EIG {}",
+            h_eig_tech,
+            h_eig_general
+        );
     }
 
     #[test]
     fn test_harmonic_queue_resolution() {
-        use super::super::{HarmonicIgnorance, IgnoranceType, IgnoranceDetection, Harmony, Uncertainty3D, Domain};
+        use super::super::{
+            Domain, HarmonicIgnorance, Harmony, IgnoranceDetection, IgnoranceType, Uncertainty3D,
+        };
 
         let config = CuriosityConfig::default();
         let mut engine = CuriosityEngine::new(config);
@@ -1261,11 +1326,17 @@ mod tests {
 
         let context = HarmonicContext::new();
 
-        let request = engine.queue_harmonic_resolution(&detection, &hi, &context).unwrap();
+        let request = engine
+            .queue_harmonic_resolution(&detection, &hi, &context)
+            .unwrap();
 
         // Priority should be harmonic EIG, not base EIG
-        assert!(request.priority > detection.eig,
-            "Harmonic priority {} should be > base EIG {}", request.priority, detection.eig);
+        assert!(
+            request.priority > detection.eig,
+            "Harmonic priority {} should be > base EIG {}",
+            request.priority,
+            detection.eig
+        );
 
         assert_eq!(engine.pending_count(), 1);
 

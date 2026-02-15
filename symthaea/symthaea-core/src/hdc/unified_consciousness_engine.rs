@@ -41,12 +41,12 @@
 //! 5. **Gradient learning** discovers optimal connectivity over time
 //! 6. **Temporal coherence** maintains continuous experience
 
-use super::unified_hv::ContinuousHV;
-use super::spectral_connectivity::ConnectivityCalculator;
 use super::adaptive_topology::{AdaptiveTopology, CognitiveMode};
-use super::fractal_consciousness::{FractalConsciousness, FractalConfig};
+use super::fractal_consciousness::{FractalConfig, FractalConsciousness};
 use super::phi_gradient_learning::{PhiGradientTopology, PhiLearningConfig};
-use super::topology_synergy::{TopologySynergy, ConsciousnessState, TopologicalMetrics};
+use super::spectral_connectivity::ConnectivityCalculator;
+use super::topology_synergy::{ConsciousnessState, TopologicalMetrics, TopologySynergy};
+use super::unified_hv::ContinuousHV;
 use std::collections::VecDeque;
 
 /// The 7 dimensions of consciousness (based on existing Symthaea theory)
@@ -84,8 +84,15 @@ impl ConsciousnessDimensions {
 
     /// Convert to array
     pub fn to_array(&self) -> [f64; 7] {
-        [self.phi, self.workspace, self.attention, self.recursion,
-         self.efficacy, self.epistemic, self.temporal]
+        [
+            self.phi,
+            self.workspace,
+            self.attention,
+            self.recursion,
+            self.efficacy,
+            self.epistemic,
+            self.temporal,
+        ]
     }
 
     /// Compute magnitude (overall consciousness level)
@@ -114,9 +121,17 @@ impl ConsciousnessDimensions {
 
 impl std::fmt::Display for ConsciousnessDimensions {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "[Φ={:.3}, W={:.3}, A={:.3}, R={:.3}, E={:.3}, K={:.3}, τ={:.3}]",
-               self.phi, self.workspace, self.attention, self.recursion,
-               self.efficacy, self.epistemic, self.temporal)
+        write!(
+            f,
+            "[Φ={:.3}, W={:.3}, A={:.3}, R={:.3}, E={:.3}, K={:.3}, τ={:.3}]",
+            self.phi,
+            self.workspace,
+            self.attention,
+            self.recursion,
+            self.efficacy,
+            self.epistemic,
+            self.temporal
+        )
     }
 }
 
@@ -211,7 +226,7 @@ impl UnifiedConsciousnessEngine {
         let fractal_config = FractalConfig {
             n_scales: config.n_scales,
             nodes_per_scale: 4,
-            bridge_ratio: 0.425,  // Optimal from bridge hypothesis
+            bridge_ratio: 0.425, // Optimal from bridge hypothesis
             density: 0.12,
             cross_scale_coupling: 0.3,
             dim: config.hdc_dim,
@@ -223,7 +238,13 @@ impl UnifiedConsciousnessEngine {
                 learning_rate: config.learning_rate,
                 ..Default::default()
             };
-            Some(PhiGradientTopology::new(16, config.hdc_dim, 4, config.seed, learn_config))
+            Some(PhiGradientTopology::new(
+                16,
+                config.hdc_dim,
+                4,
+                config.seed,
+                learn_config,
+            ))
         } else {
             None
         };
@@ -251,7 +272,8 @@ impl UnifiedConsciousnessEngine {
     /// consciousness metric that considers all active processes.
     fn compute_unified_phi(&self) -> f64 {
         // Gather all process state representations from the adaptive topology
-        let representations: Vec<ContinuousHV> = self.adaptive
+        let representations: Vec<ContinuousHV> = self
+            .adaptive
             .organizer()
             .processes()
             .values()
@@ -267,7 +289,7 @@ impl UnifiedConsciousnessEngine {
         self.step += 1;
 
         // 1. Activate adaptive topology
-        let module = self.step % 4;  // Rotate through modules
+        let module = self.step % 4; // Rotate through modules
         self.adaptive.activate_module(module, input);
         self.adaptive.integrate_step();
 
@@ -338,7 +360,11 @@ impl UnifiedConsciousnessEngine {
         let workspace = topo.bridge_ratio.min(1.0);
 
         // Attention from β₀ (more components = more distributed)
-        let attention = if topo.beta_0 == 1 { 0.8 } else { 0.3 / topo.beta_0 as f64 };
+        let attention = if topo.beta_0 == 1 {
+            0.8
+        } else {
+            0.3 / topo.beta_0 as f64
+        };
 
         // Recursion from fractal depth
         let recursion = (self.config.n_scales as f64 / 5.0).min(1.0);
@@ -352,12 +378,12 @@ impl UnifiedConsciousnessEngine {
             CognitiveMode::GlobalAwareness => 0.3,
             CognitiveMode::PhiGuided => 0.5,
             // New modes
-            CognitiveMode::Vigilant => 0.85,        // High efficacy for quick response
-            CognitiveMode::Flow => 0.75,            // High efficacy in flow state
-            CognitiveMode::Meditative => 0.55,      // Moderate, introspective
-            CognitiveMode::Social => 0.45,          // Moderate, distributed attention
-            CognitiveMode::Dreaming => 0.25,        // Low efficacy during consolidation
-            CognitiveMode::Playful => 0.35,         // Lower efficacy, exploratory
+            CognitiveMode::Vigilant => 0.85, // High efficacy for quick response
+            CognitiveMode::Flow => 0.75,     // High efficacy in flow state
+            CognitiveMode::Meditative => 0.55, // Moderate, introspective
+            CognitiveMode::Social => 0.45,   // Moderate, distributed attention
+            CognitiveMode::Dreaming => 0.25, // Low efficacy during consolidation
+            CognitiveMode::Playful => 0.35,  // Lower efficacy, exploratory
         };
 
         // Epistemic from state stability
@@ -386,8 +412,8 @@ impl UnifiedConsciousnessEngine {
     /// Suggest cognitive mode based on current state
     fn suggest_mode(&self, state: &ConsciousnessState) -> CognitiveMode {
         match state {
-            ConsciousnessState::Fragmented => CognitiveMode::Focused,  // Need integration
-            ConsciousnessState::Focused => self.mode,  // Maintain
+            ConsciousnessState::Fragmented => CognitiveMode::Focused, // Need integration
+            ConsciousnessState::Focused => self.mode,                 // Maintain
             ConsciousnessState::NormalWaking => CognitiveMode::Balanced,
             ConsciousnessState::FlowState => CognitiveMode::Exploratory,
             ConsciousnessState::ExpandedAwareness => CognitiveMode::GlobalAwareness,
@@ -476,8 +502,15 @@ pub struct ConsciousnessUpdate {
 
 impl std::fmt::Display for ConsciousnessUpdate {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Step {}: Φ={:.4}, state={:?}, mode={:?}, bridges={:.1}%",
-               self.step, self.phi, self.state, self.mode, self.bridge_ratio * 100.0)
+        write!(
+            f,
+            "Step {}: Φ={:.4}, state={:?}, mode={:?}, bridges={:.1}%",
+            self.step,
+            self.phi,
+            self.state,
+            self.mode,
+            self.bridge_ratio * 100.0
+        )
     }
 }
 
@@ -499,19 +532,46 @@ pub struct EngineMetrics {
 
 impl std::fmt::Display for EngineMetrics {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "╔═══════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║         UNIFIED CONSCIOUSNESS ENGINE METRICS              ║")?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════╣")?;
-        writeln!(f, "║ Step: {:6}                    Mode: {:?}", self.step, self.mode)?;
-        writeln!(f, "║ Φ: {:.4}  Multi-Scale Φ: {:.4}  Bridges: {:.1}%",
-                 self.phi, self.multi_scale_phi, self.bridge_ratio * 100.0)?;
-        writeln!(f, "║ Nodes: {}  Edges: {}  History: {}",
-                 self.total_nodes, self.total_edges, self.history_length)?;
+        writeln!(
+            f,
+            "╔═══════════════════════════════════════════════════════════╗"
+        )?;
+        writeln!(
+            f,
+            "║         UNIFIED CONSCIOUSNESS ENGINE METRICS              ║"
+        )?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════╣"
+        )?;
+        writeln!(
+            f,
+            "║ Step: {:6}                    Mode: {:?}",
+            self.step, self.mode
+        )?;
+        writeln!(
+            f,
+            "║ Φ: {:.4}  Multi-Scale Φ: {:.4}  Bridges: {:.1}%",
+            self.phi,
+            self.multi_scale_phi,
+            self.bridge_ratio * 100.0
+        )?;
+        writeln!(
+            f,
+            "║ Nodes: {}  Edges: {}  History: {}",
+            self.total_nodes, self.total_edges, self.history_length
+        )?;
         writeln!(f, "║ Learning Epoch: {}", self.learning_epoch)?;
-        writeln!(f, "╠═══════════════════════════════════════════════════════════╣")?;
+        writeln!(
+            f,
+            "╠═══════════════════════════════════════════════════════════╣"
+        )?;
         writeln!(f, "║ Consciousness Dimensions:")?;
         writeln!(f, "║   {}", self.dimensions)?;
-        writeln!(f, "╚═══════════════════════════════════════════════════════════╝")
+        writeln!(
+            f,
+            "╚═══════════════════════════════════════════════════════════╝"
+        )
     }
 }
 
@@ -587,6 +647,7 @@ mod tests {
         let mut engine = UnifiedConsciousnessEngine::new(config);
 
         println!("\nMode transition test:");
+        let mut phi_values = Vec::new();
         for mode in &[
             CognitiveMode::Focused,
             CognitiveMode::Balanced,
@@ -597,9 +658,31 @@ mod tests {
             let input = ContinuousHV::random(1024, 42);
             let update = engine.process(&input);
 
-            println!("  {:?}: Φ={:.4}, bridges={:.1}%",
-                     mode, update.phi, update.bridge_ratio * 100.0);
+            println!(
+                "  {:?}: Φ={:.4}, bridges={:.1}%",
+                mode,
+                update.phi,
+                update.bridge_ratio * 100.0
+            );
+
+            assert!(update.phi.is_finite(), "{:?} Φ should be finite", mode);
+            assert!(update.phi >= 0.0, "{:?} Φ should be non-negative", mode);
+            assert!(
+                update.bridge_ratio.is_finite(),
+                "{:?} bridge_ratio should be finite",
+                mode
+            );
+            assert!(
+                update.bridge_ratio >= 0.0 && update.bridge_ratio <= 1.0,
+                "{:?} bridge_ratio should be in [0, 1]",
+                mode
+            );
+
+            phi_values.push(update.phi);
         }
+
+        // All modes should produce valid phi values (4 modes processed)
+        assert_eq!(phi_values.len(), 4, "Should have processed all 4 modes");
     }
 
     #[test]
@@ -647,6 +730,6 @@ mod tests {
 
         // Check temporal dimension increases
         let dims = engine.dimensions();
-        assert!(dims.temporal > 0.9);  // Near full buffer
+        assert!(dims.temporal > 0.9); // Near full buffer
     }
 }

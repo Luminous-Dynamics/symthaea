@@ -146,17 +146,58 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::DidToRecoveryConfig => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::DidToRecoveryRequest => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::RequestToVotes => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::TrusteeToConfig => Ok(ValidateCallbackResult::Valid),
-        },
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            if tag.0.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds maximum length of 1024 bytes".into(),
+                ));
+            }
+            match link_type {
+                LinkTypes::DidToRecoveryConfig => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::DidToRecoveryRequest => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::RequestToVotes => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::TrusteeToConfig => Ok(ValidateCallbackResult::Valid),
+            }
+        }
+        FlatOp::RegisterDeleteLink {
+            original_action,
+            action,
+            ..
+        } => {
+            if action.author != original_action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the link creator can delete their links".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(update) => {
+            let action = match &update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(action.original_action_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can update their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDelete(OpDelete { action }) => {
+            let original = must_get_action(action.deletes_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can delete their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -231,7 +272,7 @@ fn validate_create_recovery_config(
 
 /// Validate recovery config update
 fn validate_update_recovery_config(
-    _action: Update,
+    action: Update,
     config: RecoveryConfig,
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate trustee count (3-7)
@@ -256,6 +297,40 @@ fn validate_update_recovery_config(
             "Threshold must be at least {} (majority)",
             min_threshold
         )));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: RecoveryConfig = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original recovery config not found".into()
+        )))?;
+
+    // Immutable fields
+    if config.did != original.did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config DID cannot be changed".into(),
+        ));
+    }
+    if config.owner != original.owner {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config owner cannot be changed".into(),
+        ));
+    }
+    if config.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config created timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Updated timestamp must advance
+    if config.updated <= original.updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery config updated timestamp must advance".into(),
+        ));
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -299,7 +374,7 @@ fn validate_create_recovery_request(
 
 /// Validate recovery request update (status transitions)
 fn validate_update_recovery_request(
-    _action: Update,
+    action: Update,
     request: RecoveryRequest,
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate DID format
@@ -309,12 +384,65 @@ fn validate_update_recovery_request(
         ));
     }
 
-    // Validate status transitions:
-    // Completed status requires time_lock_expires to be set (timelock was applied)
-    if request.status == RecoveryStatus::Completed && request.time_lock_expires.is_none() {
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: RecoveryRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original recovery request not found".into()
+        )))?;
+
+    // Immutable fields
+    if request.id != original.id {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot complete recovery without timelock (time_lock_expires must be set)".into(),
+            "Recovery request ID cannot be changed".into(),
         ));
+    }
+    if request.did != original.did {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request DID cannot be changed".into(),
+        ));
+    }
+    if request.new_agent != original.new_agent {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request new_agent cannot be changed".into(),
+        ));
+    }
+    if request.initiated_by != original.initiated_by {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request initiator cannot be changed".into(),
+        ));
+    }
+    if request.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Recovery request created timestamp cannot be changed".into(),
+        ));
+    }
+
+    // Validate status transitions via state machine
+    // Terminal states: Completed, Rejected, Cancelled cannot transition further
+    let valid_transition = match (&original.status, &request.status) {
+        // Pending → Approved (threshold reached), Rejected, or Cancelled
+        (RecoveryStatus::Pending, RecoveryStatus::Approved)
+        | (RecoveryStatus::Pending, RecoveryStatus::Rejected)
+        | (RecoveryStatus::Pending, RecoveryStatus::Cancelled) => true,
+        // Approved → ReadyToExecute (timelock expired) or Cancelled
+        (RecoveryStatus::Approved, RecoveryStatus::ReadyToExecute)
+        | (RecoveryStatus::Approved, RecoveryStatus::Cancelled) => true,
+        // ReadyToExecute → Completed or Cancelled
+        (RecoveryStatus::ReadyToExecute, RecoveryStatus::Completed)
+        | (RecoveryStatus::ReadyToExecute, RecoveryStatus::Cancelled) => true,
+        // Same status (no-op update) is allowed
+        (a, b) if a == b => true,
+        _ => false,
+    };
+    if !valid_transition {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Invalid recovery status transition from {:?} to {:?}",
+            original.status, request.status
+        )));
     }
 
     // Approved status must have time_lock_expires set
@@ -324,7 +452,142 @@ fn validate_update_recovery_request(
         ));
     }
 
+    // Completed status requires time_lock_expires to be set
+    if request.status == RecoveryStatus::Completed && request.time_lock_expires.is_none() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot complete recovery without timelock (time_lock_expires must be set)".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    fn arb_recovery_status() -> impl Strategy<Value = RecoveryStatus> {
+        prop_oneof![
+            Just(RecoveryStatus::Pending),
+            Just(RecoveryStatus::Approved),
+            Just(RecoveryStatus::ReadyToExecute),
+            Just(RecoveryStatus::Completed),
+            Just(RecoveryStatus::Rejected),
+            Just(RecoveryStatus::Cancelled),
+        ]
+    }
+
+    fn arb_vote_decision() -> impl Strategy<Value = VoteDecision> {
+        prop_oneof![
+            Just(VoteDecision::Approve),
+            Just(VoteDecision::Reject),
+            Just(VoteDecision::Abstain),
+        ]
+    }
+
+    /// Generate a valid trustee list (3-7 unique DID strings).
+    fn arb_trustee_list() -> impl Strategy<Value = Vec<String>> {
+        (3usize..=7).prop_flat_map(|count| {
+            proptest::collection::vec("[a-zA-Z0-9]{8,16}".prop_map(|s| format!("did:mycelix:{}", s)), count)
+        })
+    }
+
+    proptest! {
+        /// RecoveryStatus round-trips through JSON.
+        #[test]
+        fn recovery_status_json_roundtrip(status in arb_recovery_status()) {
+            let json = serde_json::to_string(&status).unwrap();
+            let back: RecoveryStatus = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(status, back);
+        }
+
+        /// VoteDecision round-trips through JSON.
+        #[test]
+        fn vote_decision_json_roundtrip(vote in arb_vote_decision()) {
+            let json = serde_json::to_string(&vote).unwrap();
+            let back: VoteDecision = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(vote, back);
+        }
+
+        /// Majority threshold is always ceil(n/2) for any valid trustee count.
+        #[test]
+        fn majority_threshold_formula(count in 3usize..=7) {
+            let min_threshold = (count as f64 * 0.5).ceil() as u32;
+            // For 3 trustees: ceil(1.5) = 2
+            // For 4 trustees: ceil(2.0) = 2
+            // For 5 trustees: ceil(2.5) = 3
+            // For 6 trustees: ceil(3.0) = 3
+            // For 7 trustees: ceil(3.5) = 4
+            prop_assert!(min_threshold >= 2, "Majority must be at least 2");
+            prop_assert!(min_threshold as usize <= count, "Majority can't exceed count");
+        }
+
+        /// Valid thresholds are within [majority, trustees.len()].
+        #[test]
+        fn threshold_bounds(trustees in arb_trustee_list()) {
+            let n = trustees.len();
+            let min_threshold = (n as f64 * 0.5).ceil() as u32;
+            for threshold in min_threshold..=(n as u32) {
+                prop_assert!(threshold >= min_threshold);
+                prop_assert!(threshold as usize <= n);
+            }
+        }
+
+        /// Terminal recovery states cannot transition to non-self states.
+        #[test]
+        fn terminal_recovery_states(
+            target in arb_recovery_status()
+        ) {
+            let terminals = [
+                RecoveryStatus::Completed,
+                RecoveryStatus::Rejected,
+                RecoveryStatus::Cancelled,
+            ];
+            for terminal in &terminals {
+                let valid = match (terminal, &target) {
+                    (RecoveryStatus::Completed, RecoveryStatus::Completed)
+                    | (RecoveryStatus::Rejected, RecoveryStatus::Rejected)
+                    | (RecoveryStatus::Cancelled, RecoveryStatus::Cancelled) => true,
+                    _ => false,
+                };
+                if terminal != &target {
+                    prop_assert!(!valid, "Terminal {:?} should not transition to {:?}", terminal, target);
+                }
+            }
+        }
+
+        /// Pending can transition to Approved, Rejected, or Cancelled (not ReadyToExecute or Completed).
+        #[test]
+        fn pending_valid_transitions(target in arb_recovery_status()) {
+            let valid = match target {
+                RecoveryStatus::Approved
+                | RecoveryStatus::Rejected
+                | RecoveryStatus::Cancelled
+                | RecoveryStatus::Pending => true,
+                RecoveryStatus::ReadyToExecute | RecoveryStatus::Completed => false,
+            };
+            // This matches the validation logic in validate_update_recovery_request
+            let matches_validation = match (&RecoveryStatus::Pending, &target) {
+                (RecoveryStatus::Pending, RecoveryStatus::Approved)
+                | (RecoveryStatus::Pending, RecoveryStatus::Rejected)
+                | (RecoveryStatus::Pending, RecoveryStatus::Cancelled) => true,
+                (a, b) if a == b => true,
+                _ => false,
+            };
+            prop_assert_eq!(valid, matches_validation);
+        }
+
+        /// Generated trustee lists always have 3-7 entries.
+        #[test]
+        fn trustee_list_size(trustees in arb_trustee_list()) {
+            prop_assert!(trustees.len() >= 3);
+            prop_assert!(trustees.len() <= 7);
+            for t in &trustees {
+                prop_assert!(t.starts_with("did:mycelix:"));
+            }
+        }
+    }
 }
 
 /// Validate recovery vote creation

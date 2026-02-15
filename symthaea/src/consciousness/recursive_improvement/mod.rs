@@ -45,91 +45,100 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 // Core infrastructure for MAGI Loop
-pub mod types;
 pub mod core;
+pub mod types;
 
 // MAGI Loop implementation (World-Grounded Prediction)
-pub mod world_prediction;
+pub mod active_inference_bridge;
 pub mod calibration;
 pub mod constraint_gate;
-pub mod magi_integration;
-pub mod resolution;
-pub mod active_inference_bridge;
-pub mod persistence;
-pub mod runtime;
 pub mod dream_feedback;
+pub mod magi_integration;
+pub mod persistence;
+pub mod resolution;
+pub mod runtime;
+pub mod world_prediction;
 
 // Re-export key types from core infrastructure
 pub use types::{
-    instant_now, calculate_trend,
-    SemanticInput, InputModality, ActionContext, TimeWindow,
+    calculate_trend, instant_now, ActionContext, InputModality, SemanticInput, TimeWindow,
 };
 
 pub use core::{
-    ComponentId, BottleneckType, Bottleneck, ImprovementType,
-    MonitorConfig, ComponentMetrics, PerformanceMonitor, AccuracyMetric,
+    AccuracyMetric, Bottleneck, BottleneckType, ComponentId, ComponentMetrics, ImprovementType,
+    MonitorConfig, PerformanceMonitor,
 };
 
 // MAGI Loop exports (World-Grounded Prediction)
 pub use world_prediction::{
-    WorldPrediction, PredictionDomain, OutcomeCategory, Resolution,
-    RiskTier, WorldActionContext,
-    ResolutionAuthority, ResolutionContract, ContractRegistry,
-    DiffTolerance, ResourceExpectation,
+    ContractRegistry, DiffTolerance, OutcomeCategory, PredictionDomain, Resolution,
+    ResolutionAuthority, ResolutionContract, ResourceExpectation, RiskTier, WorldActionContext,
+    WorldPrediction,
 };
 
 // Calibration exports (MAGI Loop Step 2)
 pub use calibration::{
-    BrierScoreTracker, CalibrationConfig, DomainCalibration,
-    CalibrationSummary, DomainStats, ResolvedPredictionRecord,
+    BrierScoreTracker, CalibrationConfig, CalibrationSummary, DomainCalibration, DomainStats,
+    ResolvedPredictionRecord,
 };
 
 // Constraint Gate exports (MAGI Loop Step 3.5 - UPGRADE B)
 pub use constraint_gate::{
-    ConstraintGate, ConstraintGateConfig, ExecutionMode,
-    GateDecision, GateFactor, GateStatistics,
-    DryRunReason, SupervisionReason,
+    ConstraintGate, ConstraintGateConfig, DryRunReason, ExecutionMode, GateDecision, GateFactor,
+    GateStatistics, SupervisionReason,
 };
 
 // MAGI Loop Integration exports
 pub use magi_integration::{
-    WorldGroundedSelfModel, WorldGroundedConfig,
-    CausalAttribution, MagiLoopState, CalibrationQuality,
+    CalibratedEfe,
+    CalibrationQuality,
+    CausalAttribution,
     // EFE Integration (Phase 3)
-    EfeContribution, EfeWeights, CalibratedEfe,
+    EfeContribution,
+    EfeWeights,
+    MagiLoopState,
+    ModelUpdate,
+    RollbackCondition,
     // Safe Update Protocol (Phase 6)
-    SafeUpdate, SafeUpdateManager, SystemSnapshot, ModelUpdate,
-    RollbackCondition, UpdateStatus, UpdateStatistics,
+    SafeUpdate,
+    SafeUpdateManager,
+    SystemSnapshot,
+    UpdateStatistics,
+    UpdateStatus,
+    WorldGroundedConfig,
+    WorldGroundedSelfModel,
 };
 
 // Active Inference Bridge exports (MAGI + PAC + Signals)
 pub use active_inference_bridge::{
-    ActiveInferenceBridge, ActiveInferenceBridgeConfig,
-    CouplingQuality, BridgeStatistics,
+    ActiveInferenceBridge, ActiveInferenceBridgeConfig, BridgeStatistics, CouplingQuality,
     MagiActiveInferenceController,
 };
 
 // Persistence exports (Epistemic Save File)
 pub use persistence::{
-    PersistenceManager, PersistenceConfig, MagiStateSnapshot,
-    StartupMode, PersistedDomainCalibration, PersistedCausalAttribution,
-    GlobalCalibrationStats, PersistedLoopState,
+    GlobalCalibrationStats,
     // High-level integration
     MagiPersistentModel,
+    MagiStateSnapshot,
+    PersistedCausalAttribution,
+    PersistedDomainCalibration,
+    PersistedLoopState,
+    PersistenceConfig,
+    PersistenceManager,
+    StartupMode,
 };
 
 // Runtime exports (MAGI Loop Heartbeat)
 pub use runtime::{
-    MagiLoopRuntime, RuntimeConfig, RuntimeState,
-    RuntimeSnapshot, RuntimeSignals, RuntimeEvent,
-    RuntimeLogEntry, LogLevel,
-    PendingPrediction, AutoResolveType,
+    AutoResolveType, LogLevel, MagiLoopRuntime, PendingPrediction, RuntimeConfig, RuntimeEvent,
+    RuntimeLogEntry, RuntimeSignals, RuntimeSnapshot, RuntimeState,
 };
 
 // Dream Feedback exports (Counterfactual Learning)
 pub use dream_feedback::{
-    DreamFeedbackBridge, DreamInsight, ActionPrior,
-    ConfidenceAdjustment, DreamFeedbackStats, hash_context,
+    hash_context, ActionPrior, ConfidenceAdjustment, DreamFeedbackBridge, DreamFeedbackStats,
+    DreamInsight,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -138,9 +147,9 @@ pub use dream_feedback::{
 
 // World modeling and routing - these compile cleanly
 #[cfg(feature = "full_consciousness")]
-pub mod world_model;
-#[cfg(feature = "full_consciousness")]
 pub mod routers;
+#[cfg(feature = "full_consciousness")]
+pub mod world_model;
 
 // Self-improvement modules that compile cleanly
 #[cfg(feature = "full_consciousness")]
@@ -187,31 +196,30 @@ pub mod semantic_bridge;
 #[cfg(feature = "recursive_improvement_advanced")]
 pub mod benchmark_suite;
 #[cfg(feature = "recursive_improvement_advanced")]
-pub mod routing_hub;
-#[cfg(feature = "recursive_improvement_advanced")]
 pub mod primitive_semantic_bridge;
+#[cfg(feature = "recursive_improvement_advanced")]
+pub mod routing_hub;
 
 // ── Conditional re-exports for compiled legacy modules ──
 
 #[cfg(feature = "full_consciousness")]
 pub use world_model::{
-    LatentConsciousnessState, ConsciousnessAction, ActionType,
-    ConsciousnessStateDelta, ConsciousnessTransition,
-    WorldModelConfig, WorldModelStats, ConsciousnessWorldModel,
+    ActionType, ConsciousnessAction, ConsciousnessStateDelta, ConsciousnessTransition,
+    ConsciousnessWorldModel, LatentConsciousnessState, WorldModelConfig, WorldModelStats,
 };
 
 #[cfg(feature = "full_consciousness")]
 pub use routers::{
-    RoutingDecision, RouterType, ConsciousnessRouter,
-    DirectRouter, PhiMaximizingRouter, ExploratoryRouter, ConsolidatingRouter,
+    ConsciousnessRouter, ConsolidatingRouter, DirectRouter, ExploratoryRouter, PhiMaximizingRouter,
+    RouterType, RoutingDecision,
 };
 
 #[cfg(feature = "full_consciousness")]
-pub use self_model::{SelfModel, SelfModelConfig};
-#[cfg(feature = "full_consciousness")]
-pub use meta_cognitive::{MetaCognitiveController, MetaCognitiveConfig};
-#[cfg(feature = "full_consciousness")]
 pub use intrinsic_motivation::{IntrinsicMotivationSystem, MotivationConfig};
+#[cfg(feature = "full_consciousness")]
+pub use meta_cognitive::{MetaCognitiveConfig, MetaCognitiveController};
+#[cfg(feature = "full_consciousness")]
+pub use self_model::{SelfModel, SelfModelConfig};
 // semantic_bridge disabled - see module comment above
 // #[cfg(feature = "full_consciousness")]
 // pub use semantic_bridge::{

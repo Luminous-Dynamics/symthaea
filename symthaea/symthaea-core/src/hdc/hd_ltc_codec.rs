@@ -517,8 +517,9 @@ mod tests {
 
         let (recovered, error) = codec.round_trip(&hv);
 
-        println!("Round-trip error: {:.4}", error);
-        println!("Similarity: {:.4}", hv.similarity(&recovered));
+        assert!(error.is_finite(), "Round-trip error should be finite");
+        assert!(error >= 0.0, "Round-trip error should be non-negative");
+        assert_eq!(recovered.len(), hv.len(), "Recovered HV should have same dimension");
     }
 
     #[test]
@@ -532,8 +533,10 @@ mod tests {
         let loss1 = codec.train_step(&hv, &target);
         let loss2 = codec.train_step(&hv, &target);
 
-        // Loss should decrease
-        println!("Loss 1: {:.4}, Loss 2: {:.4}", loss1, loss2);
+        assert!(loss1.is_finite(), "First loss should be finite");
+        assert!(loss2.is_finite(), "Second loss should be finite");
+        assert!(loss1 >= 0.0, "First loss should be non-negative");
+        assert!(loss2 >= 0.0, "Second loss should be non-negative");
     }
 
     #[test]

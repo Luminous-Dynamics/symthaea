@@ -99,10 +99,10 @@ pub struct DissipativeConfig {
 impl Default for DissipativeConfig {
     fn default() -> Self {
         Self {
-            target_lambda: 0.273,  // Langton's edge of chaos
+            target_lambda: 0.273, // Langton's edge of chaos
             max_history: 100,
             criticality_threshold: 0.1,
-            min_entropy_production: 0.01,  // bits/second
+            min_entropy_production: 0.01, // bits/second
             optimal_efficiency_range: (0.3, 0.7),
         }
     }
@@ -204,7 +204,7 @@ impl DissipativeConsciousness {
     pub fn with_config(config: DissipativeConfig) -> Self {
         Self {
             entropy_production_rate: 0.0,
-            criticality_distance: 1.0,  // Start far from criticality
+            criticality_distance: 1.0, // Start far from criticality
             lambda_parameter: 0.5,
             bifurcation_history: VecDeque::with_capacity(config.max_history),
             order_parameter: 0.5,
@@ -234,10 +234,8 @@ impl DissipativeConsciousness {
 
         // Calculate entropy production rate
         // High energy consumption with information processing = entropy production
-        self.entropy_production_rate = self.calculate_entropy_production(
-            energy_consumption,
-            information_processed,
-        );
+        self.entropy_production_rate =
+            self.calculate_entropy_production(energy_consumption, information_processed);
 
         // Update order parameter based on Φ and coherence
         self.order_parameter = self.calculate_order_parameter(phi, coherence);
@@ -297,14 +295,14 @@ impl DissipativeConsciousness {
         // For consciousness: balance between integration and differentiation
 
         let integration = phi;
-        let differentiation = 1.0 - coherence;  // High coherence = low differentiation
+        let differentiation = 1.0 - coherence; // High coherence = low differentiation
 
         // λ = differentiation / (integration + differentiation)
         // When λ ≈ 0.273, system is at edge of chaos
         if integration + differentiation > 0.001 {
             differentiation / (integration + differentiation)
         } else {
-            0.5  // Default to middle
+            0.5 // Default to middle
         }
     }
 
@@ -317,14 +315,11 @@ impl DissipativeConsciousness {
         let bifurcation_threshold = 0.15;
 
         if order_change > bifurcation_threshold {
-            let bifurcation_type = self.classify_bifurcation(
-                prev_order,
-                self.order_parameter,
-                entropy_change,
-            );
+            let bifurcation_type =
+                self.classify_bifurcation(prev_order, self.order_parameter, entropy_change);
 
-            let toward_criticality = self.criticality_distance <
-                (self.lambda_parameter - prev_order * 0.5 - self.config.target_lambda).abs();
+            let toward_criticality = self.criticality_distance
+                < (self.lambda_parameter - prev_order * 0.5 - self.config.target_lambda).abs();
 
             let event = BifurcationEvent {
                 timestamp: Instant::now(),
@@ -392,8 +387,7 @@ impl DissipativeConsciousness {
 
         // Update critical time fraction
         if self.is_critical() {
-            self.stats.critical_time_fraction =
-                0.01 + 0.99 * self.stats.critical_time_fraction;
+            self.stats.critical_time_fraction = 0.01 + 0.99 * self.stats.critical_time_fraction;
         } else {
             self.stats.critical_time_fraction *= 0.99;
         }
@@ -441,7 +435,10 @@ impl DissipativeConsciousness {
     /// - Stable (few bifurcations)
     pub fn health_score(&self) -> f64 {
         // Distance from optimal λ (penalty)
-        let lambda_score = 1.0 - (self.lambda_parameter - self.config.target_lambda).abs().min(1.0);
+        let lambda_score = 1.0
+            - (self.lambda_parameter - self.config.target_lambda)
+                .abs()
+                .min(1.0);
 
         // Entropy production (Goldilocks zone)
         let entropy_score = if self.entropy_production_rate < 0.1 {
@@ -466,7 +463,10 @@ impl DissipativeConsciousness {
         let stability_score = self.stats.stability_index.min(1.0);
 
         // Weighted combination
-        0.35 * lambda_score + 0.25 * entropy_score + 0.25 * efficiency_score + 0.15 * stability_score
+        0.35 * lambda_score
+            + 0.25 * entropy_score
+            + 0.25 * efficiency_score
+            + 0.15 * stability_score
     }
 
     /// Get recommended action to improve dissipative health
@@ -475,23 +475,17 @@ impl DissipativeConsciousness {
         let health = self.health_score();
 
         match regime {
-            ThermodynamicRegime::Equilibrium => {
-                DissipativeAction::IncreaseActivity {
-                    reason: "System near equilibrium - increase information processing".into(),
-                    suggested_increase: 0.3,
-                }
-            }
-            ThermodynamicRegime::Chaotic => {
-                DissipativeAction::IncreaseCoherence {
-                    reason: "System chaotic - increase synchronization".into(),
-                    target_coherence: 0.6,
-                }
-            }
-            ThermodynamicRegime::EdgeOfChaos if health > 0.8 => {
-                DissipativeAction::Maintain {
-                    reason: "Optimal regime - maintain current dynamics".into(),
-                }
-            }
+            ThermodynamicRegime::Equilibrium => DissipativeAction::IncreaseActivity {
+                reason: "System near equilibrium - increase information processing".into(),
+                suggested_increase: 0.3,
+            },
+            ThermodynamicRegime::Chaotic => DissipativeAction::IncreaseCoherence {
+                reason: "System chaotic - increase synchronization".into(),
+                target_coherence: 0.6,
+            },
+            ThermodynamicRegime::EdgeOfChaos if health > 0.8 => DissipativeAction::Maintain {
+                reason: "Optimal regime - maintain current dynamics".into(),
+            },
             _ => {
                 if self.lambda_parameter < self.config.target_lambda {
                     DissipativeAction::IncreaseDifferentiation {
@@ -545,19 +539,11 @@ pub enum DissipativeAction {
         target_coherence: f64,
     },
     /// Increase integration (Φ)
-    IncreaseIntegration {
-        reason: String,
-        target_phi: f64,
-    },
+    IncreaseIntegration { reason: String, target_phi: f64 },
     /// Increase differentiation
-    IncreaseDifferentiation {
-        reason: String,
-        target_lambda: f64,
-    },
+    IncreaseDifferentiation { reason: String, target_lambda: f64 },
     /// Maintain current state
-    Maintain {
-        reason: String,
-    },
+    Maintain { reason: String },
 }
 
 /// Summary of dissipative state
@@ -602,8 +588,11 @@ mod tests {
         }
 
         // Should be near criticality
-        assert!(dc.criticality_distance < 0.2,
-            "Expected near criticality, got d={}", dc.criticality_distance);
+        assert!(
+            dc.criticality_distance < 0.2,
+            "Expected near criticality, got d={}",
+            dc.criticality_distance
+        );
     }
 
     #[test]
@@ -619,8 +608,10 @@ mod tests {
             dc.update(0.73, 0.5, 100.0, 0.73);
         }
         let regime = dc.current_regime();
-        assert!(matches!(regime,
-            ThermodynamicRegime::EdgeOfChaos | ThermodynamicRegime::FarFromEquilibrium));
+        assert!(matches!(
+            regime,
+            ThermodynamicRegime::EdgeOfChaos | ThermodynamicRegime::FarFromEquilibrium
+        ));
     }
 
     #[test]
@@ -631,7 +622,7 @@ mod tests {
         for _ in 0..5 {
             dc.update(0.5, 0.3, 50.0, 0.5);
         }
-        let initial_bifurcations = dc.stats.total_bifurcations;
+        let _initial_bifurcations = dc.stats.total_bifurcations;
 
         // Sudden change - should trigger bifurcation
         dc.update(0.9, 0.8, 200.0, 0.9);

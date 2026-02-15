@@ -1,7 +1,7 @@
 # Mycelix Workspace - Claude Context
 
 **Version**: Holochain 0.6.0
-**Status**: 3 production + 9 beta + 14 scaffold hApps (see [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md))
+**Status**: 7 production + 7 beta + 10 scaffold hApps (see [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md))
 
 ---
 
@@ -22,10 +22,11 @@ just status          # Check status
 
 | Stage | Count | hApps |
 |-------|-------|-------|
-| Production | 3 | core (62 tests), mail (12 zomes), desci (141 tests, REST not hApp) |
-| Beta | 9 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus, civic-happ, lucid |
-| **Cluster** | **2** | **commons** (property+housing+care+mutualaid+water, 28 zomes), **civic** (justice+emergency+media, 16 zomes) |
-| Scaffold | 6 | identity, knowledge, governance, finance, energy, health, space |
+| **Core Four** | **4** | **identity** (9 zomes, 23 sweettests, MFA+PQC+recovery), **governance** (7 zomes, treasury+delegation+DKG), **core FL** (6 zomes, 62 tests, model versioning), **LUCID** (8 zomes, 92 functions, Symthaea bridge 95%) |
+| Production | 3 | mail (12 zomes), desci (141 tests, REST not hApp), space |
+| **Cluster** | **2** | **commons** (property+housing+care+mutualaid+water+food+transport, 35 zomes, 127 tests), **civic** (justice+emergency+media, 16 zomes, 144 tests) |
+| Beta | 7 | marketplace, supplychain, observatory, epistemic-markets, fabrication, edunet, consensus |
+| Scaffold | 3 | knowledge, finance, energy, health |
 | Stub/Other | 3 | bots (Python), music (early), symthaea-bridge |
 | Dormant | 1 | climate |
 
@@ -38,7 +39,7 @@ Full breakdown: [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md)
 ```
 mycelix-workspace/
 ├── happs/           # hApps (symlinks to mycelix-* dirs)
-│   ├── commons/     # → mycelix-commons (28 zomes: property+housing+care+mutualaid+water)
+│   ├── commons/     # → mycelix-commons (34 domain + 1 bridge = 35 zomes: property+housing+care+mutualaid+water+food+transport)
 │   ├── civic/       # → mycelix-civic (16 zomes: justice+emergency+media)
 │   └── ...          # identity, governance, finance, etc.
 ├── sdk/             # Rust SDK (MATL, epistemic, bridge, etc.)
@@ -105,8 +106,17 @@ hc dna pack .
 | Mycelix-Core | 62 | Verified |
 | DeSci | 141 | Verified |
 | Rust SDK | 996 pass (1002 w/ parallel) | Verified 2026-02-04 |
-| TypeScript SDK | 6,316 pass / 15 skip | All pass (libsodium ESM compat fixed) |
+| TypeScript SDK | 6,650 pass / 196 skip | All pass, types aligned to Rust serde values (2026-02-14) |
 | Identity unit | 23 | Pass (recovery + trust_credential) |
+| Commons cluster unit | 2,588 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation across all 35 zomes (35/35 integrity tested) |
+| Civic cluster unit | 1,320 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation across all 16 zomes |
+| Bridge-common | 29 | Shared dispatch types, allowlist validation, rate limiting, typed helpers, audit trail |
+| SDK cluster integration | 49 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster + signal type guards + audit trail |
+| SDK conductor cluster | 22 | Typed convenience, rate limiting, allowlist, audit trail mock tests |
+| Sweettest cross-cluster | 12 | OtherRole dispatch, allowlist enforcement, typed helpers, bidirectional health |
+| Commons sweettest | 14/14 pass | Property, housing, care, mutualaid, water, food, transport, bridge, cross-domain. Run with `--test-threads=2` |
+| Civic sweettest | 14/14 pass | Justice, emergency, media, bridge, cross-domain. Run with `--test-threads=2` |
+| DNA/hApp bundles | 2 | commons (24M, 35 zomes) + civic (12M, 16 zomes) packed and verified |
 | WASM zomes | 66 | Compile to wasm32-unknown-unknown |
 | Sweettest | 15/15 pass | `just test-sweettest` (--release required) |
 | Tryorama | 13 suites | Needs running conductor + hApp bundles |
@@ -116,7 +126,7 @@ See [ECOSYSTEM_STATUS.md](./ECOSYSTEM_STATUS.md) for full details.
 
 ## Development Priorities
 
-1. **P0**: Sweettests passing (15/15). Fix CI `continue-on-error` flags, expand CI sweettest coverage
+1. **P0**: Sweettests passing (28/28 commons+civic). Fix CI `continue-on-error` flags, expand CI sweettest coverage
 2. **P1**: Add `cargo doc` + `cargo test --doc` to CI pipeline
 3. **P2**: Tryorama ecosystem test execution, E2E coverage
 

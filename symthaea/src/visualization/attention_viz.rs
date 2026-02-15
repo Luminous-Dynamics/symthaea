@@ -138,12 +138,8 @@ impl AttentionSnapshot {
     ///
     /// Returns Vec of (index, name, weight) tuples
     pub fn top_k_attended(&self, k: usize) -> Vec<(usize, String, f32)> {
-        let mut indexed: Vec<(usize, f32)> = self
-            .attention_weights
-            .iter()
-            .copied()
-            .enumerate()
-            .collect();
+        let mut indexed: Vec<(usize, f32)> =
+            self.attention_weights.iter().copied().enumerate().collect();
 
         indexed.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap_or(std::cmp::Ordering::Equal));
         indexed.truncate(k);
@@ -191,10 +187,21 @@ impl AttentionSnapshot {
     ///
     /// Shows attention weights as a bar chart using Unicode block characters.
     pub fn to_ascii_bar(&self) -> String {
-        let blocks = [' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}', '\u{2587}', '\u{2588}'];
+        let blocks = [
+            ' ', '\u{2581}', '\u{2582}', '\u{2583}', '\u{2584}', '\u{2585}', '\u{2586}',
+            '\u{2587}', '\u{2588}',
+        ];
 
-        let max_weight = self.attention_weights.iter().cloned().fold(0.0f32, f32::max);
-        let scale = if max_weight > 0.0 { 1.0 / max_weight } else { 1.0 };
+        let max_weight = self
+            .attention_weights
+            .iter()
+            .cloned()
+            .fold(0.0f32, f32::max);
+        let scale = if max_weight > 0.0 {
+            1.0 / max_weight
+        } else {
+            1.0
+        };
 
         let bar: String = self
             .attention_weights
@@ -220,12 +227,7 @@ impl AttentionSnapshot {
         ));
         lines.push("-".repeat(60));
 
-        let max_name_len = self
-            .input_names
-            .iter()
-            .map(|n| n.len())
-            .max()
-            .unwrap_or(10);
+        let max_name_len = self.input_names.iter().map(|n| n.len()).max().unwrap_or(10);
 
         for i in 0..self.attention_weights.len() {
             let name = self
@@ -619,10 +621,7 @@ impl AttentionFlowGraph {
         lines.push("    label=\"Output\";".to_string());
         lines.push("    style=dashed;".to_string());
         for node in &self.outputs {
-            lines.push(format!(
-                "    {} [label=\"{}\"];",
-                node.id, node.label
-            ));
+            lines.push(format!("    {} [label=\"{}\"];", node.id, node.label));
         }
         lines.push("  }".to_string());
         lines.push("".to_string());
@@ -715,12 +714,7 @@ impl AttentionVisualizer {
     }
 
     /// Capture from a PhiAttentionResult using default names
-    pub fn capture(
-        &mut self,
-        result: &PhiAttentionResult,
-        phi_values: &[f64],
-        temperature: f32,
-    ) {
+    pub fn capture(&mut self, result: &PhiAttentionResult, phi_values: &[f64], temperature: f32) {
         let snapshot = if let Some(names) = &self.default_names {
             let name_refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
             AttentionSnapshot::from_result(result, phi_values, name_refs, temperature)
@@ -832,7 +826,11 @@ mod tests {
     #[test]
     fn test_snapshot_creation() {
         let snapshot = AttentionSnapshot::new(
-            vec!["visual".to_string(), "auditory".to_string(), "semantic".to_string()],
+            vec![
+                "visual".to_string(),
+                "auditory".to_string(),
+                "semantic".to_string(),
+            ],
             vec![0.8, 0.3, 0.5],
             vec![0.6, 0.1, 0.3],
             1.0,
@@ -913,12 +911,8 @@ mod tests {
         let mut history = AttentionHistory::with_max_size(3);
 
         for i in 0..10 {
-            let snapshot = AttentionSnapshot::new(
-                vec![format!("input_{}", i)],
-                vec![0.5],
-                vec![1.0],
-                1.0,
-            );
+            let snapshot =
+                AttentionSnapshot::new(vec![format!("input_{}", i)], vec![0.5], vec![1.0], 1.0);
             history.record(snapshot);
         }
 
@@ -1016,8 +1010,7 @@ mod tests {
 
     #[test]
     fn test_visualizer_capture() {
-        let mut viz = AttentionVisualizer::new()
-            .with_input_names(vec!["x", "y", "z"]);
+        let mut viz = AttentionVisualizer::new().with_input_names(vec!["x", "y", "z"]);
 
         // Simulate capturing attention results
         let snapshot = AttentionSnapshot::new(
@@ -1104,14 +1097,24 @@ mod tests {
     #[test]
     fn test_is_focused() {
         let focused = AttentionSnapshot::new(
-            vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string()],
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+            ],
             vec![0.9, 0.1, 0.0, 0.0],
             vec![0.9, 0.05, 0.03, 0.02], // Very focused
             1.0,
         );
 
         let unfocused = AttentionSnapshot::new(
-            vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string()],
+            vec![
+                "a".to_string(),
+                "b".to_string(),
+                "c".to_string(),
+                "d".to_string(),
+            ],
             vec![0.25, 0.25, 0.25, 0.25],
             vec![0.25, 0.25, 0.25, 0.25], // Uniform
             1.0,
@@ -1123,16 +1126,14 @@ mod tests {
 
     #[test]
     fn test_metadata() {
-        let snapshot = AttentionSnapshot::new(
-            vec!["a".to_string()],
-            vec![0.5],
-            vec![1.0],
-            1.0,
-        )
-        .with_metadata("context", "test_run")
-        .with_metadata("iteration", "42");
+        let snapshot = AttentionSnapshot::new(vec!["a".to_string()], vec![0.5], vec![1.0], 1.0)
+            .with_metadata("context", "test_run")
+            .with_metadata("iteration", "42");
 
-        assert_eq!(snapshot.metadata.get("context"), Some(&"test_run".to_string()));
+        assert_eq!(
+            snapshot.metadata.get("context"),
+            Some(&"test_run".to_string())
+        );
         assert_eq!(snapshot.metadata.get("iteration"), Some(&"42".to_string()));
     }
 

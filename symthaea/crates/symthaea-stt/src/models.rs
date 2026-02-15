@@ -24,17 +24,17 @@
 //!     └── decoder
 //! ```
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Write};
 use std::path::Path;
-use serde::{Deserialize, Serialize};
 
-use crate::hdc::HV16;
-use crate::lm::NgramLM;
 use crate::audio::AudioConfig;
 use crate::bootstrap::TrainedPrototypes;
+use crate::hdc::HV16;
 use crate::lm::BeamConfig;
+use crate::lm::NgramLM;
 
 /// Current model format version
 pub const MODEL_VERSION: &str = "1.0.0";
@@ -110,7 +110,8 @@ impl ModelPackage {
     /// Create from trained prototypes
     pub fn from_prototypes(prototypes: &TrainedPrototypes) -> Self {
         let pairs = prototypes.as_pairs();
-        let proto_data: Vec<PrototypeData> = pairs.into_iter()
+        let proto_data: Vec<PrototypeData> = pairs
+            .into_iter()
             .map(|(label, hv)| PrototypeData {
                 label,
                 words: hv.words.to_vec(),
@@ -156,7 +157,9 @@ impl ModelPackage {
 
     /// Add metadata field
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
-        self.metadata.extra.insert(key.to_string(), value.to_string());
+        self.metadata
+            .extra
+            .insert(key.to_string(), value.to_string());
         self
     }
 
@@ -164,7 +167,8 @@ impl ModelPackage {
     pub fn get_prototypes(&self) -> Vec<(String, HV16)> {
         use crate::hdc::HDC_WORDS;
 
-        self.prototypes.iter()
+        self.prototypes
+            .iter()
             .map(|p| {
                 let mut words = [0u128; HDC_WORDS];
                 for (i, &v) in p.words.iter().enumerate().take(HDC_WORDS) {
@@ -194,14 +198,12 @@ impl ModelPackage {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, self)
-            .map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::to_writer_pretty(writer, self).map_err(std::io::Error::other)
     }
 
     /// Save model to compressed binary format
     pub fn save_binary<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
-        let json = serde_json::to_vec(self)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let json = serde_json::to_vec(self).map_err(std::io::Error::other)?;
 
         // Simple compression: just store as-is for now
         // In production, could use flate2 or similar
@@ -214,16 +216,14 @@ impl ModelPackage {
     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader)
-            .map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::from_reader(reader).map_err(std::io::Error::other)
     }
 
     /// Load model from binary format
     pub fn load_binary<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader)
-            .map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::from_reader(reader).map_err(std::io::Error::other)
     }
 
     /// Get model summary as string
@@ -308,16 +308,14 @@ impl ModelRegistry {
     pub fn save<P: AsRef<Path>>(&self, path: P) -> std::io::Result<()> {
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, self)
-            .map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::to_writer_pretty(writer, self).map_err(std::io::Error::other)
     }
 
     /// Load registry from file
     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        serde_json::from_reader(reader)
-            .map_err(|e| std::io::Error::other(e.to_string()))
+        serde_json::from_reader(reader).map_err(std::io::Error::other)
     }
 }
 
@@ -337,13 +335,13 @@ pub mod presets {
     /// Useful for testing and as a starting point.
     pub fn minimal_english() -> ModelPackage {
         let phonemes = [
-            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH",
-            "EH", "ER", "EY", "F", "G", "HH", "IH", "IY", "JH", "K",
-            "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH",
-            "T", "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH",
+            "AA", "AE", "AH", "AO", "AW", "AY", "B", "CH", "D", "DH", "EH", "ER", "EY", "F", "G",
+            "HH", "IH", "IY", "JH", "K", "L", "M", "N", "NG", "OW", "OY", "P", "R", "S", "SH", "T",
+            "TH", "UH", "UW", "V", "W", "Y", "Z", "ZH",
         ];
 
-        let protos: Vec<PrototypeData> = phonemes.iter()
+        let protos: Vec<PrototypeData> = phonemes
+            .iter()
             .map(|&p| PrototypeData {
                 label: p.to_string(),
                 words: HV16::random(p).words.to_vec(),
@@ -453,8 +451,10 @@ fn chrono_lite_now() -> String {
     let minutes = (secs_today % 3600) / 60;
     let seconds = secs_today % 60;
 
-    format!("{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
-            year, month, day, hours, minutes, seconds)
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}Z",
+        year, month, day, hours, minutes, seconds
+    )
 }
 
 fn is_leap_year(year: i64) -> bool {
@@ -500,7 +500,10 @@ mod tests {
 
         assert_eq!(pkg.metadata.description, "Test model");
         assert_eq!(pkg.metadata.training_info, Some("Unit tests".to_string()));
-        assert_eq!(pkg.metadata.extra.get("test_key"), Some(&"test_value".to_string()));
+        assert_eq!(
+            pkg.metadata.extra.get("test_key"),
+            Some(&"test_value".to_string())
+        );
     }
 
     #[test]
@@ -516,14 +519,17 @@ mod tests {
     fn test_model_registry() {
         let mut registry = ModelRegistry::new();
 
-        registry.register("test", ModelInfo {
-            name: "test".to_string(),
-            description: "Test model".to_string(),
-            path: "/path/to/model".to_string(),
-            size: 1024,
-            checksum: None,
-            is_default: true,
-        });
+        registry.register(
+            "test",
+            ModelInfo {
+                name: "test".to_string(),
+                description: "Test model".to_string(),
+                path: "/path/to/model".to_string(),
+                size: 1024,
+                checksum: None,
+                is_default: true,
+            },
+        );
 
         assert_eq!(registry.list().len(), 1);
         assert!(registry.get("test").is_some());

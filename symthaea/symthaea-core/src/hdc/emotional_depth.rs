@@ -64,11 +64,11 @@ pub enum EmotionalComponent {
     Contempt,
 
     // Modifiers (not standalone emotions)
-    Intensity,      // Amplifies other emotions
-    Uncertainty,    // Adds doubt/hesitation
-    Temporal,       // Past/future orientation
-    Social,         // Other-directed
-    SelfDirected,   // Self-directed
+    Intensity,    // Amplifies other emotions
+    Uncertainty,  // Adds doubt/hesitation
+    Temporal,     // Past/future orientation
+    Social,       // Other-directed
+    SelfDirected, // Self-directed
 }
 
 impl EmotionalComponent {
@@ -131,7 +131,10 @@ impl EmotionalComponent {
 
     /// Whether this component can invert (for ambivalence)
     pub fn invertible(&self) -> bool {
-        !matches!(self, Self::Intensity | Self::Temporal | Self::Social | Self::SelfDirected)
+        !matches!(
+            self,
+            Self::Intensity | Self::Temporal | Self::Social | Self::SelfDirected
+        )
     }
 }
 
@@ -143,8 +146,8 @@ impl EmotionalComponent {
 #[derive(Debug, Clone)]
 pub struct WeightedComponent {
     pub component: EmotionalComponent,
-    pub weight: f64,        // 0.0 to 1.0 (relative contribution)
-    pub inverted: bool,     // For emotions like schadenfreude (inverted empathy)
+    pub weight: f64,    // 0.0 to 1.0 (relative contribution)
+    pub inverted: bool, // For emotions like schadenfreude (inverted empathy)
 }
 
 impl WeightedComponent {
@@ -167,7 +170,11 @@ impl WeightedComponent {
     /// Calculate effective valence considering inversion
     pub fn effective_valence(&self) -> f64 {
         let base = self.component.valence();
-        if self.inverted { -base } else { base }
+        if self.inverted {
+            -base
+        } else {
+            base
+        }
     }
 
     /// Calculate effective arousal (inversion doesn't affect arousal)
@@ -239,13 +246,17 @@ impl EmotionalBlend {
             return (0.0, 0.5);
         }
 
-        let valence: f64 = components.iter()
+        let valence: f64 = components
+            .iter()
             .map(|c| c.effective_valence() * c.weight)
-            .sum::<f64>() / total_weight;
+            .sum::<f64>()
+            / total_weight;
 
-        let arousal: f64 = components.iter()
+        let arousal: f64 = components
+            .iter()
             .map(|c| c.effective_arousal() * c.weight)
-            .sum::<f64>() / total_weight;
+            .sum::<f64>()
+            / total_weight;
 
         (valence.clamp(-1.0, 1.0), arousal.clamp(0.0, 1.0))
     }
@@ -257,21 +268,21 @@ impl EmotionalBlend {
         }
 
         // Check for conflicting valences (high conflict = low coherence)
-        let valences: Vec<f64> = components.iter()
-            .map(|c| c.effective_valence())
-            .collect();
+        let valences: Vec<f64> = components.iter().map(|c| c.effective_valence()).collect();
 
         let has_positive = valences.iter().any(|v| *v > 0.3);
         let has_negative = valences.iter().any(|v| *v < -0.3);
 
         // Conflicting emotions reduce coherence but aren't invalid
         // (bittersweet is low coherence but meaningful)
-        let valence_conflict = if has_positive && has_negative { 0.3 } else { 0.0 };
+        let valence_conflict = if has_positive && has_negative {
+            0.3
+        } else {
+            0.0
+        };
 
         // Check for arousal spread (very different arousals reduce coherence)
-        let arousals: Vec<f64> = components.iter()
-            .map(|c| c.effective_arousal())
-            .collect();
+        let arousals: Vec<f64> = components.iter().map(|c| c.effective_arousal()).collect();
         let max_arousal = arousals.iter().cloned().fold(0.0, f64::max);
         let min_arousal = arousals.iter().cloned().fold(1.0, f64::min);
         let arousal_spread = max_arousal - min_arousal;
@@ -286,9 +297,11 @@ impl EmotionalBlend {
 
     /// Dominant emotion (highest weighted)
     pub fn dominant(&self) -> Option<&WeightedComponent> {
-        self.components.iter().max_by(|a, b|
-            a.weight.partial_cmp(&b.weight).unwrap_or(std::cmp::Ordering::Equal)
-        )
+        self.components.iter().max_by(|a, b| {
+            a.weight
+                .partial_cmp(&b.weight)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
     }
 
     /// Get human-readable description
@@ -297,18 +310,25 @@ impl EmotionalBlend {
             return "Neutral".to_string();
         }
 
-        let parts: Vec<String> = self.components.iter()
+        let parts: Vec<String> = self
+            .components
+            .iter()
             .filter(|c| c.weight > 0.1)
             .map(|c| {
-                let intensity = if c.weight > 0.7 { "strong" }
-                    else if c.weight > 0.4 { "moderate" }
-                    else { "mild" };
+                let intensity = if c.weight > 0.7 {
+                    "strong"
+                } else if c.weight > 0.4 {
+                    "moderate"
+                } else {
+                    "mild"
+                };
                 let inversion = if c.inverted { " (inverted)" } else { "" };
                 format!("{} {:?}{}", intensity, c.component, inversion)
             })
             .collect();
 
-        format!("{}: {} [valence: {:.2}, arousal: {:.2}, coherence: {:.2}]",
+        format!(
+            "{}: {} [valence: {:.2}, arousal: {:.2}, coherence: {:.2}]",
             self.name,
             parts.join(" + "),
             self.valence,
@@ -570,13 +590,18 @@ impl EmotionalEncoder {
         }
 
         // Fallback: generate deterministic random HV
-        let seed = self.seed ^ (name.as_bytes().iter().fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(*b as u64)));
+        let seed = self.seed
+            ^ (name
+                .as_bytes()
+                .iter()
+                .fold(0u64, |acc, b| acc.wrapping_mul(31).wrapping_add(*b as u64)));
         BinaryHV::random(seed)
     }
 
     /// Get cached encoding for a component
     pub fn get_component(&self, component: EmotionalComponent) -> BinaryHV {
-        self.component_cache.get(&component)
+        self.component_cache
+            .get(&component)
             .cloned()
             .unwrap_or_else(|| BinaryHV::random(self.seed))
     }
@@ -604,7 +629,8 @@ impl EmotionalEncoder {
 
         // Weighted bundling: superposition of component vectors
         // Weight affects how much each contributes to the final bundle
-        let weighted_hvs: Vec<(BinaryHV, f64)> = components.iter()
+        let weighted_hvs: Vec<(BinaryHV, f64)> = components
+            .iter()
             .map(|c| (self.encode_weighted(c), c.weight))
             .collect();
 
@@ -692,7 +718,7 @@ impl std::fmt::Debug for EmotionalEncoder {
 pub struct EmotionalMoment {
     pub blend: EmotionalBlend,
     pub timestamp: u64,
-    pub trigger: Option<String>,  // What caused this emotional shift
+    pub trigger: Option<String>, // What caused this emotional shift
 }
 
 /// Emotional trajectory - how emotions flow over time
@@ -759,8 +785,8 @@ impl EmotionalTrajectory {
 
         let mut total_change = 0.0;
         for i in 1..recent.len() {
-            let v_diff = (recent[i].blend.valence - recent[i-1].blend.valence).abs();
-            let a_diff = (recent[i].blend.arousal - recent[i-1].blend.arousal).abs();
+            let v_diff = (recent[i].blend.valence - recent[i - 1].blend.valence).abs();
+            let a_diff = (recent[i].blend.arousal - recent[i - 1].blend.arousal).abs();
             total_change += v_diff + a_diff;
         }
 
@@ -781,8 +807,8 @@ impl EmotionalTrajectory {
         let count = (recent.len() - 1) as f64;
 
         for i in 1..recent.len() {
-            valence_delta += recent[i-1].blend.valence - recent[i].blend.valence;
-            arousal_delta += recent[i-1].blend.arousal - recent[i].blend.arousal;
+            valence_delta += recent[i - 1].blend.valence - recent[i].blend.valence;
+            arousal_delta += recent[i - 1].blend.arousal - recent[i].blend.arousal;
         }
 
         valence_delta /= count;
@@ -805,7 +831,9 @@ impl EmotionalTrajectory {
         // Temporal binding: bind each moment with position vector, then bundle
         let time_base = self.encoder.get_component(EmotionalComponent::Temporal);
 
-        let temporal_hvs: Vec<(BinaryHV, f64)> = recent.iter().enumerate()
+        let temporal_hvs: Vec<(BinaryHV, f64)> = recent
+            .iter()
+            .enumerate()
             .map(|(i, moment)| {
                 // Create position vector by permuting time base
                 let position = time_base.permute(i);
@@ -879,7 +907,12 @@ impl EmotionalDepthSystem {
     }
 
     /// Set current emotion to a custom blend
-    pub fn feel_blend(&mut self, name: &str, components: Vec<WeightedComponent>, trigger: Option<String>) {
+    pub fn feel_blend(
+        &mut self,
+        name: &str,
+        components: Vec<WeightedComponent>,
+        trigger: Option<String>,
+    ) {
         let blend = EmotionalBlend::new(name, components, &self.encoder);
         self.trajectory.record(blend.clone(), trigger);
         self.current_blend = blend;
@@ -924,7 +957,8 @@ impl EmotionalDepthSystem {
     /// Check similarity between current state and a compound emotion
     pub fn similarity_to(&self, compound: CompoundEmotion) -> f64 {
         let compound_blend = self.encoder.encode_compound(compound);
-        self.encoder.similarity(&self.current_blend.encoding, &compound_blend.encoding)
+        self.encoder
+            .similarity(&self.current_blend.encoding, &compound_blend.encoding)
     }
 
     /// Get HDC encoding of current emotional trajectory
@@ -957,8 +991,10 @@ impl EmotionalDepthSystem {
              Volatility: {} ({:.2})\n\
              Trajectory length: {} moments",
             self.current_blend.describe(),
-            trend_description, self.trend(),
-            volatility_description, self.volatility(),
+            trend_description,
+            self.trend(),
+            volatility_description,
+            self.volatility(),
             self.trajectory.len()
         )
     }
@@ -1034,9 +1070,15 @@ mod tests {
         let encoder = EmotionalEncoder::new();
 
         // Record some emotions
-        trajectory.record(encoder.encode_compound(CompoundEmotion::Excitement), Some("Good news".into()));
+        trajectory.record(
+            encoder.encode_compound(CompoundEmotion::Excitement),
+            Some("Good news".into()),
+        );
         trajectory.record(encoder.encode_compound(CompoundEmotion::Excitement), None);
-        trajectory.record(encoder.encode_compound(CompoundEmotion::Bittersweet), Some("Farewell".into()));
+        trajectory.record(
+            encoder.encode_compound(CompoundEmotion::Bittersweet),
+            Some("Farewell".into()),
+        );
 
         assert_eq!(trajectory.len(), 3);
         assert!(trajectory.current().is_some());

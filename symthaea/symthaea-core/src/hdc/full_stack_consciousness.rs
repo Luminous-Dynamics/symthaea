@@ -45,12 +45,10 @@
 //! └────────────────────────────────────────────────────────────────────────────┘
 //! ```
 
-use super::unified_understanding::{
-    UnifiedUnderstandingPipeline, DeepUnderstanding, StoryRole,
-};
-use super::grounded_understanding::CausalRelation;
-use super::universal_semantics::SemanticPrime;
 use super::binary_hv::BinaryHV;
+use super::grounded_understanding::CausalRelation;
+use super::unified_understanding::{DeepUnderstanding, StoryRole, UnifiedUnderstandingPipeline};
+use super::universal_semantics::SemanticPrime;
 use std::collections::{HashMap, VecDeque};
 
 // =============================================================================
@@ -152,23 +150,44 @@ impl ActiveInferenceAdapter {
     }
 
     /// Process a DeepUnderstanding and generate prediction errors
-    pub fn process(&mut self, understanding: &DeepUnderstanding) -> Vec<UnderstandingPredictionError> {
+    pub fn process(
+        &mut self,
+        understanding: &DeepUnderstanding,
+    ) -> Vec<UnderstandingPredictionError> {
         let mut errors = Vec::new();
 
         // 1. Semantic coherence prediction
         let semantic_obs = understanding.confidence as f32;
-        let semantic_pred = *self.predictions.get(&InferenceDomain::SemanticCoherence).unwrap();
-        let semantic_prec = *self.precisions.get(&InferenceDomain::SemanticCoherence).unwrap();
+        let semantic_pred = *self
+            .predictions
+            .get(&InferenceDomain::SemanticCoherence)
+            .expect("SemanticCoherence initialized in new()");
+        let semantic_prec = *self
+            .precisions
+            .get(&InferenceDomain::SemanticCoherence)
+            .expect("SemanticCoherence initialized in new()");
         errors.push(UnderstandingPredictionError::new(
-            semantic_pred, semantic_obs, semantic_prec, InferenceDomain::SemanticCoherence
+            semantic_pred,
+            semantic_obs,
+            semantic_prec,
+            InferenceDomain::SemanticCoherence,
         ));
 
         // 2. Emotional state prediction
         let emotion_obs = (understanding.grounded.embodied.valence + 1.0) / 2.0; // Normalize to 0-1
-        let emotion_pred = *self.predictions.get(&InferenceDomain::EmotionalState).unwrap();
-        let emotion_prec = *self.precisions.get(&InferenceDomain::EmotionalState).unwrap();
+        let emotion_pred = *self
+            .predictions
+            .get(&InferenceDomain::EmotionalState)
+            .expect("EmotionalState initialized in new()");
+        let emotion_prec = *self
+            .precisions
+            .get(&InferenceDomain::EmotionalState)
+            .expect("EmotionalState initialized in new()");
         errors.push(UnderstandingPredictionError::new(
-            emotion_pred, emotion_obs, emotion_prec, InferenceDomain::EmotionalState
+            emotion_pred,
+            emotion_obs,
+            emotion_prec,
+            InferenceDomain::EmotionalState,
         ));
 
         // 3. Social dynamics (speaker intention clarity)
@@ -177,34 +196,74 @@ impl ActiveInferenceAdapter {
         } else {
             understanding.speaker_model.intentions[0].confidence
         };
-        let social_pred = *self.predictions.get(&InferenceDomain::SocialDynamics).unwrap();
-        let social_prec = *self.precisions.get(&InferenceDomain::SocialDynamics).unwrap();
+        let social_pred = *self
+            .predictions
+            .get(&InferenceDomain::SocialDynamics)
+            .expect("SocialDynamics initialized in new()");
+        let social_prec = *self
+            .precisions
+            .get(&InferenceDomain::SocialDynamics)
+            .expect("SocialDynamics initialized in new()");
         errors.push(UnderstandingPredictionError::new(
-            social_pred, social_obs, social_prec, InferenceDomain::SocialDynamics
+            social_pred,
+            social_obs,
+            social_prec,
+            InferenceDomain::SocialDynamics,
         ));
 
         // 4. Narrative continuity
         let narrative_obs = understanding.narrative.identity_coherence as f32;
-        let narrative_pred = *self.predictions.get(&InferenceDomain::NarrativeContinuity).unwrap();
-        let narrative_prec = *self.precisions.get(&InferenceDomain::NarrativeContinuity).unwrap();
+        let narrative_pred = *self
+            .predictions
+            .get(&InferenceDomain::NarrativeContinuity)
+            .expect("NarrativeContinuity initialized in new()");
+        let narrative_prec = *self
+            .precisions
+            .get(&InferenceDomain::NarrativeContinuity)
+            .expect("NarrativeContinuity initialized in new()");
         errors.push(UnderstandingPredictionError::new(
-            narrative_pred, narrative_obs, narrative_prec, InferenceDomain::NarrativeContinuity
+            narrative_pred,
+            narrative_obs,
+            narrative_prec,
+            InferenceDomain::NarrativeContinuity,
         ));
 
         // 5. Causal reasoning (was causation detected as expected?)
-        let causal_obs = if understanding.grounded.causal_structure.is_some() { 1.0 } else { 0.0 };
-        let causal_pred = *self.predictions.get(&InferenceDomain::CausalReasoning).unwrap();
-        let causal_prec = *self.precisions.get(&InferenceDomain::CausalReasoning).unwrap();
+        let causal_obs = if understanding.grounded.causal_structure.is_some() {
+            1.0
+        } else {
+            0.0
+        };
+        let causal_pred = *self
+            .predictions
+            .get(&InferenceDomain::CausalReasoning)
+            .expect("CausalReasoning initialized in new()");
+        let causal_prec = *self
+            .precisions
+            .get(&InferenceDomain::CausalReasoning)
+            .expect("CausalReasoning initialized in new()");
         errors.push(UnderstandingPredictionError::new(
-            causal_pred, causal_obs, causal_prec, InferenceDomain::CausalReasoning
+            causal_pred,
+            causal_obs,
+            causal_prec,
+            InferenceDomain::CausalReasoning,
         ));
 
         // 6. Temporal flow (surprise in predictive processing)
         let temporal_obs = 1.0 - understanding.predictive.surprise; // Low surprise = expected
-        let temporal_pred = *self.predictions.get(&InferenceDomain::TemporalFlow).unwrap();
-        let temporal_prec = *self.precisions.get(&InferenceDomain::TemporalFlow).unwrap();
+        let temporal_pred = *self
+            .predictions
+            .get(&InferenceDomain::TemporalFlow)
+            .expect("TemporalFlow initialized in new()");
+        let temporal_prec = *self
+            .precisions
+            .get(&InferenceDomain::TemporalFlow)
+            .expect("TemporalFlow initialized in new()");
         errors.push(UnderstandingPredictionError::new(
-            temporal_pred, temporal_obs, temporal_prec, InferenceDomain::TemporalFlow
+            temporal_pred,
+            temporal_obs,
+            temporal_prec,
+            InferenceDomain::TemporalFlow,
         ));
 
         // Update predictions based on observations (belief update)
@@ -213,7 +272,11 @@ impl ActiveInferenceAdapter {
         }
 
         // Calculate total free energy
-        self.free_energy = errors.iter().map(|e| e.weighted_error.powi(2) as f64).sum::<f64>().sqrt();
+        self.free_energy = errors
+            .iter()
+            .map(|e| e.weighted_error.powi(2) as f64)
+            .sum::<f64>()
+            .sqrt();
 
         // Store history
         for error in errors.iter().cloned() {
@@ -279,9 +342,13 @@ pub enum MemoryEmotion {
 
 impl MemoryEmotion {
     pub fn from_valence(valence: f32) -> Self {
-        if valence > 0.3 { MemoryEmotion::Positive }
-        else if valence < -0.3 { MemoryEmotion::Negative }
-        else { MemoryEmotion::Neutral }
+        if valence > 0.3 {
+            MemoryEmotion::Positive
+        } else if valence < -0.3 {
+            MemoryEmotion::Negative
+        } else {
+            MemoryEmotion::Neutral
+        }
     }
 
     pub fn to_scalar(&self) -> f32 {
@@ -354,7 +421,10 @@ impl EpisodicMemoryAdapter {
             .as_secs();
 
         // Extract tags from entities
-        let mut tags: Vec<String> = understanding.narrative.entities.iter()
+        let mut tags: Vec<String> = understanding
+            .narrative
+            .entities
+            .iter()
             .map(|e| e.name.clone())
             .collect();
 
@@ -380,9 +450,15 @@ impl EpisodicMemoryAdapter {
 
         // Update indices
         for entity in &understanding.narrative.entities {
-            self.entity_index.entry(entity.name.clone()).or_default().push(id);
+            self.entity_index
+                .entry(entity.name.clone())
+                .or_default()
+                .push(id);
         }
-        self.role_index.entry(understanding.narrative.story_role).or_default().push(id);
+        self.role_index
+            .entry(understanding.narrative.story_role)
+            .or_default()
+            .push(id);
 
         // Store trace
         self.traces.push_back(trace.clone());
@@ -404,8 +480,14 @@ impl EpisodicMemoryAdapter {
     }
 
     /// Recall memories by semantic similarity
-    pub fn recall_by_similarity(&mut self, query: &BinaryHV, top_k: usize) -> Vec<&UnderstandingMemoryTrace> {
-        let mut scored: Vec<(f32, u64)> = self.traces.iter()
+    pub fn recall_by_similarity(
+        &mut self,
+        query: &BinaryHV,
+        top_k: usize,
+    ) -> Vec<&UnderstandingMemoryTrace> {
+        let mut scored: Vec<(f32, u64)> = self
+            .traces
+            .iter()
             .map(|t| (query.similarity(&t.encoding), t.id))
             .collect();
 
@@ -421,7 +503,10 @@ impl EpisodicMemoryAdapter {
             }
         }
 
-        self.traces.iter().filter(|t| top_ids.contains(&t.id)).collect()
+        self.traces
+            .iter()
+            .filter(|t| top_ids.contains(&t.id))
+            .collect()
     }
 
     /// Recall memories by entity
@@ -477,25 +562,16 @@ pub enum UnderstandingCognitiveEvent {
         surprise: f32,
     },
     /// Uncertainty detected (unknown words, ambiguous meaning)
-    UncertaintyDetected {
-        source: String,
-        level: f32,
-    },
+    UncertaintyDetected { source: String, level: f32 },
     /// Error in understanding (contradiction, missing context)
     UnderstandingError {
         error_type: UnderstandingErrorType,
         severity: f32,
     },
     /// Word learned during processing
-    WordLearned {
-        word: String,
-        confidence: f32,
-    },
+    WordLearned { word: String, confidence: f32 },
     /// Narrative continuity maintained/broken
-    NarrativeEvent {
-        coherence: f64,
-        role_change: bool,
-    },
+    NarrativeEvent { coherence: f64, role_change: bool },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -576,40 +652,45 @@ impl MetacognitiveAdapter {
         }
 
         // Generate events
-        self.events.push_back(UnderstandingCognitiveEvent::UnderstandingComplete {
-            phi: understanding.integration_phi,
-            confidence: understanding.confidence,
-            surprise: understanding.predictive.surprise,
-        });
+        self.events
+            .push_back(UnderstandingCognitiveEvent::UnderstandingComplete {
+                phi: understanding.integration_phi,
+                confidence: understanding.confidence,
+                surprise: understanding.predictive.surprise,
+            });
 
         // Check for uncertainty (high surprise or low confidence)
         if understanding.predictive.surprise > 0.7 {
-            self.events.push_back(UnderstandingCognitiveEvent::UncertaintyDetected {
-                source: "predictive_processing".to_string(),
-                level: understanding.predictive.surprise,
-            });
+            self.events
+                .push_back(UnderstandingCognitiveEvent::UncertaintyDetected {
+                    source: "predictive_processing".to_string(),
+                    level: understanding.predictive.surprise,
+                });
         }
 
         if understanding.confidence < 0.5 {
-            self.events.push_back(UnderstandingCognitiveEvent::UncertaintyDetected {
-                source: "semantic_decomposition".to_string(),
-                level: (1.0 - understanding.confidence) as f32,
-            });
+            self.events
+                .push_back(UnderstandingCognitiveEvent::UncertaintyDetected {
+                    source: "semantic_decomposition".to_string(),
+                    level: (1.0 - understanding.confidence) as f32,
+                });
         }
 
         // Record learned words
         for word in &understanding.learned_words {
-            self.events.push_back(UnderstandingCognitiveEvent::WordLearned {
-                word: word.word.clone(),
-                confidence: word.confidence,
-            });
+            self.events
+                .push_back(UnderstandingCognitiveEvent::WordLearned {
+                    word: word.word.clone(),
+                    confidence: word.confidence,
+                });
         }
 
         // Narrative coherence event
-        self.events.push_back(UnderstandingCognitiveEvent::NarrativeEvent {
-            coherence: understanding.narrative.identity_coherence,
-            role_change: false, // Would need to track previous role
-        });
+        self.events
+            .push_back(UnderstandingCognitiveEvent::NarrativeEvent {
+                coherence: understanding.narrative.identity_coherence,
+                role_change: false, // Would need to track previous role
+            });
 
         while self.events.len() > 100 {
             self.events.pop_front();
@@ -649,7 +730,10 @@ impl MetacognitiveAdapter {
             issues.push("Low narrative coherence".to_string());
         }
         if !understanding.learned_words.is_empty() {
-            issues.push(format!("Learned {} new words", understanding.learned_words.len()));
+            issues.push(format!(
+                "Learned {} new words",
+                understanding.learned_words.len()
+            ));
         }
 
         // Determine recommendation
@@ -787,30 +871,39 @@ impl CounterfactualEngine {
                 strength: causal.strength as f32,
                 relation: causal.relation,
             };
-            self.causal_graph.entry(causal.cause.clone()).or_default().push(edge);
+            self.causal_graph
+                .entry(causal.cause.clone())
+                .or_default()
+                .push(edge);
         }
 
         // Learn entity valences
         for entity in &understanding.narrative.entities {
-            let entry = self.entity_valences.entry(entity.name.clone()).or_insert(0.0);
+            let entry = self
+                .entity_valences
+                .entry(entity.name.clone())
+                .or_insert(0.0);
             // Exponential moving average
             *entry = 0.8 * *entry + 0.2 * entity.valence;
         }
 
         // Update baseline free energy
-        self.baseline_free_energy = 0.9 * self.baseline_free_energy
-            + 0.1 * understanding.predictive.free_energy as f32;
+        self.baseline_free_energy =
+            0.9 * self.baseline_free_energy + 0.1 * understanding.predictive.free_energy as f32;
     }
 
     /// Generate a counterfactual scenario
-    pub fn imagine(&self, query: CounterfactualQuery, context: &DeepUnderstanding) -> Counterfactual {
+    pub fn imagine(
+        &self,
+        query: CounterfactualQuery,
+        context: &DeepUnderstanding,
+    ) -> Counterfactual {
         match query {
-            CounterfactualQuery::Negation { event } => {
-                self.imagine_negation(&event, context)
-            }
-            CounterfactualQuery::Substitution { variable, new_value } => {
-                self.imagine_substitution(&variable, &new_value, context)
-            }
+            CounterfactualQuery::Negation { event } => self.imagine_negation(&event, context),
+            CounterfactualQuery::Substitution {
+                variable,
+                new_value,
+            } => self.imagine_substitution(&variable, &new_value, context),
             CounterfactualQuery::Hypothetical { scenario } => {
                 self.imagine_hypothetical(&scenario, context)
             }
@@ -862,7 +955,12 @@ impl CounterfactualEngine {
         }
     }
 
-    fn imagine_substitution(&self, variable: &str, new_value: &str, context: &DeepUnderstanding) -> Counterfactual {
+    fn imagine_substitution(
+        &self,
+        variable: &str,
+        new_value: &str,
+        context: &DeepUnderstanding,
+    ) -> Counterfactual {
         let original_valence = self.entity_valences.get(variable).copied().unwrap_or(0.0);
 
         // Estimate new valence based on new_value sentiment
@@ -933,7 +1031,10 @@ impl CounterfactualEngine {
         let causal_path = if causes.is_empty() {
             vec![format!("No known causes for '{}'", effect)]
         } else {
-            causes.iter().map(|(c, s)| format!("'{}' (strength: {:.2}) → '{}'", c, s, effect)).collect()
+            causes
+                .iter()
+                .map(|(c, s)| format!("'{}' (strength: {:.2}) → '{}'", c, s, effect))
+                .collect()
         };
 
         let outcome = CounterfactualOutcome {
@@ -962,16 +1063,27 @@ impl CounterfactualEngine {
         let mut causal_path = vec![format!("If you do '{}' now:", action)];
 
         for edge in &effects {
-            let effect_valence = self.entity_valences.get(&edge.effect).copied().unwrap_or(0.0);
+            let effect_valence = self
+                .entity_valences
+                .get(&edge.effect)
+                .copied()
+                .unwrap_or(0.0);
             total_valence += effect_valence * edge.strength;
-            causal_path.push(format!("  → Could lead to '{}' (conf: {:.0}%)", edge.effect, edge.strength * 100.0));
+            causal_path.push(format!(
+                "  → Could lead to '{}' (conf: {:.0}%)",
+                edge.effect,
+                edge.strength * 100.0
+            ));
         }
 
         // If no known effects, estimate from action keywords
         if effects.is_empty() {
             let estimated_valence = self.estimate_valence(action);
             total_valence = estimated_valence;
-            causal_path.push(format!("  → Estimated outcome valence: {:+.2}", estimated_valence));
+            causal_path.push(format!(
+                "  → Estimated outcome valence: {:+.2}",
+                estimated_valence
+            ));
         }
 
         let outcome = CounterfactualOutcome {
@@ -996,11 +1108,21 @@ impl CounterfactualEngine {
         let text_lower = text.to_lowercase();
 
         // Simple keyword-based valence estimation
-        let positive_words = ["happy", "good", "love", "help", "success", "better", "joy", "peace"];
-        let negative_words = ["sad", "bad", "hate", "hurt", "fail", "worse", "pain", "angry"];
+        let positive_words = [
+            "happy", "good", "love", "help", "success", "better", "joy", "peace",
+        ];
+        let negative_words = [
+            "sad", "bad", "hate", "hurt", "fail", "worse", "pain", "angry",
+        ];
 
-        let pos_count = positive_words.iter().filter(|w| text_lower.contains(*w)).count();
-        let neg_count = negative_words.iter().filter(|w| text_lower.contains(*w)).count();
+        let pos_count = positive_words
+            .iter()
+            .filter(|w| text_lower.contains(*w))
+            .count();
+        let neg_count = negative_words
+            .iter()
+            .filter(|w| text_lower.contains(*w))
+            .count();
 
         let total = (pos_count + neg_count).max(1) as f32;
         (pos_count as f32 - neg_count as f32) / total
@@ -1111,13 +1233,18 @@ impl FullStackConsciousness {
             InferenceDomain::NarrativeContinuity,
             InferenceDomain::CausalReasoning,
             InferenceDomain::TemporalFlow,
-        ].iter().map(|&d| (d, self.inference.precision(d))).collect();
+        ]
+        .iter()
+        .map(|&d| (d, self.inference.precision(d)))
+        .collect();
 
         // 3. Episodic memory encoding
         let trace = self.memory.encode(&understanding);
 
         // 4. Recall related memories
-        let recalled = self.memory.recall_by_similarity(&understanding.grounded.semantic_hv, 3);
+        let recalled = self
+            .memory
+            .recall_by_similarity(&understanding.grounded.semantic_hv, 3);
         let recalled_memories: Vec<String> = recalled.iter().map(|t| t.text.clone()).collect();
 
         // 5. Metacognitive assessment
@@ -1132,8 +1259,10 @@ impl FullStackConsciousness {
             if let Some(ref causal) = understanding.grounded.causal_structure {
                 // "What if the cause hadn't happened?"
                 counterfactuals.push(self.counterfactual.imagine(
-                    CounterfactualQuery::Negation { event: causal.cause.clone() },
-                    &understanding
+                    CounterfactualQuery::Negation {
+                        event: causal.cause.clone(),
+                    },
+                    &understanding,
                 ));
             }
 
@@ -1141,8 +1270,10 @@ impl FullStackConsciousness {
             if !understanding.speaker_model.intentions.is_empty() {
                 let action = &understanding.speaker_model.intentions[0].goal;
                 counterfactuals.push(self.counterfactual.imagine(
-                    CounterfactualQuery::ActionSimulation { action: action.clone() },
-                    &understanding
+                    CounterfactualQuery::ActionSimulation {
+                        action: action.clone(),
+                    },
+                    &understanding,
                 ));
             }
         }
@@ -1150,7 +1281,8 @@ impl FullStackConsciousness {
         let latency_ms = start.elapsed().as_millis() as u64;
 
         // Calculate overall consciousness Φ
-        let consciousness_phi = self.calculate_overall_phi(&understanding, &assessment, total_free_energy);
+        let consciousness_phi =
+            self.calculate_overall_phi(&understanding, &assessment, total_free_energy);
 
         ConsciousComprehension {
             understanding,
@@ -1172,7 +1304,12 @@ impl FullStackConsciousness {
         }
     }
 
-    fn calculate_overall_phi(&self, understanding: &DeepUnderstanding, assessment: &UnderstandingAssessment, free_energy: f64) -> f64 {
+    fn calculate_overall_phi(
+        &self,
+        understanding: &DeepUnderstanding,
+        assessment: &UnderstandingAssessment,
+        free_energy: f64,
+    ) -> f64 {
         // Integrate multiple sources of Φ:
         // 1. Base understanding Φ
         // 2. Metacognitive confidence
@@ -1212,7 +1349,11 @@ impl FullStackConsciousness {
     }
 
     /// Ask a counterfactual question
-    pub fn ask_counterfactual(&self, query: CounterfactualQuery, context: &DeepUnderstanding) -> Counterfactual {
+    pub fn ask_counterfactual(
+        &self,
+        query: CounterfactualQuery,
+        context: &DeepUnderstanding,
+    ) -> Counterfactual {
         self.counterfactual.imagine(query, context)
     }
 }
@@ -1273,8 +1414,15 @@ mod tests {
         // Query related
         let result = stack.comprehend("Sarah was always a good friend");
 
-        // Verify memory tracking initialized
-        let _ = result.memory.recalled_count;
+        // Phi should be valid after recall
+        assert!(
+            result.consciousness_phi.is_finite(),
+            "Phi should be finite after recall"
+        );
+        assert!(
+            result.consciousness_phi >= 0.0,
+            "Phi should be non-negative"
+        );
     }
 
     #[test]

@@ -4,10 +4,8 @@
 //! This is the core of hallucination prevention - every claim must be
 //! epistemically verified before being presented.
 
+use super::types::{EpistemicStatus, ResearchSource, VerifiedClaim, WebResearchResult};
 use std::collections::HashMap;
-use super::types::{
-    EpistemicStatus, WebResearchResult, VerifiedClaim, ResearchSource,
-};
 
 /// Configuration for the epistemic verifier
 #[derive(Debug, Clone)]
@@ -137,17 +135,15 @@ impl EpistemicVerifier {
     }
 
     /// Verify a claim against collected evidence
-    pub fn verify_claim(
-        &self,
-        claim: &str,
-        context: &VerificationContext,
-    ) -> VerificationResult {
+    pub fn verify_claim(&self, claim: &str, context: &VerificationContext) -> VerificationResult {
         if context.sources.is_empty() {
             return VerificationResult {
                 claim: claim.to_string(),
                 status: EpistemicStatus::InsufficientEvidence,
                 confidence: 0.2,
-                hedge: EpistemicStatus::InsufficientEvidence.hedge_phrase().to_string(),
+                hedge: EpistemicStatus::InsufficientEvidence
+                    .hedge_phrase()
+                    .to_string(),
                 supporting_sources: vec![],
                 contradicting_sources: vec![],
                 reasoning: "No sources available for verification".to_string(),
@@ -201,11 +197,7 @@ impl EpistemicVerifier {
     }
 
     /// Verify a claim from research results
-    pub fn verify_from_results(
-        &self,
-        claim: &str,
-        results: &[WebResearchResult],
-    ) -> VerifiedClaim {
+    pub fn verify_from_results(&self, claim: &str, results: &[WebResearchResult]) -> VerifiedClaim {
         // Build verification context from results
         let sources: Vec<SourceEvidence> = results
             .iter()
@@ -241,13 +233,15 @@ impl EpistemicVerifier {
     /// Get credibility score for a source
     fn get_source_credibility(&self, source: &SourceEvidence) -> f32 {
         // Start with domain credibility
-        let domain_cred = self.domain_credibility
+        let domain_cred = self
+            .domain_credibility
             .get(&source.domain)
             .copied()
             .unwrap_or(0.5);
 
         // Apply source type multiplier
-        let type_mult = self.source_type_credibility
+        let type_mult = self
+            .source_type_credibility
             .get(&source.source_type)
             .copied()
             .unwrap_or(0.6);
@@ -297,10 +291,7 @@ impl EpistemicVerifier {
             return (
                 EpistemicStatus::HighConfidence,
                 confidence,
-                format!(
-                    "Strongly supported by {} reliable sources",
-                    support_count
-                ),
+                format!("Strongly supported by {} reliable sources", support_count),
             );
         }
 
@@ -309,10 +300,7 @@ impl EpistemicVerifier {
             return (
                 EpistemicStatus::ModerateConfidence,
                 confidence,
-                format!(
-                    "Supported by {} sources",
-                    support_count
-                ),
+                format!("Supported by {} sources", support_count),
             );
         }
 
@@ -321,10 +309,7 @@ impl EpistemicVerifier {
             return (
                 EpistemicStatus::LowConfidence,
                 confidence,
-                format!(
-                    "Limited support from {} source(s)",
-                    support_count
-                ),
+                format!("Limited support from {} source(s)", support_count),
             );
         }
 
@@ -351,7 +336,8 @@ impl EpistemicVerifier {
         let current = self.domain_credibility.get(domain).copied().unwrap_or(0.5);
         let adjustment = if outcome_correct { 0.02 } else { -0.05 };
         let new_value = (current + adjustment).clamp(0.1, 0.99);
-        self.domain_credibility.insert(domain.to_string(), new_value);
+        self.domain_credibility
+            .insert(domain.to_string(), new_value);
     }
 
     /// Get current domain credibility
@@ -361,7 +347,8 @@ impl EpistemicVerifier {
 
     /// Add a known credible domain
     pub fn add_credible_domain(&mut self, domain: String, credibility: f32) {
-        self.domain_credibility.insert(domain, credibility.clamp(0.0, 1.0));
+        self.domain_credibility
+            .insert(domain, credibility.clamp(0.0, 1.0));
     }
 }
 

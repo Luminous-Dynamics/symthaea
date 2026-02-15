@@ -61,8 +61,8 @@ pub struct SparseMatrix {
 impl SparseMatrix {
     /// Create a random sparse matrix with deterministic seed
     pub fn random_sparse(rows: usize, cols: usize, sparsity: f32, seed: u64) -> Self {
-        use rand::SeedableRng;
         use rand::Rng;
+        use rand::SeedableRng;
         let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(seed);
         let connectivity = 1.0 - sparsity; // sparsity=0.9 means 10% connected
 
@@ -82,7 +82,13 @@ impl SparseMatrix {
         }
 
         Self {
-            inner: CsrMatrix { rows, cols, values, col_indices, row_ptrs },
+            inner: CsrMatrix {
+                rows,
+                cols,
+                values,
+                col_indices,
+                row_ptrs,
+            },
         }
     }
 
@@ -128,8 +134,8 @@ impl Default for HierarchicalConfig {
             num_circuits: 16,
             circuit_size: 64,
             global_size: 128,
-            local_sparsity: 0.15,  // 15% local connectivity
-            inter_sparsity: 0.10,  // 10% inter-circuit
+            local_sparsity: 0.15, // 15% local connectivity
+            inter_sparsity: 0.10, // 10% inter-circuit
             dt: 0.01,
             parallel: true,
         }
@@ -145,12 +151,12 @@ impl HierarchicalConfig {
     /// Create config for consciousness-optimized network
     pub fn consciousness_optimized() -> Self {
         Self {
-            num_circuits: 16,      // 16 cortical column analogs
-            circuit_size: 64,      // Rich local processing
-            global_size: 128,      // Substantial workspace
-            local_sparsity: 0.20,  // Dense local
-            inter_sparsity: 0.05,  // Sparse global
-            dt: 0.005,             // Fine integration
+            num_circuits: 16,     // 16 cortical column analogs
+            circuit_size: 64,     // Rich local processing
+            global_size: 128,     // Substantial workspace
+            local_sparsity: 0.20, // Dense local
+            inter_sparsity: 0.05, // Sparse global
+            dt: 0.005,            // Fine integration
             parallel: true,
         }
     }
@@ -218,7 +224,7 @@ impl LocalCircuit {
                 let mut hasher = DefaultHasher::new();
                 (circuit_seed, i, "state").hash(&mut hasher);
                 let hash = hasher.finish();
-                (hash % 1000) as f32 / 10000.0 - 0.05  // [-0.05, 0.05]
+                (hash % 1000) as f32 / 10000.0 - 0.05 // [-0.05, 0.05]
             })
             .collect();
 
@@ -228,7 +234,7 @@ impl LocalCircuit {
                 let mut hasher = DefaultHasher::new();
                 (circuit_seed, i, "tau").hash(&mut hasher);
                 let hash = hasher.finish();
-                0.3 + 0.7 * (hash % 1000) as f32 / 1000.0  // [0.3, 1.0]
+                0.3 + 0.7 * (hash % 1000) as f32 / 1000.0 // [0.3, 1.0]
             })
             .collect();
 
@@ -241,7 +247,7 @@ impl LocalCircuit {
                 let mut hasher = DefaultHasher::new();
                 (circuit_seed, i, "bias").hash(&mut hasher);
                 let hash = hasher.finish();
-                (hash % 1000) as f32 / 2000.0 - 0.25  // [-0.25, 0.25]
+                (hash % 1000) as f32 / 2000.0 - 0.25 // [-0.25, 0.25]
             })
             .collect();
 
@@ -374,7 +380,7 @@ impl GlobalIntegrator {
                 let mut hasher = DefaultHasher::new();
                 (global_seed, i, "tau").hash(&mut hasher);
                 let hash = hasher.finish();
-                0.5 + 1.0 * (hash % 1000) as f32 / 1000.0  // [0.5, 1.5]
+                0.5 + 1.0 * (hash % 1000) as f32 / 1000.0 // [0.5, 1.5]
             })
             .collect();
 
@@ -445,9 +451,8 @@ impl GlobalIntegrator {
     /// Compute workspace coherence (variance-normalized activity)
     pub fn coherence(&self) -> f32 {
         let mean = self.state.iter().sum::<f32>() / self.size as f32;
-        let variance = self.state.iter()
-            .map(|x| (x - mean).powi(2))
-            .sum::<f32>() / self.size as f32;
+        let variance =
+            self.state.iter().map(|x| (x - mean).powi(2)).sum::<f32>() / self.size as f32;
 
         // Higher coherence when variance is low (synchronized activity)
         1.0 / (1.0 + variance.sqrt())
@@ -515,7 +520,7 @@ impl HierarchicalLTC {
         let inter_circuit = SparseMatrix::random_sparse(
             total_local,
             total_local,
-            config.inter_sparsity * 0.5,  // Very sparse
+            config.inter_sparsity * 0.5, // Very sparse
             seed.wrapping_add(888_888),
         );
 
@@ -588,7 +593,8 @@ impl HierarchicalLTC {
         }
 
         // Phase 3: Global integration
-        let output_refs: Vec<&[f32]> = self.circuit_output_refs
+        let output_refs: Vec<&[f32]> = self
+            .circuit_output_refs
             .iter()
             .map(|v| v.as_slice())
             .collect();
@@ -623,10 +629,11 @@ impl HierarchicalLTC {
 
     /// Compute total network activity
     pub fn total_activity(&self) -> f32 {
-        let circuit_activity: f32 = self.circuits.iter()
-            .map(|c| c.activity())
-            .sum();
-        let global_activity: f32 = self.global.state().iter()
+        let circuit_activity: f32 = self.circuits.iter().map(|c| c.activity()).sum();
+        let global_activity: f32 = self
+            .global
+            .state()
+            .iter()
             .map(|x| x * x)
             .sum::<f32>()
             .sqrt();
@@ -676,7 +683,9 @@ impl HierarchicalLTC {
             for (j, circuit_b) in self.circuits.iter().enumerate() {
                 if i != j {
                     // Correlation as information flow proxy
-                    let corr = circuit_a.output().iter()
+                    let corr = circuit_a
+                        .output()
+                        .iter()
                         .zip(circuit_b.output().iter())
                         .map(|(a, b)| a * b)
                         .sum::<f32>();
@@ -697,13 +706,11 @@ impl HierarchicalLTC {
     ///
     /// Measures how much local information reaches global workspace
     pub fn workspace_access(&self) -> f32 {
-        let global_activity = self.global.state().iter()
-            .map(|x| x.abs())
-            .sum::<f32>() / self.config.global_size as f32;
+        let global_activity = self.global.state().iter().map(|x| x.abs()).sum::<f32>()
+            / self.config.global_size as f32;
 
-        let local_activity: f32 = self.circuits.iter()
-            .map(|c| c.activity())
-            .sum::<f32>() / self.circuits.len() as f32;
+        let local_activity: f32 =
+            self.circuits.iter().map(|c| c.activity()).sum::<f32>() / self.circuits.len() as f32;
 
         // Ratio of global to local activity
         if local_activity > 0.001 {
@@ -727,10 +734,10 @@ impl HierarchicalLTC {
         for (i, circuit_a) in self.circuits.iter().enumerate() {
             for circuit_b in self.circuits.iter().skip(i + 1) {
                 // Compute correlation as coherence measure
-                let mean_a = circuit_a.output().iter().sum::<f32>()
-                    / circuit_a.output().len() as f32;
-                let mean_b = circuit_b.output().iter().sum::<f32>()
-                    / circuit_b.output().len() as f32;
+                let mean_a =
+                    circuit_a.output().iter().sum::<f32>() / circuit_a.output().len() as f32;
+                let mean_b =
+                    circuit_b.output().iter().sum::<f32>() / circuit_b.output().len() as f32;
 
                 let mut cov = 0.0f32;
                 let mut var_a = 0.0f32;
@@ -818,9 +825,9 @@ mod tests {
         println!("  B (binding):     {:.3}", binding);
 
         // Metrics should be in valid range
-        assert!(phi >= 0.0 && phi <= 1.0);
-        assert!(workspace >= 0.0 && workspace <= 1.0);
-        assert!(binding >= 0.0 && binding <= 1.0);
+        assert!((0.0..=1.0).contains(&phi));
+        assert!((0.0..=1.0).contains(&workspace));
+        assert!((0.0..=1.0).contains(&binding));
     }
 
     #[test]

@@ -5,13 +5,13 @@
 //! - IPC (Unix socket from shell/GUI clients)
 //! - Programmatic (library embedding)
 
-use std::io::{self, Write, BufRead, BufReader};
-use std::sync::mpsc::{self, Receiver, Sender};
 use std::collections::VecDeque;
+use std::io::{self, BufRead, BufReader, Write};
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::time::Duration;
 
 use anyhow::Result;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // I/O EVENTS

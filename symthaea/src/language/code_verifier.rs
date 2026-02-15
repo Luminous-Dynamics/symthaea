@@ -17,7 +17,7 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-use super::code_parser::{ParsedCode, CodeDiagnostic, DiagnosticSeverity};
+use super::code_parser::{CodeDiagnostic, DiagnosticSeverity, ParsedCode};
 use crate::hdc::code_encoder::CodeHDEncoder;
 
 /// Default similarity threshold for verification to pass
@@ -59,7 +59,10 @@ impl VerificationResult {
                 reasons.push(format!("{} syntax errors", self.syntax_errors.len()));
             }
             if !self.passes_threshold {
-                reasons.push(format!("similarity {:.3} below threshold", self.semantic_similarity));
+                reasons.push(format!(
+                    "similarity {:.3} below threshold",
+                    self.semantic_similarity
+                ));
             }
             format!("Verification FAILED: {}", reasons.join(", "))
         }
@@ -109,12 +112,16 @@ impl CodeVerifier {
         intent_hv: &ContinuousHV,
     ) -> VerificationResult {
         // Check syntax
-        let syntax_errors: Vec<CodeDiagnostic> = parsed.diagnostics.iter()
+        let syntax_errors: Vec<CodeDiagnostic> = parsed
+            .diagnostics
+            .iter()
             .filter(|d| d.severity == DiagnosticSeverity::Error)
             .cloned()
             .collect();
 
-        let warnings: Vec<CodeDiagnostic> = parsed.diagnostics.iter()
+        let warnings: Vec<CodeDiagnostic> = parsed
+            .diagnostics
+            .iter()
             .filter(|d| d.severity == DiagnosticSeverity::Warning)
             .cloned()
             .collect();
@@ -156,7 +163,8 @@ impl CodeVerifier {
         let original_entities = original.all_entities();
         let transformed_entities = transformed.all_entities();
 
-        let entity_count_diff = (original_entities.len() as i32 - transformed_entities.len() as i32).abs();
+        let entity_count_diff =
+            (original_entities.len() as i32 - transformed_entities.len() as i32).abs();
 
         EquivalenceResult {
             semantic_similarity: similarity,
@@ -169,7 +177,9 @@ impl CodeVerifier {
 
     /// Quick syntax-only verification (no HDC comparison)
     pub fn verify_syntax(&self, parsed: &ParsedCode) -> bool {
-        parsed.diagnostics.iter()
+        parsed
+            .diagnostics
+            .iter()
             .all(|d| d.severity != DiagnosticSeverity::Error)
     }
 }
@@ -196,9 +206,12 @@ mod tests {
 
     fn test_span() -> Span {
         Span {
-            start_byte: 0, end_byte: 10,
-            start_line: 0, start_col: 0,
-            end_line: 0, end_col: 10,
+            start_byte: 0,
+            end_byte: 10,
+            start_line: 0,
+            start_col: 0,
+            end_line: 0,
+            end_col: 10,
         }
     }
 
@@ -209,7 +222,9 @@ mod tests {
 
         // Create a "generated" parsed code
         let mut parsed = ParsedCode::new("fn sort() {}", "rust");
-        parsed.entities.push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+        parsed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
 
         // Create an intent HV by encoding "sort"
         let intent_hv = encoder.encode_name("sort");
@@ -244,13 +259,21 @@ mod tests {
 
         // Original
         let mut original = ParsedCode::new("fn a() {} fn b() {}", "rust");
-        original.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
-        original.entities.push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+        original
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        original
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
 
         // Same code, same structure
         let mut transformed = ParsedCode::new("fn a() {} fn b() {}", "rust");
-        transformed.entities.push(CodeEntity::new(EntityKind::Function, "a", test_span()));
-        transformed.entities.push(CodeEntity::new(EntityKind::Function, "b", test_span()));
+        transformed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "a", test_span()));
+        transformed
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "b", test_span()));
 
         let result = verifier.verify_equivalence(&original, &transformed);
         assert!(result.semantic_similarity > 0.9);
@@ -263,10 +286,14 @@ mod tests {
         let verifier = CodeVerifier::new(CodeHDEncoder::new(512));
 
         let mut original = ParsedCode::new("fn sort() {}", "rust");
-        original.entities.push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
+        original
+            .entities
+            .push(CodeEntity::new(EntityKind::Function, "sort", test_span()));
 
         let mut transformed = ParsedCode::new("struct Config {}", "rust");
-        transformed.entities.push(CodeEntity::new(EntityKind::Struct, "Config", test_span()));
+        transformed
+            .entities
+            .push(CodeEntity::new(EntityKind::Struct, "Config", test_span()));
 
         let result = verifier.verify_equivalence(&original, &transformed);
         assert!(result.semantic_similarity < 0.9);

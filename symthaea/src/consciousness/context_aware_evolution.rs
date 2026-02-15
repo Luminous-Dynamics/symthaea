@@ -163,9 +163,9 @@ impl ReasoningContext {
 /// Weights for the three objectives
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ObjectiveWeights {
-    pub phi_weight: f64,        // Consciousness (Φ)
-    pub harmonic_weight: f64,   // Ethics (Harmonics)
-    pub epistemic_weight: f64,  // Truth (Epistemics)
+    pub phi_weight: f64,       // Consciousness (Φ)
+    pub harmonic_weight: f64,  // Ethics (Harmonics)
+    pub epistemic_weight: f64, // Truth (Epistemics)
 }
 
 impl ObjectiveWeights {
@@ -255,7 +255,11 @@ pub struct TradeoffPoint {
 
 impl TradeoffPoint {
     pub fn new(phi: f64, harmonic: f64, epistemic: f64) -> Self {
-        Self { phi, harmonic, epistemic }
+        Self {
+            phi,
+            harmonic,
+            epistemic,
+        }
     }
 
     /// Calculate weighted fitness using objective weights
@@ -350,7 +354,9 @@ impl ParetoFrontier3D {
         let mut distances = Vec::new();
         for i in 0..self.frontier_points.len() {
             for j in (i + 1)..self.frontier_points.len() {
-                let dist = self.frontier_points[i].0.distance_to(&self.frontier_points[j].0);
+                let dist = self.frontier_points[i]
+                    .0
+                    .distance_to(&self.frontier_points[j].0);
                 distances.push(dist);
             }
         }
@@ -402,44 +408,23 @@ impl ContextAwareResult {
     ) -> String {
         let mut explanation = String::new();
 
-        explanation.push_str(&format!(
-            "Context: {}\n\n",
-            context.description()
-        ));
+        explanation.push_str(&format!("Context: {}\n\n", context.description()));
 
         explanation.push_str(&format!(
             "Objective Priorities:\n  {}\n\n",
             weights.format_percentages()
         ));
 
-        explanation.push_str(&format!(
-            "Chosen Primitive: {}\n",
-            primitive.name
-        ));
+        explanation.push_str(&format!("Chosen Primitive: {}\n", primitive.name));
 
-        explanation.push_str(&format!(
-            "  Tier: {:?}\n",
-            primitive.tier
-        ));
+        explanation.push_str(&format!("  Tier: {:?}\n", primitive.tier));
 
-        explanation.push_str(&format!(
-            "  Tier: {:?}\n\n",
-            primitive.tier
-        ));
+        explanation.push_str(&format!("  Tier: {:?}\n\n", primitive.tier));
 
         explanation.push_str("Objective Scores:\n");
-        explanation.push_str(&format!(
-            "  Φ (Consciousness): {:.4}\n",
-            point.phi
-        ));
-        explanation.push_str(&format!(
-            "  Harmonics (Ethics): {:.4}\n",
-            point.harmonic
-        ));
-        explanation.push_str(&format!(
-            "  Epistemics (Truth): {:.4}\n\n",
-            point.epistemic
-        ));
+        explanation.push_str(&format!("  Φ (Consciousness): {:.4}\n", point.phi));
+        explanation.push_str(&format!("  Harmonics (Ethics): {:.4}\n", point.harmonic));
+        explanation.push_str(&format!("  Epistemics (Truth): {:.4}\n\n", point.epistemic));
 
         explanation.push_str(&format!(
             "Why This Primitive:\n  Given the {} context, this primitive excels in {},\n",
@@ -485,10 +470,18 @@ impl ContextAwareResult {
             alternatives.push(("Highest Φ (consciousness)".to_string(), prim, max_phi.2));
         }
         if let Some(prim) = max_harmonic.1 {
-            alternatives.push(("Highest Harmonics (ethics)".to_string(), prim, max_harmonic.2));
+            alternatives.push((
+                "Highest Harmonics (ethics)".to_string(),
+                prim,
+                max_harmonic.2,
+            ));
         }
         if let Some(prim) = max_epistemic.1 {
-            alternatives.push(("Highest Epistemics (truth)".to_string(), prim, max_epistemic.2));
+            alternatives.push((
+                "Highest Epistemics (truth)".to_string(),
+                prim,
+                max_epistemic.2,
+            ));
         }
 
         alternatives
@@ -539,7 +532,11 @@ impl ContextAwareOptimizer {
     }
 
     /// Set custom weights for a context
-    pub fn set_weights_for_context(&mut self, context: ReasoningContext, weights: ObjectiveWeights) {
+    pub fn set_weights_for_context(
+        &mut self,
+        context: ReasoningContext,
+        weights: ObjectiveWeights,
+    ) {
         self._context_weights.insert(context, weights);
     }
 

@@ -130,17 +130,58 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
-        FlatOp::RegisterCreateLink { link_type, .. } => match link_type {
-            LinkTypes::AuthorToSchema => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::CategoryToSchema => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SchemaToEndorsement => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::SchemaHistory => Ok(ValidateCallbackResult::Valid),
-        },
-        FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterCreateLink { link_type, tag, .. } => {
+            if tag.0.len() > 1024 {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Link tag exceeds maximum length of 1024 bytes".into(),
+                ));
+            }
+            match link_type {
+                LinkTypes::AuthorToSchema => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::CategoryToSchema => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::SchemaToEndorsement => Ok(ValidateCallbackResult::Valid),
+                LinkTypes::SchemaHistory => Ok(ValidateCallbackResult::Valid),
+            }
+        }
+        FlatOp::RegisterDeleteLink {
+            original_action,
+            action,
+            ..
+        } => {
+            if action.author != original_action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the link creator can delete their links".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterAgentActivity(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterUpdate(_) => Ok(ValidateCallbackResult::Valid),
-        FlatOp::RegisterDelete(_) => Ok(ValidateCallbackResult::Valid),
+        FlatOp::RegisterUpdate(update) => {
+            let action = match &update {
+                OpUpdate::Entry { action, .. }
+                | OpUpdate::PrivateEntry { action, .. }
+                | OpUpdate::Agent { action, .. }
+                | OpUpdate::CapClaim { action, .. }
+                | OpUpdate::CapGrant { action, .. } => action,
+            };
+            let original = must_get_action(action.original_action_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can update their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
+        FlatOp::RegisterDelete(OpDelete { action }) => {
+            let original = must_get_action(action.deletes_address.clone())?;
+            if *original.action().author() != action.author {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Only the original entry author can delete their entries".into(),
+                ));
+            }
+            Ok(ValidateCallbackResult::Valid)
+        }
     }
 }
 
@@ -182,14 +223,10 @@ fn validate_create_credential_schema(
 
 /// Validate schema update
 fn validate_update_credential_schema(
-    _action: Update,
+    action: Update,
     schema: CredentialSchema,
     _original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Basic validation - cannot change schema ID or author
-    // Note: Full validation would require fetching original entry
-    // For now, we validate the updated entry is valid
-
     if !schema.id.starts_with("mycelix:schema:") {
         return Ok(ValidateCallbackResult::Invalid(
             "Schema ID must start with 'mycelix:schema:'".into(),
@@ -199,6 +236,45 @@ fn validate_update_credential_schema(
     if serde_json::from_str::<serde_json::Value>(&schema.schema).is_err() {
         return Ok(ValidateCallbackResult::Invalid(
             "Schema must be valid JSON".into(),
+        ));
+    }
+
+    // Fetch original to enforce invariants
+    let original_record = must_get_valid_record(action.original_action_address.clone())?;
+    let original: CredentialSchema = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original credential schema not found".into()
+        )))?;
+
+    // Immutable fields
+    if schema.id != original.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema ID cannot be changed".into(),
+        ));
+    }
+    if schema.author != original.author {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema author cannot be changed".into(),
+        ));
+    }
+    if schema.created != original.created {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema created timestamp cannot be changed".into(),
+        ));
+    }
+    if schema.credential_type != original.credential_type {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema credential type cannot be changed".into(),
+        ));
+    }
+
+    // Updated timestamp must advance
+    if schema.updated <= original.updated {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schema updated timestamp must advance".into(),
         ));
     }
 
@@ -353,6 +429,102 @@ mod tests {
     fn schema_endorsement_rejects_invalid_trust() {
         for level in [1.1, -0.01, f64::INFINITY] {
             assert!(!(0.0..=1.0).contains(&level));
+        }
+    }
+
+    // --- Property-Based Tests (proptest) ---
+
+    mod proptests {
+        use super::*;
+        use proptest::prelude::*;
+
+        fn arb_schema_category() -> impl Strategy<Value = SchemaCategory> {
+            prop_oneof![
+                Just(SchemaCategory::Education),
+                Just(SchemaCategory::Employment),
+                Just(SchemaCategory::Identity),
+                Just(SchemaCategory::Skills),
+                Just(SchemaCategory::Governance),
+                Just(SchemaCategory::Financial),
+                Just(SchemaCategory::Energy),
+                "[a-zA-Z]{3,20}".prop_map(SchemaCategory::Custom),
+            ]
+        }
+
+        proptest! {
+            /// SchemaCategory round-trips through JSON.
+            #[test]
+            fn schema_category_json_roundtrip(cat in arb_schema_category()) {
+                let json = serde_json::to_string(&cat).unwrap();
+                let back: SchemaCategory = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(cat, back);
+            }
+
+            /// Valid schema IDs always start with "mycelix:schema:".
+            #[test]
+            fn schema_id_format(suffix in "[a-z]{3,20}:[a-z]{3,20}:v[0-9]{1,3}") {
+                let id = format!("mycelix:schema:{}", suffix);
+                prop_assert!(id.starts_with("mycelix:schema:"));
+            }
+
+            /// Invalid schema IDs never start with "mycelix:schema:".
+            #[test]
+            fn invalid_schema_id_rejected(prefix in "(urn|http|did|schema)") {
+                let id = format!("{}:foo:bar:v1", prefix);
+                prop_assert!(!id.starts_with("mycelix:schema:"));
+            }
+
+            /// Semver versions always contain a dot.
+            #[test]
+            fn semver_format(major in 0u32..100, minor in 0u32..100, patch in 0u32..100) {
+                let version = format!("{}.{}.{}", major, minor, patch);
+                prop_assert!(version.contains('.'));
+            }
+
+            /// Trust levels outside [0, 1] are rejected.
+            #[test]
+            fn endorsement_trust_level_bounds(level in proptest::num::f64::ANY) {
+                let in_bounds = (0.0..=1.0).contains(&level);
+                // NaN is not in bounds
+                if level.is_nan() {
+                    prop_assert!(!in_bounds);
+                }
+            }
+
+            /// Valid trust levels are within [0, 1].
+            #[test]
+            fn endorsement_valid_trust_level(level in 0.0f64..=1.0f64) {
+                prop_assert!((0.0..=1.0).contains(&level));
+            }
+
+            /// CredentialSchema JSON round-trips with arbitrary versions.
+            #[test]
+            fn schema_json_roundtrip(
+                major in 0u32..100,
+                minor in 0u32..100,
+                patch in 0u32..100,
+                name in "[A-Z][a-z]{2,20}"
+            ) {
+                let schema = CredentialSchema {
+                    id: "mycelix:schema:test:v1".into(),
+                    name,
+                    description: "Test".into(),
+                    version: format!("{}.{}.{}", major, minor, patch),
+                    author: "did:mycelix:test".into(),
+                    schema: r#"{"type":"object"}"#.into(),
+                    required_fields: vec!["field1".into()],
+                    optional_fields: vec![],
+                    credential_type: vec!["VerifiableCredential".into()],
+                    default_expiration: 0,
+                    revocable: true,
+                    active: true,
+                    created: Timestamp::from_micros(1_700_000_000_000_000),
+                    updated: Timestamp::from_micros(1_700_000_000_000_000),
+                };
+                let json = serde_json::to_string(&schema).unwrap();
+                let back: CredentialSchema = serde_json::from_str(&json).unwrap();
+                prop_assert_eq!(schema, back);
+            }
         }
     }
 

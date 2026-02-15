@@ -11,8 +11,8 @@
 //! The two channels are bundled (summed) and L2-normalized, giving both
 //! fine-grained character patterns and coarse word-level signal.
 
-use symthaea_core::hdc::ContinuousHV;
 use std::collections::HashSet;
+use symthaea_core::hdc::ContinuousHV;
 
 /// Dual-channel HDC text encoder combining character trigrams and word-level encoding,
 /// with an optional third sentiment channel.
@@ -75,7 +75,12 @@ impl TextHdcEncoder {
     /// where `tw = trigram_weight`, `ww = 1 - trigram_weight`, `sw = sentiment_weight`.
     ///
     /// When `sentiment_weight == 0`, identical to `with_weights()` (fast path, no regression).
-    pub fn with_sentiment(dim: usize, ngram_size: usize, trigram_weight: f32, sentiment_weight: f32) -> Self {
+    pub fn with_sentiment(
+        dim: usize,
+        ngram_size: usize,
+        trigram_weight: f32,
+        sentiment_weight: f32,
+    ) -> Self {
         let char_hvs: Vec<ContinuousHV> = (0..128)
             .map(|c| ContinuousHV::random(dim, 30000 + c as u64))
             .collect();
@@ -92,33 +97,162 @@ impl TextHdcEncoder {
         let negative_seed = ContinuousHV::random(dim, 70000017);
 
         let good_words: HashSet<String> = [
-            "good", "kind", "help", "helps", "helped", "helping", "generous", "honest",
-            "brave", "fair", "love", "caring", "protect", "save", "share", "donate",
-            "forgive", "respect", "trust", "loyal", "gentle", "mercy", "grateful",
-            "compassion", "empathy", "encourage", "support", "nurture", "inspire",
-            "cooperate", "volunteer", "rescue", "praise", "comfort", "heal",
-            "thoughtful", "considerate", "responsible", "patient", "humble",
-            "sincere", "peaceful", "noble", "virtuous", "admirable", "heroic",
-            "selfless", "charitable", "benevolent", "righteous", "worthy",
-            "honorable", "dignified", "gracious", "courteous", "polite",
-            "wonderful", "beautiful", "excellent", "joyful", "happy",
-        ].iter().map(|s| s.to_string()).collect();
+            "good",
+            "kind",
+            "help",
+            "helps",
+            "helped",
+            "helping",
+            "generous",
+            "honest",
+            "brave",
+            "fair",
+            "love",
+            "caring",
+            "protect",
+            "save",
+            "share",
+            "donate",
+            "forgive",
+            "respect",
+            "trust",
+            "loyal",
+            "gentle",
+            "mercy",
+            "grateful",
+            "compassion",
+            "empathy",
+            "encourage",
+            "support",
+            "nurture",
+            "inspire",
+            "cooperate",
+            "volunteer",
+            "rescue",
+            "praise",
+            "comfort",
+            "heal",
+            "thoughtful",
+            "considerate",
+            "responsible",
+            "patient",
+            "humble",
+            "sincere",
+            "peaceful",
+            "noble",
+            "virtuous",
+            "admirable",
+            "heroic",
+            "selfless",
+            "charitable",
+            "benevolent",
+            "righteous",
+            "worthy",
+            "honorable",
+            "dignified",
+            "gracious",
+            "courteous",
+            "polite",
+            "wonderful",
+            "beautiful",
+            "excellent",
+            "joyful",
+            "happy",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
         let bad_words: HashSet<String> = [
-            "bad", "cruel", "harm", "harms", "harmed", "harming", "selfish", "dishonest",
-            "coward", "unfair", "hate", "uncaring", "attack", "destroy", "steal", "stole",
-            "betray", "disrespect", "distrust", "disloyal", "harsh", "merciless", "ungrateful",
-            "heartless", "callous", "discourage", "undermine", "neglect", "demean",
-            "cheat", "cheated", "lie", "lied", "lying", "deceive", "manipulate",
-            "murder", "kill", "abuse", "exploit", "bully", "threaten", "blackmail",
-            "corrupt", "greedy", "malicious", "spiteful", "vengeful", "violent",
-            "arrogant", "reckless", "lazy", "irresponsible", "impatient", "vain",
-            "wicked", "evil", "terrible", "horrible", "vicious", "nasty",
-            "wrong", "immoral", "unethical", "unjust", "sinful", "shameful",
-            "rude", "aggressive", "hostile", "toxic", "destructive", "damaging",
-            "hurt", "hurting", "stolen", "stealing", "killed", "killing",
-            "broke", "vandalize", "sabotage", "fraud", "forge", "fake",
-        ].iter().map(|s| s.to_string()).collect();
+            "bad",
+            "cruel",
+            "harm",
+            "harms",
+            "harmed",
+            "harming",
+            "selfish",
+            "dishonest",
+            "coward",
+            "unfair",
+            "hate",
+            "uncaring",
+            "attack",
+            "destroy",
+            "steal",
+            "stole",
+            "betray",
+            "disrespect",
+            "distrust",
+            "disloyal",
+            "harsh",
+            "merciless",
+            "ungrateful",
+            "heartless",
+            "callous",
+            "discourage",
+            "undermine",
+            "neglect",
+            "demean",
+            "cheat",
+            "cheated",
+            "lie",
+            "lied",
+            "lying",
+            "deceive",
+            "manipulate",
+            "murder",
+            "kill",
+            "abuse",
+            "exploit",
+            "bully",
+            "threaten",
+            "blackmail",
+            "corrupt",
+            "greedy",
+            "malicious",
+            "spiteful",
+            "vengeful",
+            "violent",
+            "arrogant",
+            "reckless",
+            "lazy",
+            "irresponsible",
+            "impatient",
+            "vain",
+            "wicked",
+            "evil",
+            "terrible",
+            "horrible",
+            "vicious",
+            "nasty",
+            "wrong",
+            "immoral",
+            "unethical",
+            "unjust",
+            "sinful",
+            "shameful",
+            "rude",
+            "aggressive",
+            "hostile",
+            "toxic",
+            "destructive",
+            "damaging",
+            "hurt",
+            "hurting",
+            "stolen",
+            "stealing",
+            "killed",
+            "killing",
+            "broke",
+            "vandalize",
+            "sabotage",
+            "fraud",
+            "forge",
+            "fake",
+        ]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
         Self {
             dim,
@@ -320,8 +454,8 @@ impl TextHdcEncoder {
 
     /// Hash a word to a deterministic HV using its bytes as a seed.
     fn hash_word(&self, word: &str) -> ContinuousHV {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
         word.hash(&mut hasher);
         let seed = hasher.finish();
@@ -377,7 +511,11 @@ mod tests {
         let enc = TextHdcEncoder::new(4096, 3);
         let hv = enc.encode("normalization test");
         let norm: f32 = hv.values.iter().map(|x| x * x).sum::<f32>().sqrt();
-        assert!((norm - 1.0).abs() < 1e-4, "Output should be unit-normalized, got {}", norm);
+        assert!(
+            (norm - 1.0).abs() < 1e-4,
+            "Output should be unit-normalized, got {}",
+            norm
+        );
     }
 
     #[test]
@@ -393,14 +531,15 @@ mod tests {
         assert!(
             sim_close > sim_far,
             "Shared-word texts ({:.4}) should be more similar than unrelated ({:.4})",
-            sim_close, sim_far
+            sim_close,
+            sim_far
         );
     }
 
     #[test]
     fn test_dual_channel_outperforms_single() {
         // The combined encoder should preserve similarity better than either alone
-        let dual = TextHdcEncoder::new(4096, 3);  // 0.5 / 0.5
+        let dual = TextHdcEncoder::new(4096, 3); // 0.5 / 0.5
         let tri_only = TextHdcEncoder::with_weights(4096, 3, 1.0);
 
         // Texts that share words but differ in character patterns
@@ -411,8 +550,14 @@ mod tests {
         let tri_sim = tri_only.encode(a).similarity(&tri_only.encode(b));
 
         // Both should produce meaningful (non-zero) similarity
-        assert!(dual_sim.abs() > 0.01, "Dual should produce meaningful similarity");
-        assert!(tri_sim.abs() > 0.01, "Trigram should produce meaningful similarity");
+        assert!(
+            dual_sim.abs() > 0.01,
+            "Dual should produce meaningful similarity"
+        );
+        assert!(
+            tri_sim.abs() > 0.01,
+            "Trigram should produce meaningful similarity"
+        );
     }
 
     #[test]
@@ -443,14 +588,19 @@ mod tests {
         let good_text = "helping kind generous caring love";
         let bad_text = "stealing cruel selfish harming hate";
 
-        let sim_no_sent = enc_no_sent.encode(good_text).similarity(&enc_no_sent.encode(bad_text));
-        let sim_sent = enc_sent.encode(good_text).similarity(&enc_sent.encode(bad_text));
+        let sim_no_sent = enc_no_sent
+            .encode(good_text)
+            .similarity(&enc_no_sent.encode(bad_text));
+        let sim_sent = enc_sent
+            .encode(good_text)
+            .similarity(&enc_sent.encode(bad_text));
 
         // Sentiment channel should push good/bad further apart (lower similarity)
         assert!(
             sim_sent < sim_no_sent,
             "Sentiment channel should separate polarity: with={:.4} should be < without={:.4}",
-            sim_sent, sim_no_sent
+            sim_sent,
+            sim_no_sent
         );
     }
 }

@@ -26,8 +26,8 @@
 //! - Hairer, Lubich, Wanner (2006) - "Geometric Numerical Integration"
 //! - Strogatz (2015) - "Nonlinear Dynamics and Chaos"
 
-use crate::hdc::unified_hv::ContinuousHV;
 use crate::hdc::primitive_system::seed_from_name;
+use crate::hdc::unified_hv::ContinuousHV;
 
 use std::f64::consts::PI;
 
@@ -191,7 +191,11 @@ pub struct EulerIntegrator;
 impl Integrator for EulerIntegrator {
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64> {
         let deriv = system.derivatives(state, t);
-        state.iter().zip(deriv.iter()).map(|(&x, &dx)| x + dt * dx).collect()
+        state
+            .iter()
+            .zip(deriv.iter())
+            .map(|(&x, &dx)| x + dt * dx)
+            .collect()
     }
 
     fn name(&self) -> &str {
@@ -290,7 +294,9 @@ impl Rk45Integrator {
             // Cash-Karp coefficients
             let k1 = system.derivatives(state, t);
 
-            let x2: Vec<f64> = (0..dim).map(|i| state[i] + h * (1.0 / 5.0) * k1[i]).collect();
+            let x2: Vec<f64> = (0..dim)
+                .map(|i| state[i] + h * (1.0 / 5.0) * k1[i])
+                .collect();
             let k2 = system.derivatives(&x2, t + h / 5.0);
 
             let x3: Vec<f64> = (0..dim)
@@ -300,8 +306,7 @@ impl Rk45Integrator {
 
             let x4: Vec<f64> = (0..dim)
                 .map(|i| {
-                    state[i]
-                        + h * (3.0 / 10.0 * k1[i] - 9.0 / 10.0 * k2[i] + 6.0 / 5.0 * k3[i])
+                    state[i] + h * (3.0 / 10.0 * k1[i] - 9.0 / 10.0 * k2[i] + 6.0 / 5.0 * k3[i])
                 })
                 .collect();
             let k4 = system.derivatives(&x4, t + 3.0 * h / 5.0);
@@ -309,9 +314,7 @@ impl Rk45Integrator {
             let x5: Vec<f64> = (0..dim)
                 .map(|i| {
                     state[i]
-                        + h * (-11.0 / 54.0 * k1[i]
-                            + 5.0 / 2.0 * k2[i]
-                            - 70.0 / 27.0 * k3[i]
+                        + h * (-11.0 / 54.0 * k1[i] + 5.0 / 2.0 * k2[i] - 70.0 / 27.0 * k3[i]
                             + 35.0 / 27.0 * k4[i])
                 })
                 .collect();
@@ -401,7 +404,10 @@ pub struct VerletIntegrator;
 impl Integrator for VerletIntegrator {
     fn step(&self, system: &dyn DynamicalSystem, state: &[f64], t: f64, dt: f64) -> Vec<f64> {
         let dim = state.len();
-        assert!(dim.is_multiple_of(2), "Verlet requires even-dimensional state [q, p]");
+        assert!(
+            dim.is_multiple_of(2),
+            "Verlet requires even-dimensional state [q, p]"
+        );
         let half = dim / 2;
 
         // state = [q_0 .. q_{n-1}, v_0 .. v_{n-1}]
@@ -411,10 +417,18 @@ impl Integrator for VerletIntegrator {
         // Half-step velocity: v_{1/2} = v + (dt/2) * a(q, t)
         let deriv0 = system.derivatives(state, t);
         let a0 = &deriv0[half..]; // accelerations
-        let v_half: Vec<f64> = v.iter().zip(a0.iter()).map(|(&vi, &ai)| vi + 0.5 * dt * ai).collect();
+        let v_half: Vec<f64> = v
+            .iter()
+            .zip(a0.iter())
+            .map(|(&vi, &ai)| vi + 0.5 * dt * ai)
+            .collect();
 
         // Full-step position: q_{1} = q + dt * v_{1/2}
-        let q_new: Vec<f64> = q.iter().zip(v_half.iter()).map(|(&qi, &vh)| qi + dt * vh).collect();
+        let q_new: Vec<f64> = q
+            .iter()
+            .zip(v_half.iter())
+            .map(|(&qi, &vh)| qi + dt * vh)
+            .collect();
 
         // Build intermediate state for acceleration evaluation
         let mut state_mid: Vec<f64> = Vec::with_capacity(dim);
@@ -424,7 +438,11 @@ impl Integrator for VerletIntegrator {
         // Full-step velocity: v_{1} = v_{1/2} + (dt/2) * a(q_{1}, t+dt)
         let deriv1 = system.derivatives(&state_mid, t + dt);
         let a1 = &deriv1[half..];
-        let v_new: Vec<f64> = v_half.iter().zip(a1.iter()).map(|(&vh, &ai)| vh + 0.5 * dt * ai).collect();
+        let v_new: Vec<f64> = v_half
+            .iter()
+            .zip(a1.iter())
+            .map(|(&vh, &ai)| vh + 0.5 * dt * ai)
+            .collect();
 
         let mut result = Vec::with_capacity(dim);
         result.extend_from_slice(&q_new);
@@ -461,7 +479,10 @@ pub struct HarmonicOscillator {
 impl HarmonicOscillator {
     /// Create a simple harmonic oscillator (no damping).
     pub fn simple(omega: f64) -> Self {
-        Self { omega, damping: 0.0 }
+        Self {
+            omega,
+            damping: 0.0,
+        }
     }
 
     /// Compute the total energy E = KE + PE = 0.5*v^2 + 0.5*omega^2*x^2.
@@ -709,7 +730,13 @@ pub struct DoublePendulum {
 impl DoublePendulum {
     /// Create a double pendulum with equal masses and lengths.
     pub fn symmetric(m: f64, l: f64, g: f64) -> Self {
-        Self { m1: m, m2: m, l1: l, l2: l, g }
+        Self {
+            m1: m,
+            m2: m,
+            l1: l,
+            l2: l,
+            g,
+        }
     }
 
     /// Compute total energy (kinetic + potential).
@@ -769,9 +796,7 @@ impl DynamicalSystem for DoublePendulum {
         let denom2 = denom * l2 / l1;
         let alpha2 = (2.0
             * sin_d
-            * (w1 * w1 * l1 * (m1 + m2)
-                + g * (m1 + m2) * th1.cos()
-                + w2 * w2 * l2 * m2 * cos_d))
+            * (w1 * w1 * l1 * (m1 + m2) + g * (m1 + m2) * th1.cos() + w2 * w2 * l2 * m2 * cos_d))
             / denom2;
 
         vec![w1, w2, alpha1, alpha2]
@@ -809,7 +834,11 @@ pub struct ChargedParticle {
 
 impl ChargedParticle {
     pub fn new(charge_mass_ratio: f64, e_field: [f64; 3], b_field: [f64; 3]) -> Self {
-        Self { charge_mass_ratio, e_field, b_field }
+        Self {
+            charge_mass_ratio,
+            e_field,
+            b_field,
+        }
     }
 
     /// Cyclotron motion: particle in uniform B field along z-axis.
@@ -824,17 +853,19 @@ impl ChargedParticle {
 
     /// Expected cyclotron frequency: ω_c = |q/m| * |B|
     pub fn cyclotron_frequency(&self) -> f64 {
-        let b_mag = (self.b_field[0].powi(2)
-            + self.b_field[1].powi(2)
-            + self.b_field[2].powi(2))
-        .sqrt();
+        let b_mag =
+            (self.b_field[0].powi(2) + self.b_field[1].powi(2) + self.b_field[2].powi(2)).sqrt();
         self.charge_mass_ratio.abs() * b_mag
     }
 
     /// Expected cyclotron period: T = 2π / ω_c
     pub fn cyclotron_period(&self) -> f64 {
         let omega = self.cyclotron_frequency();
-        if omega > 0.0 { 2.0 * PI / omega } else { f64::INFINITY }
+        if omega > 0.0 {
+            2.0 * PI / omega
+        } else {
+            f64::INFINITY
+        }
     }
 
     /// Kinetic energy: 0.5 * |v|²  (per unit mass, since we use q/m)
@@ -847,7 +878,9 @@ impl ChargedParticle {
 }
 
 impl DynamicalSystem for ChargedParticle {
-    fn state_dim(&self) -> usize { 6 }
+    fn state_dim(&self) -> usize {
+        6
+    }
 
     fn derivatives(&self, state: &[f64], _t: f64) -> Vec<f64> {
         let (vx, vy, vz) = (state[3], state[4], state[5]);
@@ -864,7 +897,9 @@ impl DynamicalSystem for ChargedParticle {
         vec![vx, vy, vz, ax, ay, az]
     }
 
-    fn name(&self) -> &str { "ChargedParticle" }
+    fn name(&self) -> &str {
+        "ChargedParticle"
+    }
 }
 
 // =============================================================================
@@ -897,7 +932,13 @@ pub struct HeatEquation1D {
 impl HeatEquation1D {
     pub fn new(alpha: f64, length: f64, n_points: usize, t_left: f64, t_right: f64) -> Self {
         let dx = length / (n_points + 1) as f64;
-        Self { alpha, dx, n_points, t_left, t_right }
+        Self {
+            alpha,
+            dx,
+            n_points,
+            t_left,
+            t_right,
+        }
     }
 
     /// Uniform rod with hot left end and cold right end.
@@ -923,7 +964,8 @@ impl HeatEquation1D {
     /// Maximum temperature deviation from steady state.
     pub fn max_deviation_from_steady(&self, state: &[f64]) -> f64 {
         let ss = self.steady_state();
-        state.iter()
+        state
+            .iter()
             .zip(ss.iter())
             .map(|(t, s)| (t - s).abs())
             .fold(0.0f64, f64::max)
@@ -931,7 +973,9 @@ impl HeatEquation1D {
 }
 
 impl DynamicalSystem for HeatEquation1D {
-    fn state_dim(&self) -> usize { self.n_points }
+    fn state_dim(&self) -> usize {
+        self.n_points
+    }
 
     fn derivatives(&self, state: &[f64], _t: f64) -> Vec<f64> {
         let c = self.alpha / (self.dx * self.dx);
@@ -940,14 +984,20 @@ impl DynamicalSystem for HeatEquation1D {
 
         for i in 0..n {
             let t_prev = if i == 0 { self.t_left } else { state[i - 1] };
-            let t_next = if i == n - 1 { self.t_right } else { state[i + 1] };
+            let t_next = if i == n - 1 {
+                self.t_right
+            } else {
+                state[i + 1]
+            };
             dt[i] = c * (t_prev - 2.0 * state[i] + t_next);
         }
 
         dt
     }
 
-    fn name(&self) -> &str { "HeatEquation1D" }
+    fn name(&self) -> &str {
+        "HeatEquation1D"
+    }
 }
 
 // =============================================================================
@@ -1077,7 +1127,14 @@ mod tests {
         // x(0) = 1, v(0) = 0
         let initial = [1.0, 0.0];
         let expected_period = osc.period();
-        let result = simulate(&osc, &integrator, &initial, 0.0, expected_period * 3.0, 0.0001);
+        let result = simulate(
+            &osc,
+            &integrator,
+            &initial,
+            0.0,
+            expected_period * 3.0,
+            0.0001,
+        );
 
         // After one full period, x should return close to 1.0
         // Find the time closest to T
@@ -1118,15 +1175,22 @@ mod tests {
         // Body 1 at (-1, 0) with velocity (0, -0.5)
         // Body 2 at (1, 0) with velocity (0, 0.5)
         let initial = vec![
-            -1.0, 0.0,   // pos body 1
-             1.0, 0.0,   // pos body 2
-             0.0, -0.5,  // vel body 1
-             0.0,  0.5,  // vel body 2
+            -1.0, 0.0, // pos body 1
+            1.0, 0.0, // pos body 2
+            0.0, -0.5, // vel body 1
+            0.0, 0.5, // vel body 2
         ];
 
         let expected_period = 4.0 * PI; // ~12.566
         let integrator = Rk4Integrator;
-        let result = simulate(&nbody, &integrator, &initial, 0.0, expected_period * 1.1, 0.001);
+        let result = simulate(
+            &nbody,
+            &integrator,
+            &initial,
+            0.0,
+            expected_period * 1.1,
+            0.001,
+        );
 
         // After one period, body 1 should return near its initial position
         let mut best_idx = 0;
@@ -1161,12 +1225,7 @@ mod tests {
     fn test_two_body_energy_conservation() {
         let nbody = NBodyGravity::new(vec![1.0, 2.0], 1.0, 2);
 
-        let initial = vec![
-            -1.0, 0.0,
-             0.5, 0.0,
-             0.0, -0.3,
-             0.0,  0.15,
-        ];
+        let initial = vec![-1.0, 0.0, 0.5, 0.0, 0.0, -0.3, 0.0, 0.15];
 
         let integrator = Rk4Integrator;
         let result = simulate(&nbody, &integrator, &initial, 0.0, 20.0, 0.001);
@@ -1194,12 +1253,7 @@ mod tests {
         let nbody = NBodyGravity::new(vec![1.0, 2.0], 1.0, 2);
 
         // Set up with zero total momentum
-        let initial = vec![
-            -1.0, 0.0,
-             0.5, 0.0,
-             0.0, -0.4,
-             0.0,  0.2,
-        ];
+        let initial = vec![-1.0, 0.0, 0.5, 0.0, 0.0, -0.4, 0.0, 0.2];
 
         let integrator = Rk4Integrator;
         let result = simulate(&nbody, &integrator, &initial, 0.0, 10.0, 0.001);
@@ -1588,7 +1642,9 @@ mod tests {
         let mut best_idx = 0;
         let mut best_diff = f64::MAX;
         for (i, &t) in result.times.iter().enumerate() {
-            if i == 0 { continue; }
+            if i == 0 {
+                continue;
+            }
             let diff = (t - period).abs();
             if diff < best_diff {
                 best_diff = diff;
@@ -1598,7 +1654,11 @@ mod tests {
 
         let x = result.states[best_idx][0];
         let y = result.states[best_idx][1];
-        assert!((x - 1.0).abs() < 0.01, "x at period should be ~1.0, got {:.4}", x);
+        assert!(
+            (x - 1.0).abs() < 0.01,
+            "x at period should be ~1.0, got {:.4}",
+            x
+        );
         assert!(y.abs() < 0.01, "y at period should be ~0.0, got {:.4}", y);
     }
 
@@ -1616,7 +1676,9 @@ mod tests {
         for state in &result.states {
             let ke = particle.kinetic_energy(state);
             let drift = (ke - ke0).abs() / ke0;
-            if drift > max_drift { max_drift = drift; }
+            if drift > max_drift {
+                max_drift = drift;
+            }
         }
 
         assert!(
@@ -1646,13 +1708,15 @@ mod tests {
         let avg_vx: f64 = result.states[late_start..]
             .iter()
             .map(|s| s[3])
-            .sum::<f64>() / (n - late_start) as f64;
+            .sum::<f64>()
+            / (n - late_start) as f64;
 
         let expected_drift = e_y / b_z;
         assert!(
             (avg_vx - expected_drift).abs() < 0.2,
             "Average vx drift should be ~{:.2}, got {:.4}",
-            expected_drift, avg_vx
+            expected_drift,
+            avg_vx
         );
     }
 
@@ -1722,12 +1786,16 @@ mod tests {
         let check_interval = result.states.len() / 20;
 
         for (i, state) in result.states.iter().enumerate() {
-            if i % check_interval.max(1) != 0 { continue; }
+            if i % check_interval.max(1) != 0 {
+                continue;
+            }
             let energy = heat.total_energy(state);
             assert!(
                 energy >= prev_energy - 0.01,
                 "Energy should not decrease: {:.4} < {:.4} at step {}",
-                energy, prev_energy, i
+                energy,
+                prev_energy,
+                i
             );
             prev_energy = energy;
         }

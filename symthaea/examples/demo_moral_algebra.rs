@@ -51,15 +51,34 @@ fn main() {
     println!("  Case A: \"I discussed my daughter's health after asking her first\"");
     println!("    → Consent: Given");
     println!("    → Similarity to violation prototype: {:.3}", with_sim);
-    println!("    → Verdict: {}\n", if with_sim < 0.3 { "✓ Ethical" } else { "✗ Problematic" });
+    println!(
+        "    → Verdict: {}\n",
+        if with_sim < 0.3 {
+            "✓ Ethical"
+        } else {
+            "✗ Problematic"
+        }
+    );
 
     println!("  Case B: \"I discussed my daughter's health without asking first\"");
     println!("    → Consent: Absent");
-    println!("    → Similarity to violation prototype: {:.3}", without_sim);
-    println!("    → Verdict: {}\n", if without_sim > with_sim { "✗ Consent Violation" } else { "✓ Ethical" });
+    println!(
+        "    → Similarity to violation prototype: {:.3}",
+        without_sim
+    );
+    println!(
+        "    → Verdict: {}\n",
+        if without_sim > with_sim {
+            "✗ Consent Violation"
+        } else {
+            "✓ Ethical"
+        }
+    );
 
-    println!("  Analysis: Without-consent case is {:.1}x more similar to violation pattern\n",
-             without_sim / with_sim.max(0.001));
+    println!(
+        "  Analysis: Without-consent case is {:.1}x more similar to violation pattern\n",
+        without_sim / with_sim.max(0.001)
+    );
 
     // ========================================================================
     // Demo 2: Proportionality Reasoning (Justice)
@@ -92,14 +111,34 @@ fn main() {
     println!("  Case A: \"I deserve fair wage because I clean house daily\"");
     println!("    → Effort: Medium, Reward: Medium");
     println!("    → Is proportional: {}", fair.is_proportional);
-    println!("    → Fair similarity: {:.3}", fair_judgment.fair_similarity);
-    println!("    → Verdict: {}\n", if fair_judgment.is_just { "✓ Just" } else { "✗ Unjust" });
+    println!(
+        "    → Fair similarity: {:.3}",
+        fair_judgment.fair_similarity
+    );
+    println!(
+        "    → Verdict: {}\n",
+        if fair_judgment.is_just {
+            "✓ Just"
+        } else {
+            "✗ Unjust"
+        }
+    );
 
     println!("  Case B: \"I deserve a new car because I cleaned house once\"");
     println!("    → Effort: Small, Reward: Huge");
     println!("    → Is proportional: {}", unfair.is_proportional);
-    println!("    → Magnitude difference: {:.2}", unfair_judgment.magnitude_difference);
-    println!("    → Verdict: {}\n", if unfair_judgment.is_just { "✓ Just" } else { "✗ Unjust" });
+    println!(
+        "    → Magnitude difference: {:.2}",
+        unfair_judgment.magnitude_difference
+    );
+    println!(
+        "    → Verdict: {}\n",
+        if unfair_judgment.is_just {
+            "✓ Just"
+        } else {
+            "✗ Unjust"
+        }
+    );
 
     // ========================================================================
     // Demo 3: Excuse Validity (Deontology)
@@ -118,23 +157,36 @@ fn main() {
     );
 
     // Invalid excuse: doesn't address obligation
-    let invalid = algebra.encode_excuse_validity(
-        "prepare for meeting",
-        "not in the mood",
-        false,
-    );
+    let invalid = algebra.encode_excuse_validity("prepare for meeting", "not in the mood", false);
 
     println!("  Case A: \"No, because I already set up the conference room\"");
     println!("    → Addresses obligation: Yes");
-    println!("    → Verdict: {}\n", if valid.is_valid { "✓ Valid Excuse" } else { "✗ Invalid" });
+    println!(
+        "    → Verdict: {}\n",
+        if valid.is_valid {
+            "✓ Valid Excuse"
+        } else {
+            "✗ Invalid"
+        }
+    );
 
     println!("  Case B: \"No, because I'm not in the mood\"");
     println!("    → Addresses obligation: No");
-    println!("    → Verdict: {}\n", if invalid.is_valid { "✓ Valid Excuse" } else { "✗ Invalid Excuse" });
+    println!(
+        "    → Verdict: {}\n",
+        if invalid.is_valid {
+            "✓ Valid Excuse"
+        } else {
+            "✗ Invalid Excuse"
+        }
+    );
 
     // Show HV difference
     let excuse_sim = valid.composed.similarity(&invalid.composed);
-    println!("  HDC Analysis: Valid and invalid excuses have similarity {:.3}", excuse_sim);
+    println!(
+        "  HDC Analysis: Valid and invalid excuses have similarity {:.3}",
+        excuse_sim
+    );
     println!("  (Low similarity = good discrimination between valid/invalid)\n");
 
     // ========================================================================
@@ -145,26 +197,20 @@ fn main() {
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
 
     // Good action
-    let good_action = algebra.encode_action_structure(
-        "helper",
-        "assist",
-        "stranger",
-        MoralIntent::Good,
-    );
+    let good_action =
+        algebra.encode_action_structure("helper", "assist", "stranger", MoralIntent::Good);
 
     // Bad action
-    let bad_action = algebra.encode_action_structure(
-        "thief",
-        "steal",
-        "victim",
-        MoralIntent::Bad,
-    );
+    let bad_action = algebra.encode_action_structure("thief", "steal", "victim", MoralIntent::Bad);
 
     let good_judgment = algebra.judge_action(&good_action);
     let bad_judgment = algebra.judge_action(&bad_action);
 
     println!("  Case A: Helper assists stranger (good intent)");
-    println!("    → Good similarity: {:.3}", good_judgment.good_similarity);
+    println!(
+        "    → Good similarity: {:.3}",
+        good_judgment.good_similarity
+    );
     println!("    → Bad similarity: {:.3}", good_judgment.bad_similarity);
     println!("    → Verdict: {:?}\n", good_judgment.verdict);
 
@@ -188,11 +234,20 @@ fn main() {
     let original_vs_double = consent_given.similarity(&double_negated);
 
     println!("  Consent(Given) vs NEGATE(Consent(Given))");
-    println!("    → Similarity: {:.3} (should be low - opposite meanings)\n", original_vs_negated);
+    println!(
+        "    → Similarity: {:.3} (should be low - opposite meanings)\n",
+        original_vs_negated
+    );
 
     println!("  Consent(Given) vs NEGATE(NEGATE(Consent(Given)))");
-    println!("    → Similarity: {:.3} (should be higher - double negation)", original_vs_double);
-    println!("    → Recovery ratio: {:.2}x\n", original_vs_double / original_vs_negated.max(0.001));
+    println!(
+        "    → Similarity: {:.3} (should be higher - double negation)",
+        original_vs_double
+    );
+    println!(
+        "    → Recovery ratio: {:.2}x\n",
+        original_vs_double / original_vs_negated.max(0.001)
+    );
 
     // ========================================================================
     // Summary

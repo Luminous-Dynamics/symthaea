@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 use super::hybrid::{AbstractProof, HybridArithmeticEngine};
@@ -71,7 +71,13 @@ impl MathDiscovery {
     /// Explore multiple proof strategies for a theorem
     ///
     /// Returns proofs ranked by Φ (consciousness/elegance)
-    pub fn explore_proofs(&mut self, theorem_type: &str, a: u64, b: u64, c: u64) -> ProofExploration {
+    pub fn explore_proofs(
+        &mut self,
+        theorem_type: &str,
+        a: u64,
+        b: u64,
+        c: u64,
+    ) -> ProofExploration {
         let mut proofs = Vec::new();
         let mut insights = Vec::new();
 
@@ -82,34 +88,40 @@ impl MathDiscovery {
                 let ba = self.engine.add_deep(b, a);
 
                 if ab.value == ba.value {
-                    proofs.push((AbstractProof {
-                        theorem: format!("{} + {} = {} + {}", a, b, b, a),
-                        base_cases: vec!["Proven for all pairs up to 50".to_string()],
-                        inductive_step: "Direct computation verification".to_string(),
-                        justification: vec![
-                            format!("{} + {} = {}", a, b, ab.value),
-                            format!("{} + {} = {}", b, a, ba.value),
-                            "Both equal, so commutative".to_string(),
-                        ],
-                        is_sound: true,
-                    }, ab.phi + ba.phi));
+                    proofs.push((
+                        AbstractProof {
+                            theorem: format!("{} + {} = {} + {}", a, b, b, a),
+                            base_cases: vec!["Proven for all pairs up to 50".to_string()],
+                            inductive_step: "Direct computation verification".to_string(),
+                            justification: vec![
+                                format!("{} + {} = {}", a, b, ab.value),
+                                format!("{} + {} = {}", b, a, ba.value),
+                                "Both equal, so commutative".to_string(),
+                            ],
+                            is_sound: true,
+                        },
+                        ab.phi + ba.phi,
+                    ));
                 }
 
                 // Strategy 2: Inductive proof sketch
                 let inductive_phi = self.engine.config.phi_scale_factor * 2.0;
-                proofs.push((AbstractProof {
-                    theorem: format!("{} + {} = {} + {}", a, b, b, a),
-                    base_cases: vec![
-                        "Base: a + 0 = 0 + a = a".to_string(),
-                    ],
-                    inductive_step: "Assume a + k = k + a. Then a + S(k) = S(a + k) = S(k + a) = S(k) + a".to_string(),
-                    justification: vec![
-                        "PA5: a + S(b) = S(a + b)".to_string(),
-                        "Induction hypothesis".to_string(),
-                        "PA5 again".to_string(),
-                    ],
-                    is_sound: true,
-                }, inductive_phi));
+                proofs.push((
+                    AbstractProof {
+                        theorem: format!("{} + {} = {} + {}", a, b, b, a),
+                        base_cases: vec!["Base: a + 0 = 0 + a = a".to_string()],
+                        inductive_step:
+                            "Assume a + k = k + a. Then a + S(k) = S(a + k) = S(k + a) = S(k) + a"
+                                .to_string(),
+                        justification: vec![
+                            "PA5: a + S(b) = S(a + b)".to_string(),
+                            "Induction hypothesis".to_string(),
+                            "PA5 again".to_string(),
+                        ],
+                        is_sound: true,
+                    },
+                    inductive_phi,
+                ));
 
                 insights.push("Commutativity follows from the successor structure".to_string());
             }
@@ -122,19 +134,28 @@ impl MathDiscovery {
                 let a_bc = self.engine.add(a, bc.value);
 
                 if ab_c.value == a_bc.value {
-                    proofs.push((AbstractProof {
-                        theorem: format!("({} + {}) + {} = {} + ({} + {})", a, b, c, a, b, c),
-                        base_cases: vec!["(a + b) + 0 = a + b = a + (b + 0)".to_string()],
-                        inductive_step: format!(
-                            "({} + {}) + {} = {} = {} + ({} + {})",
-                            a, b, c, ab_c.value, a, b, c
-                        ),
-                        justification: vec![
-                            format!("Left: ({} + {}) + {} = {} + {} = {}", a, b, c, ab.value, c, ab_c.value),
-                            format!("Right: {} + ({} + {}) = {} + {} = {}", a, b, c, a, bc.value, a_bc.value),
-                        ],
-                        is_sound: true,
-                    }, ab_c.phi + a_bc.phi));
+                    proofs.push((
+                        AbstractProof {
+                            theorem: format!("({} + {}) + {} = {} + ({} + {})", a, b, c, a, b, c),
+                            base_cases: vec!["(a + b) + 0 = a + b = a + (b + 0)".to_string()],
+                            inductive_step: format!(
+                                "({} + {}) + {} = {} = {} + ({} + {})",
+                                a, b, c, ab_c.value, a, b, c
+                            ),
+                            justification: vec![
+                                format!(
+                                    "Left: ({} + {}) + {} = {} + {} = {}",
+                                    a, b, c, ab.value, c, ab_c.value
+                                ),
+                                format!(
+                                    "Right: {} + ({} + {}) = {} + {} = {}",
+                                    a, b, c, a, bc.value, a_bc.value
+                                ),
+                            ],
+                            is_sound: true,
+                        },
+                        ab_c.phi + a_bc.phi,
+                    ));
                 }
 
                 insights.push("Associativity is independent of specific values".to_string());
@@ -150,25 +171,33 @@ impl MathDiscovery {
 
                 if a_bc.value == ab_ac.value {
                     let total_phi = a_bc.phi + ab_ac.phi;
-                    proofs.push((AbstractProof {
-                        theorem: format!("{} × ({} + {}) = {} × {} + {} × {}", a, b, c, a, b, a, c),
-                        base_cases: vec![
-                            "a × (b + 0) = a × b = a × b + a × 0".to_string(),
-                        ],
-                        inductive_step: format!(
-                            "{} × {} = {} = {} + {} = {} × {} + {} × {}",
-                            a, bc.value, a_bc.value, ab.value, ac.value, a, b, a, c
-                        ),
-                        justification: vec![
-                            "Multiplication distributes over addition".to_string(),
-                            format!("Left side: {} × {} = {}", a, bc.value, a_bc.value),
-                            format!("Right side: {} + {} = {}", ab.value, ac.value, ab_ac.value),
-                        ],
-                        is_sound: true,
-                    }, total_phi));
+                    proofs.push((
+                        AbstractProof {
+                            theorem: format!(
+                                "{} × ({} + {}) = {} × {} + {} × {}",
+                                a, b, c, a, b, a, c
+                            ),
+                            base_cases: vec!["a × (b + 0) = a × b = a × b + a × 0".to_string()],
+                            inductive_step: format!(
+                                "{} × {} = {} = {} + {} = {} × {} + {} × {}",
+                                a, bc.value, a_bc.value, ab.value, ac.value, a, b, a, c
+                            ),
+                            justification: vec![
+                                "Multiplication distributes over addition".to_string(),
+                                format!("Left side: {} × {} = {}", a, bc.value, a_bc.value),
+                                format!(
+                                    "Right side: {} + {} = {}",
+                                    ab.value, ac.value, ab_ac.value
+                                ),
+                            ],
+                            is_sound: true,
+                        },
+                        total_phi,
+                    ));
 
                     insights.push(format!(
-                        "Distributive law Φ = {:.4} (elegant proof)", total_phi
+                        "Distributive law Φ = {:.4} (elegant proof)",
+                        total_phi
                     ));
                 }
             }
@@ -221,14 +250,17 @@ impl MathDiscovery {
 
         // Conjecture 1: Φ scales with operation complexity
         if let Some(add_data) = self.patterns.get("add") {
-            let avg_phi: f64 = add_data.iter().map(|(_, _, p)| p).sum::<f64>() / add_data.len() as f64;
+            let avg_phi: f64 =
+                add_data.iter().map(|(_, _, p)| p).sum::<f64>() / add_data.len() as f64;
 
             if let Some(mul_data) = self.patterns.get("multiply") {
-                let avg_mul_phi: f64 = mul_data.iter().map(|(_, _, p)| p).sum::<f64>() / mul_data.len() as f64;
+                let avg_mul_phi: f64 =
+                    mul_data.iter().map(|(_, _, p)| p).sum::<f64>() / mul_data.len() as f64;
 
                 if avg_mul_phi > avg_phi * 1.5 {
                     new_conjectures.push(Conjecture {
-                        statement: "Multiplication has higher Φ than addition for same operands".to_string(),
+                        statement: "Multiplication has higher Φ than addition for same operands"
+                            .to_string(),
                         evidence: vec![
                             format!("Avg addition Φ: {:.4}", avg_phi),
                             format!("Avg multiplication Φ: {:.4}", avg_mul_phi),
@@ -245,9 +277,7 @@ impl MathDiscovery {
 
         // Conjecture 2: Symmetric operations have equal Φ
         if let Some(add_data) = self.patterns.get("add") {
-            let symmetric_pairs: Vec<_> = add_data.iter()
-                .filter(|(a, b, _)| a != b)
-                .collect();
+            let symmetric_pairs: Vec<_> = add_data.iter().filter(|(a, b, _)| a != b).collect();
 
             let mut symmetric_evidence = Vec::new();
             for (a, b, phi_ab) in &symmetric_pairs {
@@ -261,7 +291,8 @@ impl MathDiscovery {
 
             if symmetric_evidence.len() > samples / 2 {
                 new_conjectures.push(Conjecture {
-                    statement: "Commutative operations have equal Φ: Φ(a ⊕ b) = Φ(b ⊕ a)".to_string(),
+                    statement: "Commutative operations have equal Φ: Φ(a ⊕ b) = Φ(b ⊕ a)"
+                        .to_string(),
                     evidence: symmetric_evidence.into_iter().take(5).collect(),
                     confidence: 0.95,
                     pattern_phi: 0.5,
@@ -311,4 +342,3 @@ impl Default for HybridArithmeticEngine {
         Self::new()
     }
 }
-

@@ -111,8 +111,7 @@ impl NeuralBridge {
             .with_context(|| format!("Failed to open probe weights: {}", path.display()))?;
         let mut reader = BufReader::new(file);
 
-        let (shape, data) = parse_npy(&mut reader)
-            .with_context(|| "Failed to parse NumPy file")?;
+        let (shape, data) = parse_npy(&mut reader).with_context(|| "Failed to parse NumPy file")?;
 
         if shape.len() != 2 {
             bail!("Expected 2D array, got {}D", shape.len());
@@ -123,7 +122,8 @@ impl NeuralBridge {
         if output_dim != HDC_DIMENSION {
             bail!(
                 "Output dimension mismatch: expected {}, got {}",
-                HDC_DIMENSION, output_dim
+                HDC_DIMENSION,
+                output_dim
             );
         }
 
@@ -192,10 +192,7 @@ impl NeuralBridge {
             let row = &self.weights[row_start..row_start + self.input_dim];
 
             // Dot product of row with activation
-            *out_val = row.iter()
-                .zip(activation.iter())
-                .map(|(w, a)| w * a)
-                .sum();
+            *out_val = row.iter().zip(activation.iter()).map(|(w, a)| w * a).sum();
         }
 
         Ok(output)
@@ -313,12 +310,8 @@ fn parse_npy<R: Read>(reader: &mut R) -> Result<(Vec<usize>, Vec<f32>)> {
     let mut data = vec![0.0f32; n_elements];
 
     // Read as bytes and transmute (safe because we control the layout)
-    let data_bytes = unsafe {
-        std::slice::from_raw_parts_mut(
-            data.as_mut_ptr() as *mut u8,
-            n_elements * 4
-        )
-    };
+    let data_bytes =
+        unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, n_elements * 4) };
     reader.read_exact(data_bytes)?;
 
     // Convert from little-endian if needed (no-op on little-endian systems)
@@ -335,17 +328,19 @@ fn parse_npy<R: Read>(reader: &mut R) -> Result<(Vec<usize>, Vec<f32>)> {
 /// Header looks like: "{'descr': '<f4', 'fortran_order': False, 'shape': (16384, 2048), }"
 fn parse_shape(header: &str) -> Result<Vec<usize>> {
     // Find 'shape': (dim1, dim2, ...)
-    let shape_start = header.find("'shape':").ok_or_else(|| {
-        anyhow::anyhow!("Could not find 'shape' in header: {}", header.trim())
-    })?;
+    let shape_start = header
+        .find("'shape':")
+        .ok_or_else(|| anyhow::anyhow!("Could not find 'shape' in header: {}", header.trim()))?;
 
-    let paren_start = header[shape_start..].find('(').ok_or_else(|| {
-        anyhow::anyhow!("Could not find shape tuple opening parenthesis")
-    })? + shape_start;
+    let paren_start = header[shape_start..]
+        .find('(')
+        .ok_or_else(|| anyhow::anyhow!("Could not find shape tuple opening parenthesis"))?
+        + shape_start;
 
-    let paren_end = header[paren_start..].find(')').ok_or_else(|| {
-        anyhow::anyhow!("Could not find shape tuple closing parenthesis")
-    })? + paren_start;
+    let paren_end = header[paren_start..]
+        .find(')')
+        .ok_or_else(|| anyhow::anyhow!("Could not find shape tuple closing parenthesis"))?
+        + paren_start;
 
     let shape_str = &header[paren_start + 1..paren_end];
 
@@ -431,7 +426,7 @@ mod tests {
         assert!(bipolar.iter().all(|&v| v == 1 || v == -1));
 
         // Check expected pattern
-        assert_eq!(bipolar[0], 1);  // Even rows have positive weights -> positive output
+        assert_eq!(bipolar[0], 1); // Even rows have positive weights -> positive output
         assert_eq!(bipolar[1], -1); // Odd rows have negative weights -> negative output
     }
 

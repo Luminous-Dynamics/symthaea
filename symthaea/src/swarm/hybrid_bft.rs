@@ -20,10 +20,7 @@
 use super::federated_cfc::GradientMessage;
 
 // Re-export core types for convenience
-pub use mycelix_fl_core::hybrid_bft::{
-    HybridBftConfig,
-    HybridAggregationResult,
-};
+pub use mycelix_fl_core::hybrid_bft::{HybridAggregationResult, HybridBftConfig};
 
 /// A contribution with its associated reputation score
 ///
@@ -163,8 +160,11 @@ mod tests {
 
         let result = hybrid_trimmed_mean(&contributions, &config).unwrap();
 
-        assert!(result.trimmed_indices.contains(&5) || result.trimmed_indices.contains(&6),
-            "At least one Byzantine node should be trimmed, trimmed: {:?}", result.trimmed_indices);
+        assert!(
+            result.trimmed_indices.contains(&5) || result.trimmed_indices.contains(&6),
+            "At least one Byzantine node should be trimmed, trimmed: {:?}",
+            result.trimmed_indices
+        );
         assert_eq!(result.surviving_count, 5);
         assert!((result.aggregated[0] - 0.11).abs() < 0.05);
     }
@@ -184,20 +184,30 @@ mod tests {
 
         let result = hybrid_trimmed_mean(&contributions, &config).unwrap();
 
-        assert!((result.aggregated[0] - 0.9).abs() < 0.01,
-            "High-rep node should dominate: expected ~0.9, got {}", result.aggregated[0]);
+        assert!(
+            (result.aggregated[0] - 0.9).abs() < 0.01,
+            "High-rep node should dominate: expected ~0.9, got {}",
+            result.aggregated[0]
+        );
     }
 
     #[test]
     fn test_effective_byzantine_fraction_low_rep() {
         let frac = effective_byzantine_fraction(100, 34, 0.3, 0.9, 2.0);
-        assert!(frac < 0.06, "34% Byzantine at low rep should have <6% effective power, got {}", frac);
+        assert!(
+            frac < 0.06,
+            "34% Byzantine at low rep should have <6% effective power, got {}",
+            frac
+        );
     }
 
     #[test]
     fn test_effective_byzantine_fraction_same_rep() {
         let frac = effective_byzantine_fraction(100, 45, 0.9, 0.9, 2.0);
-        assert!((frac - 0.45).abs() < 0.01, "Same rep should give no improvement");
+        assert!(
+            (frac - 0.45).abs() < 0.01,
+            "Same rep should give no improvement"
+        );
     }
 
     #[test]
@@ -230,8 +240,12 @@ mod tests {
         assert_eq!(result.gated_count, 80, "20 should be gated out");
 
         for (i, val) in result.aggregated.iter().enumerate() {
-            assert!((*val - 0.5).abs() < 0.15,
-                "Dim {} should be ~0.5, got {}", i, val);
+            assert!(
+                (*val - 0.5).abs() < 0.15,
+                "Dim {} should be ~0.5, got {}",
+                i,
+                val
+            );
         }
     }
 

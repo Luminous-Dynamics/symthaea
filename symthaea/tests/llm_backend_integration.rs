@@ -10,8 +10,8 @@
 //! ```
 
 use symthaea::language::{
-    AnthropicBackend, GenerationParams, LLMBackend, OllamaBackend, OpenAiBackend,
-    SimulatedBackend, create_backend_from_env,
+    create_backend_from_env, AnthropicBackend, GenerationParams, LLMBackend, OpenAiBackend,
+    SimulatedBackend,
 };
 
 // ============================================================================
@@ -33,9 +33,15 @@ fn test_create_backend_from_env_defaults_to_ollama() {
     assert_eq!(backend.name(), "Ollama");
 
     // Restore
-    if let Some(v) = prev_provider { std::env::set_var("SYMTHAEA_LLM_PROVIDER", v); }
-    if let Some(v) = prev_openai { std::env::set_var("OPENAI_API_KEY", v); }
-    if let Some(v) = prev_anthropic { std::env::set_var("ANTHROPIC_API_KEY", v); }
+    if let Some(v) = prev_provider {
+        std::env::set_var("SYMTHAEA_LLM_PROVIDER", v);
+    }
+    if let Some(v) = prev_openai {
+        std::env::set_var("OPENAI_API_KEY", v);
+    }
+    if let Some(v) = prev_anthropic {
+        std::env::set_var("ANTHROPIC_API_KEY", v);
+    }
 }
 
 #[test]
@@ -67,12 +73,16 @@ fn test_create_backend_auto_detects_openai_key() {
     assert_eq!(backend.name(), "OpenAI");
 
     // Restore
-    if let Some(v) = prev_provider { std::env::set_var("SYMTHAEA_LLM_PROVIDER", v); }
+    if let Some(v) = prev_provider {
+        std::env::set_var("SYMTHAEA_LLM_PROVIDER", v);
+    }
     match prev_openai {
         Some(v) => std::env::set_var("OPENAI_API_KEY", v),
         None => std::env::remove_var("OPENAI_API_KEY"),
     }
-    if let Some(v) = prev_anthropic { std::env::set_var("ANTHROPIC_API_KEY", v); }
+    if let Some(v) = prev_anthropic {
+        std::env::set_var("ANTHROPIC_API_KEY", v);
+    }
 }
 
 #[test]
@@ -89,8 +99,12 @@ fn test_create_backend_auto_detects_anthropic_key() {
     assert_eq!(backend.name(), "Anthropic");
 
     // Restore
-    if let Some(v) = prev_provider { std::env::set_var("SYMTHAEA_LLM_PROVIDER", v); }
-    if let Some(v) = prev_openai { std::env::set_var("OPENAI_API_KEY", v); }
+    if let Some(v) = prev_provider {
+        std::env::set_var("SYMTHAEA_LLM_PROVIDER", v);
+    }
+    if let Some(v) = prev_openai {
+        std::env::set_var("OPENAI_API_KEY", v);
+    }
     match prev_anthropic {
         Some(v) => std::env::set_var("ANTHROPIC_API_KEY", v),
         None => std::env::remove_var("ANTHROPIC_API_KEY"),
@@ -118,11 +132,11 @@ async fn test_simulated_backend_streaming() {
     let params = GenerationParams::default();
 
     let mut tokens = Vec::new();
-    let result = backend.generate_streaming(
-        "Tell me about HDC",
-        &params,
-        &mut |token| tokens.push(token.to_string()),
-    ).await;
+    let result = backend
+        .generate_streaming("Tell me about HDC", &params, &mut |token| {
+            tokens.push(token.to_string())
+        })
+        .await;
 
     assert!(result.is_ok());
     assert!(!tokens.is_empty());
@@ -225,7 +239,7 @@ fn test_generation_params_with_system_prompt() {
 // ============================================================================
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires OPENAI_API_KEY environment variable"]
 async fn test_openai_real_api() {
     let backend = match OpenAiBackend::from_env() {
         Some(b) => b,
@@ -254,7 +268,7 @@ async fn test_openai_real_api() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires ANTHROPIC_API_KEY environment variable"]
 async fn test_anthropic_real_api() {
     let backend = match AnthropicBackend::from_env() {
         Some(b) => b,
@@ -283,7 +297,7 @@ async fn test_anthropic_real_api() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires OPENAI_API_KEY environment variable"]
 async fn test_openai_streaming_real_api() {
     let backend = match OpenAiBackend::from_env() {
         Some(b) => b,
@@ -300,14 +314,12 @@ async fn test_openai_streaming_real_api() {
     };
 
     let mut token_count = 0;
-    let result = backend.generate_streaming(
-        "Count from 1 to 5",
-        &params,
-        &mut |token| {
+    let result = backend
+        .generate_streaming("Count from 1 to 5", &params, &mut |token| {
             print!("{}", token);
             token_count += 1;
-        },
-    ).await;
+        })
+        .await;
     println!();
 
     match result {
@@ -324,7 +336,7 @@ async fn test_openai_streaming_real_api() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "requires ANTHROPIC_API_KEY environment variable"]
 async fn test_anthropic_streaming_real_api() {
     let backend = match AnthropicBackend::from_env() {
         Some(b) => b,
@@ -341,14 +353,12 @@ async fn test_anthropic_streaming_real_api() {
     };
 
     let mut token_count = 0;
-    let result = backend.generate_streaming(
-        "Count from 1 to 5",
-        &params,
-        &mut |token| {
+    let result = backend
+        .generate_streaming("Count from 1 to 5", &params, &mut |token| {
             print!("{}", token);
             token_count += 1;
-        },
-    ).await;
+        })
+        .await;
     println!();
 
     match result {

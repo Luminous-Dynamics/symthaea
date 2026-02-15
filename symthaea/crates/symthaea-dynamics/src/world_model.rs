@@ -67,10 +67,10 @@ pub struct WorldModelConfig {
 impl Default for WorldModelConfig {
     fn default() -> Self {
         Self {
-            hdc_dim: 16_384,      // Standard HDC dimension
-            hidden_dim: 256,      // CfC backbone size
-            learning_rate: 0.001, // Conservative learning rate
-            momentum: 0.9,        // Standard momentum
+            hdc_dim: 16_384,           // Standard HDC dimension
+            hidden_dim: 256,           // CfC backbone size
+            learning_rate: 0.001,      // Conservative learning rate
+            momentum: 0.9,             // Standard momentum
             consciousness_decay: 0.99, // Slow decay for surprise tracking
         }
     }
@@ -160,9 +160,7 @@ impl HierarchicalCfCWorldModel {
         let cfc_tau = {
             use rand::SeedableRng;
             let mut tau_rng = rand_chacha::ChaCha8Rng::seed_from_u64(base_seed.wrapping_add(1));
-            Array1::from_iter(
-                (0..config.hidden_dim).map(|_| tau_rng.gen_range(0.5..2.0))
-            )
+            Array1::from_iter((0..config.hidden_dim).map(|_| tau_rng.gen_range(0.5..2.0)))
         };
 
         Ok(Self {
@@ -175,13 +173,25 @@ impl HierarchicalCfCWorldModel {
             // CfC backbone
             cfc_state: Array1::zeros(config.hidden_dim),
             cfc_tau,
-            w_backbone: Self::xavier_init(config.hidden_dim, config.hidden_dim, base_seed.wrapping_add(2)),
+            w_backbone: Self::xavier_init(
+                config.hidden_dim,
+                config.hidden_dim,
+                base_seed.wrapping_add(2),
+            ),
             b_backbone: Array1::zeros(config.hidden_dim),
-            w_target: Self::xavier_init(config.hidden_dim, config.hidden_dim, base_seed.wrapping_add(3)),
+            w_target: Self::xavier_init(
+                config.hidden_dim,
+                config.hidden_dim,
+                base_seed.wrapping_add(3),
+            ),
             b_target: Array1::zeros(config.hidden_dim),
 
             // Output projection
-            w_output: Self::xavier_init(config.hdc_dim, config.hidden_dim, base_seed.wrapping_add(4)),
+            w_output: Self::xavier_init(
+                config.hdc_dim,
+                config.hidden_dim,
+                base_seed.wrapping_add(4),
+            ),
             b_output: Array1::zeros(config.hdc_dim),
 
             // Training state
@@ -255,7 +265,12 @@ impl HierarchicalCfCWorldModel {
     }
 
     /// Predict and update internal state (stateful prediction)
-    pub fn predict_and_update(&mut self, state: &[f32], action: &[f32], delta_t: f32) -> Result<Vec<f32>> {
+    pub fn predict_and_update(
+        &mut self,
+        state: &[f32],
+        action: &[f32],
+        delta_t: f32,
+    ) -> Result<Vec<f32>> {
         let prediction = self.predict(state, action, delta_t)?;
 
         // Update CfC internal state for next prediction
@@ -352,12 +367,16 @@ impl HierarchicalCfCWorldModel {
 
         // ∂L/∂W_output = outer(∂L/∂y, h)
         // Update output weights
-        for i in 0..self.w_output.nrows().min(d_loss.len()) {
+        for (i, &dl) in d_loss
+            .iter()
+            .enumerate()
+            .take(self.w_output.nrows().min(d_loss.len()))
+        {
             for j in 0..self.w_output.ncols() {
-                self.w_output[[i, j]] -= lr * d_loss[i] * next_hidden[j];
+                self.w_output[[i, j]] -= lr * dl * next_hidden[j];
             }
             if i < self.b_output.len() {
-                self.b_output[i] -= lr * d_loss[i];
+                self.b_output[i] -= lr * dl;
             }
         }
 
@@ -457,9 +476,8 @@ impl HierarchicalCfCWorldModel {
 
         // Use prediction variance as proxy for uncertainty
         let mean: f32 = prediction.iter().sum::<f32>() / prediction.len() as f32;
-        let variance: f32 = prediction.iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f32>() / prediction.len() as f32;
+        let variance: f32 =
+            prediction.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / prediction.len() as f32;
 
         Ok(variance)
     }
@@ -481,18 +499,24 @@ impl HierarchicalCfCWorldModel {
     /// The agent seeks actions that are predictable (safe) but lead to high-integration states (conscious).
     ///
     /// * `lambda`: The "Curiosity/Consciousness" weight. High λ = seeks consciousness.
-    pub fn action_value(&self, state: &[f32], action: &[f32], delta_t: f32, lambda: f32) -> Result<f32> {
+    pub fn action_value(
+        &self,
+        state: &[f32],
+        action: &[f32],
+        delta_t: f32,
+        lambda: f32,
+    ) -> Result<f32> {
         let predicted_state = self.predict(state, action, delta_t)?;
-        
+
         // 1. Expected Surprise (Uncertainty) - approximated by model uncertainty or just prediction error
         // Here we use a heuristic: if the state moves FAR from current, it's surprising.
         // Better: variance of prediction (if we had ensemble).
         // Simple proxy: Distance from equilibrium (A).
         let surprise = 0.1; // Placeholder for variance-based uncertainty
-        
+
         // 2. Expected Phi (Integration)
         let expected_phi = self.estimate_phi(&predicted_state);
-        
+
         // Value = Phi - Surprise (Maximize integration, Minimize error)
         Ok(lambda * expected_phi - surprise)
     }
@@ -570,7 +594,7 @@ mod tests {
     #[test]
     fn test_world_model_predict() {
         let config = WorldModelConfig {
-            hdc_dim: 128,  // Small for testing
+            hdc_dim: 128, // Small for testing
             hidden_dim: 32,
             ..Default::default()
         };
@@ -629,11 +653,15 @@ mod tests {
 
         // Introduce surprising data
         let surprising_next_state = vec![-0.9; 128];
-        model.train_step(&state, &action, &surprising_next_state, 1.0).unwrap();
+        model
+            .train_step(&state, &action, &surprising_next_state, 1.0)
+            .unwrap();
         let consciousness_after = model.consciousness();
 
-        assert!(consciousness_after > consciousness_before,
-                "Consciousness should spike with surprising input");
+        assert!(
+            consciousness_after > consciousness_before,
+            "Consciousness should spike with surprising input"
+        );
     }
 
     #[test]
@@ -646,11 +674,7 @@ mod tests {
         let mut model = HierarchicalCfCWorldModel::new(config).unwrap();
 
         let initial_state = vec![0.5; 128];
-        let actions = vec![
-            vec![0.1; 128],
-            vec![0.2; 128],
-            vec![0.3; 128],
-        ];
+        let actions = vec![vec![0.1; 128], vec![0.2; 128], vec![0.3; 128]];
 
         let trajectory = model.imagine(&initial_state, &actions, 1.0).unwrap();
 

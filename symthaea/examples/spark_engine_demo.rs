@@ -14,11 +14,9 @@
 
 use symthaea_core::genesis::GenesisSeed;
 use symthaea_core::physics::{
-    StandardModel, Hadrons, PeriodicTable, PhononDynamics,
-    RadiationDamageSystem, FusionReaction,
-    HEADesigner, HEATarget, multi_seed_hea_search,
-    AdvancedMaterials,
-    SparkEngineSpec, SparkTarget,
+    multi_seed_hea_search, AdvancedMaterials, FusionReaction, HEADesigner, HEATarget, Hadrons,
+    PeriodicTable, PhononDynamics, RadiationDamageSystem, SparkEngineSpec, SparkTarget,
+    StandardModel,
 };
 
 fn main() {
@@ -44,8 +42,8 @@ fn main() {
         "Spark Engine",
         &target,
         FusionReaction::DT,
-        5,   // 5 seeds
-        5,   // top 5 per seed
+        5, // 5 seeds
+        5, // top 5 per seed
     );
 
     println!("\n  {:─^68}", " CONSENSUS CANDIDATES ");
@@ -55,10 +53,18 @@ fn main() {
         let rank = i + 1;
         let stars = "★".repeat((result.consensus_score * 5.0) as usize);
 
-        println!("  #{} {} (Consensus: {:.0}%)",
-            rank, result.alloy.name, result.consensus_score * 100.0);
-        println!("     {} Seeds: {}/5, Avg Match: {:.1}%",
-            stars, result.occurrence_count, result.avg_match_score * 100.0);
+        println!(
+            "  #{} {} (Consensus: {:.0}%)",
+            rank,
+            result.alloy.name,
+            result.consensus_score * 100.0
+        );
+        println!(
+            "     {} Seeds: {}/5, Avg Match: {:.1}%",
+            stars,
+            result.occurrence_count,
+            result.avg_match_score * 100.0
+        );
         println!();
     }
 
@@ -78,15 +84,35 @@ fn main() {
     println!("\n  MAX PHASES (Kink Band Healing):\n");
 
     let rankings = advanced.rank_all_materials(&damage);
-    for (i, mat) in rankings.iter().filter(|m| m.material_type == symthaea_core::physics::MaterialType::MAXPhase).take(3).enumerate() {
-        println!("    {}. {} (LCF: {:.0}%)", i + 1, mat.name, mat.lcf_score * 100.0);
+    for (i, mat) in rankings
+        .iter()
+        .filter(|m| m.material_type == symthaea_core::physics::MaterialType::MAXPhase)
+        .take(3)
+        .enumerate()
+    {
+        println!(
+            "    {}. {} (LCF: {:.0}%)",
+            i + 1,
+            mat.name,
+            mat.lcf_score * 100.0
+        );
         println!("       Role: {}", mat.recommended_role);
     }
 
     println!("\n  NANO-LAMINATES (Interface Sinks):\n");
 
-    for (i, mat) in rankings.iter().filter(|m| m.material_type == symthaea_core::physics::MaterialType::NanoLaminate).take(3).enumerate() {
-        println!("    {}. {} (LCF: {:.0}%)", i + 1, mat.name, mat.lcf_score * 100.0);
+    for (i, mat) in rankings
+        .iter()
+        .filter(|m| m.material_type == symthaea_core::physics::MaterialType::NanoLaminate)
+        .take(3)
+        .enumerate()
+    {
+        println!(
+            "    {}. {} (LCF: {:.0}%)",
+            i + 1,
+            mat.name,
+            mat.lcf_score * 100.0
+        );
         println!("       Role: {}", mat.recommended_role);
     }
 
@@ -116,18 +142,33 @@ fn main() {
     println!("PHASE 4: Model Comparison");
     println!("{}", "━".repeat(72));
 
-    println!("\n  {:<20} {:>15} {:>15}", "Metric", "Consumer", "Industrial");
+    println!(
+        "\n  {:<20} {:>15} {:>15}",
+        "Metric", "Consumer", "Industrial"
+    );
     println!("  {:─<20} {:─>15} {:─>15}", "", "", "");
-    println!("  {:<20} {:>12.1} kW {:>12.0} kW",
-        "Power Output", consumer_spec.power_kw, industrial_spec.power_kw);
-    println!("  {:<20} {:>12.1} yr {:>12.1} yr",
-        "Lifetime", consumer_spec.lifetime_years, industrial_spec.lifetime_years);
-    println!("  {:<20} {:>12.4} g {:>12.2} g",
-        "Fuel/Year", consumer_spec.fuel_rate_g_year, industrial_spec.fuel_rate_g_year);
-    println!("  {:<20} {:>15?} {:>15?}",
-        "Reaction", consumer_spec.reaction, industrial_spec.reaction);
-    println!("  {:<20} {:>14.0}% {:>14.0}%",
-        "Confidence", consumer_spec.confidence * 100.0, industrial_spec.confidence * 100.0);
+    println!(
+        "  {:<20} {:>12.1} kW {:>12.0} kW",
+        "Power Output", consumer_spec.power_kw, industrial_spec.power_kw
+    );
+    println!(
+        "  {:<20} {:>12.1} yr {:>12.1} yr",
+        "Lifetime", consumer_spec.lifetime_years, industrial_spec.lifetime_years
+    );
+    println!(
+        "  {:<20} {:>12.4} g {:>12.2} g",
+        "Fuel/Year", consumer_spec.fuel_rate_g_year, industrial_spec.fuel_rate_g_year
+    );
+    println!(
+        "  {:<20} {:>15?} {:>15?}",
+        "Reaction", consumer_spec.reaction, industrial_spec.reaction
+    );
+    println!(
+        "  {:<20} {:>14.0}% {:>14.0}%",
+        "Confidence",
+        consumer_spec.confidence * 100.0,
+        industrial_spec.confidence * 100.0
+    );
 
     // ═══════════════════════════════════════════════════════════════════════
     // FINAL OUTPUT: Complete Specification
@@ -137,7 +178,8 @@ fn main() {
     println!("SPARK ENGINE COMPLETE SPECIFICATION");
     println!("{}", "━".repeat(72));
 
-    println!(r#"
+    println!(
+        r#"
 
   ┌─────────────────────────────────────────────────────────────────────┐
   │                     SPARK ENGINE v1.0                               │

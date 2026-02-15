@@ -8,8 +8,8 @@
 //! This example validates the relationship using different topology-generated signals.
 
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
-use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::hdc::reservoir::HybridEnsemblePredictor;
+use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea::hdc::HDC_DIMENSION;
 
 fn main() {
@@ -25,11 +25,17 @@ fn main() {
     let phi_calc = ConnectivityCalculator::new();
 
     // Test multiple topologies
-    let topologies: Vec<(&str, Box<dyn Fn(usize, usize, u64) -> ConsciousnessTopology>)> = vec![
+    let topologies: Vec<(
+        &str,
+        Box<dyn Fn(usize, usize, u64) -> ConsciousnessTopology>,
+    )> = vec![
         ("Ring (High Φ)", Box::new(ConsciousnessTopology::ring)),
         ("Star (Low Φ)", Box::new(ConsciousnessTopology::star)),
         ("Random", Box::new(ConsciousnessTopology::random)),
-        ("Dense", Box::new(|n, d, s| ConsciousnessTopology::dense_network(n, d, None, s))),
+        (
+            "Dense",
+            Box::new(|n, d, s| ConsciousnessTopology::dense_network(n, d, None, s)),
+        ),
         ("Line", Box::new(ConsciousnessTopology::line)),
     ];
 
@@ -76,8 +82,13 @@ fn main() {
 
         results.push((name, phi, accuracy, unpredictability));
 
-        println!("  {:<20} Φ={:.4}  Accuracy={:.1}%  Unpredictability={:.3}",
-                 name, phi, accuracy * 100.0, unpredictability);
+        println!(
+            "  {:<20} Φ={:.4}  Accuracy={:.1}%  Unpredictability={:.3}",
+            name,
+            phi,
+            accuracy * 100.0,
+            unpredictability
+        );
     }
 
     // Analyze correlation
@@ -90,11 +101,26 @@ fn main() {
     sorted.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
 
     println!("  Topologies ranked by Φ (integrated information):\n");
-    println!("  {:20} {:10} {:12} {:15}", "Topology", "Φ", "Accuracy", "Unpredictability");
-    println!("  {:20} {:10} {:12} {:15}", "─".repeat(20), "─".repeat(10), "─".repeat(12), "─".repeat(15));
+    println!(
+        "  {:20} {:10} {:12} {:15}",
+        "Topology", "Φ", "Accuracy", "Unpredictability"
+    );
+    println!(
+        "  {:20} {:10} {:12} {:15}",
+        "─".repeat(20),
+        "─".repeat(10),
+        "─".repeat(12),
+        "─".repeat(15)
+    );
 
     for (name, phi, acc, unp) in &sorted {
-        println!("  {:20} {:10.4} {:12.1}% {:15.3}", name, phi, acc * 100.0, unp);
+        println!(
+            "  {:20} {:10.4} {:12.1}% {:15.3}",
+            name,
+            phi,
+            acc * 100.0,
+            unp
+        );
     }
 
     // Calculate correlation between Φ and unpredictability
@@ -119,7 +145,10 @@ fn main() {
 
     let correlation = cov / (var_phi.sqrt() * var_unp.sqrt());
 
-    println!("\n  Correlation (Φ vs Unpredictability): {:.3}", correlation);
+    println!(
+        "\n  Correlation (Φ vs Unpredictability): {:.3}",
+        correlation
+    );
 
     if correlation > 0.3 {
         println!("\n  ✅ POSITIVE CORRELATION: Higher Φ → Less predictable signals");
@@ -149,7 +178,9 @@ fn generate_topology_signal(topology: &ConsciousnessTopology, length: usize) -> 
     }
 
     // Initialize node activities from topology (each node gets chaotic logistic map)
-    let mut activities: Vec<f64> = topology.node_representations.iter()
+    let mut activities: Vec<f64> = topology
+        .node_representations
+        .iter()
         .enumerate()
         .map(|(i, hv)| {
             // Use HV values to seed initial conditions
@@ -219,8 +250,8 @@ fn generate_topology_signal(topology: &ConsciousnessTopology, length: usize) -> 
             // Blend local chaos with neighbor coupling
             // High coupling = more synchronization = more predictable
             // Low coupling = independent chaos = harder to predict from topology
-            new_activities[i] = (1.0 - coupling_strength) * local
-                              + coupling_strength * neighbor_avg;
+            new_activities[i] =
+                (1.0 - coupling_strength) * local + coupling_strength * neighbor_avg;
 
             // Clamp to valid logistic map range
             new_activities[i] = new_activities[i].clamp(0.001, 0.999);

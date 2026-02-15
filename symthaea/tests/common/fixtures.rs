@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 //! Test Fixtures
 //!
 //! Shared test state management including temporary directories,

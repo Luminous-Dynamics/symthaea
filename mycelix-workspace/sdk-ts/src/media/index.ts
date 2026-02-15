@@ -25,13 +25,15 @@ export interface ZomeCallable {
 // Media Types
 // ============================================================================
 
-export type ContentType = 'Article' | 'Video' | 'Audio' | 'Image' | 'Document' | 'Data' | 'Other';
+/** Matches Rust ContentType in media-publication integrity */
+export type ContentType = 'Article' | 'Opinion' | 'Investigation' | 'Review' | 'Analysis' | 'Interview' | 'Report' | 'Editorial' | 'Other';
+/** Matches Rust LicenseType in media-publication integrity */
 export type LicenseType =
   | 'CC0'
-  | 'CC-BY'
-  | 'CC-BY-SA'
-  | 'CC-BY-NC'
-  | 'CC-BY-NC-SA'
+  | 'CCBY'
+  | 'CCBYSA'
+  | 'CCBYNC'
+  | 'CCBYNCSA'
   | 'AllRightsReserved'
   | 'Custom';
 export type VerificationStatus = 'Unverified' | 'Pending' | 'Verified' | 'Disputed' | 'Debunked';

@@ -24,7 +24,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-use super::primitive_system::{PrimitiveTier, Primitive};
+use super::primitive_system::{Primitive, PrimitiveTier};
 
 /// A recorded primitive activation event
 #[derive(Debug, Clone)]
@@ -77,8 +77,8 @@ impl PrimitiveStats {
         if let Some(d) = duration {
             let ms = d.as_secs_f64() * 1000.0;
             // Running average
-            self.avg_duration_ms =
-                (self.avg_duration_ms * (self.activations - 1) as f64 + ms) / self.activations as f64;
+            self.avg_duration_ms = (self.avg_duration_ms * (self.activations - 1) as f64 + ms)
+                / self.activations as f64;
         }
         self.last_activation = Some(Instant::now());
     }
@@ -156,15 +156,11 @@ impl PrimitiveDashboard {
         duration: Option<Duration>,
     ) {
         // Update per-primitive stats
-        let stats = self.stats
-            .entry(primitive_name.to_string())
-            .or_default();
+        let stats = self.stats.entry(primitive_name.to_string()).or_default();
         stats.record(success, duration);
 
         // Update per-tier stats
-        let tier_stats = self.tier_stats
-            .entry(tier)
-            .or_default();
+        let tier_stats = self.tier_stats.entry(tier).or_default();
         tier_stats.activations += 1;
         if success {
             tier_stats.successes += 1;
@@ -218,14 +214,16 @@ impl PrimitiveDashboard {
 
     /// Get primitives with low success rate (potential issues)
     pub fn problematic_primitives(&self, threshold: f64) -> Vec<(&String, &PrimitiveStats)> {
-        self.stats.iter()
+        self.stats
+            .iter()
             .filter(|(_, s)| s.activations >= 5 && s.success_rate() < threshold)
             .collect()
     }
 
     /// Get recent activations for a context
     pub fn recent_in_context(&self, context: &str, count: usize) -> Vec<&PrimitiveActivation> {
-        self.history.iter()
+        self.history
+            .iter()
             .rev()
             .filter(|a| a.context == context)
             .take(count)
@@ -251,7 +249,10 @@ impl PrimitiveDashboard {
         let elapsed = self.start_time.elapsed();
         report.push_str(&format!("Uptime: {:.1}s\n", elapsed.as_secs_f64()));
         report.push_str(&format!("Total Activations: {}\n", self.total_activations));
-        report.push_str(&format!("Rate: {:.1}/min\n\n", self.activations_per_minute()));
+        report.push_str(&format!(
+            "Rate: {:.1}/min\n\n",
+            self.activations_per_minute()
+        ));
 
         // Per-tier breakdown
         report.push_str("--- Tier Breakdown ---\n");
@@ -284,7 +285,10 @@ impl PrimitiveDashboard {
         for (name, stats) in self.top_primitives(5) {
             report.push_str(&format!(
                 "  {}: {} uses ({:.1}% success, {:.1}ms avg)\n",
-                name, stats.activations, stats.success_rate() * 100.0, stats.avg_duration_ms
+                name,
+                stats.activations,
+                stats.success_rate() * 100.0,
+                stats.avg_duration_ms
             ));
         }
 
@@ -295,7 +299,9 @@ impl PrimitiveDashboard {
             for (name, stats) in problems {
                 report.push_str(&format!(
                     "  {}: {:.1}% success ({} uses)\n",
-                    name, stats.success_rate() * 100.0, stats.activations
+                    name,
+                    stats.success_rate() * 100.0,
+                    stats.activations
                 ));
             }
         }
@@ -317,10 +323,13 @@ impl PrimitiveDashboard {
         let diversity = (self.stats.len() as f64 / 20.0).min(1.0); // Expect ~20 primitives
 
         // Penalize if activations are too slow
-        let avg_duration: f64 = self.stats.values()
+        let avg_duration: f64 = self
+            .stats
+            .values()
             .filter(|s| s.avg_duration_ms > 0.0)
             .map(|s| s.avg_duration_ms)
-            .sum::<f64>() / self.stats.len().max(1) as f64;
+            .sum::<f64>()
+            / self.stats.len().max(1) as f64;
         let speed_score = 1.0 - (avg_duration / 100.0).min(1.0); // 100ms = poor
 
         // Weighted combination
@@ -368,35 +377,42 @@ impl VoicePrimitiveTracker {
 
     /// Begin listening - activates ATTEND primitive
     pub fn begin_listening(&mut self) {
-        self.dashboard.record_activation("ATTEND", PrimitiveTier::Consciousness, true);
+        self.dashboard
+            .record_activation("ATTEND", PrimitiveTier::Consciousness, true);
         self.active_attention.push("ATTEND".to_string());
     }
 
     /// Detect speech - activates SALIENCE primitive
     pub fn speech_detected(&mut self, confidence: f32) {
         let success = confidence > 0.5;
-        self.dashboard.record_activation("SALIENCE", PrimitiveTier::Consciousness, success);
+        self.dashboard
+            .record_activation("SALIENCE", PrimitiveTier::Consciousness, success);
     }
 
     /// Process transcription - activates BINDING_WINDOW
     pub fn process_transcription(&mut self) {
-        self.dashboard.record_activation("BINDING_WINDOW", PrimitiveTier::Consciousness, true);
+        self.dashboard
+            .record_activation("BINDING_WINDOW", PrimitiveTier::Consciousness, true);
     }
 
     /// Recall context - activates REMEMBER
     pub fn recall_context(&mut self, success: bool) {
-        self.dashboard.record_activation("REMEMBER", PrimitiveTier::Consciousness, success);
+        self.dashboard
+            .record_activation("REMEMBER", PrimitiveTier::Consciousness, success);
     }
 
     /// Generate response - activates INTEND
     pub fn generate_response(&mut self) {
-        self.dashboard.record_activation("INTEND", PrimitiveTier::Consciousness, true);
-        self.dashboard.record_activation("DECIDE", PrimitiveTier::Consciousness, true);
+        self.dashboard
+            .record_activation("INTEND", PrimitiveTier::Consciousness, true);
+        self.dashboard
+            .record_activation("DECIDE", PrimitiveTier::Consciousness, true);
     }
 
     /// Speak response - activates PHENOMENAL_BINDING
     pub fn begin_speaking(&mut self) {
-        self.dashboard.record_activation("PHENOMENAL_BINDING", PrimitiveTier::Consciousness, true);
+        self.dashboard
+            .record_activation("PHENOMENAL_BINDING", PrimitiveTier::Consciousness, true);
     }
 
     /// End turn - cleanup
@@ -420,13 +436,23 @@ impl VoicePrimitiveTracker {
         let mut summary = format!("=== Voice Session ({} turns) ===\n", self.turn);
 
         // Get voice-specific primitives
-        let voice_primitives = ["ATTEND", "SALIENCE", "REMEMBER", "INTEND", "DECIDE", "BINDING_WINDOW", "PHENOMENAL_BINDING"];
+        let voice_primitives = [
+            "ATTEND",
+            "SALIENCE",
+            "REMEMBER",
+            "INTEND",
+            "DECIDE",
+            "BINDING_WINDOW",
+            "PHENOMENAL_BINDING",
+        ];
 
         for prim in &voice_primitives {
             if let Some(stats) = self.dashboard.get_stats(prim) {
                 summary.push_str(&format!(
                     "  {}: {} activations ({:.0}% success)\n",
-                    prim, stats.activations, stats.success_rate() * 100.0
+                    prim,
+                    stats.activations,
+                    stats.success_rate() * 100.0
                 ));
             }
         }

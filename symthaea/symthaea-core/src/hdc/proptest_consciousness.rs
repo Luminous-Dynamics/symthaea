@@ -5,10 +5,10 @@
 
 use proptest::prelude::*;
 
-use super::semantic_bridge::SemanticBridge;
-use super::consciousness_verifier::{ConsciousnessVerifier, ConsciousnessVerdict};
-use super::phi_feedback::PhiFeedbackController;
 use super::consciousness_integration::ConsciousnessState;
+use super::consciousness_verifier::{ConsciousnessVerdict, ConsciousnessVerifier};
+use super::phi_feedback::PhiFeedbackController;
+use super::semantic_bridge::SemanticBridge;
 
 // =============================================================================
 // STRATEGIES
@@ -17,10 +17,10 @@ use super::consciousness_integration::ConsciousnessState;
 /// Generate a word from a fixed vocabulary (ensures it's known to the bridge)
 fn known_word() -> impl Strategy<Value = String> {
     prop::sample::select(vec![
-        "cat", "dog", "bird", "fish", "tree",
-        "sky", "sun", "moon", "star", "rain",
-        "red", "blue", "green", "big", "small",
-    ]).prop_map(|s| s.to_string())
+        "cat", "dog", "bird", "fish", "tree", "sky", "sun", "moon", "star", "rain", "red", "blue",
+        "green", "big", "small",
+    ])
+    .prop_map(|s| s.to_string())
 }
 
 /// Generate a Phi value in [0, 1]
@@ -270,7 +270,9 @@ proptest! {
 // =============================================================================
 
 use super::binary_hv::BinaryHV;
-use super::consciousness_integration::{ConsciousnessPipeline, ConsciousnessPipelineBuilder, IntegrationConfig};
+use super::consciousness_integration::{
+    ConsciousnessPipeline, ConsciousnessPipelineBuilder, IntegrationConfig,
+};
 
 /// Generate a seed for BinaryHV::random
 fn hv_seed() -> impl Strategy<Value = u64> {

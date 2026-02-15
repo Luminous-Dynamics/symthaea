@@ -23,9 +23,9 @@
 //! - Discovery of universal principles
 //! - Creative problem-solving via analogy
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -62,12 +62,12 @@ pub struct Analogy {
 /// Category of structural analogy
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum AnalogyType {
-    Mathematical,    // Same equations
-    Symmetry,        // Similar symmetries
-    ScaleInvariant,  // Same at different scales
-    Dynamical,       // Similar dynamics
-    Topological,     // Same topology
-    Emergent,        // Similar emergence patterns
+    Mathematical,   // Same equations
+    Symmetry,       // Similar symmetries
+    ScaleInvariant, // Same at different scales
+    Dynamical,      // Similar dynamics
+    Topological,    // Same topology
+    Emergent,       // Similar emergence patterns
 }
 
 /// Cross-Domain Analogy Engine
@@ -112,7 +112,10 @@ impl AnalogyEngine {
             analogy_type: AnalogyType::Mathematical,
             marker: self.genesis.hv("pattern::wave_equation", PHYSICS_DIM),
             examples: vec![
-                ("electromagnetic_wave".to_string(), "acoustic_wave".to_string()),
+                (
+                    "electromagnetic_wave".to_string(),
+                    "acoustic_wave".to_string(),
+                ),
                 ("gravitational_wave".to_string(), "seismic_wave".to_string()),
             ],
         });
@@ -123,7 +126,10 @@ impl AnalogyEngine {
             analogy_type: AnalogyType::Mathematical,
             marker: self.genesis.hv("pattern::diffusion", PHYSICS_DIM),
             examples: vec![
-                ("heat_conduction".to_string(), "molecular_diffusion".to_string()),
+                (
+                    "heat_conduction".to_string(),
+                    "molecular_diffusion".to_string(),
+                ),
                 ("charge_diffusion".to_string(), "neuron_signal".to_string()),
             ],
         });
@@ -132,9 +138,14 @@ impl AnalogyEngine {
         self.patterns.push(AnalogyPattern {
             name: "Threshold Oscillation".to_string(),
             analogy_type: AnalogyType::Dynamical,
-            marker: self.genesis.hv("pattern::threshold_oscillation", PHYSICS_DIM),
+            marker: self
+                .genesis
+                .hv("pattern::threshold_oscillation", PHYSICS_DIM),
             examples: vec![
-                ("vortex_shedding".to_string(), "action_potential".to_string()),
+                (
+                    "vortex_shedding".to_string(),
+                    "action_potential".to_string(),
+                ),
                 ("laser_mode_locking".to_string(), "heartbeat".to_string()),
             ],
         });
@@ -154,7 +165,9 @@ impl AnalogyEngine {
         self.patterns.push(AnalogyPattern {
             name: "Quantum Coherence".to_string(),
             analogy_type: AnalogyType::Emergent,
-            marker: self.genesis.hv("pattern::macroscopic_coherence", PHYSICS_DIM),
+            marker: self
+                .genesis
+                .hv("pattern::macroscopic_coherence", PHYSICS_DIM),
             examples: vec![
                 ("bec".to_string(), "laser".to_string()),
                 ("superconductor".to_string(), "superfluid".to_string()),
@@ -167,7 +180,10 @@ impl AnalogyEngine {
             analogy_type: AnalogyType::ScaleInvariant,
             marker: self.genesis.hv("pattern::scale_invariance", PHYSICS_DIM),
             examples: vec![
-                ("critical_point".to_string(), "turbulence_cascade".to_string()),
+                (
+                    "critical_point".to_string(),
+                    "turbulence_cascade".to_string(),
+                ),
                 ("fractal".to_string(), "renormalization".to_string()),
             ],
         });
@@ -178,7 +194,10 @@ impl AnalogyEngine {
             analogy_type: AnalogyType::Topological,
             marker: self.genesis.hv("pattern::topological", PHYSICS_DIM),
             examples: vec![
-                ("quantum_hall".to_string(), "topological_insulator".to_string()),
+                (
+                    "quantum_hall".to_string(),
+                    "topological_insulator".to_string(),
+                ),
                 ("vortex".to_string(), "magnetic_monopole".to_string()),
             ],
         });
@@ -186,142 +205,238 @@ impl AnalogyEngine {
 
     fn populate_concepts(&mut self) {
         // Fluid dynamics concepts
-        self.register_concept("vortex_shedding", "fluid_dynamics",
+        self.register_concept(
+            "vortex_shedding",
+            "fluid_dynamics",
             "Periodic vortex formation behind bluff body",
-            self.genesis.hv("fluid::vortex_shedding", PHYSICS_DIM));
+            self.genesis.hv("fluid::vortex_shedding", PHYSICS_DIM),
+        );
 
-        self.register_concept("turbulence_cascade", "fluid_dynamics",
+        self.register_concept(
+            "turbulence_cascade",
+            "fluid_dynamics",
             "Energy transfer from large to small scales",
-            self.genesis.hv("fluid::turbulence_cascade", PHYSICS_DIM));
+            self.genesis.hv("fluid::turbulence_cascade", PHYSICS_DIM),
+        );
 
-        self.register_concept("bernoulli_flow", "fluid_dynamics",
+        self.register_concept(
+            "bernoulli_flow",
+            "fluid_dynamics",
             "Pressure decreases with velocity",
-            self.genesis.hv("fluid::bernoulli", PHYSICS_DIM));
+            self.genesis.hv("fluid::bernoulli", PHYSICS_DIM),
+        );
 
         // Electromagnetism concepts
-        self.register_concept("electromagnetic_wave", "electromagnetism",
+        self.register_concept(
+            "electromagnetic_wave",
+            "electromagnetism",
             "Self-propagating EM disturbance",
-            self.genesis.hv("em::wave", PHYSICS_DIM));
+            self.genesis.hv("em::wave", PHYSICS_DIM),
+        );
 
-        self.register_concept("faraday_induction", "electromagnetism",
+        self.register_concept(
+            "faraday_induction",
+            "electromagnetism",
             "Changing magnetic flux induces EMF",
-            self.genesis.hv("em::faraday", PHYSICS_DIM));
+            self.genesis.hv("em::faraday", PHYSICS_DIM),
+        );
 
         // Thermodynamics concepts
-        self.register_concept("heat_conduction", "thermodynamics",
+        self.register_concept(
+            "heat_conduction",
+            "thermodynamics",
             "Energy transfer via temperature gradient",
-            self.genesis.hv("thermo::conduction", PHYSICS_DIM));
+            self.genesis.hv("thermo::conduction", PHYSICS_DIM),
+        );
 
-        self.register_concept("entropy_production", "thermodynamics",
+        self.register_concept(
+            "entropy_production",
+            "thermodynamics",
             "Irreversible increase of entropy",
-            self.genesis.hv("thermo::entropy_production", PHYSICS_DIM));
+            self.genesis.hv("thermo::entropy_production", PHYSICS_DIM),
+        );
 
-        self.register_concept("critical_point", "thermodynamics",
+        self.register_concept(
+            "critical_point",
+            "thermodynamics",
             "End of phase coexistence curve",
-            self.genesis.hv("thermo::critical_point", PHYSICS_DIM));
+            self.genesis.hv("thermo::critical_point", PHYSICS_DIM),
+        );
 
         // Quantum concepts
-        self.register_concept("bec", "quantum",
+        self.register_concept(
+            "bec",
+            "quantum",
             "Bose-Einstein condensation",
-            self.genesis.hv("quantum::bec", PHYSICS_DIM));
+            self.genesis.hv("quantum::bec", PHYSICS_DIM),
+        );
 
-        self.register_concept("superconductivity", "quantum",
+        self.register_concept(
+            "superconductivity",
+            "quantum",
             "Zero resistance below Tc",
-            self.genesis.hv("quantum::superconductivity", PHYSICS_DIM));
+            self.genesis.hv("quantum::superconductivity", PHYSICS_DIM),
+        );
 
-        self.register_concept("superfluidity", "quantum",
+        self.register_concept(
+            "superfluidity",
+            "quantum",
             "Frictionless flow below Tc",
-            self.genesis.hv("quantum::superfluidity", PHYSICS_DIM));
+            self.genesis.hv("quantum::superfluidity", PHYSICS_DIM),
+        );
 
-        self.register_concept("quantum_tunneling", "quantum",
+        self.register_concept(
+            "quantum_tunneling",
+            "quantum",
             "Particle traverses classically forbidden barrier",
-            self.genesis.hv("quantum::tunneling", PHYSICS_DIM));
+            self.genesis.hv("quantum::tunneling", PHYSICS_DIM),
+        );
 
-        self.register_concept("quantum_hall", "quantum",
+        self.register_concept(
+            "quantum_hall",
+            "quantum",
             "Quantized Hall conductance",
-            self.genesis.hv("quantum::hall", PHYSICS_DIM));
+            self.genesis.hv("quantum::hall", PHYSICS_DIM),
+        );
 
         // Particle physics concepts
-        self.register_concept("higgs_mechanism", "particle",
+        self.register_concept(
+            "higgs_mechanism",
+            "particle",
             "Symmetry breaking gives mass",
-            self.genesis.hv("particle::higgs", PHYSICS_DIM));
+            self.genesis.hv("particle::higgs", PHYSICS_DIM),
+        );
 
-        self.register_concept("asymptotic_freedom", "particle",
+        self.register_concept(
+            "asymptotic_freedom",
+            "particle",
             "Coupling decreases at high energy",
-            self.genesis.hv("particle::asymptotic_freedom", PHYSICS_DIM));
+            self.genesis.hv("particle::asymptotic_freedom", PHYSICS_DIM),
+        );
 
         // Condensed matter concepts
-        self.register_concept("ferromagnetism", "condensed_matter",
+        self.register_concept(
+            "ferromagnetism",
+            "condensed_matter",
             "Spontaneous magnetic ordering",
-            self.genesis.hv("cm::ferromagnetism", PHYSICS_DIM));
+            self.genesis.hv("cm::ferromagnetism", PHYSICS_DIM),
+        );
 
-        self.register_concept("topological_insulator", "condensed_matter",
+        self.register_concept(
+            "topological_insulator",
+            "condensed_matter",
             "Insulating bulk with conducting surface",
-            self.genesis.hv("cm::topological_insulator", PHYSICS_DIM));
+            self.genesis.hv("cm::topological_insulator", PHYSICS_DIM),
+        );
 
         // Neuroscience concepts
-        self.register_concept("action_potential", "neuroscience",
+        self.register_concept(
+            "action_potential",
+            "neuroscience",
             "All-or-none neural signal",
-            self.genesis.hv("neuro::action_potential", PHYSICS_DIM));
+            self.genesis.hv("neuro::action_potential", PHYSICS_DIM),
+        );
 
-        self.register_concept("neural_synchrony", "neuroscience",
+        self.register_concept(
+            "neural_synchrony",
+            "neuroscience",
             "Coordinated firing of neurons",
-            self.genesis.hv("neuro::synchrony", PHYSICS_DIM));
+            self.genesis.hv("neuro::synchrony", PHYSICS_DIM),
+        );
 
         // Optics concepts
-        self.register_concept("laser", "optics",
+        self.register_concept(
+            "laser",
+            "optics",
             "Coherent light amplification",
-            self.genesis.hv("optics::laser", PHYSICS_DIM));
+            self.genesis.hv("optics::laser", PHYSICS_DIM),
+        );
 
-        self.register_concept("soliton", "optics",
+        self.register_concept(
+            "soliton",
+            "optics",
             "Self-reinforcing solitary wave",
-            self.genesis.hv("optics::soliton", PHYSICS_DIM));
+            self.genesis.hv("optics::soliton", PHYSICS_DIM),
+        );
 
         // Acoustics concepts
-        self.register_concept("acoustic_wave", "acoustics",
+        self.register_concept(
+            "acoustic_wave",
+            "acoustics",
             "Mechanical wave in medium",
-            self.genesis.hv("acoustics::wave", PHYSICS_DIM));
+            self.genesis.hv("acoustics::wave", PHYSICS_DIM),
+        );
 
-        self.register_concept("resonance", "acoustics",
+        self.register_concept(
+            "resonance",
+            "acoustics",
             "Frequency matching amplification",
-            self.genesis.hv("acoustics::resonance", PHYSICS_DIM));
+            self.genesis.hv("acoustics::resonance", PHYSICS_DIM),
+        );
 
         // Geophysics concepts
-        self.register_concept("seismic_wave", "geophysics",
+        self.register_concept(
+            "seismic_wave",
+            "geophysics",
             "Elastic wave in Earth",
-            self.genesis.hv("geo::seismic", PHYSICS_DIM));
+            self.genesis.hv("geo::seismic", PHYSICS_DIM),
+        );
 
-        self.register_concept("mantle_convection", "geophysics",
+        self.register_concept(
+            "mantle_convection",
+            "geophysics",
             "Thermal convection in Earth's mantle",
-            self.genesis.hv("geo::convection", PHYSICS_DIM));
+            self.genesis.hv("geo::convection", PHYSICS_DIM),
+        );
 
         // Cosmology concepts
-        self.register_concept("inflation", "cosmology",
+        self.register_concept(
+            "inflation",
+            "cosmology",
             "Exponential early universe expansion",
-            self.genesis.hv("cosmo::inflation", PHYSICS_DIM));
+            self.genesis.hv("cosmo::inflation", PHYSICS_DIM),
+        );
 
-        self.register_concept("gravitational_wave", "cosmology",
+        self.register_concept(
+            "gravitational_wave",
+            "cosmology",
             "Ripples in spacetime",
-            self.genesis.hv("cosmo::gw", PHYSICS_DIM));
+            self.genesis.hv("cosmo::gw", PHYSICS_DIM),
+        );
 
         // Biophysics concepts
-        self.register_concept("protein_folding", "biophysics",
+        self.register_concept(
+            "protein_folding",
+            "biophysics",
             "Polypeptide finding native state",
-            self.genesis.hv("bio::folding", PHYSICS_DIM));
+            self.genesis.hv("bio::folding", PHYSICS_DIM),
+        );
 
-        self.register_concept("molecular_diffusion", "biophysics",
+        self.register_concept(
+            "molecular_diffusion",
+            "biophysics",
             "Random walk of molecules",
-            self.genesis.hv("bio::diffusion", PHYSICS_DIM));
+            self.genesis.hv("bio::diffusion", PHYSICS_DIM),
+        );
     }
 
     /// Register a physics concept
-    pub fn register_concept(&mut self, name: &str, domain: &str, description: &str, vector: ContinuousHV) {
-        self.concepts.insert(name.to_string(), PhysicsConcept {
-            name: name.to_string(),
-            domain: domain.to_string(),
-            description: description.to_string(),
-            vector,
-        });
+    pub fn register_concept(
+        &mut self,
+        name: &str,
+        domain: &str,
+        description: &str,
+        vector: ContinuousHV,
+    ) {
+        self.concepts.insert(
+            name.to_string(),
+            PhysicsConcept {
+                name: name.to_string(),
+                domain: domain.to_string(),
+                description: description.to_string(),
+                vector,
+            },
+        );
     }
 
     /// Find analogies for a given concept
@@ -331,10 +446,10 @@ impl AnalogyEngine {
             None => return vec![],
         };
 
-        let mut analogies: Vec<Analogy> = self.concepts.iter()
-            .filter(|(name, other)| {
-                *name != concept_name && other.domain != concept.domain
-            })
+        let mut analogies: Vec<Analogy> = self
+            .concepts
+            .iter()
+            .filter(|(name, other)| *name != concept_name && other.domain != concept.domain)
             .map(|(_, other)| {
                 let sim = concept.vector.similarity(&other.vector) as f64;
                 let explanation = self.explain_analogy(concept, other, sim);
@@ -350,7 +465,12 @@ impl AnalogyEngine {
             .filter(|a| a.similarity.abs() >= min_similarity)
             .collect();
 
-        analogies.sort_by(|a, b| b.similarity.abs().partial_cmp(&a.similarity.abs()).unwrap_or(std::cmp::Ordering::Equal));
+        analogies.sort_by(|a, b| {
+            b.similarity
+                .abs()
+                .partial_cmp(&a.similarity.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         analogies
     }
 
@@ -360,7 +480,7 @@ impl AnalogyEngine {
         let names: Vec<_> = self.concepts.keys().cloned().collect();
 
         for i in 0..names.len() {
-            for j in (i+1)..names.len() {
+            for j in (i + 1)..names.len() {
                 let c1 = &self.concepts[&names[i]];
                 let c2 = &self.concepts[&names[j]];
 
@@ -384,7 +504,12 @@ impl AnalogyEngine {
             }
         }
 
-        analogies.sort_by(|a, b| b.similarity.abs().partial_cmp(&a.similarity.abs()).unwrap_or(std::cmp::Ordering::Equal));
+        analogies.sort_by(|a, b| {
+            b.similarity
+                .abs()
+                .partial_cmp(&a.similarity.abs())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         analogies
     }
 
@@ -405,7 +530,10 @@ impl AnalogyEngine {
 
         // Generic explanation
         if similarity > 0.3 {
-            format!("Strong structural similarity between {} and {}", c1.name, c2.name)
+            format!(
+                "Strong structural similarity between {} and {}",
+                c1.name, c2.name
+            )
         } else if similarity > 0.1 {
             format!("Moderate analogy between {} and {}", c1.name, c2.name)
         } else {
@@ -420,14 +548,18 @@ impl AnalogyEngine {
             None => return vec![],
         };
 
-        let mut matches: Vec<_> = self.concepts.values()
+        let mut matches: Vec<_> = self
+            .concepts
+            .values()
             .filter(|c| c.vector.similarity(&pattern.marker).abs() > 0.1)
             .collect();
 
         matches.sort_by(|a, b| {
             let sim_a = a.vector.similarity(&pattern.marker).abs();
             let sim_b = b.vector.similarity(&pattern.marker).abs();
-            sim_b.partial_cmp(&sim_a).unwrap_or(std::cmp::Ordering::Equal)
+            sim_b
+                .partial_cmp(&sim_a)
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         matches
@@ -435,7 +567,8 @@ impl AnalogyEngine {
 
     /// Compose concepts to explore hypothetical phenomena
     pub fn compose_concepts(&self, names: &[&str]) -> Option<ContinuousHV> {
-        let vectors: Vec<_> = names.iter()
+        let vectors: Vec<_> = names
+            .iter()
             .filter_map(|n| self.concepts.get(*n))
             .map(|c| &c.vector)
             .collect();
@@ -452,7 +585,8 @@ impl AnalogyEngine {
 
     /// Find the nearest existing concept to a composed vector
     pub fn nearest_concept(&self, target: &ContinuousHV) -> Option<(&PhysicsConcept, f64)> {
-        self.concepts.values()
+        self.concepts
+            .values()
             .map(|c| (c, c.vector.similarity(target) as f64))
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
     }
@@ -464,7 +598,8 @@ impl AnalogyEngine {
 
     /// List all concepts in a domain
     pub fn list_domain(&self, domain: &str) -> Vec<&PhysicsConcept> {
-        self.concepts.values()
+        self.concepts
+            .values()
             .filter(|c| c.domain == domain)
             .collect()
     }

@@ -35,13 +35,13 @@
 //! let validated = service.get_validated_discoveries(0.5);
 //! ```
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
-use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveTier, PrimitiveSystem};
+use super::primitive_composition_rules::CompositionRuleEngine;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
-use std::sync::mpsc::{Sender, Receiver, channel};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::{Duration, Instant};
-use super::primitive_composition_rules::CompositionRuleEngine;
+use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::primitive_system::{Primitive, PrimitiveSystem, PrimitiveTier};
 
 // =============================================================================
 // DISCOVERED PRIMITIVE
@@ -101,7 +101,8 @@ impl DiscoveredPrimitive {
         phi_score: f64,
     ) -> Self {
         let name_str = name.into();
-        let id = format!("disc_{}_{}",
+        let id = format!(
+            "disc_{}_{}",
             name_str.to_lowercase().replace(' ', "_"),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
@@ -141,9 +142,9 @@ impl DiscoveredPrimitive {
 
     /// Check if this primitive meets quality thresholds
     pub fn meets_quality_threshold(&self, min_phi: f64, min_confidence: f64) -> bool {
-        self.phi_score >= min_phi &&
-        self.confidence >= min_confidence &&
-        self.validation_errors.is_empty()
+        self.phi_score >= min_phi
+            && self.confidence >= min_confidence
+            && self.validation_errors.is_empty()
     }
 }
 
@@ -332,21 +333,28 @@ impl PatternDetector {
 
         // If pattern is significant, record it
         if count >= self.min_occurrences {
-            self.detected_patterns.insert(hash, DetectedPattern {
-                encoding: *result_encoding,
-                count,
-                context: primitives_used.iter().map(|s| s.to_string()).collect(),
-                suggested_tier: self.infer_tier_hdc(result_encoding, primitives_used),
-            });
+            self.detected_patterns.insert(
+                hash,
+                DetectedPattern {
+                    encoding: *result_encoding,
+                    count,
+                    context: primitives_used.iter().map(|s| s.to_string()).collect(),
+                    suggested_tier: self.infer_tier_hdc(result_encoding, primitives_used),
+                },
+            );
         }
     }
 
     /// Get patterns that should become primitives
     pub fn get_significant_patterns(&self) -> Vec<DiscoveredPrimitive> {
-        self.detected_patterns.values()
+        self.detected_patterns
+            .values()
             .filter(|p| p.count >= self.min_occurrences * 2)
             .map(|p| {
-                let name = format!("PATTERN_{:08x}", self.hash_sequence(&p.context.iter().map(|s| s.as_str()).collect::<Vec<_>>()));
+                let name = format!(
+                    "PATTERN_{:08x}",
+                    self.hash_sequence(&p.context.iter().map(|s| s.as_str()).collect::<Vec<_>>())
+                );
                 DiscoveredPrimitive::new(
                     name,
                     p.suggested_tier,
@@ -359,8 +367,8 @@ impl PatternDetector {
     }
 
     fn hash_sequence(&self, primitives: &[&str]) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
         let mut hasher = DefaultHasher::new();
         for p in primitives {
             p.hash(&mut hasher);
@@ -388,16 +396,20 @@ impl PatternDetector {
 
         // Collect all HVs per tier and bundle them into centroids
         let tiers = [
-            PrimitiveTier::NSM, PrimitiveTier::Mathematical, PrimitiveTier::Physical,
-            PrimitiveTier::Geometric, PrimitiveTier::Strategic, PrimitiveTier::MetaCognitive,
-            PrimitiveTier::Temporal, PrimitiveTier::Compositional, PrimitiveTier::Consciousness,
+            PrimitiveTier::NSM,
+            PrimitiveTier::Mathematical,
+            PrimitiveTier::Physical,
+            PrimitiveTier::Geometric,
+            PrimitiveTier::Strategic,
+            PrimitiveTier::MetaCognitive,
+            PrimitiveTier::Temporal,
+            PrimitiveTier::Compositional,
+            PrimitiveTier::Consciousness,
         ];
 
         for tier in &tiers {
-            let tier_hvs: Vec<&BinaryHV> = system.get_tier(*tier)
-                .iter()
-                .map(|p| &p.encoding)
-                .collect();
+            let tier_hvs: Vec<&BinaryHV> =
+                system.get_tier(*tier).iter().map(|p| &p.encoding).collect();
 
             if tier_hvs.len() >= 2 {
                 // Bundle all HVs in this tier to create centroid
@@ -489,7 +501,10 @@ impl PrimitiveDiscoveryService {
     }
 
     /// Run a discovery cycle
-    pub fn run_cycle(&mut self, primitive_system: &mut PrimitiveSystem) -> Vec<DiscoveredPrimitive> {
+    pub fn run_cycle(
+        &mut self,
+        primitive_system: &mut PrimitiveSystem,
+    ) -> Vec<DiscoveredPrimitive> {
         self.stats.cycles_completed += 1;
         self.emit_event(DiscoveryEventType::CycleStarted, None);
 
@@ -514,7 +529,8 @@ impl PrimitiveDiscoveryService {
         let mut accepted = Vec::new();
         for mut discovery in discoveries {
             if discovery.phi_score >= self.config.min_phi_threshold {
-                self.stats.record_discovery(discovery.source, discovery.phi_score);
+                self.stats
+                    .record_discovery(discovery.source, discovery.phi_score);
                 discovery.confidence = self.compute_confidence(&discovery);
 
                 // Validate
@@ -526,12 +542,14 @@ impl PrimitiveDiscoveryService {
                     accepted.push(discovery.clone());
 
                     // Auto-integrate high-phi discoveries
-                    if self.config.auto_integrate && discovery.phi_score >= self.config.auto_integrate_threshold
-                        && self.try_integrate(&discovery, primitive_system) {
-                            self.emit_event(DiscoveryEventType::Integrated, Some(discovery.clone()));
-                            self.stats.auto_integrated += 1;
-                            self.stats.record_integration(discovery.phi_score);
-                        }
+                    if self.config.auto_integrate
+                        && discovery.phi_score >= self.config.auto_integrate_threshold
+                        && self.try_integrate(&discovery, primitive_system)
+                    {
+                        self.emit_event(DiscoveryEventType::Integrated, Some(discovery.clone()));
+                        self.stats.auto_integrated += 1;
+                        self.stats.record_integration(discovery.phi_score);
+                    }
                 } else {
                     self.stats.record_rejection();
                     self.emit_event(DiscoveryEventType::Rejected, Some(discovery.clone()));
@@ -557,7 +575,10 @@ impl PrimitiveDiscoveryService {
     }
 
     /// Evolution-based discovery
-    fn discover_via_evolution(&mut self, _system: &mut PrimitiveSystem) -> Vec<DiscoveredPrimitive> {
+    fn discover_via_evolution(
+        &mut self,
+        _system: &mut PrimitiveSystem,
+    ) -> Vec<DiscoveredPrimitive> {
         let mut discoveries = Vec::new();
 
         // Generate random mutations of existing primitives
@@ -598,7 +619,10 @@ impl PrimitiveDiscoveryService {
     }
 
     /// Composition-based discovery
-    fn discover_via_composition(&mut self, system: &mut PrimitiveSystem) -> Vec<DiscoveredPrimitive> {
+    fn discover_via_composition(
+        &mut self,
+        system: &mut PrimitiveSystem,
+    ) -> Vec<DiscoveredPrimitive> {
         let mut discoveries = Vec::new();
 
         // Get random pairs of existing primitives and compose them
@@ -615,14 +639,15 @@ impl PrimitiveDiscoveryService {
                 continue;
             }
 
-            if let (Some(prim_a), Some(prim_b)) = (
-                system.get(names[idx_a]),
-                system.get(names[idx_b]),
-            ) {
+            if let (Some(prim_a), Some(prim_b)) =
+                (system.get(names[idx_a]), system.get(names[idx_b]))
+            {
                 // Compose via domain-specific rules
                 let composed = self.composition_engine.compose(
-                    &prim_a.encoding, &prim_b.encoding,
-                    prim_a.tier, prim_b.tier,
+                    &prim_a.encoding,
+                    &prim_b.encoding,
+                    prim_a.tier,
+                    prim_b.tier,
                 );
                 let composed_name = format!("{}_{}", names[idx_a], names[idx_b]);
                 let phi_score = self.estimate_phi(&composed);
@@ -650,7 +675,8 @@ impl PrimitiveDiscoveryService {
                     phi_score,
                 );
 
-                discovery.composition_formula = Some(format!("{} ⊗ {}", names[idx_a], names[idx_b]));
+                discovery.composition_formula =
+                    Some(format!("{} ⊗ {}", names[idx_a], names[idx_b]));
                 discovery.parent_ids = vec![names[idx_a].to_owned(), names[idx_b].to_owned()];
 
                 discoveries.push(discovery);
@@ -668,7 +694,13 @@ impl PrimitiveDiscoveryService {
         // Partition the 16384-bit HV into 8 chunks as "nodes"
         let chunk_size = crate::hdc::HDC_DIMENSION / 8;
         let bits: Vec<f32> = (0..crate::hdc::HDC_DIMENSION)
-            .map(|i| if encoding.get_bit(i) != 0 { 1.0f32 } else { -1.0f32 })
+            .map(|i| {
+                if encoding.get_bit(i) != 0 {
+                    1.0f32
+                } else {
+                    -1.0f32
+                }
+            })
             .collect();
 
         let mut nodes = Vec::new();
@@ -711,7 +743,9 @@ impl PrimitiveDiscoveryService {
         let popcount = discovery.encoding.popcount();
         let total_bits = crate::hdc::HDC_DIMENSION as u32;
         if popcount < total_bits / 10 || popcount > total_bits * 9 / 10 {
-            discovery.validation_errors.push("Degenerate encoding (too sparse or dense)".into());
+            discovery
+                .validation_errors
+                .push("Degenerate encoding (too sparse or dense)".into());
             valid = false;
         }
 
@@ -780,12 +814,14 @@ impl PrimitiveDiscoveryService {
 
     /// Record a reasoning trace for pattern detection
     pub fn record_reasoning_trace(&mut self, primitives_used: &[&str], result_encoding: &BinaryHV) {
-        self.pattern_detector.record_trace(primitives_used, result_encoding);
+        self.pattern_detector
+            .record_trace(primitives_used, result_encoding);
     }
 
     /// Get validated discoveries ready for integration
     pub fn get_validated_discoveries(&self, min_phi: f64) -> Vec<&DiscoveredPrimitive> {
-        self.validated.iter()
+        self.validated
+            .iter()
             .filter(|d| d.phi_score >= min_phi && d.validated)
             .collect()
     }
@@ -818,7 +854,10 @@ impl PrimitiveDiscoveryService {
 
     /// Generate random u64
     fn random_u64(&mut self) -> u64 {
-        self.rng_state = self.rng_state.wrapping_mul(6364136223846793005).wrapping_add(1);
+        self.rng_state = self
+            .rng_state
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1);
         self.rng_state
     }
 }
@@ -890,7 +929,7 @@ mod tests {
 
         let _patterns = detector.get_significant_patterns();
         // Pattern should be detected but may not meet 2x threshold yet
-        assert!(detector.pattern_counts.len() >= 1);
+        assert!(!detector.pattern_counts.is_empty());
     }
 
     #[test]

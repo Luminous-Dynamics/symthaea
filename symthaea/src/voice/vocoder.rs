@@ -69,11 +69,16 @@ impl Default for VocoderConfig {
 #[derive(Debug, Clone, Default)]
 struct Resonator {
     // Coefficients
-    b0: f32, b1: f32, b2: f32,
-    a1: f32, a2: f32,
+    b0: f32,
+    b1: f32,
+    b2: f32,
+    a1: f32,
+    a2: f32,
     // State
-    x1: f32, x2: f32,
-    y1: f32, y2: f32,
+    x1: f32,
+    x2: f32,
+    y1: f32,
+    y2: f32,
 }
 
 impl Resonator {
@@ -110,7 +115,7 @@ impl Resonator {
         let a2 = 1.0 - alpha;
 
         // Bandpass with unity peak gain (constant peak, not constant skirt)
-        let peak_gain = q;  // Compensate for Q
+        let peak_gain = q; // Compensate for Q
         let b0 = alpha * peak_gain;
         let b1 = 0.0;
         let b2 = -alpha * peak_gain;
@@ -125,9 +130,7 @@ impl Resonator {
 
     /// Process one sample
     fn process(&mut self, input: f32) -> f32 {
-        let output = self.b0 * input
-            + self.b1 * self.x1
-            + self.b2 * self.x2
+        let output = self.b0 * input + self.b1 * self.x1 + self.b2 * self.x2
             - self.a1 * self.y1
             - self.a2 * self.y2;
 
@@ -192,12 +195,12 @@ impl GlottalSource {
         // Rosenberg C model glottal pulse
         // Open phase: 0 to 0.4
         // Closed phase: 0.4 to 1.0
-        let open_ratio = 0.4 + self.shape * 0.2;  // 0.4 to 0.6
+        let open_ratio = 0.4 + self.shape * 0.2; // 0.4 to 0.6
 
         if self.phase < open_ratio {
             // Opening phase - polynomial rise and fall
             let t = self.phase / open_ratio;
-            let pulse = 3.0 * t * t - 2.0 * t * t * t;  // Smoothstep
+            let pulse = 3.0 * t * t - 2.0 * t * t * t; // Smoothstep
 
             // LF model: blend pulse shape with its derivative for realistic glottal waveform
             let derivative = 6.0 * t * (1.0 - t) / open_ratio;
@@ -223,7 +226,7 @@ impl GlottalSource {
 #[derive(Debug, Clone)]
 struct NoiseSource {
     state: u64,
-    pink_state: [f32; 7],  // For pink noise filtering
+    pink_state: [f32; 7], // For pink noise filtering
 }
 
 impl NoiseSource {
@@ -258,13 +261,18 @@ impl NoiseSource {
         self.pink_state[4] = 0.55000 * self.pink_state[4] + white * 0.5329522;
         self.pink_state[5] = -0.7616 * self.pink_state[5] - white * 0.0168980;
 
-        let pink = self.pink_state[0] + self.pink_state[1] + self.pink_state[2]
-            + self.pink_state[3] + self.pink_state[4] + self.pink_state[5]
-            + self.pink_state[6] + white * 0.5362;
+        let pink = self.pink_state[0]
+            + self.pink_state[1]
+            + self.pink_state[2]
+            + self.pink_state[3]
+            + self.pink_state[4]
+            + self.pink_state[5]
+            + self.pink_state[6]
+            + white * 0.5362;
 
         self.pink_state[6] = white * 0.115926;
 
-        pink * 0.11  // Normalize
+        pink * 0.11 // Normalize
     }
 }
 
@@ -343,7 +351,8 @@ impl FormantVocoder {
         self.reset();
 
         // Calculate total samples
-        let total_duration = frames.last().unwrap().time - frames.first().unwrap().time;
+        let total_duration = frames.last().expect("frames checked non-empty above").time
+            - frames.first().expect("frames checked non-empty above").time;
         let frame_duration = if frames.len() > 1 {
             total_duration / (frames.len() - 1) as f32
         } else {
@@ -373,15 +382,15 @@ impl FormantVocoder {
                 // Generate source signal
                 let voiced = self.glottal.tick(current.f0) * current.voicing;
                 let unvoiced = self.noise.pink() * (1.0 - current.voicing) * 0.3;
-                let source = (voiced + unvoiced) * 30.0;  // Boost source level to audible range
+                let source = (voiced + unvoiced) * 30.0; // Boost source level to audible range
 
                 // Apply formant filters (parallel configuration with weighted sum)
                 let mut filtered = 0.0;
                 if self.resonators.len() >= 3 {
                     // Parallel formant synthesis with decreasing weights for higher formants
-                    filtered += self.resonators[0].process(source) * 1.0;   // F1 (strongest)
-                    filtered += self.resonators[1].process(source) * 0.5;   // F2
-                    filtered += self.resonators[2].process(source) * 0.25;  // F3 (weakest)
+                    filtered += self.resonators[0].process(source) * 1.0; // F1 (strongest)
+                    filtered += self.resonators[1].process(source) * 0.5; // F2
+                    filtered += self.resonators[2].process(source) * 0.25; // F3 (weakest)
                 } else {
                     for res in &mut self.resonators {
                         filtered += res.process(source);
@@ -467,7 +476,7 @@ mod tests {
         // Process some samples
         let mut output = 0.0;
         for i in 0..1000 {
-            let input = if i == 0 { 1.0 } else { 0.0 };  // Impulse
+            let input = if i == 0 { 1.0 } else { 0.0 }; // Impulse
             output = res.process(input);
         }
 
@@ -480,8 +489,9 @@ mod tests {
         let mut glottal = GlottalSource::new(24000.0, 0.5);
 
         let mut samples = Vec::new();
-        for _ in 0..480 {  // 20ms at 24kHz
-            samples.push(glottal.tick(120.0));  // 120 Hz
+        for _ in 0..480 {
+            // 20ms at 24kHz
+            samples.push(glottal.tick(120.0)); // 120 Hz
         }
 
         // Should have some non-zero samples
@@ -502,7 +512,8 @@ mod tests {
 
         // Should have variance
         let mean: f32 = samples.iter().sum::<f32>() / samples.len() as f32;
-        let variance: f32 = samples.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / samples.len() as f32;
+        let variance: f32 =
+            samples.iter().map(|s| (s - mean).powi(2)).sum::<f32>() / samples.len() as f32;
 
         assert!(variance > 0.001);
         assert!(variance < 1.0);
@@ -515,22 +526,36 @@ mod tests {
         // Create a simple vowel frame
         let frames = vec![
             FormantFrame {
-                f1: 500.0, f2: 1500.0, f3: 2500.0,
-                b1: 60.0, b2: 90.0, b3: 150.0,
-                f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.0,
+                f1: 500.0,
+                f2: 1500.0,
+                f3: 2500.0,
+                b1: 60.0,
+                b2: 90.0,
+                b3: 150.0,
+                f0: 120.0,
+                energy: 0.8,
+                voicing: 1.0,
+                time: 0.0,
             },
             FormantFrame {
-                f1: 500.0, f2: 1500.0, f3: 2500.0,
-                b1: 60.0, b2: 90.0, b3: 150.0,
-                f0: 120.0, energy: 0.8, voicing: 1.0, time: 0.1,
+                f1: 500.0,
+                f2: 1500.0,
+                f3: 2500.0,
+                b1: 60.0,
+                b2: 90.0,
+                b3: 150.0,
+                f0: 120.0,
+                energy: 0.8,
+                voicing: 1.0,
+                time: 0.1,
             },
         ];
 
         let audio = vocoder.synthesize(&frames);
 
         assert!(!audio.is_empty());
-        assert!(audio.iter().any(|&s| s.abs() > 0.01));  // Has content
-        assert!(audio.iter().all(|&s| s.abs() < 1.5));   // Not clipping badly
+        assert!(audio.iter().any(|&s| s.abs() > 0.01)); // Has content
+        assert!(audio.iter().all(|&s| s.abs() < 1.5)); // Not clipping badly
     }
 
     #[test]

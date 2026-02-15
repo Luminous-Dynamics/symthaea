@@ -8,18 +8,18 @@
 //! - Performance metrics and statistics
 //! - Counterfactual reasoning with uncertainty propagation
 
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
-use anyhow::Result;
 
 pub mod causal_observer;
 pub mod counterfactual_reasoning;
 
 pub use causal_observer::CausalTraceObserver;
 pub use counterfactual_reasoning::{
-    CounterfactualEngine, CounterfactualConfig, CounterfactualResult,
-    CounterfactualUncertainty, CausalNode, CausalLink,
+    CausalLink, CausalNode, CounterfactualConfig, CounterfactualEngine, CounterfactualResult,
+    CounterfactualUncertainty,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -533,7 +533,11 @@ impl SymthaeaObserver for NoOpObserver {
 
     fn record_broca_pipeline(&mut self, _event: BrocaPipelineEvent) -> Result<()> {
         self.stats.total_events += 1;
-        *self.stats.events_by_type.entry("broca_pipeline".to_string()).or_insert(0) += 1;
+        *self
+            .stats
+            .events_by_type
+            .entry("broca_pipeline".to_string())
+            .or_insert(0) += 1;
         Ok(())
     }
 

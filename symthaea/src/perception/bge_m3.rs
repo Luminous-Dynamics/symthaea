@@ -129,15 +129,30 @@ impl XlmRobertaSelfAttention {
         // Reshape for multi-head attention: [batch, seq, heads, head_dim]
         // Note: .contiguous() is needed for batched matmul after transpose
         let query = query
-            .reshape((batch_size, seq_len, self.num_attention_heads, self.attention_head_size))?
+            .reshape((
+                batch_size,
+                seq_len,
+                self.num_attention_heads,
+                self.attention_head_size,
+            ))?
             .transpose(1, 2)? // [batch, heads, seq, head_dim]
             .contiguous()?;
         let key = key
-            .reshape((batch_size, seq_len, self.num_attention_heads, self.attention_head_size))?
+            .reshape((
+                batch_size,
+                seq_len,
+                self.num_attention_heads,
+                self.attention_head_size,
+            ))?
             .transpose(1, 2)?
             .contiguous()?;
         let value = value
-            .reshape((batch_size, seq_len, self.num_attention_heads, self.attention_head_size))?
+            .reshape((
+                batch_size,
+                seq_len,
+                self.num_attention_heads,
+                self.attention_head_size,
+            ))?
             .transpose(1, 2)?
             .contiguous()?;
 
@@ -152,7 +167,7 @@ impl XlmRobertaSelfAttention {
                 // Explicit broadcast: [batch, 1, 1, seq] -> [batch, heads, seq, seq]
                 let mask = mask.broadcast_as(attention_scores.shape())?;
                 (attention_scores + mask)?
-            },
+            }
             None => attention_scores,
         };
 
@@ -161,10 +176,11 @@ impl XlmRobertaSelfAttention {
         let context = attention_probs.matmul(&value)?;
 
         // Reshape back: [batch, seq, hidden_size]
-        let context = context
-            .transpose(1, 2)?
-            .contiguous()?
-            .reshape((batch_size, seq_len, self.num_attention_heads * self.attention_head_size))?;
+        let context = context.transpose(1, 2)?.contiguous()?.reshape((
+            batch_size,
+            seq_len,
+            self.num_attention_heads * self.attention_head_size,
+        ))?;
 
         Ok(context)
     }
@@ -182,7 +198,11 @@ impl XlmRobertaSelfOutput {
     fn new(config: &XlmRobertaConfig, vb: VarBuilder) -> Result<Self> {
         Ok(Self {
             dense: linear(config.hidden_size, config.hidden_size, vb.pp("dense"))?,
-            layer_norm: layer_norm(config.hidden_size, config.layer_norm_eps, vb.pp("LayerNorm"))?,
+            layer_norm: layer_norm(
+                config.hidden_size,
+                config.layer_norm_eps,
+                vb.pp("LayerNorm"),
+            )?,
         })
     }
 
@@ -248,7 +268,11 @@ impl XlmRobertaOutput {
     fn new(config: &XlmRobertaConfig, vb: VarBuilder) -> Result<Self> {
         Ok(Self {
             dense: linear(config.intermediate_size, config.hidden_size, vb.pp("dense"))?,
-            layer_norm: layer_norm(config.hidden_size, config.layer_norm_eps, vb.pp("LayerNorm"))?,
+            layer_norm: layer_norm(
+                config.hidden_size,
+                config.layer_norm_eps,
+                vb.pp("LayerNorm"),
+            )?,
         })
     }
 
@@ -277,7 +301,11 @@ impl XlmRobertaLayer {
         })
     }
 
-    pub(crate) fn forward(&self, hidden_states: &Tensor, attention_mask: Option<&Tensor>) -> Result<Tensor> {
+    pub(crate) fn forward(
+        &self,
+        hidden_states: &Tensor,
+        attention_mask: Option<&Tensor>,
+    ) -> Result<Tensor> {
         let attention_output = self.attention.forward(hidden_states, attention_mask)?;
         let intermediate_output = self.intermediate.forward(&attention_output)?;
         self.output.forward(&intermediate_output, &attention_output)
@@ -332,7 +360,11 @@ impl XlmRobertaEmbeddings {
                 config.hidden_size,
                 vb.pp("position_embeddings"),
             )?,
-            layer_norm: layer_norm(config.hidden_size, config.layer_norm_eps, vb.pp("LayerNorm"))?,
+            layer_norm: layer_norm(
+                config.hidden_size,
+                config.layer_norm_eps,
+                vb.pp("LayerNorm"),
+            )?,
             padding_idx: config.pad_token_id,
         })
     }
@@ -396,7 +428,8 @@ impl XlmRobertaModel {
             None => None,
         };
 
-        self.encoder.forward(&hidden_states, extended_attention_mask.as_ref())
+        self.encoder
+            .forward(&hidden_states, extended_attention_mask.as_ref())
     }
 }
 
@@ -445,7 +478,12 @@ impl BgeM3 {
         // Try to get safetensors first, handling the case where the hub
         // might return a different format in the default revision
         let weights_path = match repo.get("model.safetensors") {
-            Ok(path) if path.extension().map(|e| e == "safetensors").unwrap_or(false) => {
+            Ok(path)
+                if path
+                    .extension()
+                    .map(|e| e == "safetensors")
+                    .unwrap_or(false) =>
+            {
                 // Got actual safetensors file
                 path
             }
@@ -544,8 +582,8 @@ impl BgeM3 {
         use std::collections::HashMap;
 
         // Read the pickle file - returns Vec<(String, Tensor)>
-        let weights = candle_core::pickle::read_all(path)
-            .context("Failed to read PyTorch weights file")?;
+        let weights =
+            candle_core::pickle::read_all(path).context("Failed to read PyTorch weights file")?;
 
         // Convert to HashMap and move tensors to target device
         let mut tensors_map: HashMap<String, Tensor> = HashMap::new();
@@ -577,17 +615,13 @@ impl BgeM3 {
             num_hidden_layers: config["num_hidden_layers"].as_u64().unwrap_or(24) as usize,
             num_attention_heads: config["num_attention_heads"].as_u64().unwrap_or(16) as usize,
             intermediate_size: config["intermediate_size"].as_u64().unwrap_or(4096) as usize,
-            hidden_act: config["hidden_act"]
-                .as_str()
-                .unwrap_or("gelu")
-                .to_string(),
+            hidden_act: config["hidden_act"].as_str().unwrap_or("gelu").to_string(),
             hidden_dropout_prob: config["hidden_dropout_prob"].as_f64().unwrap_or(0.1),
             attention_probs_dropout_prob: config["attention_probs_dropout_prob"]
                 .as_f64()
                 .unwrap_or(0.1),
-            max_position_embeddings: config["max_position_embeddings"]
-                .as_u64()
-                .unwrap_or(8194) as usize,
+            max_position_embeddings: config["max_position_embeddings"].as_u64().unwrap_or(8194)
+                as usize,
             type_vocab_size: config["type_vocab_size"].as_u64().unwrap_or(1) as usize,
             layer_norm_eps: config["layer_norm_eps"].as_f64().unwrap_or(1e-5),
             pad_token_id: config["pad_token_id"].as_u64().unwrap_or(1) as usize,
@@ -602,9 +636,7 @@ impl BgeM3 {
 
         // Load weights
         let vb = if is_safetensors {
-            unsafe {
-                VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)?
-            }
+            unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path], DType::F32, &device)? }
         } else {
             // PyTorch pickle format - try to load using candle's pickle support
             Self::load_pytorch_weights(weights_path, &device)?
@@ -637,7 +669,10 @@ impl BgeM3 {
                                 return Ok(device);
                             }
                             Err(e) => {
-                                tracing::warn!("CUDA tensor creation failed, falling back to CPU: {}", e);
+                                tracing::warn!(
+                                    "CUDA tensor creation failed, falling back to CPU: {}",
+                                    e
+                                );
                             }
                         }
                     }
@@ -664,7 +699,10 @@ impl BgeM3 {
     /// * `Result<Vec<f32>>` - 1024-dimensional embedding
     pub fn encode(&self, text: &str) -> Result<Vec<f32>> {
         let embeddings = self.encode_batch(&[text])?;
-        Ok(embeddings.into_iter().next().unwrap())
+        Ok(embeddings
+            .into_iter()
+            .next()
+            .expect("embeddings must not be empty"))
     }
 
     /// Encode multiple texts in a batch.
@@ -688,7 +726,11 @@ impl BgeM3 {
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
 
         // Find max length for padding
-        let max_len = encodings.iter().map(|e| e.get_ids().len()).max().unwrap_or(0);
+        let max_len = encodings
+            .iter()
+            .map(|e| e.get_ids().len())
+            .max()
+            .unwrap_or(0);
 
         // Prepare input tensors
         let mut input_ids_vec = Vec::new();
@@ -710,8 +752,8 @@ impl BgeM3 {
         }
 
         let batch_size = texts.len();
-        let input_ids = Tensor::new(&input_ids_vec[..], &self.device)?
-            .reshape((batch_size, max_len))?;
+        let input_ids =
+            Tensor::new(&input_ids_vec[..], &self.device)?.reshape((batch_size, max_len))?;
         let attention_mask = Tensor::new(&attention_mask_vec[..], &self.device)?
             .reshape((batch_size, max_len))?
             .to_dtype(DType::F32)?;
@@ -787,7 +829,10 @@ impl BgeM3Client {
         if self.model.is_none() {
             self.model = Some(BgeM3::load_from_hub(&self.model_id)?);
         }
-        self.model.as_ref().unwrap().encode(text)
+        self.model
+            .as_ref()
+            .expect("model must be loaded")
+            .encode(text)
     }
 
     /// Encode batch, loading the model if needed.
@@ -795,7 +840,10 @@ impl BgeM3Client {
         if self.model.is_none() {
             self.model = Some(BgeM3::load_from_hub(&self.model_id)?);
         }
-        self.model.as_ref().unwrap().encode_batch(texts)
+        self.model
+            .as_ref()
+            .expect("model must be loaded")
+            .encode_batch(texts)
     }
 
     /// Check if model is loaded.

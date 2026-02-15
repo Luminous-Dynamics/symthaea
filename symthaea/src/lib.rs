@@ -209,7 +209,7 @@ Key types are re-exported at the crate root for convenience:
     clippy::wrong_self_convention,
     clippy::await_holding_lock,
     clippy::cloned_ref_to_slice_refs,
-    clippy::doc_overindented_list_items,
+    clippy::doc_overindented_list_items
 )]
 
 // ============================================================================
@@ -237,15 +237,9 @@ pub mod mind;
 // Local HDC module - extends symthaea_core with additional modules
 pub mod hdc;
 
-// Minimal prelude
-pub mod prelude;
-
 // ============================================================================
 // Standalone Module Files (Generally Stable)
 // ============================================================================
-
-// CfC (Closed-form Continuous-time) network
-pub mod cfc;
 
 // Cognitive loop for conscious processing
 pub mod cognitive_loop;
@@ -350,9 +344,6 @@ pub mod experience;
 // Wisdom (enabled - 0 errors)
 pub mod wisdom;
 
-// Markets: HDC-based financial pattern recognition (enabled - 0 errors)
-pub mod markets;
-
 // Mycelix (enabled - GIS, Kosmic Song, Dark Spot DHT)
 pub mod mycelix;
 
@@ -376,9 +367,6 @@ pub mod intelligence;
 // Tracks (input, output) pairs and discovers causal structure for attention weighting
 pub mod causal;
 
-// Substrate (enabled - 0 errors)
-pub mod substrate;
-
 // Identity: MFDI (Multi-Factor Delegated Identity) integration
 // Enables agents to prove identity, sign outputs, and carry reputation
 #[cfg(feature = "identity")]
@@ -389,9 +377,6 @@ pub mod gui_bridge;
 
 // Physics: Spark Engine, plasma encoding, and physical simulations
 pub mod physics;
-
-// Physics Discovery: HDC-based anomaly detection, symbolic regression, pattern matching
-pub mod physics_discovery;
 
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]

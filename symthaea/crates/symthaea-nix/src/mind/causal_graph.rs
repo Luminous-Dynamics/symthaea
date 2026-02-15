@@ -6,7 +6,7 @@
 //! - Predict side effects of changes
 //! - Recommend fixes based on causal structure
 
-use crate::traits::{CausalDiscoveryEngine, CausalDirection};
+use crate::traits::{CausalDirection, CausalDiscoveryEngine};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::path::Path;
@@ -91,7 +91,7 @@ impl NixCausalGraph {
 
     /// Observe an execution outcome and update causal edges via Hebbian learning.
     ///
-    /// When action A is followed by outcome effects [B, C, ...]:
+    /// When action A is followed by outcome effects \[B, C, ...\]:
     /// - Strengthen A→B and A→C edges (they co-occurred)
     /// - Weaken A→X edges where X was predicted but didn't occur
     ///
@@ -108,12 +108,15 @@ impl NixCausalGraph {
         // Strengthen edges for effects that actually occurred
         for &effect in &observed_set {
             let key = (action.to_string(), effect.to_string());
-            let entry = self.causal_graph.entry(key.clone()).or_insert_with(|| CausalEdge {
-                from: action.to_string(),
-                to: effect.to_string(),
-                direction: CausalDirection::Forward,
-                confidence: 0.3, // Start with moderate confidence for newly discovered edges
-            });
+            let entry = self
+                .causal_graph
+                .entry(key.clone())
+                .or_insert_with(|| CausalEdge {
+                    from: action.to_string(),
+                    to: effect.to_string(),
+                    direction: CausalDirection::Forward,
+                    confidence: 0.3, // Start with moderate confidence for newly discovered edges
+                });
             // Hebbian strengthening: Δw = η * (1 - w) — bounded growth
             entry.confidence += self.learning_rate * (1.0 - entry.confidence);
             entry.confidence = entry.confidence.clamp(0.0, 1.0);
@@ -132,7 +135,8 @@ impl NixCausalGraph {
         }
 
         // Prune edges below minimum confidence threshold
-        self.causal_graph.retain(|_, edge| edge.confidence >= self.min_confidence);
+        self.causal_graph
+            .retain(|_, edge| edge.confidence >= self.min_confidence);
     }
 
     /// Record an observation of a configuration variable
@@ -161,10 +165,9 @@ impl NixCausalGraph {
                 let var_a = &variables[i];
                 let var_b = &variables[j];
 
-                if let (Some(obs_a), Some(obs_b)) = (
-                    self.observations.get(var_a),
-                    self.observations.get(var_b),
-                ) {
+                if let (Some(obs_a), Some(obs_b)) =
+                    (self.observations.get(var_a), self.observations.get(var_b))
+                {
                     let min_len = obs_a.len().min(obs_b.len());
                     if min_len < 20 {
                         continue;
@@ -190,7 +193,8 @@ impl NixCausalGraph {
                         confidence,
                     };
 
-                    self.causal_graph.insert((edge.from.clone(), edge.to.clone()), edge.clone());
+                    self.causal_graph
+                        .insert((edge.from.clone(), edge.to.clone()), edge.clone());
                     edges.push(edge);
                 }
             }
@@ -231,13 +235,19 @@ impl NixCausalGraph {
                     confidence: edge.confidence,
                     explanation: format!(
                         "{} causally influences {} with confidence {:.1}%",
-                        edge.from, symptom, edge.confidence * 100.0
+                        edge.from,
+                        symptom,
+                        edge.confidence * 100.0
                     ),
                 });
             }
         }
 
-        root_causes.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        root_causes.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
 
         RootCauseAnalysis {
             symptom: symptom.to_string(),
@@ -271,7 +281,11 @@ impl NixCausalGraph {
             }
         }
 
-        effects.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+        effects.sort_by(|a, b| {
+            b.confidence
+                .partial_cmp(&a.confidence)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         effects
     }
 
@@ -301,8 +315,8 @@ impl NixCausalGraph {
 
     /// Encode a NixOS option path as a numeric value for causal analysis
     pub fn encode_option_value(value: &str) -> f64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         value.hash(&mut hasher);
@@ -313,7 +327,11 @@ impl NixCausalGraph {
 
     /// Encode a boolean as numeric
     pub fn encode_bool(value: bool) -> f64 {
-        if value { 1.0 } else { 0.0 }
+        if value {
+            1.0
+        } else {
+            0.0
+        }
     }
 
     /// Add a structural causal edge from known NixOS knowledge.
@@ -327,7 +345,8 @@ impl NixCausalGraph {
             direction: CausalDirection::Forward,
             confidence,
         };
-        self.causal_graph.insert((from.to_string(), to.to_string()), edge);
+        self.causal_graph
+            .insert((from.to_string(), to.to_string()), edge);
     }
 
     /// Save the causal graph to a JSON file for persistence across sessions.
@@ -391,7 +410,10 @@ impl NixCausalGraph {
     /// - `services.X.package` ← `nixpkgs.config.allowUnfree` (if unfree)
     /// - `networking.firewall.enable` → `networking.firewall.allowed*`
     /// - Sibling `.enable` options under the same parent are potential conflicts
-    pub fn bootstrap_from_schemas(&mut self, schemas: &[crate::parser::option_schema::NixOptionSchema]) {
+    pub fn bootstrap_from_schemas(
+        &mut self,
+        schemas: &[crate::parser::option_schema::NixOptionSchema],
+    ) {
         // Index enable options by parent path
         let mut enable_opts: HashMap<String, Vec<&str>> = HashMap::new();
 
@@ -422,16 +444,8 @@ impl NixCausalGraph {
             // Service options that reference firewall need firewall ports
             if schema.name.contains("openFirewall") {
                 let parent = parts[..2.min(parts.len())].join(".");
-                self.add_structural_edge(
-                    &format!("{}.enable", parent),
-                    &schema.name,
-                    0.9,
-                );
-                self.add_structural_edge(
-                    &schema.name,
-                    "networking.firewall.allowedTCPPorts",
-                    0.7,
-                );
+                self.add_structural_edge(&format!("{}.enable", parent), &schema.name, 0.9);
+                self.add_structural_edge(&schema.name, "networking.firewall.allowedTCPPorts", 0.7);
             }
         }
 
@@ -443,7 +457,8 @@ impl NixCausalGraph {
                         // Only flag as conflicts if they share the same immediate parent
                         let a_parts: Vec<&str> = opts[i].split('.').collect();
                         let b_parts: Vec<&str> = opts[j].split('.').collect();
-                        if a_parts.len() >= 3 && b_parts.len() >= 3
+                        if a_parts.len() >= 3
+                            && b_parts.len() >= 3
                             && a_parts[..a_parts.len() - 1] == b_parts[..b_parts.len() - 1]
                         {
                             self.add_structural_edge(opts[i], opts[j], 0.5);
@@ -467,253 +482,906 @@ impl NixOSCausalPatterns {
 
         // ── Boot & Init (~20) ──────────────────────────────────────────
         patterns.extend_from_slice(&[
-            ("boot.loader.grub.enable", "boot.loader.systemd-boot.enable", "conflicts"),
-            ("boot.loader.systemd-boot.enable", "boot.loader.grub.enable", "conflicts"),
-            ("boot.loader.grub.device", "boot.loader.grub.enable", "requires"),
-            ("boot.loader.grub.efiSupport", "boot.loader.efi.canTouchEfiVariables", "enables"),
-            ("boot.loader.efi.efiSysMountPoint", "boot.loader.systemd-boot.enable", "configures"),
-            ("boot.initrd.availableKernelModules", "boot.initrd.kernelModules", "provides"),
-            ("boot.initrd.kernelModules", "hardware.enableAllFirmware", "requires"),
-            ("boot.initrd.luks.devices", "boot.initrd.kernelModules", "requires"),
-            ("boot.initrd.luks.devices", "boot.initrd.availableKernelModules", "requires"),
-            ("boot.kernelPackages", "boot.extraModulePackages", "determines"),
+            (
+                "boot.loader.grub.enable",
+                "boot.loader.systemd-boot.enable",
+                "conflicts",
+            ),
+            (
+                "boot.loader.systemd-boot.enable",
+                "boot.loader.grub.enable",
+                "conflicts",
+            ),
+            (
+                "boot.loader.grub.device",
+                "boot.loader.grub.enable",
+                "requires",
+            ),
+            (
+                "boot.loader.grub.efiSupport",
+                "boot.loader.efi.canTouchEfiVariables",
+                "enables",
+            ),
+            (
+                "boot.loader.efi.efiSysMountPoint",
+                "boot.loader.systemd-boot.enable",
+                "configures",
+            ),
+            (
+                "boot.initrd.availableKernelModules",
+                "boot.initrd.kernelModules",
+                "provides",
+            ),
+            (
+                "boot.initrd.kernelModules",
+                "hardware.enableAllFirmware",
+                "requires",
+            ),
+            (
+                "boot.initrd.luks.devices",
+                "boot.initrd.kernelModules",
+                "requires",
+            ),
+            (
+                "boot.initrd.luks.devices",
+                "boot.initrd.availableKernelModules",
+                "requires",
+            ),
+            (
+                "boot.kernelPackages",
+                "boot.extraModulePackages",
+                "determines",
+            ),
             ("boot.kernelPackages", "boot.kernelModules", "provides"),
             ("boot.kernelParams", "boot.kernelPackages", "configures"),
-            ("boot.kernelModules", "hardware.enableAllFirmware", "supplements"),
-            ("boot.supportedFilesystems", "boot.initrd.supportedFilesystems", "enables"),
+            (
+                "boot.kernelModules",
+                "hardware.enableAllFirmware",
+                "supplements",
+            ),
+            (
+                "boot.supportedFilesystems",
+                "boot.initrd.supportedFilesystems",
+                "enables",
+            ),
             ("boot.tmp.useTmpfs", "boot.tmp.tmpfsSize", "enables"),
-            ("boot.binfmt.emulatedSystems", "boot.binfmt.registrations", "configures"),
-            ("boot.plymouth.enable", "boot.initrd.systemd.enable", "requires"),
-            ("boot.loader.timeout", "boot.loader.systemd-boot.enable", "configures"),
-            ("boot.initrd.systemd.enable", "boot.initrd.services", "enables"),
+            (
+                "boot.binfmt.emulatedSystems",
+                "boot.binfmt.registrations",
+                "configures",
+            ),
+            (
+                "boot.plymouth.enable",
+                "boot.initrd.systemd.enable",
+                "requires",
+            ),
+            (
+                "boot.loader.timeout",
+                "boot.loader.systemd-boot.enable",
+                "configures",
+            ),
+            (
+                "boot.initrd.systemd.enable",
+                "boot.initrd.services",
+                "enables",
+            ),
             ("boot.isContainer", "boot.loader.grub.enable", "disables"),
         ]);
 
         // ── Display & GPU (~30) ────────────────────────────────────────
         patterns.extend_from_slice(&[
-            ("hardware.opengl.enable", "services.xserver.enable", "enables"),
-            ("services.xserver.enable", "services.xserver.displayManager", "requires"),
-            ("services.xserver.enable", "services.xserver.desktopManager", "enables"),
-            ("services.xserver.enable", "services.xserver.windowManager", "enables"),
-            ("services.xserver.displayManager.gdm.enable", "services.xserver.enable", "requires"),
-            ("services.xserver.displayManager.sddm.enable", "services.xserver.enable", "requires"),
-            ("services.xserver.displayManager.lightdm.enable", "services.xserver.enable", "requires"),
-            ("services.xserver.displayManager.gdm.enable", "services.xserver.displayManager.sddm.enable", "conflicts"),
-            ("services.xserver.displayManager.gdm.enable", "services.xserver.displayManager.lightdm.enable", "conflicts"),
-            ("services.xserver.displayManager.sddm.enable", "services.xserver.displayManager.lightdm.enable", "conflicts"),
-            ("services.xserver.desktopManager.gnome.enable", "services.xserver.displayManager.gdm.enable", "recommends"),
-            ("services.xserver.desktopManager.plasma5.enable", "services.xserver.displayManager.sddm.enable", "recommends"),
-            ("hardware.nvidia.modesetting.enable", "services.xserver.videoDrivers", "affects"),
-            ("hardware.nvidia.package", "hardware.nvidia.modesetting.enable", "requires"),
-            ("boot.kernelPackages", "hardware.nvidia.package", "determines"),
-            ("hardware.nvidia.open", "hardware.nvidia.package", "configures"),
-            ("hardware.nvidia.powerManagement.enable", "hardware.nvidia.modesetting.enable", "requires"),
-            ("hardware.nvidia.prime.offload.enable", "hardware.nvidia.prime.intelBusId", "requires"),
-            ("hardware.nvidia.prime.offload.enable", "hardware.nvidia.prime.nvidiaBusId", "requires"),
-            ("hardware.nvidia.prime.sync.enable", "hardware.nvidia.prime.offload.enable", "conflicts"),
-            ("services.xserver.videoDrivers", "hardware.opengl.driSupport", "enables"),
-            ("hardware.opengl.driSupport32Bit", "hardware.opengl.enable", "requires"),
-            ("hardware.opengl.extraPackages", "hardware.opengl.enable", "requires"),
-            ("services.xserver.desktopManager.gnome.enable", "services.xserver.enable", "requires"),
-            ("services.xserver.desktopManager.plasma5.enable", "services.xserver.enable", "requires"),
-            ("services.xserver.desktopManager.xfce.enable", "services.xserver.enable", "requires"),
-            ("programs.sway.enable", "services.xserver.enable", "conflicts"),
+            (
+                "hardware.opengl.enable",
+                "services.xserver.enable",
+                "enables",
+            ),
+            (
+                "services.xserver.enable",
+                "services.xserver.displayManager",
+                "requires",
+            ),
+            (
+                "services.xserver.enable",
+                "services.xserver.desktopManager",
+                "enables",
+            ),
+            (
+                "services.xserver.enable",
+                "services.xserver.windowManager",
+                "enables",
+            ),
+            (
+                "services.xserver.displayManager.gdm.enable",
+                "services.xserver.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.displayManager.sddm.enable",
+                "services.xserver.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.displayManager.lightdm.enable",
+                "services.xserver.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.displayManager.gdm.enable",
+                "services.xserver.displayManager.sddm.enable",
+                "conflicts",
+            ),
+            (
+                "services.xserver.displayManager.gdm.enable",
+                "services.xserver.displayManager.lightdm.enable",
+                "conflicts",
+            ),
+            (
+                "services.xserver.displayManager.sddm.enable",
+                "services.xserver.displayManager.lightdm.enable",
+                "conflicts",
+            ),
+            (
+                "services.xserver.desktopManager.gnome.enable",
+                "services.xserver.displayManager.gdm.enable",
+                "recommends",
+            ),
+            (
+                "services.xserver.desktopManager.plasma5.enable",
+                "services.xserver.displayManager.sddm.enable",
+                "recommends",
+            ),
+            (
+                "hardware.nvidia.modesetting.enable",
+                "services.xserver.videoDrivers",
+                "affects",
+            ),
+            (
+                "hardware.nvidia.package",
+                "hardware.nvidia.modesetting.enable",
+                "requires",
+            ),
+            (
+                "boot.kernelPackages",
+                "hardware.nvidia.package",
+                "determines",
+            ),
+            (
+                "hardware.nvidia.open",
+                "hardware.nvidia.package",
+                "configures",
+            ),
+            (
+                "hardware.nvidia.powerManagement.enable",
+                "hardware.nvidia.modesetting.enable",
+                "requires",
+            ),
+            (
+                "hardware.nvidia.prime.offload.enable",
+                "hardware.nvidia.prime.intelBusId",
+                "requires",
+            ),
+            (
+                "hardware.nvidia.prime.offload.enable",
+                "hardware.nvidia.prime.nvidiaBusId",
+                "requires",
+            ),
+            (
+                "hardware.nvidia.prime.sync.enable",
+                "hardware.nvidia.prime.offload.enable",
+                "conflicts",
+            ),
+            (
+                "services.xserver.videoDrivers",
+                "hardware.opengl.driSupport",
+                "enables",
+            ),
+            (
+                "hardware.opengl.driSupport32Bit",
+                "hardware.opengl.enable",
+                "requires",
+            ),
+            (
+                "hardware.opengl.extraPackages",
+                "hardware.opengl.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.desktopManager.gnome.enable",
+                "services.xserver.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.desktopManager.plasma5.enable",
+                "services.xserver.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.desktopManager.xfce.enable",
+                "services.xserver.enable",
+                "requires",
+            ),
+            (
+                "programs.sway.enable",
+                "services.xserver.enable",
+                "conflicts",
+            ),
             ("programs.sway.enable", "security.polkit.enable", "requires"),
-            ("services.xserver.displayManager.gdm.wayland", "services.xserver.displayManager.gdm.enable", "requires"),
-            ("services.xserver.xkb.layout", "services.xserver.enable", "requires"),
+            (
+                "services.xserver.displayManager.gdm.wayland",
+                "services.xserver.displayManager.gdm.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.xkb.layout",
+                "services.xserver.enable",
+                "requires",
+            ),
         ]);
 
         // ── Networking (~25) ───────────────────────────────────────────
         patterns.extend_from_slice(&[
-            ("networking.networkmanager.enable", "networking.wireless.enable", "conflicts"),
-            ("networking.wireless.enable", "networking.wireless.userControlled.enable", "enables"),
-            ("networking.networkmanager.enable", "networking.useDHCP", "overrides"),
-            ("networking.firewall.enable", "networking.firewall.allowedTCPPorts", "gates"),
-            ("networking.firewall.enable", "networking.firewall.allowedUDPPorts", "gates"),
-            ("networking.firewall.enable", "networking.firewall.allowedTCPPortRanges", "gates"),
-            ("networking.firewall.enable", "services.openssh.enable", "blocks"),
-            ("networking.firewall.allowedTCPPorts", "services.openssh.enable", "enables"),
+            (
+                "networking.networkmanager.enable",
+                "networking.wireless.enable",
+                "conflicts",
+            ),
+            (
+                "networking.wireless.enable",
+                "networking.wireless.userControlled.enable",
+                "enables",
+            ),
+            (
+                "networking.networkmanager.enable",
+                "networking.useDHCP",
+                "overrides",
+            ),
+            (
+                "networking.firewall.enable",
+                "networking.firewall.allowedTCPPorts",
+                "gates",
+            ),
+            (
+                "networking.firewall.enable",
+                "networking.firewall.allowedUDPPorts",
+                "gates",
+            ),
+            (
+                "networking.firewall.enable",
+                "networking.firewall.allowedTCPPortRanges",
+                "gates",
+            ),
+            (
+                "networking.firewall.enable",
+                "services.openssh.enable",
+                "blocks",
+            ),
+            (
+                "networking.firewall.allowedTCPPorts",
+                "services.openssh.enable",
+                "enables",
+            ),
             ("networking.hostName", "networking.domain", "configures"),
-            ("networking.nameservers", "networking.resolvconf.enable", "configures"),
+            (
+                "networking.nameservers",
+                "networking.resolvconf.enable",
+                "configures",
+            ),
             ("networking.useDHCP", "networking.interfaces", "overrides"),
-            ("networking.nat.enable", "networking.nat.internalInterfaces", "enables"),
-            ("networking.nat.enable", "networking.nat.externalInterface", "requires"),
-            ("networking.wireguard.enable", "networking.wireguard.interfaces", "enables"),
-            ("networking.wireguard.interfaces", "networking.firewall.allowedUDPPorts", "requires"),
-            ("networking.wg-quick.interfaces", "networking.wireguard.interfaces", "alternative"),
-            ("networking.proxy.default", "networking.proxy.httpProxy", "provides"),
+            (
+                "networking.nat.enable",
+                "networking.nat.internalInterfaces",
+                "enables",
+            ),
+            (
+                "networking.nat.enable",
+                "networking.nat.externalInterface",
+                "requires",
+            ),
+            (
+                "networking.wireguard.enable",
+                "networking.wireguard.interfaces",
+                "enables",
+            ),
+            (
+                "networking.wireguard.interfaces",
+                "networking.firewall.allowedUDPPorts",
+                "requires",
+            ),
+            (
+                "networking.wg-quick.interfaces",
+                "networking.wireguard.interfaces",
+                "alternative",
+            ),
+            (
+                "networking.proxy.default",
+                "networking.proxy.httpProxy",
+                "provides",
+            ),
             ("networking.bridges", "networking.interfaces", "requires"),
             ("networking.vlans", "networking.interfaces", "requires"),
             ("networking.bonds", "networking.interfaces", "requires"),
-            ("networking.nftables.enable", "networking.firewall.enable", "replaces"),
-            ("services.resolved.enable", "networking.resolvconf.enable", "conflicts"),
-            ("services.dnsmasq.enable", "networking.resolvconf.enable", "configures"),
-            ("networking.enableIPv6", "networking.firewall.allowedTCPPorts", "affects"),
-            ("networking.stealth", "networking.firewall.enable", "requires"),
+            (
+                "networking.nftables.enable",
+                "networking.firewall.enable",
+                "replaces",
+            ),
+            (
+                "services.resolved.enable",
+                "networking.resolvconf.enable",
+                "conflicts",
+            ),
+            (
+                "services.dnsmasq.enable",
+                "networking.resolvconf.enable",
+                "configures",
+            ),
+            (
+                "networking.enableIPv6",
+                "networking.firewall.allowedTCPPorts",
+                "affects",
+            ),
+            (
+                "networking.stealth",
+                "networking.firewall.enable",
+                "requires",
+            ),
         ]);
 
         // ── Services (~40) ─────────────────────────────────────────────
         patterns.extend_from_slice(&[
             // Web servers
-            ("services.nginx.enable", "networking.firewall.allowedTCPPorts", "requires"),
-            ("services.nginx.enable", "services.nginx.virtualHosts", "enables"),
-            ("services.nginx.virtualHosts", "security.acme.certs", "requires"),
-            ("services.caddy.enable", "networking.firewall.allowedTCPPorts", "requires"),
-            ("services.apache.enable", "services.nginx.enable", "conflicts"),
-
+            (
+                "services.nginx.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
+            (
+                "services.nginx.enable",
+                "services.nginx.virtualHosts",
+                "enables",
+            ),
+            (
+                "services.nginx.virtualHosts",
+                "security.acme.certs",
+                "requires",
+            ),
+            (
+                "services.caddy.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
+            (
+                "services.apache.enable",
+                "services.nginx.enable",
+                "conflicts",
+            ),
             // Databases
-            ("services.postgresql.enable", "services.postgresql.package", "requires"),
-            ("services.postgresql.enable", "services.postgresql.dataDir", "configures"),
-            ("services.postgresql.enable", "services.postgresql.authentication", "enables"),
-            ("services.mysql.enable", "services.mysql.package", "requires"),
-            ("services.redis.servers", "services.redis.package", "requires"),
-            ("services.mongodb.enable", "services.mongodb.package", "requires"),
-
+            (
+                "services.postgresql.enable",
+                "services.postgresql.package",
+                "requires",
+            ),
+            (
+                "services.postgresql.enable",
+                "services.postgresql.dataDir",
+                "configures",
+            ),
+            (
+                "services.postgresql.enable",
+                "services.postgresql.authentication",
+                "enables",
+            ),
+            (
+                "services.mysql.enable",
+                "services.mysql.package",
+                "requires",
+            ),
+            (
+                "services.redis.servers",
+                "services.redis.package",
+                "requires",
+            ),
+            (
+                "services.mongodb.enable",
+                "services.mongodb.package",
+                "requires",
+            ),
             // Docker & containers
-            ("virtualisation.docker.enable", "users.extraGroups.docker", "requires"),
-            ("virtualisation.docker.enable", "networking.firewall.trustedInterfaces", "recommends"),
-            ("virtualisation.docker.rootless.enable", "virtualisation.docker.enable", "alternative"),
-            ("virtualisation.podman.enable", "virtualisation.docker.enable", "alternative"),
-            ("virtualisation.oci-containers.containers", "virtualisation.docker.enable", "requires"),
-
+            (
+                "virtualisation.docker.enable",
+                "users.extraGroups.docker",
+                "requires",
+            ),
+            (
+                "virtualisation.docker.enable",
+                "networking.firewall.trustedInterfaces",
+                "recommends",
+            ),
+            (
+                "virtualisation.docker.rootless.enable",
+                "virtualisation.docker.enable",
+                "alternative",
+            ),
+            (
+                "virtualisation.podman.enable",
+                "virtualisation.docker.enable",
+                "alternative",
+            ),
+            (
+                "virtualisation.oci-containers.containers",
+                "virtualisation.docker.enable",
+                "requires",
+            ),
             // SSH & security
-            ("services.openssh.enable", "services.openssh.settings.PermitRootLogin", "enables"),
-            ("services.openssh.enable", "networking.firewall.allowedTCPPorts", "requires"),
-            ("services.fail2ban.enable", "services.openssh.enable", "protects"),
-
+            (
+                "services.openssh.enable",
+                "services.openssh.settings.PermitRootLogin",
+                "enables",
+            ),
+            (
+                "services.openssh.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
+            (
+                "services.fail2ban.enable",
+                "services.openssh.enable",
+                "protects",
+            ),
             // System services
             ("services.ntp.enable", "services.chrony.enable", "conflicts"),
-            ("services.chrony.enable", "services.timesyncd.enable", "conflicts"),
-            ("services.timesyncd.enable", "services.ntp.enable", "conflicts"),
-            ("services.cron.enable", "services.cron.systemCronJobs", "enables"),
-            ("services.logrotate.enable", "services.journald.extraConfig", "supplements"),
-            ("services.printing.enable", "services.printing.drivers", "enables"),
-            ("services.avahi.enable", "services.avahi.nssmdns4", "enables"),
-            ("services.avahi.enable", "networking.firewall.allowedUDPPorts", "requires"),
-
+            (
+                "services.chrony.enable",
+                "services.timesyncd.enable",
+                "conflicts",
+            ),
+            (
+                "services.timesyncd.enable",
+                "services.ntp.enable",
+                "conflicts",
+            ),
+            (
+                "services.cron.enable",
+                "services.cron.systemCronJobs",
+                "enables",
+            ),
+            (
+                "services.logrotate.enable",
+                "services.journald.extraConfig",
+                "supplements",
+            ),
+            (
+                "services.printing.enable",
+                "services.printing.drivers",
+                "enables",
+            ),
+            (
+                "services.avahi.enable",
+                "services.avahi.nssmdns4",
+                "enables",
+            ),
+            (
+                "services.avahi.enable",
+                "networking.firewall.allowedUDPPorts",
+                "requires",
+            ),
             // Mail
-            ("services.postfix.enable", "networking.firewall.allowedTCPPorts", "requires"),
-            ("services.dovecot2.enable", "services.postfix.enable", "requires"),
-
+            (
+                "services.postfix.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
+            (
+                "services.dovecot2.enable",
+                "services.postfix.enable",
+                "requires",
+            ),
             // Monitoring
-            ("services.prometheus.enable", "networking.firewall.allowedTCPPorts", "requires"),
-            ("services.grafana.enable", "services.prometheus.enable", "recommends"),
-            ("services.grafana.enable", "networking.firewall.allowedTCPPorts", "requires"),
-
+            (
+                "services.prometheus.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
+            (
+                "services.grafana.enable",
+                "services.prometheus.enable",
+                "recommends",
+            ),
+            (
+                "services.grafana.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
             // Misc
-            ("services.xrdp.enable", "networking.firewall.allowedTCPPorts", "requires"),
-            ("services.syncthing.enable", "networking.firewall.allowedTCPPorts", "requires"),
+            (
+                "services.xrdp.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
+            (
+                "services.syncthing.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
             ("services.tor.enable", "services.tor.settings", "enables"),
-            ("services.tailscale.enable", "networking.firewall.trustedInterfaces", "recommends"),
-            ("services.k3s.enable", "networking.firewall.allowedTCPPorts", "requires"),
-            ("services.nextcloud.enable", "services.nginx.enable", "requires"),
-            ("services.nextcloud.enable", "services.postgresql.enable", "recommends"),
-            ("services.gitea.enable", "services.postgresql.enable", "recommends"),
+            (
+                "services.tailscale.enable",
+                "networking.firewall.trustedInterfaces",
+                "recommends",
+            ),
+            (
+                "services.k3s.enable",
+                "networking.firewall.allowedTCPPorts",
+                "requires",
+            ),
+            (
+                "services.nextcloud.enable",
+                "services.nginx.enable",
+                "requires",
+            ),
+            (
+                "services.nextcloud.enable",
+                "services.postgresql.enable",
+                "recommends",
+            ),
+            (
+                "services.gitea.enable",
+                "services.postgresql.enable",
+                "recommends",
+            ),
         ]);
 
         // ── Sound (~15) ────────────────────────────────────────────────
         patterns.extend_from_slice(&[
-            ("services.pipewire.enable", "hardware.pulseaudio.enable", "conflicts"),
-            ("hardware.pulseaudio.enable", "services.pipewire.enable", "conflicts"),
-            ("services.pipewire.enable", "services.pipewire.alsa.enable", "enables"),
-            ("services.pipewire.enable", "services.pipewire.pulse.enable", "enables"),
-            ("services.pipewire.enable", "services.pipewire.jack.enable", "enables"),
-            ("services.pipewire.alsa.enable", "services.pipewire.alsa.support32Bit", "enables"),
-            ("hardware.pulseaudio.enable", "hardware.pulseaudio.package", "requires"),
-            ("hardware.pulseaudio.support32Bit", "hardware.pulseaudio.enable", "requires"),
+            (
+                "services.pipewire.enable",
+                "hardware.pulseaudio.enable",
+                "conflicts",
+            ),
+            (
+                "hardware.pulseaudio.enable",
+                "services.pipewire.enable",
+                "conflicts",
+            ),
+            (
+                "services.pipewire.enable",
+                "services.pipewire.alsa.enable",
+                "enables",
+            ),
+            (
+                "services.pipewire.enable",
+                "services.pipewire.pulse.enable",
+                "enables",
+            ),
+            (
+                "services.pipewire.enable",
+                "services.pipewire.jack.enable",
+                "enables",
+            ),
+            (
+                "services.pipewire.alsa.enable",
+                "services.pipewire.alsa.support32Bit",
+                "enables",
+            ),
+            (
+                "hardware.pulseaudio.enable",
+                "hardware.pulseaudio.package",
+                "requires",
+            ),
+            (
+                "hardware.pulseaudio.support32Bit",
+                "hardware.pulseaudio.enable",
+                "requires",
+            ),
             ("sound.enable", "hardware.pulseaudio.enable", "enables"),
             ("sound.enable", "services.pipewire.enable", "enables"),
-            ("hardware.bluetooth.enable", "services.pipewire.enable", "recommends"),
-            ("hardware.bluetooth.enable", "hardware.bluetooth.powerOnBoot", "configures"),
-            ("services.blueman.enable", "hardware.bluetooth.enable", "requires"),
-            ("hardware.pulseaudio.extraModules", "hardware.pulseaudio.enable", "requires"),
-            ("services.pipewire.wireplumber.enable", "services.pipewire.enable", "requires"),
+            (
+                "hardware.bluetooth.enable",
+                "services.pipewire.enable",
+                "recommends",
+            ),
+            (
+                "hardware.bluetooth.enable",
+                "hardware.bluetooth.powerOnBoot",
+                "configures",
+            ),
+            (
+                "services.blueman.enable",
+                "hardware.bluetooth.enable",
+                "requires",
+            ),
+            (
+                "hardware.pulseaudio.extraModules",
+                "hardware.pulseaudio.enable",
+                "requires",
+            ),
+            (
+                "services.pipewire.wireplumber.enable",
+                "services.pipewire.enable",
+                "requires",
+            ),
         ]);
 
         // ── Users & Security (~20) ─────────────────────────────────────
         patterns.extend_from_slice(&[
             ("users.users", "users.groups", "references"),
             ("users.users.*.extraGroups", "users.groups", "requires"),
-            ("security.sudo.enable", "security.sudo.extraRules", "enables"),
+            (
+                "security.sudo.enable",
+                "security.sudo.extraRules",
+                "enables",
+            ),
             ("security.sudo.enable", "security.doas.enable", "conflicts"),
             ("security.doas.enable", "security.sudo.enable", "conflicts"),
-            ("security.polkit.enable", "security.polkit.extraConfig", "enables"),
-            ("security.apparmor.enable", "security.apparmor.policies", "enables"),
-            ("security.pam.services", "security.pam.loginLimits", "configures"),
-            ("security.rtkit.enable", "services.pipewire.enable", "supports"),
-            ("security.acme.defaults.email", "security.acme.certs", "configures"),
-            ("security.acme.acceptTerms", "security.acme.certs", "requires"),
-            ("services.openssh.settings.PasswordAuthentication", "services.openssh.enable", "requires"),
+            (
+                "security.polkit.enable",
+                "security.polkit.extraConfig",
+                "enables",
+            ),
+            (
+                "security.apparmor.enable",
+                "security.apparmor.policies",
+                "enables",
+            ),
+            (
+                "security.pam.services",
+                "security.pam.loginLimits",
+                "configures",
+            ),
+            (
+                "security.rtkit.enable",
+                "services.pipewire.enable",
+                "supports",
+            ),
+            (
+                "security.acme.defaults.email",
+                "security.acme.certs",
+                "configures",
+            ),
+            (
+                "security.acme.acceptTerms",
+                "security.acme.certs",
+                "requires",
+            ),
+            (
+                "services.openssh.settings.PasswordAuthentication",
+                "services.openssh.enable",
+                "requires",
+            ),
             ("users.mutableUsers", "users.users", "configures"),
             ("users.defaultUserShell", "environment.shells", "requires"),
-            ("security.pam.u2f.enable", "security.pam.services", "configures"),
+            (
+                "security.pam.u2f.enable",
+                "security.pam.services",
+                "configures",
+            ),
             ("security.auditd.enable", "security.audit.rules", "enables"),
-            ("security.tpm2.enable", "security.tpm2.pkcs11.enable", "enables"),
-            ("nix.settings.trusted-users", "nix.settings.allowed-users", "extends"),
+            (
+                "security.tpm2.enable",
+                "security.tpm2.pkcs11.enable",
+                "enables",
+            ),
+            (
+                "nix.settings.trusted-users",
+                "nix.settings.allowed-users",
+                "extends",
+            ),
             ("security.wrappers", "security.wrappers.*.source", "enables"),
-            ("services.fprintd.enable", "security.pam.services", "configures"),
+            (
+                "services.fprintd.enable",
+                "security.pam.services",
+                "configures",
+            ),
         ]);
 
         // ── Packages & Nix Settings (~25) ──────────────────────────────
         patterns.extend_from_slice(&[
-            ("nixpkgs.config.allowUnfree", "environment.systemPackages", "enables"),
-            ("nixpkgs.config.allowUnfree", "programs.steam.enable", "enables"),
+            (
+                "nixpkgs.config.allowUnfree",
+                "environment.systemPackages",
+                "enables",
+            ),
+            (
+                "nixpkgs.config.allowUnfree",
+                "programs.steam.enable",
+                "enables",
+            ),
             ("nixpkgs.overlays", "environment.systemPackages", "modifies"),
-            ("nix.settings.experimental-features", "nix.settings.flakes", "enables"),
+            (
+                "nix.settings.experimental-features",
+                "nix.settings.flakes",
+                "enables",
+            ),
             ("nix.gc.automatic", "nix.gc.dates", "enables"),
             ("nix.gc.automatic", "nix.gc.options", "enables"),
-            ("nix.settings.auto-optimise-store", "nix.gc.automatic", "supplements"),
-            ("nix.settings.substituters", "nix.settings.trusted-public-keys", "requires"),
+            (
+                "nix.settings.auto-optimise-store",
+                "nix.gc.automatic",
+                "supplements",
+            ),
+            (
+                "nix.settings.substituters",
+                "nix.settings.trusted-public-keys",
+                "requires",
+            ),
             ("nix.settings.max-jobs", "nix.settings.cores", "configures"),
-            ("programs.steam.enable", "hardware.opengl.driSupport32Bit", "requires"),
-            ("programs.steam.enable", "hardware.pulseaudio.support32Bit", "recommends"),
+            (
+                "programs.steam.enable",
+                "hardware.opengl.driSupport32Bit",
+                "requires",
+            ),
+            (
+                "programs.steam.enable",
+                "hardware.pulseaudio.support32Bit",
+                "recommends",
+            ),
             ("programs.zsh.enable", "users.defaultUserShell", "provides"),
             ("programs.fish.enable", "users.defaultUserShell", "provides"),
-            ("programs.bash.enableCompletion", "environment.systemPackages", "supplements"),
-            ("programs.gnupg.agent.enable", "programs.gnupg.agent.pinentryPackage", "configures"),
+            (
+                "programs.bash.enableCompletion",
+                "environment.systemPackages",
+                "supplements",
+            ),
+            (
+                "programs.gnupg.agent.enable",
+                "programs.gnupg.agent.pinentryPackage",
+                "configures",
+            ),
             ("programs.java.enable", "programs.java.package", "requires"),
-            ("programs.nix-ld.enable", "programs.nix-ld.libraries", "enables"),
+            (
+                "programs.nix-ld.enable",
+                "programs.nix-ld.libraries",
+                "enables",
+            ),
             ("programs.git.enable", "programs.git.config", "enables"),
             ("environment.shells", "programs.zsh.enable", "requires"),
-            ("environment.variables", "environment.sessionVariables", "supplements"),
-            ("environment.etc", "environment.systemPackages", "supplements"),
-            ("programs.dconf.enable", "services.xserver.desktopManager.gnome.enable", "supports"),
-            ("programs.xwayland.enable", "services.xserver.enable", "supplements"),
+            (
+                "environment.variables",
+                "environment.sessionVariables",
+                "supplements",
+            ),
+            (
+                "environment.etc",
+                "environment.systemPackages",
+                "supplements",
+            ),
+            (
+                "programs.dconf.enable",
+                "services.xserver.desktopManager.gnome.enable",
+                "supports",
+            ),
+            (
+                "programs.xwayland.enable",
+                "services.xserver.enable",
+                "supplements",
+            ),
             ("programs.mtr.enable", "security.wrappers", "requires"),
-            ("nixpkgs.hostPlatform", "nixpkgs.buildPlatform", "configures"),
+            (
+                "nixpkgs.hostPlatform",
+                "nixpkgs.buildPlatform",
+                "configures",
+            ),
         ]);
 
         // ── Desktop Environment (~10) ──────────────────────────────────
         patterns.extend_from_slice(&[
             ("services.flatpak.enable", "xdg.portal.enable", "requires"),
             ("xdg.portal.enable", "xdg.portal.extraPortals", "enables"),
-            ("services.dbus.enable", "services.xserver.enable", "supports"),
-            ("services.udisks2.enable", "services.dbus.enable", "requires"),
+            (
+                "services.dbus.enable",
+                "services.xserver.enable",
+                "supports",
+            ),
+            (
+                "services.udisks2.enable",
+                "services.dbus.enable",
+                "requires",
+            ),
             ("services.gvfs.enable", "services.dbus.enable", "requires"),
-            ("services.gnome.gnome-keyring.enable", "security.pam.services", "configures"),
-            ("services.xserver.desktopManager.gnome.enable", "services.dbus.enable", "requires"),
-            ("services.xserver.desktopManager.gnome.enable", "services.udev.packages", "configures"),
-            ("programs.thunar.enable", "services.gvfs.enable", "recommends"),
-            ("services.xserver.desktopManager.plasma5.enable", "services.dbus.enable", "requires"),
+            (
+                "services.gnome.gnome-keyring.enable",
+                "security.pam.services",
+                "configures",
+            ),
+            (
+                "services.xserver.desktopManager.gnome.enable",
+                "services.dbus.enable",
+                "requires",
+            ),
+            (
+                "services.xserver.desktopManager.gnome.enable",
+                "services.udev.packages",
+                "configures",
+            ),
+            (
+                "programs.thunar.enable",
+                "services.gvfs.enable",
+                "recommends",
+            ),
+            (
+                "services.xserver.desktopManager.plasma5.enable",
+                "services.dbus.enable",
+                "requires",
+            ),
         ]);
 
         // ── Virtualization (~15) ───────────────────────────────────────
         patterns.extend_from_slice(&[
-            ("virtualisation.docker.enable", "virtualisation.docker.storageDriver", "configures"),
-            ("virtualisation.docker.enable", "virtualisation.docker.daemon.settings", "enables"),
-            ("virtualisation.libvirtd.enable", "virtualisation.libvirtd.qemu.package", "requires"),
-            ("virtualisation.libvirtd.enable", "users.extraGroups.libvirtd", "requires"),
-            ("virtualisation.libvirtd.enable", "boot.kernelModules", "requires"),
-            ("virtualisation.podman.enable", "virtualisation.podman.dockerCompat", "enables"),
-            ("virtualisation.podman.enable", "virtualisation.podman.defaultNetwork.settings", "enables"),
-            ("virtualisation.virtualbox.host.enable", "users.extraGroups.vboxusers", "requires"),
-            ("virtualisation.virtualbox.host.enable", "boot.kernelModules", "requires"),
-            ("virtualisation.virtualbox.host.enableExtensionPack", "virtualisation.virtualbox.host.enable", "requires"),
-            ("virtualisation.kvmgt.enable", "boot.kernelModules", "requires"),
-            ("virtualisation.lxd.enable", "virtualisation.lxd.package", "requires"),
-            ("virtualisation.waydroid.enable", "virtualisation.lxc.enable", "requires"),
-            ("virtualisation.vmware.host.enable", "boot.kernelModules", "requires"),
-            ("boot.kernelModules", "virtualisation.libvirtd.enable", "supports"),
+            (
+                "virtualisation.docker.enable",
+                "virtualisation.docker.storageDriver",
+                "configures",
+            ),
+            (
+                "virtualisation.docker.enable",
+                "virtualisation.docker.daemon.settings",
+                "enables",
+            ),
+            (
+                "virtualisation.libvirtd.enable",
+                "virtualisation.libvirtd.qemu.package",
+                "requires",
+            ),
+            (
+                "virtualisation.libvirtd.enable",
+                "users.extraGroups.libvirtd",
+                "requires",
+            ),
+            (
+                "virtualisation.libvirtd.enable",
+                "boot.kernelModules",
+                "requires",
+            ),
+            (
+                "virtualisation.podman.enable",
+                "virtualisation.podman.dockerCompat",
+                "enables",
+            ),
+            (
+                "virtualisation.podman.enable",
+                "virtualisation.podman.defaultNetwork.settings",
+                "enables",
+            ),
+            (
+                "virtualisation.virtualbox.host.enable",
+                "users.extraGroups.vboxusers",
+                "requires",
+            ),
+            (
+                "virtualisation.virtualbox.host.enable",
+                "boot.kernelModules",
+                "requires",
+            ),
+            (
+                "virtualisation.virtualbox.host.enableExtensionPack",
+                "virtualisation.virtualbox.host.enable",
+                "requires",
+            ),
+            (
+                "virtualisation.kvmgt.enable",
+                "boot.kernelModules",
+                "requires",
+            ),
+            (
+                "virtualisation.lxd.enable",
+                "virtualisation.lxd.package",
+                "requires",
+            ),
+            (
+                "virtualisation.waydroid.enable",
+                "virtualisation.lxc.enable",
+                "requires",
+            ),
+            (
+                "virtualisation.vmware.host.enable",
+                "boot.kernelModules",
+                "requires",
+            ),
+            (
+                "boot.kernelModules",
+                "virtualisation.libvirtd.enable",
+                "supports",
+            ),
         ]);
 
         patterns
@@ -750,17 +1418,54 @@ mod tests {
             analyzer.observe("config.C", 1.5 * x + (i % 5) as f64);
         }
 
-        analyzer.discover_structure();
+        let edges = analyzer.discover_structure();
+        assert!(
+            !edges.is_empty(),
+            "Should discover causal edges from correlated observations"
+        );
 
-        let effects = analyzer.predict_side_effects("config.A");
-        println!("Side effects of changing config.A: {:?}", effects);
+        // HashMap iteration order is non-deterministic, so which variable
+        // becomes `from` vs `to` depends on key ordering. Check that at least
+        // one of the three variables has outgoing side effects.
+        let mut any_has_effects = false;
+        for var in &["config.A", "config.B", "config.C"] {
+            let effects = analyzer.predict_side_effects(var);
+            if !effects.is_empty() {
+                any_has_effects = true;
+                // Validate all predicted effects
+                for effect in &effects {
+                    assert!(
+                        effect.confidence >= 0.0 && effect.confidence <= 1.0,
+                        "Side effect confidence should be in [0, 1], got {} for {}",
+                        effect.confidence,
+                        effect.affected_variable
+                    );
+                    assert!(
+                        !effect.affected_variable.is_empty(),
+                        "Affected variable name should not be empty"
+                    );
+                    assert!(
+                        !effect.direction.is_empty(),
+                        "Direction should not be empty"
+                    );
+                }
+            }
+        }
+        assert!(
+            any_has_effects,
+            "At least one variable should have predicted side effects"
+        );
     }
 
     #[test]
     fn test_known_patterns_count() {
         let patterns = NixOSCausalPatterns::known_patterns();
         // Should have at least 200 curated patterns
-        assert!(patterns.len() >= 200, "Expected >=200 patterns, got {}", patterns.len());
+        assert!(
+            patterns.len() >= 200,
+            "Expected >=200 patterns, got {}",
+            patterns.len()
+        );
         // Verify all entries are non-empty
         for (cause, effect, rel) in &patterns {
             assert!(!cause.is_empty());
@@ -772,10 +1477,17 @@ mod tests {
     #[test]
     fn test_add_structural_edge() {
         let mut graph = NixCausalGraph::new(42);
-        graph.add_structural_edge("services.nginx.enable", "networking.firewall.allowedTCPPorts", 0.9);
+        graph.add_structural_edge(
+            "services.nginx.enable",
+            "networking.firewall.allowedTCPPorts",
+            0.9,
+        );
         let effects = graph.predict_side_effects("services.nginx.enable");
         assert_eq!(effects.len(), 1);
-        assert_eq!(effects[0].affected_variable, "networking.firewall.allowedTCPPorts");
+        assert_eq!(
+            effects[0].affected_variable,
+            "networking.firewall.allowedTCPPorts"
+        );
     }
 
     #[test]
@@ -835,7 +1547,11 @@ mod tests {
         // Observe A→B occurring — should strengthen
         graph.observe_outcome("A", &["B"], &["B"]);
         let edge = &graph.causal_graph[&("A".to_string(), "B".to_string())];
-        assert!(edge.confidence > 0.5, "Edge should strengthen: {}", edge.confidence);
+        assert!(
+            edge.confidence > 0.5,
+            "Edge should strengthen: {}",
+            edge.confidence
+        );
     }
 
     #[test]
@@ -846,7 +1562,11 @@ mod tests {
         // Predict A→B but B doesn't occur — should weaken
         graph.observe_outcome("A", &[], &["B"]);
         let edge = &graph.causal_graph[&("A".to_string(), "B".to_string())];
-        assert!(edge.confidence < 0.5, "Edge should weaken: {}", edge.confidence);
+        assert!(
+            edge.confidence < 0.5,
+            "Edge should weaken: {}",
+            edge.confidence
+        );
     }
 
     #[test]
@@ -855,9 +1575,15 @@ mod tests {
 
         // Observe A→C for the first time (no prior edge)
         graph.observe_outcome("A", &["C"], &[]);
-        assert!(graph.causal_graph.contains_key(&("A".to_string(), "C".to_string())));
+        assert!(graph
+            .causal_graph
+            .contains_key(&("A".to_string(), "C".to_string())));
         let edge = &graph.causal_graph[&("A".to_string(), "C".to_string())];
-        assert!(edge.confidence > 0.3, "New edge should have boosted confidence: {}", edge.confidence);
+        assert!(
+            edge.confidence > 0.3,
+            "New edge should have boosted confidence: {}",
+            edge.confidence
+        );
     }
 
     #[test]
@@ -872,8 +1598,11 @@ mod tests {
         graph.observe_outcome("A", &[], &["B"]);
         // Should be pruned below min_confidence
         assert!(
-            !graph.causal_graph.contains_key(&("A".to_string(), "B".to_string()))
-            || graph.causal_graph[&("A".to_string(), "B".to_string())].confidence >= graph.min_confidence,
+            !graph
+                .causal_graph
+                .contains_key(&("A".to_string(), "B".to_string()))
+                || graph.causal_graph[&("A".to_string(), "B".to_string())].confidence
+                    >= graph.min_confidence,
             "Weak edges should be pruned"
         );
     }
@@ -907,13 +1636,24 @@ mod tests {
 
         let analysis = graph.analyze_root_causes("D");
         assert_eq!(analysis.symptom, "D");
-        assert!(!analysis.causal_chain.is_empty(), "Should find causal chain to D");
-        assert!(!analysis.root_causes.is_empty(), "Should identify root causes");
+        assert!(
+            !analysis.causal_chain.is_empty(),
+            "Should find causal chain to D"
+        );
+        assert!(
+            !analysis.root_causes.is_empty(),
+            "Should identify root causes"
+        );
 
         // A should be a root cause (no incoming edges)
         assert!(
             analysis.root_causes.iter().any(|rc| rc.variable == "A"),
-            "A should be root cause. Got: {:?}", analysis.root_causes.iter().map(|rc| &rc.variable).collect::<Vec<_>>()
+            "A should be root cause. Got: {:?}",
+            analysis
+                .root_causes
+                .iter()
+                .map(|rc| &rc.variable)
+                .collect::<Vec<_>>()
         );
     }
 
@@ -932,7 +1672,10 @@ mod tests {
         graph.add_structural_edge("B", "C", 0.6);
 
         let effects = graph.predict_side_effects("A");
-        let affected: Vec<&str> = effects.iter().map(|e| e.affected_variable.as_str()).collect();
+        let affected: Vec<&str> = effects
+            .iter()
+            .map(|e| e.affected_variable.as_str())
+            .collect();
         assert!(affected.contains(&"B"), "Should predict B as affected");
         assert!(affected.contains(&"C"), "Should predict C transitively");
     }
@@ -945,7 +1688,8 @@ mod tests {
         let fixes = graph.recommend_fixes("service-unreachable");
         assert!(
             fixes.iter().any(|f| f.contains("misconfigured-firewall")),
-            "Should recommend adjusting the firewall. Got: {:?}", fixes
+            "Should recommend adjusting the firewall. Got: {:?}",
+            fixes
         );
     }
 
@@ -958,7 +1702,8 @@ mod tests {
         let fixes = graph.recommend_fixes("symptom");
         assert!(
             fixes.iter().any(|f| f.contains("Insufficient")),
-            "Low-confidence edges shouldn't produce recommendations. Got: {:?}", fixes
+            "Low-confidence edges shouldn't produce recommendations. Got: {:?}",
+            fixes
         );
     }
 
@@ -996,7 +1741,15 @@ mod tests {
             graph.observe_outcome("A", &["B"], &["B"]);
         }
         let edge = &graph.causal_graph[&("A".to_string(), "B".to_string())];
-        assert!(edge.confidence <= 1.0, "Confidence should be bounded: {}", edge.confidence);
-        assert!(edge.confidence > 0.95, "Should be very high after many observations: {}", edge.confidence);
+        assert!(
+            edge.confidence <= 1.0,
+            "Confidence should be bounded: {}",
+            edge.confidence
+        );
+        assert!(
+            edge.confidence > 0.95,
+            "Should be very high after many observations: {}",
+            edge.confidence
+        );
     }
 }

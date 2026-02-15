@@ -28,8 +28,8 @@ use rand::prelude::*;
 use rand::SeedableRng;
 use rayon::prelude::*;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
 use std::f64;
+use std::sync::{Arc, Mutex};
 
 /// Maximum samples to use for efficiency
 const MAX_SAMPLES: usize = 500;
@@ -139,8 +139,8 @@ impl CausalDiscoveryEngine {
 
     /// Hash data for caching
     fn hash_data(&self, x: &[f64], y: &[f64]) -> u64 {
-        use std::hash::{Hash, Hasher};
         use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
         x.len().hash(&mut hasher);
@@ -202,7 +202,7 @@ impl CausalDiscoveryEngine {
         };
 
         let confidence = (forward_votes as f64 - self.n_ensemble as f64 / 2.0).abs()
-                        / (self.n_ensemble as f64 / 2.0);
+            / (self.n_ensemble as f64 / 2.0);
         let direction = if forward_votes > self.n_ensemble / 2 {
             CausalDirection::Forward
         } else {
@@ -235,7 +235,10 @@ impl CausalDiscoveryEngine {
             .map(|i| {
                 // Each thread gets its own RNG seeded differently
                 let mut rng = StdRng::seed_from_u64(seed.wrapping_add(i as u64));
-                let mut engine = ParallelPredictHelper { rng: &mut rng, use_hsic_anm: use_hsic };
+                let mut engine = ParallelPredictHelper {
+                    rng: &mut rng,
+                    use_hsic_anm: use_hsic,
+                };
                 if engine.predict_single(&x_arc, &y_arc) == CausalDirection::Forward {
                     1
                 } else {
@@ -399,9 +402,9 @@ impl CausalDiscoveryEngine {
     fn compute_robust_scores(&self, x: &[f64], y: &[f64]) -> MethodScores {
         MethodScores {
             reci: self.robust_reci_score(x, y),
-            igci: self.igci_score(x, y),  // IGCI is already robust
+            igci: self.igci_score(x, y), // IGCI is already robust
             anm: self.robust_anm_score(x, y),
-            info: self.info_score(x, y),  // Info is already robust
+            info: self.info_score(x, y), // Info is already robust
         }
     }
 
@@ -447,10 +450,14 @@ impl CausalDiscoveryEngine {
 
     /// IGCI: Information-Geometric Causal Inference
     fn igci_score(&self, x: &[f64], y: &[f64]) -> f64 {
-        let (min_x, max_x) = (x.iter().cloned().fold(f64::INFINITY, f64::min),
-                              x.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
-        let (min_y, max_y) = (y.iter().cloned().fold(f64::INFINITY, f64::min),
-                              y.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
+        let (min_x, max_x) = (
+            x.iter().cloned().fold(f64::INFINITY, f64::min),
+            x.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        );
+        let (min_y, max_y) = (
+            y.iter().cloned().fold(f64::INFINITY, f64::min),
+            y.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        );
 
         if max_x - min_x < 1e-10 || max_y - min_y < 1e-10 {
             return 0.0;
@@ -486,10 +493,16 @@ impl CausalDiscoveryEngine {
             }
         }
 
-        let mean_xy = if slopes_xy.is_empty() { 0.0 }
-                      else { slopes_xy.iter().sum::<f64>() / slopes_xy.len() as f64 };
-        let mean_yx = if slopes_yx.is_empty() { 0.0 }
-                      else { slopes_yx.iter().sum::<f64>() / slopes_yx.len() as f64 };
+        let mean_xy = if slopes_xy.is_empty() {
+            0.0
+        } else {
+            slopes_xy.iter().sum::<f64>() / slopes_xy.len() as f64
+        };
+        let mean_yx = if slopes_yx.is_empty() {
+            0.0
+        } else {
+            slopes_yx.iter().sum::<f64>() / slopes_yx.len() as f64
+        };
 
         mean_xy - mean_yx
     }
@@ -535,7 +548,7 @@ impl CausalDiscoveryEngine {
     /// HSIC-based ANM: Uses kernel independence testing
     ///
     /// This is more powerful than correlation-based ANM for non-linear relationships
-    #[allow(dead_code)]  // Reserved for advanced causal discovery mode
+    #[allow(dead_code)] // Reserved for advanced causal discovery mode
     fn hsic_anm_score(&self, x: &[f64], y: &[f64]) -> f64 {
         let res_xy = self.linear_residuals(x, y);
         let res_yx = self.linear_residuals(y, x);
@@ -549,7 +562,7 @@ impl CausalDiscoveryEngine {
     }
 
     /// Compute HSIC (Hilbert-Schmidt Independence Criterion)
-    #[allow(dead_code)]  // Used by hsic_anm_score
+    #[allow(dead_code)] // Used by hsic_anm_score
     fn compute_hsic(&self, x: &[f64], y: &[f64]) -> f64 {
         let n = x.len().min(100); // Limit for O(n²) computation
 
@@ -606,7 +619,7 @@ impl CausalDiscoveryEngine {
         k
     }
 
-    #[allow(dead_code)]  // Used by compute_hsic
+    #[allow(dead_code)] // Used by compute_hsic
     fn center_kernel(&self, k: &[Vec<f64>]) -> Vec<Vec<f64>> {
         let n = k.len();
         let mut row_means = vec![0.0; n];
@@ -662,7 +675,7 @@ impl CausalDiscoveryEngine {
 
         // E[k(x,x')] - excluding diagonal
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 let diff = xs[i] - xs[j];
                 kxx_sum += 2.0 * (-gamma * diff * diff).exp();
             }
@@ -671,7 +684,7 @@ impl CausalDiscoveryEngine {
 
         // E[k(y,y')] - excluding diagonal
         for i in 0..n {
-            for j in (i+1)..n {
+            for j in (i + 1)..n {
                 let diff = ys[i] - ys[j];
                 kyy_sum += 2.0 * (-gamma * diff * diff).exp();
             }
@@ -700,10 +713,12 @@ impl CausalDiscoveryEngine {
 
         // Compare MMD of residuals to uniform noise
         let n = res_xy.len();
-        let noise: Vec<f64> = (0..n).map(|i| {
-            // Pseudo-random but deterministic noise
-            ((i as f64 * 1.618033988749).fract() - 0.5) * 2.0
-        }).collect();
+        let noise: Vec<f64> = (0..n)
+            .map(|i| {
+                // Pseudo-random but deterministic noise
+                ((i as f64 * 1.618033988749).fract() - 0.5) * 2.0
+            })
+            .collect();
 
         let mmd_xy = self.compute_mmd(&res_xy, &noise);
         let mmd_yx = self.compute_mmd(&res_yx, &noise);
@@ -814,7 +829,12 @@ impl CausalDiscoveryEngine {
     ///
     /// Given X, Y, Z, determines causal ordering by testing conditional independencies.
     /// Uses the fact that in a DAG: X ⊥ Z | Y iff Y is on all paths between X and Z
-    pub fn trivariate_direction(&mut self, x: &[f64], y: &[f64], z: &[f64]) -> (CausalDirection, f64) {
+    pub fn trivariate_direction(
+        &mut self,
+        x: &[f64],
+        y: &[f64],
+        z: &[f64],
+    ) -> (CausalDirection, f64) {
         // Test X ⊥ Z | Y  (Y mediates X-Z relationship)
         let (_indep_xz_y, stat_xz_y) = self.kcit(x, z, y);
 
@@ -848,12 +868,16 @@ impl CausalDiscoveryEngine {
     // ========================================================================
 
     fn mean(&self, v: &[f64]) -> f64 {
-        if v.is_empty() { return 0.0; }
+        if v.is_empty() {
+            return 0.0;
+        }
         v.iter().sum::<f64>() / v.len() as f64
     }
 
     fn variance(&self, v: &[f64]) -> f64 {
-        if v.len() < 2 { return 1e-10; }
+        if v.len() < 2 {
+            return 1e-10;
+        }
         let m = self.mean(v);
         v.iter().map(|&x| (x - m).powi(2)).sum::<f64>() / (v.len() - 1) as f64
     }
@@ -863,33 +887,46 @@ impl CausalDiscoveryEngine {
     }
 
     fn correlation(&self, x: &[f64], y: &[f64]) -> f64 {
-        if x.len() < 2 { return 0.0; }
+        if x.len() < 2 {
+            return 0.0;
+        }
         let mx = self.mean(x);
         let my = self.mean(y);
         let sx = self.std(x);
         let sy = self.std(y);
 
-        if sx < 1e-10 || sy < 1e-10 { return 0.0; }
+        if sx < 1e-10 || sy < 1e-10 {
+            return 0.0;
+        }
 
-        let cov: f64 = x.iter().zip(y.iter())
+        let cov: f64 = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| (xi - mx) * (yi - my))
-            .sum::<f64>() / (x.len() - 1) as f64;
+            .sum::<f64>()
+            / (x.len() - 1) as f64;
 
         cov / (sx * sy)
     }
 
     fn kurtosis(&self, v: &[f64]) -> f64 {
-        if v.len() < 4 { return 0.0; }
+        if v.len() < 4 {
+            return 0.0;
+        }
         let m = self.mean(v);
         let s = self.std(v);
-        if s < 1e-10 { return 0.0; }
+        if s < 1e-10 {
+            return 0.0;
+        }
 
         let m4: f64 = v.iter().map(|&x| ((x - m) / s).powi(4)).sum();
         m4 / v.len() as f64 - 3.0
     }
 
     fn median(&self, v: &[f64]) -> f64 {
-        if v.is_empty() { return 0.0; }
+        if v.is_empty() {
+            return 0.0;
+        }
         let mut sorted = v.to_vec();
         sorted.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
         let n = sorted.len();
@@ -905,7 +942,9 @@ impl CausalDiscoveryEngine {
         let mx = self.mean(x);
         let my = self.mean(y);
 
-        let num: f64 = x.iter().zip(y.iter())
+        let num: f64 = x
+            .iter()
+            .zip(y.iter())
             .map(|(&xi, &yi)| (xi - mx) * (yi - my))
             .sum();
         let den: f64 = x.iter().map(|&xi| (xi - mx).powi(2)).sum();
@@ -913,7 +952,8 @@ impl CausalDiscoveryEngine {
         let slope = if den > 1e-10 { num / den } else { 0.0 };
         let intercept = my - slope * mx;
 
-        y.iter().zip(x.iter())
+        y.iter()
+            .zip(x.iter())
             .map(|(&yi, &xi)| yi - (slope * xi + intercept))
             .collect()
     }
@@ -922,19 +962,21 @@ impl CausalDiscoveryEngine {
     fn theil_sen_residuals(&self, x: &[f64], y: &[f64]) -> Vec<f64> {
         let slope = self.theil_sen_slope(x, y);
         let intercept = self.median(
-            &x.iter().zip(y.iter())
+            &x.iter()
+                .zip(y.iter())
                 .map(|(&xi, &yi)| yi - slope * xi)
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>(),
         );
 
-        y.iter().zip(x.iter())
+        y.iter()
+            .zip(x.iter())
             .map(|(&yi, &xi)| yi - (slope * xi + intercept))
             .collect()
     }
 
     /// Theil-Sen slope estimator (median of pairwise slopes)
     fn theil_sen_slope(&self, x: &[f64], y: &[f64]) -> f64 {
-        let n = x.len().min(100);  // Limit for efficiency
+        let n = x.len().min(100); // Limit for efficiency
 
         let mut slopes = Vec::new();
         for i in 0..n {
@@ -946,7 +988,9 @@ impl CausalDiscoveryEngine {
             }
         }
 
-        if slopes.is_empty() { return 0.0; }
+        if slopes.is_empty() {
+            return 0.0;
+        }
         self.median(&slopes)
     }
 
@@ -974,7 +1018,8 @@ impl CausalDiscoveryEngine {
         }
 
         let n = v.len() as f64;
-        counts.values()
+        counts
+            .values()
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
@@ -990,7 +1035,8 @@ impl CausalDiscoveryEngine {
         }
 
         let n = x.len() as f64;
-        counts.values()
+        counts
+            .values()
             .filter(|&&c| c > 0)
             .map(|&c| {
                 let p = c as f64 / n;
@@ -1006,7 +1052,7 @@ impl CausalDiscoveryEngine {
 /// in a parallel context with thread-local RNG.
 struct ParallelPredictHelper<'a> {
     rng: &'a mut StdRng,
-    #[allow(dead_code)]  // Reserved for HSIC-ANM mode activation
+    #[allow(dead_code)] // Reserved for HSIC-ANM mode activation
     use_hsic_anm: bool,
 }
 
@@ -1041,8 +1087,16 @@ impl<'a> ParallelPredictHelper<'a> {
         }
 
         if meta.correlation.abs() > 0.85 {
-            let igci_dir = if scores.igci > 0.0 { CausalDirection::Forward } else { CausalDirection::Backward };
-            let info_dir = if scores.info > 0.0 { CausalDirection::Forward } else { CausalDirection::Backward };
+            let igci_dir = if scores.igci > 0.0 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            };
+            let info_dir = if scores.info > 0.0 {
+                CausalDirection::Forward
+            } else {
+                CausalDirection::Backward
+            };
             if igci_dir == info_dir && igci_dir != majority {
                 return igci_dir;
             }
@@ -1116,11 +1170,17 @@ impl<'a> ParallelPredictHelper<'a> {
 
     // Static statistical methods (duplicated for thread safety)
     fn mean(v: &[f64]) -> f64 {
-        if v.is_empty() { 0.0 } else { v.iter().sum::<f64>() / v.len() as f64 }
+        if v.is_empty() {
+            0.0
+        } else {
+            v.iter().sum::<f64>() / v.len() as f64
+        }
     }
 
     fn variance(v: &[f64]) -> f64 {
-        if v.len() < 2 { return 1e-10; }
+        if v.len() < 2 {
+            return 1e-10;
+        }
         let m = Self::mean(v);
         v.iter().map(|&x| (x - m).powi(2)).sum::<f64>() / (v.len() - 1) as f64
     }
@@ -1130,21 +1190,34 @@ impl<'a> ParallelPredictHelper<'a> {
     }
 
     fn correlation(x: &[f64], y: &[f64]) -> f64 {
-        if x.len() < 2 { return 0.0; }
+        if x.len() < 2 {
+            return 0.0;
+        }
         let mx = Self::mean(x);
         let my = Self::mean(y);
         let sx = Self::std(x);
         let sy = Self::std(y);
-        if sx < 1e-10 || sy < 1e-10 { return 0.0; }
-        let cov: f64 = x.iter().zip(y.iter()).map(|(&xi, &yi)| (xi - mx) * (yi - my)).sum::<f64>() / (x.len() - 1) as f64;
+        if sx < 1e-10 || sy < 1e-10 {
+            return 0.0;
+        }
+        let cov: f64 = x
+            .iter()
+            .zip(y.iter())
+            .map(|(&xi, &yi)| (xi - mx) * (yi - my))
+            .sum::<f64>()
+            / (x.len() - 1) as f64;
         cov / (sx * sy)
     }
 
     fn kurtosis(v: &[f64]) -> f64 {
-        if v.len() < 4 { return 0.0; }
+        if v.len() < 4 {
+            return 0.0;
+        }
         let m = Self::mean(v);
         let s = Self::std(v);
-        if s < 1e-10 { return 0.0; }
+        if s < 1e-10 {
+            return 0.0;
+        }
         let m4: f64 = v.iter().map(|&x| ((x - m) / s).powi(4)).sum();
         m4 / v.len() as f64 - 3.0
     }
@@ -1152,11 +1225,18 @@ impl<'a> ParallelPredictHelper<'a> {
     fn linear_residuals(x: &[f64], y: &[f64]) -> Vec<f64> {
         let mx = Self::mean(x);
         let my = Self::mean(y);
-        let num: f64 = x.iter().zip(y.iter()).map(|(&xi, &yi)| (xi - mx) * (yi - my)).sum();
+        let num: f64 = x
+            .iter()
+            .zip(y.iter())
+            .map(|(&xi, &yi)| (xi - mx) * (yi - my))
+            .sum();
         let den: f64 = x.iter().map(|&xi| (xi - mx).powi(2)).sum();
         let slope = if den > 1e-10 { num / den } else { 0.0 };
         let intercept = my - slope * mx;
-        y.iter().zip(x.iter()).map(|(&yi, &xi)| yi - (slope * xi + intercept)).collect()
+        y.iter()
+            .zip(x.iter())
+            .map(|(&yi, &xi)| yi - (slope * xi + intercept))
+            .collect()
     }
 
     fn reci_score(x: &[f64], y: &[f64]) -> f64 {
@@ -1166,16 +1246,24 @@ impl<'a> ParallelPredictHelper<'a> {
         let mse_yx = res_yx.iter().map(|r| r.powi(2)).sum::<f64>() / y.len() as f64;
         let var_x = Self::variance(x);
         let var_y = Self::variance(y);
-        if var_x < 1e-10 || var_y < 1e-10 { return 0.0; }
+        if var_x < 1e-10 || var_y < 1e-10 {
+            return 0.0;
+        }
         mse_yx / var_x - mse_xy / var_y
     }
 
     fn igci_score(x: &[f64], y: &[f64]) -> f64 {
-        let (min_x, max_x) = (x.iter().cloned().fold(f64::INFINITY, f64::min),
-                              x.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
-        let (min_y, max_y) = (y.iter().cloned().fold(f64::INFINITY, f64::min),
-                              y.iter().cloned().fold(f64::NEG_INFINITY, f64::max));
-        if max_x - min_x < 1e-10 || max_y - min_y < 1e-10 { return 0.0; }
+        let (min_x, max_x) = (
+            x.iter().cloned().fold(f64::INFINITY, f64::min),
+            x.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        );
+        let (min_y, max_y) = (
+            y.iter().cloned().fold(f64::INFINITY, f64::min),
+            y.iter().cloned().fold(f64::NEG_INFINITY, f64::max),
+        );
+        if max_x - min_x < 1e-10 || max_y - min_y < 1e-10 {
+            return 0.0;
+        }
 
         let xn: Vec<f64> = x.iter().map(|&v| (v - min_x) / (max_x - min_x)).collect();
         let yn: Vec<f64> = y.iter().map(|&v| (v - min_y) / (max_y - min_y)).collect();
@@ -1202,8 +1290,16 @@ impl<'a> ParallelPredictHelper<'a> {
             }
         }
 
-        let mean_xy = if slopes_xy.is_empty() { 0.0 } else { slopes_xy.iter().sum::<f64>() / slopes_xy.len() as f64 };
-        let mean_yx = if slopes_yx.is_empty() { 0.0 } else { slopes_yx.iter().sum::<f64>() / slopes_yx.len() as f64 };
+        let mean_xy = if slopes_xy.is_empty() {
+            0.0
+        } else {
+            slopes_xy.iter().sum::<f64>() / slopes_xy.len() as f64
+        };
+        let mean_yx = if slopes_yx.is_empty() {
+            0.0
+        } else {
+            slopes_yx.iter().sum::<f64>() / slopes_yx.len() as f64
+        };
         mean_xy - mean_yx
     }
 
@@ -1228,31 +1324,47 @@ impl<'a> ParallelPredictHelper<'a> {
     fn discretize(v: &[f64], n_bins: usize) -> Vec<usize> {
         let min_v = v.iter().cloned().fold(f64::INFINITY, f64::min);
         let max_v = v.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-        if max_v - min_v < 1e-10 { return vec![0; v.len()]; }
-        v.iter().map(|&x| {
-            let bin = ((x - min_v) / (max_v - min_v + 1e-10) * n_bins as f64) as usize;
-            bin.min(n_bins - 1)
-        }).collect()
+        if max_v - min_v < 1e-10 {
+            return vec![0; v.len()];
+        }
+        v.iter()
+            .map(|&x| {
+                let bin = ((x - min_v) / (max_v - min_v + 1e-10) * n_bins as f64) as usize;
+                bin.min(n_bins - 1)
+            })
+            .collect()
     }
 
     fn entropy(v: &[usize]) -> f64 {
         let mut counts = HashMap::new();
-        for &x in v { *counts.entry(x).or_insert(0) += 1; }
+        for &x in v {
+            *counts.entry(x).or_insert(0) += 1;
+        }
         let n = v.len() as f64;
-        counts.values().filter(|&&c| c > 0).map(|&c| {
-            let p = c as f64 / n;
-            -p * p.log2()
-        }).sum()
+        counts
+            .values()
+            .filter(|&&c| c > 0)
+            .map(|&c| {
+                let p = c as f64 / n;
+                -p * p.log2()
+            })
+            .sum()
     }
 
     fn joint_entropy(x: &[usize], y: &[usize]) -> f64 {
         let mut counts = HashMap::new();
-        for (&xi, &yi) in x.iter().zip(y.iter()) { *counts.entry((xi, yi)).or_insert(0) += 1; }
+        for (&xi, &yi) in x.iter().zip(y.iter()) {
+            *counts.entry((xi, yi)).or_insert(0) += 1;
+        }
         let n = x.len() as f64;
-        counts.values().filter(|&&c| c > 0).map(|&c| {
-            let p = c as f64 / n;
-            -p * p.log2()
-        }).sum()
+        counts
+            .values()
+            .filter(|&&c| c > 0)
+            .map(|&c| {
+                let p = c as f64 / n;
+                -p * p.log2()
+            })
+            .sum()
     }
 }
 
@@ -1284,7 +1396,7 @@ mod tests {
 
         let (direction, confidence) = engine.predict_with_confidence(&x, &y);
 
-        assert!(confidence >= 0.0 && confidence <= 1.0);
+        assert!((0.0..=1.0).contains(&confidence));
         println!("Direction: {:?}, Confidence: {}", direction, confidence);
     }
 
@@ -1338,8 +1450,14 @@ mod tests {
         let (indep_xz_y, stat_xz_y) = engine.kcit(&x, &z, &y);
         let (indep_xy_z, stat_xy_z) = engine.kcit(&x, &y, &z);
 
-        println!("X ⊥ Z | Y: independent={}, stat={:.6}", indep_xz_y, stat_xz_y);
-        println!("X ⊥ Y | Z: independent={}, stat={:.6}", indep_xy_z, stat_xy_z);
+        println!(
+            "X ⊥ Z | Y: independent={}, stat={:.6}",
+            indep_xz_y, stat_xz_y
+        );
+        println!(
+            "X ⊥ Y | Z: independent={}, stat={:.6}",
+            indep_xy_z, stat_xy_z
+        );
 
         // Stats should be non-negative
         assert!(stat_xz_y >= 0.0);
@@ -1361,6 +1479,6 @@ mod tests {
         println!("Confidence: {:.4}", confidence);
 
         // Confidence should be in valid range
-        assert!(confidence >= 0.0 && confidence <= 1.0);
+        assert!((0.0..=1.0).contains(&confidence));
     }
 }

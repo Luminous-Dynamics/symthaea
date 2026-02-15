@@ -16,12 +16,12 @@
 //! cargo run --example cross_architecture_validation --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
+use anyhow::{Context, Result};
 use std::collections::HashMap;
-use anyhow::{Result, Context};
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
 use symthaea_core::hdc::binary_hv::BinaryHV;
@@ -48,7 +48,7 @@ struct ModelSpec {
     num_layers: usize,
     hidden_dim: usize,
     architecture: &'static str,
-    late_layers: Vec<usize>,  // Layers at ~75-95% depth
+    late_layers: Vec<usize>, // Layers at ~75-95% depth
 }
 
 #[cfg(feature = "neural-bridge")]
@@ -90,7 +90,7 @@ fn run_experiment() -> Result<()> {
             num_layers: 24,
             hidden_dim: 1024,
             architecture: "Encoder (XLM-RoBERTa-large)",
-            late_layers: vec![18, 20, 21, 22, 23],  // 75-96% depth
+            late_layers: vec![18, 20, 21, 22, 23], // 75-96% depth
         },
         ModelSpec {
             name: "XLM-RoBERTa-base",
@@ -98,7 +98,7 @@ fn run_experiment() -> Result<()> {
             num_layers: 12,
             hidden_dim: 768,
             architecture: "Encoder (RoBERTa-base)",
-            late_layers: vec![9, 10, 11],  // 75-92% depth
+            late_layers: vec![9, 10, 11], // 75-92% depth
         },
         // Note: GPT-2 requires different extraction method (decoder-only)
         // Will be handled separately if LayerExtractor supports it
@@ -112,7 +112,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(50).collect();
     let functional: Vec<_> = functional.into_iter().take(50).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     let topology_config = TopologyConfig {
         min_persistence: 0.1,
@@ -127,7 +131,10 @@ fn run_experiment() -> Result<()> {
     // Test each model
     for spec in &models {
         println!("════════════════════════════════════════════════════════════════");
-        println!("   {} ({} layers, {}D)", spec.name, spec.num_layers, spec.hidden_dim);
+        println!(
+            "   {} ({} layers, {}D)",
+            spec.name, spec.num_layers, spec.hidden_dim
+        );
         println!("   Architecture: {}", spec.architecture);
         println!("════════════════════════════════════════════════════════════════\n");
 
@@ -164,18 +171,28 @@ fn run_experiment() -> Result<()> {
             None => "-",
         };
 
-        println!("{:16} │ {:7} │ {:6} │ {:6} │ {:5.1}% │ {:+5.2} │ {:8} │ {:^7}",
-                 result.spec.name,
-                 if result.spec.architecture.contains("Encoder") { "Encoder" } else { "Decoder" },
-                 result.spec.num_layers,
-                 result.best_layer,
-                 depth_pct,
-                 result.best_effect_size,
-                 format_pvalue(result.layer_results.iter()
-                     .find(|r| r.layer == result.best_layer)
-                     .map(|r| r.p_value)
-                     .unwrap_or(1.0)),
-                 phi_status);
+        println!(
+            "{:16} │ {:7} │ {:6} │ {:6} │ {:5.1}% │ {:+5.2} │ {:8} │ {:^7}",
+            result.spec.name,
+            if result.spec.architecture.contains("Encoder") {
+                "Encoder"
+            } else {
+                "Decoder"
+            },
+            result.spec.num_layers,
+            result.best_layer,
+            depth_pct,
+            result.best_effect_size,
+            format_pvalue(
+                result
+                    .layer_results
+                    .iter()
+                    .find(|r| r.layer == result.best_layer)
+                    .map(|r| r.p_value)
+                    .unwrap_or(1.0)
+            ),
+            phi_status
+        );
     }
 
     // Analysis
@@ -191,26 +208,41 @@ fn run_experiment() -> Result<()> {
         println!("   This strongly suggests a general property of transformers\n");
 
         // Check relative depth consistency
-        let depths: Vec<f64> = all_results.iter()
+        let depths: Vec<f64> = all_results
+            .iter()
             .map(|r| r.best_layer as f64 / r.spec.num_layers as f64)
             .collect();
         let mean_depth: f64 = depths.iter().sum::<f64>() / depths.len() as f64;
-        let depth_variance: f64 = depths.iter().map(|d| (d - mean_depth).powi(2)).sum::<f64>() / depths.len() as f64;
+        let depth_variance: f64 =
+            depths.iter().map(|d| (d - mean_depth).powi(2)).sum::<f64>() / depths.len() as f64;
 
         println!("   Relative depth of phenomenal peak:");
         for result in &all_results {
             let depth = result.best_layer as f64 / result.spec.num_layers as f64;
-            println!("     {}: Layer {}/{} = {:.1}%", result.spec.name, result.best_layer, result.spec.num_layers, depth * 100.0);
+            println!(
+                "     {}: Layer {}/{} = {:.1}%",
+                result.spec.name,
+                result.best_layer,
+                result.spec.num_layers,
+                depth * 100.0
+            );
         }
-        println!("   Mean depth: {:.1}% ± {:.1}%", mean_depth * 100.0, depth_variance.sqrt() * 100.0);
+        println!(
+            "   Mean depth: {:.1}% ± {:.1}%",
+            mean_depth * 100.0,
+            depth_variance.sqrt() * 100.0
+        );
 
         if depth_variance.sqrt() < 0.1 {
             println!("\n   → CONSISTENT DEPTH: Effect emerges at similar relative position");
             println!("     This suggests a fundamental architectural pattern");
         }
-
     } else if replicating.len() > 0 {
-        println!("◐ PARTIAL REPLICATION: {}/{} architectures show the effect\n", replicating.len(), total);
+        println!(
+            "◐ PARTIAL REPLICATION: {}/{} architectures show the effect\n",
+            replicating.len(),
+            total
+        );
         println!("   Replicating models:");
         for r in &replicating {
             println!("     ✓ {} (d={:+.2})", r.spec.name, r.best_effect_size);
@@ -225,7 +257,8 @@ fn run_experiment() -> Result<()> {
     }
 
     // Φ validation summary
-    let phi_validated: Vec<_> = all_results.iter()
+    let phi_validated: Vec<_> = all_results
+        .iter()
         .filter(|r| r.phi_validated == Some(true))
         .collect();
 
@@ -262,8 +295,7 @@ fn test_model(
         ..Default::default()
     };
 
-    let extractor = LayerExtractor::load(config)
-        .context("Failed to load model")?;
+    let extractor = LayerExtractor::load(config).context("Failed to load model")?;
     println!("  Loaded in {:.2}s\n", load_start.elapsed().as_secs_f64());
 
     let mut layer_results = Vec::new();
@@ -326,7 +358,12 @@ fn test_model(
 
         let p_value = permutation_test(&phen_unity, &func_unity, 5000);
 
-        println!("d={:+.3}, p={:.4}{}", cohens_d, p_value, if p_value < 0.05 { "*" } else { "" });
+        println!(
+            "d={:+.3}, p={:.4}{}",
+            cohens_d,
+            p_value,
+            if p_value < 0.05 { "*" } else { "" }
+        );
 
         layer_results.push(LayerResult {
             layer,
@@ -340,18 +377,25 @@ fn test_model(
     }
 
     // Find best layer
-    let best = layer_results.iter()
+    let best = layer_results
+        .iter()
         .max_by(|a, b| a.cohens_d.partial_cmp(&b.cohens_d).unwrap())
         .cloned()
         .unwrap_or(LayerResult {
-            layer: 0, phen_mean: 0.0, phen_std: 0.0,
-            func_mean: 0.0, func_std: 0.0, cohens_d: 0.0, p_value: 1.0
+            layer: 0,
+            phen_mean: 0.0,
+            phen_std: 0.0,
+            func_mean: 0.0,
+            func_std: 0.0,
+            cohens_d: 0.0,
+            p_value: 1.0,
         });
 
     // Attempt Φ extraction at best layer
-    let (phi_validated, phi_effect_size) = if let (Some(phen_acts), Some(func_acts)) =
-        (all_phen_activations.get(&best.layer), all_func_activations.get(&best.layer))
-    {
+    let (phi_validated, phi_effect_size) = if let (Some(phen_acts), Some(func_acts)) = (
+        all_phen_activations.get(&best.layer),
+        all_func_activations.get(&best.layer),
+    ) {
         extract_and_validate_phi(phen_acts, func_acts, topology_config)
     } else {
         (None, None)
@@ -392,7 +436,8 @@ fn extract_and_validate_phi(
         .collect();
 
     // Difference vector
-    let diff: Vec<f64> = phen_centroid.iter()
+    let diff: Vec<f64> = phen_centroid
+        .iter()
         .zip(func_centroid.iter())
         .map(|(p, f)| p - f)
         .collect();
@@ -406,11 +451,13 @@ fn extract_and_validate_phi(
     let phi: Vec<f64> = diff.iter().map(|x| x / norm).collect();
 
     // Compute Φ loadings
-    let phen_loadings: Vec<f64> = phen_acts.iter()
+    let phen_loadings: Vec<f64> = phen_acts
+        .iter()
         .map(|a| a.iter().zip(phi.iter()).map(|(x, p)| (*x as f64) * p).sum())
         .collect();
 
-    let func_loadings: Vec<f64> = func_acts.iter()
+    let func_loadings: Vec<f64> = func_acts
+        .iter()
         .map(|a| a.iter().zip(phi.iter()).map(|(x, p)| (*x as f64) * p).sum())
         .collect();
 
@@ -432,8 +479,13 @@ fn extract_and_validate_phi(
     let mut phen_minus_phi_unity = Vec::new();
     for act in phen_acts {
         // Subtract Φ component
-        let loading: f64 = act.iter().zip(phi.iter()).map(|(x, p)| (*x as f64) * p).sum();
-        let adjusted: Vec<f32> = act.iter()
+        let loading: f64 = act
+            .iter()
+            .zip(phi.iter())
+            .map(|(x, p)| (*x as f64) * p)
+            .sum();
+        let adjusted: Vec<f32> = act
+            .iter()
             .zip(phi.iter())
             .map(|(x, p)| (*x as f64 - loading * p) as f32)
             .collect();
@@ -462,13 +514,21 @@ fn print_model_results(results: &ModelResults) {
     println!("──────┼────────────┼────────────┼────────┼───────────┼────────");
 
     for r in &results.layer_results {
-        println!("{:5} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:+8.3} │ {}",
-                 r.layer, r.phen_mean, r.func_mean,
-                 r.phen_mean - r.func_mean, r.cohens_d,
-                 format_pvalue(r.p_value));
+        println!(
+            "{:5} │ {:10.4} │ {:10.4} │ {:+6.4} │ {:+8.3} │ {}",
+            r.layer,
+            r.phen_mean,
+            r.func_mean,
+            r.phen_mean - r.func_mean,
+            r.cohens_d,
+            format_pvalue(r.p_value)
+        );
     }
 
-    println!("\nBest layer: {} (d={:+.3})", results.best_layer, results.best_effect_size);
+    println!(
+        "\nBest layer: {} (d={:+.3})",
+        results.best_layer, results.best_effect_size
+    );
 
     if let Some(validated) = results.phi_validated {
         if validated {
@@ -481,8 +541,14 @@ fn print_model_results(results: &ModelResults) {
         }
     }
 
-    println!("\nReplicates BGE-M3 finding: {}\n",
-             if results.replicates { "✓ YES" } else { "✗ NO" });
+    println!(
+        "\nReplicates BGE-M3 finding: {}\n",
+        if results.replicates {
+            "✓ YES"
+        } else {
+            "✗ NO"
+        }
+    );
 }
 
 #[cfg(feature = "neural-bridge")]
@@ -549,13 +615,17 @@ fn compute_unity(hv: &BinaryHV, config: &TopologyConfig) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / values.len() as f64;
     variance.sqrt()

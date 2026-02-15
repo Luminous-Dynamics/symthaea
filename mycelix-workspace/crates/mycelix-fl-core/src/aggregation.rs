@@ -68,9 +68,7 @@ fn validate_update_metadata(update: &GradientUpdate) -> Result<(), AggregationEr
         return Err(AggregationError::InvalidBatchSize(0));
     }
     if !update.metadata.loss.is_finite() {
-        return Err(AggregationError::InvalidLoss(
-            update.participant_id.clone(),
-        ));
+        return Err(AggregationError::InvalidLoss(update.participant_id.clone()));
     }
     Ok(())
 }
@@ -339,7 +337,13 @@ mod tests {
     fn test_trimmed_mean() {
         let mut updates = test_updates();
         // Add outlier
-        updates.push(GradientUpdate::new("byz".into(), 1, vec![100.0, -50.0, 200.0], 100, 0.5));
+        updates.push(GradientUpdate::new(
+            "byz".into(),
+            1,
+            vec![100.0, -50.0, 200.0],
+            100,
+            0.5,
+        ));
         let result = trimmed_mean(&updates, 0.25).unwrap();
         // Outlier should be trimmed; result close to honest consensus
         assert!((result[0] - 0.175).abs() < 0.1);

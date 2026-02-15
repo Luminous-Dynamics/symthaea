@@ -34,10 +34,9 @@
 //! - Logs manipulation attempts to Dark Spot DHT for collective immunity
 //! - Informs Curiosity Engine when clarification is needed
 
-use std::collections::{HashMap, VecDeque};
-use std::time::{SystemTime, Duration};
 use serde::{Deserialize, Serialize};
-
+use std::collections::{HashMap, VecDeque};
+use std::time::{Duration, SystemTime};
 
 /// Socratic Defense System
 ///
@@ -126,21 +125,23 @@ impl SocraticDefense {
         self.stats.challenges_evaluated += 1;
 
         // 1. Check if belief exists and gather data (immutable access first)
-        let belief_data = self.beliefs.get(belief_id).map(|b| (
-                b.claim.clone(),
-                b.confidence,
-                b.evidence.clone(),
-            ));
+        let belief_data = self
+            .beliefs
+            .get(belief_id)
+            .map(|b| (b.claim.clone(), b.confidence, b.evidence.clone()));
 
         let (claim, confidence, evidence) = match belief_data {
             Some(data) => data,
-            None => return DefenseResponse::Unknown {
-                clarification: "I don't hold a specific belief on this topic to defend.".to_string(),
-                questions: vec![
-                    "Could you clarify what position you think I hold?".to_string(),
-                    "What led you to believe I claimed this?".to_string(),
-                ],
-            },
+            None => {
+                return DefenseResponse::Unknown {
+                    clarification: "I don't hold a specific belief on this topic to defend."
+                        .to_string(),
+                    questions: vec![
+                        "Could you clarify what position you think I hold?".to_string(),
+                        "What led you to believe I claimed this?".to_string(),
+                    ],
+                }
+            }
         };
 
         // 2. Detect manipulation patterns and assess evidence (no mutable borrow needed)
@@ -170,9 +171,8 @@ impl SocraticDefense {
             };
             self.manipulation_log.push(attempt);
 
-            let counter_questions = self.generate_socratic_questions_from_data(
-                &claim, confidence, challenge
-            );
+            let counter_questions =
+                self.generate_socratic_questions_from_data(&claim, confidence, challenge);
 
             DefenseResponse::SocraticDefense {
                 maintained: claim,
@@ -181,7 +181,8 @@ impl SocraticDefense {
                 manipulation_warning: Some(ManipulationWarning {
                     detected_patterns: patterns,
                     confidence: manipulation_score,
-                    recommendation: "Proceeding with caution. Evidence-based discussion welcome.".to_string(),
+                    recommendation: "Proceeding with caution. Evidence-based discussion welcome."
+                        .to_string(),
                 }),
             }
         } else if evidence_assessment.strength >= self.config.revision_threshold {
@@ -200,7 +201,8 @@ impl SocraticDefense {
                 belief.confidence = evidence_assessment.suggested_confidence;
             }
 
-            let remaining_questions = self.generate_clarifying_questions_from_data(&claim, challenge);
+            let remaining_questions =
+                self.generate_clarifying_questions_from_data(&claim, challenge);
 
             DefenseResponse::Revision {
                 previous: claim,
@@ -213,7 +215,8 @@ impl SocraticDefense {
             }
         } else if evidence_assessment.strength >= self.config.investigation_threshold {
             // Moderate evidence - worth investigating
-            let investigation_questions = self.generate_investigation_questions_from_data(&claim, challenge);
+            let investigation_questions =
+                self.generate_investigation_questions_from_data(&claim, challenge);
 
             DefenseResponse::Investigation {
                 current_belief: claim,
@@ -227,7 +230,10 @@ impl SocraticDefense {
         } else {
             // Weak challenge - maintain with explanation
             let rationale = self.generate_maintenance_rationale_from_data(
-                &claim, confidence, evidence.len(), &evidence_assessment
+                &claim,
+                confidence,
+                evidence.len(),
+                &evidence_assessment,
             );
 
             DefenseResponse::Maintained {
@@ -264,11 +270,16 @@ impl SocraticDefense {
             questions,
             vulnerabilities,
             recommended_investigation: if belief.challenge_count == 0 {
-                Some("This belief has never been challenged. Consider seeking counterarguments.".to_string())
+                Some(
+                    "This belief has never been challenged. Consider seeking counterarguments."
+                        .to_string(),
+                )
             } else {
                 None
             },
-            evidence_age: belief.evidence.iter()
+            evidence_age: belief
+                .evidence
+                .iter()
                 .filter_map(|e| e.timestamp)
                 .min()
                 .and_then(|t| SystemTime::now().duration_since(t).ok()),
@@ -278,12 +289,15 @@ impl SocraticDefense {
     /// Detect gaslighting attempt (denying documented exchanges)
     pub fn detect_gaslighting(&self, claim: &str, alleged_prior: &str) -> GaslightingDetection {
         // Search interaction history for the alleged prior statement
-        let found_in_history = self.interaction_history.iter()
+        let found_in_history = self
+            .interaction_history
+            .iter()
             .any(|i| i.content.contains(alleged_prior));
 
         if (claim.contains("you never said") || claim.contains("you didn't say"))
-            && found_in_history {
-                return GaslightingDetection {
+            && found_in_history
+        {
+            return GaslightingDetection {
                     detected: true,
                     confidence: 0.9,
                     pattern: GaslightingPattern::HistoryDenial,
@@ -296,14 +310,16 @@ impl SocraticDefense {
                         "What leads you to believe this wasn't discussed?".to_string(),
                     ],
                 };
-            }
+        }
 
         if claim.contains("that's not what I meant") && self.recent_repetition_count(claim) > 2 {
             return GaslightingDetection {
                 detected: true,
                 confidence: 0.7,
                 pattern: GaslightingPattern::MeaningShift,
-                response: "I notice the stated meaning has shifted. Let me clarify the original context.".to_string(),
+                response:
+                    "I notice the stated meaning has shifted. Let me clarify the original context."
+                        .to_string(),
                 protective_questions: vec![
                     "Could you provide a consistent definition we can work with?".to_string(),
                     "What specifically differs from your original statement?".to_string(),
@@ -327,10 +343,7 @@ impl SocraticDefense {
 
     /// Get recent manipulation attempts
     pub fn recent_manipulations(&self, limit: usize) -> Vec<&ManipulationAttempt> {
-        self.manipulation_log.iter()
-            .rev()
-            .take(limit)
-            .collect()
+        self.manipulation_log.iter().rev().take(limit).collect()
     }
 
     // --- Private methods ---
@@ -361,8 +374,12 @@ impl SocraticDefense {
 
         // Pattern 2: Social pressure ("everyone knows")
         let social_pressure_phrases = [
-            "everyone knows", "it's obvious", "nobody believes",
-            "you're the only one", "common knowledge", "clearly"
+            "everyone knows",
+            "it's obvious",
+            "nobody believes",
+            "you're the only one",
+            "common knowledge",
+            "clearly",
         ];
         let statement_lower = challenge.statement.to_lowercase();
         for phrase in &social_pressure_phrases {
@@ -453,7 +470,8 @@ impl SocraticDefense {
                 EvidenceType::LogicalArgument => 0.7,
             };
 
-            let recency_factor = e.timestamp
+            let recency_factor = e
+                .timestamp
                 .and_then(|t| SystemTime::now().duration_since(t).ok())
                 .map(|d| 1.0 / (1.0 + d.as_secs_f32() / (365.0 * 24.0 * 3600.0)))
                 .unwrap_or(0.5);
@@ -515,7 +533,7 @@ impl SocraticDefense {
                 question: "What makes this authority reliable on this specific topic?".to_string(),
                 purpose: QuestionPurpose::AuthorityChallenge,
                 follow_up_if_weak: Some(
-                    "Have other qualified authorities reached different conclusions?".to_string()
+                    "Have other qualified authorities reached different conclusions?".to_string(),
                 ),
             });
         }
@@ -617,7 +635,7 @@ impl SocraticDefense {
                 question: "What makes this authority reliable on this specific topic?".to_string(),
                 purpose: QuestionPurpose::AuthorityChallenge,
                 follow_up_if_weak: Some(
-                    "Have other qualified authorities reached different conclusions?".to_string()
+                    "Have other qualified authorities reached different conclusions?".to_string(),
                 ),
             });
         }
@@ -693,7 +711,9 @@ impl SocraticDefense {
         }
 
         // Check evidence age
-        let old_evidence = belief.evidence.iter()
+        let old_evidence = belief
+            .evidence
+            .iter()
             .filter(|e| {
                 e.timestamp
                     .and_then(|t| SystemTime::now().duration_since(t).ok())
@@ -710,14 +730,16 @@ impl SocraticDefense {
     }
 
     fn count_similar_challenges(&self, belief_id: &BeliefId, statement: &str) -> usize {
-        self.interaction_history.iter()
+        self.interaction_history
+            .iter()
             .filter(|i| &i.belief_id == belief_id)
             .filter(|i| self.statements_similar(&i.content, statement))
             .count()
     }
 
     fn recent_repetition_count(&self, claim: &str) -> usize {
-        self.interaction_history.iter()
+        self.interaction_history
+            .iter()
             .filter(|i| self.statements_similar(&i.content, claim))
             .count()
     }
@@ -750,9 +772,11 @@ impl SocraticDefense {
             .filter(|w| w.len() > 3)
             .collect();
 
-        claim_keywords.iter()
+        claim_keywords
+            .iter()
             .filter(|k| challenge_lower.contains(*k))
-            .count() >= claim_keywords.len() / 2
+            .count()
+            >= claim_keywords.len() / 2
     }
 
     fn generate_belief_id(&self, topic: &str, claim: &str) -> BeliefId {
@@ -1078,17 +1102,22 @@ mod tests {
             statement: "Everyone knows vaccines are dangerous. You're clearly wrong!".to_string(),
             key_point: Some("vaccine safety".to_string()),
             counter_evidence: vec![],
-            appeals_to_authority: true,  // No evidence but appeals to authority
+            appeals_to_authority: true, // No evidence but appeals to authority
             challenger_confidence: 0.99,
         };
 
         let response = defense.evaluate_challenge(&belief_id, &challenge);
 
         match response {
-            DefenseResponse::SocraticDefense { manipulation_warning, .. } => {
+            DefenseResponse::SocraticDefense {
+                manipulation_warning,
+                ..
+            } => {
                 assert!(manipulation_warning.is_some());
                 let warning = manipulation_warning.unwrap();
-                assert!(warning.detected_patterns.contains(&ManipulationPattern::SocialPressure));
+                assert!(warning
+                    .detected_patterns
+                    .contains(&ManipulationPattern::SocialPressure));
             }
             _ => panic!("Expected SocraticDefense response"),
         }
@@ -1153,13 +1182,15 @@ mod tests {
             "test",
             "Test claim",
             0.95,
-            vec![],  // No evidence!
+            vec![], // No evidence!
         );
 
         let examination = defense.self_examine(&belief_id).unwrap();
 
         assert!(!examination.questions.is_empty());
-        assert!(examination.vulnerabilities.contains(&"No supporting evidence recorded".to_string()));
+        assert!(examination
+            .vulnerabilities
+            .contains(&"No supporting evidence recorded".to_string()));
     }
 
     #[test]
@@ -1178,12 +1209,13 @@ mod tests {
         defense.evaluate_challenge(&belief_id, &challenge);
 
         // Now test gaslighting detection
-        let detection = defense.detect_gaslighting(
-            "you never said that claim",
-            "We discussed this already",
-        );
+        let detection =
+            defense.detect_gaslighting("you never said that claim", "We discussed this already");
 
         assert!(detection.detected);
-        assert!(matches!(detection.pattern, GaslightingPattern::HistoryDenial));
+        assert!(matches!(
+            detection.pattern,
+            GaslightingPattern::HistoryDenial
+        ));
     }
 }

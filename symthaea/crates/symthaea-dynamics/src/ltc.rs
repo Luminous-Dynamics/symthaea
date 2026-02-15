@@ -142,11 +142,15 @@ impl CsrMatrix {
     /// - SIMD-friendly inner loop (can be auto-vectorized)
     #[inline]
     pub fn spmv(&self, x: &[f32]) -> Vec<f32> {
-        debug_assert_eq!(x.len(), self.cols, "Vector length must match matrix columns");
+        debug_assert_eq!(
+            x.len(),
+            self.cols,
+            "Vector length must match matrix columns"
+        );
 
         let mut result = vec![0.0f32; self.rows];
 
-        for row in 0..self.rows {
+        for (row, result_val) in result.iter_mut().enumerate().take(self.rows) {
             let start = self.row_ptrs[row];
             let end = self.row_ptrs[row + 1];
 
@@ -156,7 +160,7 @@ impl CsrMatrix {
                 // This inner loop is SIMD-friendly
                 sum += self.values[idx] * x[self.col_indices[idx]];
             }
-            result[row] = sum;
+            *result_val = sum;
         }
 
         result
@@ -165,7 +169,11 @@ impl CsrMatrix {
     /// Sparse matrix-vector multiplication with bias: y = self * x + bias
     #[inline]
     pub fn spmv_bias(&self, x: &[f32], bias: &[f32]) -> Vec<f32> {
-        debug_assert_eq!(x.len(), self.cols, "Vector length must match matrix columns");
+        debug_assert_eq!(
+            x.len(),
+            self.cols,
+            "Vector length must match matrix columns"
+        );
         debug_assert_eq!(bias.len(), self.rows, "Bias length must match matrix rows");
 
         let mut result = vec![0.0f32; self.rows];
@@ -325,9 +333,9 @@ impl Default for LiquidNetworkConfig {
     fn default() -> Self {
         Self {
             num_neurons: 128,
-            connectivity: 0.1,      // 10% - biologically plausible
-            dt: 0.01,               // 10ms timestep
-            tau_range: (0.5, 2.0),  // Time constants
+            connectivity: 0.1,     // 10% - biologically plausible
+            dt: 0.01,              // 10ms timestep
+            tau_range: (0.5, 2.0), // Time constants
             bias_range: (-0.5, 0.5),
             weight_range: (-1.0, 1.0),
         }
@@ -353,7 +361,7 @@ impl LiquidNetwork {
 
         // Time constants: uniform random in tau_range
         let tau = Array1::from_iter(
-            (0..num_neurons).map(|_| rng.gen_range(config.tau_range.0..config.tau_range.1))
+            (0..num_neurons).map(|_| rng.gen_range(config.tau_range.0..config.tau_range.1)),
         );
 
         // Sparse random weights using CSR format
@@ -365,7 +373,7 @@ impl LiquidNetwork {
         );
 
         let bias = Array1::from_iter(
-            (0..num_neurons).map(|_| rng.gen_range(config.bias_range.0..config.bias_range.1))
+            (0..num_neurons).map(|_| rng.gen_range(config.bias_range.0..config.bias_range.1)),
         );
 
         Ok(Self {
@@ -400,8 +408,8 @@ impl LiquidNetwork {
         // Add input to first N neurons
         let n = input.len().min(self.num_neurons);
 
-        for i in 0..n {
-            self.state[i] += input[i] * 0.1;  // Scaled input
+        for (i, &val) in input.iter().enumerate().take(n) {
+            self.state[i] += val * 0.1; // Scaled input
         }
 
         Ok(())
@@ -435,8 +443,8 @@ impl LiquidNetwork {
         // Integrate: x += dx
         // Clip to [0, 1] range
         // All in one pass for cache efficiency
-        for i in 0..self.num_neurons {
-            let dx = (sigmoid_output[i] - self.state[i] / self.tau[i]) * self.dt;
+        for (i, &sig_val) in sigmoid_output.iter().enumerate().take(self.num_neurons) {
+            let dx = (sig_val - self.state[i] / self.tau[i]) * self.dt;
             self.state[i] = (self.state[i] + dx).clamp(0.0, 1.0);
         }
 
@@ -462,22 +470,17 @@ impl LiquidNetwork {
         // Measure of synchronized, coherent activity
 
         // 1. Fraction of active neurons (> 0.5)
-        let active_fraction = self.state
-            .iter()
-            .filter(|&&x| x > 0.5)
-            .count() as f32 / self.num_neurons as f32;
+        let active_fraction =
+            self.state.iter().filter(|&&x| x > 0.5).count() as f32 / self.num_neurons as f32;
 
         // 2. Variance (high variance = diverse, conscious)
         let mean = self.state.mean().unwrap_or(0.0);
-        let variance = self.state
-            .iter()
-            .map(|&x| (x - mean).powi(2))
-            .sum::<f32>() / self.num_neurons as f32;
+        let variance =
+            self.state.iter().map(|&x| (x - mean).powi(2)).sum::<f32>() / self.num_neurons as f32;
 
         // Combine: conscious if active AND diverse
-        let consciousness = (active_fraction * variance.sqrt()).min(1.0);
 
-        consciousness
+        (active_fraction * variance.sqrt()).min(1.0)
     }
 
     /// Read current state as hypervector
@@ -539,10 +542,7 @@ mod tests {
 
     #[test]
     fn test_csr_spmv() {
-        let dense = vec![
-            vec![1.0, 2.0],
-            vec![3.0, 4.0],
-        ];
+        let dense = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
 
         let csr = CsrMatrix::from_dense(&dense);
         let x = vec![1.0, 2.0];
@@ -556,10 +556,7 @@ mod tests {
 
     #[test]
     fn test_csr_spmv_bias() {
-        let dense = vec![
-            vec![1.0, 2.0],
-            vec![3.0, 4.0],
-        ];
+        let dense = vec![vec![1.0, 2.0], vec![3.0, 4.0]];
 
         let csr = CsrMatrix::from_dense(&dense);
         let x = vec![1.0, 2.0];
@@ -582,8 +579,12 @@ mod tests {
 
         // Check density is approximately correct (allow 5% tolerance)
         let actual_density = csr.density();
-        assert!((actual_density - connectivity).abs() < 0.05,
-            "Expected density ~{}, got {}", connectivity, actual_density);
+        assert!(
+            (actual_density - connectivity).abs() < 0.05,
+            "Expected density ~{}, got {}",
+            connectivity,
+            actual_density
+        );
     }
 
     #[test]
@@ -596,8 +597,11 @@ mod tests {
 
         // Check connectivity
         let density = network.actual_density();
-        assert!(density > 0.05 && density < 0.15,
-            "Expected ~10% density, got {}", density);
+        assert!(
+            density > 0.05 && density < 0.15,
+            "Expected ~10% density, got {}",
+            density
+        );
     }
 
     #[test]
@@ -617,7 +621,7 @@ mod tests {
 
         // States should be in [0, 1]
         for &s in network.state.iter() {
-            assert!(s >= 0.0 && s <= 1.0, "State {} out of range", s);
+            assert!((0.0..=1.0).contains(&s), "State {} out of range", s);
         }
     }
 
@@ -628,7 +632,14 @@ mod tests {
             let standard = 1.0_f32 / (1.0 + (-x).exp());
             let fast = fast_sigmoid(x);
             let error = (standard - fast).abs();
-            assert!(error < 0.1, "Fast sigmoid error {} at x={}, standard={}, fast={}", error, x, standard, fast);
+            assert!(
+                error < 0.1,
+                "Fast sigmoid error {} at x={}, standard={}, fast={}",
+                error,
+                x,
+                standard,
+                fast
+            );
         }
     }
 
@@ -636,7 +647,7 @@ mod tests {
     fn test_liquid_network_with_config() {
         let config = LiquidNetworkConfig {
             num_neurons: 256,
-            connectivity: 0.2,  // 20% connectivity
+            connectivity: 0.2, // 20% connectivity
             dt: 0.005,
             tau_range: (1.0, 3.0),
             bias_range: (-1.0, 1.0),
@@ -650,8 +661,11 @@ mod tests {
 
         // Density should be ~20%
         let density = network.actual_density();
-        assert!(density > 0.15 && density < 0.25,
-            "Expected ~20% density, got {}", density);
+        assert!(
+            density > 0.15 && density < 0.25,
+            "Expected ~20% density, got {}",
+            density
+        );
     }
 
     #[test]

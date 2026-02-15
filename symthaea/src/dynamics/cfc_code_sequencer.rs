@@ -19,7 +19,6 @@
 
 use symthaea_core::hdc::ContinuousHV;
 
-
 /// Maximum number of planning steps before forcing completion
 const MAX_PLAN_STEPS: usize = 32;
 
@@ -174,23 +173,27 @@ impl CfCCodeSequencer {
             PlanAction::Complete,
         ];
 
-        actions.iter().enumerate().map(|(i, action)| {
-            let mut proto = vec![0.0f32; hidden_dim];
-            // Deterministic initialization: each action activates different hidden units
-            let base = (i * hidden_dim) / actions.len();
-            let width = hidden_dim / actions.len();
-            for j in base..(base + width).min(hidden_dim) {
-                proto[j] = 1.0;
-            }
-            // Normalize
-            let mag: f32 = proto.iter().map(|v| v * v).sum::<f32>().sqrt();
-            if mag > 0.0 {
-                for v in &mut proto {
-                    *v /= mag;
+        actions
+            .iter()
+            .enumerate()
+            .map(|(i, action)| {
+                let mut proto = vec![0.0f32; hidden_dim];
+                // Deterministic initialization: each action activates different hidden units
+                let base = (i * hidden_dim) / actions.len();
+                let width = hidden_dim / actions.len();
+                for j in base..(base + width).min(hidden_dim) {
+                    proto[j] = 1.0;
                 }
-            }
-            (action.clone(), proto)
-        }).collect()
+                // Normalize
+                let mag: f32 = proto.iter().map(|v| v * v).sum::<f32>().sqrt();
+                if mag > 0.0 {
+                    for v in &mut proto {
+                        *v /= mag;
+                    }
+                }
+                (action.clone(), proto)
+            })
+            .collect()
     }
 
     /// Project an HDC vector into the hidden state space
@@ -330,7 +333,11 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
     }
 
     let mag = (mag_a * mag_b).sqrt();
-    if mag > 0.0 { dot / mag } else { 0.0 }
+    if mag > 0.0 {
+        dot / mag
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]
@@ -375,8 +382,11 @@ mod tests {
 
         let plan = sequencer.plan_structure(&intent, &[]);
         for i in 1..plan.len() {
-            assert_ne!(plan[i].action, plan[i - 1].action,
-                "Plan should not have consecutive duplicate actions");
+            assert_ne!(
+                plan[i].action,
+                plan[i - 1].action,
+                "Plan should not have consecutive duplicate actions"
+            );
         }
     }
 

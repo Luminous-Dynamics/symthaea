@@ -6,16 +6,16 @@
 //! This test validates that all layers connect properly and produce
 //! meaningful results through the entire cognitive pipeline.
 
-use symthaea_nix::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot, ServiceState};
+use symthaea_core::hdc::ContinuousHV;
+use symthaea_nix::encoding::{NixCodebook, ServiceState, SystemStateEncoder, SystemStateSnapshot};
 use symthaea_nix::ipc::{AnomalyEntry, ConcernEntry, DaemonConfig, DaemonSnapshot};
 use symthaea_nix::mind::active_inference::NixActiveInference;
 use symthaea_nix::mind::causal_graph::{NixCausalGraph, NixOSCausalPatterns};
 use symthaea_nix::mind::episodic_memory::{EpisodeOutcome, NixEpisodicMemory, SystemEpisode};
-use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
-use symthaea_nix::mind::{NixWorldModel, HdcWorldModel};
 use symthaea_nix::mind::journal_anomaly::JournalAnomalyDetector;
+use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
+use symthaea_nix::mind::{HdcWorldModel, NixWorldModel};
 use symthaea_nix::observe::journal::JournalEntry;
-use symthaea_core::hdc::ContinuousHV;
 
 /// Full observation → encoding → world model → drift detection loop.
 #[test]
@@ -75,7 +75,10 @@ fn test_observation_encoding_drift_loop() {
     world_model.observe(&hv2);
     let drift = world_model.detect_drift(0.7);
     // Similar system state — no drift expected
-    assert!(!drift.drifted, "Similar observations should not trigger drift");
+    assert!(
+        !drift.drifted,
+        "Similar observations should not trigger drift"
+    );
 
     // Observation 3: degraded (services failing)
     let snapshot3 = SystemStateSnapshot {
@@ -120,8 +123,14 @@ fn test_active_inference_planning_loop() {
 
     // Working memory should accumulate context
     let wm = engine.goal_inference().working_memory();
-    assert!(!wm.is_empty(), "Working memory should have items after input");
-    assert!(wm.mean_activation() > 0.0, "Working memory should have positive activation");
+    assert!(
+        !wm.is_empty(),
+        "Working memory should have items after input"
+    );
+    assert!(
+        wm.mean_activation() > 0.0,
+        "Working memory should have positive activation"
+    );
 
     // Check working memory item sources
     let items = wm.items();
@@ -179,9 +188,7 @@ fn test_predictive_hierarchy_loop() {
     // Feed a series of observations and track hierarchy state
     for i in 0..10 {
         let snapshot = SystemStateSnapshot {
-            services: vec![
-                ("nginx.service".into(), ServiceState::Running),
-            ],
+            services: vec![("nginx.service".into(), ServiceState::Running)],
             packages: vec![format!("pkg-{}", i)],
             generation: Some(42 + i),
             ..Default::default()
@@ -225,14 +232,12 @@ fn test_anomaly_to_concern_pipeline() {
     }
 
     // Inject error-level entries
-    let error_entries = vec![
-        JournalEntry {
-            unit: "kernel".into(),
-            message: "Out of memory: Kill process 999 (java) score 800".into(),
-            priority: 3,
-            timestamp: "2025-01-15T10:30:00Z".into(),
-        },
-    ];
+    let error_entries = vec![JournalEntry {
+        unit: "kernel".into(),
+        message: "Out of memory: Kill process 999 (java) score 800".into(),
+        priority: 3,
+        timestamp: "2025-01-15T10:30:00Z".into(),
+    }];
 
     let anomalies = detector.process_entries(&error_entries);
     // The detector may or may not flag this depending on baseline — just verify no panic
@@ -268,7 +273,11 @@ fn test_pre_post_action_verification() {
 
     // Same state should produce identical vectors
     let sim = pre_hv.similarity(&post_hv);
-    assert!(sim > 0.99, "Same state should have high similarity, got {}", sim);
+    assert!(
+        sim > 0.99,
+        "Same state should have high similarity, got {}",
+        sim
+    );
 
     // Different state should produce lower similarity
     let changed_snapshot = SystemStateSnapshot {
@@ -285,7 +294,12 @@ fn test_pre_post_action_verification() {
         encoder.encode_snapshot(&changed_snapshot)
     };
     let changed_sim = pre_hv.similarity(&changed_hv);
-    assert!(changed_sim < sim, "Different state should have lower similarity: {} vs {}", changed_sim, sim);
+    assert!(
+        changed_sim < sim,
+        "Different state should have lower similarity: {} vs {}",
+        changed_sim,
+        sim
+    );
 }
 
 /// Full consciousness loop: observe → encode → infer → plan → predict.
@@ -310,9 +324,7 @@ fn test_full_consciousness_loop() {
         generation: Some(42),
         store_size_bytes: Some(15_000_000_000),
         store_path_count: Some(5000),
-        config_options: vec![
-            ("services.nginx.enable".into(), "true".into()),
-        ],
+        config_options: vec![("services.nginx.enable".into(), "true".into())],
     };
 
     let state_hv = {
@@ -328,7 +340,10 @@ fn test_full_consciousness_loop() {
 
     // 5. Verify plan was generated
     assert!(!plan.goal.description.is_empty(), "Goal should be inferred");
-    assert!(plan.current_free_energy >= 0.0, "Free energy should be non-negative");
+    assert!(
+        plan.current_free_energy >= 0.0,
+        "Free energy should be non-negative"
+    );
 
     // 6. Verify working memory accumulated context
     let wm = engine.goal_inference().working_memory();
@@ -405,7 +420,10 @@ fn test_daemon_ipc_snapshot_roundtrip() {
     snapshot.write_to(&path).expect("write_to should succeed");
 
     // Verify temp file was cleaned up (atomic rename)
-    assert!(!path.with_extension("tmp").exists(), "Temp file should be removed after rename");
+    assert!(
+        !path.with_extension("tmp").exists(),
+        "Temp file should be removed after rename"
+    );
 
     // Read back
     let restored = DaemonSnapshot::read_from(&path).expect("read_from should return Some");
@@ -479,9 +497,7 @@ fn test_cognitive_to_ipc_pipeline() {
         generation: Some(42),
         store_size_bytes: Some(15_000_000_000),
         store_path_count: Some(5000),
-        config_options: vec![
-            ("services.nginx.enable".into(), "true".into()),
-        ],
+        config_options: vec![("services.nginx.enable".into(), "true".into())],
     };
 
     let state_hv = {
@@ -578,7 +594,10 @@ fn test_cognitive_to_ipc_pipeline() {
     assert!(restored.daemon_running);
 
     // 8. Verify freshness
-    assert!(restored.is_fresh(60), "Just-written snapshot should be fresh");
+    assert!(
+        restored.is_fresh(60),
+        "Just-written snapshot should be fresh"
+    );
 
     // 9. Verify liveness (current process PID)
     assert!(restored.daemon_alive(), "Current PID should be alive");
@@ -605,7 +624,10 @@ fn test_stale_snapshot_detection() {
         daemon_pid: 1, // PID 1 (init) is always alive
     };
 
-    assert!(!snapshot.is_fresh(60), "Ancient snapshot should not be fresh");
+    assert!(
+        !snapshot.is_fresh(60),
+        "Ancient snapshot should not be fresh"
+    );
     assert!(!snapshot.is_fresh(3600), "Still ancient");
     assert!(snapshot.daemon_alive(), "PID 1 should be alive");
 

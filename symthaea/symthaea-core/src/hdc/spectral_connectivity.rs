@@ -133,19 +133,8 @@ impl ConnectivityCalculator {
 
         // Step 3: Normalize to [0, 1]
         // With normalized Laplacian, eigenvalues are bounded [0, 2]
-        
 
         (lambda2 / self.max_connectivity).clamp(0.0, 1.0)
-    }
-
-    /// Deprecated: Use `algebraic_connectivity()` instead
-    ///
-    /// This method is kept for backward compatibility but will be removed
-    /// in a future version. The name "compute" was misleading as it implied
-    /// IIT Φ calculation, which this does NOT perform.
-    #[deprecated(since = "0.5.0", note = "Use algebraic_connectivity() instead - this measures λ₂, NOT IIT Φ")]
-    pub fn compute(&self, components: &[ContinuousHV]) -> f64 {
-        self.algebraic_connectivity(components)
     }
 
     /// Build pairwise cosine similarity matrix (optimized: exploits symmetry)
@@ -209,7 +198,8 @@ impl ConnectivityCalculator {
         }
 
         // Step 2: Compute D^(-1/2) for normalization
-        let inv_sqrt_degrees: Vec<f64> = degrees.iter()
+        let inv_sqrt_degrees: Vec<f64> = degrees
+            .iter()
             .map(|&d| if d > 1e-10 { 1.0 / d.sqrt() } else { 0.0 })
             .collect();
 
@@ -247,7 +237,6 @@ impl ConnectivityCalculator {
             0.0
         }
     }
-
 }
 
 impl Default for ConnectivityCalculator {
@@ -259,12 +248,6 @@ impl Default for ConnectivityCalculator {
 // ============================================================================
 // BACKWARD COMPATIBILITY ALIASES
 // ============================================================================
-
-/// Deprecated type alias for backward compatibility
-///
-/// Use `ConnectivityCalculator` instead. This alias will be removed in v1.0.0.
-#[deprecated(since = "0.5.0", note = "Use ConnectivityCalculator instead - this measures λ₂, NOT IIT Φ")]
-pub type RealPhiCalculator = ConnectivityCalculator;
 
 #[cfg(test)]
 mod tests {
@@ -293,7 +276,11 @@ mod tests {
 
         let lambda2 = calc.algebraic_connectivity(&components);
 
-        assert!(lambda2 >= 0.0 && lambda2 <= 1.0, "λ₂ should be in valid range: {}", lambda2);
+        assert!(
+            lambda2 >= 0.0 && lambda2 <= 1.0,
+            "λ₂ should be in valid range: {}",
+            lambda2
+        );
     }
 
     #[test]
@@ -316,10 +303,7 @@ mod tests {
     fn test_similarity_matrix() {
         let calc = ConnectivityCalculator::new();
 
-        let components = vec![
-            ContinuousHV::random(128, 1),
-            ContinuousHV::random(128, 2),
-        ];
+        let components = vec![ContinuousHV::random(128, 1), ContinuousHV::random(128, 2)];
 
         let matrix = calc.build_similarity_matrix(&components);
 
@@ -364,23 +348,11 @@ mod tests {
         ];
         let lambda2_k3 = calc.compute_lambda2(&matrix_k3);
 
-        assert!((lambda2_k3 - 1.5).abs() < 0.01, "K3 λ₂ should be ~1.5, got {}", lambda2_k3);
-    }
-
-    #[test]
-    #[allow(deprecated)]
-    fn test_backward_compatibility() {
-        let calc: RealPhiCalculator = RealPhiCalculator::new();
-        let components = vec![
-            ContinuousHV::random(128, 1),
-            ContinuousHV::random(128, 2),
-        ];
-
-        let result = calc.compute(&components);
-        assert!(result >= 0.0 && result <= 1.0);
-
-        let new_result = calc.algebraic_connectivity(&components);
-        assert!((result - new_result).abs() < 1e-10);
+        assert!(
+            (lambda2_k3 - 1.5).abs() < 0.01,
+            "K3 λ₂ should be ~1.5, got {}",
+            lambda2_k3
+        );
     }
 
     // ===== Migrated from phi_real (Round 5) =====
@@ -401,8 +373,11 @@ mod tests {
             ContinuousHV::random(256, 3),
         ];
         let result = calc.algebraic_connectivity(&components);
-        assert!(result >= 0.0 && result <= 1.0,
-            "Lambda2 should be in [0, 1], got {}", result);
+        assert!(
+            result >= 0.0 && result <= 1.0,
+            "Lambda2 should be in [0, 1], got {}",
+            result
+        );
     }
 
     #[test]
@@ -411,7 +386,11 @@ mod tests {
         let hv = ContinuousHV::random(128, 42);
         let components = vec![hv.clone(), hv.clone(), hv.clone()];
         let result = calc.algebraic_connectivity(&components);
-        assert!(result >= 0.0, "Result should be non-negative, got {}", result);
+        assert!(
+            result >= 0.0,
+            "Result should be non-negative, got {}",
+            result
+        );
     }
 
     #[test]
@@ -429,23 +408,33 @@ mod tests {
 
         // Diagonal should be 1.0
         for i in 0..3 {
-            assert!((matrix[i][i] - 1.0).abs() < 1e-10,
-                "Diagonal should be 1.0, got {}", matrix[i][i]);
+            assert!(
+                (matrix[i][i] - 1.0).abs() < 1e-10,
+                "Diagonal should be 1.0, got {}",
+                matrix[i][i]
+            );
         }
 
         // Should be symmetric
         for i in 0..3 {
-            for j in i+1..3 {
-                assert!((matrix[i][j] - matrix[j][i]).abs() < 1e-10,
-                    "Matrix should be symmetric at ({},{})", i, j);
+            for j in i + 1..3 {
+                assert!(
+                    (matrix[i][j] - matrix[j][i]).abs() < 1e-10,
+                    "Matrix should be symmetric at ({},{})",
+                    i,
+                    j
+                );
             }
         }
 
         // All values in [0, 1]
         for row in &matrix {
             for &val in row {
-                assert!(val >= 0.0 && val <= 1.0,
-                    "Similarity should be in [0, 1], got {}", val);
+                assert!(
+                    val >= 0.0 && val <= 1.0,
+                    "Similarity should be in [0, 1], got {}",
+                    val
+                );
             }
         }
     }

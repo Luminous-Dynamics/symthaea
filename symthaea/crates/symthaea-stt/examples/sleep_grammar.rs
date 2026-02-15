@@ -7,10 +7,10 @@
 //! - Wake → N1 → N2 → N3 → N2 → REM → N2 → ...
 //! - Each stage has characteristic EEG features
 
-use symthaea_stt::temporal_grammar::{TemporalGrammar, TemporalEvent, DomainConfig, Sparsity};
-use symthaea_stt::sleep_sentinel::{ConsciousnessSentinel, BandPowers};
-use symthaea_stt::edf_loader::EdfFile;
 use std::path::Path;
+use symthaea_stt::edf_loader::EdfFile;
+use symthaea_stt::sleep_sentinel::{BandPowers, ConsciousnessSentinel};
+use symthaea_stt::temporal_grammar::{DomainConfig, Sparsity, TemporalEvent, TemporalGrammar};
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
@@ -36,32 +36,32 @@ fn subheader(title: &str) {
 #[derive(Debug, Clone, Copy, PartialEq)]
 enum EegEventType {
     // Wakefulness markers
-    AlphaWave,          // 8-12 Hz, eyes closed wake
-    BetaWave,           // 13-30 Hz, alert wake
+    AlphaWave, // 8-12 Hz, eyes closed wake
+    BetaWave,  // 13-30 Hz, alert wake
 
     // N1 (light sleep) markers
-    ThetaWave,          // 4-7 Hz, drowsiness
-    VertexSharp,        // Sharp waves at vertex
+    ThetaWave,   // 4-7 Hz, drowsiness
+    VertexSharp, // Sharp waves at vertex
 
     // N2 markers
-    SleepSpindle,       // 11-16 Hz bursts, 0.5-2s
-    KComplex,           // Large biphasic waves
+    SleepSpindle, // 11-16 Hz bursts, 0.5-2s
+    KComplex,     // Large biphasic waves
 
     // N3 (deep sleep) markers
-    DeltaWave,          // 0.5-4 Hz, >75μV
-    SlowOscillation,    // <1 Hz, cortical
+    DeltaWave,       // 0.5-4 Hz, >75μV
+    SlowOscillation, // <1 Hz, cortical
 
     // REM markers
-    SawtoothWave,       // 2-6 Hz, serrated
-    RemBurst,           // Rapid eye movement artifact
-    MuscleAtonia,       // Low EMG
+    SawtoothWave, // 2-6 Hz, serrated
+    RemBurst,     // Rapid eye movement artifact
+    MuscleAtonia, // Low EMG
 
     // Transitions
-    Arousal,            // Brief awakening
-    Microarousal,       // 3-15s arousal
+    Arousal,      // Brief awakening
+    Microarousal, // 3-15s arousal
 
     // Artifacts
-    Artifact,           // Movement, electrode
+    Artifact, // Movement, electrode
 }
 
 impl EegEventType {
@@ -107,26 +107,36 @@ impl EegEventType {
 /// Create EEG sleep grammar config
 fn eeg_sleep_config() -> DomainConfig {
     let events = vec![
-        "alpha", "beta",                           // Wake
-        "theta", "vertex_sharp",                   // N1
-        "spindle", "k_complex",                    // N2
-        "delta", "slow_osc",                       // N3
-        "sawtooth", "rem_burst", "atonia",         // REM
-        "arousal", "microarousal",                 // Transitions
-        "artifact",                                // Noise
-    ].into_iter().map(String::from).collect();
+        "alpha",
+        "beta", // Wake
+        "theta",
+        "vertex_sharp", // N1
+        "spindle",
+        "k_complex", // N2
+        "delta",
+        "slow_osc", // N3
+        "sawtooth",
+        "rem_burst",
+        "atonia", // REM
+        "arousal",
+        "microarousal", // Transitions
+        "artifact",     // Noise
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect();
 
     DomainConfig {
         name: "eeg_sleep".to_string(),
         categories: events,
-        sample_rate: 256.0,  // Common EEG sample rate
-        frame_size: 256,     // 1 second epochs
+        sample_rate: 256.0, // Common EEG sample rate
+        frame_size: 256,    // 1 second epochs
         sparsity: Sparsity::Sparse5,
-        duration_bins: 6,    // Sleep events have variable duration
+        duration_bins: 6, // Sleep events have variable duration
         intensity_bins: 4,
         predictive_feedback: true,
-        prediction_boost: 0.4,  // Strong prediction for sleep cycling
-        hierarchy_depth: 2,     // event → stage
+        prediction_boost: 0.4, // Strong prediction for sleep cycling
+        hierarchy_depth: 2,    // event → stage
     }
 }
 
@@ -146,7 +156,7 @@ fn classify_epoch(powers: &BandPowers) -> EegEventType {
     let theta_rel = powers.theta / total;
     let alpha_rel = powers.alpha / total;
     let beta_rel = powers.beta / total;
-    let sigma_rel = powers.sigma / total;  // sigma (spindles) instead of gamma
+    let sigma_rel = powers.sigma / total; // sigma (spindles) instead of gamma
 
     // Classification rules based on AASM guidelines
     if delta_rel > 0.5 && delta_ratio > 2.0 {
@@ -159,7 +169,7 @@ fn classify_epoch(powers: &BandPowers) -> EegEventType {
     } else if theta_rel > 0.4 && alpha_rel < 0.2 {
         // Theta dominance without alpha = N1 or REM
         if sigma_rel > 0.1 {
-            EegEventType::SleepSpindle  // N2 with spindles
+            EegEventType::SleepSpindle // N2 with spindles
         } else {
             EegEventType::ThetaWave
         }
@@ -191,12 +201,44 @@ fn generate_sleep_cycle(cycle_num: usize) -> Vec<TemporalEvent> {
 
     // Stage durations in minutes (will convert to events)
     let stages = vec![
-        ("wake", 2.0, vec![EegEventType::AlphaWave, EegEventType::BetaWave]),
-        ("n1", 5.0, vec![EegEventType::ThetaWave, EegEventType::VertexSharp]),
-        ("n2", 20.0, vec![EegEventType::SleepSpindle, EegEventType::KComplex, EegEventType::ThetaWave]),
-        ("n3", 20.0 * n3_weight, vec![EegEventType::DeltaWave, EegEventType::SlowOscillation]),
-        ("n2", 10.0, vec![EegEventType::SleepSpindle, EegEventType::KComplex]),
-        ("rem", 15.0 * rem_weight, vec![EegEventType::SawtoothWave, EegEventType::RemBurst, EegEventType::MuscleAtonia]),
+        (
+            "wake",
+            2.0,
+            vec![EegEventType::AlphaWave, EegEventType::BetaWave],
+        ),
+        (
+            "n1",
+            5.0,
+            vec![EegEventType::ThetaWave, EegEventType::VertexSharp],
+        ),
+        (
+            "n2",
+            20.0,
+            vec![
+                EegEventType::SleepSpindle,
+                EegEventType::KComplex,
+                EegEventType::ThetaWave,
+            ],
+        ),
+        (
+            "n3",
+            20.0 * n3_weight,
+            vec![EegEventType::DeltaWave, EegEventType::SlowOscillation],
+        ),
+        (
+            "n2",
+            10.0,
+            vec![EegEventType::SleepSpindle, EegEventType::KComplex],
+        ),
+        (
+            "rem",
+            15.0 * rem_weight,
+            vec![
+                EegEventType::SawtoothWave,
+                EegEventType::RemBurst,
+                EegEventType::MuscleAtonia,
+            ],
+        ),
     ];
 
     for (_stage_name, duration_mins, event_types) in stages {
@@ -205,7 +247,7 @@ fn generate_sleep_cycle(cycle_num: usize) -> Vec<TemporalEvent> {
         }
 
         // Generate events for this stage
-        let stage_duration = duration_mins * 60.0;  // seconds
+        let stage_duration = duration_mins * 60.0; // seconds
         let mut stage_time = 0.0f32;
 
         while stage_time < stage_duration {
@@ -215,11 +257,11 @@ fn generate_sleep_cycle(cycle_num: usize) -> Vec<TemporalEvent> {
 
             // Event duration varies by type
             let duration = match event_type {
-                EegEventType::SleepSpindle => 1.0,  // 0.5-2s
+                EegEventType::SleepSpindle => 1.0, // 0.5-2s
                 EegEventType::KComplex => 0.8,
                 EegEventType::DeltaWave => 3.0,
                 EegEventType::SlowOscillation => 2.0,
-                _ => 5.0,  // Background waves
+                _ => 5.0, // Background waves
             };
 
             // Intensity based on event type
@@ -239,7 +281,7 @@ fn generate_sleep_cycle(cycle_num: usize) -> Vec<TemporalEvent> {
                 intensity,
             ));
 
-            stage_time += duration + 2.0;  // Gap between events
+            stage_time += duration + 2.0; // Gap between events
         }
 
         time += stage_duration;
@@ -305,9 +347,12 @@ fn main() {
 
     for cycle in 0..4 {
         let events = generate_sleep_cycle(cycle);
-        println!("    Cycle {}: {} events, {:.1} min",
-                 cycle + 1, events.len(),
-                 events.last().map(|e| e.start_time / 60.0).unwrap_or(0.0));
+        println!(
+            "    Cycle {}: {} events, {:.1} min",
+            cycle + 1,
+            events.len(),
+            events.last().map(|e| e.start_time / 60.0).unwrap_or(0.0)
+        );
         normal_cycles.push(events);
     }
 
@@ -342,7 +387,11 @@ fn main() {
     let fragmented = generate_fragmented_sleep();
     let frag_score = grammar.score_sequence(&fragmented);
     abnormal_scores.push(frag_score);
-    println!("      Fragmented (insomnia): {:+.4} ({} events)", frag_score, fragmented.len());
+    println!(
+        "      Fragmented (insomnia): {:+.4} ({} events)",
+        frag_score,
+        fragmented.len()
+    );
 
     // All-wake pattern
     let all_wake: Vec<TemporalEvent> = (0..20)

@@ -407,6 +407,174 @@ pub struct VetoTimelockInput {
     pub reason: String,
 }
 
+/// Lock funds in escrow for a proposal's execution.
+///
+/// Called after a proposal is approved and before a timelock is created.
+/// Creates a `FundAllocation` entry with status `Locked` and links it
+/// to the proposal.
+#[hdk_extern]
+pub fn lock_proposal_funds(input: LockFundsInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.source_account.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Source account is required".into())));
+    }
+    if input.amount <= 0.0 || !input.amount.is_finite() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Amount must be positive and finite".into())));
+    }
+
+    // Check for existing locked allocation for this proposal
+    if let Some(_existing) = find_fund_allocation_for_proposal(&input.proposal_id)? {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Funds already locked for proposal '{}'", input.proposal_id)
+        )));
+    }
+
+    let now = sys_time()?;
+    let alloc_id = format!("alloc:{}:{}", input.proposal_id, now.as_micros());
+
+    let alloc = FundAllocation {
+        id: alloc_id,
+        proposal_id: input.proposal_id.clone(),
+        timelock_id: input.timelock_id.unwrap_or_default(),
+        source_account: input.source_account,
+        amount: input.amount,
+        currency: input.currency.unwrap_or_else(|| "credits".to_string()),
+        locked_at: now,
+        status: AllocationStatus::Locked,
+        status_reason: None,
+    };
+
+    let action_hash = create_entry(&EntryTypes::FundAllocation(alloc))?;
+
+    // Link proposal to fund allocation
+    let alloc_anchor = format!("fund_alloc:{}", input.proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(alloc_anchor.clone())))?;
+    create_link(
+        anchor_hash(&alloc_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalToFundAllocation,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find fund allocation".into())))
+}
+
+/// Input for locking funds
+#[derive(Serialize, Deserialize, Debug)]
+pub struct LockFundsInput {
+    pub proposal_id: String,
+    pub timelock_id: Option<String>,
+    pub source_account: String,
+    pub amount: f64,
+    pub currency: Option<String>,
+}
+
+/// Release locked funds after successful execution
+#[hdk_extern]
+pub fn release_locked_funds(input: ReleaseFundsInput) -> ExternResult<Record> {
+    let (record, alloc) = find_fund_allocation_for_proposal(&input.proposal_id)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("No fund allocation found for proposal '{}'", input.proposal_id)
+        )))?;
+
+    if alloc.status != AllocationStatus::Locked {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Allocation is not locked (current status: {:?})", alloc.status)
+        )));
+    }
+
+    let released = FundAllocation {
+        status: AllocationStatus::Released,
+        status_reason: Some(input.reason.unwrap_or_else(|| "Execution completed successfully".to_string())),
+        ..alloc
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::FundAllocation(released),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated allocation".into())))
+}
+
+/// Input for releasing funds
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ReleaseFundsInput {
+    pub proposal_id: String,
+    pub reason: Option<String>,
+}
+
+/// Refund locked funds (e.g., after veto or expiration)
+#[hdk_extern]
+pub fn refund_locked_funds(input: RefundFundsInput) -> ExternResult<Record> {
+    let (record, alloc) = find_fund_allocation_for_proposal(&input.proposal_id)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("No fund allocation found for proposal '{}'", input.proposal_id)
+        )))?;
+
+    if alloc.status != AllocationStatus::Locked {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Allocation is not locked (current status: {:?})", alloc.status)
+        )));
+    }
+
+    let refunded = FundAllocation {
+        status: AllocationStatus::Refunded,
+        status_reason: Some(input.reason),
+        ..alloc
+    };
+
+    let action_hash = update_entry(
+        record.action_address().clone(),
+        &EntryTypes::FundAllocation(refunded),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated allocation".into())))
+}
+
+/// Input for refunding funds
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RefundFundsInput {
+    pub proposal_id: String,
+    pub reason: String,
+}
+
+/// Query fund allocation status for a proposal
+#[hdk_extern]
+pub fn get_fund_allocation(proposal_id: String) -> ExternResult<Option<Record>> {
+    Ok(find_fund_allocation_for_proposal(&proposal_id)?.map(|(r, _)| r))
+}
+
+/// Internal helper: find the active fund allocation for a proposal
+fn find_fund_allocation_for_proposal(proposal_id: &str) -> ExternResult<Option<(Record, FundAllocation)>> {
+    let alloc_anchor = format!("fund_alloc:{}", proposal_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&alloc_anchor)?, LinkTypes::ProposalToFundAllocation)?,
+        GetStrategy::default(),
+    )?;
+
+    // Find the most recent allocation
+    let latest_link = links.into_iter().max_by_key(|l| l.timestamp);
+    if let Some(link) = latest_link {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            let alloc: FundAllocation = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid allocation entry".into())))?;
+            return Ok(Some((record, alloc)));
+        }
+    }
+    Ok(None)
+}
+
 /// Get pending timelocks
 #[hdk_extern]
 pub fn get_pending_timelocks(_: ()) -> ExternResult<Vec<Record>> {

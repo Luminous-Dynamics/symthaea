@@ -69,58 +69,79 @@ impl SemanticCategory {
         let lower = concept.to_lowercase();
 
         // Contrast indicators (check BEFORE Question because "however" contains "how")
-        if lower.contains("however") || lower.contains("although")
-            || lower == "but" || lower.contains("contrast")
-            || lower.contains("instead") || lower == "yet"
+        if lower.contains("however")
+            || lower.contains("although")
+            || lower == "but"
+            || lower.contains("contrast")
+            || lower.contains("instead")
+            || lower == "yet"
         {
             return Self::Contrast;
         }
 
         // Cause indicators
-        if lower.contains("cause") || lower.contains("because")
-            || lower.contains("leads") || lower.contains("since")
-            || lower.contains("due to") || lower.contains("reason")
+        if lower.contains("cause")
+            || lower.contains("because")
+            || lower.contains("leads")
+            || lower.contains("since")
+            || lower.contains("due to")
+            || lower.contains("reason")
         {
             return Self::Cause;
         }
 
         // Effect indicators
-        if lower.contains("effect") || lower.contains("therefore")
-            || lower.contains("result") || lower.contains("consequently")
-            || lower.contains("thus") || lower.contains("hence")
+        if lower.contains("effect")
+            || lower.contains("therefore")
+            || lower.contains("result")
+            || lower.contains("consequently")
+            || lower.contains("thus")
+            || lower.contains("hence")
         {
             return Self::Effect;
         }
 
         // Question indicators
-        if lower.contains("why") || lower == "how"
-            || lower.contains("what") || lower.contains("when")
-            || lower.contains("where") || lower.contains("who")
+        if lower.contains("why")
+            || lower == "how"
+            || lower.contains("what")
+            || lower.contains("when")
+            || lower.contains("where")
+            || lower.contains("who")
             || lower.contains("?")
         {
             return Self::Question;
         }
 
         // Emphasis indicators
-        if lower.contains("important") || lower.contains("critical")
-            || lower.contains("key") || lower.contains("essential")
-            || lower.contains("crucial") || lower.contains("vital")
+        if lower.contains("important")
+            || lower.contains("critical")
+            || lower.contains("key")
+            || lower.contains("essential")
+            || lower.contains("crucial")
+            || lower.contains("vital")
         {
             return Self::Emphasis;
         }
 
         // Uncertainty indicators
-        if lower.contains("maybe") || lower.contains("perhaps")
-            || lower.contains("possibly") || lower.contains("might")
-            || lower.contains("uncertain") || lower.contains("unclear")
+        if lower.contains("maybe")
+            || lower.contains("perhaps")
+            || lower.contains("possibly")
+            || lower.contains("might")
+            || lower.contains("uncertain")
+            || lower.contains("unclear")
         {
             return Self::Uncertainty;
         }
 
         // Sequence indicators
-        if lower.contains("first") || lower.contains("then")
-            || lower.contains("next") || lower.contains("finally")
-            || lower.contains("second") || lower.contains("last")
+        if lower.contains("first")
+            || lower.contains("then")
+            || lower.contains("next")
+            || lower.contains("finally")
+            || lower.contains("second")
+            || lower.contains("last")
         {
             return Self::Sequence;
         }
@@ -157,7 +178,8 @@ pub struct SemanticProsody {
 impl SemanticProsody {
     /// Create prosody from detected semantic primitives
     pub fn from_primitives(primitives: &[String]) -> Self {
-        let categories: Vec<SemanticCategory> = primitives.iter()
+        let categories: Vec<SemanticCategory> = primitives
+            .iter()
             .map(|p| SemanticCategory::from_concept(p))
             .filter(|c| *c != SemanticCategory::Neutral)
             .collect();
@@ -203,12 +225,12 @@ impl SemanticProsody {
     fn category_prosody(category: SemanticCategory) -> (f32, f32, f32, f32, f32, f32) {
         // Returns: (pitch_contour, rate_modifier, pre_pause, post_pause, pitch_range, energy)
         match category {
-            SemanticCategory::Cause => (0.3, 0.9, 1.0, 1.2, 1.1, 1.0),    // Rising, slower, pause after
+            SemanticCategory::Cause => (0.3, 0.9, 1.0, 1.2, 1.1, 1.0), // Rising, slower, pause after
             SemanticCategory::Effect => (-0.3, 1.0, 1.2, 1.0, 1.0, 1.0), // Falling, pause before
             SemanticCategory::Question => (0.5, 0.85, 1.0, 1.3, 1.3, 1.0), // Rising, slower, expressive
-            SemanticCategory::Emphasis => (0.2, 0.8, 1.1, 1.1, 1.2, 1.2), // Higher, slower, louder
+            SemanticCategory::Emphasis => (0.2, 0.8, 1.1, 1.1, 1.2, 1.2),  // Higher, slower, louder
             SemanticCategory::Uncertainty => (-0.2, 0.85, 1.0, 1.2, 0.9, 0.9), // Falling, quieter
-            SemanticCategory::Contrast => (0.0, 0.9, 1.5, 1.3, 1.4, 1.1), // Pause, expressive
+            SemanticCategory::Contrast => (0.0, 0.9, 1.5, 1.3, 1.4, 1.1),  // Pause, expressive
             SemanticCategory::Sequence => (0.1, 1.0, 1.2, 1.0, 1.0, 1.0), // Slight rise, pause before
             SemanticCategory::Neutral => (0.0, 1.0, 1.0, 1.0, 1.0, 1.0),
         }
@@ -276,7 +298,8 @@ impl CognitivePacing {
 
         // Convert attention weights to emphasis multipliers
         // Normalize attention to 0.5-1.5 range
-        let max_attention = attention_state.values()
+        let max_attention = attention_state
+            .values()
             .cloned()
             .fold(0.0f32, f32::max)
             .max(0.001);
@@ -286,7 +309,7 @@ impl CognitivePacing {
             .map(|(concept, attention)| {
                 // Scale attention to emphasis multiplier
                 let normalized = attention / max_attention;
-                let emphasis = 0.5 + normalized;  // 0.5 to 1.5
+                let emphasis = 0.5 + normalized; // 0.5 to 1.5
                 (concept, emphasis)
             })
             .collect();
@@ -310,7 +333,7 @@ impl CognitivePacing {
         // === Confidence Modulation ===
 
         // Low confidence → slower rate, longer pauses
-        let confidence_factor = 0.7 + self.confidence * 0.3;  // 0.7 to 1.0
+        let confidence_factor = 0.7 + self.confidence * 0.3; // 0.7 to 1.0
         pacing.rate *= confidence_factor;
 
         // Low confidence → higher tau (more deliberate)
@@ -359,12 +382,16 @@ impl CognitivePacing {
 
     /// Check if semantic content suggests a question
     pub fn is_question(&self) -> bool {
-        self.semantic_prosody.categories.contains(&SemanticCategory::Question)
+        self.semantic_prosody
+            .categories
+            .contains(&SemanticCategory::Question)
     }
 
     /// Check if semantic content suggests emphasis
     pub fn needs_emphasis(&self) -> bool {
-        self.semantic_prosody.categories.contains(&SemanticCategory::Emphasis)
+        self.semantic_prosody
+            .categories
+            .contains(&SemanticCategory::Emphasis)
     }
 
     /// Get all detected semantic categories
@@ -395,7 +422,8 @@ impl CognitivePacing {
     /// Check if a concept is highlighted (should be emphasized)
     pub fn is_highlighted(&self, concept: &str) -> bool {
         let concept_lower = concept.to_lowercase();
-        self.highlighted_concepts.iter()
+        self.highlighted_concepts
+            .iter()
             .any(|c| c.to_lowercase() == concept_lower)
     }
 }
@@ -429,7 +457,7 @@ impl CognitiveVoiceBridge {
     pub fn new() -> Self {
         Self {
             current_pacing: CognitivePacing::default(),
-            smoothing: 0.3,  // 30% new, 70% old
+            smoothing: 0.3, // 30% new, 70% old
             error_history: Vec::new(),
             max_history: 10,
         }
@@ -451,8 +479,8 @@ impl CognitiveVoiceBridge {
         }
 
         // Smooth prediction error
-        let smoothed_error = self.error_history.iter().sum::<f32>()
-            / self.error_history.len() as f32;
+        let smoothed_error =
+            self.error_history.iter().sum::<f32>() / self.error_history.len() as f32;
 
         // Create new pacing
         let new_pacing = CognitivePacing::from_cognitive_loop(
@@ -464,10 +492,12 @@ impl CognitiveVoiceBridge {
         );
 
         // Smooth transition to new pacing
-        self.current_pacing.base_pacing = self.current_pacing.base_pacing
+        self.current_pacing.base_pacing = self
+            .current_pacing
+            .base_pacing
             .lerp(&new_pacing.base_pacing, self.smoothing);
-        self.current_pacing.confidence = self.current_pacing.confidence
-            * (1.0 - self.smoothing) + new_pacing.confidence * self.smoothing;
+        self.current_pacing.confidence = self.current_pacing.confidence * (1.0 - self.smoothing)
+            + new_pacing.confidence * self.smoothing;
         self.current_pacing.word_emphasis = new_pacing.word_emphasis;
         self.current_pacing.highlighted_concepts = new_pacing.highlighted_concepts;
         self.current_pacing.semantic_prosody = new_pacing.semantic_prosody;
@@ -524,7 +554,11 @@ mod tests {
 
         // Should have emphasis for "cause"
         let cause_emphasis = pacing.get_emphasis("cause");
-        assert!(cause_emphasis > 1.0, "cause should be emphasized: {}", cause_emphasis);
+        assert!(
+            cause_emphasis > 1.0,
+            "cause should be emphasized: {}",
+            cause_emphasis
+        );
     }
 
     #[test]
@@ -536,7 +570,7 @@ mod tests {
         let pacing_high = CognitivePacing::from_cognitive_loop(
             &cfc_output,
             tau,
-            0.1,  // Low error = high confidence
+            0.1, // Low error = high confidence
             HashMap::new(),
             vec![],
         );
@@ -545,7 +579,7 @@ mod tests {
         let pacing_low = CognitivePacing::from_cognitive_loop(
             &cfc_output,
             tau,
-            0.8,  // High error = low confidence
+            0.8, // High error = low confidence
             HashMap::new(),
             vec![],
         );
@@ -554,14 +588,20 @@ mod tests {
         let effective_low = pacing_low.effective_pacing();
 
         // Low confidence should have slower rate
-        assert!(effective_low.rate < effective_high.rate,
-                "Low confidence should have slower rate: {} vs {}",
-                effective_low.rate, effective_high.rate);
+        assert!(
+            effective_low.rate < effective_high.rate,
+            "Low confidence should have slower rate: {} vs {}",
+            effective_low.rate,
+            effective_high.rate
+        );
 
         // Low confidence should have longer pauses
-        assert!(effective_low.phrase_pause > effective_high.phrase_pause,
-                "Low confidence should have longer pauses: {} vs {}",
-                effective_low.phrase_pause, effective_high.phrase_pause);
+        assert!(
+            effective_low.phrase_pause > effective_high.phrase_pause,
+            "Low confidence should have longer pauses: {} vs {}",
+            effective_low.phrase_pause,
+            effective_high.phrase_pause
+        );
     }
 
     #[test]
@@ -570,14 +610,17 @@ mod tests {
 
         // Get initial confidence (should be default = 1.0)
         let initial_confidence = bridge.get_pacing().confidence;
-        assert!((initial_confidence - 1.0).abs() < 0.01,
-                "Initial confidence should be 1.0: {}", initial_confidence);
+        assert!(
+            (initial_confidence - 1.0).abs() < 0.01,
+            "Initial confidence should be 1.0: {}",
+            initial_confidence
+        );
 
         // Single update with very high error
         bridge.update(
             &[0.5; 10],
             1.0,
-            1.0,  // Maximum error = 0 confidence
+            1.0, // Maximum error = 0 confidence
             HashMap::new(),
             vec![],
         );
@@ -586,17 +629,24 @@ mod tests {
         // Smoothing should prevent instant jump to 0
         // With smoothing=0.3: new = 1.0*0.7 + 0.0*0.3 = 0.7 (theoretical)
         // But error history also smooths, so actual value differs
-        assert!(after_one_update > 0.2,
-                "Smoothing should prevent instant drop to 0: {}", after_one_update);
-        assert!(after_one_update < initial_confidence,
-                "Confidence should decrease: {} vs {}", after_one_update, initial_confidence);
+        assert!(
+            after_one_update > 0.2,
+            "Smoothing should prevent instant drop to 0: {}",
+            after_one_update
+        );
+        assert!(
+            after_one_update < initial_confidence,
+            "Confidence should decrease: {} vs {}",
+            after_one_update,
+            initial_confidence
+        );
 
         // Multiple updates should converge toward the new value
         for _ in 0..20 {
             bridge.update(
                 &[0.5; 10],
                 1.0,
-                1.0,  // Keep high error
+                1.0, // Keep high error
                 HashMap::new(),
                 vec![],
             );
@@ -604,22 +654,49 @@ mod tests {
         let after_many_updates = bridge.get_pacing().confidence;
 
         // After many high-error updates, confidence should be low
-        assert!(after_many_updates < 0.3,
-                "Many high-error updates should reduce confidence: {}", after_many_updates);
+        assert!(
+            after_many_updates < 0.3,
+            "Many high-error updates should reduce confidence: {}",
+            after_many_updates
+        );
     }
 
     // ===== Semantic Prosody Tests =====
 
     #[test]
     fn test_semantic_category_detection() {
-        assert_eq!(SemanticCategory::from_concept("because"), SemanticCategory::Cause);
-        assert_eq!(SemanticCategory::from_concept("therefore"), SemanticCategory::Effect);
-        assert_eq!(SemanticCategory::from_concept("why"), SemanticCategory::Question);
-        assert_eq!(SemanticCategory::from_concept("important"), SemanticCategory::Emphasis);
-        assert_eq!(SemanticCategory::from_concept("maybe"), SemanticCategory::Uncertainty);
-        assert_eq!(SemanticCategory::from_concept("however"), SemanticCategory::Contrast);
-        assert_eq!(SemanticCategory::from_concept("first"), SemanticCategory::Sequence);
-        assert_eq!(SemanticCategory::from_concept("random"), SemanticCategory::Neutral);
+        assert_eq!(
+            SemanticCategory::from_concept("because"),
+            SemanticCategory::Cause
+        );
+        assert_eq!(
+            SemanticCategory::from_concept("therefore"),
+            SemanticCategory::Effect
+        );
+        assert_eq!(
+            SemanticCategory::from_concept("why"),
+            SemanticCategory::Question
+        );
+        assert_eq!(
+            SemanticCategory::from_concept("important"),
+            SemanticCategory::Emphasis
+        );
+        assert_eq!(
+            SemanticCategory::from_concept("maybe"),
+            SemanticCategory::Uncertainty
+        );
+        assert_eq!(
+            SemanticCategory::from_concept("however"),
+            SemanticCategory::Contrast
+        );
+        assert_eq!(
+            SemanticCategory::from_concept("first"),
+            SemanticCategory::Sequence
+        );
+        assert_eq!(
+            SemanticCategory::from_concept("random"),
+            SemanticCategory::Neutral
+        );
     }
 
     #[test]
@@ -627,12 +704,18 @@ mod tests {
         let prosody = SemanticProsody::from_primitives(&["cause".to_string()]);
 
         // Cause should have rising pitch
-        assert!(prosody.pitch_contour > 0.0,
-                "Cause should have rising pitch: {}", prosody.pitch_contour);
+        assert!(
+            prosody.pitch_contour > 0.0,
+            "Cause should have rising pitch: {}",
+            prosody.pitch_contour
+        );
 
         // Cause should slow down
-        assert!(prosody.rate_modifier < 1.0,
-                "Cause should slow rate: {}", prosody.rate_modifier);
+        assert!(
+            prosody.rate_modifier < 1.0,
+            "Cause should slow rate: {}",
+            prosody.rate_modifier
+        );
     }
 
     #[test]
@@ -640,25 +723,38 @@ mod tests {
         let prosody = SemanticProsody::from_primitives(&["why".to_string()]);
 
         // Questions have strong rising pitch
-        assert!(prosody.pitch_contour > 0.3,
-                "Question should have rising pitch: {}", prosody.pitch_contour);
+        assert!(
+            prosody.pitch_contour > 0.3,
+            "Question should have rising pitch: {}",
+            prosody.pitch_contour
+        );
 
         // Questions are more expressive
-        assert!(prosody.pitch_range > 1.0,
-                "Question should expand pitch range: {}", prosody.pitch_range);
+        assert!(
+            prosody.pitch_range > 1.0,
+            "Question should expand pitch range: {}",
+            prosody.pitch_range
+        );
     }
 
     #[test]
     fn test_semantic_prosody_uncertainty() {
-        let prosody = SemanticProsody::from_primitives(&["maybe".to_string(), "perhaps".to_string()]);
+        let prosody =
+            SemanticProsody::from_primitives(&["maybe".to_string(), "perhaps".to_string()]);
 
         // Uncertainty has falling pitch
-        assert!(prosody.pitch_contour < 0.0,
-                "Uncertainty should have falling pitch: {}", prosody.pitch_contour);
+        assert!(
+            prosody.pitch_contour < 0.0,
+            "Uncertainty should have falling pitch: {}",
+            prosody.pitch_contour
+        );
 
         // Uncertainty is quieter
-        assert!(prosody.energy_modifier < 1.0,
-                "Uncertainty should reduce energy: {}", prosody.energy_modifier);
+        assert!(
+            prosody.energy_modifier < 1.0,
+            "Uncertainty should reduce energy: {}",
+            prosody.energy_modifier
+        );
     }
 
     #[test]
@@ -674,26 +770,24 @@ mod tests {
             tau,
             0.1,
             HashMap::new(),
-            vec!["why".to_string()],  // Question
+            vec!["why".to_string()], // Question
         );
 
         // Create pacing without semantics
-        let pacing_neutral = CognitivePacing::from_cognitive_loop(
-            &cfc_output,
-            tau,
-            0.1,
-            HashMap::new(),
-            vec![],
-        );
+        let pacing_neutral =
+            CognitivePacing::from_cognitive_loop(&cfc_output, tau, 0.1, HashMap::new(), vec![]);
 
         let effective_question = pacing_question.effective_pacing();
         let effective_neutral = pacing_neutral.effective_pacing();
 
         // Question should have higher emotional valence (rising intonation)
         // Question adds pitch_contour * 0.3 = 0.5 * 0.3 = 0.15 to valence
-        assert!(effective_question.emotional_valence > effective_neutral.emotional_valence,
-                "Question should raise emotional valence: {} vs {}",
-                effective_question.emotional_valence, effective_neutral.emotional_valence);
+        assert!(
+            effective_question.emotional_valence > effective_neutral.emotional_valence,
+            "Question should raise emotional valence: {} vs {}",
+            effective_question.emotional_valence,
+            effective_neutral.emotional_valence
+        );
 
         // Question detection should work
         assert!(pacing_question.is_question());
@@ -704,8 +798,8 @@ mod tests {
     fn test_semantic_prosody_combination() {
         // Multiple semantic categories combine
         let prosody = SemanticProsody::from_primitives(&[
-            "important".to_string(),  // Emphasis
-            "but".to_string(),        // Contrast
+            "important".to_string(), // Emphasis
+            "but".to_string(),       // Contrast
         ]);
 
         assert!(prosody.has_semantic_content());

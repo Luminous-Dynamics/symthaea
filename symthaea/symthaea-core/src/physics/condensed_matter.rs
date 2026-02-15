@@ -23,9 +23,9 @@
 //! - Heavy fermions
 //! - Quantum criticality
 
+use super::standard_model::PHYSICS_DIM;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
-use super::standard_model::PHYSICS_DIM;
 use serde::{Deserialize, Serialize};
 
 /// Material type based on band structure
@@ -220,7 +220,8 @@ impl CMEncoder {
 
     /// Create band structure for a metal
     pub fn create_metal(&self, fermi_energy_ev: f64, _genesis: &GenesisSeed) -> BandStructure {
-        let vector = self.metal
+        let vector = self
+            .metal
             .bind(&self.fermi_surface)
             .scale(fermi_energy_ev as f32);
 
@@ -234,8 +235,14 @@ impl CMEncoder {
     }
 
     /// Create band structure for a semiconductor
-    pub fn create_semiconductor(&self, band_gap_ev: f64, effective_mass: f64, _genesis: &GenesisSeed) -> BandStructure {
-        let vector = self.semiconductor
+    pub fn create_semiconductor(
+        &self,
+        band_gap_ev: f64,
+        effective_mass: f64,
+        _genesis: &GenesisSeed,
+    ) -> BandStructure {
+        let vector = self
+            .semiconductor
             .bind(&self.band_gap)
             .scale(band_gap_ev as f32)
             .bind(&self.effective_mass.scale(effective_mass as f32));
@@ -244,14 +251,15 @@ impl CMEncoder {
             material_type: MaterialType::Semiconductor,
             band_gap_ev,
             effective_mass,
-            fermi_energy_ev: band_gap_ev / 2.0,  // Intrinsic: Fermi level at mid-gap
+            fermi_energy_ev: band_gap_ev / 2.0, // Intrinsic: Fermi level at mid-gap
             vector,
         }
     }
 
     /// Create band structure for an insulator
     pub fn create_insulator(&self, band_gap_ev: f64, _genesis: &GenesisSeed) -> BandStructure {
-        let vector = self.insulator
+        let vector = self
+            .insulator
             .bind(&self.band_gap)
             .scale(band_gap_ev as f32);
 
@@ -280,11 +288,15 @@ impl CMEncoder {
     }
 
     /// Create a phonon mode
-    pub fn create_phonon(&self, branch: PhononBranch, frequency_thz: f64, wave_vector: f64, genesis: &GenesisSeed) -> PhononMode {
+    pub fn create_phonon(
+        &self,
+        branch: PhononBranch,
+        frequency_thz: f64,
+        wave_vector: f64,
+        genesis: &GenesisSeed,
+    ) -> PhononMode {
         let branch_vec = genesis.hv(branch.domain(), PHYSICS_DIM);
-        let vector = self.phonon
-            .bind(&branch_vec)
-            .scale(frequency_thz as f32);
+        let vector = self.phonon.bind(&branch_vec).scale(frequency_thz as f32);
 
         PhononMode {
             branch,
@@ -296,12 +308,22 @@ impl CMEncoder {
 
     /// Acoustic phonon at long wavelength
     pub fn acoustic_phonon(&self, frequency_thz: f64, genesis: &GenesisSeed) -> PhononMode {
-        self.create_phonon(PhononBranch::AcousticLongitudinal, frequency_thz, 0.1, genesis)
+        self.create_phonon(
+            PhononBranch::AcousticLongitudinal,
+            frequency_thz,
+            0.1,
+            genesis,
+        )
     }
 
     /// Optical phonon
     pub fn optical_phonon(&self, frequency_thz: f64, genesis: &GenesisSeed) -> PhononMode {
-        self.create_phonon(PhononBranch::OpticalLongitudinal, frequency_thz, 0.0, genesis)
+        self.create_phonon(
+            PhononBranch::OpticalLongitudinal,
+            frequency_thz,
+            0.0,
+            genesis,
+        )
     }
 
     /// Debye model: phonon density of states ~ ω²
@@ -314,7 +336,11 @@ impl CMEncoder {
     }
 
     /// Electron-phonon coupling strength (dimensionless λ)
-    pub fn electron_phonon_coupling(&self, electron: &ContinuousHV, phonon: &PhononMode) -> ContinuousHV {
+    pub fn electron_phonon_coupling(
+        &self,
+        electron: &ContinuousHV,
+        phonon: &PhononMode,
+    ) -> ContinuousHV {
         electron.bind(&phonon.vector).bind(&self.electron_phonon)
     }
 
@@ -323,7 +349,7 @@ impl CMEncoder {
         if temperature_k <= 0.0 {
             return if energy_ev <= fermi_ev { 1.0 } else { 0.0 };
         }
-        let k_b = 8.617e-5;  // eV/K
+        let k_b = 8.617e-5; // eV/K
         let x = (energy_ev - fermi_ev) / (k_b * temperature_k);
         1.0 / (x.exp() + 1.0)
     }
@@ -440,14 +466,19 @@ mod tests {
         let (encoder, _) = setup();
 
         // Large U/t → Mott insulator
-        let mott_strong = encoder.mott_insulator(10.0, 1.0);  // U/t = 10
-        let mott_weak = encoder.mott_insulator(1.0, 10.0);    // U/t = 0.1
+        let mott_strong = encoder.mott_insulator(10.0, 1.0); // U/t = 10
+        let mott_weak = encoder.mott_insulator(1.0, 10.0); // U/t = 0.1
 
         // Strong correlation (large U/t) should have larger norm
         // (scaling encodes magnitude)
         let strong_norm = mott_strong.norm();
         let weak_norm = mott_weak.norm();
-        assert!(strong_norm > weak_norm, "Large U/t should give larger norm: {} vs {}", strong_norm, weak_norm);
+        assert!(
+            strong_norm > weak_norm,
+            "Large U/t should give larger norm: {} vs {}",
+            strong_norm,
+            weak_norm
+        );
     }
 
     #[test]

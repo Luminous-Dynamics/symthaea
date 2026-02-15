@@ -48,7 +48,7 @@ use hf_hub::{api::sync::Api, Repo, RepoType};
 #[cfg(feature = "neural-bridge")]
 use std::path::PathBuf;
 
-use super::layer_extractor::{LayerActivation, AllLayerActivations, PoolingMethod};
+use super::layer_extractor::{AllLayerActivations, LayerActivation, PoolingMethod};
 
 /// Supported BERT-family model presets
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,8 +101,10 @@ impl BertPreset {
     /// Get the tensor prefix for this model's safetensors file
     pub fn tensor_prefix(&self) -> &'static str {
         match self {
-            Self::BertBaseUncased | Self::BertLargeUncased |
-            Self::BertBaseCased | Self::BertLargeCased => "bert",
+            Self::BertBaseUncased
+            | Self::BertLargeUncased
+            | Self::BertBaseCased
+            | Self::BertLargeCased => "bert",
             Self::XlmRobertaBase => "roberta",
         }
     }
@@ -110,8 +112,10 @@ impl BertPreset {
     /// Whether this model uses modern LayerNorm naming (weight/bias vs gamma/beta)
     pub fn uses_modern_naming(&self) -> bool {
         match self {
-            Self::BertBaseUncased | Self::BertLargeUncased |
-            Self::BertBaseCased | Self::BertLargeCased => false, // Legacy gamma/beta
+            Self::BertBaseUncased
+            | Self::BertLargeUncased
+            | Self::BertBaseCased
+            | Self::BertLargeCased => false, // Legacy gamma/beta
             Self::XlmRobertaBase => true, // Modern weight/bias
         }
     }
@@ -254,7 +258,9 @@ impl BertLayerExtractor {
         let is_safetensors = Self::is_safetensors_file(weights_path)?;
 
         if is_safetensors {
-            Ok(unsafe { VarBuilder::from_mmaped_safetensors(&[weights_path.clone()], DType::F32, device)? })
+            Ok(unsafe {
+                VarBuilder::from_mmaped_safetensors(&[weights_path.clone()], DType::F32, device)?
+            })
         } else {
             Ok(VarBuilder::from_pth(weights_path, DType::F32, device)?)
         }
@@ -308,7 +314,10 @@ impl BertLayerExtractor {
         // requires direct layer access which BertModel doesn't expose publicly
 
         // Fallback: Run full forward and return only final layer
-        let output = self.model.inner.forward(&input_ids, &token_type_ids, Some(&attention_mask))?;
+        let output =
+            self.model
+                .inner
+                .forward(&input_ids, &token_type_ids, Some(&attention_mask))?;
         let final_activation = self.pool(&output, &attention_mask)?;
 
         // Create layer activations - for now only final layer is accurate
@@ -342,7 +351,10 @@ impl BertLayerExtractor {
     /// extracted without model modification.
     pub fn extract_final_layer(&self, text: &str) -> Result<LayerActivation> {
         let (input_ids, token_type_ids, attention_mask) = self.tokenize(text)?;
-        let output = self.model.inner.forward(&input_ids, &token_type_ids, Some(&attention_mask))?;
+        let output =
+            self.model
+                .inner
+                .forward(&input_ids, &token_type_ids, Some(&attention_mask))?;
         let activation = self.pool(&output, &attention_mask)?;
 
         Ok(LayerActivation {
@@ -353,7 +365,8 @@ impl BertLayerExtractor {
     }
 
     fn tokenize(&self, text: &str) -> Result<(Tensor, Tensor, Tensor)> {
-        let encoding = self.tokenizer
+        let encoding = self
+            .tokenizer
             .encode(text, true)
             .map_err(|e| anyhow::anyhow!("Tokenization failed: {}", e))?;
 
@@ -450,11 +463,13 @@ pub fn print_bert_status() {
 
     println!("Supported Models (Modern Naming - WORKING):");
     for preset in [BertPreset::XlmRobertaBase] {
-        println!("  ✓ {} ({} layers, {} dim) → Corridor Layer {}",
-                 preset.model_id(),
-                 preset.num_layers(),
-                 preset.hidden_dim(),
-                 preset.phenomenal_corridor_layer());
+        println!(
+            "  ✓ {} ({} layers, {} dim) → Corridor Layer {}",
+            preset.model_id(),
+            preset.num_layers(),
+            preset.hidden_dim(),
+            preset.phenomenal_corridor_layer()
+        );
     }
 
     println!("\nUnsupported Models (Legacy gamma/beta Naming):");
@@ -464,10 +479,12 @@ pub fn print_bert_status() {
         BertPreset::BertBaseCased,
         BertPreset::BertLargeCased,
     ] {
-        println!("  ✗ {} ({} layers, {} dim) - legacy LayerNorm naming",
-                 preset.model_id(),
-                 preset.num_layers(),
-                 preset.hidden_dim());
+        println!(
+            "  ✗ {} ({} layers, {} dim) - legacy LayerNorm naming",
+            preset.model_id(),
+            preset.num_layers(),
+            preset.hidden_dim()
+        );
     }
 
     println!("\nLimitations:");
@@ -518,7 +535,10 @@ mod tests {
     #[test]
     fn test_bert_presets_model_id() {
         assert_eq!(BertPreset::BertBaseUncased.model_id(), "bert-base-uncased");
-        assert_eq!(BertPreset::BertLargeUncased.model_id(), "bert-large-uncased");
+        assert_eq!(
+            BertPreset::BertLargeUncased.model_id(),
+            "bert-large-uncased"
+        );
         assert_eq!(BertPreset::BertBaseCased.model_id(), "bert-base-cased");
         assert_eq!(BertPreset::BertLargeCased.model_id(), "bert-large-cased");
         assert_eq!(BertPreset::XlmRobertaBase.model_id(), "xlm-roberta-base");
@@ -561,15 +581,27 @@ mod tests {
 
     #[test]
     fn test_extraction_status() {
-        assert_eq!(bert_extraction_status(), BertExtractionStatus::FinalLayerOnly);
+        assert_eq!(
+            bert_extraction_status(),
+            BertExtractionStatus::FinalLayerOnly
+        );
     }
 
     #[test]
     fn test_extraction_status_variants() {
         // Ensure all variants are distinct
-        assert_ne!(BertExtractionStatus::FullSupport, BertExtractionStatus::FinalLayerOnly);
-        assert_ne!(BertExtractionStatus::FinalLayerOnly, BertExtractionStatus::NotSupported);
-        assert_ne!(BertExtractionStatus::FullSupport, BertExtractionStatus::NotSupported);
+        assert_ne!(
+            BertExtractionStatus::FullSupport,
+            BertExtractionStatus::FinalLayerOnly
+        );
+        assert_ne!(
+            BertExtractionStatus::FinalLayerOnly,
+            BertExtractionStatus::NotSupported
+        );
+        assert_ne!(
+            BertExtractionStatus::FullSupport,
+            BertExtractionStatus::NotSupported
+        );
     }
 
     #[test]
@@ -618,9 +650,17 @@ mod tests {
 
         for preset in presets {
             // All presets should have positive layer counts
-            assert!(preset.num_layers() > 0, "Preset {:?} has invalid num_layers", preset);
+            assert!(
+                preset.num_layers() > 0,
+                "Preset {:?} has invalid num_layers",
+                preset
+            );
             // All presets should have positive hidden dimensions
-            assert!(preset.hidden_dim() > 0, "Preset {:?} has invalid hidden_dim", preset);
+            assert!(
+                preset.hidden_dim() > 0,
+                "Preset {:?} has invalid hidden_dim",
+                preset
+            );
             // Phenomenal corridor should be within layer bounds
             assert!(
                 preset.phenomenal_corridor_layer() < preset.num_layers(),
@@ -628,9 +668,17 @@ mod tests {
                 preset
             );
             // Model ID should not be empty
-            assert!(!preset.model_id().is_empty(), "Preset {:?} has empty model_id", preset);
+            assert!(
+                !preset.model_id().is_empty(),
+                "Preset {:?} has empty model_id",
+                preset
+            );
             // Tensor prefix should not be empty
-            assert!(!preset.tensor_prefix().is_empty(), "Preset {:?} has empty tensor_prefix", preset);
+            assert!(
+                !preset.tensor_prefix().is_empty(),
+                "Preset {:?} has empty tensor_prefix",
+                preset
+            );
         }
     }
 }

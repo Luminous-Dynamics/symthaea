@@ -140,7 +140,8 @@ impl VisualCortex {
 
         // Update attention weights based on layer feature energies
         if self.config.use_attention && !layer_features.is_empty() {
-            let energies: Vec<f32> = layer_features.iter()
+            let energies: Vec<f32> = layer_features
+                .iter()
                 .map(|f| f.as_slice().iter().map(|v| v * v).sum::<f32>().sqrt())
                 .collect();
             let total_energy: f32 = energies.iter().sum();
@@ -174,11 +175,15 @@ impl VisualCortex {
     }
 
     /// Process through a single layer
-    fn process_layer(&self, input: &ContinuousHV, filters: &[ContinuousHV], _layer_idx: usize) -> ContinuousHV {
+    fn process_layer(
+        &self,
+        input: &ContinuousHV,
+        filters: &[ContinuousHV],
+        _layer_idx: usize,
+    ) -> ContinuousHV {
         // Apply filters and aggregate
-        let filter_outputs: Vec<ContinuousHV> = filters.iter()
-            .map(|filter| input.bind(filter))
-            .collect();
+        let filter_outputs: Vec<ContinuousHV> =
+            filters.iter().map(|filter| input.bind(filter)).collect();
 
         if filter_outputs.is_empty() {
             input.clone()
@@ -205,7 +210,8 @@ impl VisualCortex {
 
     /// Generate attention maps
     fn generate_attention_maps(&self, layer_features: &[ContinuousHV]) -> Vec<Vec<f32>> {
-        layer_features.iter()
+        layer_features
+            .iter()
             .map(|feat| {
                 // Simple attention based on feature magnitudes
                 let slice = feat.as_slice();
@@ -253,8 +259,14 @@ impl VisualFeatureExtractor {
         let mut feature_bases = HashMap::new();
 
         // Initialize bases for common visual features
-        for (i, feature) in ["edge", "color", "texture", "shape", "motion", "depth"].iter().enumerate() {
-            feature_bases.insert(feature.to_string(), ContinuousHV::random(dimension, (i + 1) as u64));
+        for (i, feature) in ["edge", "color", "texture", "shape", "motion", "depth"]
+            .iter()
+            .enumerate()
+        {
+            feature_bases.insert(
+                feature.to_string(),
+                ContinuousHV::random(dimension, (i + 1) as u64),
+            );
         }
 
         Self {
@@ -330,7 +342,12 @@ impl VisualAttention {
     }
 
     /// Apply attention to features
-    pub fn attend(&self, query: &ContinuousHV, keys: &[ContinuousHV], values: &[ContinuousHV]) -> ContinuousHV {
+    pub fn attend(
+        &self,
+        query: &ContinuousHV,
+        keys: &[ContinuousHV],
+        values: &[ContinuousHV],
+    ) -> ContinuousHV {
         if keys.is_empty() || values.is_empty() || keys.len() != values.len() {
             return query.clone();
         }
@@ -339,7 +356,8 @@ impl VisualAttention {
         let q = query.bind(&self.query_transform);
 
         // Calculate attention scores
-        let scores: Vec<f32> = keys.iter()
+        let scores: Vec<f32> = keys
+            .iter()
             .map(|k| {
                 let k_transformed = k.bind(&self.key_transform);
                 q.similarity(&k_transformed)
@@ -371,7 +389,8 @@ impl VisualAttention {
 
         let q = query.bind(&self.query_transform);
 
-        let scores: Vec<f32> = keys.iter()
+        let scores: Vec<f32> = keys
+            .iter()
             .map(|k| {
                 let k_transformed = k.bind(&self.key_transform);
                 q.similarity(&k_transformed)
@@ -439,7 +458,11 @@ mod tests {
         let attention = VisualAttention::default();
 
         let query = ContinuousHV::random(512, 20);
-        let keys = vec![ContinuousHV::random(512, 21), ContinuousHV::random(512, 22), ContinuousHV::random(512, 23)];
+        let keys = vec![
+            ContinuousHV::random(512, 21),
+            ContinuousHV::random(512, 22),
+            ContinuousHV::random(512, 23),
+        ];
 
         let weights = attention.get_attention_weights(&query, &keys);
         assert_eq!(weights.len(), 3);

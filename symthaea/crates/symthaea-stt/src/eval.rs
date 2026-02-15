@@ -37,22 +37,34 @@ pub struct Alignment<T: Clone> {
 impl<T: Clone> Alignment<T> {
     /// Count correct matches
     pub fn correct(&self) -> usize {
-        self.operations.iter().filter(|&&op| op == EditOp::Correct).count()
+        self.operations
+            .iter()
+            .filter(|&&op| op == EditOp::Correct)
+            .count()
     }
 
     /// Count substitutions
     pub fn substitutions(&self) -> usize {
-        self.operations.iter().filter(|&&op| op == EditOp::Substitution).count()
+        self.operations
+            .iter()
+            .filter(|&&op| op == EditOp::Substitution)
+            .count()
     }
 
     /// Count insertions
     pub fn insertions(&self) -> usize {
-        self.operations.iter().filter(|&&op| op == EditOp::Insertion).count()
+        self.operations
+            .iter()
+            .filter(|&&op| op == EditOp::Insertion)
+            .count()
     }
 
     /// Count deletions
     pub fn deletions(&self) -> usize {
-        self.operations.iter().filter(|&&op| op == EditOp::Deletion).count()
+        self.operations
+            .iter()
+            .filter(|&&op| op == EditOp::Deletion)
+            .count()
     }
 
     /// Total errors
@@ -82,9 +94,14 @@ impl EvalResult {
     /// Compute error rate
     pub fn error_rate(&self) -> f32 {
         if self.reference_length == 0 {
-            return if self.hypothesis_length == 0 { 0.0 } else { 1.0 };
+            return if self.hypothesis_length == 0 {
+                0.0
+            } else {
+                1.0
+            };
         }
-        (self.substitutions + self.insertions + self.deletions) as f32 / self.reference_length as f32
+        (self.substitutions + self.insertions + self.deletions) as f32
+            / self.reference_length as f32
     }
 
     /// Compute accuracy
@@ -109,10 +126,7 @@ impl EvalResult {
 }
 
 /// Compute Levenshtein edit distance and alignment
-pub fn levenshtein_align<T: PartialEq + Clone>(
-    reference: &[T],
-    hypothesis: &[T],
-) -> Alignment<T> {
+pub fn levenshtein_align<T: PartialEq + Clone>(reference: &[T], hypothesis: &[T]) -> Alignment<T> {
     let n = reference.len();
     let m = hypothesis.len();
 
@@ -130,10 +144,14 @@ pub fn levenshtein_align<T: PartialEq + Clone>(
     // Fill DP table
     for i in 1..=n {
         for j in 1..=m {
-            let cost = if reference[i - 1] == hypothesis[j - 1] { 0 } else { 1 };
-            dp[i][j] = (dp[i - 1][j] + 1)           // deletion
-                .min(dp[i][j - 1] + 1)              // insertion
-                .min(dp[i - 1][j - 1] + cost);      // substitution/match
+            let cost = if reference[i - 1] == hypothesis[j - 1] {
+                0
+            } else {
+                1
+            };
+            dp[i][j] = (dp[i - 1][j] + 1) // deletion
+                .min(dp[i][j - 1] + 1) // insertion
+                .min(dp[i - 1][j - 1] + cost); // substitution/match
         }
     }
 
@@ -222,11 +240,12 @@ pub fn phoneme_error_rate_detailed<'a>(
 }
 
 /// Evaluate multiple utterances and return aggregate PER
-pub fn evaluate_phonemes(
-    references: &[Vec<String>],
-    hypotheses: &[Vec<String>],
-) -> EvalResult {
-    assert_eq!(references.len(), hypotheses.len(), "Number of references and hypotheses must match");
+pub fn evaluate_phonemes(references: &[Vec<String>], hypotheses: &[Vec<String>]) -> EvalResult {
+    assert_eq!(
+        references.len(),
+        hypotheses.len(),
+        "Number of references and hypotheses must match"
+    );
 
     let mut total = EvalResult::default();
 
@@ -271,11 +290,12 @@ pub fn word_error_rate_detailed<'a>(
 }
 
 /// Evaluate multiple utterances and return aggregate WER
-pub fn evaluate_words(
-    references: &[&str],
-    hypotheses: &[&str],
-) -> EvalResult {
-    assert_eq!(references.len(), hypotheses.len(), "Number of references and hypotheses must match");
+pub fn evaluate_words(references: &[&str], hypotheses: &[&str]) -> EvalResult {
+    assert_eq!(
+        references.len(),
+        hypotheses.len(),
+        "Number of references and hypotheses must match"
+    );
 
     let mut total = EvalResult::default();
 
@@ -329,27 +349,39 @@ impl ConfusionMatrix {
 
     /// Add a substitution
     pub fn add_substitution(&mut self, reference: &str, hypothesis: &str) {
-        *self.confusions.entry((reference.to_string(), hypothesis.to_string())).or_insert(0) += 1;
-        *self.reference_counts.entry(reference.to_string()).or_insert(0) += 1;
+        *self
+            .confusions
+            .entry((reference.to_string(), hypothesis.to_string()))
+            .or_insert(0) += 1;
+        *self
+            .reference_counts
+            .entry(reference.to_string())
+            .or_insert(0) += 1;
     }
 
     /// Add a correct match
     pub fn add_correct(&mut self, token: &str) {
-        *self.confusions.entry((token.to_string(), token.to_string())).or_insert(0) += 1;
+        *self
+            .confusions
+            .entry((token.to_string(), token.to_string()))
+            .or_insert(0) += 1;
         *self.reference_counts.entry(token.to_string()).or_insert(0) += 1;
     }
 
     /// Get count for a specific confusion
     pub fn get(&self, reference: &str, hypothesis: &str) -> usize {
-        self.confusions.get(&(reference.to_string(), hypothesis.to_string()))
+        self.confusions
+            .get(&(reference.to_string(), hypothesis.to_string()))
             .cloned()
             .unwrap_or(0)
     }
 
     /// Get most common confusions
     pub fn top_confusions(&self, n: usize) -> Vec<((String, String), usize)> {
-        let mut confusions: Vec<_> = self.confusions.iter()
-            .filter(|((r, h), _)| r != h)  // Exclude correct matches
+        let mut confusions: Vec<_> = self
+            .confusions
+            .iter()
+            .filter(|((r, h), _)| r != h) // Exclude correct matches
             .map(|(k, v)| (k.clone(), *v))
             .collect();
 
@@ -380,7 +412,9 @@ impl ConfusionMatrix {
                         }
                     }
                     EditOp::Substitution => {
-                        if let (Some(ref r), Some(ref h)) = (&alignment.reference[i], &alignment.hypothesis[i]) {
+                        if let (Some(ref r), Some(ref h)) =
+                            (&alignment.reference[i], &alignment.hypothesis[i])
+                        {
                             matrix.add_substitution(r, h);
                         }
                     }
@@ -418,57 +452,57 @@ pub struct EvaluationReport {
     pub confusion_matrix: Option<ConfusionMatrix>,
 }
 
-impl EvaluationReport {
-    /// Format as string
-    pub fn to_string(&self) -> String {
-        let mut s = String::new();
-
-        s.push_str(&format!("Evaluation Report ({} utterances)\n", self.num_utterances));
-        s.push_str(&"=".repeat(50));
-        s.push('\n');
+impl std::fmt::Display for EvaluationReport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Evaluation Report ({} utterances)", self.num_utterances)?;
+        writeln!(f, "{}", "=".repeat(50))?;
 
         if let Some(ref per) = self.phoneme_results {
-            s.push_str("\nPhoneme Error Rate (PER)\n");
-            s.push_str(&"-".repeat(30));
-            s.push_str(&format!("\n  Reference phonemes: {}\n", per.reference_length));
-            s.push_str(&format!("  Hypothesis phonemes: {}\n", per.hypothesis_length));
-            s.push_str(&format!("  Correct: {}\n", per.correct));
-            s.push_str(&format!("  Substitutions: {}\n", per.substitutions));
-            s.push_str(&format!("  Insertions: {}\n", per.insertions));
-            s.push_str(&format!("  Deletions: {}\n", per.deletions));
-            s.push_str(&format!("  PER: {:.2}%\n", per.error_rate() * 100.0));
-            s.push_str(&format!("  Accuracy: {:.2}%\n", per.accuracy() * 100.0));
+            writeln!(f)?;
+            writeln!(f, "Phoneme Error Rate (PER)")?;
+            write!(f, "{}", "-".repeat(30))?;
+            writeln!(f, "\n  Reference phonemes: {}", per.reference_length)?;
+            writeln!(f, "  Hypothesis phonemes: {}", per.hypothesis_length)?;
+            writeln!(f, "  Correct: {}", per.correct)?;
+            writeln!(f, "  Substitutions: {}", per.substitutions)?;
+            writeln!(f, "  Insertions: {}", per.insertions)?;
+            writeln!(f, "  Deletions: {}", per.deletions)?;
+            writeln!(f, "  PER: {:.2}%", per.error_rate() * 100.0)?;
+            writeln!(f, "  Accuracy: {:.2}%", per.accuracy() * 100.0)?;
         }
 
         if let Some(ref wer) = self.word_results {
-            s.push_str("\nWord Error Rate (WER)\n");
-            s.push_str(&"-".repeat(30));
-            s.push_str(&format!("\n  Reference words: {}\n", wer.reference_length));
-            s.push_str(&format!("  Hypothesis words: {}\n", wer.hypothesis_length));
-            s.push_str(&format!("  Correct: {}\n", wer.correct));
-            s.push_str(&format!("  Substitutions: {}\n", wer.substitutions));
-            s.push_str(&format!("  Insertions: {}\n", wer.insertions));
-            s.push_str(&format!("  Deletions: {}\n", wer.deletions));
-            s.push_str(&format!("  WER: {:.2}%\n", wer.error_rate() * 100.0));
-            s.push_str(&format!("  Accuracy: {:.2}%\n", wer.accuracy() * 100.0));
+            writeln!(f)?;
+            writeln!(f, "Word Error Rate (WER)")?;
+            write!(f, "{}", "-".repeat(30))?;
+            writeln!(f, "\n  Reference words: {}", wer.reference_length)?;
+            writeln!(f, "  Hypothesis words: {}", wer.hypothesis_length)?;
+            writeln!(f, "  Correct: {}", wer.correct)?;
+            writeln!(f, "  Substitutions: {}", wer.substitutions)?;
+            writeln!(f, "  Insertions: {}", wer.insertions)?;
+            writeln!(f, "  Deletions: {}", wer.deletions)?;
+            writeln!(f, "  WER: {:.2}%", wer.error_rate() * 100.0)?;
+            writeln!(f, "  Accuracy: {:.2}%", wer.accuracy() * 100.0)?;
         }
 
         if let Some(ref cer) = self.char_results {
-            s.push_str("\nCharacter Error Rate (CER)\n");
-            s.push_str(&"-".repeat(30));
-            s.push_str(&format!("\n  CER: {:.2}%\n", cer.error_rate() * 100.0));
+            writeln!(f)?;
+            writeln!(f, "Character Error Rate (CER)")?;
+            write!(f, "{}", "-".repeat(30))?;
+            writeln!(f, "\n  CER: {:.2}%", cer.error_rate() * 100.0)?;
         }
 
         if let Some(ref cm) = self.confusion_matrix {
-            s.push_str("\nTop Confusions\n");
-            s.push_str(&"-".repeat(30));
+            writeln!(f)?;
+            writeln!(f, "Top Confusions")?;
+            write!(f, "{}", "-".repeat(30))?;
             for ((r, h), count) in cm.top_confusions(10) {
-                s.push_str(&format!("\n  {} -> {}: {}", r, h, count));
+                write!(f, "\n  {} -> {}: {}", r, h, count)?;
             }
-            s.push('\n');
+            writeln!(f)?;
         }
 
-        s
+        Ok(())
     }
 }
 
@@ -522,7 +556,7 @@ mod tests {
         let hypothesis = vec!["AH", "B", "OW", "T"];
 
         let per = phoneme_error_rate(&reference, &hypothesis);
-        assert!((per - 0.25).abs() < 0.01);  // 1 error / 4 tokens = 25%
+        assert!((per - 0.25).abs() < 0.01); // 1 error / 4 tokens = 25%
     }
 
     #[test]
@@ -531,7 +565,7 @@ mod tests {
         let hypothesis = "the cat sat in the mat";
 
         let wer = word_error_rate(reference, hypothesis);
-        assert!((wer - 1.0/6.0).abs() < 0.01);  // 1 substitution / 6 words
+        assert!((wer - 1.0 / 6.0).abs() < 0.01); // 1 substitution / 6 words
     }
 
     #[test]
@@ -545,7 +579,7 @@ mod tests {
 
         assert_eq!(cm.get("AA", "AA"), 2);
         assert_eq!(cm.get("AA", "AH"), 1);
-        assert!((cm.token_accuracy("AA") - 2.0/3.0).abs() < 0.01);
+        assert!((cm.token_accuracy("AA") - 2.0 / 3.0).abs() < 0.01);
     }
 
     #[test]

@@ -7,7 +7,7 @@
 
 use crate::hdc::HV16;
 use crate::ltc::{LtcCell, LtcConfig};
-use rustfft::{FftPlanner, num_complex::Complex};
+use rustfft::{num_complex::Complex, FftPlanner};
 use std::f32::consts::PI;
 use std::path::Path;
 use std::sync::Arc;
@@ -82,7 +82,8 @@ impl AudioFrontend {
     /// Load audio from any supported format (WAV, FLAC)
     pub fn load_audio<P: AsRef<Path>>(path: P) -> std::io::Result<(Vec<f32>, u32)> {
         let path = path.as_ref();
-        let ext = path.extension()
+        let ext = path
+            .extension()
             .and_then(|e| e.to_str())
             .map(|e| e.to_lowercase())
             .unwrap_or_default();
@@ -92,27 +93,27 @@ impl AudioFrontend {
             "flac" => Self::load_flac(path),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidInput,
-                format!("Unsupported audio format: {}", ext)
-            ))
+                format!("Unsupported audio format: {}", ext),
+            )),
         }
     }
 
     /// Load audio from WAV file
     pub fn load_wav<P: AsRef<Path>>(path: P) -> std::io::Result<(Vec<f32>, u32)> {
-        let reader = hound::WavReader::open(path)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let reader =
+            hound::WavReader::open(path).map_err(|e| std::io::Error::other(e.to_string()))?;
         let spec = reader.spec();
         let sample_rate = spec.sample_rate;
 
         let samples: Vec<f32> = match spec.sample_format {
-            hound::SampleFormat::Float => {
-                reader.into_samples::<f32>()
-                    .filter_map(|s| s.ok())
-                    .collect()
-            }
+            hound::SampleFormat::Float => reader
+                .into_samples::<f32>()
+                .filter_map(|s| s.ok())
+                .collect(),
             hound::SampleFormat::Int => {
                 let max = (1 << (spec.bits_per_sample - 1)) as f32;
-                reader.into_samples::<i32>()
+                reader
+                    .into_samples::<i32>()
                     .filter_map(|s| s.ok())
                     .map(|s| s as f32 / max)
                     .collect()
@@ -121,7 +122,8 @@ impl AudioFrontend {
 
         // Convert to mono if stereo
         let mono = if spec.channels == 2 {
-            samples.chunks(2)
+            samples
+                .chunks(2)
                 .map(|c| (c[0] + c.get(1).copied().unwrap_or(0.0)) / 2.0)
                 .collect()
         } else {
@@ -133,8 +135,8 @@ impl AudioFrontend {
 
     /// Load audio from FLAC file
     pub fn load_flac<P: AsRef<Path>>(path: P) -> std::io::Result<(Vec<f32>, u32)> {
-        let mut reader = claxon::FlacReader::open(path)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
+        let mut reader =
+            claxon::FlacReader::open(path).map_err(|e| std::io::Error::other(e.to_string()))?;
 
         let info = reader.streaminfo();
         let sample_rate = info.sample_rate;
@@ -142,19 +144,22 @@ impl AudioFrontend {
         let bits = info.bits_per_sample;
         let max = (1i64 << (bits - 1)) as f32;
 
-        let samples: Vec<f32> = reader.samples()
+        let samples: Vec<f32> = reader
+            .samples()
             .filter_map(|s| s.ok())
             .map(|s| s as f32 / max)
             .collect();
 
         // Convert to mono if stereo
         let mono = if channels == 2 {
-            samples.chunks(2)
+            samples
+                .chunks(2)
                 .map(|c| (c[0] + c.get(1).copied().unwrap_or(0.0)) / 2.0)
                 .collect()
         } else if channels > 2 {
             // Mix all channels
-            samples.chunks(channels)
+            samples
+                .chunks(channels)
                 .map(|c| c.iter().sum::<f32>() / channels as f32)
                 .collect()
         } else {
@@ -214,7 +219,11 @@ impl AudioFrontend {
     /// Compute delta features using regression over a window
     fn compute_deltas(features: &[Vec<f32>], window: usize) -> Vec<Vec<f32>> {
         let n_frames = features.len();
-        let n_dims = if features.is_empty() { 0 } else { features[0].len() };
+        let n_dims = if features.is_empty() {
+            0
+        } else {
+            features[0].len()
+        };
 
         let mut deltas = vec![vec![0.0f32; n_dims]; n_frames];
 
@@ -239,7 +248,8 @@ impl AudioFrontend {
     /// Compute mel features for a single frame
     fn compute_mel_frame(&mut self, frame: &[f32]) -> Vec<f32> {
         // Apply window
-        let windowed: Vec<f32> = frame.iter()
+        let windowed: Vec<f32> = frame
+            .iter()
             .zip(self.window.iter())
             .map(|(&s, &w)| s * w)
             .collect();
@@ -250,7 +260,8 @@ impl AudioFrontend {
         // Apply mel filterbank
         let mut mel = vec![0.0; self.config.n_mels];
         for (i, filter) in self.mel_filters.iter().enumerate() {
-            let energy = filter.iter()
+            let energy = filter
+                .iter()
                 .zip(power_spectrum.iter())
                 .map(|(&f, &p)| f * p)
                 .sum::<f32>()
@@ -271,17 +282,20 @@ impl AudioFrontend {
         let n = self.config.n_fft;
 
         // Zero-pad frame into complex buffer
-        let mut buffer: Vec<Complex<f32>> = frame.iter()
+        let mut buffer: Vec<Complex<f32>> = frame
+            .iter()
             .map(|&s| Complex::new(s, 0.0))
             .chain(std::iter::repeat(Complex::new(0.0, 0.0)))
             .take(n)
             .collect();
 
         // Perform FFT in-place
-        self.fft.process_with_scratch(&mut buffer, &mut self.scratch);
+        self.fft
+            .process_with_scratch(&mut buffer, &mut self.scratch);
 
         // Compute power spectrum (first half + DC)
-        buffer.iter()
+        buffer
+            .iter()
             .take(n / 2 + 1)
             .map(|c| (c.re * c.re + c.im * c.im) / n as f32)
             .collect()
@@ -312,9 +326,12 @@ impl AudioFrontend {
 
         // Convert back to Hz and then to FFT bin indices
         let hz_points: Vec<f32> = mel_points.iter().map(|&m| mel_to_hz(m)).collect();
-        let bin_points: Vec<usize> = hz_points.iter()
-            .map(|&hz| ((hz * config.n_fft as f32 / config.sample_rate as f32) as usize)
-                .min(n_fft_bins - 1))
+        let bin_points: Vec<usize> = hz_points
+            .iter()
+            .map(|&hz| {
+                ((hz * config.n_fft as f32 / config.sample_rate as f32) as usize)
+                    .min(n_fft_bins - 1)
+            })
             .collect();
 
         // Create triangular filters
@@ -359,7 +376,7 @@ pub struct AudioProjector {
     /// LTC cells
     ltc: LtcCell,
     /// Frame duration
-    frame_duration: f32,
+    _frame_duration: f32,
 }
 
 impl AudioProjector {
@@ -372,7 +389,7 @@ impl AudioProjector {
         Self {
             frontend,
             ltc,
-            frame_duration,
+            _frame_duration: frame_duration,
         }
     }
 
@@ -501,7 +518,8 @@ impl AudioProjector {
         for feature in &features {
             // Compute salience from mel energy change
             let salience = if let Some(ref prev) = prev_features {
-                feature.iter()
+                feature
+                    .iter()
                     .zip(prev.iter())
                     .map(|(a, b)| (a - b).powi(2))
                     .sum::<f32>()
@@ -547,11 +565,7 @@ impl AudioProjector {
             }
 
             let basis = Self::get_dim_basis(dim_idx);
-            let rotated = if val > 0.0 {
-                basis
-            } else {
-                basis.rotate(1024)
-            };
+            let rotated = if val > 0.0 { basis } else { basis.rotate(1024) };
 
             for w in 0..16 {
                 hv.words[w] ^= rotated.words[w];
@@ -609,7 +623,7 @@ impl AudioProjector {
             let basis_idx = bin_idx * NUM_LEVELS + level;
             let basis = Self::get_dim_basis(basis_idx);
             acc.add(&basis);
-            acc.add(&basis);  // Double weight for exact level
+            acc.add(&basis); // Double weight for exact level
 
             // Add adjacent levels with single weight (creates local overlap)
             if level > 0 {
@@ -679,25 +693,25 @@ impl AudioProjector {
             // Maps to rotations spread across the hypervector dimension
             // Each level gets 256 bits of rotation (2048 / 8 = 256)
             let level = if val > 0.8 {
-                7  // Very high energy (formant peaks)
+                7 // Very high energy (formant peaks)
             } else if val > 0.5 {
-                6  // High energy
+                6 // High energy
             } else if val > 0.3 {
-                5  // Medium-high energy
+                5 // Medium-high energy
             } else if val > 0.1 {
-                4  // Medium energy
+                4 // Medium energy
             } else if val > -0.1 {
-                3  // Low-medium energy
+                3 // Low-medium energy
             } else if val > -0.3 {
-                2  // Low energy
+                2 // Low energy
             } else if val > -0.5 {
-                1  // Very low energy
+                1 // Very low energy
             } else {
-                0  // Silence
+                0 // Silence
             };
 
             // Spread rotations across full 2048-bit space for maximum discrimination
-            let rotation = (level - 3) * 256;  // Center around 0
+            let rotation = (level - 3) * 256; // Center around 0
             let rotated = basis.rotate(rotation);
             for w in 0..16 {
                 hv.words[w] ^= rotated.words[w];
@@ -714,13 +728,13 @@ impl AudioProjector {
 
             // 4-level encoding: strong negative, weak negative, weak positive, strong positive
             let rotation = if val > 0.5 {
-                512   // Strong positive
+                512 // Strong positive
             } else if val > 0.0 {
-                256   // Weak positive
+                256 // Weak positive
             } else if val > -0.5 {
-                -256  // Weak negative
+                -256 // Weak negative
             } else {
-                -512  // Strong negative
+                -512 // Strong negative
             };
 
             let rotated = basis.rotate(rotation);
@@ -741,13 +755,13 @@ impl AudioProjector {
 
             // 3-level: rising, stable, falling
             let rotation = if delta > 0.1 {
-                512   // Rising fast
+                512 // Rising fast
             } else if delta > 0.0 {
-                256   // Rising slow
+                256 // Rising slow
             } else if delta > -0.1 {
-                -256  // Falling slow
+                -256 // Falling slow
             } else {
-                -512  // Falling fast
+                -512 // Falling fast
             };
 
             let rotated = basis.rotate(rotation);
@@ -805,17 +819,23 @@ impl ProsodyFeatures {
         let pitch = Self::detect_pitch(audio, sample_rate);
 
         // Rate estimated from zero-crossing rate
-        let zcr = audio.windows(2)
+        let zcr = audio
+            .windows(2)
             .filter(|w| (w[0] >= 0.0) != (w[1] >= 0.0))
-            .count() as f32 / audio.len() as f32;
+            .count() as f32
+            / audio.len() as f32;
         let rate = zcr * sample_rate as f32 / 2.0;
 
-        Self { pitch, energy, rate }
+        Self {
+            pitch,
+            energy,
+            rate,
+        }
     }
 
     fn detect_pitch(audio: &[f32], sample_rate: u32) -> f32 {
         let min_lag = sample_rate as usize / 500; // Max 500 Hz
-        let max_lag = sample_rate as usize / 50;  // Min 50 Hz
+        let max_lag = sample_rate as usize / 50; // Min 50 Hz
 
         if audio.len() < max_lag * 2 {
             return 0.0;
@@ -894,7 +914,10 @@ mod tests {
 
         assert!(prosody.energy > 0.0);
         // Pitch should be around 200 Hz
-        assert!(prosody.pitch > 150.0 && prosody.pitch < 250.0,
-                "pitch = {}", prosody.pitch);
+        assert!(
+            prosody.pitch > 150.0 && prosody.pitch < 250.0,
+            "pitch = {}",
+            prosody.pitch
+        );
     }
 }

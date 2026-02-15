@@ -62,11 +62,11 @@
 //!
 //! This is how Symthaea achieves genuine cognition distinct from LLMs.
 
-use symthaea_core::hdc::binary_hv::BinaryHV;
-use symthaea_core::hdc::semantic_decoder::{SemanticDecoder, PrimitiveToText, DecodedExpression};
 use crate::hdc::hd_ltc_codec::HDLTCCodec;
-use crate::hdc::ltc_generative_core::{LTCGenerativeCore, GeneratedThought, GenerativeCoreConfig};
-use serde::{Serialize, Deserialize};
+use crate::hdc::ltc_generative_core::{GeneratedThought, GenerativeCoreConfig, LTCGenerativeCore};
+use serde::{Deserialize, Serialize};
+use symthaea_core::hdc::binary_hv::BinaryHV;
+use symthaea_core::hdc::semantic_decoder::{DecodedExpression, PrimitiveToText, SemanticDecoder};
 
 // SemanticEar is optional - we provide a hash-based fallback
 // When rust-bert is available, it can be injected via set_semantic_ear()
@@ -262,7 +262,9 @@ impl GenerativeThoughtEngine {
         // Step 2: Decode input to see what primitives it activates
         let input_decoded = self.decoder.decode(&input_hv);
         let hv_stats = HVStats {
-            closest_primitive_similarity: input_decoded.primitives.first()
+            closest_primitive_similarity: input_decoded
+                .primitives
+                .first()
                 .map(|p| p.activation)
                 .unwrap_or(0.0),
             primitives_activated: input_decoded.primitives.len(),
@@ -280,20 +282,24 @@ impl GenerativeThoughtEngine {
                     activation: generated.confidence,
                     tier: crate::hdc::primitive_system::PrimitiveTier::NSM,
                     position: Some(0),
-                }
+                },
             ),
-            primitives: generated.primitives.iter().map(|name| {
-                crate::hdc::semantic_decoder::ActivatedPrimitive {
+            primitives: generated
+                .primitives
+                .iter()
+                .map(|name| crate::hdc::semantic_decoder::ActivatedPrimitive {
                     name: name.clone(),
                     activation: generated.confidence,
                     tier: crate::hdc::primitive_system::PrimitiveTier::NSM,
                     position: None,
-                }
-            }).collect(),
+                })
+                .collect(),
             confidence: generated.confidence,
             operators: vec![],
             vector_stats: crate::hdc::semantic_decoder::VectorStats {
-                norm: 1.0, sparsity: 0.0, entropy: 1.0,
+                norm: 1.0,
+                sparsity: 0.0,
+                entropy: 1.0,
             },
         };
         let proto_language = self.primitive_to_text.to_text(&proto_decoded);
@@ -400,29 +406,39 @@ impl GenerativeThoughtEngine {
 
     /// Continue a previous thought
     pub fn continue_thought(&mut self, previous: &CompleteThought) -> CompleteThought {
-        let continued_generated = self.generator.continue_thought(&previous.generated, self.current_phi);
+        let continued_generated = self
+            .generator
+            .continue_thought(&previous.generated, self.current_phi);
 
         let proto_decoded = DecodedExpression {
             tree: crate::hdc::semantic_decoder::ExpressionNode::Primitive(
                 crate::hdc::semantic_decoder::ActivatedPrimitive {
-                    name: continued_generated.primitives.first().cloned().unwrap_or_default(),
+                    name: continued_generated
+                        .primitives
+                        .first()
+                        .cloned()
+                        .unwrap_or_default(),
                     activation: continued_generated.confidence,
                     tier: crate::hdc::primitive_system::PrimitiveTier::NSM,
                     position: Some(0),
-                }
+                },
             ),
-            primitives: continued_generated.primitives.iter().map(|name| {
-                crate::hdc::semantic_decoder::ActivatedPrimitive {
+            primitives: continued_generated
+                .primitives
+                .iter()
+                .map(|name| crate::hdc::semantic_decoder::ActivatedPrimitive {
                     name: name.clone(),
                     activation: continued_generated.confidence,
                     tier: crate::hdc::primitive_system::PrimitiveTier::NSM,
                     position: None,
-                }
-            }).collect(),
+                })
+                .collect(),
             confidence: continued_generated.confidence,
             operators: vec![],
             vector_stats: crate::hdc::semantic_decoder::VectorStats {
-                norm: 1.0, sparsity: 0.0, entropy: 1.0,
+                norm: 1.0,
+                sparsity: 0.0,
+                entropy: 1.0,
             },
         };
         let proto_language = self.primitive_to_text.to_text(&proto_decoded);

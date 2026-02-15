@@ -7,17 +7,22 @@
 //! - Time-aware binding: Φ ⊗ Duration ⊗ Intensity
 //! - Grammar learns temporal patterns, not just symbols
 
-use symthaea_stt::liquid_hdc::{LiquidHDC, LiquidHDCPipeline, LiquidHDCStats};
-use symthaea_stt::liquid::{LiquidEvent, LiquidEventType};
-use symthaea_stt::hdc::HV16;
 use std::f32::consts::PI;
+use symthaea_stt::hdc::HV16;
+use symthaea_stt::liquid::{LiquidEvent, LiquidEventType};
+use symthaea_stt::liquid_hdc::{LiquidHDC, LiquidHDCPipeline, LiquidHDCStats};
 
 fn separator(c: char, n: usize) {
     println!("{}", std::iter::repeat(c).take(n).collect::<String>());
 }
 
 /// Generate synthetic whale click train (sperm whale style)
-fn generate_click_train(sample_rate: f32, duration: f32, click_rate: f32, intensity: f32) -> Vec<f32> {
+fn generate_click_train(
+    sample_rate: f32,
+    duration: f32,
+    click_rate: f32,
+    intensity: f32,
+) -> Vec<f32> {
     let n_samples = (sample_rate * duration) as usize;
     let mut audio = vec![0.0f32; n_samples];
 
@@ -36,7 +41,13 @@ fn generate_click_train(sample_rate: f32, duration: f32, click_rate: f32, intens
 }
 
 /// Generate synthetic whale whistle (dolphin/humpback style)
-fn generate_whistle(sample_rate: f32, duration: f32, start_freq: f32, end_freq: f32, intensity: f32) -> Vec<f32> {
+fn generate_whistle(
+    sample_rate: f32,
+    duration: f32,
+    start_freq: f32,
+    end_freq: f32,
+    intensity: f32,
+) -> Vec<f32> {
     let n_samples = (sample_rate * duration) as usize;
     let mut audio = vec![0.0f32; n_samples];
     let mut phase = 0.0f32;
@@ -232,7 +243,10 @@ fn main() {
     println!();
 
     println!("  Discrimination:");
-    println!("    Sperm vs Dolphin:  {:+.4}", score_trained - score_dolphin);
+    println!(
+        "    Sperm vs Dolphin:  {:+.4}",
+        score_trained - score_dolphin
+    );
     println!("    Sperm vs Orca:     {:+.4}", score_trained - score_orca);
     println!();
 
@@ -245,22 +259,26 @@ fn main() {
     println!();
 
     // Fast clicks (short duration, high intensity) - sperm whale coda
-    let fast_clicks: Vec<LiquidEvent> = (0..5).map(|i| LiquidEvent {
-        event_type: LiquidEventType::Click,
-        start_time: i as f32 * 0.05, // 50ms apart (20 Hz)
-        duration: 0.01,              // 10ms (fast)
-        intensity: 0.9,              // Loud
-        hv: HV16::random(&format!("fast{}", i)),
-    }).collect();
+    let fast_clicks: Vec<LiquidEvent> = (0..5)
+        .map(|i| LiquidEvent {
+            event_type: LiquidEventType::Click,
+            start_time: i as f32 * 0.05, // 50ms apart (20 Hz)
+            duration: 0.01,              // 10ms (fast)
+            intensity: 0.9,              // Loud
+            hv: HV16::random(&format!("fast{}", i)),
+        })
+        .collect();
 
     // Slow clicks (long duration, lower intensity) - beaked whale
-    let slow_clicks: Vec<LiquidEvent> = (0..5).map(|i| LiquidEvent {
-        event_type: LiquidEventType::Click,
-        start_time: i as f32 * 0.3, // 300ms apart (3.3 Hz)
-        duration: 0.1,              // 100ms (slow)
-        intensity: 0.5,             // Quieter
-        hv: HV16::random(&format!("slow{}", i)),
-    }).collect();
+    let slow_clicks: Vec<LiquidEvent> = (0..5)
+        .map(|i| LiquidEvent {
+            event_type: LiquidEventType::Click,
+            start_time: i as f32 * 0.3, // 300ms apart (3.3 Hz)
+            duration: 0.1,              // 100ms (slow)
+            intensity: 0.5,             // Quieter
+            hv: HV16::random(&format!("slow{}", i)),
+        })
+        .collect();
 
     // Reset and train on fast clicks only
     scorer = LiquidHDC::new(sample_rate, frame_size);
@@ -273,7 +291,10 @@ fn main() {
 
     println!("    Fast clicks (trained):   {:.4}", score_fast);
     println!("    Slow clicks (untrained): {:.4}", score_slow);
-    println!("    Time-Aware Discrimination: {:+.4}", score_fast - score_slow);
+    println!(
+        "    Time-Aware Discrimination: {:+.4}",
+        score_fast - score_slow
+    );
     println!();
 
     if score_fast - score_slow > 0.1 {

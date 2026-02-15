@@ -1,21 +1,23 @@
 //! Main UnifiedValueEvaluator struct and implementation.
 
-use std::collections::HashMap;
 use super::super::contextual_weights::{
     ActionDomain, ContextualWeights, DomainClassifier, HarmonyWeightProfile,
 };
 use super::super::semantic_value_embedder::{EmbedderConfig, SemanticValueEmbedder};
 use super::super::seven_harmonies::{AlignmentResult, Harmony, SevenHarmonies};
-use super::super::value_feedback_loop::{FeedbackLoopConfig, FeedbackLoopSummary, ValueFeedbackLoop};
+use super::super::value_feedback_loop::{
+    FeedbackLoopConfig, FeedbackLoopSummary, ValueFeedbackLoop,
+};
 use super::explanation::{
     ConfidenceLevel, ConfidenceScore, ContributionType, DecisionExplanation, ExplanationFactor,
     FactorType, HarmonyContribution, HarmonyTension, NarrativeValueReport,
 };
 use super::types::{
-    ActionType, Decision, EvaluationBreakdown, EvaluationContext,
-    EvaluationResult, EvaluatorConfig, EvaluatorStats, VetoReason,
+    ActionType, Decision, EvaluationBreakdown, EvaluationContext, EvaluationResult,
+    EvaluatorConfig, EvaluatorStats, VetoReason,
 };
 use crate::perception::SemanticEncoder;
+use std::collections::HashMap;
 
 /// The Unified Value Evaluator
 pub struct UnifiedValueEvaluator {
@@ -137,7 +139,11 @@ impl UnifiedValueEvaluator {
     }
 
     /// Register a custom action type profile
-    pub fn register_action_profile(&mut self, action_type: ActionType, profile: HarmonyWeightProfile) {
+    pub fn register_action_profile(
+        &mut self,
+        action_type: ActionType,
+        profile: HarmonyWeightProfile,
+    ) {
         self.contextual_weights
             .register_action_profile(action_type, profile);
     }
@@ -351,8 +357,16 @@ impl UnifiedValueEvaluator {
 
         // Strong negative patterns
         let negative_phrases = [
-            "harm", "deceive", "manipulate", "exploit", "destroy",
-            "steal", "attack", "abuse", "corrupt", "betray",
+            "harm",
+            "deceive",
+            "manipulate",
+            "exploit",
+            "destroy",
+            "steal",
+            "attack",
+            "abuse",
+            "corrupt",
+            "betray",
         ];
         for phrase in &negative_phrases {
             if lower.contains(phrase) {
@@ -362,8 +376,16 @@ impl UnifiedValueEvaluator {
 
         // Positive patterns
         let positive_phrases = [
-            "help", "support", "nurture", "protect", "heal",
-            "compassion", "care", "kindness", "serve", "empower",
+            "help",
+            "support",
+            "nurture",
+            "protect",
+            "heal",
+            "compassion",
+            "care",
+            "kindness",
+            "serve",
+            "empower",
         ];
         for phrase in &positive_phrases {
             if lower.contains(phrase) {
@@ -403,9 +425,7 @@ impl UnifiedValueEvaluator {
             let contextual_weight = profile.get_weight(harmony) as f64;
 
             // Learned adjustment from feedback loop (1.0 = no adjustment)
-            let learned_adjustment = self
-                .feedback_loop
-                .get_importance_adjustment(harmony);
+            let learned_adjustment = self.feedback_loop.get_importance_adjustment(harmony);
 
             // Combined weight = contextual × learned
             let combined_weight = contextual_weight * learned_adjustment;
@@ -847,8 +867,9 @@ impl UnifiedValueEvaluator {
                 .collect();
 
             if !significant_adjustments.is_empty() {
-                summary
-                    .push_str(" The evaluation incorporates learned adjustments from past outcomes.");
+                summary.push_str(
+                    " The evaluation incorporates learned adjustments from past outcomes.",
+                );
             }
         }
 
@@ -1047,7 +1068,6 @@ mod tests {
         ActionType, AffectiveSystemsState, Decision, EvaluationBreakdown, EvaluationContext,
         EvaluationResult, VetoReason,
     };
-    use std::collections::HashMap;
     use super::*;
 
     #[test]
@@ -1248,7 +1268,7 @@ mod tests {
         };
 
         // A potentially harmful action in healthcare context
-        let result = evaluator.evaluate(
+        let _result = evaluator.evaluate(
             "recommend treatment that might have side effects",
             healthcare_context,
         );
@@ -1380,7 +1400,10 @@ mod tests {
             evaluator.explain_decision(&result, "provide compassionate care to patient");
 
         // Check explanation structure
-        assert!(!explanation.summary.is_empty(), "Summary should not be empty");
+        assert!(
+            !explanation.summary.is_empty(),
+            "Summary should not be empty"
+        );
         assert!(
             !explanation.harmony_contributions.is_empty(),
             "Should have harmony contributions"
@@ -1419,10 +1442,9 @@ mod tests {
 
         // Check that factors are populated
         // Either it's vetoed or has warnings
-        let has_veto_or_warning = matches!(
-            explanation.decision,
-            Decision::Veto(_) | Decision::Warn(_)
-        ) || !explanation.factors.is_empty();
+        let has_veto_or_warning =
+            matches!(explanation.decision, Decision::Veto(_) | Decision::Warn(_))
+                || !explanation.factors.is_empty();
         assert!(
             has_veto_or_warning || explanation.overall_score < 0.5,
             "Low consciousness actions should have factors or low score"

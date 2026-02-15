@@ -215,7 +215,10 @@ impl NegationDetector {
                     }
 
                     // Check for punctuation that ends scope
-                    if next_word.ends_with('.') || next_word.ends_with('!') || next_word.ends_with('?') {
+                    if next_word.ends_with('.')
+                        || next_word.ends_with('!')
+                        || next_word.ends_with('?')
+                    {
                         // Include this word but end scope after
                         if !clean_next.is_empty() {
                             scope.push(clean_next.clone());
@@ -279,7 +282,10 @@ impl NegationDetector {
         // Check if the target or its stem is in negated words
         analysis.negated_words.contains(&target_lower)
             || analysis.negated_words.contains(&target_stem)
-            || analysis.negated_words.iter().any(|w| self.simple_stem(w) == target_stem)
+            || analysis
+                .negated_words
+                .iter()
+                .any(|w| self.simple_stem(w) == target_stem)
     }
 
     /// Get the polarity adjustment for a word in context
@@ -295,11 +301,17 @@ impl NegationDetector {
 
         let is_negated = analysis.negated_words.contains(&word_lower)
             || analysis.negated_words.contains(&word_stem)
-            || analysis.negated_words.iter().any(|w| self.simple_stem(w) == word_stem);
+            || analysis
+                .negated_words
+                .iter()
+                .any(|w| self.simple_stem(w) == word_stem);
 
         let is_affirmed = analysis.affirmed_words.contains(&word_lower)
             || analysis.affirmed_words.contains(&word_stem)
-            || analysis.affirmed_words.iter().any(|w| self.simple_stem(w) == word_stem);
+            || analysis
+                .affirmed_words
+                .iter()
+                .any(|w| self.simple_stem(w) == word_stem);
 
         if is_negated && !is_affirmed {
             -1.0
@@ -317,11 +329,11 @@ impl NegationDetector {
     /// Expand common contractions for better analysis
     fn expand_contractions(&self, text: &str) -> String {
         // First normalize curly apostrophes to straight ones
-        let normalized = text
-            .replace(['\u{2019}', '\u{2018}'], "'"); // Left single quotation mark (')
+        let normalized = text.replace(['\u{2019}', '\u{2018}'], "'"); // Left single quotation mark (')
 
         // Then expand contractions
-        normalized.replace("don't", "do not")
+        normalized
+            .replace("don't", "do not")
             .replace("doesn't", "does not")
             .replace("didn't", "did not")
             .replace("won't", "will not")
@@ -354,7 +366,9 @@ impl NegationDetector {
         let word = word.to_lowercase();
 
         // Common suffixes to strip
-        let suffixes = ["ing", "ed", "tion", "sion", "ment", "ness", "ful", "less", "ly", "er", "est", "s"];
+        let suffixes = [
+            "ing", "ed", "tion", "sion", "ment", "ness", "ful", "less", "ly", "er", "est", "s",
+        ];
 
         for suffix in suffixes {
             if word.len() > suffix.len() + 2 && word.ends_with(suffix) {
@@ -492,7 +506,10 @@ mod tests {
         // Convenience function tests
         assert!(is_harmful_intent_negated("avoid causing harm", "harm"));
         assert!(is_harmful_intent_negated("never exploit anyone", "exploit"));
-        assert!(!is_harmful_intent_negated("exploit the vulnerability", "exploit"));
+        assert!(!is_harmful_intent_negated(
+            "exploit the vulnerability",
+            "exploit"
+        ));
     }
 
     #[test]
@@ -502,11 +519,19 @@ mod tests {
 
         // "avoid harm" -> harm is negated -> -0.5 * -1.0 = 0.5 (positive!)
         let adjusted = get_context_adjusted_polarity("avoid harm to users", "harm", harm_base);
-        assert!(adjusted > 0.0, "Negated harm should become positive: {}", adjusted);
+        assert!(
+            adjusted > 0.0,
+            "Negated harm should become positive: {}",
+            adjusted
+        );
 
         // "cause harm" -> harm is affirmed -> -0.5 * 1.0 = -0.5 (still negative)
         let adjusted = get_context_adjusted_polarity("cause harm to users", "harm", harm_base);
-        assert!(adjusted < 0.0, "Affirmed harm should stay negative: {}", adjusted);
+        assert!(
+            adjusted < 0.0,
+            "Affirmed harm should stay negative: {}",
+            adjusted
+        );
     }
 
     #[test]
@@ -514,14 +539,8 @@ mod tests {
         let detector = NegationDetector::new();
 
         // Multiple negations
-        assert!(detector.is_word_negated(
-            "We must never harm or exploit anyone",
-            "harm"
-        ));
-        assert!(detector.is_word_negated(
-            "We must never harm or exploit anyone",
-            "exploit"
-        ));
+        assert!(detector.is_word_negated("We must never harm or exploit anyone", "harm"));
+        assert!(detector.is_word_negated("We must never harm or exploit anyone", "exploit"));
 
         // Negation with multiple targets
         let analysis = detector.analyze("Do not deceive, manipulate, or harm");
@@ -573,26 +592,16 @@ mod tests {
             "exploitation"
         ));
 
-        assert!(detector.is_word_negated(
-            "The system should avoid causing suffering",
-            "suffering"
-        ));
+        assert!(detector.is_word_negated("The system should avoid causing suffering", "suffering"));
 
-        assert!(detector.is_word_negated(
-            "Users should not be deceived about data usage",
-            "deceived"
-        ));
+        assert!(
+            detector.is_word_negated("Users should not be deceived about data usage", "deceived")
+        );
 
         // Negative statements that should NOT be inverted
-        assert!(!detector.is_word_negated(
-            "The attacker wants to harm the system",
-            "harm"
-        ));
+        assert!(!detector.is_word_negated("The attacker wants to harm the system", "harm"));
 
-        assert!(!detector.is_word_negated(
-            "They plan to exploit the vulnerability",
-            "exploit"
-        ));
+        assert!(!detector.is_word_negated("They plan to exploit the vulnerability", "exploit"));
     }
 
     #[test]

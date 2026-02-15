@@ -7,8 +7,8 @@
 
 use std::fs;
 use std::path::PathBuf;
-use symthaea_stt::whale::{WhaleSentinel, WhaleConfig, analyze_coda_topology};
 use symthaea_stt::audio::AudioFrontend;
+use symthaea_stt::whale::{analyze_coda_topology, WhaleConfig, WhaleSentinel};
 
 fn main() {
     println!("╔═══════════════════════════════════════════════════════════════╗");
@@ -54,14 +54,14 @@ fn main() {
     // Configure sentinel for whale acoustics
     // These parameters are tuned for typical sperm whale coda recordings
     let config = WhaleConfig {
-        sample_rate: 44100,      // Standard sample rate
-        click_threshold: 0.01,   // Low threshold for recorded audio
-        min_click_gap: 0.01,     // 10ms minimum between clicks
-        max_ici: 0.8,            // 800ms max gap between clicks in a coda
-        min_coda_clicks: 2,      // At least 2 clicks per coda
-        max_coda_clicks: 10,     // Allow up to 10 clicks
-        click_tau: 0.002,        // 2ms - fast for click transients
-        rhythm_tau: 0.2,         // 200ms for rhythm memory
+        sample_rate: 44100,    // Standard sample rate
+        click_threshold: 0.01, // Low threshold for recorded audio
+        min_click_gap: 0.01,   // 10ms minimum between clicks
+        max_ici: 0.8,          // 800ms max gap between clicks in a coda
+        min_coda_clicks: 2,    // At least 2 clicks per coda
+        max_coda_clicks: 10,   // Allow up to 10 clicks
+        click_tau: 0.002,      // 2ms - fast for click transients
+        rhythm_tau: 0.2,       // 200ms for rhythm memory
     };
 
     let mut sentinel = WhaleSentinel::with_config(config);
@@ -79,12 +79,20 @@ fn main() {
         // Load audio
         match AudioFrontend::load_wav(wav_path) {
             Ok((samples, sample_rate)) => {
-                println!("({} Hz, {:.1}s)", sample_rate, samples.len() as f32 / sample_rate as f32);
+                println!(
+                    "({} Hz, {:.1}s)",
+                    sample_rate,
+                    samples.len() as f32 / sample_rate as f32
+                );
 
                 // Debug: show audio stats
                 let max_abs: f32 = samples.iter().map(|x| x.abs()).fold(0.0f32, f32::max);
-                let mean_abs: f32 = samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
-                println!("  Audio stats: max_abs={:.4}, mean_abs={:.4}", max_abs, mean_abs);
+                let mean_abs: f32 =
+                    samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
+                println!(
+                    "  Audio stats: max_abs={:.4}, mean_abs={:.4}",
+                    max_abs, mean_abs
+                );
 
                 // Reset sentinel for new file
                 sentinel.reset();
@@ -96,10 +104,14 @@ fn main() {
                 println!("  Codas recognized: {}", codas.len());
 
                 for coda in &codas {
-                    println!("    └─ {} clicks, {:.3}s duration, ICI: {:?}",
+                    println!(
+                        "    └─ {} clicks, {:.3}s duration, ICI: {:?}",
                         coda.num_clicks,
                         coda.duration,
-                        coda.ici_pattern.iter().map(|x| format!("{:.2}", x)).collect::<Vec<_>>()
+                        coda.ici_pattern
+                            .iter()
+                            .map(|x| format!("{:.2}", x))
+                            .collect::<Vec<_>>()
                     );
                 }
 
@@ -158,7 +170,10 @@ fn main() {
         println!("╔═══════════════════════════════════════════════════════════════╗");
         println!("║                     HYPOTHESIS VALIDATED                      ║");
         println!("╠═══════════════════════════════════════════════════════════════╣");
-        println!("║  Symthaea discovered {} distinct coda types with {} variants  ", num_types, num_variants);
+        println!(
+            "║  Symthaea discovered {} distinct coda types with {} variants  ",
+            num_types, num_variants
+        );
         println!("║  The LTC/HDC architecture finds structure in whale clicks     ║");
         println!("║  Bio-Acoustic Structure is UNIVERSAL                          ║");
         println!("╚═══════════════════════════════════════════════════════════════╝");

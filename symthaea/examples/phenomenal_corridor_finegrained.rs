@@ -14,17 +14,19 @@
 //! cargo run --example phenomenal_corridor_finegrained --features neural-bridge --release
 //! ```
 
-use std::time::Instant;
 use anyhow::Result;
+use std::time::Instant;
 
 #[cfg(feature = "neural-bridge")]
-use symthaea::perception::{LayerExtractor, PoolingMethod, layer_extractor::LayerExtractorConfig};
+use symthaea::perception::{layer_extractor::LayerExtractorConfig, LayerExtractor, PoolingMethod};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::{HDC_DIMENSION, binary_hv::BinaryHV};
+use symthaea_core::hdc::{binary_hv::BinaryHV, HDC_DIMENSION};
 
 #[cfg(feature = "neural-bridge")]
-use symthaea_core::hdc::consciousness_topology::{ConsciousnessTopology, TopologyConfig, TopologicalAssessment};
+use symthaea_core::hdc::consciousness_topology::{
+    ConsciousnessTopology, TopologicalAssessment, TopologyConfig,
+};
 
 fn main() -> Result<()> {
     #[cfg(not(feature = "neural-bridge"))]
@@ -53,7 +55,11 @@ fn run_experiment() -> Result<()> {
     let phenomenal: Vec<_> = phenomenal.into_iter().take(80).collect();
     let functional: Vec<_> = functional.into_iter().take(80).collect();
 
-    println!("Using {} phenomenal, {} functional concepts\n", phenomenal.len(), functional.len());
+    println!(
+        "Using {} phenomenal, {} functional concepts\n",
+        phenomenal.len(),
+        functional.len()
+    );
 
     // Load model
     println!("Loading BGE-M3...");
@@ -107,7 +113,9 @@ fn run_experiment() -> Result<()> {
             metrics.phen_unity.push(assessment.unity_score);
             metrics.phen_betti0.push(assessment.betti.beta_0 as f64);
             metrics.phen_betti1.push(assessment.betti.beta_1 as f64);
-            metrics.phen_persistence.push(total_persistence(&assessment));
+            metrics
+                .phen_persistence
+                .push(total_persistence(&assessment));
         }
 
         // Process functional concepts
@@ -119,7 +127,9 @@ fn run_experiment() -> Result<()> {
             metrics.func_unity.push(assessment.unity_score);
             metrics.func_betti0.push(assessment.betti.beta_0 as f64);
             metrics.func_betti1.push(assessment.betti.beta_1 as f64);
-            metrics.func_persistence.push(total_persistence(&assessment));
+            metrics
+                .func_persistence
+                .push(total_persistence(&assessment));
         }
 
         println!("Done");
@@ -144,10 +154,20 @@ fn run_experiment() -> Result<()> {
         let d = cohens_d(&metrics.phen_unity, &metrics.func_unity);
         let p = permutation_test(&metrics.phen_unity, &metrics.func_unity, 5000);
 
-        let sig = if p < 0.001 { "***" } else if p < 0.01 { "**" } else if p < 0.05 { "*" } else { "" };
+        let sig = if p < 0.001 {
+            "***"
+        } else if p < 0.01 {
+            "**"
+        } else if p < 0.05 {
+            "*"
+        } else {
+            ""
+        };
 
-        println!("{:5} │ {:10.4} │ {:10.4} │ {:+10.4} │ {:+9.3} │ {:.4}{}",
-                 layer, phen_mean, func_mean, diff, d, p, sig);
+        println!(
+            "{:5} │ {:10.4} │ {:10.4} │ {:+10.4} │ {:+9.3} │ {:.4}{}",
+            layer, phen_mean, func_mean, diff, d, p, sig
+        );
 
         if diff > peak_effect {
             peak_effect = diff;
@@ -170,11 +190,18 @@ fn run_experiment() -> Result<()> {
         let sig0 = if p_betti0 < 0.05 { "*" } else { "" };
         let sig1 = if p_betti1 < 0.05 { "*" } else { "" };
 
-        println!("{:5} │ {:7.2} │ {:7.2} │ {:7.2} │ {:7.2} │ {:8.4}{} │ {:8.4}{}",
-                 layer,
-                 mean(&metrics.phen_betti0), mean(&metrics.func_betti0),
-                 mean(&metrics.phen_betti1), mean(&metrics.func_betti1),
-                 p_betti0, sig0, p_betti1, sig1);
+        println!(
+            "{:5} │ {:7.2} │ {:7.2} │ {:7.2} │ {:7.2} │ {:8.4}{} │ {:8.4}{}",
+            layer,
+            mean(&metrics.phen_betti0),
+            mean(&metrics.func_betti0),
+            mean(&metrics.phen_betti1),
+            mean(&metrics.func_betti1),
+            p_betti0,
+            sig0,
+            p_betti1,
+            sig1
+        );
     }
 
     // Total persistence
@@ -190,9 +217,15 @@ fn run_experiment() -> Result<()> {
         let p = permutation_test(&metrics.phen_persistence, &metrics.func_persistence, 2000);
         let sig = if p < 0.05 { "*" } else { "" };
 
-        println!("{:5} │ {:9.4} │ {:9.4} │ {:+10.4} │ {:.4}{}",
-                 layer, mean(&metrics.phen_persistence), mean(&metrics.func_persistence),
-                 diff, p, sig);
+        println!(
+            "{:5} │ {:9.4} │ {:9.4} │ {:+10.4} │ {:.4}{}",
+            layer,
+            mean(&metrics.phen_persistence),
+            mean(&metrics.func_persistence),
+            diff,
+            p,
+            sig
+        );
     }
 
     // Transition analysis: detect non-linear jumps
@@ -229,7 +262,8 @@ fn run_experiment() -> Result<()> {
     }
 
     // Find largest positive transition
-    let max_transition = transitions.iter()
+    let max_transition = transitions
+        .iter()
         .max_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
         .unwrap();
 
@@ -238,35 +272,46 @@ fn run_experiment() -> Result<()> {
     println!("   SUMMARY");
     println!("================================================================\n");
 
-    println!("Peak phenomenal effect: Layer {} (diff = {:+.4})", peak_layer, peak_effect);
-    println!("Largest emergence transition: {} → {} (Δ = {:+.4})", max_transition.0, max_transition.1, max_transition.2);
+    println!(
+        "Peak phenomenal effect: Layer {} (diff = {:+.4})",
+        peak_layer, peak_effect
+    );
+    println!(
+        "Largest emergence transition: {} → {} (Δ = {:+.4})",
+        max_transition.0, max_transition.1, max_transition.2
+    );
 
     // Count significant layers
-    let sig_layers: Vec<usize> = results.iter()
-        .filter(|(_, m)| {
-            permutation_test(&m.phen_unity, &m.func_unity, 2000) < 0.05
-        })
+    let sig_layers: Vec<usize> = results
+        .iter()
+        .filter(|(_, m)| permutation_test(&m.phen_unity, &m.func_unity, 2000) < 0.05)
         .map(|(l, _)| *l)
         .collect();
 
     if sig_layers.is_empty() {
         println!("No layers show significant phenomenal advantage");
     } else {
-        println!("Significant phenomenal advantage at layers: {:?}", sig_layers);
+        println!(
+            "Significant phenomenal advantage at layers: {:?}",
+            sig_layers
+        );
     }
 
     // Corridor characterization
-    let early_corridor: Vec<f64> = results.iter()
+    let early_corridor: Vec<f64> = results
+        .iter()
         .filter(|(l, _)| *l >= 17 && *l <= 19)
         .map(|(_, m)| mean(&m.phen_unity) - mean(&m.func_unity))
         .collect();
 
-    let late_corridor: Vec<f64> = results.iter()
+    let late_corridor: Vec<f64> = results
+        .iter()
         .filter(|(l, _)| *l >= 20 && *l <= 22)
         .map(|(_, m)| mean(&m.phen_unity) - mean(&m.func_unity))
         .collect();
 
-    let final_layer: f64 = results.iter()
+    let final_layer: f64 = results
+        .iter()
         .find(|(l, _)| *l == 23)
         .map(|(_, m)| mean(&m.phen_unity) - mean(&m.func_unity))
         .unwrap_or(0.0);
@@ -342,13 +387,17 @@ fn total_persistence(assessment: &TopologicalAssessment) -> f64 {
 
 #[cfg(feature = "neural-bridge")]
 fn mean(values: &[f64]) -> f64 {
-    if values.is_empty() { return 0.0; }
+    if values.is_empty() {
+        return 0.0;
+    }
     values.iter().sum::<f64>() / values.len() as f64
 }
 
 #[cfg(feature = "neural-bridge")]
 fn std_dev(values: &[f64]) -> f64 {
-    if values.len() < 2 { return 0.0; }
+    if values.len() < 2 {
+        return 0.0;
+    }
     let m = mean(values);
     let variance = values.iter().map(|x| (x - m).powi(2)).sum::<f64>() / (values.len() - 1) as f64;
     variance.sqrt()
@@ -358,8 +407,8 @@ fn std_dev(values: &[f64]) -> f64 {
 fn cohens_d(a: &[f64], b: &[f64]) -> f64 {
     let mean_diff = mean(a) - mean(b);
     let pooled_var = ((a.len() - 1) as f64 * std_dev(a).powi(2)
-                    + (b.len() - 1) as f64 * std_dev(b).powi(2))
-                    / (a.len() + b.len() - 2) as f64;
+        + (b.len() - 1) as f64 * std_dev(b).powi(2))
+        / (a.len() + b.len() - 2) as f64;
     mean_diff / pooled_var.sqrt()
 }
 

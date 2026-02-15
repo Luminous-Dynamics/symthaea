@@ -10,9 +10,9 @@ pub mod endocrine;
 pub mod social_coherence;
 
 // Re-exports for convenience
-pub use coherence::{CoherenceField, CoherenceConfig, CoherenceState};
+pub use coherence::{CoherenceConfig, CoherenceField, CoherenceState};
 pub use endocrine::HormoneState;
 pub use social_coherence::{
-    SocialCoherenceField, CoherenceLendingProtocol, CollectiveLearning,
-    CoherenceBeacon, CoherenceLoan,
+    CoherenceBeacon, CoherenceLendingProtocol, CoherenceLoan, CollectiveLearning,
+    SocialCoherenceField,
 };

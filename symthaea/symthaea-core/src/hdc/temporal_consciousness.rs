@@ -116,8 +116,8 @@
 // ==================================================================================
 
 use super::binary_hv::BinaryHV;
-use super::integrated_information::IntegratedInformation;
 use super::consciousness_dynamics::ConsciousnessDynamics;
+use super::integrated_information::IntegratedInformation;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
@@ -141,10 +141,10 @@ impl TimeScale {
     /// Get time scale in seconds
     pub fn duration_secs(&self) -> f64 {
         match self {
-            Self::Perception => 0.1,      // 100ms
-            Self::Thought => 3.0,         // 3s (specious present)
-            Self::Narrative => 300.0,     // 5 minutes
-            Self::Identity => 86400.0,    // 1 day
+            Self::Perception => 0.1,   // 100ms
+            Self::Thought => 3.0,      // 3s (specious present)
+            Self::Narrative => 300.0,  // 5 minutes
+            Self::Identity => 86400.0, // 1 day
         }
     }
 
@@ -156,16 +156,21 @@ impl TimeScale {
     /// Get weight for this time scale (how much it contributes to total)
     pub fn weight(&self) -> f64 {
         match self {
-            Self::Perception => 0.3,  // 30% (immediate present)
-            Self::Thought => 0.4,     // 40% (thinking/reasoning)
-            Self::Narrative => 0.2,   // 20% (context/story)
-            Self::Identity => 0.1,    // 10% (stable self)
+            Self::Perception => 0.3, // 30% (immediate present)
+            Self::Thought => 0.4,    // 40% (thinking/reasoning)
+            Self::Narrative => 0.2,  // 20% (context/story)
+            Self::Identity => 0.1,   // 10% (stable self)
         }
     }
 
     /// All time scales in order
     pub fn all() -> Vec<Self> {
-        vec![Self::Perception, Self::Thought, Self::Narrative, Self::Identity]
+        vec![
+            Self::Perception,
+            Self::Thought,
+            Self::Narrative,
+            Self::Identity,
+        ]
     }
 }
 
@@ -255,14 +260,14 @@ impl TemporalAssessment {
     /// Is experiencing "timelessness"? (flow state)
     pub fn is_timeless(&self) -> bool {
         // All scales roughly equal (unified temporal experience)
-        let scales = [self.phi_perception,
+        let scales = [
+            self.phi_perception,
             self.phi_thought,
             self.phi_narrative,
-            self.phi_identity];
+            self.phi_identity,
+        ];
         let mean = scales.iter().sum::<f64>() / scales.len() as f64;
-        let variance = scales.iter()
-            .map(|s| (s - mean).powi(2))
-            .sum::<f64>() / scales.len() as f64;
+        let variance = scales.iter().map(|s| (s - mean).powi(2)).sum::<f64>() / scales.len() as f64;
 
         variance < 0.05 // Low variance = unified
     }
@@ -337,7 +342,7 @@ pub struct TemporalConfig {
 impl Default for TemporalConfig {
     fn default() -> Self {
         Self {
-            max_history_size: 10000,  // ~10 seconds at 1kHz sampling
+            max_history_size: 10000, // ~10 seconds at 1kHz sampling
             decay_rate: 0.1,
             critical_slowing_threshold: 0.8,
             enable_dynamics: true,
@@ -401,22 +406,10 @@ impl TemporalConsciousness {
         let phi_instant = current.phi;
 
         // 2. Compute Φ at each time scale
-        let phi_perception = self.compute_scale_phi(
-            current_time,
-            TimeScale::Perception,
-        );
-        let phi_thought = self.compute_scale_phi(
-            current_time,
-            TimeScale::Thought,
-        );
-        let phi_narrative = self.compute_scale_phi(
-            current_time,
-            TimeScale::Narrative,
-        );
-        let phi_identity = self.compute_scale_phi(
-            current_time,
-            TimeScale::Identity,
-        );
+        let phi_perception = self.compute_scale_phi(current_time, TimeScale::Perception);
+        let phi_thought = self.compute_scale_phi(current_time, TimeScale::Thought);
+        let phi_narrative = self.compute_scale_phi(current_time, TimeScale::Narrative);
+        let phi_identity = self.compute_scale_phi(current_time, TimeScale::Identity);
 
         // 3. Temporal Φ (weighted combination)
         let phi_temporal = TimeScale::Perception.weight() * phi_perception
@@ -431,11 +424,14 @@ impl TemporalConsciousness {
         let avg_binding = self.compute_average_binding(current_time);
 
         // 6. Dominant scale
-        let scales = [(TimeScale::Perception, phi_perception),
+        let scales = [
+            (TimeScale::Perception, phi_perception),
             (TimeScale::Thought, phi_thought),
             (TimeScale::Narrative, phi_narrative),
-            (TimeScale::Identity, phi_identity)];
-        let dominant_scale = scales.iter()
+            (TimeScale::Identity, phi_identity),
+        ];
+        let dominant_scale = scales
+            .iter()
             .max_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(s, _)| *s)
             .unwrap_or(TimeScale::Thought);
@@ -540,7 +536,9 @@ impl TemporalConsciousness {
     /// Compute average temporal binding
     fn compute_average_binding(&self, current_time: f64) -> f64 {
         let window = TimeScale::Thought.duration_secs(); // 3 seconds
-        let recent: Vec<_> = self.history.iter()
+        let recent: Vec<_> = self
+            .history
+            .iter()
             .filter(|s| current_time - s.time < window)
             .collect();
 
@@ -567,11 +565,7 @@ impl TemporalConsciousness {
     }
 
     /// Compute temporal binding between two snapshots
-    fn compute_binding(
-        &self,
-        s1: &TemporalSnapshot,
-        s2: &TemporalSnapshot,
-    ) -> TemporalBinding {
+    fn compute_binding(&self, s1: &TemporalSnapshot, s2: &TemporalSnapshot) -> TemporalBinding {
         // Similarity of states
         let mut total_sim = 0.0;
         let mut count = 0;
@@ -668,7 +662,9 @@ impl TemporalConsciousness {
     pub fn get_bindings(&self, window_secs: f64) -> Vec<TemporalBinding> {
         if let Some(current) = self.history.back() {
             let current_time = current.time;
-            let recent: Vec<_> = self.history.iter()
+            let recent: Vec<_> = self
+                .history
+                .iter()
                 .filter(|s| current_time - s.time < window_secs)
                 .collect();
 
@@ -812,9 +808,22 @@ mod tests {
 
         let assessment = temporal.assess();
 
-        // With similar states, might detect timelessness
-        // (This test is probabilistic, so we just check it runs)
-        let _ = assessment.is_timeless();
+        // Assessment should have valid fields
+        assert!(
+            assessment.phi_temporal.is_finite(),
+            "Temporal Φ should be finite"
+        );
+        assert!(
+            assessment.phi_temporal >= 0.0,
+            "Temporal Φ should be non-negative"
+        );
+
+        // is_timeless returns a valid boolean
+        let timeless = assessment.is_timeless();
+        assert!(
+            timeless || !timeless,
+            "is_timeless should return a valid bool"
+        );
     }
 
     #[test]

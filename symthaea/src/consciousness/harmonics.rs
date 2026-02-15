@@ -1225,7 +1225,7 @@ mod tests {
     #[test]
     fn test_reciprocity_harmonic_with_balance() {
         use crate::physiology::social_coherence::{CoherenceLendingProtocol, CoherenceLoan};
-        use std::time::{Duration, Instant};
+        use std::time::Duration;
 
         let mut field = HarmonicField::new();
         let mut protocol = CoherenceLendingProtocol::new("instance_a".to_string());

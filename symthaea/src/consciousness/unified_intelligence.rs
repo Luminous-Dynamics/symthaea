@@ -34,9 +34,9 @@ use crate::consciousness::primitive_evolution::{
     CandidatePrimitive, EvolutionConfig, PrimitiveEvolution, PrimitiveEvolutionResult,
 };
 use crate::consciousness::primitive_reasoning::ReasoningChain;
-use crate::physiology::social_coherence::CollectivePrimitiveEvolution;
 use crate::hdc::primitive_system::PrimitiveTier;
 use crate::hdc::BinaryHV;
+use crate::physiology::social_coherence::CollectivePrimitiveEvolution;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -249,7 +249,8 @@ impl UnifiedIntelligence {
 
         // Get local primitives
         let local_primitives = if let Some(instance) = self.instances.get(instance_id) {
-            instance.local_primitives
+            instance
+                .local_primitives
                 .iter()
                 .filter(|p| p.tier == tier)
                 .take(count.saturating_sub(collective_count))
@@ -288,10 +289,8 @@ impl UnifiedIntelligence {
         }
 
         // Step 2: Create meta-cognitive reasoner
-        let mut meta_reasoner = MetaCognitiveReasoner::new(
-            self.evolution_config.clone(),
-            self.meta_config.clone(),
-        )?;
+        let mut meta_reasoner =
+            MetaCognitiveReasoner::new(self.evolution_config.clone(), self.meta_config.clone())?;
 
         // Step 3: Perform meta-cognitive reasoning
         let mut chain = ReasoningChain::new(BinaryHV::random(self.stats.total_episodes as u64));
@@ -313,12 +312,8 @@ impl UnifiedIntelligence {
         );
 
         // Step 5: Detect emergent properties
-        let emergent_properties = self.detect_emergence(
-            &meta_result,
-            collective_count,
-            local_count,
-            &primitives,
-        );
+        let emergent_properties =
+            self.detect_emergence(&meta_result, collective_count, local_count, &primitives);
 
         // Step 6: Update instance meta-confidence
         if let Some(instance) = self.instances.get_mut(instance_id) {
@@ -393,7 +388,9 @@ impl UnifiedIntelligence {
         }
 
         // Emergence 4: Multi-objective optimization
-        let fitness = meta_result.optimization_result.tradeoff_point
+        let fitness = meta_result
+            .optimization_result
+            .tradeoff_point
             .weighted_fitness(&meta_result.optimization_result.weights);
         if fitness > 0.6 {
             properties.push(EmergentProperty {
@@ -408,9 +405,12 @@ impl UnifiedIntelligence {
 
         // Emergence 5: Meta-learning insights
         if !meta_result.meta_insights.is_empty() {
-            let avg_reliability = meta_result.meta_insights.iter()
+            let avg_reliability = meta_result
+                .meta_insights
+                .iter()
                 .map(|i| i.reliability)
-                .sum::<f64>() / meta_result.meta_insights.len() as f64;
+                .sum::<f64>()
+                / meta_result.meta_insights.len() as f64;
 
             properties.push(EmergentProperty {
                 property: "Meta-Learning".to_string(),
@@ -431,15 +431,18 @@ impl UnifiedIntelligence {
         // Update emergent properties
         for prop in emergent_properties {
             // Only keep unique properties
-            if !self.stats.emergent_properties.iter().any(|p| p.property == prop.property) {
+            if !self
+                .stats
+                .emergent_properties
+                .iter()
+                .any(|p| p.property == prop.property)
+            {
                 self.stats.emergent_properties.push(prop.clone());
             }
         }
 
         // Update average meta-confidence
-        let total_confidence: f64 = self.instances.values()
-            .map(|i| i.meta_confidence)
-            .sum();
+        let total_confidence: f64 = self.instances.values().map(|i| i.meta_confidence).sum();
         self.stats.avg_meta_confidence = if !self.instances.is_empty() {
             total_confidence / self.instances.len() as f64
         } else {
@@ -461,11 +464,15 @@ impl UnifiedIntelligence {
         let meta_component = 0.3 * meta_result.meta_confidence;
 
         // 2. Multi-objective fitness (30%)
-        let fitness_component = 0.3 * meta_result.optimization_result.tradeoff_point
-            .weighted_fitness(&meta_result.optimization_result.weights);
+        let fitness_component = 0.3
+            * meta_result
+                .optimization_result
+                .tradeoff_point
+                .weighted_fitness(&meta_result.optimization_result.weights);
 
         // 3. Collective utilization (20%)
-        let collective_component = 0.2 * (self.stats.total_collective_primitives as f64 / 100.0).min(1.0);
+        let collective_component =
+            0.2 * (self.stats.total_collective_primitives as f64 / 100.0).min(1.0);
 
         // 4. Pareto frontier size (20% - diversity of options)
         let frontier_size = meta_result.optimization_result.frontier.size() as f64;
@@ -483,9 +490,12 @@ impl UnifiedIntelligence {
         }
 
         // Individual intelligence = average local primitives
-        let avg_local_primitives = self.instances.values()
+        let avg_local_primitives = self
+            .instances
+            .values()
             .map(|i| i.local_primitives.len())
-            .sum::<usize>() as f64 / self.instances.len() as f64;
+            .sum::<usize>() as f64
+            / self.instances.len() as f64;
 
         // Collective intelligence = total unique primitives in collective
         let collective_primitives = self.stats.total_collective_primitives as f64;
@@ -527,11 +537,8 @@ mod tests {
         let evolution_config = EvolutionConfig::default();
         let meta_config = MetaReasoningConfig::default();
 
-        let system = UnifiedIntelligence::new(
-            "test_system".to_string(),
-            evolution_config,
-            meta_config,
-        );
+        let system =
+            UnifiedIntelligence::new("test_system".to_string(), evolution_config, meta_config);
 
         assert_eq!(system.stats().total_instances, 0);
         assert_eq!(system.stats().total_episodes, 0);
@@ -542,11 +549,8 @@ mod tests {
         let evolution_config = EvolutionConfig::default();
         let meta_config = MetaReasoningConfig::default();
 
-        let mut system = UnifiedIntelligence::new(
-            "test_system".to_string(),
-            evolution_config,
-            meta_config,
-        );
+        let mut system =
+            UnifiedIntelligence::new("test_system".to_string(), evolution_config, meta_config);
 
         system.add_instance("instance_a".to_string()).unwrap();
         assert_eq!(system.stats().total_instances, 1);
@@ -560,11 +564,8 @@ mod tests {
         let evolution_config = EvolutionConfig::default();
         let meta_config = MetaReasoningConfig::default();
 
-        let system = UnifiedIntelligence::new(
-            "test_system".to_string(),
-            evolution_config,
-            meta_config,
-        );
+        let system =
+            UnifiedIntelligence::new("test_system".to_string(), evolution_config, meta_config);
 
         // Initially, collective intelligence should be 1.0 (no instances)
         let collective_intelligence = system.compute_collective_intelligence();

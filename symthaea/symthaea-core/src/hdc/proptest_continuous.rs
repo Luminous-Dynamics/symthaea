@@ -17,8 +17,8 @@ operations hold across randomly generated inputs using proptest.
 
 #![cfg(test)]
 
-use proptest::prelude::*;
 use super::unified_hv::ContinuousHV;
+use proptest::prelude::*;
 
 /// Use smaller dimension for faster proptest runs.
 const TEST_DIM: usize = 256;

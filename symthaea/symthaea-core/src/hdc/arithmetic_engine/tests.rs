@@ -1,10 +1,9 @@
 use super::*;
 use crate::hdc::primitive_system::PrimitiveSystem;
-use std::collections::HashMap;
 use proptest::prelude::*;
+use std::collections::HashMap;
 
 #[test]
-
 
 fn test_number_construction() {
     let primitives = PrimitiveSystem::global();
@@ -19,7 +18,6 @@ fn test_number_construction() {
 
 #[test]
 
-
 fn test_successor() {
     let primitives = PrimitiveSystem::global();
 
@@ -30,7 +28,6 @@ fn test_successor() {
 }
 
 #[test]
-
 
 fn test_addition() {
     let mut engine = ArithmeticEngine::new();
@@ -47,7 +44,6 @@ fn test_addition() {
 
 #[test]
 
-
 fn test_multiplication() {
     let mut engine = ArithmeticEngine::new();
 
@@ -62,7 +58,6 @@ fn test_multiplication() {
 }
 
 #[test]
-
 
 fn test_subtraction() {
     let mut engine = ArithmeticEngine::new();
@@ -79,7 +74,6 @@ fn test_subtraction() {
 
 #[test]
 
-
 fn test_power() {
     let mut engine = ArithmeticEngine::new();
 
@@ -93,7 +87,6 @@ fn test_power() {
 }
 
 #[test]
-
 
 fn test_factorial() {
     let mut engine = ArithmeticEngine::new();
@@ -109,7 +102,6 @@ fn test_factorial() {
 
 #[test]
 
-
 fn test_theorem_commutativity() {
     let mut prover = TheoremProver::new();
 
@@ -120,7 +112,6 @@ fn test_theorem_commutativity() {
 
 #[test]
 
-
 fn test_theorem_associativity() {
     let mut prover = TheoremProver::new();
 
@@ -129,7 +120,6 @@ fn test_theorem_associativity() {
 }
 
 #[test]
-
 
 fn test_theorem_distributive() {
     let mut prover = TheoremProver::new();
@@ -143,7 +133,6 @@ fn test_theorem_distributive() {
 }
 
 #[test]
-
 
 fn test_caching() {
     let mut engine = ArithmeticEngine::new();
@@ -159,7 +148,6 @@ fn test_caching() {
 
 #[test]
 
-
 fn test_phi_accumulation() {
     let mut engine = ArithmeticEngine::new();
 
@@ -170,7 +158,10 @@ fn test_phi_accumulation() {
 
     let stats = engine.stats();
     // Multiply and factorial involve internal operations, so total > 3
-    assert!(stats.total_computations >= 3, "Should track all computations");
+    assert!(
+        stats.total_computations >= 3,
+        "Should track all computations"
+    );
     assert!(stats.total_phi > 0.0, "Should accumulate Φ");
     assert!(stats.mean_phi > 0.0, "Mean Φ should be positive");
 }
@@ -181,7 +172,6 @@ fn test_phi_accumulation() {
 
 #[test]
 
-
 fn test_hybrid_deep_path() {
     let mut engine = HybridArithmeticEngine::new();
 
@@ -190,12 +180,17 @@ fn test_hybrid_deep_path() {
     assert_eq!(result.value, 7);
     assert_eq!(result.computation_path, ComputationPath::Deep);
     assert!(result.phi_is_exact, "Small numbers should have exact Φ");
-    assert!(result.full_proof.is_some(), "Deep path should have full proof");
-    assert!(result.encoding.is_some(), "Deep path should have HDC encoding");
+    assert!(
+        result.full_proof.is_some(),
+        "Deep path should have full proof"
+    );
+    assert!(
+        result.encoding.is_some(),
+        "Deep path should have HDC encoding"
+    );
 }
 
 #[test]
-
 
 fn test_hybrid_fast_path() {
     let mut engine = HybridArithmeticEngine::new();
@@ -204,12 +199,17 @@ fn test_hybrid_fast_path() {
     let result = engine.add(1000, 2000);
     assert_eq!(result.value, 3000);
     assert_eq!(result.computation_path, ComputationPath::Fast);
-    assert!(!result.phi_is_exact, "Large numbers should have estimated Φ");
-    assert!(result.abstract_proof.is_some(), "Fast path should have abstract proof");
+    assert!(
+        !result.phi_is_exact,
+        "Large numbers should have estimated Φ"
+    );
+    assert!(
+        result.abstract_proof.is_some(),
+        "Fast path should have abstract proof"
+    );
 }
 
 #[test]
-
 
 fn test_hybrid_semantics_always_present() {
     let mut engine = HybridArithmeticEngine::new();
@@ -225,7 +225,6 @@ fn test_hybrid_semantics_always_present() {
 }
 
 #[test]
-
 
 fn test_hybrid_multiply() {
     let mut engine = HybridArithmeticEngine::new();
@@ -243,7 +242,6 @@ fn test_hybrid_multiply() {
 
 #[test]
 
-
 fn test_hybrid_power() {
     let mut engine = HybridArithmeticEngine::new();
 
@@ -259,7 +257,6 @@ fn test_hybrid_power() {
 }
 
 #[test]
-
 
 fn test_hybrid_factorial() {
     let mut engine = HybridArithmeticEngine::new();
@@ -277,25 +274,32 @@ fn test_hybrid_factorial() {
 
 #[test]
 
-
 fn test_hybrid_stats() {
     let mut engine = HybridArithmeticEngine::new();
 
     // Mix of deep and fast operations
-    let _ = engine.add(3, 4);      // Deep
-    let _ = engine.add(100, 200);  // Fast
+    let _ = engine.add(3, 4); // Deep
+    let _ = engine.add(100, 200); // Fast
     let _ = engine.multiply(5, 6); // Deep
     let _ = engine.multiply(1000, 2000); // Fast
 
     let stats = engine.stats();
-    assert!(stats.deep_computations >= 2, "Should track deep computations");
-    assert!(stats.fast_computations >= 2, "Should track fast computations");
+    assert!(
+        stats.deep_computations >= 2,
+        "Should track deep computations"
+    );
+    assert!(
+        stats.fast_computations >= 2,
+        "Should track fast computations"
+    );
     assert!(stats.exact_phi > 0.0, "Should have exact Φ from deep");
-    assert!(stats.estimated_phi > 0.0, "Should have estimated Φ from fast");
+    assert!(
+        stats.estimated_phi > 0.0,
+        "Should have estimated Φ from fast"
+    );
 }
 
 #[test]
-
 
 fn test_hybrid_abstract_proof_validity() {
     let mut engine = HybridArithmeticEngine::new();
@@ -310,7 +314,6 @@ fn test_hybrid_abstract_proof_validity() {
 }
 
 #[test]
-
 
 fn test_hybrid_configurable_threshold() {
     // Create with custom config - lower threshold for more deep computations
@@ -337,7 +340,6 @@ fn test_hybrid_configurable_threshold() {
 
 #[test]
 
-
 fn test_force_deep_mode() {
     let mut engine = HybridArithmeticEngine::new();
 
@@ -350,7 +352,6 @@ fn test_force_deep_mode() {
 }
 
 #[test]
-
 
 fn test_division() {
     let mut engine = HybridArithmeticEngine::new();
@@ -369,7 +370,6 @@ fn test_division() {
 
 #[test]
 
-
 fn test_modulo() {
     let mut engine = HybridArithmeticEngine::new();
 
@@ -385,7 +385,6 @@ fn test_modulo() {
 }
 
 #[test]
-
 
 fn test_gcd() {
     let mut engine = HybridArithmeticEngine::new();
@@ -414,7 +413,6 @@ fn test_gcd() {
 
 #[test]
 
-
 fn test_primality() {
     let mut engine = HybridArithmeticEngine::new();
 
@@ -441,7 +439,6 @@ fn test_primality() {
 
 #[test]
 
-
 fn test_proof_exploration() {
     let mut discovery = MathDiscovery::new();
 
@@ -455,7 +452,6 @@ fn test_proof_exploration() {
 
 #[test]
 
-
 fn test_conjecture_generation() {
     let mut discovery = MathDiscovery::new();
 
@@ -468,7 +464,6 @@ fn test_conjecture_generation() {
 }
 
 #[test]
-
 
 fn test_discovery_engine_access() {
     let mut discovery = MathDiscovery::new();
@@ -487,7 +482,6 @@ fn test_discovery_engine_access() {
 
 #[test]
 
-
 fn test_reasoning_bridge_creation() {
     let bridge = MathReasoningBridge::new();
     assert!(bridge.assertions().is_empty());
@@ -495,7 +489,6 @@ fn test_reasoning_bridge_creation() {
 }
 
 #[test]
-
 
 fn test_assert_equality() {
     let mut bridge = MathReasoningBridge::new();
@@ -512,7 +505,6 @@ fn test_assert_equality() {
 
 #[test]
 
-
 fn test_assert_divisibility() {
     let mut bridge = MathReasoningBridge::new();
 
@@ -528,7 +520,6 @@ fn test_assert_divisibility() {
 
 #[test]
 
-
 fn test_assert_primality() {
     let mut bridge = MathReasoningBridge::new();
 
@@ -541,7 +532,6 @@ fn test_assert_primality() {
 }
 
 #[test]
-
 
 fn test_assert_coprime() {
     let mut bridge = MathReasoningBridge::new();
@@ -557,7 +547,6 @@ fn test_assert_coprime() {
 }
 
 #[test]
-
 
 fn test_prove_theorem_commutativity() {
     let mut bridge = MathReasoningBridge::new();
@@ -576,7 +565,6 @@ fn test_prove_theorem_commutativity() {
 
 #[test]
 
-
 fn test_transitive_divisibility() {
     let mut bridge = MathReasoningBridge::new();
 
@@ -588,11 +576,14 @@ fn test_transitive_divisibility() {
     assert_eq!(assertion.subject, "2");
     assert_eq!(assertion.object, "12");
     assert!(assertion.proof_source.is_some());
-    assert!(assertion.proof_source.unwrap().inductive_step.contains("transitive"));
+    assert!(assertion
+        .proof_source
+        .unwrap()
+        .inductive_step
+        .contains("transitive"));
 }
 
 #[test]
-
 
 fn test_gcd_properties() {
     let mut bridge = MathReasoningBridge::new();
@@ -601,14 +592,14 @@ fn test_gcd_properties() {
     assert!(!assertions.is_empty());
 
     // Should include divisibility assertions
-    let divides_assertions: Vec<_> = assertions.iter()
+    let divides_assertions: Vec<_> = assertions
+        .iter()
         .filter(|a| a.relation == MathRelation::Divides)
         .collect();
     assert!(divides_assertions.len() >= 2);
 }
 
 #[test]
-
 
 fn test_multi_step_proof() {
     let mut bridge = MathReasoningBridge::new();
@@ -625,7 +616,6 @@ fn test_multi_step_proof() {
 }
 
 #[test]
-
 
 fn test_query_by_relation() {
     let mut bridge = MathReasoningBridge::new();
@@ -648,7 +638,6 @@ fn test_query_by_relation() {
 
 #[test]
 
-
 fn test_query_involving() {
     let mut bridge = MathReasoningBridge::new();
 
@@ -665,7 +654,6 @@ fn test_query_involving() {
 
 #[test]
 
-
 fn test_total_phi_accumulation() {
     let mut bridge = MathReasoningBridge::new();
 
@@ -680,13 +668,12 @@ fn test_total_phi_accumulation() {
 
 #[test]
 
-
 fn test_highest_phi_assertion() {
     let mut bridge = MathReasoningBridge::new();
 
-    bridge.assert_equality(2, 2, "+");  // Simple
-    bridge.assert_equality(5, 6, "*");  // More complex
-    bridge.assert_equality(3, 3, "+");  // Simple
+    bridge.assert_equality(2, 2, "+"); // Simple
+    bridge.assert_equality(5, 6, "*"); // More complex
+    bridge.assert_equality(3, 3, "+"); // Simple
 
     let highest = bridge.highest_phi_assertion();
     assert!(highest.is_some());
@@ -700,7 +687,6 @@ fn test_highest_phi_assertion() {
 
 #[test]
 
-
 fn test_symbolic_expr_constant() {
     let primitives = PrimitiveSystem::global();
     let expr = SymbolicExpr::constant(5, &primitives);
@@ -709,7 +695,6 @@ fn test_symbolic_expr_constant() {
 }
 
 #[test]
-
 
 fn test_symbolic_expr_variable() {
     let primitives = PrimitiveSystem::global();
@@ -720,19 +705,23 @@ fn test_symbolic_expr_variable() {
 
 #[test]
 
-
 fn test_symbolic_addition() {
     let primitives = PrimitiveSystem::global();
     let x = SymbolicExpr::variable("x", &primitives);
     let five = SymbolicExpr::constant(5, &primitives);
     let sum = x.add(&five, &primitives);
 
-    assert!(matches!(sum.term_type, TermType::BinaryOp { op: SymbolicOp::Add, .. }));
+    assert!(matches!(
+        sum.term_type,
+        TermType::BinaryOp {
+            op: SymbolicOp::Add,
+            ..
+        }
+    ));
     assert_eq!(sum.to_string(), "(x + 5)");
 }
 
 #[test]
-
 
 fn test_symbolic_multiplication() {
     let primitives = PrimitiveSystem::global();
@@ -740,12 +729,17 @@ fn test_symbolic_multiplication() {
     let three = SymbolicExpr::constant(3, &primitives);
     let prod = three.mul(&x, &primitives);
 
-    assert!(matches!(prod.term_type, TermType::BinaryOp { op: SymbolicOp::Mul, .. }));
+    assert!(matches!(
+        prod.term_type,
+        TermType::BinaryOp {
+            op: SymbolicOp::Mul,
+            ..
+        }
+    ));
     assert_eq!(prod.to_string(), "(3 * x)");
 }
 
 #[test]
-
 
 fn test_symbolic_evaluation() {
     let primitives = PrimitiveSystem::global();
@@ -769,7 +763,6 @@ fn test_symbolic_evaluation() {
 
 #[test]
 
-
 fn test_symbolic_simplify_like_terms() {
     let primitives = PrimitiveSystem::global();
     let mut algebra = SymbolicAlgebra::new();
@@ -790,7 +783,6 @@ fn test_symbolic_simplify_like_terms() {
 
 #[test]
 
-
 fn test_symbolic_constant_folding() {
     let primitives = PrimitiveSystem::global();
     let mut algebra = SymbolicAlgebra::new();
@@ -807,7 +799,6 @@ fn test_symbolic_constant_folding() {
 
 #[test]
 
-
 fn test_symbolic_multiply_by_zero() {
     let primitives = PrimitiveSystem::global();
     let mut algebra = SymbolicAlgebra::new();
@@ -822,7 +813,6 @@ fn test_symbolic_multiply_by_zero() {
 }
 
 #[test]
-
 
 fn test_symbolic_multiply_by_one() {
     let primitives = PrimitiveSystem::global();
@@ -839,7 +829,6 @@ fn test_symbolic_multiply_by_one() {
 
 #[test]
 
-
 fn test_symbolic_add_zero() {
     let primitives = PrimitiveSystem::global();
     let mut algebra = SymbolicAlgebra::new();
@@ -854,7 +843,6 @@ fn test_symbolic_add_zero() {
 }
 
 #[test]
-
 
 fn test_symbolic_expand_distribution() {
     let primitives = PrimitiveSystem::global();
@@ -874,7 +862,6 @@ fn test_symbolic_expand_distribution() {
 
 #[test]
 
-
 fn test_polynomial_creation() {
     let primitives = PrimitiveSystem::global();
 
@@ -885,7 +872,6 @@ fn test_polynomial_creation() {
 }
 
 #[test]
-
 
 fn test_polynomial_evaluation() {
     let primitives = PrimitiveSystem::global();
@@ -899,7 +885,6 @@ fn test_polynomial_evaluation() {
 }
 
 #[test]
-
 
 fn test_polynomial_addition() {
     let primitives = PrimitiveSystem::global();
@@ -915,7 +900,6 @@ fn test_polynomial_addition() {
 
 #[test]
 
-
 fn test_polynomial_multiplication() {
     let primitives = PrimitiveSystem::global();
     let algebra = SymbolicAlgebra::new();
@@ -930,7 +914,6 @@ fn test_polynomial_multiplication() {
 
 #[test]
 
-
 fn test_linear_equation_solver() {
     let primitives = PrimitiveSystem::global();
     let mut algebra = SymbolicAlgebra::new();
@@ -944,7 +927,6 @@ fn test_linear_equation_solver() {
 }
 
 #[test]
-
 
 fn test_quadratic_equation_solver() {
     let primitives = PrimitiveSystem::global();
@@ -962,7 +944,6 @@ fn test_quadratic_equation_solver() {
 }
 
 #[test]
-
 
 fn test_symbolic_algebra_stats() {
     let primitives = PrimitiveSystem::global();
@@ -985,13 +966,15 @@ fn test_symbolic_algebra_stats() {
 
 #[test]
 
-
 fn test_multipath_addition_commutative() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_addition_commutative(3, 5);
 
     assert_eq!(result.theorem, "3 + 5 = 5 + 3");
-    assert!(result.total_paths >= 2, "Should have at least 2 proof paths");
+    assert!(
+        result.total_paths >= 2,
+        "Should have at least 2 proof paths"
+    );
     assert!(result.valid_paths >= 2, "At least 2 paths should be valid");
     assert!(result.paths_agree, "All paths should agree on result");
 
@@ -1003,7 +986,6 @@ fn test_multipath_addition_commutative() {
 }
 
 #[test]
-
 
 fn test_multipath_multiplication_commutative() {
     let mut verifier = MultiPathVerifier::new();
@@ -1023,13 +1005,16 @@ fn test_multipath_multiplication_commutative() {
 
 #[test]
 
-
 fn test_multipath_associativity() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_associativity(2, 3, 4, "+");
 
     // Verify correct theorem format
-    assert!(result.theorem.contains("2") && result.theorem.contains("3") && result.theorem.contains("4"));
+    assert!(
+        result.theorem.contains("2")
+            && result.theorem.contains("3")
+            && result.theorem.contains("4")
+    );
     assert!(result.total_paths >= 2);
     assert!(result.valid_paths >= 2);
     assert!(result.paths_agree);
@@ -1043,13 +1028,16 @@ fn test_multipath_associativity() {
 
 #[test]
 
-
 fn test_multipath_distributive() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_distributive(2, 3, 4);
 
     // Verify theorem contains expected operands and structure
-    assert!(result.theorem.contains("2") && result.theorem.contains("3") && result.theorem.contains("4"));
+    assert!(
+        result.theorem.contains("2")
+            && result.theorem.contains("3")
+            && result.theorem.contains("4")
+    );
     assert!(result.total_paths >= 2);
     assert!(result.valid_paths >= 2);
     assert!(result.paths_agree);
@@ -1062,7 +1050,6 @@ fn test_multipath_distributive() {
 }
 
 #[test]
-
 
 fn test_multipath_divisibility_true() {
     let mut verifier = MultiPathVerifier::new();
@@ -1078,7 +1065,6 @@ fn test_multipath_divisibility_true() {
 
 #[test]
 
-
 fn test_multipath_divisibility_false() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_divisibility(5, 12);
@@ -1090,7 +1076,6 @@ fn test_multipath_divisibility_false() {
 }
 
 #[test]
-
 
 fn test_multipath_proof_steps() {
     let mut verifier = MultiPathVerifier::new();
@@ -1105,7 +1090,6 @@ fn test_multipath_proof_steps() {
 }
 
 #[test]
-
 
 fn test_multipath_best_path_selection() {
     let mut verifier = MultiPathVerifier::new();
@@ -1122,14 +1106,15 @@ fn test_multipath_best_path_selection() {
     // Best path should have highest Φ among valid paths
     for (i, path) in result.paths.iter().enumerate() {
         if path.is_valid && i != best_idx {
-            assert!(best_path.total_phi >= path.total_phi,
-                "Best path should have highest Φ");
+            assert!(
+                best_path.total_phi >= path.total_phi,
+                "Best path should have highest Φ"
+            );
         }
     }
 }
 
 #[test]
-
 
 fn test_multipath_verifier_stats() {
     let mut verifier = MultiPathVerifier::new();
@@ -1149,7 +1134,6 @@ fn test_multipath_verifier_stats() {
 
 #[test]
 
-
 fn test_multipath_division_by_zero() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_divisibility(0, 10);
@@ -1159,7 +1143,6 @@ fn test_multipath_division_by_zero() {
 }
 
 #[test]
-
 
 fn test_multipath_identity_cases() {
     let mut verifier = MultiPathVerifier::new();
@@ -1181,7 +1164,6 @@ fn test_multipath_identity_cases() {
 
 #[test]
 
-
 fn test_multipath_large_numbers() {
     let mut verifier = MultiPathVerifier::new();
 
@@ -1201,7 +1183,7 @@ fn test_multipath_large_numbers() {
 }
 
 #[test]
-#[ignore] // 47s: MultiPathVerifier with full Φ measurement. Run with --ignored.
+#[ignore = "slow ~47s: MultiPathVerifier with full Phi measurement"]
 fn test_multipath_phi_measurement() {
     let mut verifier = MultiPathVerifier::new();
     let result = verifier.verify_distributive(3, 4, 5);

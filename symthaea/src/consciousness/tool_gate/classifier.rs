@@ -111,11 +111,7 @@ fn classify_command(command: &str) -> RiskLevel {
 ///
 /// # INV-8: Confidence/Action Alignment
 /// Even if Φ_eff is high, low plan_confidence blocks risky actions.
-pub fn gate(
-    tool: &ToolDescriptor,
-    phi_eff: f64,
-    plan_confidence: f64,
-) -> GateResult {
+pub fn gate(tool: &ToolDescriptor, phi_eff: f64, plan_confidence: f64) -> GateResult {
     let risk = classify(tool);
     let required_phi = risk.phi_threshold();
     let required_conf = risk.confidence_threshold();
@@ -172,11 +168,9 @@ fn select_fallback(
                 required_phi: *required,
             }
         }
-        GateDecision::InsufficientConfidence { .. } => {
-            FallbackStrategy::RequestHumanConfirmation {
-                reason: "Plan confidence is too low for this risk level".to_string(),
-            }
-        }
+        GateDecision::InsufficientConfidence { .. } => FallbackStrategy::RequestHumanConfirmation {
+            reason: "Plan confidence is too low for this risk level".to_string(),
+        },
         GateDecision::Allowed => unreachable!("Fallback should not be computed for Allowed"),
     }
 }
@@ -210,10 +204,13 @@ mod tests {
     #[test]
     fn test_inv7_missing_rollback_escalates() {
         // INV-7: Missing rollback → automatic escalation to Critical
-        let tool = ToolDescriptor::from_command("some-unknown-command")
-            .with_domain("unknown");
+        let tool = ToolDescriptor::from_command("some-unknown-command").with_domain("unknown");
         let risk = classify(&tool);
-        assert_eq!(risk, RiskLevel::Critical, "INV-7: Missing rollback must escalate to Critical");
+        assert_eq!(
+            risk,
+            RiskLevel::Critical,
+            "INV-7: Missing rollback must escalate to Critical"
+        );
     }
 
     #[test]
@@ -228,8 +225,7 @@ mod tests {
 
     #[test]
     fn test_destructive_command() {
-        let tool = ToolDescriptor::from_command("nix-collect-garbage -d")
-            .with_domain("nixos");
+        let tool = ToolDescriptor::from_command("nix-collect-garbage -d").with_domain("nixos");
         let risk = classify(&tool);
         assert_eq!(risk, RiskLevel::Critical);
     }
@@ -250,8 +246,8 @@ mod tests {
 
     #[test]
     fn test_gate_allows_with_sufficient_phi_and_confidence() {
-        let tool = ToolDescriptor::read_only("nix search nixpkgs firefox")
-            .with_calibration_count(100);
+        let tool =
+            ToolDescriptor::read_only("nix search nixpkgs firefox").with_calibration_count(100);
         let result = gate(&tool, 0.5, 0.5);
         assert!(result.is_allowed());
     }
@@ -275,7 +271,10 @@ mod tests {
             .with_calibration_count(5); // cold
         let risk = classify(&tool);
         // Reversible + cold → Elevated
-        assert!(risk >= RiskLevel::Elevated, "Cold calibration should escalate");
+        assert!(
+            risk >= RiskLevel::Elevated,
+            "Cold calibration should escalate"
+        );
     }
 
     #[test]
@@ -285,7 +284,10 @@ mod tests {
             .with_rollback("nixos-rebuild switch --rollback")
             .with_calibration_count(100);
         let result = gate(&tool, 0.3, 0.9);
-        if let Some(FallbackStrategy::DowngradeToReadOnly { alternative_command }) = &result.fallback {
+        if let Some(FallbackStrategy::DowngradeToReadOnly {
+            alternative_command,
+        }) = &result.fallback
+        {
             assert!(alternative_command.contains("dry-build"));
         }
     }

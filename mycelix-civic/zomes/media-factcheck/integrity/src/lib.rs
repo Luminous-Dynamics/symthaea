@@ -177,10 +177,16 @@ fn validate_create_fact_check(
     _action: EntryCreationAction,
     check: FactCheck,
 ) -> ExternResult<ValidateCallbackResult> {
+    if check.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("FactCheck ID cannot be empty".into()));
+    }
+    if check.publication_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("FactCheck publication_id cannot be empty".into()));
+    }
     if !check.checker_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Checker must be a valid DID".into()));
     }
-    if check.claim_text.is_empty() {
+    if check.claim_text.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Claim text required".into()));
     }
     let ep = &check.epistemic_position;
@@ -194,6 +200,9 @@ fn validate_create_source_credibility(
     _action: EntryCreationAction,
     source: SourceCredibility,
 ) -> ExternResult<ValidateCallbackResult> {
+    if source.source_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("SourceCredibility source_id cannot be empty".into()));
+    }
     if source.credibility_score < 0.0 || source.credibility_score > 1.0 {
         return Ok(ValidateCallbackResult::Invalid("Credibility must be 0-1".into()));
     }
@@ -214,10 +223,16 @@ fn validate_create_fact_check_dispute(
     _action: EntryCreationAction,
     dispute: FactCheckDispute,
 ) -> ExternResult<ValidateCallbackResult> {
+    if dispute.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Dispute ID cannot be empty".into()));
+    }
+    if dispute.fact_check_id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Dispute fact_check_id cannot be empty".into()));
+    }
     if !dispute.disputer_did.starts_with("did:") {
         return Ok(ValidateCallbackResult::Invalid("Disputer must be a valid DID".into()));
     }
-    if dispute.reason.is_empty() {
+    if dispute.reason.trim().is_empty() {
         return Ok(ValidateCallbackResult::Invalid("Dispute reason required".into()));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -402,12 +417,12 @@ mod tests {
     }
 
     #[test]
-    fn fact_check_claim_text_whitespace_passes() {
-        // Validation uses is_empty(), not trim().is_empty()
+    fn fact_check_claim_text_whitespace_rejected() {
         let mut fc = make_fact_check();
         fc.claim_text = "   ".into();
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Claim text required");
     }
 
     #[test]
@@ -490,13 +505,14 @@ mod tests {
 
     #[test]
     fn fact_check_multiple_failures_first_wins() {
-        // Both checker_did and claim_text are invalid; checker_did check comes first
+        // id, publication_id, checker_did, claim_text all invalid; id check comes first
         let mut fc = make_fact_check();
+        fc.id = "".into();
         fc.checker_did = "not-a-did".into();
         fc.claim_text = "".into();
         let result = validate_create_fact_check(fake_entry_creation_action(), fc);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Checker must be a valid DID");
+        assert_eq!(invalid_msg(&result), "FactCheck ID cannot be empty");
     }
 
     #[test]
@@ -692,23 +708,24 @@ mod tests {
     }
 
     #[test]
-    fn dispute_reason_whitespace_passes() {
-        // Validation uses is_empty(), not trim().is_empty()
+    fn dispute_reason_whitespace_rejected() {
         let mut dispute = make_dispute();
         dispute.reason = "   ".into();
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
-        assert!(is_valid(&result));
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute reason required");
     }
 
     #[test]
     fn dispute_multiple_failures_first_wins() {
-        // Both disputer_did and reason invalid; DID check comes first
+        // id, fact_check_id, disputer_did, reason all invalid; id check comes first
         let mut dispute = make_dispute();
+        dispute.id = "".into();
         dispute.disputer_did = "bad".into();
         dispute.reason = "".into();
         let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
         assert!(is_invalid(&result));
-        assert_eq!(invalid_msg(&result), "Disputer must be a valid DID");
+        assert_eq!(invalid_msg(&result), "Dispute ID cannot be empty");
     }
 
     #[test]
@@ -770,5 +787,121 @@ mod tests {
         dispute.disputer_did = "not-a-did".into();
         let result = validate_update_fact_check_dispute(fake_update(), dispute);
         assert!(is_valid(&result));
+    }
+
+    // ========================================================================
+    // NEW FIELD-LEVEL VALIDATION TESTS (Fix #6)
+    // ========================================================================
+
+    #[test]
+    fn fact_check_empty_id_rejected() {
+        let mut fc = make_fact_check();
+        fc.id = "".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FactCheck ID cannot be empty");
+    }
+
+    #[test]
+    fn fact_check_whitespace_id_rejected() {
+        let mut fc = make_fact_check();
+        fc.id = "  \t ".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FactCheck ID cannot be empty");
+    }
+
+    #[test]
+    fn fact_check_empty_publication_id_rejected() {
+        let mut fc = make_fact_check();
+        fc.publication_id = "".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FactCheck publication_id cannot be empty");
+    }
+
+    #[test]
+    fn fact_check_whitespace_publication_id_rejected() {
+        let mut fc = make_fact_check();
+        fc.publication_id = "   ".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "FactCheck publication_id cannot be empty");
+    }
+
+    #[test]
+    fn source_credibility_empty_source_id_rejected() {
+        let mut sc = make_source_credibility();
+        sc.source_id = "".into();
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "SourceCredibility source_id cannot be empty");
+    }
+
+    #[test]
+    fn source_credibility_whitespace_source_id_rejected() {
+        let mut sc = make_source_credibility();
+        sc.source_id = "   ".into();
+        let result = validate_create_source_credibility(fake_entry_creation_action(), sc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "SourceCredibility source_id cannot be empty");
+    }
+
+    #[test]
+    fn dispute_empty_id_rejected() {
+        let mut dispute = make_dispute();
+        dispute.id = "".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute ID cannot be empty");
+    }
+
+    #[test]
+    fn dispute_whitespace_id_rejected() {
+        let mut dispute = make_dispute();
+        dispute.id = "  \t ".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute ID cannot be empty");
+    }
+
+    #[test]
+    fn dispute_empty_fact_check_id_rejected() {
+        let mut dispute = make_dispute();
+        dispute.fact_check_id = "".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute fact_check_id cannot be empty");
+    }
+
+    #[test]
+    fn dispute_whitespace_fact_check_id_rejected() {
+        let mut dispute = make_dispute();
+        dispute.fact_check_id = "   ".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Dispute fact_check_id cannot be empty");
+    }
+
+    #[test]
+    fn fact_check_did_before_claim_text_rejection_order() {
+        // With valid id and publication_id, checker_did fails before claim_text
+        let mut fc = make_fact_check();
+        fc.checker_did = "bad".into();
+        fc.claim_text = "".into();
+        let result = validate_create_fact_check(fake_entry_creation_action(), fc);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Checker must be a valid DID");
+    }
+
+    #[test]
+    fn dispute_did_before_reason_rejection_order() {
+        // With valid id and fact_check_id, disputer_did fails before reason
+        let mut dispute = make_dispute();
+        dispute.disputer_did = "bad".into();
+        dispute.reason = "".into();
+        let result = validate_create_fact_check_dispute(fake_entry_creation_action(), dispute);
+        assert!(is_invalid(&result));
+        assert_eq!(invalid_msg(&result), "Disputer must be a valid DID");
     }
 }

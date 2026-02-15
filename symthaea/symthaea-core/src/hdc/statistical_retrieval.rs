@@ -185,10 +185,10 @@ impl Default for StatisticalRetrievalConfig {
     fn default() -> Self {
         Self {
             dimensions: 2048,
-            min_z_score: 3.0,       // p < 0.0013
-            margin_floor: 0.6,      // Must be above this raw similarity
+            min_z_score: 3.0,  // p < 0.0013
+            margin_floor: 0.6, // Must be above this raw similarity
             check_unbind: true,
-            unbind_threshold: 0.7,  // Unbind residual must be similar to expected
+            unbind_threshold: 0.7, // Unbind residual must be similar to expected
         }
     }
 }
@@ -250,20 +250,14 @@ impl StatisticalRetriever {
             return 0.0;
         }
 
-        let matches: usize = a.iter()
-            .zip(b.iter())
-            .filter(|(x, y)| x == y)
-            .count();
+        let matches: usize = a.iter().zip(b.iter()).filter(|(x, y)| x == y).count();
 
         matches as f32 / a.len() as f32
     }
 
     /// Unbind operation (element-wise multiplication for bipolar)
     pub fn unbind(&self, a: &[i8], b: &[i8]) -> Vec<i8> {
-        a.iter()
-            .zip(b.iter())
-            .map(|(x, y)| x * y)
-            .collect()
+        a.iter().zip(b.iter()).map(|(x, y)| x * y).collect()
     }
 
     /// Three-gate retrieval decision
@@ -398,7 +392,8 @@ impl StatisticalRetriever {
         query: &[i8],
         candidates: &'a [Vec<i8>],
     ) -> Vec<(usize, &'a Vec<i8>, RetrievalDecision)> {
-        candidates.iter()
+        candidates
+            .iter()
             .enumerate()
             .map(|(idx, c)| (idx, c, self.decide_simple(query, c)))
             .filter(|(_, _, d)| d.accepted())
@@ -445,15 +440,21 @@ mod tests {
         let config = StatisticalRetrievalConfig::with_dimensions(2048);
         let sigma = config.sigma();
 
-        assert!((sigma - 0.011).abs() < 0.001,
-                "σ for 2048 dims should be ≈0.011, got {}", sigma);
+        assert!(
+            (sigma - 0.011).abs() < 0.001,
+            "σ for 2048 dims should be ≈0.011, got {}",
+            sigma
+        );
 
         // For n=10000, σ ≈ 0.005
         let config_10k = StatisticalRetrievalConfig::with_dimensions(10000);
         let sigma_10k = config_10k.sigma();
 
-        assert!((sigma_10k - 0.005).abs() < 0.001,
-                "σ for 10000 dims should be ≈0.005, got {}", sigma_10k);
+        assert!(
+            (sigma_10k - 0.005).abs() < 0.001,
+            "σ for 10000 dims should be ≈0.005, got {}",
+            sigma_10k
+        );
     }
 
     #[test]
@@ -462,24 +463,48 @@ mod tests {
 
         // Random similarity (0.5) should give z ≈ 0
         let z_random = config.z_score(0.5);
-        assert!(z_random.abs() < 0.001, "z for sim=0.5 should be 0, got {}", z_random);
+        assert!(
+            z_random.abs() < 0.001,
+            "z for sim=0.5 should be 0, got {}",
+            z_random
+        );
 
         // Perfect match (1.0) should give very high z
         let z_perfect = config.z_score(1.0);
-        assert!(z_perfect > 40.0, "z for sim=1.0 should be >40, got {}", z_perfect);
+        assert!(
+            z_perfect > 40.0,
+            "z for sim=1.0 should be >40, got {}",
+            z_perfect
+        );
 
         // Opposite (0.0) should give very negative z
         let z_opposite = config.z_score(0.0);
-        assert!(z_opposite < -40.0, "z for sim=0.0 should be <-40, got {}", z_opposite);
+        assert!(
+            z_opposite < -40.0,
+            "z for sim=0.0 should be <-40, got {}",
+            z_opposite
+        );
     }
 
     #[test]
     fn test_epistemic_tier_mapping() {
         assert_eq!(EmpiricalTier::from_z_score(0.5), EmpiricalTier::E0Null);
-        assert_eq!(EmpiricalTier::from_z_score(1.5), EmpiricalTier::E1Testimonial);
-        assert_eq!(EmpiricalTier::from_z_score(3.0), EmpiricalTier::E2PrivatelyVerifiable);
-        assert_eq!(EmpiricalTier::from_z_score(5.0), EmpiricalTier::E3CryptographicallyProven);
-        assert_eq!(EmpiricalTier::from_z_score(7.0), EmpiricalTier::E4PubliclyReproducible);
+        assert_eq!(
+            EmpiricalTier::from_z_score(1.5),
+            EmpiricalTier::E1Testimonial
+        );
+        assert_eq!(
+            EmpiricalTier::from_z_score(3.0),
+            EmpiricalTier::E2PrivatelyVerifiable
+        );
+        assert_eq!(
+            EmpiricalTier::from_z_score(5.0),
+            EmpiricalTier::E3CryptographicallyProven
+        );
+        assert_eq!(
+            EmpiricalTier::from_z_score(7.0),
+            EmpiricalTier::E4PubliclyReproducible
+        );
     }
 
     #[test]
@@ -492,11 +517,17 @@ mod tests {
         let decision = retriever.decide_simple(&v1, &v2);
 
         // Random vectors should have z ≈ 0, be rejected
-        assert!(!decision.accepted(),
-                "Random vectors should be rejected, got {:?}", decision.verdict);
+        assert!(
+            !decision.accepted(),
+            "Random vectors should be rejected, got {:?}",
+            decision.verdict
+        );
         assert_eq!(decision.verdict, RetrievalVerdict::RejectNoSignificance);
-        assert!(decision.z_score.abs() < 5.0,
-                "Random vectors should have |z| < 5, got {}", decision.z_score);
+        assert!(
+            decision.z_score.abs() < 5.0,
+            "Random vectors should have |z| < 5, got {}",
+            decision.z_score
+        );
     }
 
     #[test]
@@ -507,12 +538,17 @@ mod tests {
 
         let decision = retriever.decide_simple(&v, &v);
 
-        assert!(decision.accepted(),
-                "Identical vectors should be accepted");
+        assert!(decision.accepted(), "Identical vectors should be accepted");
         assert_eq!(decision.raw_similarity, 1.0);
-        assert!(decision.z_score > 40.0,
-                "Identical vectors should have z > 40, got {}", decision.z_score);
-        assert_eq!(decision.epistemic_tier, EmpiricalTier::E4PubliclyReproducible);
+        assert!(
+            decision.z_score > 40.0,
+            "Identical vectors should have z > 40, got {}",
+            decision.z_score
+        );
+        assert_eq!(
+            decision.epistemic_tier,
+            EmpiricalTier::E4PubliclyReproducible
+        );
     }
 
     #[test]
@@ -524,10 +560,16 @@ mod tests {
 
         let decision = retriever.decide_simple(&v1, &v2);
 
-        assert!(decision.accepted(),
-                "90% similarity should be accepted, got {:?}", decision.verdict);
-        assert!(decision.z_score > 30.0,
-                "90% similarity should have z > 30, got {}", decision.z_score);
+        assert!(
+            decision.accepted(),
+            "90% similarity should be accepted, got {:?}",
+            decision.verdict
+        );
+        assert!(
+            decision.z_score > 30.0,
+            "90% similarity should have z > 30, got {}",
+            decision.z_score
+        );
     }
 
     #[test]
@@ -536,7 +578,7 @@ mod tests {
         let config = StatisticalRetrievalConfig {
             dimensions: 2048,
             min_z_score: 2.0,
-            margin_floor: 0.7,  // High floor
+            margin_floor: 0.7, // High floor
             check_unbind: false,
             unbind_threshold: 0.7,
         };
@@ -575,15 +617,21 @@ mod tests {
 
         // The recovered vector should be IDENTICAL to b (sim = 1.0)
         let unbind_sim = retriever.hamming_similarity(&recovered_b, &b);
-        assert!(unbind_sim > 0.99,
-                "Unbind should perfectly recover original: got {}", unbind_sim);
+        assert!(
+            unbind_sim > 0.99,
+            "Unbind should perfectly recover original: got {}",
+            unbind_sim
+        );
 
         // Also verify unbind is commutative for self-inverse vectors:
         // unbind(A, C) should also give B (since A ⊗ C = A ⊗ (A ⊗ B) = B)
         let recovered_b_alt = retriever.unbind(&a, &c);
         let unbind_sim_alt = retriever.hamming_similarity(&recovered_b_alt, &b);
-        assert!(unbind_sim_alt > 0.99,
-                "Unbind should be commutative: got {}", unbind_sim_alt);
+        assert!(
+            unbind_sim_alt > 0.99,
+            "Unbind should be commutative: got {}",
+            unbind_sim_alt
+        );
     }
 
     #[test]
@@ -608,7 +656,10 @@ mod tests {
 
         // High similarity might pass first two gates, but unbind should fail
         if decision.z_score >= min_z && decision.margin_passed {
-            assert!(!decision.unbind_consistent || decision.verdict == RetrievalVerdict::RejectUnbindFailed);
+            assert!(
+                !decision.unbind_consistent
+                    || decision.verdict == RetrievalVerdict::RejectUnbindFailed
+            );
         }
     }
 
@@ -618,10 +669,10 @@ mod tests {
 
         let query = random_bipolar(2048);
         let candidates: Vec<Vec<i8>> = vec![
-            random_bipolar(2048),                         // Random
-            vector_with_similarity(&query, 0.7),          // 70%
-            vector_with_similarity(&query, 0.95),         // 95% - best
-            random_bipolar(2048),                         // Random
+            random_bipolar(2048),                 // Random
+            vector_with_similarity(&query, 0.7),  // 70%
+            vector_with_similarity(&query, 0.95), // 95% - best
+            random_bipolar(2048),                 // Random
         ];
 
         let result = retriever.find_best_match(&query, &candidates);
@@ -640,7 +691,11 @@ mod tests {
         let decision = retriever.decide_simple(&v, &v);
 
         let confidence = decision.confidence_percent();
-        assert!(confidence > 99.9, "Perfect match should have >99.9% confidence, got {}", confidence);
+        assert!(
+            confidence > 99.9,
+            "Perfect match should have >99.9% confidence, got {}",
+            confidence
+        );
     }
 
     #[test]
@@ -654,12 +709,19 @@ mod tests {
         let sim_10k = config_10k.similarity_for_z(3.0);
 
         // Higher dimensions = threshold closer to 0.5
-        assert!(sim_10k < sim_2k,
-                "Higher dims need lower threshold: 2k={}, 10k={}", sim_2k, sim_10k);
+        assert!(
+            sim_10k < sim_2k,
+            "Higher dims need lower threshold: 2k={}, 10k={}",
+            sim_2k,
+            sim_10k
+        );
 
         // For 2048: sim ≈ 0.5 + 3 * 0.011 ≈ 0.533
-        assert!((sim_2k - 0.533).abs() < 0.005,
-                "2048 dims, z=3 threshold should be ≈0.533, got {}", sim_2k);
+        assert!(
+            (sim_2k - 0.533).abs() < 0.005,
+            "2048 dims, z=3 threshold should be ≈0.533, got {}",
+            sim_2k
+        );
     }
 
     #[test]
@@ -669,7 +731,10 @@ mod tests {
         // Accept
         let retriever = StatisticalRetriever::new(2048);
         let v = random_bipolar(2048);
-        assert_eq!(retriever.decide_simple(&v, &v).verdict, RetrievalVerdict::Accept);
+        assert_eq!(
+            retriever.decide_simple(&v, &v).verdict,
+            RetrievalVerdict::Accept
+        );
 
         // RejectNoSignificance
         let v2 = random_bipolar(2048);
@@ -679,7 +744,7 @@ mod tests {
         // RejectBelowFloor
         let config_high_floor = StatisticalRetrievalConfig {
             dimensions: 2048,
-            min_z_score: 1.0,  // Very low z threshold
+            min_z_score: 1.0,   // Very low z threshold
             margin_floor: 0.99, // Very high floor
             check_unbind: false,
             unbind_threshold: 0.7,
@@ -696,11 +761,11 @@ mod tests {
 
         let query = random_bipolar(2048);
         let candidates: Vec<Vec<i8>> = vec![
-            vector_with_similarity(&query, 0.95),  // Should match
-            random_bipolar(2048),                   // Should not match
-            vector_with_similarity(&query, 0.85),  // Should match
-            random_bipolar(2048),                   // Should not match
-            vector_with_similarity(&query, 0.9),   // Should match
+            vector_with_similarity(&query, 0.95), // Should match
+            random_bipolar(2048),                 // Should not match
+            vector_with_similarity(&query, 0.85), // Should match
+            random_bipolar(2048),                 // Should not match
+            vector_with_similarity(&query, 0.9),  // Should match
         ];
 
         let matches = retriever.find_all_matches(&query, &candidates);

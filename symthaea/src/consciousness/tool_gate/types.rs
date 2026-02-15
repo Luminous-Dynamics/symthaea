@@ -45,7 +45,7 @@ impl RiskLevel {
     /// Minimum plan confidence required (INV-8).
     pub fn confidence_threshold(self) -> f64 {
         match self {
-            RiskLevel::ReadOnly => 0.0,    // no confidence needed
+            RiskLevel::ReadOnly => 0.0, // no confidence needed
             RiskLevel::Reversible => 0.2,
             RiskLevel::Elevated => 0.4,
             RiskLevel::High => 0.6,
@@ -246,15 +246,9 @@ pub enum GateDecision {
     /// Action is allowed.
     Allowed,
     /// Blocked: Φ_eff is insufficient.
-    InsufficientPhi {
-        current: f64,
-        required: f64,
-    },
+    InsufficientPhi { current: f64, required: f64 },
     /// Blocked: plan confidence is insufficient (INV-8).
-    InsufficientConfidence {
-        current: f64,
-        required: f64,
-    },
+    InsufficientConfidence { current: f64, required: f64 },
 }
 
 impl GateDecision {
@@ -302,26 +296,18 @@ impl GateResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum FallbackStrategy {
     /// Downgrade to a safer (read-only) variant of the command.
-    DowngradeToReadOnly {
-        alternative_command: String,
-    },
+    DowngradeToReadOnly { alternative_command: String },
     /// Defer until Φ_eff increases.
-    DeferUntilHigherPhi {
-        required_phi: f64,
-    },
+    DeferUntilHigherPhi { required_phi: f64 },
     /// Request human confirmation.
-    RequestHumanConfirmation {
-        reason: String,
-    },
+    RequestHumanConfirmation { reason: String },
     /// Suggest an epistemic action instead.
     EpistemicAction {
         action: super::super::epistemic_conflict::EpistemicAction,
         reason: String,
     },
     /// No fallback available; action is fully blocked.
-    NoFallback {
-        reason: String,
-    },
+    NoFallback { reason: String },
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

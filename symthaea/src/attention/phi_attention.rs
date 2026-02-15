@@ -536,7 +536,10 @@ pub fn softmax_with_temperature(values: &[f32], temperature: f32) -> Vec<f32> {
     // Numerical stability: subtract max before exp
     let max_val = values.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
 
-    let exp_values: Vec<f32> = values.iter().map(|&v| ((v - max_val) / temp).exp()).collect();
+    let exp_values: Vec<f32> = values
+        .iter()
+        .map(|&v| ((v - max_val) / temp).exp())
+        .collect();
 
     let sum: f32 = exp_values.iter().sum();
 
@@ -580,7 +583,11 @@ mod tests {
 
         // Weights should sum to 1
         let sum: f32 = weights.iter().sum();
-        assert!((sum - 1.0).abs() < 1e-5, "Weights should sum to 1, got {}", sum);
+        assert!(
+            (sum - 1.0).abs() < 1e-5,
+            "Weights should sum to 1, got {}",
+            sum
+        );
 
         // Higher Phi should get higher weight
         assert!(
@@ -652,16 +659,15 @@ mod tests {
         let result = gate.forward(&inputs, &phi_values);
 
         // Transformed phi = scale * phi + bias = 2.0 * phi + 0.5
-        let expected_transformed: Vec<f32> = phi_values
-            .iter()
-            .map(|&p| 2.0 * p as f32 + 0.5)
-            .collect();
+        let expected_transformed: Vec<f32> =
+            phi_values.iter().map(|&p| 2.0 * p as f32 + 0.5).collect();
 
-        for (actual, expected) in result.transformed_phi.iter().zip(expected_transformed.iter()) {
-            assert!(
-                (actual - expected).abs() < 1e-5,
-                "Transformed phi mismatch"
-            );
+        for (actual, expected) in result
+            .transformed_phi
+            .iter()
+            .zip(expected_transformed.iter())
+        {
+            assert!((actual - expected).abs() < 1e-5, "Transformed phi mismatch");
         }
     }
 
@@ -670,10 +676,7 @@ mod tests {
         let config = PhiAttentionConfig::learnable();
         let mut gate = PhiAttentionGate::new(config);
 
-        let inputs = vec![
-            ContinuousHV::random(256, 42),
-            ContinuousHV::random(256, 43),
-        ];
+        let inputs = vec![ContinuousHV::random(256, 42), ContinuousHV::random(256, 43)];
         let phi_values = vec![0.6, 0.4];
 
         // Forward pass with gradient tracking
@@ -705,10 +708,7 @@ mod tests {
             ..Default::default()
         };
 
-        let inputs = vec![
-            ContinuousHV::random(256, 42),
-            ContinuousHV::random(256, 43),
-        ];
+        let inputs = vec![ContinuousHV::random(256, 42), ContinuousHV::random(256, 43)];
         let phi_values = vec![0.99, 0.01]; // Extreme difference
 
         let weights = compute_attention_weights(&inputs, &phi_values, &config);

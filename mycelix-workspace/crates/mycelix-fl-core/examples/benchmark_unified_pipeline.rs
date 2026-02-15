@@ -50,7 +50,10 @@ fn main() {
         let max_err = max_error(&result.aggregated.gradients, 0.5);
         let elapsed = t.elapsed();
 
-        println!("  Participants: {} → {}", result.stats.total_contributions, result.aggregated.participant_count);
+        println!(
+            "  Participants: {} → {}",
+            result.stats.total_contributions, result.aggregated.participant_count
+        );
         println!("  Max error from target: {:.6}", max_err);
         println!("  Time: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
 
@@ -82,7 +85,10 @@ fn main() {
         let max_err = max_error(&result.aggregated.gradients, 0.5);
         let elapsed = t.elapsed();
 
-        println!("  Total: {} (66 honest + 34 Byzantine)", result.stats.total_contributions);
+        println!(
+            "  Total: {} (66 honest + 34 Byzantine)",
+            result.stats.total_contributions
+        );
         println!("  After gate: {}", result.stats.after_gate);
         println!("  Surviving: {}", result.aggregated.participant_count);
         println!("  Max error: {:.6}", max_err);
@@ -117,9 +123,16 @@ fn main() {
         let max_err = max_error(&result.aggregated.gradients, 0.5);
         let elapsed = t.elapsed();
 
-        println!("  Total: {} (80 honest + 20 Byzantine, same rep)", result.stats.total_contributions);
+        println!(
+            "  Total: {} (80 honest + 20 Byzantine, same rep)",
+            result.stats.total_contributions
+        );
         if let Some(ref det) = result.detection {
-            println!("  Byzantine detected: {}/{}", det.byzantine_indices.len(), result.stats.total_contributions);
+            println!(
+                "  Byzantine detected: {}/{}",
+                det.byzantine_indices.len(),
+                result.stats.total_contributions
+            );
         }
         println!("  Surviving: {}", result.aggregated.participant_count);
         println!("  Max error: {:.6}", max_err);
@@ -142,7 +155,10 @@ fn main() {
     {
         let dp_configs = [
             ("Low (ε≈10)", DifferentialPrivacyConfig::low_privacy()),
-            ("Moderate (ε≈1)", DifferentialPrivacyConfig::moderate_privacy()),
+            (
+                "Moderate (ε≈1)",
+                DifferentialPrivacyConfig::moderate_privacy(),
+            ),
             ("High (ε≈0.1)", DifferentialPrivacyConfig::high_privacy()),
         ];
 
@@ -158,11 +174,19 @@ fn main() {
 
             let result = pipeline.aggregate(&updates, &reps).unwrap();
             let max_err = max_error(&result.aggregated.gradients, 0.5);
-            let epsilon = result.privacy.as_ref().and_then(|p| p.epsilon_estimate).unwrap_or(0.0);
+            let epsilon = result
+                .privacy
+                .as_ref()
+                .and_then(|p| p.epsilon_estimate)
+                .unwrap_or(0.0);
 
-            println!("  {}: max_err={:.4}, ε≈{:.4}, σ={:.3}",
-                label, max_err, epsilon,
-                result.privacy.as_ref().map(|p| p.sigma).unwrap_or(0.0));
+            println!(
+                "  {}: max_err={:.4}, ε≈{:.4}, σ={:.3}",
+                label,
+                max_err,
+                epsilon,
+                result.privacy.as_ref().map(|p| p.sigma).unwrap_or(0.0)
+            );
         }
         println!("  PASS: DP modes exercised");
         pass += 1;
@@ -253,9 +277,18 @@ fn main() {
         let max_err = max_error(&result.result.aggregated.gradients, 0.5);
         let elapsed = t.elapsed();
 
-        println!("  Plugin weights applied: {}", result.plugin_weights_applied);
-        println!("  Verification: {:?}", result.verification.as_ref().map(|v| v.verified));
-        println!("  Surviving: {}", result.result.aggregated.participant_count);
+        println!(
+            "  Plugin weights applied: {}",
+            result.plugin_weights_applied
+        );
+        println!(
+            "  Verification: {:?}",
+            result.verification.as_ref().map(|v| v.verified)
+        );
+        println!(
+            "  Surviving: {}",
+            result.result.aggregated.participant_count
+        );
         println!("  Max error: {:.6}", max_err);
         println!("  Time: {:.2}ms", elapsed.as_secs_f64() * 1000.0);
 
@@ -343,7 +376,12 @@ fn main() {
             total += 1;
             let honest_count = 100 - byz_pct;
             let (updates, reps) = make_contributions_with_reps(
-                honest_count, *byz_pct, 0.5, 20, *honest_rep, *byz_rep,
+                honest_count,
+                *byz_pct,
+                0.5,
+                20,
+                *honest_rep,
+                *byz_rep,
             );
             let config = PipelineConfig {
                 min_reputation: 0.3,
@@ -394,12 +432,7 @@ fn main() {
     // ═══════════════════════════════════════════════════════════════
     let total_elapsed = total_start.elapsed();
     println!("══════════════════════════════════════════════════════════════");
-    println!(
-        "Results: {}/{} PASS ({} FAIL)",
-        pass,
-        pass + fail,
-        fail
-    );
+    println!("Results: {}/{} PASS ({} FAIL)", pass, pass + fail, fail);
     println!("Total time: {:.2}s", total_elapsed.as_secs_f64());
     println!("══════════════════════════════════════════════════════════════");
 
@@ -482,22 +515,13 @@ struct NormByzantinePlugin {
 }
 
 impl ByzantinePlugin for NormByzantinePlugin {
-    fn analyze(
-        &mut self,
-        updates: &[GradientUpdate],
-    ) -> ExternalWeightMap {
+    fn analyze(&mut self, updates: &[GradientUpdate]) -> ExternalWeightMap {
         let mut weights = ExternalWeightMap::new();
 
         // Compute median norm (robust to Byzantine skewing)
         let norms: Vec<f32> = updates
             .iter()
-            .map(|u| {
-                u.gradients
-                    .iter()
-                    .map(|g| g * g)
-                    .sum::<f32>()
-                    .sqrt()
-            })
+            .map(|u| u.gradients.iter().map(|g| g * g).sum::<f32>().sqrt())
             .collect();
         let mut sorted_norms = norms.clone();
         sorted_norms.sort_by(|a, b| a.partial_cmp(b).unwrap());

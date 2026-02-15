@@ -10,7 +10,7 @@ use std::collections::HashMap;
 
 /// Misaki phoneme vocabulary for Kokoro TTS.
 /// Maps IPA symbols to Kokoro phoneme IDs (0-44).
-/// Based on: https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md
+/// Based on: <https://github.com/hexgrad/misaki/blob/main/EN_PHONES.md>
 pub struct MisakiVocab {
     ipa_to_id: HashMap<&'static str, u32>,
 }
@@ -22,18 +22,18 @@ impl MisakiVocab {
 
         // American English phonemes (45 total)
         // Vowels - uppercase = long/diphthong, lowercase = short
-        ipa_to_id.insert("A", 0);   // FACE diphthong
-        ipa_to_id.insert("I", 1);   // PRICE diphthong
-        ipa_to_id.insert("W", 2);   // MOUTH diphthong
-        ipa_to_id.insert("Y", 3);   // CHOICE diphthong
-        ipa_to_id.insert("O", 4);   // GOAT diphthong
+        ipa_to_id.insert("A", 0); // FACE diphthong
+        ipa_to_id.insert("I", 1); // PRICE diphthong
+        ipa_to_id.insert("W", 2); // MOUTH diphthong
+        ipa_to_id.insert("Y", 3); // CHOICE diphthong
+        ipa_to_id.insert("O", 4); // GOAT diphthong
 
         // Consonants
         ipa_to_id.insert("b", 5);
         ipa_to_id.insert("d", 6);
         ipa_to_id.insert("f", 7);
         ipa_to_id.insert("h", 8);
-        ipa_to_id.insert("j", 10);  // y as in yes
+        ipa_to_id.insert("j", 10); // y as in yes
         ipa_to_id.insert("k", 11);
         ipa_to_id.insert("l", 12);
         ipa_to_id.insert("m", 13);
@@ -41,54 +41,54 @@ impl MisakiVocab {
         ipa_to_id.insert("p", 15);
 
         // IPA vowels
-        ipa_to_id.insert("ɑ", 16);  // PALM/LOT (American merged)
-        ipa_to_id.insert("ɔ", 17);  // THOUGHT
-        ipa_to_id.insert("ə", 18);  // schwa (COMMA)
-        ipa_to_id.insert("ɛ", 19);  // DRESS
-        ipa_to_id.insert("ɜ", 20);  // NURSE
-        ipa_to_id.insert("ɪ", 21);  // KIT
-        ipa_to_id.insert("ʊ", 22);  // FOOT
-        ipa_to_id.insert("ʌ", 23);  // STRUT
-        ipa_to_id.insert("i", 24);  // FLEECE
-        ipa_to_id.insert("u", 25);  // GOOSE
-        ipa_to_id.insert("ɹ", 26);  // r (American)
-        ipa_to_id.insert("ɾ", 27);  // flap t/d
-        ipa_to_id.insert("ᵻ", 28);  // unstressed KIT/schwa
+        ipa_to_id.insert("ɑ", 16); // PALM/LOT (American merged)
+        ipa_to_id.insert("ɔ", 17); // THOUGHT
+        ipa_to_id.insert("ə", 18); // schwa (COMMA)
+        ipa_to_id.insert("ɛ", 19); // DRESS
+        ipa_to_id.insert("ɜ", 20); // NURSE
+        ipa_to_id.insert("ɪ", 21); // KIT
+        ipa_to_id.insert("ʊ", 22); // FOOT
+        ipa_to_id.insert("ʌ", 23); // STRUT
+        ipa_to_id.insert("i", 24); // FLEECE
+        ipa_to_id.insert("u", 25); // GOOSE
+        ipa_to_id.insert("ɹ", 26); // r (American)
+        ipa_to_id.insert("ɾ", 27); // flap t/d
+        ipa_to_id.insert("ᵻ", 28); // unstressed KIT/schwa
         ipa_to_id.insert("z", 29);
         ipa_to_id.insert("v", 30);
         ipa_to_id.insert("w", 31);
 
         // Fricatives and affricates
-        ipa_to_id.insert("ʃ", 32);  // SH
-        ipa_to_id.insert("ʒ", 33);  // ZH (measure)
-        ipa_to_id.insert("ʤ", 34);  // J (judge)
+        ipa_to_id.insert("ʃ", 32); // SH
+        ipa_to_id.insert("ʒ", 33); // ZH (measure)
+        ipa_to_id.insert("ʤ", 34); // J (judge)
         ipa_to_id.insert("dʒ", 34); // alternate J
-        ipa_to_id.insert("ʧ", 35);  // CH (church)
+        ipa_to_id.insert("ʧ", 35); // CH (church)
         ipa_to_id.insert("tʃ", 35); // alternate CH
 
         // Prosody
-        ipa_to_id.insert("ˈ", 36);  // primary stress
-        ipa_to_id.insert("ˌ", 37);  // secondary stress
+        ipa_to_id.insert("ˈ", 36); // primary stress
+        ipa_to_id.insert("ˌ", 37); // secondary stress
 
         // More consonants
-        ipa_to_id.insert("θ", 38);  // TH (think)
-        ipa_to_id.insert("ð", 39);  // TH (this)
-        ipa_to_id.insert("ŋ", 40);  // NG (sing)
-        ipa_to_id.insert("ɡ", 41);  // g (IPA symbol)
-        ipa_to_id.insert("g", 41);  // g (ASCII fallback)
-        ipa_to_id.insert("ᵊ", 42);  // optional schwa
-        ipa_to_id.insert("æ", 43);  // TRAP
+        ipa_to_id.insert("θ", 38); // TH (think)
+        ipa_to_id.insert("ð", 39); // TH (this)
+        ipa_to_id.insert("ŋ", 40); // NG (sing)
+        ipa_to_id.insert("ɡ", 41); // g (IPA symbol)
+        ipa_to_id.insert("g", 41); // g (ASCII fallback)
+        ipa_to_id.insert("ᵊ", 42); // optional schwa
+        ipa_to_id.insert("æ", 43); // TRAP
 
         // Common IPA variants and alternates
-        ipa_to_id.insert("s", 29);  // map s to z slot (they share)
-        ipa_to_id.insert("t", 6);   // t maps to d slot (unvoiced pair)
-        ipa_to_id.insert("r", 26);  // r ASCII to ɹ
-        ipa_to_id.insert("ʔ", 18);  // glottal stop → schwa (reduced)
-        ipa_to_id.insert("ː", 18);  // length marker → ignored (schwa)
-        ipa_to_id.insert("ɐ", 23);  // near-open central → STRUT
-        ipa_to_id.insert("e", 19);  // close-mid front → DRESS
-        ipa_to_id.insert("o", 17);  // close-mid back → THOUGHT
-        ipa_to_id.insert("a", 16);  // open front → PALM
+        ipa_to_id.insert("s", 29); // map s to z slot (they share)
+        ipa_to_id.insert("t", 6); // t maps to d slot (unvoiced pair)
+        ipa_to_id.insert("r", 26); // r ASCII to ɹ
+        ipa_to_id.insert("ʔ", 18); // glottal stop → schwa (reduced)
+        ipa_to_id.insert("ː", 18); // length marker → ignored (schwa)
+        ipa_to_id.insert("ɐ", 23); // near-open central → STRUT
+        ipa_to_id.insert("e", 19); // close-mid front → DRESS
+        ipa_to_id.insert("o", 17); // close-mid back → THOUGHT
+        ipa_to_id.insert("a", 16); // open front → PALM
 
         Self { ipa_to_id }
     }
@@ -102,7 +102,7 @@ impl MisakiVocab {
         while i < chars.len() {
             // Try two-character sequences first (affricates, etc.)
             if i + 1 < chars.len() {
-                let two_char: String = chars[i..=i+1].iter().collect();
+                let two_char: String = chars[i..=i + 1].iter().collect();
                 if let Some(&id) = self.ipa_to_id.get(two_char.as_str()) {
                     ids.push(id);
                     i += 2;
@@ -162,30 +162,30 @@ impl G2PConverter {
         // Common English words → phoneme ID sequences (fallback)
         // These use Misaki phoneme IDs
         let common_words: &[(&str, &[u32])] = &[
-            ("hello", &[8, 19, 12, 4]),           // hɛloʊ → h ɛ l O
-            ("world", &[31, 20, 12, 6]),          // wɜld → w ɜ l d
-            ("the", &[39, 18]),                    // ðə → ð ə
-            ("a", &[18]),                          // ə
-            ("an", &[18, 14]),                     // ən → ə n
-            ("is", &[21, 29]),                     // ɪz → ɪ z
-            ("and", &[43, 14, 6]),                 // ænd → æ n d
-            ("to", &[6, 25]),                      // tu → t u
-            ("of", &[23, 30]),                     // ʌv → ʌ v
-            ("in", &[21, 14]),                     // ɪn → ɪ n
-            ("for", &[7, 17, 26]),                 // fɔr → f ɔ r
-            ("on", &[16, 14]),                     // ɑn → ɑ n
-            ("it", &[21, 6]),                      // ɪt → ɪ t
-            ("that", &[39, 43, 6]),                // ðæt → ð æ t
-            ("this", &[39, 21, 29]),               // ðɪs → ð ɪ s
-            ("with", &[31, 21, 38]),               // wɪθ → w ɪ θ
-            ("not", &[14, 16, 6]),                 // nɑt → n ɑ t
-            ("you", &[10, 25]),                    // ju → j u
-            ("we", &[31, 24]),                     // wi → w i
+            ("hello", &[8, 19, 12, 4]),  // hɛloʊ → h ɛ l O
+            ("world", &[31, 20, 12, 6]), // wɜld → w ɜ l d
+            ("the", &[39, 18]),          // ðə → ð ə
+            ("a", &[18]),                // ə
+            ("an", &[18, 14]),           // ən → ə n
+            ("is", &[21, 29]),           // ɪz → ɪ z
+            ("and", &[43, 14, 6]),       // ænd → æ n d
+            ("to", &[6, 25]),            // tu → t u
+            ("of", &[23, 30]),           // ʌv → ʌ v
+            ("in", &[21, 14]),           // ɪn → ɪ n
+            ("for", &[7, 17, 26]),       // fɔr → f ɔ r
+            ("on", &[16, 14]),           // ɑn → ɑ n
+            ("it", &[21, 6]),            // ɪt → ɪ t
+            ("that", &[39, 43, 6]),      // ðæt → ð æ t
+            ("this", &[39, 21, 29]),     // ðɪs → ð ɪ s
+            ("with", &[31, 21, 38]),     // wɪθ → w ɪ θ
+            ("not", &[14, 16, 6]),       // nɑt → n ɑ t
+            ("you", &[10, 25]),          // ju → j u
+            ("we", &[31, 24]),           // wi → w i
             ("consciousness", &[11, 16, 14, 30, 18, 29, 14, 18, 29]), // kɑnʃəsnəs
             ("symthaea", &[29, 21, 13, 38, 24, 18]), // sɪmθiə
             ("intelligence", &[21, 14, 6, 19, 12, 21, 6, 18, 14, 29]), // ɪntɛlɪdʒəns
-            ("neural", &[14, 22, 26, 18, 12]),     // nʊrəl
-            ("system", &[29, 21, 29, 6, 18, 13]),  // sɪstəm
+            ("neural", &[14, 22, 26, 18, 12]), // nʊrəl
+            ("system", &[29, 21, 29, 6, 18, 13]), // sɪstəm
         ];
 
         for (word, phonemes) in common_words {
@@ -194,12 +194,33 @@ impl G2PConverter {
 
         // Character-level fallback mapping (rough approximation)
         let char_phonemes: &[(char, u32)] = &[
-            ('a', 43), ('b', 5), ('c', 11), ('d', 6), ('e', 19),
-            ('f', 7), ('g', 41), ('h', 8), ('i', 21), ('j', 34),
-            ('k', 11), ('l', 12), ('m', 13), ('n', 14), ('o', 16),
-            ('p', 15), ('q', 11), ('r', 26), ('s', 29), ('t', 6),
-            ('u', 23), ('v', 30), ('w', 31), ('x', 11), ('y', 10),
-            ('z', 29), (' ', 0),
+            ('a', 43),
+            ('b', 5),
+            ('c', 11),
+            ('d', 6),
+            ('e', 19),
+            ('f', 7),
+            ('g', 41),
+            ('h', 8),
+            ('i', 21),
+            ('j', 34),
+            ('k', 11),
+            ('l', 12),
+            ('m', 13),
+            ('n', 14),
+            ('o', 16),
+            ('p', 15),
+            ('q', 11),
+            ('r', 26),
+            ('s', 29),
+            ('t', 6),
+            ('u', 23),
+            ('v', 30),
+            ('w', 31),
+            ('x', 11),
+            ('y', 10),
+            ('z', 29),
+            (' ', 0),
         ];
 
         for (ch, id) in char_phonemes {
@@ -304,9 +325,13 @@ impl G2PConverter {
     /// Check if espeak-ng is available.
     pub fn has_espeak(&self) -> bool {
         #[cfg(feature = "voice-tts")]
-        { self.espeak_available }
+        {
+            self.espeak_available
+        }
         #[cfg(not(feature = "voice-tts"))]
-        { false }
+        {
+            false
+        }
     }
 }
 
@@ -327,7 +352,7 @@ mod tests {
         // Test basic IPA conversion
         let ids = vocab.ipa_to_phoneme_ids("hɛˈloʊ");
         assert!(!ids.is_empty());
-        assert!(ids.contains(&8));  // h
+        assert!(ids.contains(&8)); // h
         assert!(ids.contains(&19)); // ɛ
     }
 

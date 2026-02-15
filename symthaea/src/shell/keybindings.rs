@@ -6,8 +6,7 @@
 use std::collections::HashMap;
 
 /// Editing mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum EditingMode {
     /// Normal (command) mode
     Normal,
@@ -20,10 +19,8 @@ pub enum EditingMode {
     Command,
 }
 
-
 /// Keybinding scheme
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[derive(Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum KeybindingScheme {
     /// Emacs-style (default readline)
     #[default]
@@ -33,7 +30,6 @@ pub enum KeybindingScheme {
     /// Minimal (basic editing)
     Minimal,
 }
-
 
 /// A key event
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -269,7 +265,7 @@ impl KeybindingManager {
         // Handle count prefix
         if let KeyEvent::Char(c) = &key {
             if c.is_ascii_digit() && (*c != '0' || self.count_prefix.is_some()) {
-                let digit = c.to_digit(10).unwrap() as usize;
+                let digit = c.to_digit(10).expect("c verified as ascii digit above") as usize;
                 self.count_prefix = Some(self.count_prefix.unwrap_or(0) * 10 + digit);
                 return EditAction::Noop;
             }
@@ -307,14 +303,18 @@ impl KeybindingManager {
                 self.pending_sequence.clear();
                 EditAction::Noop
             }
-            _ if self.pending_sequence.starts_with('d') ||
-                 self.pending_sequence.starts_with('y') ||
-                 self.pending_sequence.starts_with('c') => {
+            _ if self.pending_sequence.starts_with('d')
+                || self.pending_sequence.starts_with('y')
+                || self.pending_sequence.starts_with('c') =>
+            {
                 EditAction::Noop // Wait for more input
             }
             _ => {
                 self.pending_sequence.clear();
-                self.vim_normal_bindings.get(&key).cloned().unwrap_or(EditAction::Noop)
+                self.vim_normal_bindings
+                    .get(&key)
+                    .cloned()
+                    .unwrap_or(EditAction::Noop)
             }
         };
 
@@ -414,7 +414,6 @@ impl KeybindingManager {
             (Right, CursorRight),
             (Home, LineStart),
             (End, LineEnd),
-
             // Deletion
             (Ctrl('d'), DeleteForward),
             (Backspace, DeleteBack),
@@ -424,7 +423,6 @@ impl KeybindingManager {
             (Ctrl('k'), DeleteToEnd),
             (Ctrl('u'), DeleteToStart),
             (Alt('d'), DeleteWord),
-
             // History
             (Up, HistoryPrev),
             (Down, HistoryNext),
@@ -432,7 +430,6 @@ impl KeybindingManager {
             (Ctrl('n'), HistoryNext),
             (Ctrl('r'), HistorySearchBack),
             (Ctrl('s'), HistorySearchForward),
-
             // Actions
             (Enter, Accept),
             (Tab, Complete),
@@ -442,7 +439,6 @@ impl KeybindingManager {
             (Ctrl('y'), Yank),
             (Ctrl('_'), Undo),
             (Ctrl('x'), Redo), // Ctrl-X Ctrl-U in full Emacs
-
             // Case
             (Alt('u'), UppercaseWord),
             (Alt('l'), LowercaseWord),
@@ -467,7 +463,6 @@ impl KeybindingManager {
             (KeyEvent::Char('A'), EnterInsert), // Should also go to line end
             (KeyEvent::Char('v'), EnterVisual),
             (KeyEvent::Char(':'), EnterCommand),
-
             // Navigation
             (KeyEvent::Char('h'), CursorLeft),
             (KeyEvent::Char('l'), CursorRight),
@@ -480,17 +475,14 @@ impl KeybindingManager {
             (Right, CursorRight),
             (Home, LineStart),
             (End, LineEnd),
-
             // Deletion (single char)
             (KeyEvent::Char('x'), DeleteForward),
             (KeyEvent::Char('X'), DeleteBack),
-
             // History
             (KeyEvent::Char('k'), HistoryPrev),
             (KeyEvent::Char('j'), HistoryNext),
             (Up, HistoryPrev),
             (Down, HistoryNext),
-
             // Actions
             (Enter, Accept),
             (KeyEvent::Char('p'), Yank),

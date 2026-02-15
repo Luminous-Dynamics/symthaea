@@ -1,0 +1,15 @@
+[package]
+name = "sources"
+version = "0.1.0"
+edition = "2021"
+description = "LUCID - Source Provenance Coordinator Zome"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+getrandom_03.workspace = true
+sources_integrity = { path = "../integrity" }

@@ -46,16 +46,16 @@
 //!          result.coherence_after * 100.0);
 //! ```
 
-use anyhow::Result;
 use super::{
-    School, SchoolConfig, LearningObjective, LearningResult,
-    Curriculum, Recommendation, SchoolStats,
+    Curriculum, LearningObjective, LearningResult, Recommendation, School, SchoolConfig,
+    SchoolStats,
 };
 use crate::physiology::coherence::{
-    CoherenceField, CoherenceConfig, TaskComplexity, CoherenceError, CoherenceState,
+    CoherenceConfig, CoherenceError, CoherenceField, CoherenceState, TaskComplexity,
 };
 use crate::physiology::endocrine::HormoneState;
 use crate::wisdom::autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
+use anyhow::Result;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // COHERENCE-LEARNING CONFIGURATION
@@ -87,7 +87,6 @@ pub struct CoherenceLearningConfig {
     // ═══════════════════════════════════════════════════════════════════════════
     // LAYER 1: Bidirectional Φ-Coherence Feedback
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// How much Φ gain contributes to coherence (integration builds coherence)
     /// At phi_gain=0.01, coherence boost = phi_gain * phi_to_coherence_factor
     pub phi_to_coherence_factor: f32,
@@ -101,7 +100,6 @@ pub struct CoherenceLearningConfig {
     // ═══════════════════════════════════════════════════════════════════════════
     // LAYER 2: Hormone-Learning Integration
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Cortisol threshold above which learning is impaired
     /// High stress → reduced retention, increased hallucination risk
     pub cortisol_impairment_threshold: f32,
@@ -120,7 +118,7 @@ impl Default for CoherenceLearningConfig {
             coherence_phi_multiplier: 0.5, // Coherence affects up to 50% of Φ gain
             success_coherence_bonus: 0.02, // +2% coherence on success
             hallucination_coherence_penalty: 0.05, // -5% on hallucination
-            min_learning_coherence: None, // Use TaskComplexity default (0.8)
+            min_learning_coherence: None,  // Use TaskComplexity default (0.8)
             suggest_centering: true,
 
             // Layer 1: Bidirectional Φ-Coherence
@@ -130,8 +128,8 @@ impl Default for CoherenceLearningConfig {
 
             // Layer 2: Hormone-Learning Integration
             cortisol_impairment_threshold: 0.7, // High stress impairs learning
-            dopamine_phi_boost: 0.3, // Dopamine adds 30% to Φ gain
-            oxytocin_coherence_boost: 0.5, // Oxytocin adds 50% to coherence boost
+            dopamine_phi_boost: 0.3,            // Dopamine adds 30% to Φ gain
+            oxytocin_coherence_boost: 0.5,      // Oxytocin adds 50% to coherence boost
         }
     }
 }
@@ -167,7 +165,6 @@ pub struct CoherenceLearningResult {
     // ═══════════════════════════════════════════════════════════════════════════
     // LAYER 1: Bidirectional Φ-Coherence Feedback Results
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Coherence boost from Φ gain (integration builds coherence)
     pub phi_coherence_boost: f32,
 
@@ -177,7 +174,6 @@ pub struct CoherenceLearningResult {
     // ═══════════════════════════════════════════════════════════════════════════
     // LAYER 2: Hormone-Learning Integration Results
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// How much hormones affected Φ gain
     pub hormone_phi_modifier: f32,
 
@@ -201,9 +197,15 @@ impl CoherenceLearningResult {
         let coherence_delta = coherence_pct_after - coherence_pct_before;
 
         let coherence_desc = if coherence_delta > 1.0 {
-            format!("coherence rose to {:.0}% (+{:.1}%)", coherence_pct_after, coherence_delta)
+            format!(
+                "coherence rose to {:.0}% (+{:.1}%)",
+                coherence_pct_after, coherence_delta
+            )
         } else if coherence_delta < -1.0 {
-            format!("coherence dropped to {:.0}% ({:.1}%)", coherence_pct_after, coherence_delta)
+            format!(
+                "coherence dropped to {:.0}% ({:.1}%)",
+                coherence_pct_after, coherence_delta
+            )
         } else {
             format!("coherence stable at {:.0}%", coherence_pct_after)
         };
@@ -245,11 +247,7 @@ impl CoherenceLearningResult {
 
         format!(
             "Learned '{}' via {}: {} | {}{}",
-            self.learning.objective_name,
-            connection_desc,
-            phi_desc,
-            coherence_desc,
-            annotation_str
+            self.learning.objective_name, connection_desc, phi_desc, coherence_desc, annotation_str
         )
     }
 }
@@ -298,7 +296,6 @@ pub struct CoherenceBridgedSchool {
     // ═══════════════════════════════════════════════════════════════════════════
     // LAYER 3: Consciousness Graph Integration
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Autopoietic monitor tracks self-sustaining learning
     autopoietic: AutopoieticMonitor,
 
@@ -367,7 +364,9 @@ impl CoherenceBridgedSchool {
     ///
     /// Returns Some(seconds) if centering is needed, None if we can learn now
     pub fn centering_needed_for_learning(&self) -> Option<f32> {
-        let required = self.config.min_learning_coherence
+        let required = self
+            .config
+            .min_learning_coherence
             .unwrap_or(TaskComplexity::Learning.required_coherence(&self.coherence.config));
 
         if self.coherence.coherence >= required {
@@ -397,20 +396,22 @@ impl CoherenceBridgedSchool {
         with_connection: bool,
     ) -> LearningCoherencePrediction {
         let task = self.config.learning_task_complexity;
-        let coherence_prediction = self.coherence.predict_impact(
-            task,
-            with_connection,
-            &self.hormones,
-        );
+        let coherence_prediction =
+            self.coherence
+                .predict_impact(task, with_connection, &self.hormones);
 
         // Predict Φ gain (adjusted by coherence)
-        let base_phi_prediction = self.school.lookahead_engine()
+        let base_phi_prediction = self
+            .school
+            .lookahead_engine()
             .evaluate(objective, &self.get_consciousness_state())
             .map(|r| r.predicted_phi_gain)
             .unwrap_or(0.0);
 
         // Apply coherence multiplier to predicted Φ
-        let coherence_effect = self.coherence.coherence
+        let coherence_effect = self
+            .coherence
+            .coherence
             .powf(self.config.coherence_phi_multiplier);
         let adjusted_phi = base_phi_prediction * coherence_effect;
 
@@ -486,7 +487,8 @@ impl CoherenceBridgedSchool {
         let dopamine_boost = 1.0 + (self.hormones.dopamine * self.config.dopamine_phi_boost as f64);
 
         // Calculate oxytocin boost to coherence changes (connection enhances)
-        let oxytocin_boost = 1.0 + (self.hormones.oxytocin * self.config.oxytocin_coherence_boost as f64);
+        let oxytocin_boost =
+            1.0 + (self.hormones.oxytocin * self.config.oxytocin_coherence_boost as f64);
 
         // Combined hormone effect on Φ
         let hormone_phi_modifier = dopamine_boost * cortisol_penalty;
@@ -536,18 +538,18 @@ impl CoherenceBridgedSchool {
         // 6. Apply success/failure coherence effects
         if learning_result.was_hallucination {
             // Hallucination scatters coherence (cognitive dissonance)
-            self.coherence.coherence = (self.coherence.coherence
-                - self.config.hallucination_coherence_penalty).max(0.0);
+            self.coherence.coherence =
+                (self.coherence.coherence - self.config.hallucination_coherence_penalty).max(0.0);
         } else {
             // Apply base success bonus
             if learning_result.actual_phi_gain > 0.0 {
-                self.coherence.coherence = (self.coherence.coherence
-                    + self.config.success_coherence_bonus).min(1.0);
+                self.coherence.coherence =
+                    (self.coherence.coherence + self.config.success_coherence_bonus).min(1.0);
             }
 
             // Apply bidirectional Φ → coherence boost
-            self.coherence.coherence = (self.coherence.coherence + phi_coherence_boost)
-                .clamp(0.0, 1.0);
+            self.coherence.coherence =
+                (self.coherence.coherence + phi_coherence_boost).clamp(0.0, 1.0);
 
             // Extra boost if virtuous cycle is active
             if virtuous_cycle_active {
@@ -572,8 +574,13 @@ impl CoherenceBridgedSchool {
 
         // Record this learning cycle as a cognitive production cycle
         // Prediction error = hallucination rate (world-model mismatch)
-        let prediction_error = if learning_result.was_hallucination { 1.0 } else { 0.0 };
-        self.autopoietic.record_cycle(prediction_error, self.coherence.coherence);
+        let prediction_error = if learning_result.was_hallucination {
+            1.0
+        } else {
+            0.0
+        };
+        self.autopoietic
+            .record_cycle(prediction_error, self.coherence.coherence);
 
         // Track virtuous cycles
         if virtuous_cycle_active {
@@ -848,7 +855,6 @@ pub struct CoherenceBridgedStats {
     // ═══════════════════════════════════════════════════════════════════════════
     // LAYER 3: Consciousness Graph Stats
     // ═══════════════════════════════════════════════════════════════════════════
-
     /// Count of virtuous cycles achieved (Φ↑ → coherence↑ → next Φ↑)
     pub virtuous_cycle_count: u64,
 
@@ -869,7 +875,7 @@ pub struct CoherenceBridgedStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::school::{Difficulty, Domain, CurriculumType};
+    use crate::school::{CurriculumType, Difficulty, Domain};
 
     fn create_test_school() -> School {
         let mut school = School::new(SchoolConfig::fast()).unwrap();
@@ -921,7 +927,8 @@ mod tests {
         assert!(
             result.coherence_after >= before - 0.01 || result.with_connection,
             "Connected learning should maintain or build coherence: {} -> {}",
-            before, result.coherence_after
+            before,
+            result.coherence_after
         );
     }
 
@@ -981,7 +988,8 @@ mod tests {
         assert!(
             after > before,
             "Gratitude should boost coherence: {} -> {}",
-            before, after
+            before,
+            after
         );
     }
 
@@ -996,7 +1004,10 @@ mod tests {
         let rec = bridged.recommend_next_with_coherence().unwrap();
 
         assert!(rec.needs_centering());
-        if let CoherenceRecommendation::NeedsCentering { centering_seconds, .. } = rec {
+        if let CoherenceRecommendation::NeedsCentering {
+            centering_seconds, ..
+        } = rec
+        {
             assert!(centering_seconds > 0.0);
         }
     }
@@ -1045,7 +1056,9 @@ mod tests {
 
 // Helper trait for cloning School (for tests)
 trait TryClone {
-    fn try_clone(&self) -> Result<Self> where Self: Sized;
+    fn try_clone(&self) -> Result<Self>
+    where
+        Self: Sized;
 }
 
 impl TryClone for School {

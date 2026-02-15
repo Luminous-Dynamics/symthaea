@@ -54,3 +54,23 @@ path = "tests/fl_bridge_e2e.rs"
 [[test]]
 name = "identity_pqc_workflow"
 path = "tests/identity_pqc_workflow.rs"
+
+[[test]]
+name = "cross_cluster_dispatch"
+path = "tests/cross_cluster_dispatch.rs"
+
+[[test]]
+name = "identity_revocation"
+path = "tests/identity_revocation.rs"
+
+[[test]]
+name = "identity_recovery"
+path = "tests/identity_recovery.rs"
+
+[[test]]
+name = "identity_trust_credential"
+path = "tests/identity_trust_credential.rs"
+
+[[test]]
+name = "identity_verifiable_credential"
+path = "tests/identity_verifiable_credential.rs"

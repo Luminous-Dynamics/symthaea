@@ -36,17 +36,15 @@
 //! - **Pitch**: Higher arousal = higher pitch range
 //! - **Energy**: Flow state = more emphatic delivery
 
-use std::collections::HashMap;
 use anyhow::Result;
-use tracing::{warn, debug};
+use std::collections::HashMap;
 #[cfg(feature = "audio")]
 use tracing::info;
+use tracing::{debug, warn};
 
 use crate::voice::{
-    LTCPacing, VoiceOutput, VoiceOutputConfig,
-    ArticulatorySynthesizer, ArticulatoryConfig, TimedPhoneme,
-    FormantVocoder, VocoderConfig,
-    CognitiveVoiceBridge,
+    ArticulatoryConfig, ArticulatorySynthesizer, CognitiveVoiceBridge, FormantVocoder, LTCPacing,
+    TimedPhoneme, VocoderConfig, VoiceOutput, VoiceOutputConfig,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -89,7 +87,7 @@ impl Default for ReplVoiceConfig {
             volume: 0.8,
             device_name: None,
             consciousness_modulated: true,
-            base_f0: 150.0,  // Neutral voice
+            base_f0: 150.0, // Neutral voice
             use_articulatory: true,
             phoneme_duration_base: 0.08,
         }
@@ -100,8 +98,8 @@ impl ReplVoiceConfig {
     /// Create a low-latency configuration
     pub fn low_latency() -> Self {
         Self {
-            base_rate: 1.2,  // Slightly faster
-            use_articulatory: false,  // Simpler synthesis
+            base_rate: 1.2,          // Slightly faster
+            use_articulatory: false, // Simpler synthesis
             ..Default::default()
         }
     }
@@ -157,7 +155,10 @@ impl SimpleG2P {
         dictionary.insert("many".to_string(), vec!["M", "EH1", "N", "IY0"]);
         dictionary.insert("much".to_string(), vec!["M", "AH1", "CH"]);
         dictionary.insert("few".to_string(), vec!["F", "Y", "UW1"]);
-        dictionary.insert("several".to_string(), vec!["S", "EH1", "V", "R", "AH0", "L"]);
+        dictionary.insert(
+            "several".to_string(),
+            vec!["S", "EH1", "V", "R", "AH0", "L"],
+        );
 
         // ═══════════════════════════════════════════════════════════════════
         // PRONOUNS
@@ -170,15 +171,24 @@ impl SimpleG2P {
         dictionary.insert("you".to_string(), vec!["Y", "UW1"]);
         dictionary.insert("your".to_string(), vec!["Y", "AO1", "R"]);
         dictionary.insert("yours".to_string(), vec!["Y", "AO1", "R", "Z"]);
-        dictionary.insert("yourself".to_string(), vec!["Y", "AO0", "R", "S", "EH1", "L", "F"]);
+        dictionary.insert(
+            "yourself".to_string(),
+            vec!["Y", "AO0", "R", "S", "EH1", "L", "F"],
+        );
         dictionary.insert("he".to_string(), vec!["HH", "IY1"]);
         dictionary.insert("him".to_string(), vec!["HH", "IH1", "M"]);
         dictionary.insert("his".to_string(), vec!["HH", "IH1", "Z"]);
-        dictionary.insert("himself".to_string(), vec!["HH", "IH0", "M", "S", "EH1", "L", "F"]);
+        dictionary.insert(
+            "himself".to_string(),
+            vec!["HH", "IH0", "M", "S", "EH1", "L", "F"],
+        );
         dictionary.insert("she".to_string(), vec!["SH", "IY1"]);
         dictionary.insert("her".to_string(), vec!["HH", "ER1"]);
         dictionary.insert("hers".to_string(), vec!["HH", "ER1", "Z"]);
-        dictionary.insert("herself".to_string(), vec!["HH", "ER0", "S", "EH1", "L", "F"]);
+        dictionary.insert(
+            "herself".to_string(),
+            vec!["HH", "ER0", "S", "EH1", "L", "F"],
+        );
         dictionary.insert("it".to_string(), vec!["IH1", "T"]);
         dictionary.insert("its".to_string(), vec!["IH1", "T", "S"]);
         dictionary.insert("itself".to_string(), vec!["IH0", "T", "S", "EH1", "L", "F"]);
@@ -186,18 +196,27 @@ impl SimpleG2P {
         dictionary.insert("us".to_string(), vec!["AH1", "S"]);
         dictionary.insert("our".to_string(), vec!["AW1", "ER0"]);
         dictionary.insert("ours".to_string(), vec!["AW1", "ER0", "Z"]);
-        dictionary.insert("ourselves".to_string(), vec!["AW0", "ER0", "S", "EH1", "L", "V", "Z"]);
+        dictionary.insert(
+            "ourselves".to_string(),
+            vec!["AW0", "ER0", "S", "EH1", "L", "V", "Z"],
+        );
         dictionary.insert("they".to_string(), vec!["DH", "EY1"]);
         dictionary.insert("them".to_string(), vec!["DH", "EH1", "M"]);
         dictionary.insert("their".to_string(), vec!["DH", "EH1", "R"]);
         dictionary.insert("theirs".to_string(), vec!["DH", "EH1", "R", "Z"]);
-        dictionary.insert("themselves".to_string(), vec!["DH", "EH0", "M", "S", "EH1", "L", "V", "Z"]);
+        dictionary.insert(
+            "themselves".to_string(),
+            vec!["DH", "EH0", "M", "S", "EH1", "L", "V", "Z"],
+        );
         dictionary.insert("who".to_string(), vec!["HH", "UW1"]);
         dictionary.insert("whom".to_string(), vec!["HH", "UW1", "M"]);
         dictionary.insert("whose".to_string(), vec!["HH", "UW1", "Z"]);
         dictionary.insert("which".to_string(), vec!["W", "IH1", "CH"]);
         dictionary.insert("what".to_string(), vec!["W", "AH1", "T"]);
-        dictionary.insert("whatever".to_string(), vec!["W", "AH2", "T", "EH1", "V", "ER0"]);
+        dictionary.insert(
+            "whatever".to_string(),
+            vec!["W", "AH2", "T", "EH1", "V", "ER0"],
+        );
         dictionary.insert("whoever".to_string(), vec!["HH", "UW0", "EH1", "V", "ER0"]);
 
         // ═══════════════════════════════════════════════════════════════════
@@ -221,12 +240,18 @@ impl SimpleG2P {
         dictionary.insert("under".to_string(), vec!["AH1", "N", "D", "ER0"]);
         dictionary.insert("above".to_string(), vec!["AH0", "B", "AH1", "V"]);
         dictionary.insert("below".to_string(), vec!["B", "IH0", "L", "OW1"]);
-        dictionary.insert("between".to_string(), vec!["B", "IH0", "T", "W", "IY1", "N"]);
+        dictionary.insert(
+            "between".to_string(),
+            vec!["B", "IH0", "T", "W", "IY1", "N"],
+        );
         dictionary.insert("among".to_string(), vec!["AH0", "M", "AH1", "NG"]);
         dictionary.insert("through".to_string(), vec!["TH", "R", "UW1"]);
         dictionary.insert("during".to_string(), vec!["D", "UH1", "R", "IH0", "NG"]);
         dictionary.insert("before".to_string(), vec!["B", "IH0", "F", "AO1", "R"]);
-        dictionary.insert("behind".to_string(), vec!["B", "IH0", "HH", "AY1", "N", "D"]);
+        dictionary.insert(
+            "behind".to_string(),
+            vec!["B", "IH0", "HH", "AY1", "N", "D"],
+        );
         dictionary.insert("beyond".to_string(), vec!["B", "IH0", "AA1", "N", "D"]);
         dictionary.insert("without".to_string(), vec!["W", "IH0", "TH", "AW1", "T"]);
         dictionary.insert("within".to_string(), vec!["W", "IH0", "DH", "IH1", "N"]);
@@ -234,8 +259,14 @@ impl SimpleG2P {
         dictionary.insert("across".to_string(), vec!["AH0", "K", "R", "AO1", "S"]);
         dictionary.insert("along".to_string(), vec!["AH0", "L", "AO1", "NG"]);
         dictionary.insert("toward".to_string(), vec!["T", "AH0", "W", "AO1", "R", "D"]);
-        dictionary.insert("towards".to_string(), vec!["T", "AH0", "W", "AO1", "R", "D", "Z"]);
-        dictionary.insert("against".to_string(), vec!["AH0", "G", "EH1", "N", "S", "T"]);
+        dictionary.insert(
+            "towards".to_string(),
+            vec!["T", "AH0", "W", "AO1", "R", "D", "Z"],
+        );
+        dictionary.insert(
+            "against".to_string(),
+            vec!["AH0", "G", "EH1", "N", "S", "T"],
+        );
         dictionary.insert("and".to_string(), vec!["AE1", "N", "D"]);
         dictionary.insert("or".to_string(), vec!["AO1", "R"]);
         dictionary.insert("but".to_string(), vec!["B", "AH1", "T"]);
@@ -253,7 +284,10 @@ impl SimpleG2P {
         dictionary.insert("unless".to_string(), vec!["AH0", "N", "L", "EH1", "S"]);
         dictionary.insert("until".to_string(), vec!["AH0", "N", "T", "IH1", "L"]);
         dictionary.insert("however".to_string(), vec!["HH", "AW0", "EH1", "V", "ER0"]);
-        dictionary.insert("therefore".to_string(), vec!["DH", "EH1", "R", "F", "AO2", "R"]);
+        dictionary.insert(
+            "therefore".to_string(),
+            vec!["DH", "EH1", "R", "F", "AO2", "R"],
+        );
         dictionary.insert("thus".to_string(), vec!["DH", "AH1", "S"]);
 
         // ═══════════════════════════════════════════════════════════════════
@@ -301,7 +335,10 @@ impl SimpleG2P {
         dictionary.insert("think".to_string(), vec!["TH", "IH1", "NG", "K"]);
         dictionary.insert("thinks".to_string(), vec!["TH", "IH1", "NG", "K", "S"]);
         dictionary.insert("thought".to_string(), vec!["TH", "AO1", "T"]);
-        dictionary.insert("thinking".to_string(), vec!["TH", "IH1", "NG", "K", "IH0", "NG"]);
+        dictionary.insert(
+            "thinking".to_string(),
+            vec!["TH", "IH1", "NG", "K", "IH0", "NG"],
+        );
         dictionary.insert("take".to_string(), vec!["T", "EY1", "K"]);
         dictionary.insert("takes".to_string(), vec!["T", "EY1", "K", "S"]);
         dictionary.insert("took".to_string(), vec!["T", "UH1", "K"]);
@@ -319,7 +356,10 @@ impl SimpleG2P {
         dictionary.insert("want".to_string(), vec!["W", "AA1", "N", "T"]);
         dictionary.insert("wants".to_string(), vec!["W", "AA1", "N", "T", "S"]);
         dictionary.insert("wanted".to_string(), vec!["W", "AA1", "N", "T", "IH0", "D"]);
-        dictionary.insert("wanting".to_string(), vec!["W", "AA1", "N", "T", "IH0", "NG"]);
+        dictionary.insert(
+            "wanting".to_string(),
+            vec!["W", "AA1", "N", "T", "IH0", "NG"],
+        );
         dictionary.insert("use".to_string(), vec!["Y", "UW1", "Z"]);
         dictionary.insert("uses".to_string(), vec!["Y", "UW1", "Z", "IH0", "Z"]);
         dictionary.insert("used".to_string(), vec!["Y", "UW1", "Z", "D"]);
@@ -327,7 +367,10 @@ impl SimpleG2P {
         dictionary.insert("find".to_string(), vec!["F", "AY1", "N", "D"]);
         dictionary.insert("finds".to_string(), vec!["F", "AY1", "N", "D", "Z"]);
         dictionary.insert("found".to_string(), vec!["F", "AW1", "N", "D"]);
-        dictionary.insert("finding".to_string(), vec!["F", "AY1", "N", "D", "IH0", "NG"]);
+        dictionary.insert(
+            "finding".to_string(),
+            vec!["F", "AY1", "N", "D", "IH0", "NG"],
+        );
         dictionary.insert("give".to_string(), vec!["G", "IH1", "V"]);
         dictionary.insert("gives".to_string(), vec!["G", "IH1", "V", "Z"]);
         dictionary.insert("gave".to_string(), vec!["G", "EY1", "V"]);
@@ -358,9 +401,15 @@ impl SimpleG2P {
         dictionary.insert("felt".to_string(), vec!["F", "EH1", "L", "T"]);
         dictionary.insert("feeling".to_string(), vec!["F", "IY1", "L", "IH0", "NG"]);
         dictionary.insert("become".to_string(), vec!["B", "IH0", "K", "AH1", "M"]);
-        dictionary.insert("becomes".to_string(), vec!["B", "IH0", "K", "AH1", "M", "Z"]);
+        dictionary.insert(
+            "becomes".to_string(),
+            vec!["B", "IH0", "K", "AH1", "M", "Z"],
+        );
         dictionary.insert("became".to_string(), vec!["B", "IH0", "K", "EY1", "M"]);
-        dictionary.insert("becoming".to_string(), vec!["B", "IH0", "K", "AH1", "M", "IH0", "NG"]);
+        dictionary.insert(
+            "becoming".to_string(),
+            vec!["B", "IH0", "K", "AH1", "M", "IH0", "NG"],
+        );
         dictionary.insert("leave".to_string(), vec!["L", "IY1", "V"]);
         dictionary.insert("leaves".to_string(), vec!["L", "IY1", "V", "Z"]);
         dictionary.insert("left".to_string(), vec!["L", "EH1", "F", "T"]);
@@ -383,7 +432,10 @@ impl SimpleG2P {
         dictionary.insert("begins".to_string(), vec!["B", "IH0", "G", "IH1", "N", "Z"]);
         dictionary.insert("began".to_string(), vec!["B", "IH0", "G", "AE1", "N"]);
         dictionary.insert("begun".to_string(), vec!["B", "IH0", "G", "AH1", "N"]);
-        dictionary.insert("beginning".to_string(), vec!["B", "IH0", "G", "IH1", "N", "IH0", "NG"]);
+        dictionary.insert(
+            "beginning".to_string(),
+            vec!["B", "IH0", "G", "IH1", "N", "IH0", "NG"],
+        );
         dictionary.insert("seem".to_string(), vec!["S", "IY1", "M"]);
         dictionary.insert("seems".to_string(), vec!["S", "IY1", "M", "Z"]);
         dictionary.insert("seemed".to_string(), vec!["S", "IY1", "M", "D"]);
@@ -391,7 +443,10 @@ impl SimpleG2P {
         dictionary.insert("help".to_string(), vec!["HH", "EH1", "L", "P"]);
         dictionary.insert("helps".to_string(), vec!["HH", "EH1", "L", "P", "S"]);
         dictionary.insert("helped".to_string(), vec!["HH", "EH1", "L", "P", "T"]);
-        dictionary.insert("helping".to_string(), vec!["HH", "EH1", "L", "P", "IH0", "NG"]);
+        dictionary.insert(
+            "helping".to_string(),
+            vec!["HH", "EH1", "L", "P", "IH0", "NG"],
+        );
         dictionary.insert("show".to_string(), vec!["SH", "OW1"]);
         dictionary.insert("shows".to_string(), vec!["SH", "OW1", "Z"]);
         dictionary.insert("showed".to_string(), vec!["SH", "OW1", "D"]);
@@ -418,30 +473,66 @@ impl SimpleG2P {
         dictionary.insert("lived".to_string(), vec!["L", "IH1", "V", "D"]);
         dictionary.insert("living".to_string(), vec!["L", "IH1", "V", "IH0", "NG"]);
         dictionary.insert("believe".to_string(), vec!["B", "IH0", "L", "IY1", "V"]);
-        dictionary.insert("believes".to_string(), vec!["B", "IH0", "L", "IY1", "V", "Z"]);
-        dictionary.insert("believed".to_string(), vec!["B", "IH0", "L", "IY1", "V", "D"]);
-        dictionary.insert("believing".to_string(), vec!["B", "IH0", "L", "IY1", "V", "IH0", "NG"]);
+        dictionary.insert(
+            "believes".to_string(),
+            vec!["B", "IH0", "L", "IY1", "V", "Z"],
+        );
+        dictionary.insert(
+            "believed".to_string(),
+            vec!["B", "IH0", "L", "IY1", "V", "D"],
+        );
+        dictionary.insert(
+            "believing".to_string(),
+            vec!["B", "IH0", "L", "IY1", "V", "IH0", "NG"],
+        );
         dictionary.insert("bring".to_string(), vec!["B", "R", "IH1", "NG"]);
         dictionary.insert("brings".to_string(), vec!["B", "R", "IH1", "NG", "Z"]);
         dictionary.insert("brought".to_string(), vec!["B", "R", "AO1", "T"]);
-        dictionary.insert("bringing".to_string(), vec!["B", "R", "IH1", "NG", "IH0", "NG"]);
+        dictionary.insert(
+            "bringing".to_string(),
+            vec!["B", "R", "IH1", "NG", "IH0", "NG"],
+        );
         dictionary.insert("happen".to_string(), vec!["HH", "AE1", "P", "AH0", "N"]);
-        dictionary.insert("happens".to_string(), vec!["HH", "AE1", "P", "AH0", "N", "Z"]);
-        dictionary.insert("happened".to_string(), vec!["HH", "AE1", "P", "AH0", "N", "D"]);
-        dictionary.insert("happening".to_string(), vec!["HH", "AE1", "P", "AH0", "N", "IH0", "NG"]);
+        dictionary.insert(
+            "happens".to_string(),
+            vec!["HH", "AE1", "P", "AH0", "N", "Z"],
+        );
+        dictionary.insert(
+            "happened".to_string(),
+            vec!["HH", "AE1", "P", "AH0", "N", "D"],
+        );
+        dictionary.insert(
+            "happening".to_string(),
+            vec!["HH", "AE1", "P", "AH0", "N", "IH0", "NG"],
+        );
         dictionary.insert("write".to_string(), vec!["R", "AY1", "T"]);
         dictionary.insert("writes".to_string(), vec!["R", "AY1", "T", "S"]);
         dictionary.insert("wrote".to_string(), vec!["R", "OW1", "T"]);
         dictionary.insert("written".to_string(), vec!["R", "IH1", "T", "AH0", "N"]);
         dictionary.insert("writing".to_string(), vec!["R", "AY1", "T", "IH0", "NG"]);
-        dictionary.insert("provide".to_string(), vec!["P", "R", "AH0", "V", "AY1", "D"]);
-        dictionary.insert("provides".to_string(), vec!["P", "R", "AH0", "V", "AY1", "D", "Z"]);
-        dictionary.insert("provided".to_string(), vec!["P", "R", "AH0", "V", "AY1", "D", "IH0", "D"]);
-        dictionary.insert("providing".to_string(), vec!["P", "R", "AH0", "V", "AY1", "D", "IH0", "NG"]);
+        dictionary.insert(
+            "provide".to_string(),
+            vec!["P", "R", "AH0", "V", "AY1", "D"],
+        );
+        dictionary.insert(
+            "provides".to_string(),
+            vec!["P", "R", "AH0", "V", "AY1", "D", "Z"],
+        );
+        dictionary.insert(
+            "provided".to_string(),
+            vec!["P", "R", "AH0", "V", "AY1", "D", "IH0", "D"],
+        );
+        dictionary.insert(
+            "providing".to_string(),
+            vec!["P", "R", "AH0", "V", "AY1", "D", "IH0", "NG"],
+        );
         dictionary.insert("stand".to_string(), vec!["S", "T", "AE1", "N", "D"]);
         dictionary.insert("stands".to_string(), vec!["S", "T", "AE1", "N", "D", "Z"]);
         dictionary.insert("stood".to_string(), vec!["S", "T", "UH1", "D"]);
-        dictionary.insert("standing".to_string(), vec!["S", "T", "AE1", "N", "D", "IH0", "NG"]);
+        dictionary.insert(
+            "standing".to_string(),
+            vec!["S", "T", "AE1", "N", "D", "IH0", "NG"],
+        );
         dictionary.insert("read".to_string(), vec!["R", "IY1", "D"]);
         dictionary.insert("reads".to_string(), vec!["R", "IY1", "D", "Z"]);
         dictionary.insert("reading".to_string(), vec!["R", "IY1", "D", "IH0", "NG"]);
@@ -450,21 +541,50 @@ impl SimpleG2P {
         dictionary.insert("learned".to_string(), vec!["L", "ER1", "N", "D"]);
         dictionary.insert("learning".to_string(), vec!["L", "ER1", "N", "IH0", "NG"]);
         dictionary.insert("change".to_string(), vec!["CH", "EY1", "N", "JH"]);
-        dictionary.insert("changes".to_string(), vec!["CH", "EY1", "N", "JH", "IH0", "Z"]);
+        dictionary.insert(
+            "changes".to_string(),
+            vec!["CH", "EY1", "N", "JH", "IH0", "Z"],
+        );
         dictionary.insert("changed".to_string(), vec!["CH", "EY1", "N", "JH", "D"]);
-        dictionary.insert("changing".to_string(), vec!["CH", "EY1", "N", "JH", "IH0", "NG"]);
+        dictionary.insert(
+            "changing".to_string(),
+            vec!["CH", "EY1", "N", "JH", "IH0", "NG"],
+        );
         dictionary.insert("lead".to_string(), vec!["L", "IY1", "D"]);
         dictionary.insert("leads".to_string(), vec!["L", "IY1", "D", "Z"]);
         dictionary.insert("led".to_string(), vec!["L", "EH1", "D"]);
         dictionary.insert("leading".to_string(), vec!["L", "IY1", "D", "IH0", "NG"]);
-        dictionary.insert("understand".to_string(), vec!["AH2", "N", "D", "ER0", "S", "T", "AE1", "N", "D"]);
-        dictionary.insert("understands".to_string(), vec!["AH2", "N", "D", "ER0", "S", "T", "AE1", "N", "D", "Z"]);
-        dictionary.insert("understood".to_string(), vec!["AH2", "N", "D", "ER0", "S", "T", "UH1", "D"]);
-        dictionary.insert("understanding".to_string(), vec!["AH2", "N", "D", "ER0", "S", "T", "AE1", "N", "D", "IH0", "NG"]);
+        dictionary.insert(
+            "understand".to_string(),
+            vec!["AH2", "N", "D", "ER0", "S", "T", "AE1", "N", "D"],
+        );
+        dictionary.insert(
+            "understands".to_string(),
+            vec!["AH2", "N", "D", "ER0", "S", "T", "AE1", "N", "D", "Z"],
+        );
+        dictionary.insert(
+            "understood".to_string(),
+            vec!["AH2", "N", "D", "ER0", "S", "T", "UH1", "D"],
+        );
+        dictionary.insert(
+            "understanding".to_string(),
+            vec![
+                "AH2", "N", "D", "ER0", "S", "T", "AE1", "N", "D", "IH0", "NG",
+            ],
+        );
         dictionary.insert("create".to_string(), vec!["K", "R", "IY0", "EY1", "T"]);
-        dictionary.insert("creates".to_string(), vec!["K", "R", "IY0", "EY1", "T", "S"]);
-        dictionary.insert("created".to_string(), vec!["K", "R", "IY0", "EY1", "T", "IH0", "D"]);
-        dictionary.insert("creating".to_string(), vec!["K", "R", "IY0", "EY1", "T", "IH0", "NG"]);
+        dictionary.insert(
+            "creates".to_string(),
+            vec!["K", "R", "IY0", "EY1", "T", "S"],
+        );
+        dictionary.insert(
+            "created".to_string(),
+            vec!["K", "R", "IY0", "EY1", "T", "IH0", "D"],
+        );
+        dictionary.insert(
+            "creating".to_string(),
+            vec!["K", "R", "IY0", "EY1", "T", "IH0", "NG"],
+        );
 
         // ═══════════════════════════════════════════════════════════════════
         // MODAL VERBS
@@ -495,25 +615,37 @@ impl SimpleG2P {
         dictionary.insert("right".to_string(), vec!["R", "AY1", "T"]);
         dictionary.insert("big".to_string(), vec!["B", "IH1", "G"]);
         dictionary.insert("high".to_string(), vec!["HH", "AY1"]);
-        dictionary.insert("different".to_string(), vec!["D", "IH1", "F", "ER0", "AH0", "N", "T"]);
+        dictionary.insert(
+            "different".to_string(),
+            vec!["D", "IH1", "F", "ER0", "AH0", "N", "T"],
+        );
         dictionary.insert("small".to_string(), vec!["S", "M", "AO1", "L"]);
         dictionary.insert("large".to_string(), vec!["L", "AA1", "R", "JH"]);
         dictionary.insert("next".to_string(), vec!["N", "EH1", "K", "S", "T"]);
         dictionary.insert("young".to_string(), vec!["Y", "AH1", "NG"]);
-        dictionary.insert("important".to_string(), vec!["IH0", "M", "P", "AO1", "R", "T", "AH0", "N", "T"]);
+        dictionary.insert(
+            "important".to_string(),
+            vec!["IH0", "M", "P", "AO1", "R", "T", "AH0", "N", "T"],
+        );
         dictionary.insert("public".to_string(), vec!["P", "AH1", "B", "L", "IH0", "K"]);
         dictionary.insert("bad".to_string(), vec!["B", "AE1", "D"]);
         dictionary.insert("same".to_string(), vec!["S", "EY1", "M"]);
         dictionary.insert("able".to_string(), vec!["EY1", "B", "AH0", "L"]);
         dictionary.insert("true".to_string(), vec!["T", "R", "UW1"]);
         dictionary.insert("false".to_string(), vec!["F", "AO1", "L", "S"]);
-        dictionary.insert("possible".to_string(), vec!["P", "AA1", "S", "AH0", "B", "AH0", "L"]);
+        dictionary.insert(
+            "possible".to_string(),
+            vec!["P", "AA1", "S", "AH0", "B", "AH0", "L"],
+        );
         dictionary.insert("sure".to_string(), vec!["SH", "UH1", "R"]);
         dictionary.insert("clear".to_string(), vec!["K", "L", "IY1", "R"]);
         dictionary.insert("full".to_string(), vec!["F", "UH1", "L"]);
         dictionary.insert("empty".to_string(), vec!["EH1", "M", "P", "T", "IY0"]);
         dictionary.insert("simple".to_string(), vec!["S", "IH1", "M", "P", "AH0", "L"]);
-        dictionary.insert("complex".to_string(), vec!["K", "AA1", "M", "P", "L", "EH0", "K", "S"]);
+        dictionary.insert(
+            "complex".to_string(),
+            vec!["K", "AA1", "M", "P", "L", "EH0", "K", "S"],
+        );
         dictionary.insert("easy".to_string(), vec!["IY1", "Z", "IY0"]);
         dictionary.insert("hard".to_string(), vec!["HH", "AA1", "R", "D"]);
         dictionary.insert("fast".to_string(), vec!["F", "AE1", "S", "T"]);
@@ -523,16 +655,28 @@ impl SimpleG2P {
         dictionary.insert("open".to_string(), vec!["OW1", "P", "AH0", "N"]);
         dictionary.insert("closed".to_string(), vec!["K", "L", "OW1", "Z", "D"]);
         dictionary.insert("whole".to_string(), vec!["HH", "OW1", "L"]);
-        dictionary.insert("special".to_string(), vec!["S", "P", "EH1", "SH", "AH0", "L"]);
+        dictionary.insert(
+            "special".to_string(),
+            vec!["S", "P", "EH1", "SH", "AH0", "L"],
+        );
         dictionary.insert("real".to_string(), vec!["R", "IY1", "L"]);
         dictionary.insert("ready".to_string(), vec!["R", "EH1", "D", "IY0"]);
-        dictionary.insert("present".to_string(), vec!["P", "R", "EH1", "Z", "AH0", "N", "T"]);
+        dictionary.insert(
+            "present".to_string(),
+            vec!["P", "R", "EH1", "Z", "AH0", "N", "T"],
+        );
         dictionary.insert("future".to_string(), vec!["F", "Y", "UW1", "CH", "ER0"]);
         dictionary.insert("past".to_string(), vec!["P", "AE1", "S", "T"]);
         dictionary.insert("current".to_string(), vec!["K", "ER1", "AH0", "N", "T"]);
-        dictionary.insert("natural".to_string(), vec!["N", "AE1", "CH", "ER0", "AH0", "L"]);
+        dictionary.insert(
+            "natural".to_string(),
+            vec!["N", "AE1", "CH", "ER0", "AH0", "L"],
+        );
         dictionary.insert("human".to_string(), vec!["HH", "Y", "UW1", "M", "AH0", "N"]);
-        dictionary.insert("beautiful".to_string(), vec!["B", "Y", "UW1", "T", "AH0", "F", "AH0", "L"]);
+        dictionary.insert(
+            "beautiful".to_string(),
+            vec!["B", "Y", "UW1", "T", "AH0", "F", "AH0", "L"],
+        );
         dictionary.insert("strong".to_string(), vec!["S", "T", "R", "AO1", "NG"]);
         dictionary.insert("weak".to_string(), vec!["W", "IY1", "K"]);
         dictionary.insert("light".to_string(), vec!["L", "AY1", "T"]);
@@ -562,12 +706,24 @@ impl SimpleG2P {
         dictionary.insert("place".to_string(), vec!["P", "L", "EY1", "S"]);
         dictionary.insert("case".to_string(), vec!["K", "EY1", "S"]);
         dictionary.insert("week".to_string(), vec!["W", "IY1", "K"]);
-        dictionary.insert("company".to_string(), vec!["K", "AH1", "M", "P", "AH0", "N", "IY0"]);
+        dictionary.insert(
+            "company".to_string(),
+            vec!["K", "AH1", "M", "P", "AH0", "N", "IY0"],
+        );
         dictionary.insert("system".to_string(), vec!["S", "IH1", "S", "T", "AH0", "M"]);
-        dictionary.insert("program".to_string(), vec!["P", "R", "OW1", "G", "R", "AE2", "M"]);
-        dictionary.insert("question".to_string(), vec!["K", "W", "EH1", "S", "CH", "AH0", "N"]);
+        dictionary.insert(
+            "program".to_string(),
+            vec!["P", "R", "OW1", "G", "R", "AE2", "M"],
+        );
+        dictionary.insert(
+            "question".to_string(),
+            vec!["K", "W", "EH1", "S", "CH", "AH0", "N"],
+        );
         dictionary.insert("work".to_string(), vec!["W", "ER1", "K"]);
-        dictionary.insert("government".to_string(), vec!["G", "AH1", "V", "ER0", "N", "M", "AH0", "N", "T"]);
+        dictionary.insert(
+            "government".to_string(),
+            vec!["G", "AH1", "V", "ER0", "N", "M", "AH0", "N", "T"],
+        );
         dictionary.insert("number".to_string(), vec!["N", "AH1", "M", "B", "ER0"]);
         dictionary.insert("night".to_string(), vec!["N", "AY1", "T"]);
         dictionary.insert("point".to_string(), vec!["P", "OY1", "N", "T"]);
@@ -588,7 +744,10 @@ impl SimpleG2P {
         dictionary.insert("eye".to_string(), vec!["AY1"]);
         dictionary.insert("job".to_string(), vec!["JH", "AA1", "B"]);
         dictionary.insert("word".to_string(), vec!["W", "ER1", "D"]);
-        dictionary.insert("business".to_string(), vec!["B", "IH1", "Z", "N", "AH0", "S"]);
+        dictionary.insert(
+            "business".to_string(),
+            vec!["B", "IH1", "Z", "N", "AH0", "S"],
+        );
         dictionary.insert("issue".to_string(), vec!["IH1", "SH", "UW0"]);
         dictionary.insert("side".to_string(), vec!["S", "AY1", "D"]);
         dictionary.insert("kind".to_string(), vec!["K", "AY1", "N", "D"]);
@@ -604,14 +763,26 @@ impl SimpleG2P {
         dictionary.insert("law".to_string(), vec!["L", "AO1"]);
         dictionary.insert("car".to_string(), vec!["K", "AA1", "R"]);
         dictionary.insert("city".to_string(), vec!["S", "IH1", "T", "IY0"]);
-        dictionary.insert("community".to_string(), vec!["K", "AH0", "M", "Y", "UW1", "N", "AH0", "T", "IY0"]);
+        dictionary.insert(
+            "community".to_string(),
+            vec!["K", "AH0", "M", "Y", "UW1", "N", "AH0", "T", "IY0"],
+        );
         dictionary.insert("name".to_string(), vec!["N", "EY1", "M"]);
         dictionary.insert("power".to_string(), vec!["P", "AW1", "ER0"]);
         dictionary.insert("idea".to_string(), vec!["AY0", "D", "IY1", "AH0"]);
-        dictionary.insert("information".to_string(), vec!["IH2", "N", "F", "ER0", "M", "EY1", "SH", "AH0", "N"]);
+        dictionary.insert(
+            "information".to_string(),
+            vec!["IH2", "N", "F", "ER0", "M", "EY1", "SH", "AH0", "N"],
+        );
         dictionary.insert("result".to_string(), vec!["R", "IH0", "Z", "AH1", "L", "T"]);
-        dictionary.insert("problem".to_string(), vec!["P", "R", "AA1", "B", "L", "AH0", "M"]);
-        dictionary.insert("experience".to_string(), vec!["IH0", "K", "S", "P", "IY1", "R", "IY0", "AH0", "N", "S"]);
+        dictionary.insert(
+            "problem".to_string(),
+            vec!["P", "R", "AA1", "B", "L", "AH0", "M"],
+        );
+        dictionary.insert(
+            "experience".to_string(),
+            vec!["IH0", "K", "S", "P", "IY1", "R", "IY0", "AH0", "N", "S"],
+        );
         dictionary.insert("answer".to_string(), vec!["AE1", "N", "S", "ER0"]);
 
         // ═══════════════════════════════════════════════════════════════════
@@ -634,17 +805,38 @@ impl SimpleG2P {
         dictionary.insert("always".to_string(), vec!["AO1", "L", "W", "EY2", "Z"]);
         dictionary.insert("never".to_string(), vec!["N", "EH1", "V", "ER0"]);
         dictionary.insert("often".to_string(), vec!["AO1", "F", "AH0", "N"]);
-        dictionary.insert("sometimes".to_string(), vec!["S", "AH1", "M", "T", "AY2", "M", "Z"]);
-        dictionary.insert("usually".to_string(), vec!["Y", "UW1", "ZH", "AH0", "L", "IY0"]);
-        dictionary.insert("perhaps".to_string(), vec!["P", "ER0", "HH", "AE1", "P", "S"]);
+        dictionary.insert(
+            "sometimes".to_string(),
+            vec!["S", "AH1", "M", "T", "AY2", "M", "Z"],
+        );
+        dictionary.insert(
+            "usually".to_string(),
+            vec!["Y", "UW1", "ZH", "AH0", "L", "IY0"],
+        );
+        dictionary.insert(
+            "perhaps".to_string(),
+            vec!["P", "ER0", "HH", "AE1", "P", "S"],
+        );
         dictionary.insert("maybe".to_string(), vec!["M", "EY1", "B", "IY0"]);
         dictionary.insert("really".to_string(), vec!["R", "IY1", "L", "IY0"]);
-        dictionary.insert("already".to_string(), vec!["AO0", "L", "R", "EH1", "D", "IY0"]);
+        dictionary.insert(
+            "already".to_string(),
+            vec!["AO0", "L", "R", "EH1", "D", "IY0"],
+        );
         dictionary.insert("yet".to_string(), vec!["Y", "EH1", "T"]);
         dictionary.insert("today".to_string(), vec!["T", "AH0", "D", "EY1"]);
-        dictionary.insert("tomorrow".to_string(), vec!["T", "AH0", "M", "AA1", "R", "OW0"]);
-        dictionary.insert("yesterday".to_string(), vec!["Y", "EH1", "S", "T", "ER0", "D", "EY2"]);
-        dictionary.insert("together".to_string(), vec!["T", "AH0", "G", "EH1", "DH", "ER0"]);
+        dictionary.insert(
+            "tomorrow".to_string(),
+            vec!["T", "AH0", "M", "AA1", "R", "OW0"],
+        );
+        dictionary.insert(
+            "yesterday".to_string(),
+            vec!["Y", "EH1", "S", "T", "ER0", "D", "EY2"],
+        );
+        dictionary.insert(
+            "together".to_string(),
+            vec!["T", "AH0", "G", "EH1", "DH", "ER0"],
+        );
         dictionary.insert("away".to_string(), vec!["AH0", "W", "EY1"]);
         dictionary.insert("back".to_string(), vec!["B", "AE1", "K"]);
         dictionary.insert("down".to_string(), vec!["D", "AW1", "N"]);
@@ -657,7 +849,10 @@ impl SimpleG2P {
         dictionary.insert("too".to_string(), vec!["T", "UW1"]);
         dictionary.insert("soon".to_string(), vec!["S", "UW1", "N"]);
         dictionary.insert("later".to_string(), vec!["L", "EY1", "T", "ER0"]);
-        dictionary.insert("finally".to_string(), vec!["F", "AY1", "N", "AH0", "L", "IY0"]);
+        dictionary.insert(
+            "finally".to_string(),
+            vec!["F", "AY1", "N", "AH0", "L", "IY0"],
+        );
 
         // ═══════════════════════════════════════════════════════════════════
         // NUMBERS
@@ -673,58 +868,180 @@ impl SimpleG2P {
         dictionary.insert("eight".to_string(), vec!["EY1", "T"]);
         dictionary.insert("nine".to_string(), vec!["N", "AY1", "N"]);
         dictionary.insert("ten".to_string(), vec!["T", "EH1", "N"]);
-        dictionary.insert("hundred".to_string(), vec!["HH", "AH1", "N", "D", "R", "AH0", "D"]);
-        dictionary.insert("thousand".to_string(), vec!["TH", "AW1", "Z", "AH0", "N", "D"]);
-        dictionary.insert("million".to_string(), vec!["M", "IH1", "L", "Y", "AH0", "N"]);
+        dictionary.insert(
+            "hundred".to_string(),
+            vec!["HH", "AH1", "N", "D", "R", "AH0", "D"],
+        );
+        dictionary.insert(
+            "thousand".to_string(),
+            vec!["TH", "AW1", "Z", "AH0", "N", "D"],
+        );
+        dictionary.insert(
+            "million".to_string(),
+            vec!["M", "IH1", "L", "Y", "AH0", "N"],
+        );
 
         // ═══════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS & AI TERMINOLOGY
         // ═══════════════════════════════════════════════════════════════════
-        dictionary.insert("consciousness".to_string(), vec!["K", "AA1", "N", "SH", "AH0", "S", "N", "AH0", "S"]);
-        dictionary.insert("conscious".to_string(), vec!["K", "AA1", "N", "SH", "AH0", "S"]);
+        dictionary.insert(
+            "consciousness".to_string(),
+            vec!["K", "AA1", "N", "SH", "AH0", "S", "N", "AH0", "S"],
+        );
+        dictionary.insert(
+            "conscious".to_string(),
+            vec!["K", "AA1", "N", "SH", "AH0", "S"],
+        );
         dictionary.insert("aware".to_string(), vec!["AH0", "W", "EH1", "R"]);
-        dictionary.insert("awareness".to_string(), vec!["AH0", "W", "EH1", "R", "N", "AH0", "S"]);
+        dictionary.insert(
+            "awareness".to_string(),
+            vec!["AH0", "W", "EH1", "R", "N", "AH0", "S"],
+        );
         dictionary.insert("mind".to_string(), vec!["M", "AY1", "N", "D"]);
         dictionary.insert("brain".to_string(), vec!["B", "R", "EY1", "N"]);
         dictionary.insert("neural".to_string(), vec!["N", "UH1", "R", "AH0", "L"]);
-        dictionary.insert("network".to_string(), vec!["N", "EH1", "T", "W", "ER2", "K"]);
+        dictionary.insert(
+            "network".to_string(),
+            vec!["N", "EH1", "T", "W", "ER2", "K"],
+        );
         dictionary.insert("phi".to_string(), vec!["F", "AY1"]);
         dictionary.insert("flow".to_string(), vec!["F", "L", "OW1"]);
         dictionary.insert("state".to_string(), vec!["S", "T", "EY1", "T"]);
-        dictionary.insert("process".to_string(), vec!["P", "R", "AA1", "S", "EH0", "S"]);
-        dictionary.insert("response".to_string(), vec!["R", "IH0", "S", "P", "AA1", "N", "S"]);
-        dictionary.insert("attention".to_string(), vec!["AH0", "T", "EH1", "N", "SH", "AH0", "N"]);
+        dictionary.insert(
+            "process".to_string(),
+            vec!["P", "R", "AA1", "S", "EH0", "S"],
+        );
+        dictionary.insert(
+            "response".to_string(),
+            vec!["R", "IH0", "S", "P", "AA1", "N", "S"],
+        );
+        dictionary.insert(
+            "attention".to_string(),
+            vec!["AH0", "T", "EH1", "N", "SH", "AH0", "N"],
+        );
         dictionary.insert("memory".to_string(), vec!["M", "EH1", "M", "ER0", "IY0"]);
-        dictionary.insert("perception".to_string(), vec!["P", "ER0", "S", "EH1", "P", "SH", "AH0", "N"]);
-        dictionary.insert("emotion".to_string(), vec!["IH0", "M", "OW1", "SH", "AH0", "N"]);
-        dictionary.insert("emotional".to_string(), vec!["IH0", "M", "OW1", "SH", "AH0", "N", "AH0", "L"]);
-        dictionary.insert("reasoning".to_string(), vec!["R", "IY1", "Z", "AH0", "N", "IH0", "NG"]);
-        dictionary.insert("intelligence".to_string(), vec!["IH0", "N", "T", "EH1", "L", "AH0", "JH", "AH0", "N", "S"]);
-        dictionary.insert("intelligent".to_string(), vec!["IH0", "N", "T", "EH1", "L", "AH0", "JH", "AH0", "N", "T"]);
-        dictionary.insert("artificial".to_string(), vec!["AA2", "R", "T", "AH0", "F", "IH1", "SH", "AH0", "L"]);
-        dictionary.insert("cognitive".to_string(), vec!["K", "AA1", "G", "N", "AH0", "T", "IH0", "V"]);
-        dictionary.insert("coherent".to_string(), vec!["K", "OW0", "HH", "IY1", "R", "AH0", "N", "T"]);
-        dictionary.insert("coherence".to_string(), vec!["K", "OW0", "HH", "IY1", "R", "AH0", "N", "S"]);
-        dictionary.insert("integration".to_string(), vec!["IH2", "N", "T", "AH0", "G", "R", "EY1", "SH", "AH0", "N"]);
-        dictionary.insert("integrated".to_string(), vec!["IH1", "N", "T", "AH0", "G", "R", "EY2", "T", "IH0", "D"]);
-        dictionary.insert("holistic".to_string(), vec!["HH", "OW0", "L", "IH1", "S", "T", "IH0", "K"]);
-        dictionary.insert("emergent".to_string(), vec!["IH0", "M", "ER1", "JH", "AH0", "N", "T"]);
-        dictionary.insert("emergence".to_string(), vec!["IH0", "M", "ER1", "JH", "AH0", "N", "S"]);
-        dictionary.insert("sentient".to_string(), vec!["S", "EH1", "N", "SH", "AH0", "N", "T"]);
-        dictionary.insert("sentience".to_string(), vec!["S", "EH1", "N", "SH", "AH0", "N", "S"]);
-        dictionary.insert("qualia".to_string(), vec!["K", "W", "EY1", "L", "IY0", "AH0"]);
-        dictionary.insert("embodied".to_string(), vec!["IH0", "M", "B", "AA1", "D", "IY0", "D"]);
-        dictionary.insert("phenomenal".to_string(), vec!["F", "AH0", "N", "AA1", "M", "AH0", "N", "AH0", "L"]);
-        dictionary.insert("subjective".to_string(), vec!["S", "AH0", "B", "JH", "EH1", "K", "T", "IH0", "V"]);
-        dictionary.insert("recursive".to_string(), vec!["R", "IH0", "K", "ER1", "S", "IH0", "V"]);
-        dictionary.insert("autopoietic".to_string(), vec!["AO2", "T", "OW0", "P", "OY0", "EH1", "T", "IH0", "K"]);
-        dictionary.insert("symthaea".to_string(), vec!["S", "IH0", "M", "TH", "IY1", "AH0"]);
-        dictionary.insert("hyperdimensional".to_string(), vec!["HH", "AY2", "P", "ER0", "D", "IH0", "M", "EH1", "N", "SH", "AH0", "N", "AH0", "L"]);
-        dictionary.insert("topology".to_string(), vec!["T", "AH0", "P", "AA1", "L", "AH0", "JH", "IY0"]);
-        dictionary.insert("formant".to_string(), vec!["F", "AO1", "R", "M", "AH0", "N", "T"]);
-        dictionary.insert("vocoder".to_string(), vec!["V", "OW1", "K", "OW0", "D", "ER0"]);
-        dictionary.insert("synthesis".to_string(), vec!["S", "IH1", "N", "TH", "AH0", "S", "IH0", "S"]);
-        dictionary.insert("synthesize".to_string(), vec!["S", "IH1", "N", "TH", "AH0", "S", "AY2", "Z"]);
+        dictionary.insert(
+            "perception".to_string(),
+            vec!["P", "ER0", "S", "EH1", "P", "SH", "AH0", "N"],
+        );
+        dictionary.insert(
+            "emotion".to_string(),
+            vec!["IH0", "M", "OW1", "SH", "AH0", "N"],
+        );
+        dictionary.insert(
+            "emotional".to_string(),
+            vec!["IH0", "M", "OW1", "SH", "AH0", "N", "AH0", "L"],
+        );
+        dictionary.insert(
+            "reasoning".to_string(),
+            vec!["R", "IY1", "Z", "AH0", "N", "IH0", "NG"],
+        );
+        dictionary.insert(
+            "intelligence".to_string(),
+            vec!["IH0", "N", "T", "EH1", "L", "AH0", "JH", "AH0", "N", "S"],
+        );
+        dictionary.insert(
+            "intelligent".to_string(),
+            vec!["IH0", "N", "T", "EH1", "L", "AH0", "JH", "AH0", "N", "T"],
+        );
+        dictionary.insert(
+            "artificial".to_string(),
+            vec!["AA2", "R", "T", "AH0", "F", "IH1", "SH", "AH0", "L"],
+        );
+        dictionary.insert(
+            "cognitive".to_string(),
+            vec!["K", "AA1", "G", "N", "AH0", "T", "IH0", "V"],
+        );
+        dictionary.insert(
+            "coherent".to_string(),
+            vec!["K", "OW0", "HH", "IY1", "R", "AH0", "N", "T"],
+        );
+        dictionary.insert(
+            "coherence".to_string(),
+            vec!["K", "OW0", "HH", "IY1", "R", "AH0", "N", "S"],
+        );
+        dictionary.insert(
+            "integration".to_string(),
+            vec!["IH2", "N", "T", "AH0", "G", "R", "EY1", "SH", "AH0", "N"],
+        );
+        dictionary.insert(
+            "integrated".to_string(),
+            vec!["IH1", "N", "T", "AH0", "G", "R", "EY2", "T", "IH0", "D"],
+        );
+        dictionary.insert(
+            "holistic".to_string(),
+            vec!["HH", "OW0", "L", "IH1", "S", "T", "IH0", "K"],
+        );
+        dictionary.insert(
+            "emergent".to_string(),
+            vec!["IH0", "M", "ER1", "JH", "AH0", "N", "T"],
+        );
+        dictionary.insert(
+            "emergence".to_string(),
+            vec!["IH0", "M", "ER1", "JH", "AH0", "N", "S"],
+        );
+        dictionary.insert(
+            "sentient".to_string(),
+            vec!["S", "EH1", "N", "SH", "AH0", "N", "T"],
+        );
+        dictionary.insert(
+            "sentience".to_string(),
+            vec!["S", "EH1", "N", "SH", "AH0", "N", "S"],
+        );
+        dictionary.insert(
+            "qualia".to_string(),
+            vec!["K", "W", "EY1", "L", "IY0", "AH0"],
+        );
+        dictionary.insert(
+            "embodied".to_string(),
+            vec!["IH0", "M", "B", "AA1", "D", "IY0", "D"],
+        );
+        dictionary.insert(
+            "phenomenal".to_string(),
+            vec!["F", "AH0", "N", "AA1", "M", "AH0", "N", "AH0", "L"],
+        );
+        dictionary.insert(
+            "subjective".to_string(),
+            vec!["S", "AH0", "B", "JH", "EH1", "K", "T", "IH0", "V"],
+        );
+        dictionary.insert(
+            "recursive".to_string(),
+            vec!["R", "IH0", "K", "ER1", "S", "IH0", "V"],
+        );
+        dictionary.insert(
+            "autopoietic".to_string(),
+            vec!["AO2", "T", "OW0", "P", "OY0", "EH1", "T", "IH0", "K"],
+        );
+        dictionary.insert(
+            "symthaea".to_string(),
+            vec!["S", "IH0", "M", "TH", "IY1", "AH0"],
+        );
+        dictionary.insert(
+            "hyperdimensional".to_string(),
+            vec![
+                "HH", "AY2", "P", "ER0", "D", "IH0", "M", "EH1", "N", "SH", "AH0", "N", "AH0", "L",
+            ],
+        );
+        dictionary.insert(
+            "topology".to_string(),
+            vec!["T", "AH0", "P", "AA1", "L", "AH0", "JH", "IY0"],
+        );
+        dictionary.insert(
+            "formant".to_string(),
+            vec!["F", "AO1", "R", "M", "AH0", "N", "T"],
+        );
+        dictionary.insert(
+            "vocoder".to_string(),
+            vec!["V", "OW1", "K", "OW0", "D", "ER0"],
+        );
+        dictionary.insert(
+            "synthesis".to_string(),
+            vec!["S", "IH1", "N", "TH", "AH0", "S", "IH0", "S"],
+        );
+        dictionary.insert(
+            "synthesize".to_string(),
+            vec!["S", "IH1", "N", "TH", "AH0", "S", "AY2", "Z"],
+        );
 
         // ═══════════════════════════════════════════════════════════════════
         // GREETINGS & COMMON PHRASES
@@ -740,7 +1057,10 @@ impl SimpleG2P {
         dictionary.insert("thanks".to_string(), vec!["TH", "AE1", "NG", "K", "S"]);
         dictionary.insert("thank".to_string(), vec!["TH", "AE1", "NG", "K"]);
         dictionary.insert("sorry".to_string(), vec!["S", "AA1", "R", "IY0"]);
-        dictionary.insert("welcome".to_string(), vec!["W", "EH1", "L", "K", "AH0", "M"]);
+        dictionary.insert(
+            "welcome".to_string(),
+            vec!["W", "EH1", "L", "K", "AH0", "M"],
+        );
         dictionary.insert("so".to_string(), vec!["S", "OW1"]);
 
         Self { dictionary }
@@ -749,9 +1069,7 @@ impl SimpleG2P {
     /// Convert a word to ARPABET phonemes
     pub fn word_to_phonemes(&self, word: &str) -> Vec<&'static str> {
         let lower = word.to_lowercase();
-        let clean: String = lower.chars()
-            .filter(|c| c.is_alphabetic())
-            .collect();
+        let clean: String = lower.chars().filter(|c| c.is_alphabetic()).collect();
 
         if let Some(phonemes) = self.dictionary.get(&clean) {
             return phonemes.clone();
@@ -773,74 +1091,137 @@ impl SimpleG2P {
 
             let ph: &'static str = match c {
                 'a' => match next {
-                    Some('i') | Some('y') => { i += 1; "EY1" }
-                    Some('u') | Some('w') => { i += 1; "AO1" }
-                    Some('e') => { i += 1; "EY1" }
-                    _ => "AE1"
-                }
+                    Some('i') | Some('y') => {
+                        i += 1;
+                        "EY1"
+                    }
+                    Some('u') | Some('w') => {
+                        i += 1;
+                        "AO1"
+                    }
+                    Some('e') => {
+                        i += 1;
+                        "EY1"
+                    }
+                    _ => "AE1",
+                },
                 'e' => match next {
-                    Some('e') => { i += 1; "IY1" }
-                    Some('a') => { i += 1; "IY1" }
-                    Some('i') | Some('y') => { i += 1; "EY1" }
-                    _ => "EH1"
-                }
+                    Some('e') => {
+                        i += 1;
+                        "IY1"
+                    }
+                    Some('a') => {
+                        i += 1;
+                        "IY1"
+                    }
+                    Some('i') | Some('y') => {
+                        i += 1;
+                        "EY1"
+                    }
+                    _ => "EH1",
+                },
                 'i' => match next {
-                    Some('e') => { i += 1; "IY1" }
+                    Some('e') => {
+                        i += 1;
+                        "IY1"
+                    }
                     Some('g') if chars.get(i + 2) == Some(&'h') => "AY1",
-                    _ => "IH1"
-                }
+                    _ => "IH1",
+                },
                 'o' => match next {
-                    Some('o') => { i += 1; "UW1" }
-                    Some('u') | Some('w') => { i += 1; "AW1" }
-                    Some('i') | Some('y') => { i += 1; "OY1" }
-                    _ => "AA1"
-                }
+                    Some('o') => {
+                        i += 1;
+                        "UW1"
+                    }
+                    Some('u') | Some('w') => {
+                        i += 1;
+                        "AW1"
+                    }
+                    Some('i') | Some('y') => {
+                        i += 1;
+                        "OY1"
+                    }
+                    _ => "AA1",
+                },
                 'u' => match next {
-                    Some('e') => { i += 1; "UW1" }
-                    _ => "AH1"
-                }
+                    Some('e') => {
+                        i += 1;
+                        "UW1"
+                    }
+                    _ => "AH1",
+                },
                 'b' => "B",
                 'c' => match next {
-                    Some('h') => { i += 1; "CH" }
+                    Some('h') => {
+                        i += 1;
+                        "CH"
+                    }
                     Some('i') | Some('e') | Some('y') => "S",
-                    _ => "K"
-                }
+                    _ => "K",
+                },
                 'd' => "D",
                 'f' => "F",
                 'g' => match next {
                     Some('e') | Some('i') | Some('y') => "JH",
-                    _ => "G"
-                }
+                    _ => "G",
+                },
                 'h' => "HH",
                 'j' => "JH",
                 'k' => "K",
                 'l' => "L",
                 'm' => "M",
                 'n' => match next {
-                    Some('g') => { i += 1; "NG" }
-                    _ => "N"
-                }
+                    Some('g') => {
+                        i += 1;
+                        "NG"
+                    }
+                    _ => "N",
+                },
                 'p' => match next {
-                    Some('h') => { i += 1; "F" }
-                    _ => "P"
-                }
+                    Some('h') => {
+                        i += 1;
+                        "F"
+                    }
+                    _ => "P",
+                },
                 'q' => "K",
                 'r' => "R",
                 's' => match next {
-                    Some('h') => { i += 1; "SH" }
-                    _ => "S"
-                }
+                    Some('h') => {
+                        i += 1;
+                        "SH"
+                    }
+                    _ => "S",
+                },
                 't' => match next {
-                    Some('h') => { i += 1; "TH" }
-                    Some('i') if chars.get(i + 2) == Some(&'o') => { i += 1; "SH" }
-                    _ => "T"
-                }
+                    Some('h') => {
+                        i += 1;
+                        "TH"
+                    }
+                    Some('i') if chars.get(i + 2) == Some(&'o') => {
+                        i += 1;
+                        "SH"
+                    }
+                    _ => "T",
+                },
                 'v' => "V",
                 'w' => "W",
-                'x' => { phonemes.push("K"); "S" }
-                'y' => if i == 0 { "Y" } else { "IY0" },
+                'x' => {
+                    phonemes.push("K");
+                    "S"
+                }
+                'y' => {
+                    if i == 0 {
+                        "Y"
+                    } else {
+                        "IY0"
+                    }
+                }
                 'z' => "Z",
-                _ => { i += 1; continue; }
+                _ => {
+                    i += 1;
+                    continue;
+                }
             };
 
             phonemes.push(ph);
@@ -848,7 +1229,7 @@ impl SimpleG2P {
         }
 
         if phonemes.is_empty() {
-            vec!["AH0"]  // Fallback schwa
+            vec!["AH0"] // Fallback schwa
         } else {
             phonemes
         }
@@ -877,15 +1258,25 @@ impl SimpleG2P {
                 };
 
                 // Clean phoneme (remove stress marker for lookup)
-                let clean_ph: String = ph.chars()
-                    .filter(|c| !c.is_ascii_digit())
-                    .collect();
+                let clean_ph: String = ph.chars().filter(|c| !c.is_ascii_digit()).collect();
 
                 // Vowels are longer than consonants
                 let is_vowel = matches!(
                     clean_ph.as_str(),
-                    "AA" | "AE" | "AH" | "AO" | "AW" | "AY" | "EH" | "ER" | "EY" |
-                    "IH" | "IY" | "OW" | "OY" | "UH" | "UW"
+                    "AA" | "AE"
+                        | "AH"
+                        | "AO"
+                        | "AW"
+                        | "AY"
+                        | "EH"
+                        | "ER"
+                        | "EY"
+                        | "IH"
+                        | "IY"
+                        | "OW"
+                        | "OY"
+                        | "UH"
+                        | "UW"
                 );
                 let duration = if is_vowel {
                     base_duration * 1.3
@@ -1006,7 +1397,7 @@ impl ReplVoiceOutput {
         let voice_config = VoiceOutputConfig {
             sample_rate: config.sample_rate,
             volume: config.volume,
-            enable_tts: false,  // We use our own synthesis
+            enable_tts: false, // We use our own synthesis
             ..Default::default()
         };
         let voice_output = VoiceOutput::new(voice_config);
@@ -1040,19 +1431,19 @@ impl ReplVoiceOutput {
 
     /// Initialize audio output
     #[cfg(feature = "audio")]
-    fn init_audio(config: &ReplVoiceConfig) -> (bool, Option<rodio::OutputStream>, Option<rodio::Sink>) {
+    fn init_audio(
+        config: &ReplVoiceConfig,
+    ) -> (bool, Option<rodio::OutputStream>, Option<rodio::Sink>) {
         use rodio::{OutputStream, Sink};
 
         // Try to get output stream
         let stream_result = if let Some(ref device_name) = config.device_name {
             // Try to find specific device
-            use rodio::cpal::traits::{HostTrait, DeviceTrait};
+            use rodio::cpal::traits::{DeviceTrait, HostTrait};
             let host = rodio::cpal::default_host();
-            let device = host.output_devices()
-                .ok()
-                .and_then(|mut devices| {
-                    devices.find(|d| d.name().map(|n| n.contains(device_name)).unwrap_or(false))
-                });
+            let device = host.output_devices().ok().and_then(|mut devices| {
+                devices.find(|d| d.name().map(|n| n.contains(device_name)).unwrap_or(false))
+            });
 
             match device {
                 Some(dev) => OutputStream::try_from_device(&dev),
@@ -1066,18 +1457,16 @@ impl ReplVoiceOutput {
         };
 
         match stream_result {
-            Ok((stream, handle)) => {
-                match Sink::try_new(&handle) {
-                    Ok(sink) => {
-                        info!("Audio output initialized successfully");
-                        (true, Some(stream), Some(sink))
-                    }
-                    Err(e) => {
-                        warn!("Failed to create audio sink: {}", e);
-                        (false, None, None)
-                    }
+            Ok((stream, handle)) => match Sink::try_new(&handle) {
+                Ok(sink) => {
+                    info!("Audio output initialized successfully");
+                    (true, Some(stream), Some(sink))
                 }
-            }
+                Err(e) => {
+                    warn!("Failed to create audio sink: {}", e);
+                    (false, None, None)
+                }
+            },
             Err(e) => {
                 warn!("Failed to initialize audio output: {}", e);
                 (false, None, None)
@@ -1108,13 +1497,15 @@ impl ReplVoiceOutput {
     ) {
         // Create CfC-like output from consciousness state
         // The "hidden state" is approximated from emotional state and phi
-        let hidden_state: Vec<f32> = (0..64).map(|i| {
-            let phase = i as f32 / 64.0 * std::f32::consts::TAU;
-            let base = (phase + unified_phi * 2.0).sin() * 0.5;
-            let emotional = emotional_valence * 0.3 + emotional_arousal * 0.2;
-            let flow_contrib = if in_flow { 0.2 } else { 0.0 };
-            base + emotional + flow_contrib
-        }).collect();
+        let hidden_state: Vec<f32> = (0..64)
+            .map(|i| {
+                let phase = i as f32 / 64.0 * std::f32::consts::TAU;
+                let base = (phase + unified_phi * 2.0).sin() * 0.5;
+                let emotional = emotional_valence * 0.3 + emotional_arousal * 0.2;
+                let flow_contrib = if in_flow { 0.2 } else { 0.0 };
+                base + emotional + flow_contrib
+            })
+            .collect();
 
         // Create attention state from consciousness metrics
         let mut attention_state = HashMap::new();
@@ -1191,7 +1582,9 @@ impl ReplVoiceOutput {
 
         debug!(
             "Synthesized {} samples ({:.2}s) in {:?}",
-            samples.len(), duration, start.elapsed()
+            samples.len(),
+            duration,
+            start.elapsed()
         );
 
         Ok(samples)
@@ -1208,7 +1601,8 @@ impl ReplVoiceOutput {
         }
 
         // Filter out silence phonemes for synthesis (they're handled as gaps)
-        let speech_phonemes: Vec<TimedPhoneme> = phonemes.into_iter()
+        let speech_phonemes: Vec<TimedPhoneme> = phonemes
+            .into_iter()
             .filter(|p| p.phoneme != "SIL")
             .collect();
 
@@ -1217,7 +1611,9 @@ impl ReplVoiceOutput {
         }
 
         // Generate formant frames using articulatory synthesizer
-        let frames = self.articulatory.synthesize(&speech_phonemes, &self.current_pacing);
+        let frames = self
+            .articulatory
+            .synthesize(&speech_phonemes, &self.current_pacing);
 
         if frames.is_empty() {
             return Ok(Vec::new());
@@ -1227,9 +1623,7 @@ impl ReplVoiceOutput {
         let samples = self.vocoder.synthesize(&frames);
 
         // Apply volume scaling
-        let scaled: Vec<f32> = samples.iter()
-            .map(|s| s * self.config.volume)
-            .collect();
+        let scaled: Vec<f32> = samples.iter().map(|s| s * self.config.volume).collect();
 
         Ok(scaled)
     }
@@ -1262,7 +1656,9 @@ impl ReplVoiceOutput {
             return Ok(());
         }
 
-        let sink = self.audio_sink.as_ref()
+        let sink = self
+            .audio_sink
+            .as_ref()
             .ok_or_else(|| anyhow!("Audio sink not initialized"))?;
 
         // Create rodio source from samples
@@ -1332,10 +1728,18 @@ mod tests {
         let g2p = SimpleG2P::new();
 
         let hello = g2p.word_to_phonemes("hello");
-        assert!(hello.len() >= 3, "hello should have multiple phonemes: {:?}", hello);
+        assert!(
+            hello.len() >= 3,
+            "hello should have multiple phonemes: {:?}",
+            hello
+        );
 
         let world = g2p.word_to_phonemes("world");
-        assert!(world.len() >= 3, "world should have multiple phonemes: {:?}", world);
+        assert!(
+            world.len() >= 3,
+            "world should have multiple phonemes: {:?}",
+            world
+        );
     }
 
     #[test]
@@ -1372,14 +1776,14 @@ mod tests {
 
         // Low consciousness state
         voice.update_from_consciousness(
-            0.2,  // low phi
-            0.5,  // high error
-            -0.3, // negative valence
-            0.2,  // low arousal
+            0.2,   // low phi
+            0.5,   // high error
+            -0.3,  // negative valence
+            0.2,   // low arousal
             false, // not in flow
-            0.8,  // slow speech
-            1.5,  // long pauses
-            1.5,  // high tau
+            0.8,   // slow speech
+            1.5,   // long pauses
+            1.5,   // high tau
         );
 
         let low_rate = voice.pacing().rate;
@@ -1401,10 +1805,18 @@ mod tests {
         let high_pause = voice.pacing().phrase_pause;
 
         // High consciousness should speak faster with shorter pauses
-        assert!(high_rate > low_rate,
-            "High consciousness should speak faster: {} vs {}", high_rate, low_rate);
-        assert!(high_pause < low_pause,
-            "High consciousness should have shorter pauses: {} vs {}", high_pause, low_pause);
+        assert!(
+            high_rate > low_rate,
+            "High consciousness should speak faster: {} vs {}",
+            high_rate,
+            low_rate
+        );
+        assert!(
+            high_pause < low_pause,
+            "High consciousness should have shorter pauses: {} vs {}",
+            high_pause,
+            low_pause
+        );
     }
 
     #[test]

@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json.schemastore.org/eslintrc.json",
+  "root": true,
+  "parser": "@typescript-eslint/parser",
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module",
+    "project": ["./tsconfig.json"]
+  },
+  "plugins": [
+    "@typescript-eslint",
+    "security",
+    "import"
+  ],
+  "extends": [
+    "eslint:recommended",
+    "plugin:@typescript-eslint/recommended",
+    "plugin:@typescript-eslint/recommended-requiring-type-checking",
+    "plugin:security/recommended-legacy",
+    "plugin:import/recommended",
+    "plugin:import/typescript"
+  ],
+  "env": {
+    "node": true,
+    "es2022": true
+  },
+  "settings": {
+    "import/resolver": {
+      "typescript": {
+        "alwaysTryTypes": true,
+        "project": "./tsconfig.json"
+      }
+    }
+  },
+  "rules": {
+    // ==========================================================================
+    // SECURITY RULES - Critical for Byzantine-resistant systems
+    // ==========================================================================
+
+    // Prevent code injection
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "security/detect-eval-with-expression": "error",
+    "security/detect-non-literal-fs-filename": "warn",
+    "security/detect-non-literal-regexp": "warn",
+    "security/detect-non-literal-require": "warn",
+    "security/detect-object-injection": "warn",
+    "security/detect-possible-timing-attacks": "error",
+    "security/detect-unsafe-regex": "error",
+
+    // Prevent prototype pollution (critical for trust systems)
+    "no-prototype-builtins": "error",
+    "security/detect-buffer-noassert": "error",
+
+    // Cryptographic safety
+    "security/detect-pseudoRandomBytes": "error",
+
+    // ==========================================================================
+    // TYPESCRIPT STRICT RULES
+    // ==========================================================================
+
+    "@typescript-eslint/no-explicit-any": "warn",
+    "@typescript-eslint/explicit-function-return-type": ["warn", {
+      "allowExpressions": true,
+      "allowTypedFunctionExpressions": true,
+      "allowHigherOrderFunctions": true
+    }],
+    "@typescript-eslint/no-unused-vars": ["error", {
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^_"
+    }],
+    "@typescript-eslint/consistent-type-imports": ["error", {
+      "prefer": "type-imports",
+      "fixStyle": "inline-type-imports"
+    }],
+    "@typescript-eslint/no-floating-promises": "error",
+    "@typescript-eslint/no-misused-promises": "error",
+    "@typescript-eslint/await-thenable": "error",
+    "@typescript-eslint/require-await": "warn",
+    "@typescript-eslint/no-unnecessary-type-assertion": "warn",
+    "@typescript-eslint/strict-boolean-expressions": "off",
+
+    // ==========================================================================
+    // CODE QUALITY
+    // ==========================================================================
+
+    // Complexity limits (important for auditable code)
+    "complexity": ["warn", { "max": 15 }],
+    "max-depth": ["warn", { "max": 4 }],
+    "max-nested-callbacks": ["warn", { "max": 4 }],
+    "max-params": ["warn", { "max": 5 }],
+
+    // Prevent common mistakes
+    "no-console": ["warn", { "allow": ["warn", "error", "info"] }],
+    "no-debugger": "error",
+    "no-alert": "error",
+    "no-var": "error",
+    "prefer-const": "error",
+    "eqeqeq": ["error", "always"],
+    "no-throw-literal": "error",
+
+    // ==========================================================================
+    // IMPORT ORGANIZATION
+    // ==========================================================================
+
+    "import/order": ["error", {
+      "groups": [
+        "builtin",
+        "external",
+        "internal",
+        ["parent", "sibling"],
+        "index",
+        "type"
+      ],
+      "pathGroups": [
+        {
+          "pattern": "@mycelix/**",
+          "group": "internal",
+          "position": "before"
+        }
+      ],
+      "pathGroupsExcludedImportTypes": ["type"],
+      "newlines-between": "always",
+      "alphabetize": {
+        "order": "asc",
+        "caseInsensitive": true
+      }
+    }],
+    "import/no-duplicates": "error",
+    "import/no-cycle": ["error", { "maxDepth": 3 }],
+    "import/no-self-import": "error",
+
+    // ==========================================================================
+    // DISABLED/RELAXED RULES
+    // ==========================================================================
+
+    // These are handled by TypeScript
+    "no-undef": "off",
+    "no-redeclare": "off",
+    "@typescript-eslint/no-redeclare": "error",
+
+    // Allow empty functions for stubs/mocks
+    "@typescript-eslint/no-empty-function": "off",
+
+    // Relax for SDK patterns
+    "@typescript-eslint/unbound-method": "off",
+    "@typescript-eslint/no-unsafe-assignment": "warn",
+    "@typescript-eslint/no-unsafe-member-access": "warn",
+    "@typescript-eslint/no-unsafe-call": "warn",
+    "@typescript-eslint/no-unsafe-return": "warn",
+    "@typescript-eslint/no-unsafe-argument": "warn"
+  },
+  "overrides": [
+    // ==========================================================================
+    // TEST FILES - Relaxed rules
+    // ==========================================================================
+    {
+      "files": ["**/*.test.ts", "**/*.spec.ts", "**/tests/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-non-null-assertion": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "security/detect-object-injection": "off",
+        "no-console": "off",
+        "max-nested-callbacks": "off",
+        "complexity": "off"
+      }
+    },
+    // ==========================================================================
+    // BENCHMARK FILES - Relaxed rules
+    // ==========================================================================
+    {
+      "files": ["**/benchmarks/**/*.ts"],
+      "rules": {
+        "no-console": "off",
+        "@typescript-eslint/no-explicit-any": "off",
+        "security/detect-object-injection": "off"
+      }
+    },
+    // ==========================================================================
+    // EXAMPLE FILES - Educational, allow console
+    // ==========================================================================
+    {
+      "files": ["**/examples/**/*.ts"],
+      "rules": {
+        "no-console": "off",
+        "@typescript-eslint/no-unused-vars": "warn"
+      }
+    },
+    // ==========================================================================
+    // SECURITY MODULE - Strictest rules
+    // ==========================================================================
+    {
+      "files": ["**/security/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "error",
+        "security/detect-possible-timing-attacks": "error",
+        "complexity": ["error", { "max": 10 }]
+      }
+    },
+    // ==========================================================================
+    // CRYPTO/MATL MODULE - Extra scrutiny
+    // ==========================================================================
+    {
+      "files": ["**/matl/**/*.ts", "**/fl/**/*.ts"],
+      "rules": {
+        "security/detect-pseudoRandomBytes": "error",
+        "complexity": ["warn", { "max": 12 }]
+      }
+    },
+    // ==========================================================================
+    // CLI MODULE - Allow console for user interaction
+    // ==========================================================================
+    {
+      "files": ["**/cli/**/*.ts"],
+      "rules": {
+        "no-console": "off",
+        "@typescript-eslint/no-var-requires": "off",
+        "@typescript-eslint/no-explicit-any": "warn",
+        "@typescript-eslint/explicit-function-return-type": "off",
+        "@typescript-eslint/require-await": "off",
+        "security/detect-non-literal-fs-filename": "off"
+      }
+    },
+    // ==========================================================================
+    // INTEGRATION ADAPTERS - Slightly relaxed for DX
+    // ==========================================================================
+    {
+      "files": ["**/integrations/**/*.ts"],
+      "rules": {
+        "max-params": ["warn", { "max": 8 }]
+      }
+    },
+    // ==========================================================================
+    // FRAMEWORK STUBS (React, Vue, Svelte) - Allow any for stub types
+    // ==========================================================================
+    {
+      "files": ["**/react/**/*.ts", "**/vue/**/*.ts", "**/svelte/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-return": "off",
+        "@typescript-eslint/no-unsafe-argument": "off",
+        "@typescript-eslint/explicit-function-return-type": "off"
+      }
+    },
+    // ==========================================================================
+    // GRAPHQL MODULE - Allow flexible types for schema generation
+    // ==========================================================================
+    {
+      "files": ["**/graphql/**/*.ts"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off",
+        "@typescript-eslint/no-unsafe-assignment": "off",
+        "@typescript-eslint/no-unsafe-member-access": "off",
+        "@typescript-eslint/no-unsafe-call": "off",
+        "@typescript-eslint/no-unsafe-return": "off"
+      }
+    }
+  ],
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "coverage/**",
+    "docs/**",
+    "*.js",
+    "*.mjs",
+    "*.cjs"
+  ]
+}

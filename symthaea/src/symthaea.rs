@@ -12,36 +12,38 @@
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use symthaea_core::hdc::ContinuousHV;
+
+use crate::databases::{
+    create_database, ConsciousnessDatabase, DatabaseConfig, MemoryRecord, MemoryType,
+};
 
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridgeV2;
 
-use crate::language::{
-    ConsciousnessLanguageCore, ConsciousnessLanguageConfig,
-    LLMOrgan, LLMOrganConfig,
-    llm_backend,
-    PluginRegistry,
-};
+use crate::hdc::relational_consciousness::{RelationMode, RelationalAssessment, RelationshipStage};
 #[cfg(feature = "full_language")]
 use crate::language::learning_persistence::LearningPersistence;
-use crate::mind::{ContinuousMind, MindConfig, StructuredThought, DomainContext, ConstraintType, EpistemicStatus};
-use crate::mind::structured_thought::{EpistemicCube, ETier, NTier};
+use crate::language::{
+    llm_backend, ConsciousnessLanguageConfig, ConsciousnessLanguageCore, LLMOrgan, LLMOrganConfig,
+    PluginRegistry,
+};
+use crate::mind::structured_thought::{ETier, EpistemicCube, NTier};
 #[cfg(feature = "magi_loop")]
 use crate::mind::SemanticIntent;
-use crate::partnership::{
-    DyadInput, DyadWeights, HumanPartnerModel, InteractionEvent,
-    PhiDyadCalculator, RelationshipTrajectory,
+use crate::mind::{
+    ConstraintType, ContinuousMind, DomainContext, EpistemicStatus, MindConfig, StructuredThought,
 };
-use crate::hdc::relational_consciousness::{
-    RelationalAssessment, RelationMode, RelationshipStage,
+use crate::partnership::{
+    DyadInput, DyadWeights, HumanPartnerModel, InteractionEvent, PhiDyadCalculator,
+    RelationshipTrajectory,
 };
 
 #[cfg(feature = "magi_loop")]
 use crate::consciousness::recursive_improvement::{
-    BrierScoreTracker, CalibrationSummary,
-    PredictionDomain, OutcomeCategory, WorldPrediction,
-    WorldActionContext, ResolutionContract, RiskTier,
+    BrierScoreTracker, CalibrationSummary, OutcomeCategory, PredictionDomain, ResolutionContract,
+    RiskTier, WorldActionContext, WorldPrediction,
 };
 
 /// Response from processing a query through the consciousness pipeline.
@@ -140,6 +142,8 @@ pub struct Symthaea {
     /// When available, replaces hash-based encoding with true semantic understanding.
     #[cfg(feature = "neural-bridge")]
     neural_bridge: Option<NeuralBridgeV2>,
+    /// Optional persistent database for long-term memory storage.
+    database: Option<Arc<dyn ConsciousnessDatabase>>,
 }
 
 impl Symthaea {
@@ -252,7 +256,36 @@ impl Symthaea {
             calibration: BrierScoreTracker::with_defaults(),
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
+            database: None,
         })
+    }
+
+    /// Create a Symthaea instance with persistent database storage.
+    pub async fn with_database(
+        hdc_dim: usize,
+        ltc_neurons: usize,
+        db_config: DatabaseConfig,
+    ) -> Result<Self> {
+        let mut instance = Self::new(hdc_dim, ltc_neurons).await?;
+        let db = create_database(&db_config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
+        instance.database = Some(Arc::from(db));
+        Ok(instance)
+    }
+
+    /// Attach a consciousness database to an existing instance.
+    pub async fn attach_database(&mut self, config: DatabaseConfig) -> Result<()> {
+        let db = create_database(&config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Database initialization failed: {e}"))?;
+        self.database = Some(Arc::from(db));
+        Ok(())
+    }
+
+    /// Get a reference to the consciousness database (if configured).
+    pub fn database(&self) -> Option<&dyn ConsciousnessDatabase> {
+        self.database.as_ref().map(|d| d.as_ref())
     }
 
     /// Resume from a saved state file.
@@ -262,8 +295,8 @@ impl Symthaea {
     pub fn resume(path: &str) -> Result<Self> {
         let data = std::fs::read_to_string(path)
             .with_context(|| format!("Failed to read state file: {}", path))?;
-        let state: PersistedState = serde_json::from_str(&data)
-            .with_context(|| "Failed to parse state file")?;
+        let state: PersistedState =
+            serde_json::from_str(&data).with_context(|| "Failed to parse state file")?;
 
         let hdc_dim = state.hdc_dim;
         let ltc_neurons = state.ltc_neurons;
@@ -292,10 +325,13 @@ impl Symthaea {
         };
         let language = ConsciousnessLanguageCore::new(language_config);
         let backend = llm_backend::default_backend();
-        let llm = LLMOrgan::with_backend(LLMOrganConfig {
-            dimension: hdc_dim,
-            ..LLMOrganConfig::default()
-        }, backend);
+        let llm = LLMOrgan::with_backend(
+            LLMOrganConfig {
+                dimension: hdc_dim,
+                ..LLMOrganConfig::default()
+            },
+            backend,
+        );
 
         let plugin_registry = PluginRegistry::with_builtins();
 
@@ -363,6 +399,7 @@ impl Symthaea {
             calibration: BrierScoreTracker::with_defaults(),
             #[cfg(feature = "neural-bridge")]
             neural_bridge,
+            database: None,
         })
     }
 
@@ -381,9 +418,9 @@ impl Symthaea {
     /// **Key Insight**: The LLM does NOT think. It translates pre-computed
     /// structured thoughts into fluent natural language.
     pub async fn process(&mut self, content: &str) -> Result<ProcessResponse> {
-        use std::time::Instant;
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
+        use std::time::Instant;
 
         let pipeline_start = Instant::now();
         self.interactions += 1;
@@ -432,6 +469,41 @@ impl Symthaea {
                 evicted_count = evicted.len(),
                 "Working memory items evicted during tick"
             );
+
+            if let Some(ref db) = self.database {
+                let db = Arc::clone(db);
+                let timestamp_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let current_phi = self.mind.snapshot().consciousness_level;
+                let interaction_count = self.interactions;
+
+                tokio::spawn(async move {
+                    for (i, hv) in evicted.iter().enumerate() {
+                        let record = MemoryRecord {
+                            id: format!("wm-{}-{}", timestamp_ms, i),
+                            memory_type: MemoryType::Working,
+                            encoding: hv.to_binary(0.0),
+                            content: format!(
+                                "Working memory eviction at step {}",
+                                interaction_count
+                            ),
+                            timestamp_ms,
+                            valence: 0.0,
+                            arousal: 0.0,
+                            phi: current_phi,
+                            topics: vec![],
+                            metadata: "{}".to_string(),
+                            consolidation_strength: 0.0,
+                            retrieval_count: 0,
+                        };
+                        if let Err(e) = db.store(record).await {
+                            tracing::warn!(target: "symthaea::database", error = %e, "Failed to persist evicted item");
+                        }
+                    }
+                });
+            }
         }
 
         let phase2_duration = phase2_start.elapsed();
@@ -454,10 +526,13 @@ impl Symthaea {
         // Wire Phase 1 domain detection results into the structured thought
         // so the LLM translation has access to domain, entities, and computed answers.
         if detected_domain != "generic" || !domain_entities.is_empty() {
-            let entities: Vec<(String, String, f64)> = domain_entities.iter()
+            let entities: Vec<(String, String, f64)> = domain_entities
+                .iter()
                 .map(|e| (e.entity_type.clone(), e.value.clone(), e.confidence))
                 .collect();
-            let computed_result = self.plugin_registry.get(&detected_domain)
+            let computed_result = self
+                .plugin_registry
+                .get(&detected_domain)
                 .and_then(|p| p.compute(content, &domain_entities));
 
             let (computed_answer, cube, domain_phi) = match computed_result {
@@ -509,7 +584,8 @@ impl Symthaea {
         // of historical miscalibration should downgrade them.
         #[cfg(feature = "magi_loop")]
         {
-            let skip_calibration = thought.domain_context
+            let skip_calibration = thought
+                .domain_context
                 .as_ref()
                 .and_then(|c| c.cube.as_ref())
                 .map_or(false, |cube| cube.n == NTier::N3);
@@ -567,7 +643,7 @@ impl Symthaea {
 
         // Track AI state for dyad computation
         let ai_hv = symthaea_core::hdc::unified_hv::ContinuousHV::from_values(
-            input_embedding.values.clone()
+            input_embedding.values.clone(),
         );
         self.recent_ai_states.push(ai_hv);
         if self.recent_ai_states.len() > 8 {
@@ -603,7 +679,8 @@ impl Symthaea {
             let action_context = WorldActionContext::new(
                 "broca_translation",
                 "Faithful translation of structured thought",
-            ).with_risk_tier(RiskTier::Observation);
+            )
+            .with_risk_tier(RiskTier::Observation);
             let contract = ResolutionContract::shell_command();
 
             let mut prediction = WorldPrediction::new(
@@ -681,8 +758,10 @@ impl Symthaea {
         );
 
         // Warn on potential hallucination triggers (high novelty + certain status)
-        if matches!(thought.epistemic_status, crate::mind::structured_thought::EpistemicStatus::Certain)
-            && thought.coherence < 0.3
+        if matches!(
+            thought.epistemic_status,
+            crate::mind::structured_thought::EpistemicStatus::Certain
+        ) && thought.coherence < 0.3
         {
             tracing::warn!(
                 target: "symthaea::broca::security",
@@ -757,25 +836,27 @@ impl Symthaea {
         // Check 2: MustInclude constraints
         for constraint in &thought.constraints {
             if constraint.constraint_type == ConstraintType::MustInclude
-                && !text_lower.contains(&constraint.instruction.to_lowercase()) {
-                    tracing::debug!(
-                        "Translation verification: Missing required content: {}",
-                        constraint.instruction
-                    );
-                    verified = false;
-                }
+                && !text_lower.contains(&constraint.instruction.to_lowercase())
+            {
+                tracing::debug!(
+                    "Translation verification: Missing required content: {}",
+                    constraint.instruction
+                );
+                verified = false;
+            }
         }
 
         // Check 3: MustExclude constraints
         for constraint in &thought.constraints {
             if constraint.constraint_type == ConstraintType::MustExclude
-                && text_lower.contains(&constraint.instruction.to_lowercase()) {
-                    tracing::debug!(
-                        "Translation verification: Contains forbidden content: {}",
-                        constraint.instruction
-                    );
-                    verified = false;
-                }
+                && text_lower.contains(&constraint.instruction.to_lowercase())
+            {
+                tracing::debug!(
+                    "Translation verification: Contains forbidden content: {}",
+                    constraint.instruction
+                );
+                verified = false;
+            }
         }
 
         // Check 4: Unknown status should NOT contain factual assertions
@@ -867,10 +948,10 @@ impl Symthaea {
             partner: self.partner.clone(),
             trajectory: self.trajectory.clone(),
             recent_ai_states: self.recent_ai_states.clone(),
+            database_path: None,
         };
 
-        let json = serde_json::to_string_pretty(&state)
-            .context("Failed to serialize state")?;
+        let json = serde_json::to_string_pretty(&state).context("Failed to serialize state")?;
         std::fs::write(path, json)
             .with_context(|| format!("Failed to write state file: {}", path))?;
         Ok(())
@@ -967,9 +1048,13 @@ impl Symthaea {
         match intent {
             SemanticIntent::Answer | SemanticIntent::Clarify => PredictionDomain::Factual,
             SemanticIntent::ProposeAction => PredictionDomain::ToolUse,
-            SemanticIntent::Acknowledge | SemanticIntent::Continue => PredictionDomain::UserBehavior,
+            SemanticIntent::Acknowledge | SemanticIntent::Continue => {
+                PredictionDomain::UserBehavior
+            }
             SemanticIntent::Reflect => PredictionDomain::SystemState,
-            SemanticIntent::ExpressUncertainty | SemanticIntent::Unknown => PredictionDomain::Factual,
+            SemanticIntent::ExpressUncertainty | SemanticIntent::Unknown => {
+                PredictionDomain::Factual
+            }
         }
     }
 
@@ -1202,8 +1287,10 @@ impl Symthaea {
         }
 
         // Generate human states as reflections of AI states (simulated)
-        let human_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV> =
-            self.recent_ai_states.iter().map(|s| {
+        let human_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV> = self
+            .recent_ai_states
+            .iter()
+            .map(|s| {
                 let mut vals = s.values.clone();
                 // Simple perturbation to simulate distinct human state
                 for v in vals.iter_mut() {
@@ -1211,7 +1298,8 @@ impl Symthaea {
                     *v += 0.1;
                 }
                 symthaea_core::hdc::unified_hv::ContinuousHV::from_values(vals).normalize()
-            }).collect();
+            })
+            .collect();
 
         let assessment = RelationalAssessment {
             agent_a: "symthaea".to_string(),
@@ -1251,6 +1339,9 @@ struct PersistedState {
     partner: HumanPartnerModel,
     trajectory: RelationshipTrajectory,
     recent_ai_states: Vec<symthaea_core::hdc::unified_hv::ContinuousHV>,
+    /// Path to the consciousness database (if configured).
+    #[serde(default)]
+    database_path: Option<String>,
 }
 
 /// Summary of partnership state for external consumers.
@@ -1270,4 +1361,220 @@ pub struct PartnershipState {
     pub interactions: u64,
     /// Number of trajectory points recorded.
     pub trajectory_points: usize,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_new_valid_dimension() {
+        let s = Symthaea::new(1024, 64).await;
+        assert!(s.is_ok());
+        let s = s.unwrap();
+        assert_eq!(s.dimension(), 1024);
+        assert!(!s.has_neural_bridge());
+        assert!(!s.has_semantic_encoder());
+    }
+
+    #[tokio::test]
+    async fn test_new_zero_dimension_errors() {
+        let result = Symthaea::new(0, 64).await;
+        assert!(result.is_err());
+        let err = result.err().unwrap();
+        let msg = format!("{}", err);
+        assert!(
+            msg.contains("hdc_dim"),
+            "Error should mention hdc_dim: {msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_introspect_initial_state() {
+        let s = Symthaea::new(1024, 64).await.unwrap();
+        let intro = s.introspect();
+        // Consciousness level starts low but non-negative
+        assert!(intro.consciousness_level >= 0.0);
+        assert!(intro.consciousness_level <= 1.0);
+        // Graph has at least the seeded prototypes
+        assert!(intro.graph_size > 0, "Graph should have seeded items");
+        assert_eq!(intro.memory_stats.long_term_count, 0, "No interactions yet");
+    }
+
+    #[tokio::test]
+    async fn test_partnership_state_initial() {
+        let s = Symthaea::new(1024, 64).await.unwrap();
+        let ps = s.partnership_state();
+        assert_eq!(ps.interactions, 0);
+        assert_eq!(ps.trajectory_points, 0);
+        assert!(ps.trust >= 0.0 && ps.trust <= 1.0);
+        assert_eq!(ps.stage, RelationshipStage::NoRelation);
+    }
+
+    #[tokio::test]
+    async fn test_embed_produces_correct_dimension() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let hv = s.embed("hello world");
+        assert_eq!(hv.values.len(), 1024);
+        // Should be normalized (magnitude ~1.0)
+        let mag: f32 = hv.values.iter().map(|v| v * v).sum::<f32>().sqrt();
+        assert!(
+            (mag - 1.0).abs() < 0.01,
+            "Embedding should be normalized, got mag={mag}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_embed_vec_matches_embed() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let hv = s.embed("test input");
+        let vec = s.embed_vec("test input");
+        assert_eq!(hv.values, vec);
+    }
+
+    #[tokio::test]
+    async fn test_embed_batch() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let texts = &["alpha", "beta", "gamma"];
+        let embeddings = s.embed_batch(texts);
+        assert_eq!(embeddings.len(), 3);
+        for e in &embeddings {
+            assert_eq!(e.values.len(), 1024);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_embed_different_texts_differ() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let a = s.embed("quantum physics");
+        let b = s.embed("chocolate cake");
+        // Different texts should produce different embeddings
+        let sim = a.similarity(&b);
+        assert!(
+            sim < 0.95,
+            "Different texts should have sim < 0.95, got {sim}"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_pause_and_resume_roundtrip() {
+        let tmp = std::env::temp_dir().join("symthaea_test_pause.json");
+        let path = tmp.to_str().unwrap();
+        {
+            let mut s = Symthaea::new(1024, 64).await.unwrap();
+            // Process a query to bump interaction count
+            let _ = s.process("hello").await;
+            assert!(s.interactions > 0);
+            s.pause(path).unwrap();
+        }
+        // Resume and verify state persisted
+        let s = Symthaea::resume(path).unwrap();
+        assert_eq!(s.dimension(), 1024);
+        assert!(
+            s.interactions > 0,
+            "Interactions should persist through pause/resume"
+        );
+        // Cleanup
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[tokio::test]
+    async fn test_resume_invalid_path_errors() {
+        let result = Symthaea::resume("/nonexistent/path/state.json");
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_process_returns_response() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        let resp = s.process("What is consciousness?").await;
+        assert!(resp.is_ok());
+        let resp = resp.unwrap();
+        assert!(
+            !resp.content.is_empty(),
+            "Response content should not be empty"
+        );
+        assert!(resp.confidence >= 0.0 && resp.confidence <= 1.0);
+        assert!(resp.safe);
+    }
+
+    #[tokio::test]
+    async fn test_sleep_consolidation() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        // Process some inputs to populate working memory
+        let _ = s.process("input one").await;
+        let _ = s.process("input two").await;
+        let report = s.sleep().await;
+        assert!(report.is_ok());
+        let report = report.unwrap();
+        assert!(report.scaled > 0, "Should have some memories after sleep");
+    }
+
+    #[test]
+    fn test_cube_to_epistemic_status() {
+        use crate::mind::structured_thought::MTier;
+
+        // E4 (reproducible) → Certain
+        let cube_e4 = EpistemicCube::new(ETier::E4, NTier::N0, MTier::M0);
+        assert_eq!(
+            Symthaea::cube_to_epistemic_status(&cube_e4),
+            EpistemicStatus::Certain
+        );
+
+        // E3 (peer-verified) → Certain
+        let cube_e3 = EpistemicCube::new(ETier::E3, NTier::N0, MTier::M0);
+        assert_eq!(
+            Symthaea::cube_to_epistemic_status(&cube_e3),
+            EpistemicStatus::Certain
+        );
+
+        // E2 (verifiable) → Probable
+        let cube_e2 = EpistemicCube::new(ETier::E2, NTier::N0, MTier::M0);
+        assert_eq!(
+            Symthaea::cube_to_epistemic_status(&cube_e2),
+            EpistemicStatus::Probable
+        );
+
+        // E1 with N1+ → Probable
+        let cube_e1_n1 = EpistemicCube::new(ETier::E1, NTier::N1, MTier::M0);
+        assert_eq!(
+            Symthaea::cube_to_epistemic_status(&cube_e1_n1),
+            EpistemicStatus::Probable
+        );
+
+        // E1 with N0 → Uncertain
+        let cube_e1_n0 = EpistemicCube::new(ETier::E1, NTier::N0, MTier::M0);
+        assert_eq!(
+            Symthaea::cube_to_epistemic_status(&cube_e1_n0),
+            EpistemicStatus::Uncertain
+        );
+
+        // E0 (opinion) → Uncertain
+        let cube_e0 = EpistemicCube::new(ETier::E0, NTier::N0, MTier::M0);
+        assert_eq!(
+            Symthaea::cube_to_epistemic_status(&cube_e0),
+            EpistemicStatus::Uncertain
+        );
+    }
+
+    #[tokio::test]
+    async fn test_interactions_increment() {
+        let mut s = Symthaea::new(1024, 64).await.unwrap();
+        assert_eq!(s.interactions, 0);
+        let _ = s.process("first").await;
+        assert_eq!(s.interactions, 1);
+        let _ = s.process("second").await;
+        assert_eq!(s.interactions, 2);
+    }
+
+    #[tokio::test]
+    async fn test_mind_accessor() {
+        let s = Symthaea::new(1024, 64).await.unwrap();
+        let mind = s.mind();
+        // Mind should be awakened with seeded memory
+        assert!(
+            !mind.working_memory().is_empty(),
+            "Mind should have seeded working memory"
+        );
+    }
 }

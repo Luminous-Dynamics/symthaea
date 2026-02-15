@@ -58,10 +58,9 @@ use tokio::sync::mpsc;
 use tokio::time::interval;
 
 use super::{
-    ActiveInferenceBridge, ActiveInferenceBridgeConfig,
-    BrierScoreTracker, CalibrationQuality, ConstraintGate, ConstraintGateConfig,
-    DryRunReason, ExecutionMode, MagiPersistentModel, OutcomeCategory,
-    PersistenceConfig, PredictionDomain, SupervisionReason,
+    ActiveInferenceBridge, ActiveInferenceBridgeConfig, BrierScoreTracker, CalibrationQuality,
+    ConstraintGate, ConstraintGateConfig, DryRunReason, ExecutionMode, MagiPersistentModel,
+    OutcomeCategory, PersistenceConfig, PredictionDomain, SupervisionReason,
     WorldGroundedSelfModel, WorldPrediction,
 };
 
@@ -384,10 +383,16 @@ impl MagiLoopRuntime {
 
         let tick_count = self.tick_count.load(Ordering::Relaxed);
         let total_us = self.total_tick_us.load(Ordering::Relaxed);
-        let avg_tick_us = if tick_count > 0 { total_us / tick_count } else { 0 };
+        let avg_tick_us = if tick_count > 0 {
+            total_us / tick_count
+        } else {
+            0
+        };
 
         // Get domain briers
-        let domain_briers: Vec<_> = current.calibration.iter()
+        let domain_briers: Vec<_> = current
+            .calibration
+            .iter()
             .map(|(d, c)| (*d, c.lifetime_brier))
             .collect();
 
@@ -466,14 +471,19 @@ impl MagiLoopRuntime {
     }
 
     /// Queue a prediction for resolution
-    pub fn queue_prediction(&self, prediction: WorldPrediction, auto_resolve: Option<AutoResolveType>) {
+    pub fn queue_prediction(
+        &self,
+        prediction: WorldPrediction,
+        auto_resolve: Option<AutoResolveType>,
+    ) {
         let mut pending = self.pending.lock();
         if pending.len() < self.config.max_pending_predictions {
             let deadline = auto_resolve.as_ref().map(|ar| {
-                Instant::now() + match ar {
-                    AutoResolveType::Timeout(d) => *d,
-                    _ => Duration::from_secs(30),
-                }
+                Instant::now()
+                    + match ar {
+                        AutoResolveType::Timeout(d) => *d,
+                        _ => Duration::from_secs(30),
+                    }
             });
 
             pending.push_back(PendingPrediction {
@@ -563,7 +573,11 @@ impl MagiLoopRuntime {
                 confidence: principled.confidence,
                 coherence: principled.coherence,
                 free_energy: principled.prediction_error * 10.0 + principled.uncertainty * 5.0,
-                surprise: if principled.prediction_error > 0.3 { principled.prediction_error } else { 0.0 },
+                surprise: if principled.prediction_error > 0.3 {
+                    principled.prediction_error
+                } else {
+                    0.0
+                },
             }
         } else {
             RuntimeSignals::default()
@@ -576,10 +590,13 @@ impl MagiLoopRuntime {
         if signals.uncertainty > self.config.observation_threshold {
             if self.state() != RuntimeState::Observing {
                 self.set_state(RuntimeState::Observing);
-                self.log(LogLevel::Warning, format!(
-                    "Entering observation mode (uncertainty: {:.2})",
-                    signals.uncertainty
-                ));
+                self.log(
+                    LogLevel::Warning,
+                    format!(
+                        "Entering observation mode (uncertainty: {:.2})",
+                        signals.uncertainty
+                    ),
+                );
             }
         } else if self.state() == RuntimeState::Observing {
             self.set_state(RuntimeState::Running);
@@ -591,8 +608,7 @@ impl MagiLoopRuntime {
 
         // 5. PERSIST - Save if needed
         let tick = self.tick_count.load(Ordering::Relaxed);
-        if self.config.persist_interval_ticks == 0
-            || tick % self.config.persist_interval_ticks == 0
+        if self.config.persist_interval_ticks == 0 || tick % self.config.persist_interval_ticks == 0
         {
             let _ = self.model.lock().sync_and_save();
         }
@@ -658,8 +674,15 @@ impl MagiLoopRuntime {
                 // Log
                 let status = if success { "Success" } else { "Failure" };
                 self.log(
-                    if success { LogLevel::Success } else { LogLevel::Warning },
-                    format!("Resolved: {} ({}). Brier: {:.4}", pred.prediction.claim, status, brier),
+                    if success {
+                        LogLevel::Success
+                    } else {
+                        LogLevel::Warning
+                    },
+                    format!(
+                        "Resolved: {} ({}). Brier: {:.4}",
+                        pred.prediction.claim, status, brier
+                    ),
                 );
 
                 // Emit event
@@ -675,9 +698,7 @@ impl MagiLoopRuntime {
     /// Check if an auto-resolve condition is met
     async fn check_auto_resolve(&self, auto: &AutoResolveType) -> Option<bool> {
         match auto {
-            AutoResolveType::FileExists(path) => {
-                Some(std::path::Path::new(path).exists())
-            }
+            AutoResolveType::FileExists(path) => Some(std::path::Path::new(path).exists()),
             AutoResolveType::CommandSucceeds(cmd) => {
                 let output = tokio::process::Command::new("sh")
                     .arg("-c")

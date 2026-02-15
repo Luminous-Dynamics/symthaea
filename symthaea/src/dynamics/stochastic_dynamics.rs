@@ -60,7 +60,11 @@ impl SimpleRng {
     /// Create a new RNG from a seed. Seed 0 is mapped to a non-zero value.
     pub fn new(seed: u64) -> Self {
         Self {
-            state: if seed == 0 { 0x5A5A_5A5A_5A5A_5A5A } else { seed },
+            state: if seed == 0 {
+                0x5A5A_5A5A_5A5A_5A5A
+            } else {
+                seed
+            },
         }
     }
 
@@ -358,14 +362,24 @@ pub fn monte_carlo(
     for path_idx in 0..n_paths {
         let mut path_config = config.clone();
         // Derive a unique seed for each path
-        path_config.noise_seed = config.noise_seed.wrapping_add(path_idx as u64).wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        path_config.noise_seed = config
+            .noise_seed
+            .wrapping_add(path_idx as u64)
+            .wrapping_mul(6364136223846793005)
+            .wrapping_add(1442695040888963407);
 
         let result = solve(system, x0, t_span, &path_config);
         if shared_times.is_empty() {
             shared_times = result.times;
         }
         // Each solve returns exactly one trajectory
-        all_trajectories.push(result.trajectories.into_iter().next().unwrap());
+        all_trajectories.push(
+            result
+                .trajectories
+                .into_iter()
+                .next()
+                .expect("solve always returns at least one trajectory"),
+        );
     }
 
     let statistics = compute_ensemble_statistics(&all_trajectories);
@@ -389,7 +403,11 @@ fn compute_ensemble_statistics(trajectories: &[Vec<Vec<f64>>]) -> SdeStatistics 
     }
 
     let n_steps = trajectories[0].len();
-    let dim = if n_steps > 0 { trajectories[0][0].len() } else { 0 };
+    let dim = if n_steps > 0 {
+        trajectories[0][0].len()
+    } else {
+        0
+    };
     let n_f64 = n_paths as f64;
 
     // Mean
@@ -728,10 +746,13 @@ impl FokkerPlanckSolver {
         }
 
         let drift_values: Vec<f64> = grid.iter().map(|&x| drift_fn(x)).collect();
-        let diffusion_sq_values: Vec<f64> = grid.iter().map(|&x| {
-            let s = diffusion_fn(x);
-            s * s
-        }).collect();
+        let diffusion_sq_values: Vec<f64> = grid
+            .iter()
+            .map(|&x| {
+                let s = diffusion_fn(x);
+                s * s
+            })
+            .collect();
 
         Self {
             grid,
@@ -1135,11 +1156,7 @@ mod tests {
         // Harmonic potential V(x) = x^2 / 2, diffusion D.
         // Boltzmann distribution: p(x) ~ exp(-x^2 / (2D)) => N(0, D).
         let diffusion = 0.5_f64;
-        let mut langevin = LangevinDynamics::new(
-            Box::new(|x| 0.5 * x * x),
-            diffusion,
-            0.0,
-        );
+        let mut langevin = LangevinDynamics::new(Box::new(|x| 0.5 * x * x), diffusion, 0.0);
 
         let dt = 0.005;
         let n_steps = 200_000;
@@ -1154,10 +1171,7 @@ mod tests {
         let mean: f64 = samples.iter().sum::<f64>() / n;
         let var: f64 = samples.iter().map(|x| (x - mean) * (x - mean)).sum::<f64>() / n;
 
-        assert!(
-            mean.abs() < 0.1,
-            "Langevin mean should be ~0, got {mean}"
-        );
+        assert!(mean.abs() < 0.1, "Langevin mean should be ~0, got {mean}");
         assert!(
             (var - diffusion).abs() < 0.15,
             "Langevin variance should be ~{diffusion}, got {var}"

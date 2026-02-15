@@ -8,10 +8,8 @@
 //! - COOPERATION
 //! - ADAPTATION
 
-use symthaea_core::hdc::ucl_cross_domain_frames::{
-    concept_hv, CrossDomainFrame, FrameInstance, FrameSlot, UCLFrameSystem,
-};
 use std::collections::HashMap;
+use symthaea_core::hdc::ucl_cross_domain_frames::{concept_hv, UCLFrameSystem};
 
 /// Test that all 6 UCL frames exist
 #[test]
@@ -64,7 +62,9 @@ fn test_trade_frame_slots() {
 #[test]
 fn test_conflict_frame_slots() {
     let system = UCLFrameSystem::new();
-    let conflict = system.get_frame("CONFLICT").expect("CONFLICT frame should exist");
+    let conflict = system
+        .get_frame("CONFLICT")
+        .expect("CONFLICT frame should exist");
 
     // Required slots
     assert!(conflict.get_slot("parties").is_some(), "parties slot");
@@ -248,7 +248,10 @@ fn test_instance_similarity() {
 
     // Instances with same core should have positive similarity
     let sim = instance1.similarity(&instance2);
-    assert!(sim > 0.0, "Similar instances should have positive similarity");
+    assert!(
+        sim > 0.0,
+        "Similar instances should have positive similarity"
+    );
 }
 
 /// Test cross-domain integration
@@ -298,7 +301,10 @@ fn test_summary_generation() {
 
     // Summary should contain all frame names
     assert!(summary.contains("TRADE"), "Summary should mention TRADE");
-    assert!(summary.contains("CONFLICT"), "Summary should mention CONFLICT");
+    assert!(
+        summary.contains("CONFLICT"),
+        "Summary should mention CONFLICT"
+    );
     assert!(
         summary.contains("FEEDBACK_LOOP"),
         "Summary should mention FEEDBACK_LOOP"
@@ -317,7 +323,10 @@ fn test_summary_generation() {
     );
 
     // Summary should contain slot information
-    assert!(summary.contains("giver"), "Summary should mention giver slot");
+    assert!(
+        summary.contains("giver"),
+        "Summary should mention giver slot"
+    );
     assert!(
         summary.contains("parties"),
         "Summary should mention parties slot"

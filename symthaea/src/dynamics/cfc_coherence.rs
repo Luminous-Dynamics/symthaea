@@ -112,9 +112,7 @@ impl TemporalCoherenceMetrics {
 
         // Basic statistics
         let mean_tau = tau.iter().sum::<f32>() / n;
-        let variance = tau.iter()
-            .map(|&t| (t - mean_tau).powi(2))
-            .sum::<f32>() / n;
+        let variance = tau.iter().map(|&t| (t - mean_tau).powi(2)).sum::<f32>() / n;
         let std_tau = variance.sqrt();
 
         // Coefficient of variation
@@ -233,7 +231,8 @@ impl CfCCoherenceBridge {
     /// Returns the updated metrics and modulated learning rate.
     pub fn update(&mut self, tau_values: &[&Array1<f32>]) -> &TemporalCoherenceMetrics {
         // Flatten all tau values into one array
-        let all_tau: Vec<f32> = tau_values.iter()
+        let all_tau: Vec<f32> = tau_values
+            .iter()
             .flat_map(|arr| arr.iter().cloned())
             .collect();
 
@@ -245,7 +244,8 @@ impl CfCCoherenceBridge {
         self.current_metrics = TemporalCoherenceMetrics::from_tau(&combined_tau);
 
         // Update history
-        self.coherence_history.push_back(self.current_metrics.coherence);
+        self.coherence_history
+            .push_back(self.current_metrics.coherence);
         if self.coherence_history.len() > self.config.history_length {
             self.coherence_history.pop_front();
         }
@@ -319,12 +319,16 @@ impl CfCCoherenceBridge {
             return 0.0;
         }
 
-        let recent: Vec<f32> = self.coherence_history.iter()
+        let recent: Vec<f32> = self
+            .coherence_history
+            .iter()
             .rev()
             .take(10)
             .cloned()
             .collect();
-        let older: Vec<f32> = self.coherence_history.iter()
+        let older: Vec<f32> = self
+            .coherence_history
+            .iter()
             .rev()
             .skip(10)
             .take(10)
@@ -402,8 +406,16 @@ mod tests {
         let tau = Array1::from_vec(vec![1.0; 100]);
         let metrics = TemporalCoherenceMetrics::from_tau(&tau);
 
-        assert!(metrics.coherence > 0.99, "Uniform tau should have high coherence: {}", metrics.coherence);
-        assert!(metrics.tau_cv < 0.01, "Uniform tau should have low CV: {}", metrics.tau_cv);
+        assert!(
+            metrics.coherence > 0.99,
+            "Uniform tau should have high coherence: {}",
+            metrics.coherence
+        );
+        assert!(
+            metrics.tau_cv < 0.01,
+            "Uniform tau should have low CV: {}",
+            metrics.tau_cv
+        );
     }
 
     #[test]
@@ -412,8 +424,16 @@ mod tests {
         let tau = Array1::from_vec(vec![0.1, 0.5, 1.0, 2.0, 5.0, 10.0]);
         let metrics = TemporalCoherenceMetrics::from_tau(&tau);
 
-        assert!(metrics.coherence < 0.7, "Varied tau should have lower coherence: {}", metrics.coherence);
-        assert!(metrics.tau_cv > 0.5, "Varied tau should have higher CV: {}", metrics.tau_cv);
+        assert!(
+            metrics.coherence < 0.7,
+            "Varied tau should have lower coherence: {}",
+            metrics.coherence
+        );
+        assert!(
+            metrics.tau_cv > 0.5,
+            "Varied tau should have higher CV: {}",
+            metrics.tau_cv
+        );
     }
 
     #[test]
@@ -432,8 +452,12 @@ mod tests {
         bridge.update(&[&varied_tau]);
         let low_lr = bridge.effective_learning_rate();
 
-        assert!(high_lr > low_lr,
-                "High coherence should give higher LR: {} vs {}", high_lr, low_lr);
+        assert!(
+            high_lr > low_lr,
+            "High coherence should give higher LR: {} vs {}",
+            high_lr,
+            low_lr
+        );
     }
 
     #[test]
@@ -444,8 +468,11 @@ mod tests {
         let uniform_tau = Array1::from_vec(vec![1.0; 50]);
         bridge.update(&[&uniform_tau]);
 
-        assert!(bridge.phi_contribution() > 0.1,
-                "High coherence should contribute to phi: {}", bridge.phi_contribution());
+        assert!(
+            bridge.phi_contribution() > 0.1,
+            "High coherence should contribute to phi: {}",
+            bridge.phi_contribution()
+        );
     }
 
     #[test]
@@ -455,17 +482,23 @@ mod tests {
         let focused_metrics = TemporalCoherenceMetrics::from_tau(&focused_tau);
 
         // High focus when all values identical (entropy = 0)
-        assert!(focused_metrics.temporal_focus > 0.9,
-                "Identical values should have high focus: {}", focused_metrics.temporal_focus);
+        assert!(
+            focused_metrics.temporal_focus > 0.9,
+            "Identical values should have high focus: {}",
+            focused_metrics.temporal_focus
+        );
 
         // Varied tau distribution (spread across range)
         let varied_tau = Array1::from_vec(vec![0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0]);
         let varied_metrics = TemporalCoherenceMetrics::from_tau(&varied_tau);
 
         // Lower focus when values spread evenly
-        assert!(varied_metrics.temporal_focus < focused_metrics.temporal_focus,
-                "Even spread should have lower focus: {} vs {}",
-                varied_metrics.temporal_focus, focused_metrics.temporal_focus);
+        assert!(
+            varied_metrics.temporal_focus < focused_metrics.temporal_focus,
+            "Even spread should have lower focus: {} vs {}",
+            varied_metrics.temporal_focus,
+            focused_metrics.temporal_focus
+        );
     }
 
     #[test]

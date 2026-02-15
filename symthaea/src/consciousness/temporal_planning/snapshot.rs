@@ -94,12 +94,7 @@ mod tests {
         let mut manager = SnapshotManager::new(weights.clone(), states.clone(), taus.clone(), seed);
 
         let mut fork = manager.fork();
-        let mut full_clone = ForkedState::new(
-            Arc::new(weights),
-            states,
-            taus,
-            seed,
-        );
+        let mut full_clone = ForkedState::new(Arc::new(weights), states, taus, seed);
 
         let input = [0.7, -0.2];
         fork.evolve(0.1, &input);
@@ -107,19 +102,18 @@ mod tests {
 
         // Should be bitwise equal
         for (a, b) in fork.states[0].iter().zip(full_clone.states[0].iter()) {
-            assert_eq!(a.to_bits(), b.to_bits(), "TEST-FORK-1: fork and clone must evolve identically");
+            assert_eq!(
+                a.to_bits(),
+                b.to_bits(),
+                "TEST-FORK-1: fork and clone must evolve identically"
+            );
         }
     }
 
     #[test]
     fn test_fork_independence() {
         // TEST-FORK-2: Two forks from same snapshot don't cross-contaminate
-        let mut manager = SnapshotManager::new(
-            vec![1.0],
-            vec![vec![0.0]],
-            vec![1.0],
-            [0u8; 32],
-        );
+        let mut manager = SnapshotManager::new(vec![1.0], vec![vec![0.0]], vec![1.0], [0u8; 32]);
 
         let mut fork_a = manager.fork();
         let mut fork_b = manager.fork();
@@ -147,7 +141,10 @@ mod tests {
         manager.update_weights(vec![999.0, 888.0, 777.0]);
 
         // Fork should NOT observe the mutation
-        assert_eq!(fork.weights[0], 1.0, "TEST-FORK-3: Fork must not see weight mutation");
+        assert_eq!(
+            fork.weights[0], 1.0,
+            "TEST-FORK-3: Fork must not see weight mutation"
+        );
         assert_eq!(fork.weights[1], 2.0);
         assert_eq!(fork.weights[2], 3.0);
     }
@@ -161,6 +158,9 @@ mod tests {
         let fork1 = manager1.fork();
         let fork2 = manager2.fork();
 
-        assert_eq!(fork1.rng_state, fork2.rng_state, "INV-3: Same seed must produce same fork");
+        assert_eq!(
+            fork1.rng_state, fork2.rng_state,
+            "INV-3: Same seed must produce same fork"
+        );
     }
 }

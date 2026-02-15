@@ -39,13 +39,13 @@
 //! - **Multi-level scoring**: Combines cluster-level and global grammar scores
 //! - **Sparse HDC**: 5% density provides 10× capacity vs dense vectors
 
-use crate::hdc::{HV16, BundleAccumulator, HDC_DIM};
-use crate::temporal_grammar::{TemporalEvent, Sparsity};
+use crate::hdc::{BundleAccumulator, HDC_DIM, HV16};
+use crate::temporal_grammar::{Sparsity, TemporalEvent};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::path::Path;
-use std::io::{BufReader, BufWriter};
 use std::fs::File;
-use serde::{Serialize, Deserialize};
+use std::io::{BufReader, BufWriter};
+use std::path::Path;
 
 /// CfC cell for temporal dynamics
 #[derive(Clone)]
@@ -210,12 +210,14 @@ impl UnifiedGrammar {
         // Build clusters from config
         let mut cluster_names: HashMap<String, Vec<String>> = HashMap::new();
         for (cat, cluster_name) in &config.cluster_map {
-            cluster_names.entry(cluster_name.clone())
+            cluster_names
+                .entry(cluster_name.clone())
                 .or_default()
                 .push(cat.clone());
         }
 
-        let clusters: Vec<CategoryCluster> = cluster_names.into_iter()
+        let clusters: Vec<CategoryCluster> = cluster_names
+            .into_iter()
             .map(|(name, cats)| CategoryCluster::new(&name, cats))
             .collect();
 
@@ -244,11 +246,19 @@ impl UnifiedGrammar {
     /// Create cetacean-specific unified grammar
     pub fn cetacean() -> Self {
         let categories = vec![
-            "click_loud", "click_soft",
-            "whistle_up", "whistle_down", "whistle_flat",
-            "burst_rapid", "burst_slow",
-            "moan", "silence",
-        ].into_iter().map(String::from).collect::<Vec<_>>();
+            "click_loud",
+            "click_soft",
+            "whistle_up",
+            "whistle_down",
+            "whistle_flat",
+            "burst_rapid",
+            "burst_slow",
+            "moan",
+            "silence",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
 
         // Cluster by acoustic type
         let mut cluster_map = HashMap::new();
@@ -280,24 +290,26 @@ impl UnifiedGrammar {
     pub fn speech() -> Self {
         let categories = vec![
             // Vowels
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
-            // Stops
-            "B", "D", "G", "K", "P", "T",
-            // Fricatives
-            "CH", "DH", "F", "JH", "S", "SH", "TH", "V", "Z", "ZH",
-            // Nasals
-            "M", "N", "NG",
-            // Liquids/Glides
-            "L", "R", "W", "Y", "HH",
-            // Silence
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW", // Stops
+            "B", "D", "G", "K", "P", "T", // Fricatives
+            "CH", "DH", "F", "JH", "S", "SH", "TH", "V", "Z", "ZH", // Nasals
+            "M", "N", "NG", // Liquids/Glides
+            "L", "R", "W", "Y", "HH", // Silence
             "SIL",
-        ].into_iter().map(String::from).collect::<Vec<_>>();
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
 
         // Cluster by manner of articulation
         let mut cluster_map = HashMap::new();
 
         // Vowels
-        for v in &["AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW"] {
+        for v in &[
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW",
+        ] {
             cluster_map.insert(v.to_string(), "vowels".to_string());
         }
         // Stops
@@ -335,14 +347,24 @@ impl UnifiedGrammar {
     /// Create EEG sleep unified grammar
     pub fn eeg_sleep() -> Self {
         let categories = vec![
-            "alpha", "beta",
-            "theta", "vertex_sharp",
-            "spindle", "k_complex",
-            "delta", "slow_osc",
-            "sawtooth", "rem_burst", "atonia",
-            "arousal", "microarousal",
+            "alpha",
+            "beta",
+            "theta",
+            "vertex_sharp",
+            "spindle",
+            "k_complex",
+            "delta",
+            "slow_osc",
+            "sawtooth",
+            "rem_burst",
+            "atonia",
+            "arousal",
+            "microarousal",
             "artifact",
-        ].into_iter().map(String::from).collect::<Vec<_>>();
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect::<Vec<_>>();
 
         // Cluster by sleep stage
         let mut cluster_map = HashMap::new();
@@ -368,8 +390,8 @@ impl UnifiedGrammar {
             sparsity: Sparsity::Sparse5,
             duration_bins: 6,
             intensity_bins: 4,
-            tau_range: (0.5, 30.0),  // Slower dynamics for sleep
-            cluster_weight: 0.7,     // Cluster (stage) is important
+            tau_range: (0.5, 30.0), // Slower dynamics for sleep
+            cluster_weight: 0.7,    // Cluster (stage) is important
             global_weight: 0.3,
             prediction_boost: 0.4,
         })
@@ -390,7 +412,9 @@ impl UnifiedGrammar {
     /// Bind an event to a hypervector with temporal encoding
     fn bind_event(&self, event: &TemporalEvent) -> HV16 {
         // Get category HV
-        let cat_hv = self.category_hvs.get(&event.category)
+        let cat_hv = self
+            .category_hvs
+            .get(&event.category)
             .cloned()
             .unwrap_or_else(HV16::zero);
 
@@ -455,8 +479,8 @@ impl UnifiedGrammar {
         };
 
         // 6. Combine scores with temporal modulation
-        let base_score = self.config.cluster_weight * cluster_score
-                       + self.config.global_weight * global_score;
+        let base_score =
+            self.config.cluster_weight * cluster_score + self.config.global_weight * global_score;
 
         // Temporal modulation: higher temporal_state boosts prediction confidence
         base_score * (1.0 + self.config.prediction_boost * temporal_mod)
@@ -536,7 +560,9 @@ impl UnifiedGrammar {
     pub fn stats(&self) -> UnifiedStats {
         let global_density = self.global_memory.popcount() as f32 / HDC_DIM as f32;
 
-        let cluster_densities: Vec<f32> = self.clusters.iter()
+        let cluster_densities: Vec<f32> = self
+            .clusters
+            .iter()
             .map(|c| c.memory.popcount() as f32 / HDC_DIM as f32)
             .collect();
 
@@ -576,7 +602,8 @@ impl UnifiedGrammar {
                 Sparsity::Sparse10 => "sparse10",
                 Sparsity::Sparse5 => "sparse5",
                 Sparsity::Sparse1 => "sparse1",
-            }.to_string(),
+            }
+            .to_string(),
             duration_bins: self.config.duration_bins,
             intensity_bins: self.config.intensity_bins,
             tau_range: self.config.tau_range,
@@ -584,16 +611,30 @@ impl UnifiedGrammar {
             global_weight: self.config.global_weight,
             prediction_boost: self.config.prediction_boost,
             global_memory: self.global_memory.to_bytes().to_vec(),
-            cluster_memories: self.clusters.iter()
-                .map(|c| (c.name.clone(), c.memory.to_bytes().to_vec(), c.training_count))
+            cluster_memories: self
+                .clusters
+                .iter()
+                .map(|c| {
+                    (
+                        c.name.clone(),
+                        c.memory.to_bytes().to_vec(),
+                        c.training_count,
+                    )
+                })
                 .collect(),
-            category_hvs: self.category_hvs.iter()
+            category_hvs: self
+                .category_hvs
+                .iter()
                 .map(|(k, v)| (k.clone(), v.to_bytes().to_vec()))
                 .collect(),
-            duration_hvs: self.duration_hvs.iter()
+            duration_hvs: self
+                .duration_hvs
+                .iter()
                 .map(|hv| hv.to_bytes().to_vec())
                 .collect(),
-            intensity_hvs: self.intensity_hvs.iter()
+            intensity_hvs: self
+                .intensity_hvs
+                .iter()
                 .map(|hv| hv.to_bytes().to_vec())
                 .collect(),
             training_count: self.training_count,
@@ -601,16 +642,14 @@ impl UnifiedGrammar {
 
         let file = File::create(path)?;
         let writer = BufWriter::new(file);
-        serde_json::to_writer_pretty(writer, &model)
-            .map_err(|e| std::io::Error::other(e))
+        serde_json::to_writer_pretty(writer, &model).map_err(std::io::Error::other)
     }
 
     /// Load trained model from file
     pub fn load<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let file = File::open(path)?;
         let reader = BufReader::new(file);
-        let model: SavedModel = serde_json::from_reader(reader)
-            .map_err(|e| std::io::Error::other(e))?;
+        let model: SavedModel = serde_json::from_reader(reader).map_err(std::io::Error::other)?;
 
         let sparsity = match model.sparsity.as_str() {
             "sparse10" => Sparsity::Sparse10,
@@ -633,7 +672,9 @@ impl UnifiedGrammar {
         };
 
         // Rebuild category HVs
-        let category_hvs: HashMap<String, HV16> = model.category_hvs.into_iter()
+        let category_hvs: HashMap<String, HV16> = model
+            .category_hvs
+            .into_iter()
             .filter_map(|(k, v)| {
                 if v.len() == 256 {
                     let mut bytes = [0u8; 256];
@@ -646,7 +687,9 @@ impl UnifiedGrammar {
             .collect();
 
         // Rebuild duration HVs
-        let duration_hvs: Vec<HV16> = model.duration_hvs.into_iter()
+        let duration_hvs: Vec<HV16> = model
+            .duration_hvs
+            .into_iter()
             .filter_map(|v| {
                 if v.len() == 256 {
                     let mut bytes = [0u8; 256];
@@ -659,7 +702,9 @@ impl UnifiedGrammar {
             .collect();
 
         // Rebuild intensity HVs
-        let intensity_hvs: Vec<HV16> = model.intensity_hvs.into_iter()
+        let intensity_hvs: Vec<HV16> = model
+            .intensity_hvs
+            .into_iter()
             .filter_map(|v| {
                 if v.len() == 256 {
                     let mut bytes = [0u8; 256];
@@ -683,12 +728,14 @@ impl UnifiedGrammar {
         // Rebuild clusters
         let mut cluster_names: HashMap<String, Vec<String>> = HashMap::new();
         for (cat, cluster_name) in &config.cluster_map {
-            cluster_names.entry(cluster_name.clone())
+            cluster_names
+                .entry(cluster_name.clone())
                 .or_default()
                 .push(cat.clone());
         }
 
-        let mut clusters: Vec<CategoryCluster> = cluster_names.into_iter()
+        let mut clusters: Vec<CategoryCluster> = cluster_names
+            .into_iter()
             .map(|(name, cats)| CategoryCluster::new(&name, cats))
             .collect();
 
@@ -799,8 +846,11 @@ mod tests {
         }
 
         let stats = grammar.stats();
-        println!("Cetacean unified: {} clusters, {:.1}% global density",
-                 stats.num_clusters, stats.global_density * 100.0);
+        println!(
+            "Cetacean unified: {} clusters, {:.1}% global density",
+            stats.num_clusters,
+            stats.global_density * 100.0
+        );
 
         // Score
         let click_score = grammar.score_sequence(&click_train);
@@ -812,7 +862,11 @@ mod tests {
 
         // Both patterns should have high scores since unified learns diverse patterns
         // The key is that trained patterns produce consistent positive scores
-        assert!(click_score > 0.5, "Trained pattern should score well: {}", click_score);
+        assert!(
+            click_score > 0.5,
+            "Trained pattern should score well: {}",
+            click_score
+        );
     }
 
     #[test]
@@ -839,8 +893,11 @@ mod tests {
         }
 
         let stats = grammar.stats();
-        println!("Speech unified: {} clusters active, {:.1}% avg density",
-                 stats.active_clusters, stats.avg_cluster_density * 100.0);
+        println!(
+            "Speech unified: {} clusters active, {:.1}% avg density",
+            stats.active_clusters,
+            stats.avg_cluster_density * 100.0
+        );
 
         let cat_score = grammar.score_sequence(&cat);
         let dog_score = grammar.score_sequence(&dog);

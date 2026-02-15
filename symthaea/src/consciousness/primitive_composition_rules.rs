@@ -12,7 +12,13 @@ pub trait CompositionRule: Send + Sync {
     /// Check if this rule applies to the given tier pair
     fn applies(&self, tier1: PrimitiveTier, tier2: PrimitiveTier) -> bool;
     /// Compose two hypervectors according to this rule
-    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, tier1: PrimitiveTier, tier2: PrimitiveTier) -> BinaryHV;
+    fn compose(
+        &self,
+        hv1: &BinaryHV,
+        hv2: &BinaryHV,
+        tier1: PrimitiveTier,
+        tier2: PrimitiveTier,
+    ) -> BinaryHV;
     /// Rule name for debugging
     fn name(&self) -> &'static str;
 }
@@ -25,12 +31,18 @@ impl CompositionRule for TemporalPhysicalRule {
         matches!(
             (tier1, tier2),
             (PrimitiveTier::Temporal, PrimitiveTier::Physical)
-            | (PrimitiveTier::Physical, PrimitiveTier::Temporal)
-            | (PrimitiveTier::Temporal, PrimitiveTier::Temporal)
+                | (PrimitiveTier::Physical, PrimitiveTier::Temporal)
+                | (PrimitiveTier::Temporal, PrimitiveTier::Temporal)
         )
     }
 
-    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> BinaryHV {
+    fn compose(
+        &self,
+        hv1: &BinaryHV,
+        hv2: &BinaryHV,
+        _tier1: PrimitiveTier,
+        _tier2: PrimitiveTier,
+    ) -> BinaryHV {
         // Permute hv1 to encode ordering, then bind
         let permuted = hv1.permute(1);
         permuted.bind(hv2)
@@ -46,11 +58,16 @@ pub struct MathematicalRule;
 
 impl CompositionRule for MathematicalRule {
     fn applies(&self, tier1: PrimitiveTier, tier2: PrimitiveTier) -> bool {
-        matches!(tier1, PrimitiveTier::Mathematical)
-            || matches!(tier2, PrimitiveTier::Mathematical)
+        matches!(tier1, PrimitiveTier::Mathematical) || matches!(tier2, PrimitiveTier::Mathematical)
     }
 
-    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> BinaryHV {
+    fn compose(
+        &self,
+        hv1: &BinaryHV,
+        hv2: &BinaryHV,
+        _tier1: PrimitiveTier,
+        _tier2: PrimitiveTier,
+    ) -> BinaryHV {
         hv1.bind(hv2)
     }
 
@@ -64,11 +81,22 @@ pub struct ConsciousnessRule;
 
 impl CompositionRule for ConsciousnessRule {
     fn applies(&self, tier1: PrimitiveTier, tier2: PrimitiveTier) -> bool {
-        matches!(tier1, PrimitiveTier::Consciousness | PrimitiveTier::MetaCognitive)
-            || matches!(tier2, PrimitiveTier::Consciousness | PrimitiveTier::MetaCognitive)
+        matches!(
+            tier1,
+            PrimitiveTier::Consciousness | PrimitiveTier::MetaCognitive
+        ) || matches!(
+            tier2,
+            PrimitiveTier::Consciousness | PrimitiveTier::MetaCognitive
+        )
     }
 
-    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, _tier1: PrimitiveTier, _tier2: PrimitiveTier) -> BinaryHV {
+    fn compose(
+        &self,
+        hv1: &BinaryHV,
+        hv2: &BinaryHV,
+        _tier1: PrimitiveTier,
+        _tier2: PrimitiveTier,
+    ) -> BinaryHV {
         // Bundle first (majority vote preserves both), then bind for uniqueness
         let bundled = BinaryHV::bundle(&[*hv1, *hv2]);
         bundled.bind(&hv1.bind(hv2))
@@ -96,7 +124,13 @@ impl CompositionRule for CrossTierRule {
         tier1 != tier2
     }
 
-    fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, tier1: PrimitiveTier, tier2: PrimitiveTier) -> BinaryHV {
+    fn compose(
+        &self,
+        hv1: &BinaryHV,
+        hv2: &BinaryHV,
+        tier1: PrimitiveTier,
+        tier2: PrimitiveTier,
+    ) -> BinaryHV {
         let distance = Self::tier_distance(tier1, tier2) as usize;
         // Permute by tier distance to encode structural relationship
         let permuted = hv1.permute(distance.max(1));
@@ -127,7 +161,13 @@ impl CompositionRuleEngine {
     }
 
     /// Compose two HVs using the best matching rule
-    pub fn compose(&self, hv1: &BinaryHV, hv2: &BinaryHV, tier1: PrimitiveTier, tier2: PrimitiveTier) -> BinaryHV {
+    pub fn compose(
+        &self,
+        hv1: &BinaryHV,
+        hv2: &BinaryHV,
+        tier1: PrimitiveTier,
+        tier2: PrimitiveTier,
+    ) -> BinaryHV {
         for rule in &self.rules {
             if rule.applies(tier1, tier2) {
                 return rule.compose(hv1, hv2, tier1, tier2);
@@ -191,8 +231,16 @@ mod tests {
         let sim1 = result.similarity(&hv1);
         let sim2 = result.similarity(&hv2);
         // Composed HV should not be identical to either parent
-        assert!(sim1 < 0.95, "Composed should differ from hv1, similarity={}", sim1);
-        assert!(sim2 < 0.95, "Composed should differ from hv2, similarity={}", sim2);
+        assert!(
+            sim1 < 0.95,
+            "Composed should differ from hv1, similarity={}",
+            sim1
+        );
+        assert!(
+            sim2 < 0.95,
+            "Composed should differ from hv2, similarity={}",
+            sim2
+        );
     }
 
     #[test]
@@ -200,7 +248,12 @@ mod tests {
         let rule = ConsciousnessRule;
         let hv1 = BinaryHV::random(42);
         let hv2 = BinaryHV::random(99);
-        let composed = rule.compose(&hv1, &hv2, PrimitiveTier::Consciousness, PrimitiveTier::Physical);
+        let composed = rule.compose(
+            &hv1,
+            &hv2,
+            PrimitiveTier::Consciousness,
+            PrimitiveTier::Physical,
+        );
 
         // Consciousness rule uses bundle+bind, result should exist
         assert!(composed.popcount() > 0);

@@ -7,7 +7,7 @@
 //!
 //! The key insight: Learn only what's messy (acoustics), encode what's structured (linguistics).
 
-use crate::hdc::{HV16, BundleAccumulator};
+use crate::hdc::{BundleAccumulator, HV16};
 use std::collections::HashMap;
 
 /// Phoneme class definitions for English (ARPABET)
@@ -79,17 +79,16 @@ impl PhonemeClasses {
         let liquid = bundle(&["L", "R"]);
         let glide = bundle(&["W", "Y"]);
         let vowel = bundle(&[
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY",
-            "IH", "IY", "OW", "OY", "UH", "UW"
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW",
         ]);
 
         // Voicing
         let voiced = bundle(&[
-            "B", "D", "G", "V", "DH", "Z", "ZH", "JH",
-            "M", "N", "NG", "L", "R", "W", "Y",
+            "B", "D", "G", "V", "DH", "Z", "ZH", "JH", "M", "N", "NG", "L", "R", "W", "Y",
             // All vowels are voiced
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY",
-            "IH", "IY", "OW", "OY", "UH", "UW"
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW",
         ]);
         let voiceless = bundle(&["P", "T", "K", "F", "TH", "S", "SH", "CH", "HH"]);
 
@@ -114,30 +113,43 @@ impl PhonemeClasses {
         // Phonotactic position constraints
         // What can start a word (most consonants, all vowels, but NOT NG or ZH)
         let word_initial = bundle(&[
-            "P", "B", "T", "D", "K", "G", "M", "N",
-            "F", "V", "TH", "DH", "S", "Z", "SH", "CH", "JH", "HH",
-            "L", "R", "W", "Y",
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY",
-            "IH", "IY", "OW", "OY", "UH", "UW"
+            "P", "B", "T", "D", "K", "G", "M", "N", "F", "V", "TH", "DH", "S", "Z", "SH", "CH",
+            "JH", "HH", "L", "R", "W", "Y", "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY",
+            "IH", "IY", "OW", "OY", "UH", "UW",
         ]);
 
         // What can end a word
         let word_final = bundle(&[
-            "P", "B", "T", "D", "K", "G", "M", "N", "NG",
-            "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "CH", "JH",
-            "L", "R",
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY",
-            "IH", "IY", "OW", "OY", "UH", "UW"
+            "P", "B", "T", "D", "K", "G", "M", "N", "NG", "F", "V", "TH", "DH", "S", "Z", "SH",
+            "ZH", "CH", "JH", "L", "R", "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH",
+            "IY", "OW", "OY", "UH", "UW",
         ]);
 
         Self {
             phonemes,
-            stop, nasal, fricative, affricate, liquid, glide, vowel,
-            voiced, voiceless,
-            labial, dental, alveolar, palatal, velar, glottal,
-            high_vowel, mid_vowel, low_vowel,
-            front_vowel, central_vowel, back_vowel,
-            word_initial, word_final,
+            stop,
+            nasal,
+            fricative,
+            affricate,
+            liquid,
+            glide,
+            vowel,
+            voiced,
+            voiceless,
+            labial,
+            dental,
+            alveolar,
+            palatal,
+            velar,
+            glottal,
+            high_vowel,
+            mid_vowel,
+            low_vowel,
+            front_vowel,
+            central_vowel,
+            back_vowel,
+            word_initial,
+            word_final,
         }
     }
 
@@ -149,7 +161,8 @@ impl PhonemeClasses {
             // Manner
             is_stop: self.is_member(&base, &["P", "B", "T", "D", "K", "G"]),
             is_nasal: self.is_member(&base, &["M", "N", "NG"]),
-            is_fricative: self.is_member(&base, &["F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"]),
+            is_fricative: self
+                .is_member(&base, &["F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"]),
             is_affricate: self.is_member(&base, &["CH", "JH"]),
             is_liquid: self.is_member(&base, &["L", "R"]),
             is_glide: self.is_member(&base, &["W", "Y"]),
@@ -175,24 +188,20 @@ impl PhonemeClasses {
     /// Score a candidate phoneme given class evidence from acoustics
     ///
     /// Returns a multiplier (0.0 to 2.0) based on class consistency
-    pub fn class_consistency_score(
-        &self,
-        acoustic_hv: &HV16,
-        candidate_phoneme: &str,
-    ) -> f32 {
+    pub fn class_consistency_score(&self, acoustic_hv: &HV16, candidate_phoneme: &str) -> f32 {
         let features = self.get_features(candidate_phoneme);
         let mut score: f32 = 1.0;
 
         // Check voicing consistency (most discriminative)
-        let voicing_evidence = acoustic_hv.similarity(&self.voiced)
-            - acoustic_hv.similarity(&self.voiceless);
+        let voicing_evidence =
+            acoustic_hv.similarity(&self.voiced) - acoustic_hv.similarity(&self.voiceless);
 
-        if features.is_voiced && voicing_evidence > 0.05 {
-            score += 0.3;
-        } else if !features.is_voiced && voicing_evidence < -0.05 {
-            score += 0.3;
+        if (features.is_voiced && voicing_evidence > 0.05)
+            || (!features.is_voiced && voicing_evidence < -0.05)
+        {
+            score += 0.3; // Voicing matches acoustic evidence
         } else if features.is_voiced && voicing_evidence < -0.1 {
-            score -= 0.3;  // Penalty for mismatch
+            score -= 0.3; // Penalty for mismatch
         } else if !features.is_voiced && voicing_evidence > 0.1 {
             score -= 0.3;
         }
@@ -255,8 +264,20 @@ impl PhonemeClasses {
     fn is_vowel(&self, phoneme: &str) -> bool {
         matches!(
             phoneme,
-            "AA" | "AE" | "AH" | "AO" | "AW" | "AY" | "EH" | "ER" | "EY" |
-            "IH" | "IY" | "OW" | "OY" | "UH" | "UW"
+            "AA" | "AE"
+                | "AH"
+                | "AO"
+                | "AW"
+                | "AY"
+                | "EH"
+                | "ER"
+                | "EY"
+                | "IH"
+                | "IY"
+                | "OW"
+                | "OY"
+                | "UH"
+                | "UW"
         )
     }
 }
@@ -325,8 +346,8 @@ impl PhonotacticConstraints {
 
         // After stops: most things (vowels, liquids, nasals common)
         let after_stop = bundle(&[
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
-            "L", "R", "W", "Y", "M", "N"
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW", "L", "R", "W", "Y", "M", "N",
         ]);
         for stop in &["P", "B", "T", "D", "K", "G"] {
             constraints.insert(stop.to_string(), after_stop);
@@ -334,8 +355,8 @@ impl PhonotacticConstraints {
 
         // After nasals: usually vowels
         let after_nasal = bundle(&[
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
-            "T", "D", "K", "G", "Z", "S"  // Can have nasal + stop clusters
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW", "T", "D", "K", "G", "Z", "S", // Can have nasal + stop clusters
         ]);
         for nasal in &["M", "N"] {
             constraints.insert(nasal.to_string(), after_nasal);
@@ -343,15 +364,15 @@ impl PhonotacticConstraints {
 
         // After NG: very restricted (usually vowel or nothing)
         let after_ng = bundle(&[
-            "AA", "AE", "AH", "AO", "EH", "ER", "IH", "IY", "UH",
-            "K", "G", "Z"  // "inks", "ings"
+            "AA", "AE", "AH", "AO", "EH", "ER", "IH", "IY", "UH", "K", "G",
+            "Z", // "inks", "ings"
         ]);
         constraints.insert("NG".to_string(), after_ng);
 
         // After fricatives: vowels, liquids, some stops
         let after_fricative = bundle(&[
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
-            "L", "R", "W", "Y", "T", "P", "K"
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW", "L", "R", "W", "Y", "T", "P", "K",
         ]);
         for fric in &["F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "HH"] {
             constraints.insert(fric.to_string(), after_fricative);
@@ -359,19 +380,21 @@ impl PhonotacticConstraints {
 
         // After vowels: almost anything
         let after_vowel = bundle(&[
-            "P", "B", "T", "D", "K", "G", "M", "N", "NG",
-            "F", "V", "TH", "DH", "S", "Z", "SH", "ZH", "CH", "JH", "HH",
-            "L", "R", "W", "Y",
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW"
+            "P", "B", "T", "D", "K", "G", "M", "N", "NG", "F", "V", "TH", "DH", "S", "Z", "SH",
+            "ZH", "CH", "JH", "HH", "L", "R", "W", "Y", "AA", "AE", "AH", "AO", "AW", "AY", "EH",
+            "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
         ]);
-        for vowel in &["AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW"] {
+        for vowel in &[
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW",
+        ] {
             constraints.insert(vowel.to_string(), after_vowel);
         }
 
         // After liquids
         let after_liquid = bundle(&[
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
-            "P", "B", "T", "D", "K", "G", "M", "N", "S", "Z", "F", "V"
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW", "P", "B", "T", "D", "K", "G", "M", "N", "S", "Z", "F", "V",
         ]);
         for liquid in &["L", "R"] {
             constraints.insert(liquid.to_string(), after_liquid);
@@ -379,7 +402,8 @@ impl PhonotacticConstraints {
 
         // After glides
         let after_glide = bundle(&[
-            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH", "UW",
+            "AA", "AE", "AH", "AO", "AW", "AY", "EH", "ER", "EY", "IH", "IY", "OW", "OY", "UH",
+            "UW",
         ]);
         for glide in &["W", "Y"] {
             constraints.insert(glide.to_string(), after_glide);
@@ -420,7 +444,8 @@ fn strip_stress(phoneme: &str) -> String {
         phoneme
     };
 
-    base.trim_end_matches(|c: char| c.is_ascii_digit()).to_string()
+    base.trim_end_matches(|c: char| c.is_ascii_digit())
+        .to_string()
 }
 
 #[cfg(test)]

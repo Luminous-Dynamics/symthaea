@@ -128,7 +128,9 @@ impl PhiGradient {
 
     /// Recompute magnitude from components
     fn recompute_magnitude(&mut self) {
-        let sum_sq: f64 = self.node_gradients.iter()
+        let sum_sq: f64 = self
+            .node_gradients
+            .iter()
             .flat_map(|g| g.iter())
             .map(|x| x * x)
             .sum();
@@ -191,7 +193,14 @@ impl DifferentiablePhiCalculator {
         if n < 2 {
             return DiffPhiResult {
                 phi: 0.0,
-                gradients: PhiGradient::zeros(n, if n > 0 { topology.node_representations[0].dim() } else { 0 }),
+                gradients: PhiGradient::zeros(
+                    n,
+                    if n > 0 {
+                        topology.node_representations[0].dim()
+                    } else {
+                        0
+                    },
+                ),
                 partition_weights: Vec::new(),
                 integration: 0.0,
                 information: 0.0,
@@ -202,7 +211,8 @@ impl DifferentiablePhiCalculator {
         let _dim = topology.node_representations[0].dim();
 
         // Step 1: Compute similarity matrix with differentiable operations
-        let (similarity_matrix, sim_gradients) = self.compute_similarity_matrix(&topology.node_representations);
+        let (similarity_matrix, sim_gradients) =
+            self.compute_similarity_matrix(&topology.node_representations);
 
         // Step 2: Compute soft partitioning
         let partition_weights = self.compute_soft_partitions(&similarity_matrix, n);
@@ -219,8 +229,8 @@ impl DifferentiablePhiCalculator {
             .collect();
 
         // Step 5: Compute Φ as integration minus partition integrations (soft MIP)
-        let partition_sum: f64 = partition_integrations.iter().sum::<f64>()
-            / partition_integrations.len() as f64;
+        let partition_sum: f64 =
+            partition_integrations.iter().sum::<f64>() / partition_integrations.len() as f64;
         let phi = (whole_integration - partition_sum).max(0.0);
 
         // Step 6: Compute gradients via chain rule
@@ -233,15 +243,14 @@ impl DifferentiablePhiCalculator {
         );
 
         // Compute effective number of partitions
-        let effective_partitions = partition_weights.iter()
+        let effective_partitions = partition_weights
+            .iter()
             .map(|w| {
-                let entropy: f64 = w.iter()
-                    .filter(|&&x| x > 1e-10)
-                    .map(|&x| -x * x.ln())
-                    .sum();
+                let entropy: f64 = w.iter().filter(|&&x| x > 1e-10).map(|&x| -x * x.ln()).sum();
                 entropy.exp()
             })
-            .sum::<f64>() / partition_weights.len() as f64;
+            .sum::<f64>()
+            / partition_weights.len() as f64;
 
         DiffPhiResult {
             phi,
@@ -254,7 +263,10 @@ impl DifferentiablePhiCalculator {
     }
 
     /// Compute similarity matrix with gradients
-    fn compute_similarity_matrix(&self, nodes: &[ContinuousHV]) -> (Vec<Vec<f64>>, Vec<Vec<Vec<f64>>>) {
+    fn compute_similarity_matrix(
+        &self,
+        nodes: &[ContinuousHV],
+    ) -> (Vec<Vec<f64>>, Vec<Vec<Vec<f64>>>) {
         let n = nodes.len();
         let dim = nodes[0].dim();
 
@@ -275,8 +287,18 @@ impl DifferentiablePhiCalculator {
 
                 // Gradient of cosine similarity
                 // d(cos(a,b))/d(a) = (b - cos(a,b)*a) / ||a||
-                let norm_i: f64 = nodes[i].values.iter().map(|&x| (x as f64).powi(2)).sum::<f64>().sqrt();
-                let norm_j: f64 = nodes[j].values.iter().map(|&x| (x as f64).powi(2)).sum::<f64>().sqrt();
+                let norm_i: f64 = nodes[i]
+                    .values
+                    .iter()
+                    .map(|&x| (x as f64).powi(2))
+                    .sum::<f64>()
+                    .sqrt();
+                let norm_j: f64 = nodes[j]
+                    .values
+                    .iter()
+                    .map(|&x| (x as f64).powi(2))
+                    .sum::<f64>()
+                    .sqrt();
 
                 if norm_i > 1e-10 && norm_j > 1e-10 {
                     for k in 0..dim {
@@ -312,7 +334,8 @@ impl DifferentiablePhiCalculator {
                 let affinity = if self.config.use_gumbel_softmax {
                     // Add Gumbel noise for exploration
                     let gumbel = self.sample_gumbel();
-                    (similarity[i][center_idx] + gumbel * self.config.gumbel_scale) / self.config.temperature
+                    (similarity[i][center_idx] + gumbel * self.config.gumbel_scale)
+                        / self.config.temperature
                 } else {
                     similarity[i][center_idx] / self.config.temperature
                 };
@@ -333,7 +356,6 @@ impl DifferentiablePhiCalculator {
 
     /// Sample from Gumbel(0, 1) distribution
     fn sample_gumbel(&self) -> f64 {
-
         // Use deterministic pseudo-random for reproducibility
         let u: f64 = 0.5; // Could be seeded random
         -(-u.ln()).ln()
@@ -421,7 +443,8 @@ impl DifferentiablePhiCalculator {
         let _epsilon = 1e-5;
 
         for i in 0..n {
-            for d in 0..dim.min(100) { // Limit dimensions for efficiency
+            for d in 0..dim.min(100) {
+                // Limit dimensions for efficiency
                 // Approximate gradient via finite difference
                 // This is a simplification - full analytical gradient is available but complex
 
@@ -436,7 +459,8 @@ impl DifferentiablePhiCalculator {
                         let d_sim_d_node = sim_gradients[i][j][d];
 
                         // Chain rule: d(phi)/d(node) = d(phi)/d(integration) * d(integration)/d(similarity) * d(similarity)/d(node)
-                        gradients.node_gradients[i][d] += d_mi_d_sim * d_sim_d_node / (n * n) as f64;
+                        gradients.node_gradients[i][d] +=
+                            d_mi_d_sim * d_sim_d_node / (n * n) as f64;
                     }
                 }
             }
@@ -458,7 +482,9 @@ impl DifferentiablePhiCalculator {
         gradients.recompute_magnitude();
 
         if gradients.magnitude > 1e-10 {
-            gradients.direction = gradients.node_gradients.iter()
+            gradients.direction = gradients
+                .node_gradients
+                .iter()
                 .flat_map(|g| g.iter())
                 .map(|&x| x / gradients.magnitude)
                 .collect();
@@ -554,7 +580,8 @@ impl PhiOptimizer {
         let dim = topology.node_representations[0].dim();
 
         // Initialize velocity if needed
-        if self.velocity.len() != n || (!self.velocity.is_empty() && self.velocity[0].len() != dim) {
+        if self.velocity.len() != n || (!self.velocity.is_empty() && self.velocity[0].len() != dim)
+        {
             self.init_velocity(n, dim);
         }
 
@@ -588,7 +615,11 @@ impl PhiOptimizer {
     }
 
     /// Run optimization for multiple steps
-    pub fn optimize(&mut self, topology: &mut ConsciousnessTopology, num_steps: usize) -> Vec<DiffPhiResult> {
+    pub fn optimize(
+        &mut self,
+        topology: &mut ConsciousnessTopology,
+        num_steps: usize,
+    ) -> Vec<DiffPhiResult> {
         (0..num_steps).map(|_| self.step(topology)).collect()
     }
 }
@@ -621,7 +652,10 @@ mod tests {
         assert!(result.phi >= 0.0, "Φ should be non-negative");
         // In high-dimensional random HDC vectors, cosine similarities are near zero,
         // which can produce zero phi and zero gradients. This is valid behavior.
-        assert!(result.gradients.magnitude() >= 0.0, "Gradients should be non-negative");
+        assert!(
+            result.gradients.magnitude() >= 0.0,
+            "Gradients should be non-negative"
+        );
     }
 
     #[test]
@@ -633,11 +667,17 @@ mod tests {
 
         // Direction should be normalized
         if !result.gradients.direction.is_empty() {
-            let norm: f64 = result.gradients.direction.iter()
+            let norm: f64 = result
+                .gradients
+                .direction
+                .iter()
                 .map(|&x| x * x)
                 .sum::<f64>()
                 .sqrt();
-            assert!((norm - 1.0).abs() < 0.1, "Direction should be approximately normalized");
+            assert!(
+                (norm - 1.0).abs() < 0.1,
+                "Direction should be approximately normalized"
+            );
         }
     }
 
@@ -657,8 +697,10 @@ mod tests {
         println!("Final Φ: {:.4}", final_phi);
 
         // Optimization should not decrease Φ significantly
-        assert!(final_phi >= initial_phi * 0.9,
-                "Optimization should maintain or increase Φ");
+        assert!(
+            final_phi >= initial_phi * 0.9,
+            "Optimization should maintain or increase Φ"
+        );
     }
 
     #[test]
@@ -668,11 +710,20 @@ mod tests {
         let mut topology = create_test_topology(6);
 
         let initial = optimizer.step(&mut topology);
-        let final_result = optimizer.optimize(&mut topology, 5).pop().unwrap_or(initial.clone());
+        let final_result = optimizer
+            .optimize(&mut topology, 5)
+            .pop()
+            .unwrap_or(initial.clone());
 
         println!("Momentum optimizer:");
         println!("  Initial Φ: {:.4}", initial.phi);
         println!("  Final Φ: {:.4}", final_result.phi);
+
+        // Both phi values should be finite and non-negative
+        assert!(initial.phi.is_finite(), "Initial Φ should be finite");
+        assert!(final_result.phi.is_finite(), "Final Φ should be finite");
+        assert!(initial.phi >= 0.0, "Initial Φ should be non-negative");
+        assert!(final_result.phi >= 0.0, "Final Φ should be non-negative");
     }
 
     #[test]
@@ -685,7 +736,10 @@ mod tests {
         // Check partition weights sum to 1
         for weights in &result.partition_weights {
             let sum: f64 = weights.iter().sum();
-            assert!((sum - 1.0).abs() < 0.01, "Partition weights should sum to 1");
+            assert!(
+                (sum - 1.0).abs() < 0.01,
+                "Partition weights should sum to 1"
+            );
         }
     }
 

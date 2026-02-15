@@ -217,7 +217,10 @@ impl OcrSystem {
             char_embeddings.insert(c, ContinuousHV::random(dimension, i as u64));
         }
         // Add common punctuation
-        for (i, c) in [' ', '.', ',', '!', '?', '-', ':', ';', '\'', '"'].iter().enumerate() {
+        for (i, c) in [' ', '.', ',', '!', '?', '-', ':', ';', '\'', '"']
+            .iter()
+            .enumerate()
+        {
             char_embeddings.insert(*c, ContinuousHV::random(dimension, (1000 + i) as u64));
         }
 
@@ -248,7 +251,8 @@ impl OcrSystem {
         // Extract text-like features
         let text = self.extract_text_from_features(visual_features);
 
-        let char_confidences: Vec<f32> = text.chars()
+        let char_confidences: Vec<f32> = text
+            .chars()
             .map(|_| {
                 let jitter: f32 = if let Some(ref mut rng) = self.seeded_rng {
                     rand::Rng::gen(rng)
@@ -331,8 +335,16 @@ impl SemanticVision {
 
         // Initialize common concept embeddings
         let mut concept_embeddings = HashMap::new();
-        for (i, concept) in ["person", "animal", "vehicle", "building", "nature", "object", "text"].iter().enumerate() {
-            concept_embeddings.insert(concept.to_string(), ContinuousHV::random(dim, (2000 + i) as u64));
+        for (i, concept) in [
+            "person", "animal", "vehicle", "building", "nature", "object", "text",
+        ]
+        .iter()
+        .enumerate()
+        {
+            concept_embeddings.insert(
+                concept.to_string(),
+                ContinuousHV::random(dim, (2000 + i) as u64),
+            );
         }
 
         Self {
@@ -353,7 +365,9 @@ impl SemanticVision {
 
         let mut concept_embeddings = HashMap::new();
         let mut rng = genesis.domain(&format!("{label}::vision::concepts"));
-        for concept in ["person", "animal", "vehicle", "building", "nature", "object", "text"] {
+        for concept in [
+            "person", "animal", "vehicle", "building", "nature", "object", "text",
+        ] {
             let seed: u64 = rand::Rng::gen(&mut rng);
             concept_embeddings.insert(concept.to_string(), ContinuousHV::random(dim, seed));
         }
@@ -439,14 +453,20 @@ impl SemanticVision {
         let embedding = self.embed_image(image_data);
 
         // Find most similar concepts
-        let mut concept_scores: Vec<_> = self.concept_embeddings.iter()
+        let mut concept_scores: Vec<_> = self
+            .concept_embeddings
+            .iter()
             .map(|(name, emb)| (name.clone(), embedding.embedding.similarity(emb)))
             .collect();
 
         concept_scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Generate caption from top concepts
-        let top_concepts: Vec<_> = concept_scores.iter().take(3).map(|(n, _)| n.clone()).collect();
+        let top_concepts: Vec<_> = concept_scores
+            .iter()
+            .take(3)
+            .map(|(n, _)| n.clone())
+            .collect();
         let caption_text = format!("An image containing {}", top_concepts.join(", "));
 
         let confidence = concept_scores.first().map(|(_, s)| *s).unwrap_or(0.5);
