@@ -577,9 +577,7 @@ impl MinimalPhiValidation {
 
             // DEBUG: Print cosine similarities for first sample
             if i == 0 {
-                println!(
-                    "   🔍 DEBUG: Cosine similarities for first {topology_type} topology:"
-                );
+                println!("   🔍 DEBUG: Cosine similarities for first {topology_type} topology:");
                 for node_i in 0..components.len().min(5) {
                     for node_j in (node_i + 1)..components.len().min(5) {
                         let sim = components[node_i].similarity(&components[node_j]);
@@ -648,9 +646,7 @@ impl MinimalPhiValidation {
 
             // DEBUG: Print Hamming distances for first sample
             if i == 0 {
-                println!(
-                    "   🔍 DEBUG: Hamming distances for first {topology_type} topology:"
-                );
+                println!("   🔍 DEBUG: Hamming distances for first {topology_type} topology:");
                 for node_i in 0..components.len() {
                     for node_j in (node_i + 1)..components.len() {
                         let dist = components[node_i].hamming_distance(&components[node_j]);

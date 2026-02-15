@@ -556,9 +556,7 @@ pub fn print_validation_report(results: &[ValidationResult]) {
             result.similarity
         );
         if let Some(growth) = result.error_growth {
-            println!(
-                "║   Error Growth: {growth:12.6}/s                                      ║"
-            );
+            println!("║   Error Growth: {growth:12.6}/s                                      ║");
         }
         println!(
             "╠══════════════════════════════════════════════════════════════════════════════╣"

@@ -328,9 +328,7 @@ TRANSLATION QUALITY:
             )
         };
 
-        format!(
-            "Φ Level: {level} ({phi:.2})\nGuidance: {guidance}\n\n"
-        )
+        format!("Φ Level: {level} ({phi:.2})\nGuidance: {guidance}\n\n")
     }
 
     /// Generate uncertainty-aware guidance

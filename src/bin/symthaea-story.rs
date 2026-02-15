@@ -170,7 +170,10 @@ fn cmd_status(session: &StorySession) {
     let state = session.get_story_state();
     println!("  Scenes:      {}", state.total_scenes);
     println!("  Characters:  {}", state.character_count);
-    println!("  Conflicts:   {} ({} unresolved)", state.total_conflicts, state.unresolved_conflicts);
+    println!(
+        "  Conflicts:   {} ({} unresolved)",
+        state.total_conflicts, state.unresolved_conflicts
+    );
     println!("  Themes:      {:?}", state.themes);
     println!("  Arc phase:   {:?}", state.current_arc_phase);
     if let Some(ref sig) = state.latest_signal {

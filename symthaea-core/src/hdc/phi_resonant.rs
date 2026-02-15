@@ -810,12 +810,24 @@ mod tests {
         assert!(phi_random.phi >= 0.0, "Random Φ should be non-negative");
 
         // Both should converge within iteration bounds
-        assert!(phi_star.iterations > 0, "Star should take at least 1 iteration");
-        assert!(phi_random.iterations > 0, "Random should take at least 1 iteration");
+        assert!(
+            phi_star.iterations > 0,
+            "Star should take at least 1 iteration"
+        );
+        assert!(
+            phi_random.iterations > 0,
+            "Random should take at least 1 iteration"
+        );
 
         // Convergence time should be finite
-        assert!(phi_star.convergence_time_ms.is_finite(), "Star convergence time should be finite");
-        assert!(phi_random.convergence_time_ms.is_finite(), "Random convergence time should be finite");
+        assert!(
+            phi_star.convergence_time_ms.is_finite(),
+            "Star convergence time should be finite"
+        );
+        assert!(
+            phi_random.convergence_time_ms.is_finite(),
+            "Random convergence time should be finite"
+        );
     }
 
     #[test]

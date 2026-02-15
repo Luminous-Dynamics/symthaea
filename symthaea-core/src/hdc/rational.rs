@@ -119,7 +119,11 @@ impl RationalArithmeticEngine {
     /// most 64 iterations for any i64.
     fn encode_int(&self, n: i64) -> BinaryHV {
         if n == 0 {
-            return self.primitives.get("ZERO").expect("ZERO primitive must exist").encoding;
+            return self
+                .primitives
+                .get("ZERO")
+                .expect("ZERO primitive must exist")
+                .encoding;
         }
 
         let is_negative = n < 0;
@@ -153,7 +157,11 @@ impl RationalArithmeticEngine {
     pub fn encode(&self, numerator: i64, denominator: i64) -> HdcRational {
         let (num, den) = normalize(numerator, denominator);
 
-        let ratio = self.primitives.get("RATIO").expect("RATIO primitive must exist").encoding;
+        let ratio = self
+            .primitives
+            .get("RATIO")
+            .expect("RATIO primitive must exist")
+            .encoding;
         let num_encoding = self.encode_int(num);
         let den_encoding = self.encode_int(den);
 

@@ -90,16 +90,29 @@ fn test_iit4_correlated_higher_phi() {
     let cor_result = calc.analyze(&correlated);
 
     // Both results should have valid, finite values
-    assert!(ind_result.big_phi.is_finite(), "Independent Φ should be finite");
-    assert!(cor_result.big_phi.is_finite(), "Correlated Φ should be finite");
-    assert!(ind_result.big_phi >= 0.0, "Independent Φ should be non-negative");
-    assert!(cor_result.big_phi >= 0.0, "Correlated Φ should be non-negative");
+    assert!(
+        ind_result.big_phi.is_finite(),
+        "Independent Φ should be finite"
+    );
+    assert!(
+        cor_result.big_phi.is_finite(),
+        "Correlated Φ should be finite"
+    );
+    assert!(
+        ind_result.big_phi >= 0.0,
+        "Independent Φ should be non-negative"
+    );
+    assert!(
+        cor_result.big_phi >= 0.0,
+        "Correlated Φ should be non-negative"
+    );
 
     // Correlated should have higher Φ than independent
     assert!(
         cor_result.big_phi > ind_result.big_phi,
         "Correlated Φ ({:.6}) should exceed independent Φ ({:.6})",
-        cor_result.big_phi, ind_result.big_phi
+        cor_result.big_phi,
+        ind_result.big_phi
     );
 
     println!(

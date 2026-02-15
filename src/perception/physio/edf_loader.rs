@@ -432,8 +432,7 @@ impl EdfFile {
 
     /// Load hypnogram annotations from EDF+ annotation file
     pub fn load_hypnogram<P: AsRef<Path>>(&mut self, path: P) -> Result<(), String> {
-        let file =
-            File::open(path.as_ref()).map_err(|e| format!("Cannot open hypnogram: {e}"))?;
+        let file = File::open(path.as_ref()).map_err(|e| format!("Cannot open hypnogram: {e}"))?;
         let mut reader = BufReader::new(file);
 
         // Read entire file (hypnograms are small)

@@ -316,17 +316,11 @@ impl ConsciousDialogueGenerator {
         let emotion = &context.understanding.speaker_model.emotional_state.primary;
 
         if valence > 0.3 {
-            format!(
-                "That sense of {emotion} comes through clearly. It's meaningful."
-            )
+            format!("That sense of {emotion} comes through clearly. It's meaningful.")
         } else if valence < -0.3 {
-            format!(
-                "I can feel the weight of that {emotion}. I'm here with you in this."
-            )
+            format!("I can feel the weight of that {emotion}. I'm here with you in this.")
         } else {
-            format!(
-                "I notice the {emotion} you're experiencing. Tell me more."
-            )
+            format!("I notice the {emotion} you're experiencing. Tell me more.")
         }
     }
 

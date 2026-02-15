@@ -829,9 +829,7 @@ impl NumericTower {
                 let xi = *x as i64;
                 if *y != 0 && xi % *y == 0 {
                     let quot = xi / *y;
-                    proof_trace.push(format!(
-                        "Exact division after lift: {x} / {y} = {quot}"
-                    ));
+                    proof_trace.push(format!("Exact division after lift: {x} / {y} = {quot}"));
                     Self::from_i64(quot)
                 } else {
                     proof_trace.push(format!("Promotion to Q: {x} / {y}"));
@@ -842,9 +840,7 @@ impl NumericTower {
                 let yi = *y as i64;
                 if yi != 0 && *x % yi == 0 {
                     let quot = *x / yi;
-                    proof_trace.push(format!(
-                        "Exact division after lift: {x} / {y} = {quot}"
-                    ));
+                    proof_trace.push(format!("Exact division after lift: {x} / {y} = {quot}"));
                     Self::from_i64(quot)
                 } else {
                     proof_trace.push(format!("Promotion to Q: {x} / {y}"));
@@ -1126,15 +1122,11 @@ impl NumericTower {
             Number::Natural(n) => {
                 let isqrt = (*n as f64).sqrt().round() as u64;
                 if isqrt.wrapping_mul(isqrt) == *n {
-                    proof_trace.push(format!(
-                        "Perfect square: sqrt({n}) = {isqrt} (stays in N)"
-                    ));
+                    proof_trace.push(format!("Perfect square: sqrt({n}) = {isqrt} (stays in N)"));
                     Number::Natural(isqrt)
                 } else {
                     let root = (*n as f64).sqrt();
-                    proof_trace.push(format!(
-                        "Promotion N -> R: sqrt({n}) = {root} (irrational)"
-                    ));
+                    proof_trace.push(format!("Promotion N -> R: sqrt({n}) = {root} (irrational)"));
                     Number::Real(root)
                 }
             }
@@ -1151,9 +1143,7 @@ impl NumericTower {
                     Number::Natural(isqrt)
                 } else {
                     let root = (un as f64).sqrt();
-                    proof_trace.push(format!(
-                        "Promotion Z -> R: sqrt({n}) = {root} (irrational)"
-                    ));
+                    proof_trace.push(format!("Promotion Z -> R: sqrt({n}) = {root} (irrational)"));
                     Number::Real(root)
                 }
             }

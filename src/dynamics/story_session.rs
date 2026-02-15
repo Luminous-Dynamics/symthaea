@@ -190,7 +190,9 @@ impl StorySession {
         }
 
         // Advance dynamics using hybrid HDC+CfC signal with mood bias
-        let signal = self.dynamics.step_hybrid_with_mood(&projected, &scene_hv, 0.1, Some(mood));
+        let signal = self
+            .dynamics
+            .step_hybrid_with_mood(&projected, &scene_hv, 0.1, Some(mood));
 
         let index = self.scene_log.len();
         self.scene_log.push(SceneRecord {
@@ -395,8 +397,7 @@ impl StorySession {
         let input_dim = config.input_dim;
 
         // Rebuild character_arcs from character list
-        let characters: HashMap<String, ContinuousHV> =
-            snapshot.characters.into_iter().collect();
+        let characters: HashMap<String, ContinuousHV> = snapshot.characters.into_iter().collect();
         let mut character_arcs: HashMap<String, CharacterArc> = characters
             .iter()
             .map(|(name, hv)| {
@@ -443,9 +444,12 @@ impl StorySession {
         // Replay dynamics state by re-stepping through the scene log
         for record in &session.scene_log {
             let projected = session.project_hv(&record.scene_hv);
-            session
-                .dynamics
-                .step_hybrid_with_mood(&projected, &record.scene_hv, 0.1, Some(record.mood));
+            session.dynamics.step_hybrid_with_mood(
+                &projected,
+                &record.scene_hv,
+                0.1,
+                Some(record.mood),
+            );
         }
         Ok(session)
     }
@@ -703,44 +707,19 @@ mod tests {
     fn test_transition_ordering_matters() {
         // Scene A→B should produce different dynamics than scene B→A
         let mut session_ab = StorySession::new();
-        let prot = session_ab
-            .algebra()
-            .primitives
-            .protagonist
-            .clone();
+        let prot = session_ab.algebra().primitives.protagonist.clone();
         session_ab.register_character("Hero", &prot);
 
         session_ab.add_scene("A", "forest", &["Hero"], "lost", NarrativeMood::Mysterious);
-        let sig_ab = session_ab.add_scene(
-            "B",
-            "castle",
-            &["Hero"],
-            "battle",
-            NarrativeMood::Tense,
-        );
+        let sig_ab = session_ab.add_scene("B", "castle", &["Hero"], "battle", NarrativeMood::Tense);
 
         let mut session_ba = StorySession::new();
-        let prot2 = session_ba
-            .algebra()
-            .primitives
-            .protagonist
-            .clone();
+        let prot2 = session_ba.algebra().primitives.protagonist.clone();
         session_ba.register_character("Hero", &prot2);
 
-        session_ba.add_scene(
-            "B",
-            "castle",
-            &["Hero"],
-            "battle",
-            NarrativeMood::Tense,
-        );
-        let sig_ba = session_ba.add_scene(
-            "A",
-            "forest",
-            &["Hero"],
-            "lost",
-            NarrativeMood::Mysterious,
-        );
+        session_ba.add_scene("B", "castle", &["Hero"], "battle", NarrativeMood::Tense);
+        let sig_ba =
+            session_ba.add_scene("A", "forest", &["Hero"], "lost", NarrativeMood::Mysterious);
 
         // Different ordering should produce different second-scene signals
         let differs = (sig_ab.energy - sig_ba.energy).abs() > 0.001
@@ -786,7 +765,9 @@ mod tests {
         assert_eq!(kael_arc.scene_indices.len(), 3, "Kael in all 3 scenes");
         assert_eq!(kael_arc.signals.len(), 3);
 
-        let thira_arc = session.get_character_arc("Thira").expect("Thira registered");
+        let thira_arc = session
+            .get_character_arc("Thira")
+            .expect("Thira registered");
         assert_eq!(thira_arc.scene_indices.len(), 1, "Thira in 1 scene");
         assert_eq!(thira_arc.scene_indices[0], 1);
 
@@ -807,20 +788,8 @@ mod tests {
         let _hero =
             session.register_character("Kael", &session.algebra().primitives.protagonist.clone());
 
-        session.add_scene(
-            "S1",
-            "village",
-            &["Kael"],
-            "peace",
-            NarrativeMood::Peaceful,
-        );
-        session.add_scene(
-            "S2",
-            "forest",
-            &["Kael"],
-            "danger",
-            NarrativeMood::Tense,
-        );
+        session.add_scene("S1", "village", &["Kael"], "peace", NarrativeMood::Peaceful);
+        session.add_scene("S2", "forest", &["Kael"], "danger", NarrativeMood::Tense);
 
         let arc = session.get_character_arc("Kael").unwrap();
         // Presence HV should have nonzero norm (it's a weighted bundle of scene HVs)

@@ -340,9 +340,7 @@ impl AutoFixer {
                     let fix = Fix::new(format!("Add {var_name} to packages"))
                         .replace(
                             "environment.systemPackages = with pkgs; [",
-                            format!(
-                                "environment.systemPackages = with pkgs; [\n    {var_name}"
-                            ),
+                            format!("environment.systemPackages = with pkgs; [\n    {var_name}"),
                         )
                         .with_confidence(0.6);
 

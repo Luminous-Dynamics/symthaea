@@ -713,9 +713,7 @@ impl UnifiedCausalReasoning {
             ) => {
                 // Would use Pearl's do-calculus
                 (
-                    format!(
-                        "If {actual} had been {hypothetical}, the outcome would differ"
-                    ),
+                    format!("If {actual} had been {hypothetical}, the outcome would differ"),
                     0.8,
                     CausalSources {
                         used_pearl_scm: true,

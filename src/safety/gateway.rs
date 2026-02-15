@@ -159,9 +159,7 @@ impl SafetyGateway {
         let hv = self.encode_text_to_hv(text);
         if let Some(category) = self.guardrails.check(&hv) {
             return SafetyDecision::blocked(
-                format!(
-                    "Blocked: Semantic content matches forbidden category {category:?}"
-                ),
+                format!("Blocked: Semantic content matches forbidden category {category:?}"),
                 Some(category),
             );
         }

@@ -735,9 +735,7 @@ impl ConsciousTunnelingCalculator {
         // Track integer → f64 conversion of atomic numbers
         let (z1_f64, z1_enc) = self.bridge.integer_to_f64(z1 as i64);
         let (z2_f64, z2_enc) = self.bridge.integer_to_f64(z2 as i64);
-        trace.push(format!(
-            "Z1={z1} → f64={z1_f64}, Z2={z2} → f64={z2_f64}"
-        ));
+        trace.push(format!("Z1={z1} → f64={z1_f64}, Z2={z2} → f64={z2_f64}"));
 
         // Track the charge product Z1*Z2
         let zz_result = self.bridge.dual_compute(z1_f64, z2_f64, "multiply");

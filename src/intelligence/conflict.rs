@@ -132,9 +132,7 @@ impl Conflict {
                 package,
                 dependency,
             } => {
-                format!(
-                    "Package '{package}' requires '{dependency}' which is not installed"
-                )
+                format!("Package '{package}' requires '{dependency}' which is not installed")
             }
             ConflictType::PortConflict { port, services } => {
                 format!(
@@ -181,9 +179,9 @@ impl Conflict {
             ConflictType::VersionConflict { .. } => {
                 Some("Pin to a specific version or use an overlay".to_string())
             }
-            ConflictType::MissingDependency { dependency, .. } => Some(format!(
-                "Add '{dependency}' to environment.systemPackages"
-            )),
+            ConflictType::MissingDependency { dependency, .. } => {
+                Some(format!("Add '{dependency}' to environment.systemPackages"))
+            }
             ConflictType::PortConflict { .. } => {
                 Some("Change the port for one of the services".to_string())
             }

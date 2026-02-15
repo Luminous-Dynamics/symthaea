@@ -120,9 +120,7 @@ impl NeuralBridge {
         let (output_dim, input_dim) = (shape[0], shape[1]);
 
         if output_dim != HDC_DIMENSION {
-            bail!(
-                "Output dimension mismatch: expected {HDC_DIMENSION}, got {output_dim}"
-            );
+            bail!("Output dimension mismatch: expected {HDC_DIMENSION}, got {output_dim}");
         }
 
         Ok(Self {

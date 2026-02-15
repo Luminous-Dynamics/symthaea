@@ -424,10 +424,7 @@ fn main() {
     // Six canonical shapes as tension profiles (normalized to [0,1])
     let vonnegut_shapes: Vec<(&str, Vec<f32>)> = vec![
         // "Man in Hole" — fall then rise
-        (
-            "Man in Hole",
-            vec![0.5, 0.3, 0.15, 0.1, 0.2, 0.4, 0.6, 0.8],
-        ),
+        ("Man in Hole", vec![0.5, 0.3, 0.15, 0.1, 0.2, 0.4, 0.6, 0.8]),
         // "Boy Meets Girl" — rise, fall, rise
         (
             "Boy Meets Girl",
@@ -464,18 +461,14 @@ fn main() {
         for i in 1..=n {
             for j in 1..=m {
                 let cost = (a[i - 1] - b[j - 1]).abs();
-                dp[i][j] =
-                    cost + dp[i - 1][j].min(dp[i][j - 1]).min(dp[i - 1][j - 1]);
+                dp[i][j] = cost + dp[i - 1][j].min(dp[i][j - 1]).min(dp[i - 1][j - 1]);
             }
         }
         dp[n][m]
     }
 
     // Classify each benchmark arc against the 6 shapes
-    println!(
-        "{:<25} {:<20} {:>10}",
-        "Arc", "Best Shape", "DTW Dist"
-    );
+    println!("{:<25} {:<20} {:>10}", "Arc", "Best Shape", "DTW Dist");
     println!("{}", "-".repeat(55));
 
     for (name, _scenes, signals) in &all {

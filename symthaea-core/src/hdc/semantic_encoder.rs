@@ -256,7 +256,10 @@ impl CachedSemanticEncoder {
     /// Check if text is in cache
     pub fn is_cached(&self, text: &str) -> bool {
         let hash = Self::hash_text(text);
-        self.cache.read().unwrap_or_else(|e| e.into_inner()).contains_key(&hash)
+        self.cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .contains_key(&hash)
     }
 
     /// Get cache statistics
@@ -271,7 +274,12 @@ impl SemanticEncoder for CachedSemanticEncoder {
         let hash = Self::hash_text(text);
 
         // Try cache first
-        if let Some(embedding) = self.cache.read().unwrap_or_else(|e| e.into_inner()).get(&hash) {
+        if let Some(embedding) = self
+            .cache
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(&hash)
+        {
             // Project from embedding space to HDC space
             let projected = self.projection.project(embedding);
             return ContinuousHV::from_values(projected).normalize();
@@ -763,7 +771,11 @@ impl MoralSemanticEncoder {
     /// Get the base vector for a word's category
     fn word_to_category_hv(&self, word: &str) -> Option<(&'static str, f32, ContinuousHV)> {
         self.moral_vocabulary.get(word).map(|(cat, valence)| {
-            let base = self.category_bases.get(cat).expect("category base must exist for known moral vocabulary category").clone();
+            let base = self
+                .category_bases
+                .get(cat)
+                .expect("category base must exist for known moral vocabulary category")
+                .clone();
             (*cat, *valence, base)
         })
     }

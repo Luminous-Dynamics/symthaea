@@ -29,12 +29,12 @@ use crate::language::{
     llm_backend, ConsciousnessLanguageConfig, ConsciousnessLanguageCore, LLMOrgan, LLMOrganConfig,
     PluginRegistry,
 };
-use crate::mind::structured_thought::{ETier, EpistemicCube, NTier};
-#[cfg(feature = "magi_loop")]
-use crate::mind::SemanticIntent;
 use crate::memory::{
     CoordinatorConfig, EpisodicMemory, EpisodicReplayConfig, GraduationEvent, MemoryCoordinator,
 };
+use crate::mind::structured_thought::{ETier, EpistemicCube, NTier};
+#[cfg(feature = "magi_loop")]
+use crate::mind::SemanticIntent;
 use crate::mind::{
     ConstraintType, ContinuousMind, DomainContext, EpistemicStatus, MindConfig, StructuredThought,
 };
@@ -529,9 +529,7 @@ impl Symthaea {
                             id: format!("wm-{timestamp_ms}-{i}"),
                             memory_type: MemoryType::Working,
                             encoding: hv.to_binary(0.0),
-                            content: format!(
-                                "Working memory eviction at step {interaction_count}"
-                            ),
+                            content: format!("Working memory eviction at step {interaction_count}"),
                             timestamp_ms,
                             valence: 0.0,
                             arousal: 0.0,

@@ -161,9 +161,7 @@ impl PhiToEpistemicMapper {
                     empirical: EmpiricalLevel::PrivatelyVerifiable,
                     ..output.classification
                 },
-                reason: format!(
-                    "Consensus from {consensus_count} sources supports E2 minimum"
-                ),
+                reason: format!("Consensus from {consensus_count} sources supports E2 minimum"),
             });
         }
 

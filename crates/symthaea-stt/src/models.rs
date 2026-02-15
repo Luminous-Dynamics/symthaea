@@ -451,9 +451,7 @@ fn chrono_lite_now() -> String {
     let minutes = (secs_today % 3600) / 60;
     let seconds = secs_today % 60;
 
-    format!(
-        "{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z"
-    )
+    format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
 }
 
 fn is_leap_year(year: i64) -> bool {

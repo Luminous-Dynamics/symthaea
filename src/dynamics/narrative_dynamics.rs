@@ -421,7 +421,14 @@ impl StoryArcDynamics {
 
         // CfC online learning: use HDC-derived values as training targets (Fix #3)
         if self.online_learning {
-            self.train_cfc_online(scene_input, hdc_energy, hdc_surprise, hdc_tension, hdc_valence, dt);
+            self.train_cfc_online(
+                scene_input,
+                hdc_energy,
+                hdc_surprise,
+                hdc_tension,
+                hdc_valence,
+                dt,
+            );
         }
 
         let signal = NarrativeSignal {
@@ -451,12 +458,12 @@ impl StoryArcDynamics {
     fn mood_offsets(mood: NarrativeMood) -> (f32, f32, f32, f32) {
         match mood {
             //                         energy  surprise  tension  valence
-            NarrativeMood::Tense =>      ( 0.10,  0.05,    0.20,  -0.10),
-            NarrativeMood::Peaceful =>   (-0.10, -0.10,   -0.20,   0.15),
-            NarrativeMood::Mysterious => ( 0.00,  0.15,    0.10,   0.00),
-            NarrativeMood::Melancholy => (-0.05,  0.00,    0.05,  -0.20),
-            NarrativeMood::Triumphant => ( 0.15, -0.05,   -0.10,   0.25),
-            NarrativeMood::Hopeful =>    ( 0.05, -0.05,   -0.15,   0.20),
+            NarrativeMood::Tense => (0.10, 0.05, 0.20, -0.10),
+            NarrativeMood::Peaceful => (-0.10, -0.10, -0.20, 0.15),
+            NarrativeMood::Mysterious => (0.00, 0.15, 0.10, 0.00),
+            NarrativeMood::Melancholy => (-0.05, 0.00, 0.05, -0.20),
+            NarrativeMood::Triumphant => (0.15, -0.05, -0.10, 0.25),
+            NarrativeMood::Hopeful => (0.05, -0.05, -0.15, 0.20),
         }
     }
 
@@ -486,14 +493,16 @@ impl StoryArcDynamics {
         };
 
         let targets: Vec<Array1<f32>> = vec![
-            Self::make_target(hidden_dim, inv_sigmoid(hdc_energy)),   // layer 0: energy
+            Self::make_target(hidden_dim, inv_sigmoid(hdc_energy)), // layer 0: energy
             Self::make_target(hidden_dim, inv_sigmoid(hdc_surprise)), // layer 1: surprise
-            Self::make_target(hidden_dim, inv_sigmoid(hdc_tension)),  // layer 2: tension
+            Self::make_target(hidden_dim, inv_sigmoid(hdc_tension)), // layer 2: tension
             Self::make_target(hidden_dim, hdc_valence.clamp(-0.99, 0.99).atanh()), // layer 3: valence
         ];
 
         // Ignore errors (training is best-effort)
-        let _ = self.cfc.train_step_multiscale(scene_input, &targets, dt, lr);
+        let _ = self
+            .cfc
+            .train_step_multiscale(scene_input, &targets, dt, lr);
     }
 
     /// Build a target array: first element set to `value`, rest zero.

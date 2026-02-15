@@ -570,9 +570,7 @@ impl SleepAndAlteredStates {
 
         match self.current_state {
             AlteredState::Wake => {
-                format!(
-                    "Full waking consciousness (p={prob:.2}). All systems active."
-                )
+                format!("Full waking consciousness (p={prob:.2}). All systems active.")
             }
             AlteredState::SleepN1 => {
                 format!(

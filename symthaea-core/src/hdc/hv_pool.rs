@@ -91,7 +91,10 @@ impl PooledBinaryHV {
     #[inline]
     pub fn zeroed() -> Self {
         let mut hv = Self::new();
-        hv.data.as_mut().expect("PooledBinaryHV data is always Some until consumed").fill(0);
+        hv.data
+            .as_mut()
+            .expect("PooledBinaryHV data is always Some until consumed")
+            .fill(0);
         hv
     }
 
@@ -99,27 +102,38 @@ impl PooledBinaryHV {
     #[inline]
     pub fn from_hv16(hv: &BinaryHV) -> Self {
         let mut pooled = Self::new();
-        pooled.data.as_mut().expect("PooledBinaryHV data is always Some until consumed").copy_from_slice(&hv.0);
+        pooled
+            .data
+            .as_mut()
+            .expect("PooledBinaryHV data is always Some until consumed")
+            .copy_from_slice(&hv.0);
         pooled
     }
 
     /// Convert to owned BinaryHV (removes from pool tracking)
     #[inline]
     pub fn into_hv16(mut self) -> BinaryHV {
-        let data = self.data.take().expect("PooledBinaryHV::into_hv16 called on already-consumed value");
+        let data = self
+            .data
+            .take()
+            .expect("PooledBinaryHV::into_hv16 called on already-consumed value");
         BinaryHV(*data)
     }
 
     /// Get the inner data as a reference
     #[inline]
     pub fn as_bytes(&self) -> &[u8; 2048] {
-        self.data.as_ref().expect("PooledBinaryHV data is always Some until consumed")
+        self.data
+            .as_ref()
+            .expect("PooledBinaryHV data is always Some until consumed")
     }
 
     /// Get the inner data as a mutable reference
     #[inline]
     pub fn as_bytes_mut(&mut self) -> &mut [u8; 2048] {
-        self.data.as_mut().expect("PooledBinaryHV data is always Some until consumed")
+        self.data
+            .as_mut()
+            .expect("PooledBinaryHV data is always Some until consumed")
     }
 }
 
@@ -134,14 +148,18 @@ impl Deref for PooledBinaryHV {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.data.as_ref().expect("PooledBinaryHV deref on already-consumed value")
+        self.data
+            .as_ref()
+            .expect("PooledBinaryHV deref on already-consumed value")
     }
 }
 
 impl DerefMut for PooledBinaryHV {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.data.as_mut().expect("PooledBinaryHV deref_mut on already-consumed value")
+        self.data
+            .as_mut()
+            .expect("PooledBinaryHV deref_mut on already-consumed value")
     }
 }
 
@@ -234,7 +252,10 @@ impl PooledContinuousHV {
     #[inline]
     pub fn with_dim(dim: usize) -> Self {
         let mut hv = Self::new();
-        let data = hv.data.as_mut().expect("PooledContinuousHV data is always Some until consumed");
+        let data = hv
+            .data
+            .as_mut()
+            .expect("PooledContinuousHV data is always Some until consumed");
         data.resize(dim, 0.0);
         data.fill(0.0);
         hv
@@ -244,7 +265,10 @@ impl PooledContinuousHV {
     #[inline]
     pub fn zeroed() -> Self {
         let mut hv = Self::new();
-        hv.data.as_mut().expect("PooledContinuousHV data is always Some until consumed").fill(0.0);
+        hv.data
+            .as_mut()
+            .expect("PooledContinuousHV data is always Some until consumed")
+            .fill(0.0);
         hv
     }
 
@@ -252,7 +276,10 @@ impl PooledContinuousHV {
     #[inline]
     pub fn from_continuous_hv(hv: &ContinuousHV) -> Self {
         let mut pooled = Self::new();
-        let data = pooled.data.as_mut().expect("PooledContinuousHV data is always Some until consumed");
+        let data = pooled
+            .data
+            .as_mut()
+            .expect("PooledContinuousHV data is always Some until consumed");
         data.resize(hv.values.len(), 0.0);
         data.copy_from_slice(&hv.values);
         pooled
@@ -261,26 +288,36 @@ impl PooledContinuousHV {
     /// Convert to owned ContinuousHV (removes from pool tracking)
     #[inline]
     pub fn into_continuous_hv(mut self) -> ContinuousHV {
-        let data = self.data.take().expect("PooledContinuousHV::into_continuous_hv called on already-consumed value");
+        let data = self
+            .data
+            .take()
+            .expect("PooledContinuousHV::into_continuous_hv called on already-consumed value");
         ContinuousHV::from_vec(*data)
     }
 
     /// Get the inner data as a slice
     #[inline]
     pub fn as_slice(&self) -> &[f32] {
-        self.data.as_ref().expect("PooledContinuousHV data is always Some until consumed")
+        self.data
+            .as_ref()
+            .expect("PooledContinuousHV data is always Some until consumed")
     }
 
     /// Get the inner data as a mutable slice
     #[inline]
     pub fn as_slice_mut(&mut self) -> &mut [f32] {
-        self.data.as_mut().expect("PooledContinuousHV data is always Some until consumed")
+        self.data
+            .as_mut()
+            .expect("PooledContinuousHV data is always Some until consumed")
     }
 
     /// Get dimension
     #[inline]
     pub fn dim(&self) -> usize {
-        self.data.as_ref().expect("PooledContinuousHV data is always Some until consumed").len()
+        self.data
+            .as_ref()
+            .expect("PooledContinuousHV data is always Some until consumed")
+            .len()
     }
 }
 
@@ -295,14 +332,18 @@ impl Deref for PooledContinuousHV {
 
     #[inline]
     fn deref(&self) -> &Self::Target {
-        self.data.as_ref().expect("PooledContinuousHV deref on already-consumed value")
+        self.data
+            .as_ref()
+            .expect("PooledContinuousHV deref on already-consumed value")
     }
 }
 
 impl DerefMut for PooledContinuousHV {
     #[inline]
     fn deref_mut(&mut self) -> &mut Self::Target {
-        self.data.as_mut().expect("PooledContinuousHV deref_mut on already-consumed value")
+        self.data
+            .as_mut()
+            .expect("PooledContinuousHV deref_mut on already-consumed value")
     }
 }
 
