@@ -1,0 +1,14 @@
+[package]
+name = "symthaea-hodge"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Hodge Laplacian for simplicial complexes — higher-order topological analysis of consciousness"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["hodge-laplacian", "topology", "simplicial-complex", "spectral-analysis", "neuroscience"]
+categories = ["science", "algorithms", "mathematics"]
+
+[dependencies]
