@@ -250,6 +250,9 @@ pub enum DynamicsError {
 
     #[error("Not initialized")]
     NotInitialized,
+
+    #[error("I/O error: {0}")]
+    Io(#[from] std::io::Error),
 }
 
 // Re-export key types
@@ -427,6 +430,10 @@ mod tests {
             Box::new(DynamicsError::InvalidConfig("bad".into())),
             Box::new(DynamicsError::ComputationError("fail".into())),
             Box::new(DynamicsError::NotInitialized),
+            Box::new(DynamicsError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "test io error",
+            ))),
         ];
         for err in &errors {
             // std::error::Error::to_string delegates to Display

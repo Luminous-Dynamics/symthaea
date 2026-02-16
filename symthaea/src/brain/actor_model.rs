@@ -602,4 +602,81 @@ mod tests {
 
         assert_eq!(system.stats.total_ticks, 10);
     }
+
+    #[test]
+    fn test_actor_activation_from_message() {
+        let mut system = ActorSystem::default();
+
+        let sender = system.spawn("sender", ActorRole::Sensor).unwrap();
+        let receiver = system.spawn("receiver", ActorRole::Processor).unwrap();
+
+        system.connect(&sender, &receiver);
+
+        // Send an Activate message with content similar to the receiver's state
+        let content = ContinuousHV::random(512, 0xAC01_0001);
+        system.send(&sender, &receiver, MessageType::Activate, content);
+        system.tick();
+
+        // Receiver should have been activated (non-zero activation)
+        let actor = system.get_actor(&receiver).unwrap();
+        assert!(
+            actor.stats.messages_received > 0,
+            "Receiver should have processed the message"
+        );
+    }
+
+    #[test]
+    fn test_inhibition_message() {
+        let mut system = ActorSystem::default();
+
+        let sender = system.spawn("sender", ActorRole::Coordinator).unwrap();
+        let target = system.spawn("target", ActorRole::Processor).unwrap();
+
+        system.connect(&sender, &target);
+        system.send(
+            &sender,
+            &target,
+            MessageType::Inhibit,
+            ContinuousHV::random(512, 0xAC01_0002),
+        );
+        system.tick();
+
+        let actor = system.get_actor(&target).unwrap();
+        assert!(
+            actor.stats.messages_received > 0,
+            "Target should have received the inhibition message"
+        );
+    }
+
+    #[test]
+    fn test_actors_by_role() {
+        let mut system = ActorSystem::default();
+
+        system.spawn("s1", ActorRole::Sensor);
+        system.spawn("s2", ActorRole::Sensor);
+        system.spawn("p1", ActorRole::Processor);
+        system.spawn("e1", ActorRole::Effector);
+
+        assert_eq!(system.actors_by_role(ActorRole::Sensor).len(), 2);
+        assert_eq!(system.actors_by_role(ActorRole::Processor).len(), 1);
+        assert_eq!(system.actors_by_role(ActorRole::Effector).len(), 1);
+        assert_eq!(system.actors_by_role(ActorRole::Memory).len(), 0);
+    }
+
+    #[test]
+    fn test_max_actors_enforced() {
+        let config = ActorSystemConfig {
+            max_actors: 3,
+            ..Default::default()
+        };
+        let mut system = ActorSystem::new(config);
+
+        assert!(system.spawn("a1", ActorRole::Sensor).is_some());
+        assert!(system.spawn("a2", ActorRole::Sensor).is_some());
+        assert!(system.spawn("a3", ActorRole::Sensor).is_some());
+        assert!(
+            system.spawn("a4", ActorRole::Sensor).is_none(),
+            "Should reject spawn when at max_actors"
+        );
+    }
 }

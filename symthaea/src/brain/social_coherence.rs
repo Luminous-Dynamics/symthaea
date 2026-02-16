@@ -620,4 +620,116 @@ mod tests {
             RelationshipType::Friend | RelationshipType::Ally
         ));
     }
+
+    #[test]
+    fn test_trust_decay_toward_neutral() {
+        let mut sc = SocialCoherence::default();
+
+        // Build high trust
+        for i in 0..5 {
+            sc.record_interaction(
+                "agent_high",
+                InteractionType::Help,
+                0.9,
+                ContinuousHV::random(512, 0xDECA_0001 + i as u64),
+                "helped",
+                "thanked",
+            );
+        }
+        // Build low trust
+        for i in 0..5 {
+            sc.record_interaction(
+                "agent_low",
+                InteractionType::Conflict,
+                -0.8,
+                ContinuousHV::random(512, 0xDECA_0010 + i as u64),
+                "competed",
+                "attacked",
+            );
+        }
+
+        let high_before = sc.get_relationship("agent_high").unwrap().trust;
+        let low_before = sc.get_relationship("agent_low").unwrap().trust;
+
+        // Decay multiple times
+        for _ in 0..20 {
+            sc.decay_trust();
+        }
+
+        let high_after = sc.get_relationship("agent_high").unwrap().trust;
+        let low_after = sc.get_relationship("agent_low").unwrap().trust;
+
+        // High trust should decay toward 0.5
+        assert!(high_after < high_before, "High trust should decay");
+        assert!(high_after >= 0.5, "Trust should not decay below 0.5");
+
+        // Low trust should increase toward 0.5
+        assert!(low_after > low_before, "Low trust should increase");
+        assert!(low_after <= 0.5, "Trust should not exceed 0.5");
+    }
+
+    #[test]
+    fn test_mental_model_confidence_growth() {
+        let mut sc = SocialCoherence::default();
+
+        for i in 0..10 {
+            let behavior = ContinuousHV::random(512, 0xC0DE_0001 + i as u64);
+            let context = ContinuousHV::random(512, 0xC0DE_0010 + i as u64);
+            sc.observe_agent("observed", &behavior, &context);
+        }
+
+        let model = sc.get_mental_model("observed").unwrap();
+        assert_eq!(model.observation_count, 10);
+        // Confidence should have grown: starts at 0.1, +0.05 per observation, capped at 0.95
+        let expected = (0.1 + 0.05 * 10.0_f32).min(0.95);
+        assert!(
+            (model.confidence - expected).abs() < 0.001,
+            "Confidence should be ~{expected}: got {}",
+            model.confidence
+        );
+    }
+
+    #[test]
+    fn test_predict_response_unknown_agent() {
+        let sc = SocialCoherence::default();
+        let action = ContinuousHV::random(512, 0xFEED_0001);
+
+        // Unknown agent should return None
+        assert!(sc.predict_response("nonexistent", &action).is_none());
+    }
+
+    #[test]
+    fn test_get_allies_and_rivals() {
+        let mut sc = SocialCoherence::default();
+
+        // Build an ally
+        for i in 0..10 {
+            sc.record_interaction(
+                "ally",
+                InteractionType::Cooperation,
+                0.9,
+                ContinuousHV::random(512, 0xA11E_0001 + i as u64),
+                "cooperated",
+                "cooperated",
+            );
+        }
+
+        // Build a rival
+        for i in 0..10 {
+            sc.record_interaction(
+                "rival",
+                InteractionType::Conflict,
+                -0.7,
+                ContinuousHV::random(512, 0xBADE_0001 + i as u64),
+                "contested",
+                "attacked",
+            );
+        }
+
+        let allies = sc.get_allies();
+        assert!(!allies.is_empty(), "Should have at least one ally");
+
+        let rivals = sc.get_rivals();
+        assert!(!rivals.is_empty(), "Should have at least one rival");
+    }
 }

@@ -2,6 +2,8 @@
 
 use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
+use crate::brain::prefrontal::PrefrontalCortex;
+use crate::exploration::SurpriseExplorationBridge;
 use crate::consciousness::fep_active_inference::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, EnhancedFEPBridge,
 };
@@ -132,6 +134,20 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional surprise exploration bridge
+        let surprise_bridge = if config.enable_surprise_exploration {
+            Some(SurpriseExplorationBridge::new())
+        } else {
+            None
+        };
+
+        // Build optional prefrontal cortex
+        let prefrontal = if config.enable_prefrontal {
+            Some(PrefrontalCortex::default())
+        } else {
+            None
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -247,6 +263,8 @@ impl CognitiveLoopService {
             // Primitive-Belief Bridge for tier-level prediction error learning
             primitive_belief_bridge: PrimitiveBeliefBridge::new(),
             prev_primitive_state: None,
+            surprise_bridge,
+            prefrontal,
         })
     }
 

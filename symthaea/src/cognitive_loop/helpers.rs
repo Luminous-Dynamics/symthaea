@@ -114,6 +114,7 @@ impl CognitiveLoopService {
             learning_occurred,
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
+            metadata: super::CycleMetadata::default(),
             #[cfg(feature = "identity")]
             signed_output: self.mfdi_bridge.sign_output(output.clone()).ok(),
             #[cfg(feature = "identity")]

@@ -43,6 +43,19 @@ Full rules: @.claude/rules/DEVELOPMENT.md
 - **Quick ref**: @THE_SUBSTRATE_QUICKREF.md
 - **Full roadmap**: @THE_SUBSTRATE_ROADMAP.md (load when needed)
 
+### Symthaea (Holographic Liquid Brain)
+- **Path**: `symthaea/` (main crate), `symthaea-core/`, 10 extracted sub-crates in `symthaea/crates/`
+- **Status**: v0.5.0, ~343K LOC Rust, 2,772+ lib tests, 17 workspace crates
+- **Core**: HDC (16,384D) + IIT/Phi + LTC/CfC + Active Inference + 12-region Actor Brain
+- **Architecture**: Predictive coding loop — HDC encode → CfC evolve → predict → learn (50Hz)
+- **Key entry points**:
+  - `src/symthaea.rs` — public facade
+  - `src/cognitive_loop/cycle.rs` — core cognitive pipeline
+  - `symthaea-core/src/hdc/hdc_ltc_unified.rs` — unified HDC-LTC neuron
+- **Build**: `cargo test --lib` (default features), `cargo test --all-features`
+- **CI**: `symthaea-ci.yml` (GREEN) — fmt, clippy, test, docs, 18 feature matrix, 10 sub-crates
+- **Integration status**: Core pipeline fully wired with surprise exploration, prefrontal gating, reasoning engine, moral algebra. ~30% of `src/` modules remain structural/disconnected (social coherence, iroh P2P, some consciousness subsystems).
+
 ### Mycelix Cluster Architecture
 12 domain hApps consolidated into 2 cluster DNAs (single DNA = cross-domain `call(CallTargetCell::Local, ...)`):
 

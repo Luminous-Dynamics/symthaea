@@ -157,6 +157,9 @@ jobs:
           - epistemic_conflict
           - temporal_planning
           - api_module
+          # Multi-feature combinations (test interactions)
+          - reasoning_engine,code_understanding
+          - code_generation,neural-bridge
     defaults:
       run:
         working-directory: symthaea

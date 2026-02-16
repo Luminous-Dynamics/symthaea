@@ -120,6 +120,50 @@ impl CognitiveLoopService {
         let prediction_error = encoding_result.prediction_error;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // 1.1 Surprise-Driven Exploration: Track surprise, modulate curiosity
+        // ═══════════════════════════════════════════════════════════════════════
+        // When enabled, feed prediction error to surprise bridge. If surprise
+        // exceeds the adaptive threshold, lower the boredom threshold to
+        // encourage exploration of novel states.
+        let mut surprise_triggered = false;
+        let mut exploration_action: Option<String> = None;
+        if let Some(ref mut bridge) = self.surprise_bridge {
+            let predicted = self.last_prediction.as_deref().unwrap_or(&[]);
+            let actual = encoding_result
+                .hdv
+                .as_slice()
+                .get(..predicted.len().max(1).min(64))
+                .unwrap_or(&[]);
+            let current_state = self
+                .last_state
+                .as_deref()
+                .unwrap_or(&[0.0; 8]);
+            let (surprise, should_explore, action) =
+                bridge.cycle(predicted, actual, current_state);
+
+            if should_explore {
+                surprise_triggered = true;
+                // Lower boredom threshold to encourage exploration
+                let current_threshold = self.curiosity_drive.get_boredom_threshold();
+                self.curiosity_drive
+                    .set_boredom_threshold(current_threshold * 0.7);
+                // Boost exploration urge proportional to surprise intensity
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + bridge.exploration_factor * 0.3)
+                        .clamp(0.0, 1.0);
+                exploration_action =
+                    action.map(|a| format!("perturbation[{}d,scale={:.3}]", a.len(), bridge.exploration_factor));
+                tracing::debug!(
+                    surprise = surprise,
+                    threshold = bridge.tracker().threshold(),
+                    exploration_factor = bridge.exploration_factor,
+                    cycle = self.stats.total_cycles,
+                    "Surprise exploration triggered"
+                );
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // 1a. Memory System Integration: Recall relevant episodic memories
         // ═══════════════════════════════════════════════════════════════════════
         // Use HDC embedding to query episodic memory for context
@@ -501,6 +545,10 @@ impl CognitiveLoopService {
         // When the reasoning_engine feature is enabled, run the full conscious
         // reasoning cycle (conflict detection -> Phi_eff -> planning -> gating ->
         // counterfactual -> telemetry) with tiered degradation.
+        #[allow(unused_mut)]
+        let mut reasoning_confidence: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut reasoning_lr_factor: f32 = 1.0;
         #[cfg(feature = "reasoning_engine")]
         if let Some(ref mut reasoning_engine) = self.reasoning_engine {
             use crate::consciousness::epistemic_conflict::MultiTheoryMetrics as ECMetrics;
@@ -531,7 +579,24 @@ impl CognitiveLoopService {
                 cycle_id: self.stats.total_cycles as u64,
             };
 
-            let _reasoning_result = reasoning_engine.reason(&reasoning_ctx);
+            let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
+
+            // Capture reasoning outputs for downstream use:
+            // 1. Phi_eff modulates confidence (higher = more reliable reasoning)
+            reasoning_confidence = reasoning_result.phi_eff as f32;
+
+            // 2. Reliability modulates learning rate — low reliability = cautious learning
+            reasoning_lr_factor = reasoning_result.reliability as f32;
+
+            // 3. Log reasoning tier and timing for observability
+            tracing::debug!(
+                tier = ?reasoning_result.tier,
+                phi_eff = reasoning_result.phi_eff,
+                reliability = reasoning_result.reliability,
+                wall_time_us = reasoning_result.wall_time_us,
+                budget_exceeded = reasoning_result.budget_exceeded,
+                "Reasoning engine cycle"
+            );
         }
 
         // Get adaptive learning rate (respects pause_learning and all modulations)
@@ -540,7 +605,8 @@ impl CognitiveLoopService {
         let adaptive_lr = self.adaptive_behavior.effective_learning_rate(base_lr);
         let flow_lr = self.flow_state.effective_learning_multiplier(adaptive_lr);
         // Apply semantic memory modulation: boost learning when similar inputs had high error
-        let semantic_modulated_lr = flow_lr * semantic_lr_factor;
+        // Also apply reasoning engine reliability factor (low reliability = cautious learning)
+        let semantic_modulated_lr = flow_lr * semantic_lr_factor * reasoning_lr_factor;
         let effective_lr = (self
             .curiosity_drive
             .effective_learning_rate(semantic_modulated_lr)
@@ -888,6 +954,65 @@ impl CognitiveLoopService {
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // PREFRONTAL CORTEX: Executive control and working memory gating
+        // ═══════════════════════════════════════════════════════════════════════
+        let prefrontal_veto = if let Some(ref mut pfc) = self.prefrontal {
+            // Add current input as a working memory item
+            let wm_item = crate::brain::prefrontal::WorkingMemoryItem::new(
+                format!("cycle_{}", self.stats.total_cycles),
+                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(
+                    compressed_state.clone(),
+                ),
+            );
+            pfc.add_to_memory(wm_item);
+
+            // Advance time (decay activations, evict expired items)
+            pfc.tick();
+
+            // Check memory utilization — high utilization triggers inhibition
+            let utilization =
+                pfc.memory_contents().len() as f32 / 7.0; // default capacity
+            let veto = utilization > self.config.learning_threshold.max(0.8);
+
+            if veto {
+                tracing::debug!(
+                    utilization,
+                    cycle = self.stats.total_cycles,
+                    "Prefrontal veto: working memory overloaded"
+                );
+            }
+
+            // Graduate evicted items to memory coordinator
+            let graduates = pfc.drain_graduates();
+            if !graduates.is_empty() {
+                tracing::trace!(
+                    count = graduates.len(),
+                    "Prefrontal graduated items to episodic memory"
+                );
+            }
+
+            veto
+        } else {
+            false
+        };
+
+        // Build cycle metadata for observability
+        let metadata = super::CycleMetadata {
+            surprise_triggered,
+            prefrontal_veto,
+            reasoning_confidence,
+            exploration_action,
+        };
+
+        tracing::debug!(
+            surprise = metadata.surprise_triggered,
+            prefrontal_veto = metadata.prefrontal_veto,
+            reasoning_confidence = metadata.reasoning_confidence,
+            exploration = ?metadata.exploration_action,
+            "Cycle metadata"
+        );
+
         CycleResult {
             output: output.clone(),
             prediction_error,
@@ -896,6 +1021,7 @@ impl CognitiveLoopService {
             learning_occurred,
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
+            metadata,
             #[cfg(feature = "identity")]
             signed_output: self.mfdi_bridge.sign_output(output.clone()).ok(),
             #[cfg(feature = "identity")]
