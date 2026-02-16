@@ -23,7 +23,7 @@ pub mod code_primitives;
 pub mod compositionality;
 pub mod consciousness_unification;
 pub mod cross_modal_binding;
-pub mod fep_active_inference;
+pub use symthaea_fep as fep_active_inference;
 pub mod harmonies_integration;
 pub mod master_consciousness_equation;
 pub mod pac;
