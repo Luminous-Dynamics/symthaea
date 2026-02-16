@@ -57,7 +57,9 @@ use std::time::{Duration, Instant};
 // MYCELIX SDK INTEGRATION (when feature enabled)
 // ============================================================================
 
-#[cfg(feature = "mycelix")]
+// mycelix_sdk is currently unavailable (removed for Nix sandbox compatibility).
+// Re-enable when mycelix-sdk is published to crates.io.
+#[cfg(feature = "mycelix_sdk")]
 use mycelix_sdk::{
     bridge::{BridgeEvent, BridgeMessage, CrossHappReputation, HappReputationScore, LocalBridge},
     epistemic::{EmpiricalLevel, EpistemicClaim, MaterialityLevel, NormativeLevel},
@@ -65,7 +67,7 @@ use mycelix_sdk::{
     matl::ProofOfGradientQuality,
 };
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 use sha3::{Digest, Sha3_256};
 
 // ============================================================================
@@ -759,7 +761,7 @@ fn now_secs() -> u64 {
 /// - Cross-hApp reputation tracking
 /// - MATL trust verification
 /// - Epistemic claim classification
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 pub struct EnhancedMycelixBridge {
     /// Base bridge with value evaluation
     base: MycelixBridge,
@@ -771,7 +773,7 @@ pub struct EnhancedMycelixBridge {
     round: u32,
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl EnhancedMycelixBridge {
     /// Create a new enhanced bridge with full SDK integration
     pub fn new(agent_id: impl Into<String>) -> Self {
@@ -979,7 +981,7 @@ impl EnhancedMycelixBridge {
 /// Consciousness-weighted reputation score
 ///
 /// Integrates Symthaea's Φ measurement with Mycelix reputation
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsciousnessReputation {
     /// Agent identifier
@@ -994,7 +996,7 @@ pub struct ConsciousnessReputation {
     pub timestamp: u64,
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl ConsciousnessReputation {
     /// Create from consciousness snapshot and cross-hApp reputation
     pub fn new(

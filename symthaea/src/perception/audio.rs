@@ -30,7 +30,11 @@
 //! PerceptionInput(Auditory)
 //! ```
 
-use anyhow::{anyhow, Result};
+#[cfg(not(feature = "voice-stt"))]
+use anyhow::anyhow;
+#[cfg(feature = "voice-stt")]
+use anyhow::Context as _;
+use anyhow::Result;
 use std::path::Path;
 
 // Re-define types locally when full_perception is not available
@@ -187,7 +191,15 @@ impl AudioPerception {
 
         // Decode phonemes (if prototypes loaded)
         let (phonemes, confidences) = if self.has_prototypes {
-            self.decoder.decode(&hvs)
+            let mut ph = Vec::new();
+            let mut cf = Vec::new();
+            for hv in &hvs {
+                if let Some((phoneme, confidence)) = self.decoder.decode(hv) {
+                    ph.push(phoneme);
+                    cf.push(confidence);
+                }
+            }
+            (ph, cf)
         } else {
             (Vec::new(), Vec::new())
         };
@@ -233,7 +245,15 @@ impl AudioPerception {
 
         // Decode phonemes
         let (phonemes, confidences) = if self.has_prototypes {
-            self.decoder.decode(&hvs)
+            let mut ph = Vec::new();
+            let mut cf = Vec::new();
+            for hv in &hvs {
+                if let Some((phoneme, confidence)) = self.decoder.decode(hv) {
+                    ph.push(phoneme);
+                    cf.push(confidence);
+                }
+            }
+            (ph, cf)
         } else {
             (Vec::new(), Vec::new())
         };
@@ -257,7 +277,7 @@ impl AudioPerception {
     }
 
     /// Extract prosody features from audio
-    fn extract_prosody(&self, samples: &[f32], _hvs: &[symthaea_stt::BinaryHV]) -> ProsodyFeatures {
+    fn extract_prosody(&self, samples: &[f32], _hvs: &[symthaea_stt::HV16]) -> ProsodyFeatures {
         // Simple prosody extraction
         let energy: f32 = samples.iter().map(|x| x.abs()).sum::<f32>() / samples.len() as f32;
 

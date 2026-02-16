@@ -367,7 +367,11 @@ impl StoryArcDynamics {
     ///
     /// This produces per-character emotional trajectories that diverge from
     /// the global scene signal based on each character's accumulated context.
-    pub fn character_signal(&self, char_hv: &ContinuousHV, base_signal: &NarrativeSignal) -> NarrativeSignal {
+    pub fn character_signal(
+        &self,
+        char_hv: &ContinuousHV,
+        base_signal: &NarrativeSignal,
+    ) -> NarrativeSignal {
         let char_energy = (char_hv.similarity(&self.archetypes.high_energy) + 1.0) / 2.0;
         let char_surprise = (char_hv.similarity(&self.archetypes.surprise) + 1.0) / 2.0;
         let char_tension = (char_hv.similarity(&self.archetypes.high_tension) + 1.0) / 2.0;
@@ -377,7 +381,8 @@ impl StoryArcDynamics {
         let blend = 0.3;
         NarrativeSignal {
             energy: (base_signal.energy * (1.0 - blend) + char_energy * blend).clamp(0.0, 1.0),
-            surprise: (base_signal.surprise * (1.0 - blend) + char_surprise * blend).clamp(0.0, 1.0),
+            surprise: (base_signal.surprise * (1.0 - blend) + char_surprise * blend)
+                .clamp(0.0, 1.0),
             tension: (base_signal.tension * (1.0 - blend) + char_tension * blend).clamp(0.0, 1.0),
             valence: (base_signal.valence * (1.0 - blend) + char_valence * blend).clamp(-1.0, 1.0),
             momentum: base_signal.momentum,

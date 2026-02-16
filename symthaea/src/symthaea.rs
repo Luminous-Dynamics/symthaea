@@ -490,13 +490,13 @@ impl Symthaea {
                 "Working memory items evicted during tick"
             );
 
-            // Queue graduations for episodic consolidation
-            for hv in &evicted {
+            // Queue graduations for episodic consolidation (now with accurate steps_survived)
+            for (hv, steps_survived) in &evicted {
                 self.memory_coordinator.queue_graduation(GraduationEvent {
                     content: hv.clone(),
                     label: format!("wm_eviction_step_{interaction_count}"),
-                    steps_survived: interaction_count.min(10), // approximate
-                    final_activation: 0.5,                     // default activation
+                    steps_survived: *steps_survived,
+                    final_activation: 0.5,
                     phi_at_graduation: current_phi,
                     coherence_at_graduation: current_coherence,
                 });
@@ -524,18 +524,20 @@ impl Symthaea {
                     .as_millis() as u64;
 
                 tokio::spawn(async move {
-                    for (i, hv) in evicted.iter().enumerate() {
+                    for (i, (hv, steps)) in evicted.iter().enumerate() {
                         let record = MemoryRecord {
                             id: format!("wm-{timestamp_ms}-{i}"),
                             memory_type: MemoryType::Working,
                             encoding: hv.to_binary(0.0),
-                            content: format!("Working memory eviction at step {interaction_count}"),
+                            content: format!(
+                                "Working memory eviction at step {interaction_count} (survived {steps} ticks)"
+                            ),
                             timestamp_ms,
                             valence: 0.0,
                             arousal: 0.0,
                             phi: current_phi,
                             topics: vec![],
-                            metadata: "{}".to_string(),
+                            metadata: format!("{{\"steps_survived\":{steps}}}"),
                             consolidation_strength: 0.0,
                             retrieval_count: 0,
                         };
@@ -548,7 +550,7 @@ impl Symthaea {
         }
 
         // ── DATABASE RECALL: Query persistent memory for contextual priming ──
-        // Retrieve similar past experiences to enrich the current cognitive cycle.
+        // Retrieve similar past experiences and inject into working memory.
         if let Some(ref db) = self.database {
             let query_hv = input_embedding.to_binary(0.0);
             match db.search_similar(&query_hv, 3).await {
@@ -557,7 +559,7 @@ impl Symthaea {
                         target: "symthaea::memory",
                         recalled = results.len(),
                         top_similarity = results[0].similarity,
-                        "Database recall: found similar past experiences"
+                        "Database recall: priming working memory with past experiences"
                     );
                     // Record retrievals for reconsolidation tracking
                     for result in &results {
@@ -565,11 +567,70 @@ impl Symthaea {
                             crate::memory::content_hash(&result.record.encoding.to_continuous());
                         self.memory_coordinator.record_retrieval(hash);
                     }
+                    // Inject top recalled memory into working memory as a priming signal.
+                    // Only prime if similarity is above threshold to avoid noise.
+                    if results[0].similarity > 0.3 {
+                        let recalled_hv = results[0].record.encoding.to_continuous();
+                        self.mind.perceive(recalled_hv);
+                    }
                 }
                 Ok(_) => {} // No similar memories found — normal for early interactions
                 Err(e) => {
                     tracing::debug!(target: "symthaea::memory", error = %e, "Database recall skipped");
                 }
+            }
+        }
+
+        // ── EPISODIC PERSISTENCE: Store top episodes to database ──
+        // Episodes that passed the coordinator's phi threshold are significant
+        // enough for long-term storage. We persist top-N by phi each cycle.
+        if let Some(ref db) = self.database {
+            let top_episodes = self.episodic_memory.get_top_episodes(3);
+            if !top_episodes.is_empty() {
+                let db = Arc::clone(db);
+                let timestamp_ms = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_millis() as u64;
+                let interaction_count = self.interactions;
+
+                let episode_records: Vec<MemoryRecord> = top_episodes
+                    .into_iter()
+                    .enumerate()
+                    .map(|(i, ep)| {
+                        let coherence = ep.coherence.unwrap_or(0.0);
+                        let valence = ep.valence.unwrap_or(0.0);
+                        MemoryRecord {
+                            // Use episode timestamp for dedup — same episode won't be re-stored
+                            id: format!("ep-{}-{}", ep.timestamp, i),
+                            memory_type: MemoryType::Episodic,
+                            encoding: ep.input.to_binary(0.0),
+                            content: format!(
+                                "Episodic memory at step {interaction_count} (phi={:.3})",
+                                ep.phi
+                            ),
+                            timestamp_ms,
+                            valence: valence as f32,
+                            arousal: 0.0,
+                            phi: ep.phi,
+                            topics: vec![],
+                            metadata: format!(
+                                "{{\"coherence\":{coherence},\"replay_count\":{}}}",
+                                ep.replay_count
+                            ),
+                            consolidation_strength: ep.consolidation_strength.min(1.0),
+                            retrieval_count: ep.retrieval_count,
+                        }
+                    })
+                    .collect();
+
+                tokio::spawn(async move {
+                    for record in episode_records {
+                        if let Err(e) = db.store(record).await {
+                            tracing::warn!(target: "symthaea::database", error = %e, "Failed to persist episode");
+                        }
+                    }
+                });
             }
         }
 

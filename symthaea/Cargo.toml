@@ -9,6 +9,7 @@ members = [
     "crates/symthaea-dynamics",
     "crates/symthaea-perception",
     "crates/symthaea-causal-reasoning",
+    "crates/symthaea-fep",
 ]
 
 
@@ -60,6 +61,9 @@ symthaea-core = { path = "symthaea-core" }
 
 # Symthaea Causal Reasoning - Pearl's do-calculus, counterfactual reasoning, causal emergence
 symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default-features = false }
+
+# Symthaea FEP - Free Energy Principle active inference (always enabled)
+symthaea-fep = { path = "crates/symthaea-fep" }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
@@ -168,8 +172,8 @@ rand = { workspace = true }
 rand_chacha = "0.3"  # Deterministic RNG for reproducible JL projections
 blake3 = { workspace = true }
 hex = "0.4"     # Hex encoding for node IDs in federated network
-ed25519-dalek = { version = "2.1", features = ["serde"] }  # MFDI identity signatures
-sha2 = "0.10"   # MFDI credential hashing
+ed25519-dalek = { version = "2.1", features = ["serde"], optional = true }  # MFDI identity signatures
+sha2 = { version = "0.10", optional = true }   # MFDI credential hashing
 md5 = "0.7"  # For experience module topic hashing
 chrono = { workspace = true }
 regex = { workspace = true }
@@ -265,6 +269,9 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
 holochain = []                              # Gate only (real integration in symthaea-mycelix-bridge)
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
+# mycelix_sdk: Add mycelix-sdk dep when it's published to crates.io, then enable:
+# mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]
+mycelix_sdk = ["mycelix"]                  # Placeholder until mycelix-sdk is published (SDK code is cfg-gated)
 network = []                                # Mycelix network client (real HTTP fetching)
 
 # ── Desktop & System Integration ────────────────────────────────────
@@ -273,7 +280,7 @@ nix-mind = ["symthaea-nix"]                 # Conscious NixOS mind with HDC worl
 nix-cli = ["symthaea-nix", "symthaea-nix/cli"]
 nix-tui = ["symthaea-nix", "symthaea-nix/tui"]
 nix-daemon = ["symthaea-nix", "symthaea-nix/daemon"]
-identity = []                               # Ed25519 signatures, capability gating
+identity = ["ed25519-dalek", "sha2"]        # Ed25519 signatures, capability gating
 
 # ── Database backends ───────────────────────────────────────────────
 # DuckDB is an unconditional dep. Others deferred:

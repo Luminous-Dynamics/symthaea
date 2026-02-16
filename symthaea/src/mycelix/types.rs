@@ -178,7 +178,7 @@ impl MaterialityLevel {
 // Interop with canonical Mycelix Epistemic types
 // ============================================================================
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<mycelix_sdk::epistemic::EmpiricalLevel> for EmpiricalLevel {
     fn from(level: mycelix_sdk::epistemic::EmpiricalLevel) -> Self {
         use mycelix_sdk::epistemic::EmpiricalLevel as E;
@@ -192,7 +192,7 @@ impl From<mycelix_sdk::epistemic::EmpiricalLevel> for EmpiricalLevel {
     }
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<EmpiricalLevel> for mycelix_sdk::epistemic::EmpiricalLevel {
     fn from(level: EmpiricalLevel) -> Self {
         use mycelix_sdk::epistemic::EmpiricalLevel as E;
@@ -206,7 +206,7 @@ impl From<EmpiricalLevel> for mycelix_sdk::epistemic::EmpiricalLevel {
     }
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<mycelix_sdk::epistemic::NormativeLevel> for NormativeLevel {
     fn from(level: mycelix_sdk::epistemic::NormativeLevel) -> Self {
         use mycelix_sdk::epistemic::NormativeLevel as N;
@@ -219,7 +219,7 @@ impl From<mycelix_sdk::epistemic::NormativeLevel> for NormativeLevel {
     }
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<NormativeLevel> for mycelix_sdk::epistemic::NormativeLevel {
     fn from(level: NormativeLevel) -> Self {
         use mycelix_sdk::epistemic::NormativeLevel as N;
@@ -232,7 +232,7 @@ impl From<NormativeLevel> for mycelix_sdk::epistemic::NormativeLevel {
     }
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<mycelix_sdk::epistemic::MaterialityLevel> for MaterialityLevel {
     fn from(level: mycelix_sdk::epistemic::MaterialityLevel) -> Self {
         use mycelix_sdk::epistemic::MaterialityLevel as M;
@@ -245,7 +245,7 @@ impl From<mycelix_sdk::epistemic::MaterialityLevel> for MaterialityLevel {
     }
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<MaterialityLevel> for mycelix_sdk::epistemic::MaterialityLevel {
     fn from(level: MaterialityLevel) -> Self {
         use mycelix_sdk::epistemic::MaterialityLevel as M;
@@ -258,7 +258,7 @@ impl From<MaterialityLevel> for mycelix_sdk::epistemic::MaterialityLevel {
     }
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<mycelix_sdk::epistemic::EpistemicClassification> for EpistemicClassification {
     fn from(class: mycelix_sdk::epistemic::EpistemicClassification) -> Self {
         EpistemicClassification {
@@ -269,7 +269,7 @@ impl From<mycelix_sdk::epistemic::EpistemicClassification> for EpistemicClassifi
     }
 }
 
-#[cfg(feature = "mycelix")]
+#[cfg(feature = "mycelix_sdk")]
 impl From<EpistemicClassification> for mycelix_sdk::epistemic::EpistemicClassification {
     fn from(class: EpistemicClassification) -> Self {
         mycelix_sdk::epistemic::EpistemicClassification::new(
@@ -542,7 +542,7 @@ mod tests {
         assert!(MaterialityLevel::Permanent.suggested_ttl().is_none());
     }
 
-    #[cfg(feature = "mycelix")]
+    #[cfg(feature = "mycelix_sdk")]
     #[test]
     fn test_epistemic_level_roundtrip_with_mycelix_sdk() {
         use mycelix_sdk::epistemic as m;

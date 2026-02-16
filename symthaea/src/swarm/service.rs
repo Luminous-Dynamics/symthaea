@@ -345,10 +345,8 @@ impl NetworkService {
     }
 
     /// Broadcast our consciousness state to all connected peers
-    pub async fn broadcast_consciousness(
-        &self,
-        _state: &ConsciousnessVector,
-    ) -> SwarmResult<usize> {
+    #[allow(unused_variables)]
+    pub async fn broadcast_consciousness(&self, state: &ConsciousnessVector) -> SwarmResult<usize> {
         #[cfg(not(feature = "swarm"))]
         {
             // In stub mode, just return 0
@@ -361,7 +359,7 @@ impl NetworkService {
             let peer_ids: Vec<String> = self.peers.read().keys().cloned().collect();
 
             let mut sent_count = 0;
-            let bytes = _state.estimated_size() as u64;
+            let bytes = state.estimated_size() as u64;
 
             for peer_id in peer_ids {
                 if let Some(channel) = iroh.get_channel(&peer_id) {
