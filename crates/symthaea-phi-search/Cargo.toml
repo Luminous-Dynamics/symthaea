@@ -1,0 +1,11 @@
+[package]
+name = "symthaea-phi-search"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Phi-guided architecture search for Symthaea"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true }
+symthaea-core = { path = "../../symthaea-core" }

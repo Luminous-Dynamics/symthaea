@@ -15,7 +15,7 @@ Algorithm:
 # Example
 
 ```ignore
-use symthaea::consciousness::dream::{DreamEngine, DreamEngineConfig};
+use symthaea_dream::{DreamEngine, DreamEngineConfig};
 
 let config = DreamEngineConfig::default();
 let mut engine = DreamEngine::new(config);

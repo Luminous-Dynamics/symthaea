@@ -1,3 +1,5 @@
+#![allow(clippy::needless_range_loop)]
+
 //! # Phi-Guided Architecture Search
 //!
 //! ## Purpose
@@ -34,9 +36,7 @@
 //! ## Example Usage
 //!
 //! ```rust,ignore
-//! use symthaea::consciousness::phi_architecture_search::{
-//!     PhiArchitectureSearch, SearchConfig, SearchStrategy
-//! };
+//! use symthaea_phi_search::{PhiArchitectureSearch, SearchConfig, SearchStrategy};
 //!
 //! let config = SearchConfig::default();
 //! let mut searcher = PhiArchitectureSearch::new(config);
