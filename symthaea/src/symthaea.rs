@@ -610,7 +610,7 @@ impl Symthaea {
                                 ep.phi
                             ),
                             timestamp_ms,
-                            valence: valence as f32,
+                            valence,
                             arousal: 0.0,
                             phi: ep.phi,
                             topics: vec![],
