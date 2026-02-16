@@ -14,11 +14,12 @@ on:
       - 'mycelix-health/**'
       - 'mycelix-energy/**'
       - 'mycelix-climate/**'
-      - 'mycelix-edunet/**'
-      - 'mycelix-marketplace/**'
-      - 'mycelix-supplychain/**'
       - 'mycelix-core/**'
       - 'mycelix-mail/**'
+      # Uncomment once committed to git:
+      # - 'mycelix-edunet/**'
+      # - 'mycelix-marketplace/**'
+      # - 'mycelix-supplychain/**'
       - '.github/workflows/mycelix-ci.yml'
   pull_request:
     branches: [main]
@@ -33,16 +34,17 @@ on:
       - 'mycelix-health/**'
       - 'mycelix-energy/**'
       - 'mycelix-climate/**'
-      - 'mycelix-edunet/**'
-      - 'mycelix-marketplace/**'
-      - 'mycelix-supplychain/**'
       - 'mycelix-core/**'
       - 'mycelix-mail/**'
+      # Uncomment once committed to git:
+      # - 'mycelix-edunet/**'
+      # - 'mycelix-marketplace/**'
+      # - 'mycelix-supplychain/**'
 
 env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: '20'
-  RUST_VERSION: 'stable'  # Use latest stable Rust (system has 1.92.0)
+  RUST_VERSION: 'stable'  # Use latest stable Rust
 
 jobs:
   # ============================================================================
@@ -95,10 +97,14 @@ jobs:
 
   # ============================================================================
   # Ethereum SDK Tests
+  # NOTE: Disabled until mycelix-workspace/sdk-eth/ is committed to git.
+  # The directory exists locally but is untracked, so it will not exist on CI.
+  # To re-enable: commit sdk-eth/ to git and remove the 'if: false' condition.
   # ============================================================================
   sdk-eth:
     name: Ethereum SDK
     runs-on: ubuntu-latest
+    if: false  # sdk-eth directory is not tracked in git -- re-enable after committing it
     defaults:
       run:
         working-directory: mycelix-workspace/sdk-eth
@@ -207,24 +213,39 @@ jobs:
           - { name: commons, path: mycelix-commons }
           - { name: civic, path: mycelix-civic }
           - { name: space, path: mycelix-space }
-          - { name: health, path: mycelix-health }
+          - { name: health, path: mycelix-health }          # submodule
           - { name: energy, path: mycelix-energy }
           - { name: climate, path: mycelix-climate }
-          - { name: edunet, path: mycelix-edunet }
-          - { name: marketplace, path: mycelix-marketplace/backend }
-          - { name: supplychain, path: mycelix-supplychain/holochain }
-          - { name: mail, path: mycelix-mail/holochain }
+          - { name: mail, path: mycelix-mail/holochain }    # submodule
+          # Uncomment these once their directories are committed to git:
+          # - { name: edunet, path: mycelix-edunet }
+          # - { name: marketplace, path: mycelix-marketplace/backend }
+          # - { name: supplychain, path: mycelix-supplychain/holochain }
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Check path exists
+        id: check_path
+        run: |
+          if [ -d "${{ matrix.happ.path }}" ] && [ -f "${{ matrix.happ.path }}/Cargo.toml" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::${{ matrix.happ.path }} not found or has no Cargo.toml — skipping"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
 
       - name: Setup Rust
+        if: steps.check_path.outputs.exists == 'true'
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
           targets: wasm32-unknown-unknown
 
       - name: Cache cargo
+        if: steps.check_path.outputs.exists == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -235,6 +256,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ matrix.happ.name }}-${{ hashFiles(format('{0}/Cargo.lock', matrix.happ.path)) }}
 
       - name: Check ${{ matrix.happ.name }} (WASM)
+        if: steps.check_path.outputs.exists == 'true'
         run: cargo build --target wasm32-unknown-unknown
         working-directory: ${{ matrix.happ.path }}
 
@@ -250,6 +272,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -294,6 +318,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -347,6 +373,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v24
@@ -564,6 +592,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v24
@@ -714,6 +744,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -783,7 +815,7 @@ jobs:
       - name: Check all jobs passed
         uses: re-actors/alls-green@release/v1
         with:
-          allowed-skips: smoke-tests, e2e-tests
+          allowed-skips: smoke-tests, e2e-tests, sdk-eth
           jobs: ${{ toJSON(needs) }}
 
       - name: Summary
@@ -820,7 +852,7 @@ jobs:
           echo "| Job | Status |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|" >> $GITHUB_STEP_SUMMARY
           echo "| TypeScript SDK | $(format_status '${{ needs.typescript-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
-          echo "| Ethereum SDK (216 tests) | $(format_status '${{ needs.sdk-eth.result }}') |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ethereum SDK (disabled) | $(format_status '${{ needs.sdk-eth.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust SDK | $(format_status '${{ needs.rust-sdk.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| hApp Compilation | $(format_status '${{ needs.happ-check.result }}') |" >> $GITHUB_STEP_SUMMARY
           echo "| Holochain Zomes | $(format_status '${{ needs.holochain-zomes.result }}') |" >> $GITHUB_STEP_SUMMARY
