@@ -206,7 +206,7 @@ jobs:
             ${{ runner.os }}-cargo-subcrates-
       - name: Test sub-crates (fast path)
         run: |
-          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning; do
+          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor; do
             echo "::group::$crate"
             cargo clippy -p $crate --lib -- -D warnings
             cargo test -p $crate --lib

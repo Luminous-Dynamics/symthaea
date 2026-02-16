@@ -223,3 +223,27 @@ mycelix-workspace/observatory/.vite/
 *.happ
 *.dna
 workdir/
+
+# === Untracked Standalone Directories ===
+# These are separate projects, archives, or large directories
+# managed outside the main git tree.
+_websites/
+_development/
+_infrastructure/
+terra-atlas-mvp/
+terra-lumina/
+repos/
+phi-lab/
+services/
+mycelix.net/
+mycelix-edunet/
+mycelix-marketplace/
+mycelix-music/
+mycelix-supplychain/
+mycelix-workspace/mycelix-v6-living/
+symthaea-core.stale-v0.1/
+11-meta-consciousness/nsfw/
+docs/examples/
+
+# === Claude Session Artifacts ===
+.claude-sessions/
