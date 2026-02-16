@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop, clippy::manual_clamp)]
 //! # Full Active Inference Implementation (FEP Integration)
 //!
 //! Implements Karl Friston's Free Energy Principle (FEP) as a complete active inference loop
@@ -101,9 +102,7 @@
 //! Use [`EnhancedFEPBridge`] to connect FEP to the cognitive loop:
 //!
 //! ```rust,ignore
-//! use symthaea::consciousness::fep_active_inference::{
-//!     EnhancedFEPBridge, ActiveInferenceAgentConfig
-//! };
+//! use symthaea_fep::{EnhancedFEPBridge, ActiveInferenceAgentConfig};
 //!
 //! let config = ActiveInferenceAgentConfig::default();
 //! let mut bridge = EnhancedFEPBridge::new(config, 4);

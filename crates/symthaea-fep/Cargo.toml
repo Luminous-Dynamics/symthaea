@@ -1,0 +1,10 @@
+[package]
+name = "symthaea-fep"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Free Energy Principle active inference for Symthaea"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true }
