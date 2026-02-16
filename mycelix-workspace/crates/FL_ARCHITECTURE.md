@@ -19,7 +19,7 @@ Tier 2: mycelix-fl (decentralized WASM pipeline)
 ## Tier 1: mycelix-fl-core
 
 **Location**: `crates/mycelix-fl-core/`
-**Size**: ~4.6K LOC, 82 tests
+**Size**: ~5.1K LOC, 110 tests
 **Dependencies**: serde, rand (no-default-features), thiserror (minimal)
 
 **Use when**: Embedding FL in any Rust project. This is the canonical single source of truth for:
@@ -43,7 +43,7 @@ Tier 2: mycelix-fl (decentralized WASM pipeline)
 ## Tier 2: mycelix-fl
 
 **Location**: `crates/mycelix-fl/`
-**Size**: ~10K LOC, 173 tests
+**Size**: ~9.9K LOC, 196 tests
 **Dependencies**: serde, rand, thiserror, **mycelix-fl-core (no default features)**
 
 **Use when**: Running FL inside Holochain WASM zomes. Adds the full 9-stage decentralized pipeline on top of fl-core:
@@ -125,6 +125,6 @@ Holochain zomes ───┴──→ mycelix-fl (Tier 2)
 
 | Crate | Tests | What's Tested |
 |-------|-------|---------------|
-| fl-core | 82 | All 5 aggregation algorithms, multi-signal detection, DP mechanism, RDP composition, unified pipeline, Byzantine phase diagram |
-| mycelix-fl | 173 | All aggregation (delegated), 9-layer detection, HyperFeel compression, epistemic grading, Phi gating, trust scoring, DP mechanism, pipeline E2E, commitment protocol |
-| fl-aggregator | 277 | All aggregation (delegated + unique), HDC Byzantine (6 methods), preprocessing, clipping, normalization, distance metrics, ensemble aggregation |
+| fl-core | 110 | All 5 aggregation algorithms, multi-signal detection, DP mechanism, RDP composition, unified pipeline, Byzantine phase diagram, consciousness plugin, meta-learning |
+| mycelix-fl | 196 | All aggregation (delegated), 9-layer detection, HyperFeel compression, epistemic grading, Phi gating, trust scoring, DP mechanism, pipeline E2E, commitment protocol |
+| fl-aggregator | 278 | All aggregation (delegated + unique), HDC Byzantine (6 methods), preprocessing, clipping, normalization, distance metrics, ensemble aggregation |
