@@ -342,6 +342,77 @@ impl StorySession {
         })
     }
 
+    /// Add a scene with automatically inferred mood.
+    ///
+    /// Analyzes the setting and conflict text for keyword patterns to determine
+    /// the most appropriate `NarrativeMood`, removing the need for callers to
+    /// hand-specify mood. Useful for automated pipelines and benchmarks.
+    pub fn add_scene_auto(
+        &mut self,
+        title: &str,
+        setting: &str,
+        character_names: &[&str],
+        conflict: &str,
+    ) -> NarrativeSignal {
+        let mood = Self::infer_mood(setting, conflict);
+        self.add_scene(title, setting, character_names, conflict, mood)
+    }
+
+    /// Infer `NarrativeMood` from setting and conflict text via keyword matching.
+    ///
+    /// Scoring: each keyword hit adds to its mood's score. The mood with the
+    /// highest score wins. Ties break toward Mysterious (the most neutral).
+    pub fn infer_mood(setting: &str, conflict: &str) -> NarrativeMood {
+        let text = format!("{} {}", setting, conflict).to_lowercase();
+
+        let score = |keywords: &[&str]| -> i32 {
+            keywords.iter().filter(|k| text.contains(**k)).count() as i32
+        };
+
+        let tense = score(&[
+            "battle", "fight", "attack", "siege", "war", "death", "kill", "destroy",
+            "threat", "danger", "enemy", "ambush", "betrayal", "betray", "fire",
+            "inferno", "storm", "pursuit", "trap", "wound", "confront", "crisis",
+            "invasion", "escape", "clash",
+        ]);
+        let peaceful = score(&[
+            "quiet", "calm", "peace", "dawn", "morning", "garden", "rest", "home",
+            "gentle", "serene", "stillness", "harmony", "cottage", "meadow",
+        ]);
+        let mysterious = score(&[
+            "mystery", "strange", "unknown", "shadow", "whisper", "secret", "hidden",
+            "ancient", "dark", "cave", "mist", "fog", "riddle", "enigma", "prophecy",
+        ]);
+        let melancholy = score(&[
+            "loss", "grief", "sorrow", "lonely", "cold", "ruin", "ashes", "farewell",
+            "regret", "mourn", "abandoned", "forgotten", "decay", "alone", "poverty",
+            "neglect", "mock",
+        ]);
+        let triumphant = score(&[
+            "victory", "triumph", "crown", "glory", "celebrate", "power", "throne",
+            "conquer", "dazzl", "glitter", "grand", "palace", "kingdom", "won",
+        ]);
+        let hopeful = score(&[
+            "hope", "new", "rebuild", "dream", "light", "future", "promise",
+            "begin", "quest", "search", "sunrise", "renewal", "acceptance",
+        ]);
+
+        let scores = [
+            (tense, NarrativeMood::Tense),
+            (peaceful, NarrativeMood::Peaceful),
+            (mysterious, NarrativeMood::Mysterious),
+            (melancholy, NarrativeMood::Melancholy),
+            (triumphant, NarrativeMood::Triumphant),
+            (hopeful, NarrativeMood::Hopeful),
+        ];
+
+        scores
+            .iter()
+            .max_by_key(|(s, _)| *s)
+            .map(|(_, m)| *m)
+            .unwrap_or(NarrativeMood::Mysterious)
+    }
+
     /// Reset the session to start a new story.
     pub fn reset(&mut self) {
         self.dynamics.reset();
@@ -839,6 +910,42 @@ mod tests {
             .sum::<f32>()
             .sqrt();
         assert!(norm > 0.01, "Presence HV should have non-trivial norm");
+    }
+
+    #[test]
+    fn test_infer_mood_tense() {
+        let mood = StorySession::infer_mood("battlefield", "the enemy attacks");
+        assert_eq!(mood, NarrativeMood::Tense);
+    }
+
+    #[test]
+    fn test_infer_mood_peaceful() {
+        let mood = StorySession::infer_mood("quiet garden at dawn", "morning stillness");
+        assert_eq!(mood, NarrativeMood::Peaceful);
+    }
+
+    #[test]
+    fn test_infer_mood_melancholy() {
+        let mood = StorySession::infer_mood("cold ruins", "grief and loss, alone");
+        assert_eq!(mood, NarrativeMood::Melancholy);
+    }
+
+    #[test]
+    fn test_add_scene_auto() {
+        let mut session = StorySession::new();
+        let _hero =
+            session.register_character("Kael", &session.algebra().primitives.protagonist.clone());
+
+        let signal = session.add_scene_auto(
+            "Battle Scene",
+            "burning battlefield",
+            &["Kael"],
+            "enemy siege and attack from all sides",
+        );
+
+        // Should produce valid signal with elevated tension (auto-inferred Tense mood)
+        assert!((0.0..=1.0).contains(&signal.tension));
+        assert!((0.0..=1.0).contains(&signal.energy));
     }
 
     #[test]
