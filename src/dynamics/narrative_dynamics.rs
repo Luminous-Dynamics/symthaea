@@ -198,6 +198,13 @@ pub struct StoryArcDynamics {
     /// Running min/max tension for adaptive arc phase thresholds
     tension_min: f32,
     tension_max: f32,
+    /// Count of consecutive scenes where tension moved in the same direction.
+    /// Positive = consecutive rises, negative = consecutive falls.
+    tension_streak: i32,
+    /// Previous tension value for streak tracking
+    prev_tension: f32,
+    /// Recent mood history for mood-sequence scaling (last N moods)
+    mood_history: VecDeque<NarrativeMood>,
 }
 
 /// Maximum signal history length
@@ -250,6 +257,9 @@ impl StoryArcDynamics {
             tension_offset: 0.0,
             tension_min: 0.5,
             tension_max: 0.5,
+            tension_streak: 0,
+            prev_tension: 0.5,
+            mood_history: VecDeque::with_capacity(8),
         }
     }
 
@@ -350,6 +360,9 @@ impl StoryArcDynamics {
         self.tension_offset = 0.0;
         self.tension_min = 0.5;
         self.tension_max = 0.5;
+        self.tension_streak = 0;
+        self.prev_tension = 0.5;
+        self.mood_history.clear();
     }
 
     /// Recent signal trajectory.
@@ -451,13 +464,26 @@ impl StoryArcDynamics {
         let mut tension = alpha * cfc_tension + one_minus_alpha * hdc_tension;
         let mut valence = alpha * cfc_valence + one_minus_alpha * hdc_valence;
 
-        // Apply mood-based signal offsets
+        // Mood-sequence scaling: amplify offsets for mood transitions,
+        // compound for consecutive same-mood scenes
+        let mood_scale = if let Some(m) = mood {
+            self.mood_transition_scale(m)
+        } else {
+            1.0
+        };
+
+        // Apply mood-based signal offsets (scaled by mood transition)
         if let Some(m) = mood {
             let (de, ds, dt_, dv) = Self::mood_offsets(m);
-            energy += de;
-            surprise += ds;
-            tension += dt_;
-            valence += dv;
+            energy += de * mood_scale;
+            surprise += ds * mood_scale;
+            tension += dt_ * mood_scale;
+            valence += dv * mood_scale;
+            // Record mood in history
+            if self.mood_history.len() >= 8 {
+                self.mood_history.pop_front();
+            }
+            self.mood_history.push_back(m);
         }
 
         // Apply conflict-driven tension offset, then decay it
@@ -467,8 +493,40 @@ impl StoryArcDynamics {
         // Clamp to valid ranges
         let energy = energy.clamp(0.0, 1.0);
         let surprise = surprise.clamp(0.0, 1.0);
-        let tension = tension.clamp(0.0, 1.0);
+        let mut tension = tension.clamp(0.0, 1.0);
         let valence = valence.clamp(-1.0, 1.0);
+
+        // Tension momentum compounding: consecutive same-direction moves amplify
+        let tension_delta = tension - self.prev_tension;
+        if tension_delta > 0.005 {
+            // Rising
+            self.tension_streak = if self.tension_streak > 0 {
+                self.tension_streak + 1
+            } else {
+                1
+            };
+        } else if tension_delta < -0.005 {
+            // Falling
+            self.tension_streak = if self.tension_streak < 0 {
+                self.tension_streak - 1
+            } else {
+                -1
+            };
+        }
+        // else: no significant change, streak preserved
+
+        // Apply compounding: each consecutive same-direction scene adds a bonus
+        let streak_abs = self.tension_streak.unsigned_abs();
+        if streak_abs >= 2 {
+            // Bonus: 0.03 per streak step beyond 1 (e.g., 3-streak = +0.06)
+            let bonus = 0.03 * (streak_abs - 1) as f32;
+            if self.tension_streak > 0 {
+                tension = (tension + bonus).min(1.0);
+            } else {
+                tension = (tension - bonus).max(0.0);
+            }
+        }
+        self.prev_tension = tension;
 
         // Update adaptive tension tracking
         if tension < self.tension_min {
@@ -545,6 +603,74 @@ impl StoryArcDynamics {
         } else {
             ArcPhase::Setup
         }
+    }
+
+    /// Compute a mood-transition scale factor.
+    ///
+    /// - Same mood as previous → compounding (1.0 + 0.15 * consecutive_count)
+    /// - Different mood → amplified transition (1.5 for sharp contrast, 1.2 otherwise)
+    fn mood_transition_scale(&self, current: NarrativeMood) -> f32 {
+        if self.mood_history.is_empty() {
+            return 1.0;
+        }
+        let prev = *self.mood_history.back().unwrap();
+        if std::mem::discriminant(&prev) == std::mem::discriminant(&current) {
+            // Same mood repeating — compound by counting consecutive
+            let consecutive = self
+                .mood_history
+                .iter()
+                .rev()
+                .take_while(|m| std::mem::discriminant(*m) == std::mem::discriminant(&current))
+                .count();
+            1.0 + 0.15 * consecutive as f32
+        } else {
+            // Mood transition — check if it's a sharp contrast
+            let sharp = matches!(
+                (prev, current),
+                (NarrativeMood::Peaceful, NarrativeMood::Tense)
+                    | (NarrativeMood::Tense, NarrativeMood::Peaceful)
+                    | (NarrativeMood::Triumphant, NarrativeMood::Melancholy)
+                    | (NarrativeMood::Melancholy, NarrativeMood::Triumphant)
+                    | (NarrativeMood::Hopeful, NarrativeMood::Tense)
+            );
+            if sharp {
+                1.5
+            } else {
+                1.2
+            }
+        }
+    }
+
+    /// Score conflict text intensity using a keyword vocabulary.
+    ///
+    /// Returns a multiplier in [1.0, 2.0] based on the presence of
+    /// high-intensity words in the conflict description.
+    pub fn conflict_intensity(conflict: &str) -> f32 {
+        const HIGH_INTENSITY: &[&str] = &[
+            "dragon", "death", "ultimate", "final", "destroy", "betray",
+            "kill", "war", "apocalypse", "doom", "annihilat", "catastroph",
+            "invasion", "massacre", "inferno", "oblivion",
+        ];
+        const MED_INTENSITY: &[&str] = &[
+            "battle", "fight", "enemy", "danger", "threat", "storm",
+            "fire", "pursuit", "escape", "trap", "wound", "confront",
+            "crisis", "attack", "siege", "ambush", "power", "betrayal",
+        ];
+
+        let lower = conflict.to_lowercase();
+        let mut score = 0.0f32;
+        for word in HIGH_INTENSITY {
+            if lower.contains(word) {
+                score += 0.3;
+            }
+        }
+        for word in MED_INTENSITY {
+            if lower.contains(word) {
+                score += 0.15;
+            }
+        }
+        // Clamp to [1.0, 2.0]
+        (1.0 + score).min(2.0)
     }
 
     /// Mood-to-signal offsets: (energy, surprise, tension, valence).
