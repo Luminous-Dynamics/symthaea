@@ -1,8 +1,9 @@
 //! Narrative Coherence Benchmark
 //!
-//! Tests 3 canonical story arcs through the narrative dynamics pipeline and
-//! reports paper-worthy metrics: peak tension, trend accuracy, within/across
-//! half similarity, and arc symmetry deviation (golden ratio).
+//! Tests 4 canonical story arcs through the narrative dynamics pipeline and
+//! reports paper-worthy metrics: peak tension, trend accuracy, Spearman rank
+//! correlation, coherence score (within > across half similarity), arc symmetry
+//! deviation (golden ratio), and Vonnegut story shape classification.
 //!
 //! Run: `cargo run --example benchmark_narrative_coherence`
 
@@ -55,6 +56,43 @@ fn run_arc(name: &str, scenes: &[BenchScene]) -> Vec<NarrativeSignal> {
     signals
 }
 
+/// Compute Spearman rank correlation between two sequences.
+///
+/// Returns rho in [-1, 1]. Ties are handled by average ranking.
+fn spearman_rank_correlation(a: &[f32], b: &[f32]) -> f32 {
+    assert_eq!(a.len(), b.len());
+    let n = a.len();
+    if n < 2 {
+        return 0.0;
+    }
+
+    fn rank(vals: &[f32]) -> Vec<f32> {
+        let n = vals.len();
+        let mut indexed: Vec<(usize, f32)> = vals.iter().copied().enumerate().collect();
+        indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let mut ranks = vec![0.0f32; n];
+        let mut i = 0;
+        while i < n {
+            let mut j = i;
+            while j < n && (indexed[j].1 - indexed[i].1).abs() < 1e-9 {
+                j += 1;
+            }
+            let avg_rank = (i + j + 1) as f32 / 2.0; // 1-based average
+            for k in i..j {
+                ranks[indexed[k].0] = avg_rank;
+            }
+            i = j;
+        }
+        ranks
+    }
+
+    let ra = rank(a);
+    let rb = rank(b);
+    let d_sq_sum: f32 = ra.iter().zip(rb.iter()).map(|(a, b)| (a - b).powi(2)).sum();
+    let n = n as f32;
+    1.0 - (6.0 * d_sq_sum) / (n * (n * n - 1.0))
+}
+
 /// Compute metrics for a single arc.
 fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal]) {
     let n = signals.len();
@@ -91,6 +129,16 @@ fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal
     } else {
         1.0
     };
+
+    // Spearman rank correlation: expected cumulative tension vs actual
+    let mut expected_cumulative = Vec::with_capacity(n);
+    let mut cum = 0.0f32;
+    for scene in scenes {
+        cum += scene.expected_trend as f32;
+        expected_cumulative.push(cum);
+    }
+    let actual_tensions: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+    let spearman_rho = spearman_rank_correlation(&expected_cumulative, &actual_tensions);
 
     // Within-half and across-half similarity (using scene HVs from session)
     // We re-run to get access to session's scene_similarity
@@ -135,6 +183,7 @@ fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal
 
     let within_mean = mean(&within_sims);
     let across_mean = mean(&across_sims);
+    let coherence_pass = within_mean > across_mean;
 
     // Arc symmetry: deviation from golden ratio position (0.618)
     let golden_ratio = 0.618;
@@ -154,8 +203,16 @@ fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal
         correct,
         total
     );
+    println!("  {:<30} {:.4}", "Spearman rho:", spearman_rho);
     println!("  {:<30} {:.4}", "Within-half similarity:", within_mean);
     println!("  {:<30} {:.4}", "Across-half similarity:", across_mean);
+    println!(
+        "  {:<30} {} (W={:.4} > A={:.4})",
+        "Coherence:",
+        if coherence_pass { "PASS" } else { "FAIL" },
+        within_mean,
+        across_mean
+    );
     println!(
         "  {:<30} {:.4} (peak@{:.3}, golden={:.3})",
         "Arc symmetry deviation:", symmetry_deviation, peak_position, golden_ratio
@@ -326,18 +383,82 @@ fn main() {
     let tr_signals = run_arc("Tragedy (Freytag)", &tragedy);
     compute_metrics("Tragedy (Freytag)", &tragedy, &tr_signals);
 
+    // ---- Cinderella / Rags-to-Riches (8 scenes) ----
+    let cinderella = vec![
+        BenchScene {
+            title: "Rags",
+            setting: "cold attic room",
+            conflict: "poverty and neglect",
+            mood: NarrativeMood::Melancholy,
+            expected_trend: 0,
+        },
+        BenchScene {
+            title: "Humiliation",
+            setting: "kitchen hearth",
+            conflict: "mocked by stepsisters",
+            mood: NarrativeMood::Melancholy,
+            expected_trend: -1,
+        },
+        BenchScene {
+            title: "Fairy Godmother",
+            setting: "moonlit garden",
+            conflict: "magical intervention",
+            mood: NarrativeMood::Mysterious,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "The Ball",
+            setting: "glittering ballroom",
+            conflict: "dazzling the prince",
+            mood: NarrativeMood::Triumphant,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Midnight Flight",
+            setting: "palace steps",
+            conflict: "magic expires",
+            mood: NarrativeMood::Tense,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Back to Rags",
+            setting: "cold attic again",
+            conflict: "lost everything",
+            mood: NarrativeMood::Melancholy,
+            expected_trend: -1,
+        },
+        BenchScene {
+            title: "The Search",
+            setting: "kingdom roads",
+            conflict: "glass slipper quest",
+            mood: NarrativeMood::Hopeful,
+            expected_trend: 1,
+        },
+        BenchScene {
+            title: "Happily Ever After",
+            setting: "palace throne room",
+            conflict: "recognition and union",
+            mood: NarrativeMood::Triumphant,
+            expected_trend: 1,
+        },
+    ];
+
+    let ci_signals = run_arc("Cinderella", &cinderella);
+    compute_metrics("Cinderella", &cinderella, &ci_signals);
+
     // ---- Summary Table ----
     println!("\n=== Summary ===\n");
     println!(
-        "{:<25} {:>12} {:>12} {:>12} {:>12} {:>12}",
-        "Arc", "Peak Step", "Peak Val", "Trend Acc", "W-Half Sim", "Symmetry Dev"
+        "{:<25} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "Arc", "Peak Step", "Peak Val", "Trend Acc", "Spearman", "Coherence", "Sym Dev"
     );
-    println!("{}", "-".repeat(85));
+    println!("{}", "-".repeat(95));
 
     let all = [
         ("Hero's Journey", &heros_journey, &hj_signals),
         ("Three-Act Structure", &three_act, &ta_signals),
         ("Tragedy (Freytag)", &tragedy, &tr_signals),
+        ("Cinderella", &cinderella, &ci_signals),
     ];
 
     for (name, scenes, signals) in &all {
@@ -373,7 +494,17 @@ fn main() {
         };
         let sym_dev = (peak_pos - 0.618).abs();
 
-        // Quick within-half mean (re-run session)
+        // Spearman rank correlation
+        let mut expected_cum = Vec::with_capacity(n);
+        let mut cum = 0.0f32;
+        for scene in scenes.iter() {
+            cum += scene.expected_trend as f32;
+            expected_cum.push(cum);
+        }
+        let actual_tensions: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+        let spearman = spearman_rank_correlation(&expected_cum, &actual_tensions);
+
+        // Coherence: within-half > across-half
         let mut session = StorySession::new();
         let prot = session.algebra().primitives.protagonist.clone();
         session.register_character("Hero", &prot);
@@ -388,11 +519,14 @@ fn main() {
         }
         let half = n / 2;
         let mut w_sims = Vec::new();
+        let mut a_sims = Vec::new();
         for i in 0..n {
             for j in (i + 1)..n {
                 if let Some(sim) = session.scene_similarity(i, j) {
                     if (i < half) == (j < half) {
                         w_sims.push(sim);
+                    } else {
+                        a_sims.push(sim);
                     }
                 }
             }
@@ -402,15 +536,22 @@ fn main() {
         } else {
             w_sims.iter().sum::<f32>() / w_sims.len() as f32
         };
+        let a_mean = if a_sims.is_empty() {
+            0.0
+        } else {
+            a_sims.iter().sum::<f32>() / a_sims.len() as f32
+        };
+        let coherent = if w_mean > a_mean { "PASS" } else { "FAIL" };
 
         println!(
-            "{:<25} {:>5}/{:<6} {:>12.4} {:>11.1}% {:>12.4} {:>12.4}",
+            "{:<25} {:>4}/{:<5} {:>10.4} {:>9.1}% {:>10.4} {:>10} {:>10.4}",
             name,
             peak_idx + 1,
             n,
             peak_val.tension,
             trend_acc * 100.0,
-            w_mean,
+            spearman,
+            coherent,
             sym_dev,
         );
     }

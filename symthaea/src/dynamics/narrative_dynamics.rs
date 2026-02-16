@@ -187,12 +187,17 @@ pub struct StoryArcDynamics {
     prev_energy: f32,
     /// HDC archetype vectors for instantaneous readout
     archetypes: NarrativeArchetypes,
-    /// Blend factor: alpha * CfC + (1-alpha) * HDC (default 0.3)
+    /// Blend factor: alpha * CfC + (1-alpha) * HDC (default 0.3, decays toward 0.5)
     hdc_blend_alpha: f32,
     /// Whether to train the CfC online using HDC signal as target
     online_learning: bool,
     /// Learning rate for CfC online learning
     online_lr: f32,
+    /// Tension offset from conflict events (decays each step)
+    tension_offset: f32,
+    /// Running min/max tension for adaptive arc phase thresholds
+    tension_min: f32,
+    tension_max: f32,
 }
 
 /// Maximum signal history length
@@ -242,6 +247,9 @@ impl StoryArcDynamics {
             hdc_blend_alpha: 0.3,
             online_learning: true,
             online_lr: 0.01,
+            tension_offset: 0.0,
+            tension_min: 0.5,
+            tension_max: 0.5,
         }
     }
 
@@ -338,6 +346,10 @@ impl StoryArcDynamics {
         self.step_count = 0;
         self.signal_history.clear();
         self.prev_energy = 0.0;
+        self.hdc_blend_alpha = 0.3;
+        self.tension_offset = 0.0;
+        self.tension_min = 0.5;
+        self.tension_max = 0.5;
     }
 
     /// Recent signal trajectory.
@@ -348,6 +360,41 @@ impl StoryArcDynamics {
     /// Number of steps processed.
     pub fn step_count(&self) -> u64 {
         self.step_count
+    }
+
+    /// Compute a character-specific signal by comparing a character's presence
+    /// HV against the narrative archetypes.
+    ///
+    /// This produces per-character emotional trajectories that diverge from
+    /// the global scene signal based on each character's accumulated context.
+    pub fn character_signal(&self, char_hv: &ContinuousHV, base_signal: &NarrativeSignal) -> NarrativeSignal {
+        let char_energy = (char_hv.similarity(&self.archetypes.high_energy) + 1.0) / 2.0;
+        let char_surprise = (char_hv.similarity(&self.archetypes.surprise) + 1.0) / 2.0;
+        let char_tension = (char_hv.similarity(&self.archetypes.high_tension) + 1.0) / 2.0;
+        let char_valence = char_hv.similarity(&self.archetypes.positive_valence);
+
+        // Blend: 70% scene signal + 30% character-specific
+        let blend = 0.3;
+        NarrativeSignal {
+            energy: (base_signal.energy * (1.0 - blend) + char_energy * blend).clamp(0.0, 1.0),
+            surprise: (base_signal.surprise * (1.0 - blend) + char_surprise * blend).clamp(0.0, 1.0),
+            tension: (base_signal.tension * (1.0 - blend) + char_tension * blend).clamp(0.0, 1.0),
+            valence: (base_signal.valence * (1.0 - blend) + char_valence * blend).clamp(-1.0, 1.0),
+            momentum: base_signal.momentum,
+            arc_phase: base_signal.arc_phase,
+        }
+    }
+
+    /// Inject a tension spike (called when a conflict is introduced).
+    ///
+    /// The offset decays by 50% each scene, creating a sharp spike that fades.
+    pub fn inject_tension_spike(&mut self, magnitude: f32) {
+        self.tension_offset += magnitude;
+    }
+
+    /// Inject a tension drop (called when a conflict is resolved).
+    pub fn inject_tension_drop(&mut self, magnitude: f32) {
+        self.tension_offset -= magnitude;
     }
 
     /// Advance dynamics one step with hybrid HDC+CfC signal extraction.
@@ -377,6 +424,7 @@ impl StoryArcDynamics {
         let output = self.cfc.forward_hierarchical(scene_input, dt);
         self.step_count += 1;
 
+        // Blend ratio decay: alpha moves from 0.3 toward 0.5 as CfC learns
         let alpha = self.hdc_blend_alpha;
         let one_minus_alpha = 1.0 - alpha;
 
@@ -398,7 +446,7 @@ impl StoryArcDynamics {
         let mut tension = alpha * cfc_tension + one_minus_alpha * hdc_tension;
         let mut valence = alpha * cfc_valence + one_minus_alpha * hdc_valence;
 
-        // Apply mood-based signal offsets (Fix #2)
+        // Apply mood-based signal offsets
         if let Some(m) = mood {
             let (de, ds, dt_, dv) = Self::mood_offsets(m);
             energy += de;
@@ -407,19 +455,31 @@ impl StoryArcDynamics {
             valence += dv;
         }
 
+        // Apply conflict-driven tension offset, then decay it
+        tension += self.tension_offset;
+        self.tension_offset *= 0.5; // 50% decay per scene
+
         // Clamp to valid ranges
         let energy = energy.clamp(0.0, 1.0);
         let surprise = surprise.clamp(0.0, 1.0);
         let tension = tension.clamp(0.0, 1.0);
         let valence = valence.clamp(-1.0, 1.0);
 
+        // Update adaptive tension tracking
+        if tension < self.tension_min {
+            self.tension_min = tension;
+        }
+        if tension > self.tension_max {
+            self.tension_max = tension;
+        }
+
         let momentum_raw = energy - self.prev_energy;
         self.prev_energy = energy;
         let momentum = momentum_raw.clamp(-1.0, 1.0);
 
-        let arc_phase = Self::infer_arc_phase(tension, momentum, self.step_count);
+        let arc_phase = self.infer_arc_phase_adaptive(tension, momentum);
 
-        // CfC online learning: use HDC-derived values as training targets (Fix #3)
+        // CfC online learning: use HDC-derived values as training targets
         if self.online_learning {
             self.train_cfc_online(
                 scene_input,
@@ -430,6 +490,9 @@ impl StoryArcDynamics {
                 dt,
             );
         }
+
+        // Decay blend alpha toward 0.5 (give CfC more weight as it learns)
+        self.hdc_blend_alpha = (self.hdc_blend_alpha + 0.02).min(0.5);
 
         let signal = NarrativeSignal {
             energy,
@@ -451,6 +514,33 @@ impl StoryArcDynamics {
     // ========================================================================
     // Internal helpers
     // ========================================================================
+
+    /// Infer arc phase using adaptive thresholds based on observed tension range.
+    ///
+    /// Instead of hardcoded 0.8/0.5/0.3 thresholds, uses the running min/max
+    /// tension to compute relative thresholds. Falls back to static thresholds
+    /// if the range is too narrow (< 0.1).
+    fn infer_arc_phase_adaptive(&self, tension: f32, momentum: f32) -> ArcPhase {
+        let range = self.tension_max - self.tension_min;
+        if range < 0.1 || self.step_count < 3 {
+            return Self::infer_arc_phase(tension, momentum, self.step_count);
+        }
+
+        // Normalize tension to [0,1] within observed range
+        let t_norm = (tension - self.tension_min) / range;
+
+        if t_norm > 0.85 {
+            ArcPhase::Climax
+        } else if t_norm > 0.5 && momentum > 0.0 {
+            ArcPhase::RisingAction
+        } else if t_norm > 0.3 && momentum < 0.0 {
+            ArcPhase::FallingAction
+        } else if t_norm <= 0.3 && momentum <= 0.0 && self.step_count > 5 {
+            ArcPhase::Resolution
+        } else {
+            ArcPhase::Setup
+        }
+    }
 
     /// Mood-to-signal offsets: (energy, surprise, tension, valence).
     ///
