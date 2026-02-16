@@ -78,7 +78,10 @@ fn main() {
                 "/scenes" => {
                     if let Ok(n) = arg.trim().parse::<usize>() {
                         session.set_expected_scenes(n);
-                        println!("Expected scenes set to {} (enables position-aware tension shaping)", n);
+                        println!(
+                            "Expected scenes set to {} (enables position-aware tension shaping)",
+                            n
+                        );
                     } else {
                         println!("Usage: /scenes <number>  (e.g. /scenes 7)");
                     }
