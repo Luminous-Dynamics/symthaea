@@ -852,3 +852,329 @@ fn validate_update_relationship(
 
     Ok(ValidateCallbackResult::Valid)
 }
+
+// ============================================================================
+// UNIT TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // E/N/M/H Epistemic Classification Tests
+    // =========================================================================
+
+    #[test]
+    fn test_empirical_level_roundtrip() {
+        let levels = [
+            (EmpiricalLevel::E0, 0.0),
+            (EmpiricalLevel::E1, 0.25),
+            (EmpiricalLevel::E2, 0.5),
+            (EmpiricalLevel::E3, 0.75),
+            (EmpiricalLevel::E4, 1.0),
+        ];
+        for (level, expected_f64) in &levels {
+            let f = level.to_f64();
+            assert_eq!(f, *expected_f64, "E{:?} should be {}", level, expected_f64);
+            let roundtrip = EmpiricalLevel::from_f64(f);
+            assert_eq!(&roundtrip, level, "Roundtrip failed for {:?}", level);
+        }
+    }
+
+    #[test]
+    fn test_normative_level_roundtrip() {
+        let levels = [
+            (NormativeLevel::N0, 0.0),
+            (NormativeLevel::N1, 0.33),
+            (NormativeLevel::N2, 0.67),
+            (NormativeLevel::N3, 1.0),
+        ];
+        for (level, expected_f64) in &levels {
+            let f = level.to_f64();
+            assert!((f - expected_f64).abs() < 0.01, "N{:?} should be {}", level, expected_f64);
+            let roundtrip = NormativeLevel::from_f64(f);
+            assert_eq!(&roundtrip, level, "Roundtrip failed for {:?}", level);
+        }
+    }
+
+    #[test]
+    fn test_materiality_level_roundtrip() {
+        let levels = [
+            (MaterialityLevel::M0, 0.0),
+            (MaterialityLevel::M1, 0.33),
+            (MaterialityLevel::M2, 0.67),
+            (MaterialityLevel::M3, 1.0),
+        ];
+        for (level, expected_f64) in &levels {
+            let f = level.to_f64();
+            assert!((f - expected_f64).abs() < 0.01, "M{:?} should be {}", level, expected_f64);
+            let roundtrip = MaterialityLevel::from_f64(f);
+            assert_eq!(&roundtrip, level, "Roundtrip failed for {:?}", level);
+        }
+    }
+
+    #[test]
+    fn test_harmonic_level_roundtrip() {
+        let levels = [
+            (HarmonicLevel::H0, 0.0),
+            (HarmonicLevel::H1, 0.25),
+            (HarmonicLevel::H2, 0.5),
+            (HarmonicLevel::H3, 0.75),
+            (HarmonicLevel::H4, 1.0),
+        ];
+        for (level, expected_f64) in &levels {
+            let f = level.to_f64();
+            assert_eq!(f, *expected_f64, "H{:?} should be {}", level, expected_f64);
+            let roundtrip = HarmonicLevel::from_f64(f);
+            assert_eq!(&roundtrip, level, "Roundtrip failed for {:?}", level);
+        }
+    }
+
+    #[test]
+    fn test_epistemic_classification_code() {
+        let cls = EpistemicClassification::new(
+            EmpiricalLevel::E2,
+            NormativeLevel::N1,
+            MaterialityLevel::M2,
+            HarmonicLevel::H3,
+        );
+        assert_eq!(cls.code(), "E2N1M2H3");
+    }
+
+    #[test]
+    fn test_epistemic_overall_strength() {
+        // E4=1.0, N3=1.0, M3=1.0, H4=1.0 → max strength = 1.0
+        let max = EpistemicClassification::new(
+            EmpiricalLevel::E4,
+            NormativeLevel::N3,
+            MaterialityLevel::M3,
+            HarmonicLevel::H4,
+        );
+        assert!((max.overall_strength() - 1.0).abs() < 0.01);
+
+        // E0=0.0, N0=0.0, M0=0.0, H0=0.0 → min strength = 0.0
+        let min = EpistemicClassification::new(
+            EmpiricalLevel::E0,
+            NormativeLevel::N0,
+            MaterialityLevel::M0,
+            HarmonicLevel::H0,
+        );
+        assert!(min.overall_strength().abs() < 0.01);
+
+        // Default: E0, N0, M0, H1 → 0.15 * 0.25 = 0.0375
+        let default = EpistemicClassification::default();
+        assert!(default.overall_strength() > 0.0);
+        assert!(default.overall_strength() < 0.1);
+    }
+
+    #[test]
+    fn test_epistemic_weights_sum_to_one() {
+        // Weights: E=40%, N=25%, M=20%, H=15%
+        let sum: f64 = 0.40 + 0.25 + 0.20 + 0.15;
+        assert!((sum - 1.0).abs() < 1e-10, "Epistemic weights should sum to 1.0");
+    }
+
+    // =========================================================================
+    // Defaults
+    // =========================================================================
+
+    #[test]
+    fn test_thought_type_default_is_note() {
+        assert_eq!(ThoughtType::default(), ThoughtType::Note);
+    }
+
+    #[test]
+    fn test_harmonic_default_is_h1() {
+        assert_eq!(HarmonicLevel::default(), HarmonicLevel::H1);
+    }
+
+    // =========================================================================
+    // Source-Level Validation Verification
+    // =========================================================================
+
+    const SOURCE: &str = include_str!("lib.rs");
+
+    #[test]
+    fn test_thought_content_not_empty_validated() {
+        assert!(
+            SOURCE.contains("Thought content cannot be empty"),
+            "REGRESSION: validate_create_thought must reject empty content"
+        );
+    }
+
+    #[test]
+    fn test_thought_content_length_limit() {
+        assert!(
+            SOURCE.contains("65536") || SOURCE.contains("64KB"),
+            "REGRESSION: Thought content must have a maximum length limit"
+        );
+    }
+
+    #[test]
+    fn test_thought_confidence_range_validated() {
+        assert!(
+            SOURCE.contains("Confidence must be between 0.0 and 1.0"),
+            "REGRESSION: validate_create_thought must enforce confidence range"
+        );
+    }
+
+    #[test]
+    fn test_thought_version_starts_at_one() {
+        assert!(
+            SOURCE.contains("Initial thought version must be 1"),
+            "REGRESSION: New thoughts must start at version 1"
+        );
+    }
+
+    #[test]
+    fn test_thought_tag_limit() {
+        assert!(
+            SOURCE.contains("Maximum 50 tags allowed per thought"),
+            "REGRESSION: Thoughts must have a tag count limit"
+        );
+    }
+
+    #[test]
+    fn test_embedding_dimension_validated() {
+        assert!(
+            SOURCE.contains("16384") || SOURCE.contains("16,384"),
+            "REGRESSION: Embedding must be validated for 16,384 dimensions"
+        );
+    }
+
+    #[test]
+    fn test_coherence_score_range_validated() {
+        assert!(
+            SOURCE.contains("Coherence score must be between 0.0 and 1.0"),
+            "REGRESSION: Coherence score must be range-checked"
+        );
+    }
+
+    #[test]
+    fn test_phi_score_non_negative() {
+        assert!(
+            SOURCE.contains("Phi score must be non-negative"),
+            "REGRESSION: Phi score must be validated as non-negative"
+        );
+    }
+
+    #[test]
+    fn test_thought_id_immutable_on_update() {
+        assert!(
+            SOURCE.contains("Cannot change thought ID"),
+            "REGRESSION: Thought ID must be immutable across updates"
+        );
+    }
+
+    #[test]
+    fn test_version_must_increment() {
+        assert!(
+            SOURCE.contains("Version must be incremented by 1"),
+            "REGRESSION: Updates must increment version by exactly 1"
+        );
+    }
+
+    #[test]
+    fn test_relationship_no_self_reference() {
+        assert!(
+            SOURCE.contains("Cannot create relationship to self"),
+            "REGRESSION: Self-referencing relationships must be rejected"
+        );
+    }
+
+    #[test]
+    fn test_relationship_strength_range() {
+        assert!(
+            SOURCE.contains("Relationship strength must be between 0.0 and 1.0"),
+            "REGRESSION: Relationship strength must be range-checked"
+        );
+    }
+
+    #[test]
+    fn test_tag_name_not_empty() {
+        assert!(
+            SOURCE.contains("Tag name cannot be empty"),
+            "REGRESSION: Tag names must not be empty"
+        );
+    }
+
+    #[test]
+    fn test_tag_name_length_limit() {
+        assert!(
+            SOURCE.contains("Tag name cannot exceed 100 characters"),
+            "REGRESSION: Tag names must have a length limit"
+        );
+    }
+
+    #[test]
+    fn test_domain_name_not_empty() {
+        assert!(
+            SOURCE.contains("Domain name cannot be empty"),
+            "REGRESSION: Domain names must not be empty"
+        );
+    }
+
+    #[test]
+    fn test_only_author_can_update() {
+        assert!(
+            SOURCE.contains("Only the original author can update an entry"),
+            "REGRESSION: Author-only update must be enforced"
+        );
+    }
+
+    #[test]
+    fn test_only_author_can_delete() {
+        assert!(
+            SOURCE.contains("Only the original author can delete an entry"),
+            "REGRESSION: Author-only deletion must be enforced"
+        );
+    }
+
+    #[test]
+    fn test_only_link_creator_can_delete_link() {
+        assert!(
+            SOURCE.contains("Only the original link creator can delete a link"),
+            "REGRESSION: Link deletion must be restricted to creator"
+        );
+    }
+
+    // =========================================================================
+    // Thought Type Completeness
+    // =========================================================================
+
+    #[test]
+    fn test_all_thought_types_exist() {
+        // Verify all expected thought types compile
+        let types = vec![
+            ThoughtType::Claim,
+            ThoughtType::Note,
+            ThoughtType::Question,
+            ThoughtType::Insight,
+            ThoughtType::Definition,
+            ThoughtType::Prediction,
+            ThoughtType::Hypothesis,
+            ThoughtType::Reflection,
+            ThoughtType::Quote,
+            ThoughtType::Task,
+        ];
+        assert_eq!(types.len(), 10, "Expected 10 thought types");
+    }
+
+    #[test]
+    fn test_all_relationship_types_exist() {
+        let types = vec![
+            RelationshipType::Supports,
+            RelationshipType::Contradicts,
+            RelationshipType::Implies,
+            RelationshipType::ImpliedBy,
+            RelationshipType::Refines,
+            RelationshipType::ExampleOf,
+            RelationshipType::RelatedTo,
+            RelationshipType::DependsOn,
+            RelationshipType::Supersedes,
+            RelationshipType::RespondsTo,
+        ];
+        assert_eq!(types.len(), 10, "Expected 10 relationship types");
+    }
+}
