@@ -630,5 +630,140 @@ fn main() {
         println!("{:<25} {:<20} {:>10.4}", name, best_shape, best_dist);
     }
 
-    println!("\nDone.");
+    // ================================================================
+    // Regression Assertions (CI-safe)
+    // ================================================================
+
+    println!("\n=== Regression Checks ===\n");
+
+    let mut pass_count = 0;
+    let mut total_checks = 0;
+
+    // Helper to run an assertion-like check without panicking
+    let mut check = |name: &str, ok: bool| {
+        total_checks += 1;
+        if ok {
+            pass_count += 1;
+            println!("  [PASS] {}", name);
+        } else {
+            println!("  [FAIL] {}", name);
+        }
+    };
+
+    // 1. Tension range should span at least 0.15 for each arc
+    for (name, _scenes, signals) in &all {
+        let tensions: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+        let min_t = tensions.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max_t = tensions.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let range = max_t - min_t;
+        check(
+            &format!("{}: tension range >= 0.15 (got {:.3})", name, range),
+            range >= 0.15,
+        );
+    }
+
+    // 2. Hero's Journey peak should be in second half (scene 4-7 out of 7)
+    {
+        let (peak_idx, _) = hj_signals
+            .iter()
+            .enumerate()
+            .max_by(|a, b| a.1.tension.partial_cmp(&b.1.tension).unwrap())
+            .unwrap();
+        check(
+            &format!(
+                "Hero's Journey: peak in second half (scene {}/7)",
+                peak_idx + 1
+            ),
+            peak_idx >= 3,
+        );
+    }
+
+    // 3. Three-Act: rising trend through act 2 (scenes 2-6 should mostly rise)
+    {
+        let mut rises = 0;
+        for i in 1..6.min(ta_signals.len()) {
+            if ta_signals[i].tension > ta_signals[i - 1].tension - 0.01 {
+                rises += 1;
+            }
+        }
+        check(
+            &format!("Three-Act: mostly rising through act 2 ({}/5 rises)", rises),
+            rises >= 3,
+        );
+    }
+
+    // 4. Tragedy: tension should drop in final third
+    {
+        let n = tr_signals.len();
+        let final_third_start = n * 2 / 3;
+        let drops_at_end = tr_signals[n - 1].tension < tr_signals[final_third_start].tension;
+        check("Tragedy: tension drops in final third", drops_at_end);
+    }
+
+    // 5. At least 2/4 arcs should have positive Spearman correlation
+    {
+        let mut positive_spearman = 0;
+        for (_name, scenes, signals) in &all {
+            let mut expected_cum = Vec::with_capacity(signals.len());
+            let mut cum = 0.0f32;
+            for scene in scenes.iter() {
+                cum += scene.expected_trend as f32;
+                expected_cum.push(cum);
+            }
+            let actual: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+            let rho = spearman_rank_correlation(&expected_cum, &actual);
+            if rho > 0.0 {
+                positive_spearman += 1;
+            }
+        }
+        check(
+            &format!(
+                "At least 2/4 arcs have positive Spearman ({}/4)",
+                positive_spearman
+            ),
+            positive_spearman >= 2,
+        );
+    }
+
+    // 6. Overall trend accuracy should average >= 50%
+    {
+        let mut total_correct = 0usize;
+        let mut total_measured = 0usize;
+        for (_name, scenes, signals) in &all {
+            for i in 1..signals.len() {
+                let actual = if signals[i].tension > signals[i - 1].tension + 0.01 {
+                    1
+                } else if signals[i].tension < signals[i - 1].tension - 0.01 {
+                    -1
+                } else {
+                    0
+                };
+                if scenes[i].expected_trend != 0 {
+                    total_measured += 1;
+                    if actual == scenes[i].expected_trend {
+                        total_correct += 1;
+                    }
+                }
+            }
+        }
+        let avg_acc = if total_measured > 0 {
+            total_correct as f32 / total_measured as f32
+        } else {
+            0.0
+        };
+        check(
+            &format!(
+                "Average trend accuracy >= 50% (got {:.1}%)",
+                avg_acc * 100.0
+            ),
+            avg_acc >= 0.50,
+        );
+    }
+
+    println!(
+        "\n  Result: {}/{} checks passed\n",
+        pass_count, total_checks
+    );
+
+    println!("Done.");
 }

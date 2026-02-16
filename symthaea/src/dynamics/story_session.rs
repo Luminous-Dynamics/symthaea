@@ -167,7 +167,13 @@ impl StorySession {
         // Project 4096-D HV → input_dim-D for CfC
         let mut projected = self.project_hv(&scene_hv);
 
-        // Scene-to-scene transition modulation (Improvement #4)
+        // Conflict intensity: scale projected input by keyword intensity
+        let intensity = StoryArcDynamics::conflict_intensity(conflict);
+        if intensity > 1.0 {
+            projected.mapv_inplace(|x| x * intensity);
+        }
+
+        // Scene-to-scene transition modulation
         if let Some(prev_record) = self.scene_log.last() {
             let prev_hv = &prev_record.scene_hv;
             // Compute escalation and transformation similarity
