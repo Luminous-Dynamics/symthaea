@@ -13,6 +13,11 @@ members = [
     "crates/symthaea-dream",
     "crates/symthaea-phi-search",
     "crates/symthaea-narrative-self",
+    "crates/symthaea-field-dynamics",
+    "crates/symthaea-hodge",
+    "crates/symthaea-factor-graph",
+    "crates/symthaea-enactive",
+    "crates/symthaea-sensorimotor",
 ]
 
 
@@ -76,6 +81,21 @@ symthaea-phi-search = { path = "crates/symthaea-phi-search" }
 
 # Symthaea Narrative Self - Narrative self-model (always enabled)
 symthaea-narrative-self = { path = "crates/symthaea-narrative-self" }
+
+# Symthaea Field Dynamics - Consciousness field wave equations (always enabled)
+symthaea-field-dynamics = { path = "crates/symthaea-field-dynamics" }
+
+# Symthaea Hodge - Hodge Laplacian for simplicial complexes (always enabled)
+symthaea-hodge = { path = "crates/symthaea-hodge" }
+
+# Symthaea Factor Graph - Belief propagation inference (always enabled)
+symthaea-factor-graph = { path = "crates/symthaea-factor-graph" }
+
+# Symthaea Enactive - Enactive cognition paradigm (always enabled)
+symthaea-enactive = { path = "crates/symthaea-enactive" }
+
+# Symthaea Sensorimotor - Sensorimotor contingency theory (always enabled)
+symthaea-sensorimotor = { path = "crates/symthaea-sensorimotor" }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }

@@ -446,7 +446,7 @@ pub use symthaea_causal_reasoning::causal_calculus;
 pub use symthaea_causal_reasoning::causal_emergence;
 pub mod compositionality_primitives;
 pub mod consciousness_signatures;
-pub mod factor_graph;
+pub use symthaea_factor_graph as factor_graph;
 
 pub mod dimension_synergies;
 
@@ -455,23 +455,23 @@ pub mod meta_primitives;
 pub mod phi_validation;
 
 // ── Tier 4: Dynamics & Field ───────────────────────────────────────────────
-pub mod consciousness_field_dynamics;
+pub use symthaea_field_dynamics as consciousness_field_dynamics;
 pub mod consciousness_holography;
 pub mod consciousness_resonance;
 pub mod consciousness_topology;
 pub mod dissipative_consciousness;
 pub mod embodied_cognition;
-pub mod enactive_cognition;
+pub use symthaea_enactive as enactive_cognition;
 pub mod hierarchical_free_energy;
 /// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
 /// analysis, and Hodge decomposition of higher-order neural interaction signals
-pub mod hodge_laplacian;
+pub use symthaea_hodge as hodge_laplacian;
 pub mod meta_cognitive_optimizer;
 pub mod phenomenal_binding;
 pub mod predictive_processing;
 pub mod predictive_self;
 pub mod quantum_coherence;
-pub mod sensorimotor_contingencies;
+pub use symthaea_sensorimotor as sensorimotor_contingencies;
 
 // ── Tier 4 (NEEDS_CHAIN — dependencies now satisfied) ──────────────────────
 pub mod consciousness_equation_v2;
