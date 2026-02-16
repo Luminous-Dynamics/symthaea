@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "outDir": "dist",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts", "vitest.config.ts"],
+  "exclude": ["node_modules", "dist"]
+}

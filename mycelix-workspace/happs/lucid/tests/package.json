@@ -1,0 +1,21 @@
+{
+  "name": "@lucid/integration-tests",
+  "version": "0.1.0",
+  "description": "LUCID Holochain Integration Tests with Tryorama",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "typecheck": "tsc --noEmit",
+    "postinstall": "node -e \"const fs=require('fs');const p='node_modules/libsodium-wrappers/dist/modules-esm/libsodium.mjs';if(!fs.existsSync(p)){fs.symlinkSync('../../../libsodium/dist/modules-esm/libsodium.mjs',p)}\""
+  },
+  "devDependencies": {
+    "@holochain/client": "^0.20.0",
+    "@holochain/tryorama": "^0.19.0",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.0",
+    "vitest": "^2.0.0"
+  }
+}
