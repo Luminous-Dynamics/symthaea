@@ -2,10 +2,10 @@
 % Hyperdimensional Active Inference: Free Energy Principle in
 % Vector Symbolic Architectures
 %
-% Target venue: PLoS Computational Biology / Neural Computation
+% Target venue: PLoS Computational Biology
 % ============================================================================
 
-\documentclass[11pt,twocolumn]{article}
+\documentclass[10pt,letterpaper]{article}
 
 % --- Packages ---
 \usepackage[utf8]{inputenc}
@@ -67,6 +67,11 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
 
 \noindent\textbf{Keywords:} Active Inference, Free Energy Principle, Hyperdimensional Computing, Vector Symbolic Architectures, Precision Weighting, Cognitive Architecture
+
+% ============================================================================
+% Author Summary (required by PLoS Computational Biology)
+\section*{Author Summary}
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (338,000 lines, 3,200+ tests) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -825,6 +830,9 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
 HAI opens new directions for efficient, interpretable cognitive architectures combining the rigor of active inference with the elegance of hyperdimensional computing.
 
 % ============================================================================
+% PLoS uses numbered Vancouver-style references.
+% For final submission, switch to plos2015.bst from the PLOS LaTeX template.
+% plainnat is retained here for preview builds.
 \bibliographystyle{plainnat}
 \bibliography{references}
 
