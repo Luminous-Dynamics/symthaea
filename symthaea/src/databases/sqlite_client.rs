@@ -647,6 +647,95 @@ impl ConsciousnessDatabase for SqliteMemory {
         .await
     }
 
+    async fn search_similar_filtered(
+        &self,
+        query: &BinaryHV,
+        top_k: usize,
+        filter: Option<&str>,
+    ) -> DbResult<Vec<SearchResult>> {
+        let filter = match filter {
+            Some(f) if !f.is_empty() => Some(f.to_string()),
+            _ => return self.search_similar(query, top_k).await,
+        };
+        let query = *query;
+        self.with_connection(move |conn| {
+            let filter_str = filter.unwrap();
+
+            // Parse simple filter expressions: "memory_type = 'episodic'" or "phi > 0.5"
+            // We validate the filter to prevent SQL injection by allowing only safe patterns.
+            let allowed_columns = [
+                "memory_type",
+                "phi",
+                "valence",
+                "arousal",
+                "consolidation_strength",
+                "retrieval_count",
+                "timestamp_ms",
+            ];
+            let filter_col = filter_str.split_whitespace().next().unwrap_or("");
+            if !allowed_columns.contains(&filter_col) {
+                return Err(DatabaseError::QueryFailed(format!(
+                    "Filtered search: column '{filter_col}' not in allowlist"
+                )));
+            }
+
+            let sql = format!(
+                "SELECT id, encoding, timestamp_ms, memory_type, content, valence, arousal, phi, \
+                 topics, metadata, consolidation_strength, retrieval_count \
+                 FROM memories WHERE {filter_str}"
+            );
+
+            let mut stmt = conn.prepare(&sql).map_err(|e| {
+                DatabaseError::QueryFailed(format!("Filtered search prepare failed: {e}"))
+            })?;
+
+            let records: Vec<MemoryRecord> = stmt
+                .query_map([], Self::row_to_record)
+                .map_err(|e| {
+                    DatabaseError::QueryFailed(format!("Filtered search query failed: {e}"))
+                })?
+                .filter_map(|r| r.ok())
+                .collect();
+
+            let mut results: Vec<SearchResult> = records
+                .into_iter()
+                .map(|record| {
+                    let similarity = query.similarity(&record.encoding);
+                    SearchResult { record, similarity }
+                })
+                .collect();
+
+            results.sort_by(|a, b| b.similarity.total_cmp(&a.similarity));
+            results.truncate(top_k);
+
+            // Reconsolidate returned results
+            if !results.is_empty() {
+                let ids: Vec<&str> = results.iter().map(|r| r.record.id.as_str()).collect();
+                for chunk in ids.chunks(500) {
+                    let placeholders: String = chunk
+                        .iter()
+                        .enumerate()
+                        .map(|(i, _)| format!("?{}", i + 1))
+                        .collect::<Vec<_>>()
+                        .join(",");
+                    let update_sql = format!(
+                        "UPDATE memories SET retrieval_count = retrieval_count + 1, \
+                         consolidation_strength = MIN(consolidation_strength + 0.05, 1.0) \
+                         WHERE id IN ({placeholders})"
+                    );
+                    let params: Vec<&dyn rusqlite::types::ToSql> = chunk
+                        .iter()
+                        .map(|id| id as &dyn rusqlite::types::ToSql)
+                        .collect();
+                    let _ = conn.execute(&update_sql, params.as_slice());
+                }
+            }
+
+            Ok(results)
+        })
+        .await
+    }
+
     async fn get(&self, id: &str) -> DbResult<Option<MemoryRecord>> {
         let id = id.to_string();
         self.with_connection(move |conn| {

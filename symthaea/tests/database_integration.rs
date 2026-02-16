@@ -453,24 +453,24 @@ async fn test_default_config_creates_sqlite() {
 }
 
 // ============================================================================
-// SEARCH SIMILAR FILTERED (SQLITE — IGNORES FILTER)
+// SEARCH SIMILAR FILTERED (SQLITE — NOW SUPPORTS FILTERING)
 // ============================================================================
 
 #[tokio::test]
-async fn test_sqlite_search_similar_filtered_ignores_filter() {
+async fn test_sqlite_search_similar_filtered_by_memory_type() {
     let db = SqliteMemory::in_memory().expect("Should create database");
 
     // Store episodic and semantic records
     for i in 0..5 {
         db.store(create_test_memory(
-            &format!("ep-filter-{}", i),
+            &format!("ep-filter-{i}"),
             100 + i,
             MemoryType::Episodic,
         ))
         .await
         .unwrap();
         db.store(create_test_memory(
-            &format!("sem-filter-{}", i),
+            &format!("sem-filter-{i}"),
             200 + i,
             MemoryType::Semantic,
         ))
@@ -479,15 +479,75 @@ async fn test_sqlite_search_similar_filtered_ignores_filter() {
     }
 
     let query = BinaryHV::random(150);
-    // SQLite's default search_similar_filtered returns same as search_similar
-    // (filter is a no-op for SQLite — documented behavior)
+
+    // Filter to episodic only
     let results = db
-        .search_similar_filtered(&query, 5, Some("memory_type = 'episodic'"))
+        .search_similar_filtered(&query, 10, Some("memory_type = 'episodic'"))
         .await
         .expect("Filtered search should succeed");
 
-    assert_eq!(results.len(), 5, "Should return 5 results");
-    // SQLite ignores the filter — results may include both types
+    assert_eq!(results.len(), 5, "Should return only 5 episodic results");
+    for r in &results {
+        assert_eq!(r.record.memory_type, MemoryType::Episodic);
+    }
+
+    // Filter to semantic only
+    let results = db
+        .search_similar_filtered(&query, 10, Some("memory_type = 'semantic'"))
+        .await
+        .expect("Filtered search should succeed");
+
+    assert_eq!(results.len(), 5, "Should return only 5 semantic results");
+    for r in &results {
+        assert_eq!(r.record.memory_type, MemoryType::Semantic);
+    }
+
+    // No filter — returns all
+    let results = db
+        .search_similar_filtered(&query, 20, None)
+        .await
+        .expect("Unfiltered search should succeed");
+
+    assert_eq!(results.len(), 10, "No filter should return all 10 records");
+}
+
+#[tokio::test]
+async fn test_sqlite_search_similar_filtered_by_phi() {
+    let db = SqliteMemory::in_memory().expect("Should create database");
+
+    // Store records with varying phi values
+    for i in 0..10u64 {
+        let mut record = create_test_memory(&format!("phi-{i}"), i, MemoryType::Episodic);
+        record.phi = i as f64 * 0.1; // 0.0, 0.1, ..., 0.9
+        db.store(record).await.unwrap();
+    }
+
+    let query = BinaryHV::random(42);
+
+    // Filter to high-phi records only
+    let results = db
+        .search_similar_filtered(&query, 20, Some("phi > 0.5"))
+        .await
+        .expect("Phi-filtered search should succeed");
+
+    // phi > 0.5 matches 0.6, 0.7, 0.8, 0.9 → 4 records
+    assert_eq!(results.len(), 4);
+    for r in &results {
+        assert!(r.record.phi > 0.5, "All results should have phi > 0.5");
+    }
+}
+
+#[tokio::test]
+async fn test_sqlite_search_similar_filtered_rejects_invalid_column() {
+    let db = SqliteMemory::in_memory().expect("Should create database");
+    let query = BinaryHV::random(42);
+
+    // Attempt SQL injection via disallowed column name
+    let result = db
+        .search_similar_filtered(&query, 10, Some("1=1; DROP TABLE memories; --"))
+        .await;
+
+    assert!(result.is_err(), "Should reject non-allowlisted column");
 }
 
 // ============================================================================
