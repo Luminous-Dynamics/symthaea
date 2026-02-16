@@ -1081,3 +1081,198 @@ pub async fn backfill_and_persist_embeddings(
 
     Ok(results)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // hash_based_embedding tests
+    // ========================================================================
+
+    #[test]
+    fn hash_embedding_deterministic() {
+        let a = hash_based_embedding("consciousness is integrated information");
+        let b = hash_based_embedding("consciousness is integrated information");
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn hash_embedding_correct_dimension() {
+        let embedding = hash_based_embedding("hello world");
+        assert_eq!(embedding.len(), HDC_DIMENSION);
+    }
+
+    #[test]
+    fn hash_embedding_normalized() {
+        let embedding = hash_based_embedding("some meaningful text with several words");
+        let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
+        assert!((norm - 1.0).abs() < 1e-5, "norm = {}, expected ~1.0", norm);
+    }
+
+    #[test]
+    fn hash_embedding_different_texts_differ() {
+        let a = hash_based_embedding("the sun is bright");
+        let b = hash_based_embedding("the moon is dark");
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn hash_embedding_empty_text() {
+        let embedding = hash_based_embedding("");
+        assert_eq!(embedding.len(), HDC_DIMENSION);
+        assert!(embedding.iter().all(|x| *x == 0.0));
+    }
+
+    // ========================================================================
+    // detect_contradiction tests
+    // ========================================================================
+
+    fn make_thought(index: usize, content: &str, phi: f64, coherence: f64, status: &str) -> ThoughtAnalysis {
+        ThoughtAnalysis {
+            index,
+            content: content.to_string(),
+            embedding: vec![0.0; 10],
+            phi,
+            coherence,
+            epistemic_status: status.to_string(),
+        }
+    }
+
+    #[test]
+    fn contradiction_negation_pattern() {
+        let a = make_thought(0, "I believe in free will", 0.5, 0.7, "Certain");
+        let b = make_thought(1, "I don't believe in determinism", 0.5, 0.6, "Certain");
+        let result = detect_contradiction(&a, &b, 0.5);
+        assert!(result.is_some(), "Should detect negation pattern");
+        let c = result.unwrap();
+        assert_eq!(c.severity, 0.7);
+    }
+
+    #[test]
+    fn contradiction_low_similarity_high_phi() {
+        let a = make_thought(0, "quantum mechanics", 0.8, 0.9, "Certain");
+        let b = make_thought(1, "classical physics", 0.7, 0.8, "Certain");
+        let result = detect_contradiction(&a, &b, 0.1);
+        assert!(result.is_some(), "Should detect semantic divergence with high phi");
+        let c = result.unwrap();
+        assert!(c.severity > 0.5);
+    }
+
+    #[test]
+    fn contradiction_epistemic_conflict() {
+        let a = make_thought(0, "climate change is real", 0.5, 0.8, "Certain-E3");
+        let b = make_thought(1, "climate change is happening", 0.5, 0.6, "Uncertain-E1");
+        let result = detect_contradiction(&a, &b, 0.8);
+        assert!(result.is_some(), "Should detect epistemic conflict");
+        let c = result.unwrap();
+        assert_eq!(c.severity, 0.4);
+    }
+
+    #[test]
+    fn no_contradiction_similar_aligned_thoughts() {
+        let a = make_thought(0, "I enjoy learning new things", 0.5, 0.7, "Certain");
+        let b = make_thought(1, "education is valuable for growth", 0.5, 0.7, "Certain");
+        let result = detect_contradiction(&a, &b, 0.6);
+        assert!(result.is_none(), "Should not detect contradiction for aligned thoughts");
+    }
+
+    // ========================================================================
+    // detect_auto_contradiction tests
+    // ========================================================================
+
+    #[test]
+    fn auto_contradiction_negation() {
+        let result = detect_auto_contradiction(
+            "I think this approach is correct",
+            "I don't think the method works",
+            "existing-1",
+            0.5,
+            0.6,
+            0.5,
+        );
+        assert!(result.is_some());
+        let c = result.unwrap();
+        assert_eq!(c.contradiction_type, "negation");
+        assert_eq!(c.severity, 0.7);
+    }
+
+    #[test]
+    fn auto_contradiction_cognitive_dissonance() {
+        let result = detect_auto_contradiction(
+            "Neural networks are powerful tools",
+            "Neural networks are transformative tools",
+            "existing-2",
+            0.85,
+            0.9,
+            0.3,
+        );
+        assert!(result.is_some());
+        let c = result.unwrap();
+        assert_eq!(c.contradiction_type, "cognitive_dissonance");
+        assert_eq!(c.severity, 0.4);
+    }
+
+    #[test]
+    fn auto_contradiction_semantic_divergence() {
+        let result = detect_auto_contradiction(
+            "consciousness emerges from neural integration patterns",
+            "consciousness cannot arise from simple integration alone",
+            "existing-3",
+            0.1,
+            0.7,
+            0.6,
+        );
+        assert!(result.is_some());
+        let c = result.unwrap();
+        assert_eq!(c.contradiction_type, "semantic_divergence");
+    }
+
+    #[test]
+    fn auto_contradiction_none_for_unrelated() {
+        let result = detect_auto_contradiction(
+            "the weather is nice today",
+            "rust is a great programming language",
+            "existing-4",
+            0.4,
+            0.5,
+            0.5,
+        );
+        assert!(result.is_none());
+    }
+
+    // ========================================================================
+    // SymthaeaState tests
+    // ========================================================================
+
+    #[tokio::test]
+    async fn state_new_not_ready() {
+        let state = SymthaeaState::new();
+        assert!(!state.is_ready().await);
+        assert_eq!(state.dimension, HDC_DIMENSION);
+    }
+
+    #[tokio::test]
+    async fn state_default_matches_new() {
+        let a = SymthaeaState::new();
+        let b = SymthaeaState::default();
+        assert_eq!(a.dimension, b.dimension);
+        assert!(!a.is_ready().await);
+        assert!(!b.is_ready().await);
+    }
+
+    // ========================================================================
+    // BridgeError serialization test
+    // ========================================================================
+
+    #[test]
+    fn bridge_error_serializes_to_string() {
+        let err = BridgeError::NotInitialized;
+        let json = serde_json::to_string(&err).unwrap();
+        assert!(json.contains("Symthaea not initialized"));
+
+        let err2 = BridgeError::InvalidInput("empty".to_string());
+        let json2 = serde_json::to_string(&err2).unwrap();
+        assert!(json2.contains("empty"));
+    }
+}

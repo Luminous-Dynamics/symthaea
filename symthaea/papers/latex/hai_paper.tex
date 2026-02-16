@@ -58,14 +58,11 @@
 
 % ============================================================================
 \begin{abstract}
-Active inference, grounded in the Free Energy Principle (FEP), provides a unified framework for perception, action, and learning through variational free energy minimization.
-However, existing implementations rely on continuous Gaussian belief representations with $O(n^2)$--$O(n^3)$ matrix operations, limiting scalability and symbolic reasoning capabilities.
-We present \textbf{Hyperdimensional Active Inference (HAI)}, the first integration of FEP with Hyperdimensional Computing (HDC/Vector Symbolic Architectures).
-Our framework reformulates variational free energy using cosine similarity in 16,384-dimensional hypervector space, introduces \textbf{precision-weighted binding} as a novel operation for uncertainty-modulated feature combination, and derives eight motor command types directly from expected free energy minimization.
-On standard active inference benchmarks (T-Maze, Grid World), HAI achieves $1.9\times$ faster belief inference and $15.8\times$ faster action selection compared to pymdp, with $7.9\times$ total speedup while maintaining comparable or superior task success rates.
-We demonstrate convergence of the active inference loop over 20 iterations with validated free energy reduction, and show that precision dynamics correctly adapt to prediction error magnitude.
-Extended validation across 18 benchmarks---including neuroscience (Drosophila $\Phi$, \emph{C.~elegans}, EEG seizure detection), signal processing (sleep staging from real clinical EDF recordings, speaker identification), ethical reasoning (92.9\% on ETHICS benchmark without pretrained language models), and federated learning (Byzantine fault tolerance)---confirms the generality of HDC-based computation beyond active inference.
-Our results establish HDC as a viable substrate for probabilistic inference, opening new directions for efficient, interpretable cognitive architectures.
+Active inference unifies perception and action through free energy minimization, but existing implementations require $O(n^2)$--$O(n^3)$ matrix operations, limiting scalability.
+We present \textbf{Hyperdimensional Active Inference (HAI)}, the first integration of the Free Energy Principle with Hyperdimensional Computing (16,384-dimensional hypervector space, $O(d)$ complexity).
+HAI introduces \textbf{precision-weighted binding}---a novel operation for confidence-modulated feature composition---and derives eight interpretable motor commands directly from expected free energy minimization.
+On standard benchmarks (T-Maze, Grid World), HAI achieves $7.9\times$ total speedup over pymdp ($1.9\times$ belief inference, $15.8\times$ action selection) while improving success rates from 10--16\% to 88--100\%.
+Validation across 17 domains---including ethical reasoning (92.9\% on ETHICS via compositional moral algebra, no pretrained language models), neuroscience (\emph{C.~elegans} connectome analysis, EEG seizure detection), signal processing (94.5\% speaker identification), and federated learning (Byzantine tolerance validated to 34\%)---establishes HDC as a viable substrate for cognitive architectures.
 Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 \end{abstract}
 
@@ -426,9 +423,9 @@ Beyond core active inference, Symthaea has been validated on 18 additional bench
 Benchmark & Pass Rate & Key Metrics \\
 \midrule
 Federated Learning & 8/8 + 22/22 & Unified pipeline (\S\ref{sec:fl}): 8 E2E + MNIST 6/6, meta-learning 5/5, privacy 5/5, compression 5/5, cross-language 37 \\
-PyPhi Groundtruth & 6/6 & All IIT theory predictions validated \\
+PyPhi Groundtruth & 6/6 & IIT 3.0 theory tests pass; exact $\Phi$ degenerates for weighted systems \\
 Drosophila $\Phi$ & 6/6 & Scales to 4096 neurons, MB $\Phi >$ OL $\Phi$ \\
-Sleep Staging (EDF) & 5/5 stages & All 5 AASM stages classified from real PhysioNet EDF recordings \\
+Sleep Staging (EDF) & 5/5 stages & Preliminary: 25.6\% overall (3 recordings), N2 best at 55.0\% \\
 \emph{C.~elegans} $\Phi$ & Complete & 448 neurons, 7379 connections, circuit $\Phi$ 0.54--0.58 \\
 LibriSpeech HDC & 3/3 & 94.5\% speaker ID (10 speakers) \\
 ISOLET HDC & 3/3 & 91.7\% with retrain (lr=0.1, 8K dim) \\
@@ -470,7 +467,7 @@ LTC networks~\citep{hasani2021liquid} and their CfC variant~\citep{hasani2022clo
 
 \subsection{Integrated Information Theory}
 
-IIT 4.0~\citep{albantakis2023integrated} extends the formalism with intrinsic existence and exclusion postulates. Our benchmark suite validates against IIT 3.0~\citep{tononi2016integrated} using PyPhi-compatible TPMs (6/6 tests). The exact $\Phi$ degeneracy we document (\S\ref{sec:hdc-fails}) is consistent with known MIP challenges~\citep{toker2019information}.
+IIT 4.0~\citep{albantakis2023integrated} extends the formalism with intrinsic existence and exclusion postulates. We implement IIT 3.0~\citep{tononi2016integrated} computation using PyPhi-compatible TPMs (6/6 theory tests pass). However, exact $\Phi$ via MIP is intractable beyond ${\sim}12$ nodes and degenerates for small weighted systems (\S\ref{sec:hdc-fails}). We therefore use algebraic connectivity ($\lambda_2$) as a computationally feasible proxy for relative integration comparisons, consistent with known MIP challenges~\citep{toker2019information}.
 
 \subsection{Neuro-Symbolic AI}
 
@@ -521,14 +518,20 @@ Low correlation ($r = -0.15$) between $\Phi$ and PCI is theoretically expected: 
 
 CfC cells exhibit gradient vanishing from compounding attenuation: SiLU derivative ($0.5\times$ at origin), gradient clipping, and inter-layer decay. Combined effect can reduce gradients by 100--400$\times$, causing attractor collapse. \textbf{Mitigation:} configurable gradient clipping (default 1.0, up from 0.5) and floored inter-layer attenuation at 0.3. For classification: \texttt{gradient\_clip} $\geq 5.0$, \texttt{learning\_rate} $\geq 0.01$.
 
-\subsection{Additional Limitations}
+\subsection{Limitations}
+\label{sec:limitations}
 
-\begin{enumerate}[nosep]
-  \item CfC fails on periodic synthetic data (attractor collapse, \S\ref{sec:cfc-gradients}).
-  \item Extended POMDP benchmarks (Tiger problem, multi-step planning) would strengthen claims.
-  \item HDC cosine similarities converge to ${\sim}0$ in high dimensions, preventing meaningful exact $\Phi$.
-  \item Social Chemistry 3-class accuracy (69.6\%) limited by inherent norm ambiguity.
-\end{enumerate}
+Several limitations should be noted:
+
+\textbf{Temporal dynamics.} CfC networks fail on periodic synthetic data due to gradient vanishing (attractor collapse, \S\ref{sec:cfc-gradients}). While configurable gradient clipping mitigates this for classification tasks, temporal prediction on structured signals remains an open problem. Validation on real-world time series (ECG, motor data) is needed.
+
+\textbf{IIT computation.} Exact $\Phi$ is intractable for systems beyond ${\sim}12$ nodes and degenerates to 0.0 for all tested weighted adjacency matrices at $n \leq 7$ due to MIP finding trivial partitions. Our use of $\lambda_2$ as a proxy (\S\ref{sec:hdc-fails}) provides correct topological ordering but lacks theoretical correspondence to integrated information.
+
+\textbf{Benchmark coverage.} Sleep staging uses only 3 recordings (25.6\% overall accuracy), insufficient for generalization claims. Extended POMDP benchmarks (Tiger problem, multi-step planning) would strengthen active inference validation. Social Chemistry 3-class accuracy (69.6\% at 10 iterations, 85.4\% at 20) may be limited by inter-annotator disagreement in the dataset.
+
+\textbf{Theoretical gap.} The proof that cosine dissimilarity bounds KL divergence (Appendix~\ref{app:derivations}) assumes a specific probability encoding ($\mathbf{h}_p = \sum_i \sqrt{p_i} \mathbf{e}_i$) that is not used in the actual implementation. The practical success of HDC free energy minimization outpaces its theoretical justification.
+
+\textbf{Scalability.} All experiments use $d = 16{,}384$. Performance at higher dimensions or with continuous state spaces remains untested.
 
 \subsection{Unified Federated Learning}
 \label{sec:fl}
@@ -797,6 +800,14 @@ Learned prototypes (8,192-D, 20 iter) & 85.4\% & 50K norms \\
 
 \textbf{Virtue task insight.} The virtue category tests whether a trait adjective applies to a described scenario (label=1 means ``trait describes person,'' not ``trait is a virtue''). At 16,384-D, the per-category classifier succeeds (92.8\%) because higher-dimensional space provides sufficient capacity for the ${\sim}200$ distinct trait words. Additional retrain iterations significantly help: Social Chemistry accuracy jumped from 69.6\% (10~iter) to 85.4\% (20~iter), approaching the ${\sim}85\%$ human annotator agreement ceiling.
 
+\subsection{Ethical Considerations}
+
+The Byzantine detection capabilities in the FL pipeline could be misused for participant exclusion. We recommend transparent disclosure of detection criteria and appeals processes. The ethical reasoning system is trained on existing moral norms and may encode societal biases present in the ETHICS and Social Chemistry datasets.
+
+\subsection{Data Availability}
+
+All synthetic benchmarks are reproducible from released code. External datasets: Sleep-EDF (PhysioNet, CC-BY-4.0), LibriSpeech (OpenSLR), ETHICS~\citep{hendrycks2021aligning} (MIT License), Social Chemistry~\citep{forbes2020social}. Raw benchmark data are archived in the repository under \texttt{data/benchmarks/}.
+
 % ============================================================================
 \section{Conclusion}
 
@@ -828,8 +839,8 @@ HAI opens new directions for efficient, interpretable cognitive architectures co
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
 \textbf{Lines of code:} ${\sim}338$K total, ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
-\textbf{Test suite:} 2,797 tests, 13 ignored, 0 failures\par
-\textbf{Feature flags:} 75 (48 active in cfg attrs)\par
+\textbf{Test suite:} 3,223+ tests, 13 ignored, 0 failures\par
+\textbf{Feature flags:} 60 (40 active in cfg attrs)\par
 \textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par
 \textbf{Demo command:} \texttt{cargo run --example fep\_active\_inference\_demo}\par
 }
