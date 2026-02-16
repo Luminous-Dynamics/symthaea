@@ -265,6 +265,12 @@ fn test_working_memory_eviction_tracking() {
         1,
         "Should evict exactly one item when capacity exceeded"
     );
+    // Verify steps_survived is tracked
+    let (_hv, steps_survived) = &evicted[0];
+    assert!(
+        *steps_survived > 0,
+        "Evicted item should have survived at least 1 tick"
+    );
 
     // Verify take_evicted drains the buffer
     let evicted_again = mind.take_evicted();
@@ -307,11 +313,11 @@ fn test_full_eviction_to_graduation_pipeline() {
 
     coordinator.update_signals(0.85, 0.9);
 
-    for (i, hv) in evicted.into_iter().enumerate() {
+    for (i, (hv, steps_survived)) in evicted.into_iter().enumerate() {
         coordinator.queue_graduation(GraduationEvent {
             content: hv,
             label: format!("evicted_wm_{}", i),
-            steps_survived: 7, // Approximate: survived capacity ticks
+            steps_survived,
             final_activation: 0.5,
             phi_at_graduation: 0.85,
             coherence_at_graduation: 0.9,

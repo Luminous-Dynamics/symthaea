@@ -75,6 +75,8 @@ impl ContinuousMind {
                     ]);
                     self.working_memory[i] = bundled;
                     self.working_memory.remove(i + 1);
+                    // Keep earliest arrival tick for the merged item
+                    let _merged_tick = self.working_memory_ticks.remove(i + 1);
                     return Some(MindOutput {
                         output_type: OutputType::Memorize,
                         content: "Dreaming: Consolidating memories...".to_string(),
@@ -121,10 +123,14 @@ impl ContinuousMind {
 
             if self.working_memory.len() < self.config.working_memory_capacity {
                 self.working_memory.push(input.content.clone());
+                self.working_memory_ticks.push(self.state.tick);
             } else {
                 let evicted = self.working_memory.remove(0);
-                self.evicted_items.push(evicted);
+                let arrival_tick = self.working_memory_ticks.remove(0);
+                let steps_survived = self.state.tick.saturating_sub(arrival_tick);
+                self.evicted_items.push((evicted, steps_survived));
                 self.working_memory.push(input.content.clone());
+                self.working_memory_ticks.push(self.state.tick);
             }
 
             self.state.current_thought = self.state.current_thought.bind(&input.content);

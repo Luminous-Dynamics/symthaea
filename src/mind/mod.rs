@@ -34,6 +34,9 @@ pub struct ContinuousMind {
     pub(crate) state: MindState,
     /// Working memory
     pub(crate) working_memory: Vec<ContinuousHV>,
+    /// Arrival tick for each working memory item (parallel array).
+    /// Used to compute accurate `steps_survived` on eviction.
+    pub(crate) working_memory_ticks: Vec<u64>,
     /// Goal stack
     pub(crate) goals: Vec<Goal>,
     /// Input queue
@@ -58,9 +61,11 @@ pub struct ContinuousMind {
     /// Outgoing gradient messages to broadcast to peers.
     pub(crate) federated_outbox: Vec<crate::swarm::GradientMessage>,
     /// Buffer of items evicted from working memory when capacity is exceeded.
+    /// Each entry is `(hypervector, steps_survived)` where `steps_survived`
+    /// is `current_tick - arrival_tick` at the moment of eviction.
     /// Consuming code can drain this via `take_evicted()` and route items
     /// to episodic memory or the MemoryCoordinator for graduation.
-    evicted_items: Vec<ContinuousHV>,
+    evicted_items: Vec<(ContinuousHV, u64)>,
 }
 
 impl ContinuousMind {
@@ -75,6 +80,7 @@ impl ContinuousMind {
                 ..Default::default()
             },
             working_memory: Vec::new(),
+            working_memory_ticks: Vec::new(),
             goals: Vec::new(),
             input_queue: Vec::new(),
             stats: MindStats::default(),
@@ -180,10 +186,10 @@ impl ContinuousMind {
 
     /// Drain items evicted from working memory since the last call.
     ///
-    /// Returns the evicted hypervectors. Each was the oldest item removed
-    /// when working memory reached capacity. These can be routed to the
-    /// MemoryCoordinator for graduation into episodic storage.
-    pub fn take_evicted(&mut self) -> Vec<ContinuousHV> {
+    /// Returns `(hypervector, steps_survived)` pairs. `steps_survived` is the
+    /// number of ticks the item spent in working memory before eviction.
+    /// These can be routed to the MemoryCoordinator for graduation.
+    pub fn take_evicted(&mut self) -> Vec<(ContinuousHV, u64)> {
         std::mem::take(&mut self.evicted_items)
     }
 
@@ -286,8 +292,9 @@ impl ContinuousMind {
             total_magnitude += magnitude;
             categories_seen.insert(entry.category.to_string());
 
-            // Store in working memory
+            // Store in working memory (tick 0 = genesis seeding)
             self.working_memory.push(hv);
+            self.working_memory_ticks.push(0);
 
             tracing::debug!(
                 target: "symthaea::mind::seeding",
