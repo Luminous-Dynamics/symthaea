@@ -63,6 +63,14 @@ Composite = 0.4·PoGQ + 0.3·Consistency + 0.3·Reputation
 - **N (Normative)**: N0-N3 (Personal → Axiomatic)
 - **M (Materiality)**: M0-M3 (Ephemeral → Foundational)
 
+### FL Consciousness Plugin (`mycelix-fl-core`)
+```
+Pipeline: Validate → DP → Gate → Detect → Trim → Aggregate
+Plugins: ConsciousnessAwareByzantinePlugin (Phi → weight), MetaLearningByzantinePlugin (EMA history)
+```
+- `consciousness_plugin.rs`: Maps Phi scores to boost/dampen/veto (thresholds: 0.1 veto, 0.3 dampen, 0.6 boost)
+- Composable: multiple `ByzantinePlugin` instances via `PipelinePlugins.byzantine` vec
+
 ---
 
 ## Version Compatibility

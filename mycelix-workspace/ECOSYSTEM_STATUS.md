@@ -1,6 +1,6 @@
 # Mycelix Ecosystem Status
 
-**Last verified**: 2026-02-15
+**Last verified**: 2026-02-16
 **Holochain**: 0.6.0 | **HDK**: 0.6.0 | **HDI**: 0.7.0
 
 ## hApp Bundle Status
@@ -79,7 +79,7 @@ All 10 scaffolded hApps (health, energy, climate, mutualaid, property, media, co
 |------|-------|-------|-------|
 | **Marketplace** | 8 | Partial | Multiple build scripts need consolidation. Arbitration zome incomplete. |
 | **Supply Chain** | 8 | Partial | Provenance tracking. Submodule. |
-| **Observatory** | N/A (SvelteKit) | None | Dashboard with demo mode. Deploy-ready via `./deploy.sh`. Custom domain: observatory.mycelix.net |
+| **Observatory** | N/A (SvelteKit) | None | Live at [observatory.mycelix.net](https://luminous-dynamics.github.io/mycelix-observatory/). Demo mode + conductor fallback. DNS CNAME pending. |
 | **Epistemic Markets** | Native workspace | Compiles | Heavy documentation (manifesto, rituals, personas), light implementation. Core zome logic exists. |
 | **Fabrication** | 6 (bridge, designs, materials, printers, prints, verification) | Compiles | Native workspace hApp. |
 | **EduNet** | 10 | Restored | Restored from archive. Needs verification. |
