@@ -206,11 +206,13 @@ impl StorySession {
             scene_hv: scene_hv.clone(),
         });
 
-        // Update character arcs for each participating character
+        // Update character arcs with per-character divergent signals
         for name in character_names {
             if let Some(arc) = self.character_arcs.get_mut(*name) {
                 arc.scene_indices.push(index);
-                arc.signals.push(signal.clone());
+                // Compute character-specific signal from their presence HV
+                let char_signal = self.dynamics.character_signal(&arc.presence_hv, &signal);
+                arc.signals.push(char_signal);
                 // Running-average presence HV via weighted bundle
                 let count = arc.scene_indices.len() as f32;
                 let old_weight = (count - 1.0) / count;
@@ -225,7 +227,7 @@ impl StorySession {
         signal
     }
 
-    /// Introduce a new conflict.
+    /// Introduce a new conflict, injecting a tension spike into the dynamics.
     pub fn introduce_conflict(&mut self, description: &str) {
         let scene_idx = self.scene_log.len();
         self.conflicts.push(ConflictEntry {
@@ -233,14 +235,19 @@ impl StorySession {
             introduced_at: scene_idx,
             resolved_at: None,
         });
+        // Each active conflict raises baseline tension
+        self.dynamics.inject_tension_spike(0.15);
     }
 
     /// Resolve a conflict by description. Returns `true` if found and resolved.
+    ///
+    /// Injects a tension drop into the dynamics on resolution.
     pub fn resolve_conflict(&mut self, description: &str) -> bool {
         let scene_idx = self.scene_log.len();
         for entry in &mut self.conflicts {
             if entry.description == description && entry.resolved_at.is_none() {
                 entry.resolved_at = Some(scene_idx);
+                self.dynamics.inject_tension_drop(0.12);
                 return true;
             }
         }
