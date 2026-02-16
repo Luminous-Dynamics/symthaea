@@ -82,6 +82,29 @@ pub enum BridgeError {
     Internal(String),
 }
 
+impl From<crate::dynamics::DynamicsError> for BridgeError {
+    fn from(err: crate::dynamics::DynamicsError) -> Self {
+        use crate::dynamics::DynamicsError;
+        match err {
+            DynamicsError::DimensionMismatch { expected, actual } => {
+                BridgeError::TranslationFailed(format!(
+                    "dimension mismatch: expected {expected}, got {actual}"
+                ))
+            }
+            DynamicsError::InvalidConfig(msg) => BridgeError::InvalidConfig(msg),
+            DynamicsError::ComputationError(msg) => BridgeError::Internal(msg),
+            DynamicsError::NotInitialized => BridgeError::NotInitialized,
+            DynamicsError::Io(err) => BridgeError::Internal(err.to_string()),
+        }
+    }
+}
+
+impl From<std::io::Error> for BridgeError {
+    fn from(err: std::io::Error) -> Self {
+        BridgeError::Internal(err.to_string())
+    }
+}
+
 /// Result type for bridge operations.
 pub type BridgeResult<T> = Result<T, BridgeError>;
 

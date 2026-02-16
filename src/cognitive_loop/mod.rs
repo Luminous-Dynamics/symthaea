@@ -137,6 +137,8 @@ mod prediction;
 use crate::causal::CausalLoopEnhancer;
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
+use crate::brain::prefrontal::PrefrontalCortex;
+use crate::exploration::SurpriseExplorationBridge;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
 use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
@@ -376,6 +378,16 @@ pub struct CognitiveLoopService {
 
     /// Previous cycle's primitive consciousness state for prediction error computation
     prev_primitive_state: Option<PrimitiveConsciousnessState>,
+
+    /// Surprise-driven exploration bridge for FEP-based exploration.
+    /// Tracks prediction errors and triggers exploration when surprise
+    /// exceeds an adaptive threshold. Modulates curiosity drive.
+    surprise_bridge: Option<SurpriseExplorationBridge>,
+
+    /// Prefrontal cortex for executive control and working memory.
+    /// When enabled, maintains a working memory of recent inputs and
+    /// gates learning/exploration when memory utilization is high.
+    prefrontal: Option<PrefrontalCortex>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

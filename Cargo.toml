@@ -284,7 +284,6 @@ api_module = ["axum", "tower-http"]         # HTTP API binary + module
 # ── Voice & Audio ───────────────────────────────────────────────────
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
 voice-tts-cuda = ["voice-tts", "ort/cuda"]            # TTS with CUDA acceleration
-voice-tts-async = ["voice-tts"]                       # Async/streaming TTS (planned, not yet implemented)
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 
@@ -330,6 +329,14 @@ epistemic_conflict = []                     # Epistemic conflict detection + rel
 conscious_tool_gate = ["epistemic_conflict"]
 temporal_planning = ["epistemic_conflict", "magi_loop"]
 counterfactual = ["epistemic_conflict", "symthaea-causal-reasoning/counterfactual"]
+# Diamond dependency: all four sub-features transitively require `epistemic_conflict`.
+# This is safe — epistemic_conflict is stateless (pure types/traits, no global mutable state).
+# Dependency DAG:
+#   reasoning_engine
+#   ├── epistemic_conflict (direct)
+#   ├── conscious_tool_gate → epistemic_conflict
+#   ├── temporal_planning → epistemic_conflict + magi_loop
+#   └── counterfactual → epistemic_conflict + symthaea-causal-reasoning/counterfactual
 reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_planning", "counterfactual"]
 recursive_improvement_advanced = ["full_consciousness"]
 
@@ -337,22 +344,14 @@ recursive_improvement_advanced = ["full_consciousness"]
 code_understanding = ["tree-sitter-rust", "tree-sitter-python"]
 code_generation = ["code_understanding"]
 
-# ── Example build gates ─────────────────────────────────────────────
-# These exist solely as required-features for [[example]] entries.
-# They prevent examples from building unless explicitly opted-in.
-integration_module = []         # Integration examples
-observability_module = []       # Observability examples
-school_lookahead = []           # CfC-based lookahead in school
-physiology_module = []          # Physiology integration
-mycelix_module = []             # Mycelix governance hooks
-partnership_module = []         # Φ_dyad computation
-web_research_module = []        # Web research epistemic verification
-benchmarks_module = []          # Benchmark examples
-consciousness_module = []       # Consciousness examples
-embeddings_module = []          # Embeddings examples
-language_module = []            # Language examples
-brain_module = []               # Brain subsystem examples
-soul_module = []                # Soul/identity examples
+# ── Example & module build gates ───────────────────────────────────
+# These gate cfg blocks in src/ code and/or examples.
+integration_module = []         # Integration module (cfg-gated in lib.rs)
+observability_module = []       # Observability (cfg-gated in gwt_integration + lib.rs)
+school_lookahead = []           # CfC-based lookahead in school (cfg-gated in school/mod.rs)
+physiology_module = []          # Physiology integration (cfg-gated in school/mod.rs)
+mycelix_module = []             # Mycelix governance hooks (cfg-gated in consciousness + brain)
+web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
 school_module = []              # School/learning examples
 
 [dev-dependencies]
@@ -418,31 +417,24 @@ required-features = ["code_generation"]
 
 [[example]]
 name = "causal_tower_test"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "conscious_ollama_demo"
-required-features = ["language_module"]
 
 [[example]]
 name = "core_minimal_consciousness_loop"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "cycle_aware_pattern_recognition"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "first_breath"
-required-features = ["embeddings_module", "soul_module"]
 
 [[example]]
 name = "hippocampus_integration"
-required-features = ["embeddings_module", "brain_module"]
 
 [[example]]
 name = "multi_day_narrative"
-required-features = ["embeddings_module", "brain_module"]
 
 [[example]]
 name = "multimodal_io_test"
@@ -450,135 +442,104 @@ required-features = ["perception"]
 
 [[example]]
 name = "nixos_assistant_demo"
-required-features = ["integration_module", "language_module"]
 
 [[example]]
 name = "school_o1_benchmark"
-required-features = ["school_module"]
 
 [[example]]
 name = "semantic_consciousness"
-required-features = ["embeddings_module"]
 
 [[example]]
 name = "conscious_nixos_assistant"
-required-features = ["language_module"]
 
 [[example]]
 name = "primitive_learning_cognitive"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "prediction_gate_experiment"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "quick_primitives"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "meta_conscious_ollama_demo"
-required-features = ["language_module"]
 
 [[example]]
 name = "school_coherence_integration"
-required-features = ["physiology_module", "school_module"]
+required-features = ["physiology_module"]
 
 [[example]]
 name = "cfc_learning_lookahead_prototype"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "error_analysis"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "dual_metric_comparison"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "meta_consciousness_conversation"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "conscious_learning_demo"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "embodied_consciousness_learning"
-required-features = ["physiology_module", "school_module"]
+required-features = ["physiology_module"]
 
 [[example]]
 name = "primitive_decomposition_test"
-required-features = ["embeddings_module"]
 
 [[example]]
 name = "minimal_ai_assistant"
-required-features = ["language_module"]
 
 [[example]]
 name = "phi_dyad_demo"
-required-features = ["partnership_module"]
 
 [[example]]
 name = "primitive_learning_experiment"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "toddler_test"
-required-features = ["embeddings_module"]
 
 [[example]]
 name = "phi_crossvalidation"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "symthaea_life_simulation"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "llm_integration_test"
-required-features = ["language_module"]
 
 [[example]]
 name = "primitive_grounded_crystallization"
-required-features = ["embeddings_module"]
 
 [[example]]
 name = "cognitive_loop_validation"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "prefrontal_integration"
-required-features = ["embeddings_module", "brain_module"]
 
 [[example]]
 name = "symthaea_awakens_demo"
-required-features = ["language_module"]
 
 [[example]]
 name = "neuro_autopoietic_demo"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "cfc_lookahead_stress_test"
-required-features = ["consciousness_module"]
 
 [[example]]
 name = "causal_cantor_test"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "pattern_differentiation"
-required-features = ["embeddings_module", "soul_module"]
 
 [[example]]
 name = "unified_causal_test"
-required-features = ["benchmarks_module"]
 
 [[example]]
 name = "hdc_ltc_primitives_demo"
-required-features = ["language_module"]
 
 [[example]]
 name = "magi_simulation"

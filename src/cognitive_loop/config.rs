@@ -150,6 +150,18 @@ pub struct CognitiveLoopConfig {
     /// Configuration for episodic memory replay.
     /// Only used when `episodic_replay` is true.
     pub episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig,
+
+    /// Enable surprise-driven exploration.
+    /// When true, the cognitive loop tracks prediction surprise and triggers
+    /// exploration when surprise exceeds an adaptive threshold. The exploration
+    /// modulates the curiosity drive's boredom threshold to seek novel states.
+    pub enable_surprise_exploration: bool,
+
+    /// Enable prefrontal cortex executive control.
+    /// When true, the cognitive loop maintains a working memory of recent inputs
+    /// and uses prefrontal gating to modulate learning and exploration.
+    /// High memory utilization triggers inhibition (prefrontal_veto in metadata).
+    pub enable_prefrontal: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -176,6 +188,8 @@ impl Default for CognitiveLoopConfig {
             causal_discovery_interval: 100,
             episodic_replay: false,
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
+            enable_surprise_exploration: false,
+            enable_prefrontal: false,
         }
     }
 }

@@ -5,6 +5,25 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+/// Metadata about internal decision-making during a cycle.
+///
+/// Provides observability into which subsystems influenced the cycle's output,
+/// enabling debugging of "why did the agent do that?" questions.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CycleMetadata {
+    /// Whether the surprise exploration bridge triggered exploration this cycle
+    pub surprise_triggered: bool,
+
+    /// Whether the prefrontal cortex vetoed or modified the response
+    pub prefrontal_veto: bool,
+
+    /// Confidence score from the reasoning engine (0.0 = unused/off, >0 = active)
+    pub reasoning_confidence: f32,
+
+    /// Description of the exploration action taken (if any)
+    pub exploration_action: Option<String>,
+}
+
 /// Result of a single cognitive cycle
 #[derive(Debug, Clone)]
 pub struct CycleResult {
@@ -28,6 +47,9 @@ pub struct CycleResult {
 
     /// Cycle timing (microseconds)
     pub cycle_time_us: u64,
+
+    /// Internal decision-making metadata for observability
+    pub metadata: CycleMetadata,
 
     /// Signed output for identity verification (when identity feature enabled)
     /// Contains Ed25519 signature over output hash and agent metadata
