@@ -12515,10 +12515,15 @@ dependencies = [
  "symthaea-causal-reasoning",
  "symthaea-core",
  "symthaea-dream",
+ "symthaea-enactive",
+ "symthaea-factor-graph",
  "symthaea-fep",
+ "symthaea-field-dynamics",
+ "symthaea-hodge",
  "symthaea-narrative-self",
  "symthaea-nix",
  "symthaea-phi-search",
+ "symthaea-sensorimotor",
  "symthaea-sentinel",
  "symthaea-stt",
  "syn 2.0.114",
@@ -12599,11 +12604,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-enactive"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-factor-graph"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "symthaea-fep"
 version = "0.1.0"
 dependencies = [
  "serde",
 ]
+
+[[package]]
+name = "symthaea-field-dynamics"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "symthaea-hodge"
+version = "0.1.0"
 
 [[package]]
 name = "symthaea-narrative-self"
@@ -12671,6 +12702,14 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-sensorimotor"
+version = "0.1.0"
+dependencies = [
+ "rand 0.8.5",
+ "serde",
 ]
 
 [[package]]
