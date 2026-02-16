@@ -677,7 +677,7 @@ export class FLCoordinator {
     this.currentRound.status = 'aggregating';
 
     // Step 1: Apply Byzantine detection and filtering
-    const { filtered, detection } = filterByzantine(
+    const { filtered } = filterByzantine(
       this.currentRound.updates,
       this.config.byzantineTolerance
     );

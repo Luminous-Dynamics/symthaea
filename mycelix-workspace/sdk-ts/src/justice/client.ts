@@ -300,7 +300,7 @@ export class MycelixJusticeClient {
       byCategory[case_.category] = (byCategory[case_.category] || 0) + 1;
       byPhase[case_.phase] = (byPhase[case_.phase] || 0) + 1;
 
-      if (case_.status === 'Open' || case_.status === 'InProgress') {
+      if (case_.status === 'Active' || case_.status === 'AwaitingResponse' || case_.status === 'InDeliberation') {
         pending++;
       } else if (case_.status === 'Resolved') {
         resolved++;

@@ -901,6 +901,51 @@ export interface MfaState {
   version: number;
 }
 
+// =============================================================================
+// API Type Adapters
+// =============================================================================
+
+/**
+ * Adapts an EnrolledFactor from the MFA zome API to the hooks' view model.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function adaptEnrolledFactor(apiFactor: any): EnrolledFactor {
+  return {
+    factorType: apiFactor.factorType ?? apiFactor.factor_type,
+    factorId: apiFactor.factorId ?? apiFactor.id ?? '',
+    enrolledAt: apiFactor.enrolledAt ?? apiFactor.createdAt ?? 0,
+    lastVerified: apiFactor.lastVerified ?? apiFactor.lastUsedAt ?? 0,
+    metadata: typeof apiFactor.metadata === 'string'
+      ? apiFactor.metadata
+      : JSON.stringify(apiFactor.metadata ?? {}),
+    effectiveStrength: apiFactor.effectiveStrength ?? (apiFactor.verified ? 1.0 : 0.0),
+    active: apiFactor.active ?? apiFactor.verified ?? false,
+  };
+}
+
+/**
+ * Adapts an MfaState from the MFA zome API to the hooks' view model.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function adaptMfaState(apiState: any): MfaState {
+  const factors = (apiState.factors ?? []).map(adaptEnrolledFactor);
+  return {
+    did: apiState.did ?? '',
+    owner: apiState.owner ?? '',
+    factors,
+    assuranceLevel: apiState.assuranceLevel ?? 'Anonymous',
+    effectiveStrength: apiState.effectiveStrength ?? factors.reduce(
+      (sum: number, f: EnrolledFactor) => sum + f.effectiveStrength, 0
+    ),
+    categoryCount: apiState.categoryCount ?? new Set(factors.map(
+      (f: EnrolledFactor) => f.factorType
+    )).size,
+    created: apiState.created ?? 0,
+    updated: apiState.updated ?? 0,
+    version: apiState.version ?? 1,
+  };
+}
+
 /**
  * Assurance calculation output
  */
@@ -1031,7 +1076,7 @@ export function useMfaState(did?: DID): UseMfaStateReturn {
 
     try {
       const state = await mycelix.identity.mfa.getMfaState(targetDid);
-      setMfaState(state);
+      setMfaState(state ? adaptMfaState(state) : null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error(String(err)));
       setMfaState(null);
@@ -1146,7 +1191,7 @@ export function useMfaEnroll(did?: DID): UseMfaEnrollReturn {
 
       try {
         const result = await mycelix.identity.mfa.createMfaState(targetDid, primaryKeyHash);
-        return result;
+        return adaptMfaState(result);
       } catch (err) {
         const enrollError = err instanceof Error ? err : new Error(String(err));
         setError(enrollError);
@@ -1169,7 +1214,7 @@ export function useMfaEnroll(did?: DID): UseMfaEnrollReturn {
 
       try {
         const result = await mycelix.identity.mfa.enrollFactor(targetDid, input);
-        return result;
+        return adaptEnrolledFactor(result);
       } catch (err) {
         const enrollError = err instanceof Error ? err : new Error(String(err));
         setError(enrollError);
@@ -1192,7 +1237,7 @@ export function useMfaEnroll(did?: DID): UseMfaEnrollReturn {
 
       try {
         const result = await mycelix.identity.mfa.removeFactor(targetDid, factorId);
-        return result;
+        return adaptMfaState(result);
       } catch (err) {
         const removeError = err instanceof Error ? err : new Error(String(err));
         setError(removeError);

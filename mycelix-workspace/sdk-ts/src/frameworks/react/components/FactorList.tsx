@@ -27,7 +27,7 @@
 
 import * as React from 'react';
 import { useMfaState, useMfaEnroll } from '../hooks.js';
-import type { DID, EnrolledFactor, FactorType, MfaState } from '../hooks.js';
+import type { DID, EnrolledFactor, FactorType } from '../hooks.js';
 
 // =============================================================================
 // Types
@@ -355,7 +355,7 @@ export function FactorList({
   groupByCategory = true,
 }: FactorListProps): React.ReactElement {
   const { mfaState, loading, error, refetch, factorCount } = useMfaState(did);
-  const { removeFactor, loading: isRemoving, error: removeError } = useMfaEnroll(did);
+  const { removeFactor, error: removeError } = useMfaEnroll(did);
   const [removingFactorId, setRemovingFactorId] = React.useState<string | null>(null);
   const [confirmRemove, setConfirmRemove] = React.useState<EnrolledFactor | null>(null);
 

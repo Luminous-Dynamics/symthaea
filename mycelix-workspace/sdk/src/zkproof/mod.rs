@@ -92,9 +92,7 @@ pub use gradient_proof::{
     GradientProofInput, GradientProofOutput, GradientQualityResult, Risc0ProofConfig,
 };
 #[cfg(any(feature = "simulation", feature = "risc0"))]
-pub use risc0_prover::{
-    BatchGradientProver, GradientProver, ProverError, SimulationProofMarker,
-};
+pub use risc0_prover::{BatchGradientProver, GradientProver, ProverError, SimulationProofMarker};
 
 #[cfg(any(feature = "simulation", feature = "risc0"))]
 pub use risc0_prover::GradientProofReceipt;

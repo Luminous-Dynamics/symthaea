@@ -141,7 +141,7 @@ interface ChallengeDisplayProps {
   factorType: FactorType;
 }
 
-function ChallengeDisplay({ challenge, factorType }: ChallengeDisplayProps) {
+function ChallengeDisplay({ challenge, factorType: _factorType }: ChallengeDisplayProps) {
   const expiresAt = new Date(challenge.expiresAt / 1000);
   const [timeLeft, setTimeLeft] = React.useState<number>(
     Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))

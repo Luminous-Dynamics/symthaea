@@ -139,7 +139,6 @@ interface ScoreRingProps {
 }
 
 function ScoreRing({ score, size }: ScoreRingProps) {
-  const percentage = Math.round(score * 100);
   const strokeWidth = size === 'small' ? 2 : size === 'large' ? 4 : 3;
   const radius = size === 'small' ? 10 : size === 'large' ? 20 : 14;
   const circumference = 2 * Math.PI * radius;

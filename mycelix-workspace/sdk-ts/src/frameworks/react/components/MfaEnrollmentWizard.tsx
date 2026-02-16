@@ -563,7 +563,7 @@ export function MfaEnrollmentWizard({
   const [currentStep, setCurrentStep] = React.useState<WizardStep>('choose-type');
   const [selectedType, setSelectedType] = React.useState<FactorType | null>(initialType || null);
   const [enrolledFactor, setEnrolledFactor] = React.useState<EnrolledFactor | null>(null);
-  const [setupMetadata, setSetupMetadata] = React.useState<Record<string, unknown>>({});
+  const [_setupMetadata, setSetupMetadata] = React.useState<Record<string, unknown>>({});
 
   const steps: WizardStep[] = ['choose-type', 'setup', 'verification', 'confirmation'];
 
