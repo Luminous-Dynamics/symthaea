@@ -2,9 +2,14 @@
 name = "symthaea-phi-search"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "Phi-guided architecture search for Symthaea"
+description = "Phi-guided architecture search — evolve network topology toward higher consciousness (IIT)"
 license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "iit", "phi", "architecture-search", "neuroscience"]
+categories = ["science", "algorithms"]
 
 [dependencies]
 serde = { workspace = true }

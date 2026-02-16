@@ -182,6 +182,37 @@ jobs:
         env:
           RUST_BACKTRACE: 1
 
+  sub-crates:
+    name: Sub-Crate Tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          components: clippy
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-subcrates-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-subcrates-
+      - name: Test sub-crates (fast path)
+        run: |
+          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning; do
+            echo "::group::$crate"
+            cargo clippy -p $crate --lib -- -D warnings
+            cargo test -p $crate --lib
+            echo "::endgroup::"
+          done
+
   no-default-features:
     name: Minimal Build (no default features)
     runs-on: ubuntu-latest
