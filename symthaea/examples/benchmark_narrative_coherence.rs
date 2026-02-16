@@ -646,7 +646,14 @@ fn main() {
     println!("\n=== Summary ===\n");
     println!(
         "{:<25} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10}",
-        "Arc", "Peak Step", "Peak Val", "Trend Acc", "Spearman", "Seg Spear", "Coherence", "Sym Dev"
+        "Arc",
+        "Peak Step",
+        "Peak Val",
+        "Trend Acc",
+        "Spearman",
+        "Seg Spear",
+        "Coherence",
+        "Sym Dev"
     );
     println!("{}", "-".repeat(105));
 
@@ -1033,7 +1040,14 @@ fn main() {
 
         println!(
             "| {} | {} | {:.3} | {:.3} | {:.1}% | {:.3} | {:.3} | {:.3} |",
-            name, n, peak_val.tension, peak_pos, trend_acc * 100.0, spearman, seg_spear, sym_dev
+            name,
+            n,
+            peak_val.tension,
+            peak_pos,
+            trend_acc * 100.0,
+            spearman,
+            seg_spear,
+            sym_dev
         );
     }
     println!();
