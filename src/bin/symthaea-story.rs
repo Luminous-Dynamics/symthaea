@@ -75,6 +75,14 @@ fn main() {
                         println!("No unresolved conflict matching: {}", arg);
                     }
                 }
+                "/scenes" => {
+                    if let Ok(n) = arg.trim().parse::<usize>() {
+                        session.set_expected_scenes(n);
+                        println!("Expected scenes set to {} (enables position-aware tension shaping)", n);
+                    } else {
+                        println!("Usage: /scenes <number>  (e.g. /scenes 7)");
+                    }
+                }
                 "/status" => cmd_status(&session),
                 "/signal" => cmd_signal(&session),
                 "/save" => cmd_save(&session, arg),
@@ -95,6 +103,7 @@ fn print_help() {
   /scene Title|Setting|Chars|Conflict|Mood
                               Add a scene (moods: peaceful, tense, mysterious,
                               melancholy, triumphant, hopeful)
+  /scenes <number>             Set expected total scenes (enables position-aware shaping)
   /conflict <description>     Introduce a conflict
   /resolve <description>      Resolve a conflict
   /status                     Story state summary

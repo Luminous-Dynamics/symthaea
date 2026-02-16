@@ -24,6 +24,7 @@ struct BenchScene {
 /// Run one story arc through the session and collect signals.
 fn run_arc(name: &str, scenes: &[BenchScene]) -> Vec<NarrativeSignal> {
     let mut session = StorySession::new();
+    session.set_expected_scenes(scenes.len());
     let prot = session.algebra().primitives.protagonist.clone();
     session.register_character("Hero", &prot);
 
@@ -93,6 +94,64 @@ fn spearman_rank_correlation(a: &[f32], b: &[f32]) -> f32 {
     1.0 - (6.0 * d_sq_sum) / (n * (n * n - 1.0))
 }
 
+/// Compute segment-aware Spearman: split the arc at trend direction changes,
+/// compute Spearman within each monotonic segment, and return the weighted average.
+///
+/// For monotonic arcs this equals global Spearman. For U-shaped arcs like
+/// Cinderella (down-up-down-up), it captures per-segment ordering quality.
+fn segmented_spearman(scenes: &[BenchScene], signals: &[NarrativeSignal]) -> f32 {
+    let n = scenes.len();
+    if n < 3 {
+        // Too short to segment — use global
+        let mut cum = Vec::with_capacity(n);
+        let mut c = 0.0f32;
+        for s in scenes {
+            c += s.expected_trend as f32;
+            cum.push(c);
+        }
+        let actual: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+        return spearman_rank_correlation(&cum, &actual);
+    }
+
+    // Find segment boundaries: wherever expected_trend changes sign
+    let mut segments: Vec<(usize, usize)> = Vec::new();
+    let mut seg_start = 0;
+    for i in 1..n {
+        let prev_dir = scenes[i - 1].expected_trend.signum();
+        let curr_dir = scenes[i].expected_trend.signum();
+        if curr_dir != prev_dir && curr_dir != 0 {
+            segments.push((seg_start, i));
+            seg_start = i;
+        }
+    }
+    segments.push((seg_start, n));
+
+    // Compute per-segment Spearman (weighted by segment length)
+    let mut weighted_sum = 0.0f32;
+    let mut total_weight = 0usize;
+    for (start, end) in &segments {
+        let len = end - start;
+        if len < 2 {
+            continue;
+        }
+        let mut cum = Vec::with_capacity(len);
+        let mut c = 0.0f32;
+        for i in *start..*end {
+            c += scenes[i].expected_trend as f32;
+            cum.push(c);
+        }
+        let actual: Vec<f32> = signals[*start..*end].iter().map(|s| s.tension).collect();
+        let rho = spearman_rank_correlation(&cum, &actual);
+        weighted_sum += rho * len as f32;
+        total_weight += len;
+    }
+    if total_weight == 0 {
+        0.0
+    } else {
+        weighted_sum / total_weight as f32
+    }
+}
+
 /// Compute metrics for a single arc.
 fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal]) {
     let n = signals.len();
@@ -143,6 +202,7 @@ fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal
     // Within-half and across-half similarity (using scene HVs from session)
     // We re-run to get access to session's scene_similarity
     let mut session = StorySession::new();
+    session.set_expected_scenes(scenes.len());
     let prot = session.algebra().primitives.protagonist.clone();
     session.register_character("Hero", &prot);
     for scene in scenes {
@@ -203,7 +263,9 @@ fn compute_metrics(name: &str, scenes: &[BenchScene], signals: &[NarrativeSignal
         correct,
         total
     );
+    let seg_spearman = segmented_spearman(scenes, signals);
     println!("  {:<30} {:.4}", "Spearman rho:", spearman_rho);
+    println!("  {:<30} {:.4}", "Segmented Spearman:", seg_spearman);
     println!("  {:<30} {:.4}", "Within-half similarity:", within_mean);
     println!("  {:<30} {:.4}", "Across-half similarity:", across_mean);
     println!(
@@ -449,10 +511,10 @@ fn main() {
     // ---- Summary Table ----
     println!("\n=== Summary ===\n");
     println!(
-        "{:<25} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10}",
-        "Arc", "Peak Step", "Peak Val", "Trend Acc", "Spearman", "Coherence", "Sym Dev"
+        "{:<25} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10} {:>10}",
+        "Arc", "Peak Step", "Peak Val", "Trend Acc", "Spearman", "Seg Spear", "Coherence", "Sym Dev"
     );
-    println!("{}", "-".repeat(95));
+    println!("{}", "-".repeat(105));
 
     let all = [
         ("Hero's Journey", &heros_journey, &hj_signals),
@@ -506,6 +568,7 @@ fn main() {
 
         // Coherence: within-half > across-half
         let mut session = StorySession::new();
+        session.set_expected_scenes(scenes.len());
         let prot = session.algebra().primitives.protagonist.clone();
         session.register_character("Hero", &prot);
         for scene in scenes.iter() {
@@ -542,15 +605,17 @@ fn main() {
             a_sims.iter().sum::<f32>() / a_sims.len() as f32
         };
         let coherent = if w_mean > a_mean { "PASS" } else { "FAIL" };
+        let seg_spear = segmented_spearman(scenes, signals);
 
         println!(
-            "{:<25} {:>4}/{:<5} {:>10.4} {:>9.1}% {:>10.4} {:>10} {:>10.4}",
+            "{:<25} {:>4}/{:<5} {:>10.4} {:>9.1}% {:>10.4} {:>10.4} {:>10} {:>10.4}",
             name,
             peak_idx + 1,
             n,
             peak_val.tension,
             trend_acc * 100.0,
             spearman,
+            seg_spear,
             coherent,
             sym_dev,
         );
@@ -608,13 +673,26 @@ fn main() {
         dp[n][m]
     }
 
+    // Normalize a vector to [0, 1] range
+    fn normalize_01(v: &[f32]) -> Vec<f32> {
+        let min = v.iter().cloned().fold(f32::INFINITY, f32::min);
+        let max = v.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+        let range = max - min;
+        if range < 1e-8 {
+            vec![0.5; v.len()]
+        } else {
+            v.iter().map(|x| (x - min) / range).collect()
+        }
+    }
+
     // Classify each benchmark arc against the 6 shapes
     println!("{:<25} {:<20} {:>10}", "Arc", "Best Shape", "DTW Dist");
     println!("{}", "-".repeat(55));
 
     for (name, _scenes, signals) in &all {
-        // Extract tension profile from signals
-        let tension_profile: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+        // Extract and normalize tension profile to [0,1] for fair comparison
+        let raw_tensions: Vec<f32> = signals.iter().map(|s| s.tension).collect();
+        let tension_profile = normalize_01(&raw_tensions);
 
         let mut best_shape = "Unknown";
         let mut best_dist = f32::INFINITY;

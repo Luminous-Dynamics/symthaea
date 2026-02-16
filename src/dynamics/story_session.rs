@@ -73,6 +73,8 @@ pub struct StorySession {
     themes: Vec<String>,
     scene_log: Vec<SceneRecord>,
     input_dim: usize,
+    /// Expected total number of scenes (for position encoding). 0 = unknown.
+    expected_total_scenes: usize,
 }
 
 impl StorySession {
@@ -94,6 +96,7 @@ impl StorySession {
             themes: Vec::new(),
             scene_log: Vec::new(),
             input_dim,
+            expected_total_scenes: 0,
         }
     }
 
@@ -111,7 +114,17 @@ impl StorySession {
             themes: Vec::new(),
             scene_log: Vec::new(),
             input_dim,
+            expected_total_scenes: 0,
         }
+    }
+
+    /// Set the expected total number of scenes for position-aware tension shaping.
+    ///
+    /// When set, each scene's normalized position (0.0 = start, 1.0 = end) is
+    /// passed to the dynamics engine, causing tension to be dampened early and
+    /// amplified near the climax point. Set to 0 to disable.
+    pub fn set_expected_scenes(&mut self, total: usize) {
+        self.expected_total_scenes = total;
     }
 
     /// Register a character and return its HDC encoding.
@@ -195,10 +208,21 @@ impl StorySession {
             }
         }
 
-        // Advance dynamics using hybrid HDC+CfC signal with mood bias
-        let signal = self
-            .dynamics
-            .step_hybrid_with_mood(&projected, &scene_hv, 0.1, Some(mood));
+        // Compute scene position for arc-phase tension shaping
+        let scene_position = if self.expected_total_scenes >= 2 {
+            Some(self.scene_log.len() as f32 / (self.expected_total_scenes - 1) as f32)
+        } else {
+            None
+        };
+
+        // Advance dynamics using hybrid HDC+CfC signal with mood bias and position
+        let signal = self.dynamics.step_hybrid_with_mood_and_position(
+            &projected,
+            &scene_hv,
+            0.1,
+            Some(mood),
+            scene_position,
+        );
 
         let index = self.scene_log.len();
         self.scene_log.push(SceneRecord {
@@ -453,6 +477,7 @@ impl StorySession {
             themes: snapshot.themes,
             scene_log: snapshot.scene_log,
             input_dim,
+            expected_total_scenes: 0,
         };
         // Replay dynamics state by re-stepping through the scene log
         for record in &session.scene_log {
