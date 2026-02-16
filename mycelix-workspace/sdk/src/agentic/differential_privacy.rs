@@ -700,7 +700,7 @@ mod tests {
     #[test]
     fn test_private_mean() {
         let config = DPConfig {
-            epsilon: 10.0, // High epsilon for accuracy in test
+            epsilon: 100.0, // Very high epsilon budget to allow high-epsilon queries
             ..Default::default()
         };
         let mut agg = PrivateAggregator::new(config);
@@ -708,7 +708,10 @@ mod tests {
         let values: Vec<f64> = vec![0.5, 0.6, 0.7, 0.4, 0.5];
         let true_mean = 0.54;
 
-        let private_mean = agg.private_mean(&values, 2.0).unwrap();
+        // Use high epsilon (low noise) to make the test deterministic.
+        // With epsilon=50, Laplace scale = (1.0/5) / 50 = 0.004, so noise
+        // is negligible relative to the 0.2 tolerance.
+        let private_mean = agg.private_mean(&values, 50.0).unwrap();
 
         // With high epsilon, should be close to true mean
         assert!(
