@@ -49,10 +49,10 @@
 //! 4. **Prospective Self**: Future-oriented self-projection for planning
 //! 5. **Self-Φ**: Integrated information specific to self-representation
 
-use crate::hdc::binary_hv::BinaryHV;
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::time::Instant;
+use symthaea_core::hdc::BinaryHV;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PROTO-SELF: Immediate Bodily/Sensory State

@@ -1,0 +1,12 @@
+[package]
+name = "symthaea-dream"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Counterfactual Dream Engine for Symthaea"
+license = "MIT"
+
+[dependencies]
+serde = { workspace = true }
+anyhow = { workspace = true }
+blake3 = { workspace = true }

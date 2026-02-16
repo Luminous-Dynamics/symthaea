@@ -27,7 +27,7 @@ pub use symthaea_fep as fep_active_inference;
 pub mod harmonies_integration;
 pub mod master_consciousness_equation;
 pub mod pac;
-pub mod phi_architecture_search;
+pub use symthaea_phi_search as phi_architecture_search;
 pub mod phi_attention;
 pub mod primitive_composition_rules;
 pub mod primitive_discovery;
@@ -41,8 +41,8 @@ pub mod value_feedback_loop;
 // Cincinnati-Consciousness integration (now uses its own CincinnatiConsciousNode type)
 pub mod cincinnati_consciousness;
 
-// Counterfactual Dream Engine - self-contained, no external dependencies
-pub mod dream;
+// Counterfactual Dream Engine (extracted to symthaea-dream crate)
+pub use symthaea_dream as dream;
 
 // Neuro-Autopoietic Bridge: Connects HDC consciousness with LTC neural dynamics
 // Provides bidirectional causation between body (autopoiesis) and brain (LTC)
@@ -310,7 +310,7 @@ pub mod gis_integration;
 pub mod hierarchical_ltc;
 
 /// Narrative Self-Model (Damasio autobiographical self, Tulving autonoetic consciousness)
-pub mod narrative_self;
+pub use symthaea_narrative_self as narrative_self;
 
 /// Attention Schema Theory (Graziano) — attention as a control mechanism
 pub mod attention_schema;

@@ -10,6 +10,9 @@ members = [
     "crates/symthaea-perception",
     "crates/symthaea-causal-reasoning",
     "crates/symthaea-fep",
+    "crates/symthaea-dream",
+    "crates/symthaea-phi-search",
+    "crates/symthaea-narrative-self",
 ]
 
 
@@ -64,6 +67,15 @@ symthaea-causal-reasoning = { path = "crates/symthaea-causal-reasoning", default
 
 # Symthaea FEP - Free Energy Principle active inference (always enabled)
 symthaea-fep = { path = "crates/symthaea-fep" }
+
+# Symthaea Dream - Counterfactual Dream Engine (always enabled)
+symthaea-dream = { path = "crates/symthaea-dream" }
+
+# Symthaea Phi Search - Phi-guided architecture search (always enabled)
+symthaea-phi-search = { path = "crates/symthaea-phi-search" }
+
+# Symthaea Narrative Self - Narrative self-model (always enabled)
+symthaea-narrative-self = { path = "crates/symthaea-narrative-self" }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }

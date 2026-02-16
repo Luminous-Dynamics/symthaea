@@ -12514,8 +12514,11 @@ dependencies = [
  "strsim",
  "symthaea-causal-reasoning",
  "symthaea-core",
+ "symthaea-dream",
  "symthaea-fep",
+ "symthaea-narrative-self",
  "symthaea-nix",
+ "symthaea-phi-search",
  "symthaea-sentinel",
  "symthaea-stt",
  "syn 2.0.114",
@@ -12574,6 +12577,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "symthaea-dream"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "blake3",
+ "serde",
+]
+
+[[package]]
 name = "symthaea-dynamics"
 version = "0.1.0"
 dependencies = [
@@ -12591,6 +12603,14 @@ name = "symthaea-fep"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "symthaea-narrative-self"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-core",
 ]
 
 [[package]]
@@ -12643,6 +12663,14 @@ dependencies = [
  "tokenizers",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "symthaea-phi-search"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-core",
 ]
 
 [[package]]
