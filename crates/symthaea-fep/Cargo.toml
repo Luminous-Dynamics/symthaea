@@ -2,9 +2,14 @@
 name = "symthaea-fep"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "Free Energy Principle active inference for Symthaea"
+description = "Free Energy Principle active inference — generative models, precision-weighted prediction errors, and motor control"
 license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["active-inference", "free-energy-principle", "neuroscience", "ai", "consciousness"]
+categories = ["science", "algorithms"]
 
 [dependencies]
 serde = { workspace = true }

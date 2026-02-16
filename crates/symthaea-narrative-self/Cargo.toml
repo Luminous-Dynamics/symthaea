@@ -2,9 +2,14 @@
 name = "symthaea-narrative-self"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "Narrative Self-Model for Symthaea"
+description = "Narrative Self-Model — autobiographical memory, goals, and self-awareness via hyperdimensional computing"
 license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "narrative", "self-model", "ai", "neuroscience"]
+categories = ["science", "algorithms"]
 
 [dependencies]
 serde = { workspace = true }
