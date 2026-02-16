@@ -432,12 +432,30 @@ impl StoryArcDynamics {
     }
 
     /// Advance dynamics with explicit mood for signal bias.
+    ///
+    /// `scene_position` is an optional normalized [0,1] value indicating
+    /// where this scene falls in the overall arc (0.0 = start, 1.0 = end).
+    /// When provided, arc-phase tension shaping modulates the output so that
+    /// tension peaks later in the story rather than spiking on the first
+    /// high-intensity scene.
     pub fn step_hybrid_with_mood(
         &mut self,
         scene_input: &Array1<f32>,
         scene_hv: &ContinuousHV,
         dt: f32,
         mood: Option<NarrativeMood>,
+    ) -> NarrativeSignal {
+        self.step_hybrid_with_mood_and_position(scene_input, scene_hv, dt, mood, None)
+    }
+
+    /// Full-featured step with mood and scene position.
+    pub fn step_hybrid_with_mood_and_position(
+        &mut self,
+        scene_input: &Array1<f32>,
+        scene_hv: &ContinuousHV,
+        dt: f32,
+        mood: Option<NarrativeMood>,
+        scene_position: Option<f32>,
     ) -> NarrativeSignal {
         let output = self.cfc.forward_hierarchical(scene_input, dt);
         self.step_count += 1;
@@ -527,6 +545,17 @@ impl StoryArcDynamics {
             }
         }
         self.prev_tension = tension;
+
+        // Arc-phase tension shaping: modulate tension based on story position.
+        // Early scenes get dampened, late scenes get amplified, so peaks shift
+        // toward the climax rather than spiking on the first high-intensity input.
+        if let Some(pos) = scene_position {
+            let phase_multiplier = Self::arc_phase_tension_multiplier(pos);
+            // Apply as a soft modulation toward 0.5 baseline
+            let baseline = 0.5;
+            tension = baseline + (tension - baseline) * phase_multiplier;
+            tension = tension.clamp(0.0, 1.0);
+        }
 
         // Update adaptive tension tracking
         if tension < self.tension_min {
@@ -641,20 +670,51 @@ impl StoryArcDynamics {
         }
     }
 
+    /// Compute arc-phase tension multiplier based on normalized story position [0,1].
+    ///
+    /// The curve dampens tension early (×0.6 at start) and amplifies it near
+    /// the golden ratio climax point (×1.3 at 0.618), then fades for resolution.
+    /// This shifts peaks from the first high-intensity scene toward the natural
+    /// climax position.
+    fn arc_phase_tension_multiplier(position: f32) -> f32 {
+        // Piecewise: ramp up from 0.6 to 1.3 over [0, 0.618], then down to 0.7
+        let pos = position.clamp(0.0, 1.0);
+        if pos <= 0.618 {
+            // Linear ramp: 0.6 at pos=0, 1.3 at pos=0.618
+            0.6 + (pos / 0.618) * 0.7
+        } else {
+            // Linear decay: 1.3 at pos=0.618, 0.7 at pos=1.0
+            1.3 - ((pos - 0.618) / 0.382) * 0.6
+        }
+    }
+
     /// Score conflict text intensity using a keyword vocabulary.
     ///
     /// Returns a multiplier in [1.0, 2.0] based on the presence of
     /// high-intensity words in the conflict description.
     pub fn conflict_intensity(conflict: &str) -> f32 {
         const HIGH_INTENSITY: &[&str] = &[
-            "dragon", "death", "ultimate", "final", "destroy", "betray",
-            "kill", "war", "apocalypse", "doom", "annihilat", "catastroph",
-            "invasion", "massacre", "inferno", "oblivion",
+            "dragon",
+            "death",
+            "ultimate",
+            "final",
+            "destroy",
+            "betray",
+            "kill",
+            "war",
+            "apocalypse",
+            "doom",
+            "annihilat",
+            "catastroph",
+            "invasion",
+            "massacre",
+            "inferno",
+            "oblivion",
         ];
         const MED_INTENSITY: &[&str] = &[
-            "battle", "fight", "enemy", "danger", "threat", "storm",
-            "fire", "pursuit", "escape", "trap", "wound", "confront",
-            "crisis", "attack", "siege", "ambush", "power", "betrayal",
+            "battle", "fight", "enemy", "danger", "threat", "storm", "fire", "pursuit", "escape",
+            "trap", "wound", "confront", "crisis", "attack", "siege", "ambush", "power",
+            "betrayal",
         ];
 
         let lower = conflict.to_lowercase();
