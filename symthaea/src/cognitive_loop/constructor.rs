@@ -4,6 +4,7 @@ use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::brain::prefrontal::PrefrontalCortex;
 use crate::exploration::SurpriseExplorationBridge;
+use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::fep_active_inference::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, EnhancedFEPBridge,
 };
@@ -148,6 +149,13 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional meta-cognitive layer
+        let meta_cognition = if config.enable_meta_cognition {
+            Some(MetaCognitiveLayer::new())
+        } else {
+            None
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -265,6 +273,7 @@ impl CognitiveLoopService {
             prev_primitive_state: None,
             surprise_bridge,
             prefrontal,
+            meta_cognition,
         })
     }
 

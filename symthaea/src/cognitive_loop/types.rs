@@ -38,6 +38,12 @@ pub struct CycleMetadata {
 
     /// Human-readable reasoning narrative (Tier 2, best-effort)
     pub reasoning_narrative: Option<String>,
+
+    /// Meta-cognitive self-model accuracy (0.0 = uncertain, 1.0 = perfect self-knowledge)
+    pub meta_cognitive_accuracy: f32,
+
+    /// Meta-cognitive recursion depth (0 = off, 1 = basic, 2+ = recursive self-modeling)
+    pub meta_cognitive_depth: u8,
 }
 
 /// Result of a single cognitive cycle

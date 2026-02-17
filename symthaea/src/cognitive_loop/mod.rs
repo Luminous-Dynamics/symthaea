@@ -139,6 +139,7 @@ use crate::consciousness::consciousness_unification::ConsciousnessUnificationEng
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
 use crate::brain::prefrontal::PrefrontalCortex;
 use crate::exploration::SurpriseExplorationBridge;
+use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
 use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
@@ -388,6 +389,11 @@ pub struct CognitiveLoopService {
     /// When enabled, maintains a working memory of recent inputs and
     /// gates learning/exploration when memory utilization is high.
     prefrontal: Option<PrefrontalCortex>,
+
+    /// Meta-cognitive self-model layer.
+    /// When enabled, tracks prediction error tendencies and uses
+    /// self-model accuracy to modulate learning rate.
+    meta_cognition: Option<MetaCognitiveLayer>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

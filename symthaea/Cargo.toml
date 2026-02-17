@@ -22,6 +22,7 @@ members = [
     "crates/symthaea-exploration",
     "crates/symthaea-wisdom",
     "crates/symthaea-types",
+    "crates/symthaea-seven-harmonies",
 ]
 
 
@@ -104,6 +105,7 @@ symthaea-consciousness-topology = { path = "crates/symthaea-consciousness-topolo
 symthaea-exploration = { path = "crates/symthaea-exploration" }
 symthaea-wisdom = { path = "crates/symthaea-wisdom" }
 symthaea-types = { path = "crates/symthaea-types" }
+symthaea-seven-harmonies = { path = "crates/symthaea-seven-harmonies" }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }

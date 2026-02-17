@@ -1,0 +1,17 @@
+[package]
+name = "symthaea-seven-harmonies"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Seven Harmonies value alignment framework — evaluate actions against ethical and consciousness principles"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "harmonies", "ethics", "values", "alignment"]
+categories = ["science"]
+
+[dependencies]
+serde = { workspace = true }
+symthaea-types = { path = "../symthaea-types" }
+symthaea-core = { path = "../../symthaea-core" }

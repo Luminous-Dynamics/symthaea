@@ -209,12 +209,36 @@ jobs:
             ${{ runner.os }}-cargo-subcrates-
       - name: Test sub-crates (fast path)
         run: |
-          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types; do
+          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies; do
             echo "::group::$crate"
             cargo clippy -p $crate --lib -- -D warnings
             cargo test -p $crate --lib
             echo "::endgroup::"
           done
+
+  msrv:
+    name: MSRV Check (1.75)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.75.0'
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-msrv-
+      - name: Check MSRV compilation
+        run: cargo check --workspace --lib
 
   no-default-features:
     name: Minimal Build (no default features)
