@@ -122,6 +122,117 @@ impl CognitiveLoopService {
         })
     }
 
+    /// Process a pre-encoded hypervector through the cognitive loop.
+    ///
+    /// Pipeline: ContinuousHV → compress → CfC temporal processing → predict → learn → CycleResult.
+    ///
+    /// This bypasses the text-based HDC encoder and instead accepts a pre-encoded
+    /// hypervector directly. Use this for non-text modalities like:
+    /// - Image classification (MNIST, ISOLET): encode pixels/features into HDC space,
+    ///   then feed through CfC for temporal/consciousness processing.
+    /// - Sensor data: encode sensor readings via HDC, feed to consciousness pipeline.
+    /// - Pre-computed embeddings: any data already in HDC hypervector form.
+    ///
+    /// The CfC output state can be used as a consciousness-enriched representation
+    /// for downstream classification or decision-making.
+    pub fn cycle_with_hv(&mut self, hdv: &symthaea_core::hdc::ContinuousHV) -> super::CycleResult {
+        let cycle_start = Instant::now();
+        self.stats.total_cycles += 1;
+
+        // 1. Compress HDC → CfC input dimension via random projection
+        let compressed_state = self
+            .encoder
+            .compress_for_ltc(hdv, self.config.cfc_config.input_dim);
+
+        // 2. Convert to ndarray and step the temporal network
+        let input_array = Array1::from_vec(compressed_state.clone());
+        let delta_t = self.config.cfc_config.delta_t;
+        let _ = self.temporal_network.step(&input_array, delta_t);
+
+        // 3. Multi-scale prediction
+        let prediction = self.get_multi_scale_prediction(&input_array);
+
+        // 4. Read CfC output state
+        let output = self
+            .temporal_network
+            .read_state()
+            .map(|arr| arr.to_vec())
+            .unwrap_or_else(|_| vec![0.0; self.config.cfc_config.num_neurons]);
+
+        // 5. Feed prediction back to encoder for next cycle
+        self.encoder.set_prediction(prediction.clone());
+
+        // 6. Compute prediction error against previous prediction
+        let prediction_error = if let Some(ref prev) = self.last_prediction {
+            let n = compressed_state.len().min(prev.len());
+            if n == 0 {
+                0.0
+            } else {
+                compressed_state[..n]
+                    .iter()
+                    .zip(prev[..n].iter())
+                    .map(|(a, b)| (a - b).powi(2))
+                    .sum::<f32>()
+                    / n as f32
+            }
+        } else {
+            0.0
+        };
+
+        // 7. Store experience
+        self.create_experience(&compressed_state, &prediction, prediction_error);
+
+        // 8. Update coherence bridge with current tau values
+        let tau_owned: Vec<ndarray::Array1<f32>> = self.temporal_network.all_tau_owned();
+        let tau_refs: Vec<&ndarray::Array1<f32>> = tau_owned.iter().collect();
+        self.coherence_bridge.update(&tau_refs);
+        let coherence = self.coherence_bridge.smoothed_coherence();
+
+        // 9. Learn if error is significant
+        let (learning_occurred, training_loss) =
+            if prediction_error > self.config.learning_threshold {
+                self.stats.learning_cycles += 1;
+                if let Some(ref prev_state) = self.last_state.clone() {
+                    let train_input = Array1::from_vec(prev_state.clone());
+                    let train_target = Array1::from_vec(compressed_state.clone());
+                    let lr = self.config.cfc_config.learning_rate;
+                    match self
+                        .temporal_network
+                        .train_step_bptt(&train_input, &train_target, delta_t, lr)
+                    {
+                        Ok(loss) => {
+                            self.update_loss_stats(loss);
+                            (true, Some(loss))
+                        }
+                        Err(_) => (false, None),
+                    }
+                } else {
+                    (false, None)
+                }
+            } else {
+                (false, None)
+            };
+
+        // 10. Update statistics
+        self.update_stats(prediction_error, cycle_start.elapsed());
+        self.stats.temporal_coherence = coherence;
+
+        super::CycleResult {
+            output,
+            prediction_error,
+            attention_state: std::collections::HashMap::new(),
+            detected_primitives: Vec::new(),
+            learning_occurred,
+            training_loss,
+            cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
+            metadata: super::CycleMetadata::default(),
+            #[cfg(feature = "identity")]
+            signed_output: None,
+            #[cfg(feature = "identity")]
+            assurance_level: self.mfdi_bridge.assurance_level(),
+        }
+    }
+
     /// Update prediction confidence based on consciousness state and prediction accuracy
     ///
     /// Confidence decays during uncertain/transitioning states and grows when
@@ -426,5 +537,18 @@ impl CognitiveLoopService {
         self.prev_quantum_coherence = 0.0;
         self.mce_lr_boost = 0.0;
         self.narrative_veto_active = false;
+        if let Some(ref mut mind) = self.predictive_mind {
+            *mind = crate::consciousness::predictive_processing::PredictiveMind::new(
+                crate::consciousness::predictive_processing::PredictiveConfig::default(),
+            );
+        }
+        if let Some(ref mut binder) = self.cross_modal_binder {
+            binder.clear();
+        }
+        if let Some(ref mut bridge) = self.affective_bridge {
+            *bridge = crate::brain::affective_bridge::AffectiveBridge::default();
+        }
+        self.prev_predictive_phi_modulation = 1.0;
+        self.prev_cross_modal_phi = 0.0;
     }
 }

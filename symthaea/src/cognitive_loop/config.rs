@@ -229,6 +229,27 @@ pub struct CognitiveLoopConfig {
     /// alternative actions that would have yielded higher Phi. Accumulated wisdom
     /// biases future action selection toward more consciousness-optimal choices.
     pub enable_dream_replay: bool,
+
+    /// Enable predictive processing hierarchy.
+    /// When true, the cognitive loop maintains a hierarchical predictive coding model
+    /// (PredictiveMind) with precision dynamics and active inference engine.
+    /// Phi_modulation from free energy minimization feeds back into the CfC learning rate.
+    /// Science: Friston (2010) — precision-weighted prediction error minimization
+    pub enable_predictive_processing: bool,
+
+    /// Enable cross-modal binding.
+    /// When true, the cognitive loop binds HDC encodings across modalities (linguistic,
+    /// affective, temporal) via attention-weighted bundling. Cross-modal Phi measures
+    /// binding integration quality. High cross-modal Phi boosts confidence.
+    /// Science: Treisman (1996) — feature integration theory
+    pub enable_cross_modal_binding: bool,
+
+    /// Enable affective bridge for emotion-cognition coupling.
+    /// When true, the cognitive loop maintains an AffectiveBridge that evaluates
+    /// somatic marker signals from prediction error, surprise, consciousness, and
+    /// moral score. Positive affect broadens exploration (Fredrickson 2001).
+    /// Science: Damasio (1994) — somatic marker hypothesis
+    pub enable_affective_bridge: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -269,6 +290,9 @@ impl Default for CognitiveLoopConfig {
             enable_embodied_cognition: false,
             enable_narrative_gwt: false,
             enable_dream_replay: false,
+            enable_predictive_processing: false,
+            enable_cross_modal_binding: false,
+            enable_affective_bridge: false,
         }
     }
 }

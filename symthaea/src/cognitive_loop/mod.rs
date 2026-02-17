@@ -156,6 +156,9 @@ use crate::consciousness::enactive_cognition::EnactiveCognition;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::consciousness::dream::DreamEngine;
+use crate::consciousness::predictive_processing::PredictiveMind;
+use crate::consciousness::cross_modal_binding::CrossModalBinder;
+use crate::brain::affective_bridge::AffectiveBridge;
 use crate::exploration::SurpriseExplorationBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
@@ -457,6 +460,24 @@ pub struct CognitiveLoopService {
     /// When enabled, records high-surprise events during waking cycles and
     /// dreams during Cruise urgency to discover Phi-improving alternative actions.
     dream_engine: Option<DreamEngine>,
+
+    /// Predictive processing mind (hierarchical predictive coding + precision dynamics).
+    /// When enabled, provides phi_modulation from free energy minimization.
+    predictive_mind: Option<PredictiveMind>,
+
+    /// Cross-modal binder for multi-modal integration.
+    /// When enabled, binds HDC encodings across modalities and computes cross-modal Phi.
+    cross_modal_binder: Option<CrossModalBinder>,
+
+    /// Affective bridge for emotion-cognition coupling.
+    /// When enabled, evaluates somatic marker signals from cognitive loop state.
+    affective_bridge: Option<AffectiveBridge>,
+
+    /// Previous cycle's predictive processing phi modulation (fed back into LR)
+    prev_predictive_phi_modulation: f64,
+
+    /// Previous cycle's cross-modal Phi (fed back into confidence)
+    prev_cross_modal_phi: f64,
 
     /// Whether narrative-GWT vetoed the previous cycle (suppresses learning this cycle)
     narrative_veto_active: bool,

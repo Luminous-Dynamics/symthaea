@@ -251,6 +251,31 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional predictive processing mind
+        let predictive_mind = if config.enable_predictive_processing {
+            Some(crate::consciousness::predictive_processing::PredictiveMind::new(
+                crate::consciousness::predictive_processing::PredictiveConfig::default(),
+            ))
+        } else {
+            None
+        };
+
+        // Build optional cross-modal binder
+        let cross_modal_binder = if config.enable_cross_modal_binding {
+            Some(crate::consciousness::cross_modal_binding::CrossModalBinder::new(
+                crate::consciousness::cross_modal_binding::BindingConfig::default(),
+            ))
+        } else {
+            None
+        };
+
+        // Build optional affective bridge
+        let affective_bridge = if config.enable_affective_bridge {
+            Some(crate::brain::affective_bridge::AffectiveBridge::default())
+        } else {
+            None
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -367,6 +392,11 @@ impl CognitiveLoopService {
             primitive_belief_bridge: PrimitiveBeliefBridge::new(),
             prev_primitive_state: None,
             dream_engine,
+            predictive_mind,
+            cross_modal_binder,
+            affective_bridge,
+            prev_predictive_phi_modulation: 1.0,
+            prev_cross_modal_phi: 0.0,
             surprise_bridge,
             prefrontal,
             meta_cognition,
