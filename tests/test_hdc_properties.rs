@@ -299,6 +299,337 @@ fn test_phi_is_deterministic() {
     );
 }
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// ContinuousHV Property Tests
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Test: ContinuousHV self-similarity is 1.0 (cosine similarity identity)
+#[test]
+fn test_continuous_self_similarity_is_one() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for seed in 0..20 {
+        let hv = ContinuousHV::random(HDC_DIMENSION, seed);
+        let sim = hv.similarity(&hv);
+
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "ContinuousHV self-similarity should be 1.0, got {} (seed={})",
+            sim,
+            seed
+        );
+    }
+}
+
+/// Test: Random ContinuousHV vectors are nearly orthogonal in high dimensions
+/// (cosine similarity ≈ 0 by concentration of measure)
+#[test]
+fn test_continuous_random_near_orthogonal() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    let mut total_sim: f64 = 0.0;
+    let mut count = 0;
+
+    for i in 0..15u64 {
+        for j in (i + 1)..15u64 {
+            let a = ContinuousHV::random(HDC_DIMENSION, i);
+            let b = ContinuousHV::random(HDC_DIMENSION, j);
+            total_sim += a.similarity(&b).abs() as f64;
+            count += 1;
+        }
+    }
+
+    let avg_abs_sim = total_sim / count as f64;
+    // In 16,384 dimensions, |cos(θ)| ≈ O(1/√d) ≈ 0.0078
+    assert!(
+        avg_abs_sim < 0.05,
+        "Random ContinuousHV should be near-orthogonal, avg |sim| = {}",
+        avg_abs_sim
+    );
+}
+
+/// Test: ContinuousHV bind is commutative (A⊗B = B⊗A)
+#[test]
+fn test_continuous_bind_commutative() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for seed in 0..10 {
+        let a = ContinuousHV::random(HDC_DIMENSION, seed * 7);
+        let b = ContinuousHV::random(HDC_DIMENSION, seed * 7 + 50);
+
+        let ab = a.bind(&b);
+        let ba = b.bind(&a);
+
+        let sim = ab.similarity(&ba);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "ContinuousHV bind should be commutative: sim(A⊗B, B⊗A) = {} (seed={})",
+            sim,
+            seed
+        );
+    }
+}
+
+/// Test: ContinuousHV bind produces vectors dissimilar to both inputs
+/// (for random vectors, A⊗B is ~orthogonal to A and B)
+#[test]
+fn test_continuous_bind_dissimilarity() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for seed in 0..10 {
+        let a = ContinuousHV::random(HDC_DIMENSION, seed * 3);
+        let b = ContinuousHV::random(HDC_DIMENSION, seed * 3 + 1);
+        let bound = a.bind(&b);
+
+        let sim_a = bound.similarity(&a).abs();
+        let sim_b = bound.similarity(&b).abs();
+
+        assert!(
+            sim_a < 0.1,
+            "Bound vector should be dissimilar to A: |sim| = {} (seed={})",
+            sim_a,
+            seed
+        );
+        assert!(
+            sim_b < 0.1,
+            "Bound vector should be dissimilar to B: |sim| = {} (seed={})",
+            sim_b,
+            seed
+        );
+    }
+}
+
+/// Test: ContinuousHV bind preserves similarity structure
+/// sim(A⊗C, B⊗C) ≈ sim(A, B)
+#[test]
+fn test_continuous_bind_preserves_similarity() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    // Create two vectors with known similarity (partial overlap via bundling)
+    let base = ContinuousHV::random(HDC_DIMENSION, 42);
+    let noise = ContinuousHV::random(HDC_DIMENSION, 43);
+    let similar = ContinuousHV::bundle(&[&base, &base, &noise]); // ~2/3 similar to base
+
+    let c = ContinuousHV::random(HDC_DIMENSION, 99);
+
+    let sim_original = base.similarity(&similar);
+    let sim_bound = base.bind(&c).similarity(&similar.bind(&c));
+
+    // Binding with same key should preserve relative similarity direction
+    // (both positive or both negative; magnitude may vary with element-wise multiplication)
+    assert!(
+        sim_original > 0.3,
+        "Precondition: base and similar should be correlated: {}",
+        sim_original
+    );
+    assert!(
+        sim_bound > 0.0,
+        "Binding should preserve positive similarity direction: original={}, bound={}",
+        sim_original,
+        sim_bound
+    );
+}
+
+/// Test: ContinuousHV bundle preserves component similarity
+/// sim(bundle(A,B,C), A) > random similarity
+#[test]
+fn test_continuous_bundle_preserves_components() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for seed in 0..5 {
+        let a = ContinuousHV::random(HDC_DIMENSION, seed * 11);
+        let b = ContinuousHV::random(HDC_DIMENSION, seed * 11 + 10);
+        let c = ContinuousHV::random(HDC_DIMENSION, seed * 11 + 20);
+
+        let bundled = ContinuousHV::bundle(&[&a, &b, &c]);
+
+        let sim_a = bundled.similarity(&a);
+        let sim_b = bundled.similarity(&b);
+        let sim_c = bundled.similarity(&c);
+
+        // Bundle should be positively correlated with all components
+        assert!(
+            sim_a > 0.3,
+            "Bundle should be similar to component A: sim={} (seed={})",
+            sim_a,
+            seed
+        );
+        assert!(
+            sim_b > 0.3,
+            "Bundle should be similar to component B: sim={} (seed={})",
+            sim_b,
+            seed
+        );
+        assert!(
+            sim_c > 0.3,
+            "Bundle should be similar to component C: sim={} (seed={})",
+            sim_c,
+            seed
+        );
+    }
+}
+
+/// Test: ContinuousHV similarity is bounded in [-1, 1]
+#[test]
+fn test_continuous_similarity_bounded() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for seed in 0..20 {
+        let a = ContinuousHV::random(HDC_DIMENSION, seed);
+        let b = ContinuousHV::random(HDC_DIMENSION, seed + 100);
+
+        let sim = a.similarity(&b);
+        assert!(
+            (-1.0..=1.0).contains(&sim),
+            "Similarity should be in [-1, 1], got {} (seed={})",
+            sim,
+            seed
+        );
+
+        // Also test with non-random vectors
+        let negated = a.scale(-1.0);
+        let sim_neg = a.similarity(&negated);
+        assert!(
+            (-1.0..=1.0).contains(&sim_neg),
+            "Negated similarity should be in [-1, 1], got {}",
+            sim_neg
+        );
+    }
+}
+
+/// Test: ContinuousHV normalize produces unit norm
+#[test]
+fn test_continuous_normalize_unit_norm() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for seed in 0..10 {
+        let hv = ContinuousHV::random(HDC_DIMENSION, seed);
+        let normalized = hv.normalize();
+
+        let norm = normalized.norm();
+        assert!(
+            (norm - 1.0).abs() < 1e-4,
+            "Normalized vector should have unit norm, got {} (seed={})",
+            norm,
+            seed
+        );
+    }
+}
+
+/// Test: ContinuousHV permute is cyclic (P^dim(A) = A)
+#[test]
+fn test_continuous_permute_cyclic() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    // Use a smaller dimension for speed (full cycle over 16,384 would be slow)
+    let dim = 256;
+    let original = ContinuousHV::random(dim, 42);
+
+    let mut current = original.clone();
+    for _ in 0..dim {
+        current = current.permute(1);
+    }
+
+    let sim = original.similarity(&current);
+    assert!(
+        (sim - 1.0).abs() < 1e-5,
+        "Full cycle permutation should return original, similarity = {}",
+        sim
+    );
+}
+
+/// Test: ContinuousHV inverse_permute undoes permute
+#[test]
+fn test_continuous_inverse_permute() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for shift in [1, 7, 100, 1000, HDC_DIMENSION - 1] {
+        let original = ContinuousHV::random(HDC_DIMENSION, 42);
+        let permuted = original.permute(shift);
+        let restored = permuted.inverse_permute(shift);
+
+        let sim = original.similarity(&restored);
+        assert!(
+            (sim - 1.0).abs() < 1e-5,
+            "inverse_permute should undo permute: sim = {} (shift={})",
+            sim,
+            shift
+        );
+    }
+}
+
+/// Test: ContinuousHV permutation changes the vector
+#[test]
+fn test_continuous_permute_changes_vector() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    let original = ContinuousHV::random(HDC_DIMENSION, 42);
+    let permuted = original.permute(1);
+
+    let sim = original.similarity(&permuted);
+    // For random vectors, single-position rotation should yield ~0 similarity
+    assert!(
+        sim.abs() < 0.1,
+        "Permuted vector should be dissimilar from original, sim = {}",
+        sim
+    );
+}
+
+/// Test: ContinuousHV negation yields similarity = -1
+#[test]
+fn test_continuous_negation_similarity() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    for seed in 0..10 {
+        let hv = ContinuousHV::random(HDC_DIMENSION, seed);
+        let negated = hv.scale(-1.0);
+
+        let sim = hv.similarity(&negated);
+        assert!(
+            (sim - (-1.0)).abs() < 1e-5,
+            "Negated vector should have similarity -1.0, got {} (seed={})",
+            sim,
+            seed
+        );
+    }
+}
+
+/// Test: ContinuousHV bundle of identical vectors equals that vector
+#[test]
+fn test_continuous_bundle_identical_is_identity() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    let hv = ContinuousHV::random(HDC_DIMENSION, 42);
+    let bundled = ContinuousHV::bundle(&[&hv, &hv, &hv]);
+
+    let sim = hv.similarity(&bundled);
+    assert!(
+        (sim - 1.0).abs() < 1e-5,
+        "Bundle of identical vectors should equal that vector: sim = {}",
+        sim
+    );
+}
+
+/// Test: ContinuousHV zero vector has similarity 0 with everything
+#[test]
+fn test_continuous_zero_similarity() {
+    use symthaea::hdc::unified_hv::ContinuousHV;
+
+    let zero = ContinuousHV::zero(HDC_DIMENSION);
+    let random = ContinuousHV::random(HDC_DIMENSION, 42);
+
+    let sim = zero.similarity(&random);
+    assert!(
+        sim.abs() < 1e-6,
+        "Zero vector should have similarity 0, got {}",
+        sim
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// BinaryHV Property Tests (original)
+// ═══════════════════════════════════════════════════════════════════════════════
+
 /// Test: Hamming distance is consistent with similarity
 #[test]
 fn test_hamming_similarity_relationship() {

@@ -104,15 +104,15 @@ impl Default for CoreAffect {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct PhysiologicalState {
     /// Change in heart rate from baseline
-    pub heart_rate_delta: f64,
+    pub heart_rate_delta: f32,
     /// Skin conductance (sweat response)
-    pub skin_conductance: f64,
+    pub skin_conductance: f32,
     /// Muscle tension level
-    pub muscle_tension: f64,
+    pub muscle_tension: f32,
     /// Change in breathing rate from baseline
-    pub respiration_delta: f64,
+    pub respiration_delta: f32,
     /// Gut feeling / interoceptive signal
-    pub gut_feeling: f64,
+    pub gut_feeling: f32,
 }
 
 impl Default for PhysiologicalState {
