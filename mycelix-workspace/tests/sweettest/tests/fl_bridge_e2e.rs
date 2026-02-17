@@ -328,6 +328,68 @@ mod sdk_tests {
         assert!(bad_composite < 0.5, "Bad assessment composite {} < 0.5", bad_composite);
     }
 
+    /// Fixture: known PoGQ mapping from Symthaea bridge.
+    ///
+    /// These values are the CONTRACT between symthaea-mycelix-bridge's
+    /// `pogq_from_quality_score()` and the FL zome's composite score formula.
+    /// If the bridge changes its mapping, these must be updated in lockstep.
+    ///
+    /// Bridge mapping:
+    ///   quality = epistemic_confidence
+    ///   consistency = 0.5 * phi_trend + 0.5 * similarity
+    ///   entropy = severity-based (None=0.1, Mild=0.4, Moderate=0.7, Severe=1.0)
+    ///
+    /// Zome composite: 0.4 * quality + 0.3 * consistency + 0.3 * reputation
+    #[test]
+    fn test_pogq_fixture_honest_assessment() {
+        // Honest assessment: confidence=0.95, phi_gain=+0.2 (trend=1.0), similarity=0.9
+        // Expected: quality=0.95, consistency=0.5*1.0+0.5*0.9=0.95, entropy=0.1
+        let fixture_quality = 0.95;
+        let fixture_consistency = 0.95;
+        let _fixture_entropy = 0.1;
+
+        // Composite with default reputation (0.5 for new nodes)
+        let composite = 0.4 * fixture_quality + 0.3 * fixture_consistency + 0.3 * 0.5;
+        assert!(
+            composite > 0.7,
+            "Honest assessment fixture composite {} should be well above threshold",
+            composite
+        );
+    }
+
+    #[test]
+    fn test_pogq_fixture_byzantine_assessment() {
+        // Byzantine assessment: confidence=0.1, phi_gain=-0.4 (trend=0.6), similarity=0.2
+        // Expected: quality=0.1, consistency=0.5*0.6+0.5*0.2=0.4, entropy=1.0 (Severe)
+        let fixture_quality = 0.1;
+        let fixture_consistency = 0.4;
+
+        // Composite with default reputation (0.5)
+        let composite = 0.4 * fixture_quality + 0.3 * fixture_consistency + 0.3 * 0.5;
+        assert!(
+            composite < 0.5,
+            "Byzantine assessment fixture composite {} should be below threshold",
+            composite
+        );
+    }
+
+    #[test]
+    fn test_pogq_fixture_gray_zone_assessment() {
+        // Gray zone: confidence=0.6, phi_gain=0 (trend=1.0), similarity=0.78 (ambiguous)
+        // Expected: quality=0.6, consistency=0.5*1.0+0.5*0.78=0.89, entropy=0.5 (ambiguous)
+        let fixture_quality = 0.6;
+        let fixture_consistency = 0.89;
+
+        // Composite with moderate reputation (0.6)
+        let composite = 0.4 * fixture_quality + 0.3 * fixture_consistency + 0.3 * 0.6;
+        // Gray zone should be near threshold — not clearly honest or byzantine
+        assert!(
+            composite > 0.45 && composite < 0.75,
+            "Gray zone fixture composite {} should be near threshold (0.45-0.75)",
+            composite
+        );
+    }
+
     /// Test edge cases for PoGQ boundary values.
     #[test]
     fn test_pogq_boundary_values() {

@@ -74,3 +74,23 @@ path = "tests/identity_trust_credential.rs"
 [[test]]
 name = "identity_verifiable_credential"
 path = "tests/identity_verifiable_credential.rs"
+
+[[test]]
+name = "health_workflow"
+path = "tests/health_workflow.rs"
+
+[[test]]
+name = "marketplace_workflow"
+path = "tests/marketplace_workflow.rs"
+
+[[test]]
+name = "climate_workflow"
+path = "tests/climate_workflow.rs"
+
+[[test]]
+name = "edunet_workflow"
+path = "tests/edunet_workflow.rs"
+
+[[test]]
+name = "supplychain_workflow"
+path = "tests/supplychain_workflow.rs"

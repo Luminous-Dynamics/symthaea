@@ -1,0 +1,608 @@
+//! Personal Bridge Coordinator Zome
+//!
+//! Selective disclosure gateway for the Sovereign (Personal) cluster.
+//! Provides three integration patterns (matching civic/commons bridges):
+//!
+//! 1. **dispatch_call** — synchronous RPC to any personal domain zome
+//! 2. **query_personal** — audited async query/response
+//! 3. **broadcast_event** — event distribution to connected clients
+//!
+//! Cross-cluster callers (Civic, Commons) reach this bridge via
+//! `CallTargetCell::OtherRole("personal")`.
+
+use personal_bridge_integrity::*;
+use hdk::prelude::*;
+use mycelix_bridge_common::{
+    self as bridge,
+    DispatchInput, DispatchResult, CrossClusterDispatchInput,
+    ResolveQueryInput, EventTypeQuery, BridgeHealth,
+    RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
+};
+use personal_types::{
+    CredentialType, CredentialPresentation, DisclosureScope, PresentationRequest,
+};
+
+// ============================================================================
+// Allowed zome names — security boundary for dispatch
+// ============================================================================
+
+const ALLOWED_ZOMES: &[&str] = &[
+    "identity_vault",
+    "health_vault",
+    "credential_wallet",
+];
+
+// Cross-cluster dispatch targets (what personal bridge can call in other clusters)
+const ALLOWED_COMMONS_ZOMES: &[&str] = &[
+    "commons_bridge",
+];
+
+const ALLOWED_CIVIC_ZOMES: &[&str] = &[
+    "civic_bridge",
+];
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    create_entry(&EntryTypes::Anchor(anchor))?;
+    anchor_hash(anchor_str)
+}
+
+// ============================================================================
+// Rate Limiting
+// ============================================================================
+
+fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let anchor = ensure_anchor("dispatch_rate_limit")?;
+
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::DispatchRateLimit)?,
+        GetStrategy::Local,
+    )?;
+
+    let now = sys_time()?;
+    let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
+    let window_start = Timestamp::from_micros(window_start_micros);
+
+    let recent_count = links.iter()
+        .filter(|l| l.timestamp >= window_start)
+        .count();
+
+    check_rate_limit_count(recent_count)
+        .map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+
+    create_link(
+        agent,
+        anchor,
+        LinkTypes::DispatchRateLimit,
+        target_zome.as_bytes().to_vec(),
+    )?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Cross-Domain Dispatch (synchronous RPC)
+// ============================================================================
+
+/// Dispatch a synchronous call to any domain zome within the Personal DNA.
+#[hdk_extern]
+pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&input.zome)?;
+    bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
+}
+
+// ============================================================================
+// Audited Query/Response
+// ============================================================================
+
+/// Submit a cross-domain personal query.
+#[hdk_extern]
+pub fn query_personal(query: PersonalQueryEntry) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::Query(query.clone()))?;
+
+    let all_anchor = ensure_anchor("all_personal_queries")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllQueries, ())?;
+
+    let agent_anchor = ensure_anchor(&format!("agent_queries:{}", query.requester))?;
+    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToQuery, ())?;
+
+    let domain_anchor = ensure_anchor(&format!("domain_queries:{}", query.domain))?;
+    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToQuery, ())?;
+
+    // Attempt auto-dispatch
+    if let Some(zome_name) = resolve_domain_zome(&query.domain) {
+        let payload_bytes = ExternIO::encode(query.params.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0;
+        let dispatch = DispatchInput {
+            zome: zome_name,
+            fn_name: query.query_type.clone(),
+            payload: payload_bytes,
+        };
+        if let Ok(result) = dispatch_call(dispatch) {
+            if result.success {
+                let result_str = result.response
+                    .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+                    .unwrap_or_else(|| "null".to_string());
+                let _ = resolve_query(ResolveQueryInput {
+                    query_hash: action_hash.clone(),
+                    result: result_str,
+                    success: true,
+                });
+            }
+        }
+    }
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
+}
+
+fn resolve_domain_zome(domain: &str) -> Option<String> {
+    match domain {
+        "identity" => Some("identity_vault".to_string()),
+        "health" => Some("health_vault".to_string()),
+        "credential" => Some("credential_wallet".to_string()),
+        _ => None,
+    }
+}
+
+// ============================================================================
+// Query Resolution
+// ============================================================================
+
+#[hdk_extern]
+pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
+    let record = get(input.query_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Query not found".into())))?;
+
+    let mut query: PersonalQueryEntry = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid query entry".into())))?;
+
+    let now = sys_time()?;
+    query.result = Some(input.result);
+    query.resolved_at = Some(now);
+    query.success = Some(input.success);
+
+    let updated_hash = update_entry(input.query_hash, &EntryTypes::Query(query))?;
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated query".into()
+    )))
+}
+
+// ============================================================================
+// Event Broadcasting
+// ============================================================================
+
+/// Signal payload emitted to connected UI clients.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    pub signal_type: String,
+    pub domain: String,
+    pub event_type: String,
+    pub payload: String,
+    pub action_hash: ActionHash,
+}
+
+/// Broadcast a cross-domain event and emit a signal to connected clients.
+#[hdk_extern]
+pub fn broadcast_event(event: PersonalEventEntry) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::Event(event.clone()))?;
+
+    let all_anchor = ensure_anchor("all_personal_events")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
+
+    let type_anchor = ensure_anchor(&format!("event_type:{}:{}", event.domain, event.event_type))?;
+    create_link(type_anchor, action_hash.clone(), LinkTypes::EventTypeToEvent, ())?;
+
+    let agent_anchor = ensure_anchor(&format!("agent_events:{}", event.source_agent))?;
+    create_link(agent_anchor, action_hash.clone(), LinkTypes::AgentToEvent, ())?;
+
+    let domain_anchor = ensure_anchor(&format!("domain_events:{}", event.domain))?;
+    create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToEvent, ())?;
+
+    let signal = BridgeEventSignal {
+        signal_type: "personal_bridge_event".to_string(),
+        domain: event.domain.clone(),
+        event_type: event.event_type.clone(),
+        payload: event.payload.clone(),
+        action_hash: action_hash.clone(),
+    };
+    emit_signal(&signal)?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created event".into()
+    )))
+}
+
+// ============================================================================
+// Query helpers
+// ============================================================================
+
+#[hdk_extern]
+pub fn get_domain_events(domain: String) -> ExternResult<Vec<Record>> {
+    let domain_anchor = anchor_hash(&format!("domain_events:{}", domain))?;
+    let links = get_links(
+        LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_all_events(_: ()) -> ExternResult<Vec<Record>> {
+    let all_anchor = anchor_hash("all_personal_events")?;
+    let links = get_links(
+        LinkQuery::try_new(all_anchor, LinkTypes::AllEvents)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_events_by_type(query: EventTypeQuery) -> ExternResult<Vec<Record>> {
+    let type_anchor = anchor_hash(&format!("event_type:{}:{}", query.domain, query.event_type))?;
+    let links = get_links(
+        LinkQuery::try_new(type_anchor, LinkTypes::EventTypeToEvent)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_my_queries(_: ()) -> ExternResult<Vec<Record>> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let agent_anchor = anchor_hash(&format!("agent_queries:{}", caller))?;
+    let links = get_links(
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToQuery)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+// ============================================================================
+// Credential Presentation (cross-cluster API)
+// ============================================================================
+
+/// Present a Phi credential for governance voting.
+///
+/// Called by governance via `CallTargetCell::OtherRole("personal")`.
+/// Returns a signed attestation of the agent's Phi score from FL participation.
+#[hdk_extern]
+pub fn present_phi_credential(_: ()) -> ExternResult<CredentialPresentation> {
+    // Dispatch to credential_wallet to get FL credential
+    let dispatch = DispatchInput {
+        zome: "credential_wallet".into(),
+        fn_name: "present_credential".into(),
+        payload: ExternIO::encode(CredentialType::FederatedLearning)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    let now = sys_time()?;
+
+    if result.success {
+        let data = result.response
+            .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+            .unwrap_or_else(|| "{}".to_string());
+        Ok(CredentialPresentation {
+            credential_type: CredentialType::FederatedLearning,
+            disclosed_data: data,
+            scope: DisclosureScope::Full,
+            presented_at: now,
+        })
+    } else {
+        Err(wasm_error!(WasmErrorInner::Guest(
+            "No FL credential available for Phi attestation".into()
+        )))
+    }
+}
+
+/// Present an identity proof for cross-cluster verification.
+///
+/// Discloses only the requested fields from the identity vault.
+#[hdk_extern]
+pub fn present_identity_proof(fields: Vec<String>) -> ExternResult<CredentialPresentation> {
+    let dispatch = DispatchInput {
+        zome: "identity_vault".into(),
+        fn_name: "disclose_profile".into(),
+        payload: ExternIO::encode(fields.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    let now = sys_time()?;
+
+    if result.success {
+        let data = result.response
+            .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+            .unwrap_or_else(|| "{}".to_string());
+        Ok(CredentialPresentation {
+            credential_type: CredentialType::Identity,
+            disclosed_data: data,
+            scope: DisclosureScope::SelectedFields(fields),
+            presented_at: now,
+        })
+    } else {
+        Err(wasm_error!(WasmErrorInner::Guest(
+            "Failed to disclose identity fields".into()
+        )))
+    }
+}
+
+/// Present a K-vector credential for governance trust scoring.
+#[hdk_extern]
+pub fn present_k_vector(_: ()) -> ExternResult<CredentialPresentation> {
+    let dispatch = DispatchInput {
+        zome: "credential_wallet".into(),
+        fn_name: "present_credential".into(),
+        payload: ExternIO::encode(CredentialType::FederatedLearning)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .0,
+    };
+
+    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    let now = sys_time()?;
+
+    if result.success {
+        let data = result.response
+            .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+            .unwrap_or_else(|| "{}".to_string());
+        Ok(CredentialPresentation {
+            credential_type: CredentialType::FederatedLearning,
+            disclosed_data: data,
+            scope: DisclosureScope::Full,
+            presented_at: now,
+        })
+    } else {
+        Err(wasm_error!(WasmErrorInner::Guest(
+            "No K-vector credential available".into()
+        )))
+    }
+}
+
+// ============================================================================
+// Cross-Cluster Dispatch
+// ============================================================================
+
+const COMMONS_ROLE: &str = "commons";
+const CIVIC_ROLE: &str = "civic";
+
+/// Dispatch a call to the Commons cluster.
+#[hdk_extern]
+pub fn dispatch_commons_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("commons:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES)
+}
+
+/// Dispatch a call to the Civic cluster.
+#[hdk_extern]
+pub fn dispatch_civic_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("civic:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: CIVIC_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_CIVIC_ZOMES)
+}
+
+// ============================================================================
+// Health Check
+// ============================================================================
+
+#[hdk_extern]
+pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let events = get_all_events(())?;
+    let queries = get_my_queries(())?;
+
+    Ok(BridgeHealth {
+        healthy: true,
+        agent: caller.to_string(),
+        total_events: events.len() as u32,
+        total_queries: queries.len() as u32,
+        domains: vec![
+            "identity".to_string(),
+            "health".to_string(),
+            "credential".to_string(),
+        ],
+    })
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ---- Allowlist validation ----
+
+    #[test]
+    fn local_allowlist_covers_all_domains() {
+        assert!(ALLOWED_ZOMES.contains(&"identity_vault"));
+        assert!(ALLOWED_ZOMES.contains(&"health_vault"));
+        assert!(ALLOWED_ZOMES.contains(&"credential_wallet"));
+    }
+
+    #[test]
+    fn local_allowlist_has_expected_count() {
+        assert_eq!(ALLOWED_ZOMES.len(), 3);
+    }
+
+    #[test]
+    fn allowed_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_ZOMES {
+            assert!(seen.insert(zome), "Duplicate in ALLOWED_ZOMES: '{}'", zome);
+        }
+    }
+
+    #[test]
+    fn allowed_zomes_entries_are_non_empty() {
+        for zome in ALLOWED_ZOMES {
+            assert!(!zome.is_empty());
+            assert!(!zome.contains(' '));
+        }
+    }
+
+    // ---- Cross-cluster allowlists ----
+
+    #[test]
+    fn commons_allowlist_contains_bridge() {
+        assert!(ALLOWED_COMMONS_ZOMES.contains(&"commons_bridge"));
+    }
+
+    #[test]
+    fn civic_allowlist_contains_bridge() {
+        assert!(ALLOWED_CIVIC_ZOMES.contains(&"civic_bridge"));
+    }
+
+    #[test]
+    fn role_constants_correct() {
+        assert_eq!(COMMONS_ROLE, "commons");
+        assert_eq!(CIVIC_ROLE, "civic");
+    }
+
+    // ---- Domain resolution ----
+
+    #[test]
+    fn resolve_identity_domain() {
+        assert_eq!(resolve_domain_zome("identity").unwrap(), "identity_vault");
+    }
+
+    #[test]
+    fn resolve_health_domain() {
+        assert_eq!(resolve_domain_zome("health").unwrap(), "health_vault");
+    }
+
+    #[test]
+    fn resolve_credential_domain() {
+        assert_eq!(resolve_domain_zome("credential").unwrap(), "credential_wallet");
+    }
+
+    #[test]
+    fn resolve_unknown_domain_returns_none() {
+        assert!(resolve_domain_zome("justice").is_none());
+        assert!(resolve_domain_zome("property").is_none());
+        assert!(resolve_domain_zome("").is_none());
+    }
+
+    #[test]
+    fn resolve_outputs_are_in_allowlist() {
+        let domains = ["identity", "health", "credential"];
+        for domain in &domains {
+            let resolved = resolve_domain_zome(domain).unwrap();
+            assert!(
+                ALLOWED_ZOMES.contains(&resolved.as_str()),
+                "resolve('{}') = '{}' not in ALLOWED_ZOMES",
+                domain, resolved
+            );
+        }
+    }
+
+    // ---- Signal type ----
+
+    #[test]
+    fn bridge_event_signal_type_is_personal() {
+        let signal = BridgeEventSignal {
+            signal_type: "personal_bridge_event".to_string(),
+            domain: "identity".to_string(),
+            event_type: "profile_updated".to_string(),
+            payload: "{}".to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(signal.signal_type, "personal_bridge_event");
+    }
+
+    #[test]
+    fn bridge_event_signal_serde_roundtrip() {
+        let signal = BridgeEventSignal {
+            signal_type: "personal_bridge_event".to_string(),
+            domain: "health".to_string(),
+            event_type: "biometric_recorded".to_string(),
+            payload: r#"{"type":"heart_rate"}"#.to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let back: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.domain, "health");
+        assert_eq!(back.event_type, "biometric_recorded");
+    }
+
+    // ---- Rate limit ----
+
+    #[test]
+    fn rate_limit_under_threshold_passes() {
+        assert!(check_rate_limit_count(0).is_ok());
+        assert!(check_rate_limit_count(99).is_ok());
+    }
+
+    #[test]
+    fn rate_limit_at_threshold_rejects() {
+        let err = check_rate_limit_count(100).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+    }
+
+    // ---- Presentation types serde ----
+
+    #[test]
+    fn presentation_request_serde_roundtrip() {
+        let req = PresentationRequest {
+            credential_type: CredentialType::Governance,
+            scope: DisclosureScope::ExistenceOnly,
+            context: Some("vote:prop_7".into()),
+        };
+        let json = serde_json::to_string(&req).unwrap();
+        let back: PresentationRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.credential_type, CredentialType::Governance);
+    }
+
+    #[test]
+    fn credential_presentation_serde_roundtrip() {
+        let pres = CredentialPresentation {
+            credential_type: CredentialType::FederatedLearning,
+            disclosed_data: r#"{"phi":0.42}"#.into(),
+            scope: DisclosureScope::Full,
+            presented_at: Timestamp::from_micros(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&pres).unwrap();
+        let back: CredentialPresentation = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.credential_type, CredentialType::FederatedLearning);
+        assert!(back.disclosed_data.contains("0.42"));
+    }
+
+    // ---- Health check domain list ----
+
+    #[test]
+    fn health_check_domains_match_resolution() {
+        let domains = ["identity", "health", "credential"];
+        for domain in &domains {
+            assert!(resolve_domain_zome(domain).is_some());
+        }
+    }
+}

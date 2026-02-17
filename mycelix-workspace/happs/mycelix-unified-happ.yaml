@@ -16,14 +16,24 @@
 manifest_version: "0"
 name: mycelix-unified
 description: |
-  Unified Mycelix platform combining universal resource coordination (Commons)
-  with civic operations (Civic). Enables cross-cluster calls between domains:
-  - Justice enforcement ↔ Property registry
-  - Emergency coordination ↔ Housing capacity
-  - Media fact-checking ↔ Care credential verification
-  - Water stewardship ↔ Emergency disaster awareness
+  Unified Mycelix platform — Fractal CivOS 3-tier architecture:
+  - Personal (Sovereign): Private identity, health, credentials
+  - Civic (WE): Justice, emergency, media (permissioned)
+  - Commons (ALL): Property, housing, care, water, food, transport (public)
+  Enables cross-cluster calls between all tiers via OtherRole dispatch.
 
 roles:
+  - name: personal
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./personal/dna/mycelix_personal.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
   - name: commons
     provisioning:
       strategy: create

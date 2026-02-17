@@ -1,0 +1,22 @@
+---
+# Mycelix Personal hApp Bundle
+# Sovereign Agent Data Vault: identity + health + credentials + bridge
+
+manifest_version: "0"
+name: mycelix-personal
+description: |
+  Sovereign agent data vault for the Mycelix ecosystem.
+  Stores private identity, health records, and verifiable credentials
+  on the agent's source chain with selective disclosure via bridge.
+
+roles:
+  - name: personal
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_personal.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

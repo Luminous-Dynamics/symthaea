@@ -16,6 +16,7 @@ on:
       - 'mycelix-climate/**'
       - 'mycelix-core/**'
       - 'mycelix-mail/**'
+      - 'mycelix-personal/**'
       # Uncomment once committed to git:
       # - 'mycelix-edunet/**'
       # - 'mycelix-marketplace/**'
@@ -37,6 +38,7 @@ on:
       - 'mycelix-climate/**'
       - 'mycelix-core/**'
       - 'mycelix-mail/**'
+      - 'mycelix-personal/**'
       # Uncomment once committed to git:
       # - 'mycelix-edunet/**'
       # - 'mycelix-marketplace/**'
@@ -119,14 +121,12 @@ jobs:
 
       - name: Type check
         run: npx svelte-check --tsconfig ./tsconfig.json
-        continue-on-error: true
 
       - name: Build
         run: npm run build
 
       - name: Run tests
         run: npm test
-        continue-on-error: true
 
   # ============================================================================
   # Ethereum SDK Tests
@@ -250,6 +250,7 @@ jobs:
           - { name: energy, path: mycelix-energy }
           - { name: climate, path: mycelix-climate }
           - { name: mail, path: mycelix-mail/holochain }    # submodule
+          - { name: personal, path: mycelix-personal }
           # Uncomment these once their directories are committed to git:
           # - { name: edunet, path: mycelix-edunet }
           # - { name: marketplace, path: mycelix-marketplace/backend }
@@ -554,56 +555,41 @@ jobs:
             echo "::error::Conductor failed to start"
             exit 1
           fi
+          echo "conductor_started=true" >> $GITHUB_OUTPUT
           echo "✅ Conductor started successfully with PID: $CONDUCTOR_PID"
 
       - name: Run zome integration tests
+        if: steps.conductor.outputs.conductor_started == 'true'
         run: |
           # Test bridge zome calls
           echo "Testing bridge zome integration..."
-          if cargo test --test integration -- --test-threads=1 2>&1; then
-            echo "✅ Bridge integration tests passed"
-          else
-            echo "::warning::Bridge integration tests failed or not found"
-          fi
+          cargo test --test integration -- --test-threads=1 || echo "::warning::Bridge integration tests not found"
 
           # Test federated learning zome calls
           echo "Testing FL zome integration..."
-          if cargo test --test integration -- --test-threads=1 2>&1; then
-            echo "✅ FL integration tests passed"
-          else
-            echo "::warning::FL integration tests failed or not found"
-          fi
+          cargo test --test fl_integration -- --test-threads=1 || echo "::warning::FL integration tests not found"
         working-directory: mycelix-core
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
-        continue-on-error: true  # Don't fail CI for missing tests, but do warn
 
       - name: Run cross-zome communication tests
+        if: steps.conductor.outputs.conductor_started == 'true'
         run: |
           echo "Testing cross-zome communication..."
-          if cargo test cross_zome -- --test-threads=1 2>&1; then
-            echo "✅ Cross-zome tests passed"
-          else
-            echo "::warning::Cross-zome tests not found or failed"
-          fi
+          cargo test cross_zome -- --test-threads=1
         working-directory: mycelix-core
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
-        continue-on-error: true
 
       - name: Run TypeScript integration tests
+        if: steps.conductor.outputs.conductor_started == 'true'
         run: |
           npm ci
-          if npm run test:integration 2>&1; then
-            echo "✅ TypeScript integration tests passed"
-          else
-            echo "::warning::TypeScript integration tests failed or not configured"
-          fi
+          npm run test:integration
         working-directory: mycelix-workspace/sdk-ts
         env:
           HOLOCHAIN_ADMIN_URL: ws://localhost:4444
           CONDUCTOR_AVAILABLE: "true"
-        continue-on-error: true
 
       - name: Cleanup conductor
         if: always()
@@ -827,6 +813,183 @@ jobs:
           cargo audit
 
   # ============================================================================
+  # Sweettest (cross-cluster E2E with Holochain conductor)
+  # ============================================================================
+  sweettest:
+    name: Sweettest E2E
+    runs-on: ubuntu-latest
+    needs: [holochain-zomes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Setup Holochain cache
+        run: |
+          nix-env -iA cachix -f https://cachix.org/api/v1/install
+          cachix use holochain-ci
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-workspace/tests/sweettest/target/
+          key: ${{ runner.os }}-cargo-sweettest-${{ hashFiles('mycelix-workspace/tests/sweettest/Cargo.lock') }}
+
+      - name: Build DNA bundles
+        run: |
+          # Build Commons WASM
+          cd mycelix-commons && cargo build --release --target wasm32-unknown-unknown && cd ..
+          # Build Civic WASM
+          cd mycelix-civic && cargo build --release --target wasm32-unknown-unknown && cd ..
+          # Build Core WASM
+          cd mycelix-core && cargo build --release --target wasm32-unknown-unknown \
+            -p bridge_integrity -p bridge_coordinator -p fl_integrity -p fl_coordinator && cd ..
+
+      - name: Run sweettest suite
+        run: |
+          cargo test --release -p mycelix-sweettest -- --ignored --test-threads=1
+        working-directory: mycelix-workspace/tests/sweettest
+
+  # ============================================================================
+  # Governance Zome Tests
+  # ============================================================================
+  governance-tests:
+    name: Governance Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-governance/target/
+          key: ${{ runner.os }}-cargo-governance-${{ hashFiles('mycelix-governance/Cargo.lock') }}
+
+      - name: Run tests
+        run: cargo test --all
+        working-directory: mycelix-governance
+
+      - name: Clippy
+        run: cargo clippy --all -- -D warnings
+        working-directory: mycelix-governance
+
+      - name: Build WASM
+        run: cargo build --release --target wasm32-unknown-unknown
+        working-directory: mycelix-governance
+
+  # ============================================================================
+  # Crypto Library Tests
+  # ============================================================================
+  crypto-libs:
+    name: Crypto Libraries
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        lib:
+          - { name: feldman-dkg, path: mycelix-core/libs/feldman-dkg }
+          - { name: rb-bft-consensus, path: mycelix-core/libs/rb-bft-consensus }
+          - { name: kvector-zkp, path: mycelix-core/libs/kvector-zkp }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check path exists
+        id: check_path
+        run: |
+          if [ -d "${{ matrix.lib.path }}" ] && [ -f "${{ matrix.lib.path }}/Cargo.toml" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "::warning::${{ matrix.lib.path }} not found — skipping"
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Rust
+        if: steps.check_path.outputs.exists == 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+
+      - name: Run tests
+        if: steps.check_path.outputs.exists == 'true'
+        run: cargo test --all
+        working-directory: ${{ matrix.lib.path }}
+
+      - name: Clippy
+        if: steps.check_path.outputs.exists == 'true'
+        run: cargo clippy -- -D warnings
+        working-directory: ${{ matrix.lib.path }}
+
+  # ============================================================================
+  # Personal Cluster Tests
+  # ============================================================================
+  personal-tests:
+    name: Personal Cluster Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: wasm32-unknown-unknown
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            mycelix-personal/target/
+          key: ${{ runner.os }}-cargo-personal-${{ hashFiles('mycelix-personal/Cargo.lock') }}
+
+      - name: Run tests
+        run: cargo test --all
+        working-directory: mycelix-personal
+
+      - name: Build WASM
+        run: cargo build --release --target wasm32-unknown-unknown
+        working-directory: mycelix-personal
+
+  # ============================================================================
   # CI Pass Check (ensures all required jobs succeed)
   # ============================================================================
   ci-pass:
@@ -844,12 +1007,15 @@ jobs:
       - integration-tests
       - smoke-tests
       - security
+      - governance-tests
+      - crypto-libs
+      - personal-tests
 
     steps:
       - name: Check all jobs passed
         uses: re-actors/alls-green@release/v1
         with:
-          allowed-skips: smoke-tests, e2e-tests, sdk-eth, lucid-frontend
+          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest
           jobs: ${{ toJSON(needs) }}
 
       - name: Summary

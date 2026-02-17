@@ -1,0 +1,16 @@
+[package]
+name = "credential_wallet_integrity"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "credential_wallet_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+thiserror = { workspace = true }
+personal-types = { workspace = true }

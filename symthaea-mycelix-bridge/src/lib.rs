@@ -701,6 +701,168 @@ mod tests {
         assert!(diagnostic.max_concepts.is_some());
     }
 
+    // ============================================================================
+    // SparseProjector tests
+    // ============================================================================
+
+    #[test]
+    fn sparse_projector_output_has_correct_dimension() {
+        let projector = SparseProjector::new(8, HDC_DIMENSION);
+        let input = vec![128u8; HV16_BYTES];
+        let hv = projector.project(&input);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+    }
+
+    #[test]
+    fn sparse_projector_is_deterministic() {
+        let projector = SparseProjector::new(8, HDC_DIMENSION);
+        let input = vec![42u8; HV16_BYTES];
+        let hv1 = projector.project(&input);
+        let hv2 = projector.project(&input);
+        assert!(
+            hv1.similarity(&hv2) > 0.999,
+            "Same input must yield identical output"
+        );
+    }
+
+    #[test]
+    fn sparse_projector_distinct_inputs_differ() {
+        let projector = SparseProjector::new(8, HDC_DIMENSION);
+        let input_a = vec![0u8; HV16_BYTES];
+        let input_b = vec![255u8; HV16_BYTES];
+        let hv_a = projector.project(&input_a);
+        let hv_b = projector.project(&input_b);
+        let sim = hv_a.similarity(&hv_b);
+        assert!(
+            sim < 0.99,
+            "Distinct inputs should produce different projections, got sim={}",
+            sim
+        );
+    }
+
+    #[test]
+    fn sparse_projector_output_is_normalized() {
+        let projector = SparseProjector::new(8, HDC_DIMENSION);
+        let input = vec![100u8; HV16_BYTES];
+        let hv = projector.project(&input);
+        let self_sim = hv.similarity(&hv);
+        assert!(
+            (self_sim - 1.0).abs() < 0.01,
+            "Projected HV should be normalized, self-similarity={}",
+            self_sim
+        );
+    }
+
+    #[test]
+    fn sparse_projector_empty_input_produces_valid_hv() {
+        let projector = SparseProjector::new(8, HDC_DIMENSION);
+        let input: Vec<u8> = vec![];
+        let hv = projector.project(&input);
+        assert_eq!(hv.dim(), HDC_DIMENSION);
+    }
+
+    // ============================================================================
+    // HebbianAssociativeMemory tests
+    // ============================================================================
+
+    #[test]
+    fn hebbian_memory_store_and_recall() {
+        let mut mem = HebbianAssociativeMemory::new();
+        let concept = vec![0.1f32; HDC_DIMENSION];
+        mem.store("test_concept", concept.clone());
+        let (id, _proto_vec, sim) = mem.recall_by_vector(&concept).expect("should recall stored concept");
+        assert_eq!(id, "test_concept");
+        assert!(sim > 0.99, "Exact input should have high similarity, got {}", sim);
+    }
+
+    #[test]
+    fn hebbian_memory_recall_missing_returns_none() {
+        let mem = HebbianAssociativeMemory::new();
+        let query = vec![0.5f32; HDC_DIMENSION];
+        assert!(mem.recall_by_vector(&query).is_none(), "Empty memory should return None");
+    }
+
+    #[test]
+    fn hebbian_memory_distinct_concepts_recalled_correctly() {
+        let mut mem = HebbianAssociativeMemory::new();
+        let concept_a = vec![1.0f32; HDC_DIMENSION];
+        let concept_b = vec![-1.0f32; HDC_DIMENSION];
+        mem.store("a", concept_a.clone());
+        mem.store("b", concept_b.clone());
+
+        let (id_a, _, _) = mem.recall_by_vector(&concept_a).expect("recall a");
+        let (id_b, _, _) = mem.recall_by_vector(&concept_b).expect("recall b");
+        assert_eq!(id_a, "a");
+        assert_eq!(id_b, "b");
+    }
+
+    #[test]
+    fn hebbian_memory_stats_count_concepts() {
+        let mut mem = HebbianAssociativeMemory::new();
+        assert_eq!(mem.stats().num_concepts, 0);
+        mem.store("c1", vec![0.1f32; HDC_DIMENSION]);
+        assert_eq!(mem.stats().num_concepts, 1);
+        mem.store("c2", vec![0.2f32; HDC_DIMENSION]);
+        assert_eq!(mem.stats().num_concepts, 2);
+    }
+
+    // ============================================================================
+    // classify_from_phi tests
+    // ============================================================================
+
+    #[test]
+    fn classify_from_phi_produces_valid_classification() {
+        let backend = SymthaeaBackend::new();
+        let hg = HyperGradient::new(
+            "node-1".to_string(),
+            1,
+            vec![128u8; HV16_BYTES],
+            0.5,
+            4_000_000,
+            10.0,
+            [0u8; 32],
+        );
+        let classification = backend.classify_from_phi(0.9, &hg);
+        // Must produce a classification without panicking
+        let _ = classification;
+    }
+
+    #[test]
+    fn classify_from_phi_low_phi_does_not_panic() {
+        let backend = SymthaeaBackend::new();
+        let hg = HyperGradient::new(
+            "node-2".to_string(),
+            1,
+            vec![64u8; HV16_BYTES],
+            0.1,
+            4_000_000,
+            1.0,
+            [0u8; 32],
+        );
+        let _classification = backend.classify_from_phi(0.05, &hg);
+    }
+
+    #[test]
+    fn classify_from_phi_reproducible_for_same_inputs() {
+        let backend = SymthaeaBackend::new();
+        let hg = HyperGradient::new(
+            "node-3".to_string(),
+            1,
+            vec![200u8; HV16_BYTES],
+            0.7,
+            4_000_000,
+            5.0,
+            [1u8; 32],
+        );
+        let c1 = backend.classify_from_phi(0.5, &hg);
+        let c2 = backend.classify_from_phi(0.5, &hg);
+        assert_eq!(format!("{:?}", c1), format!("{:?}", c2));
+    }
+
+    // ============================================================================
+    // Original PoGQ tests
+    // ============================================================================
+
     #[test]
     fn test_pogq_from_quality_score_mapping_behaves_sensibly() {
         // High-confidence, non-anomalous update should yield high PoGQ quality

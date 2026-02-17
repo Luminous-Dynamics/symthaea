@@ -1,0 +1,57 @@
+---
+# Mycelix Personal DNA
+# Sovereign Agent Data Vault: identity + health + credentials + bridge
+# 4 domain zomes + 1 unified bridge = 5 zome pairs (10 WASM crates)
+
+manifest_version: "0"
+name: mycelix_personal
+
+integrity:
+  network_seed: "mycelix-personal-v1"
+  properties:
+    # Personal DNA stores private data on the source chain.
+    # Cross-cluster calls are mediated exclusively through personal_bridge.
+    cross_domain_calls: true
+
+  zomes:
+    # Identity vault
+    - name: identity_vault_integrity
+      path: ../target/wasm32-unknown-unknown/release/identity_vault_integrity.wasm
+
+    # Health vault
+    - name: health_vault_integrity
+      path: ../target/wasm32-unknown-unknown/release/health_vault_integrity.wasm
+
+    # Credential wallet
+    - name: credential_wallet_integrity
+      path: ../target/wasm32-unknown-unknown/release/credential_wallet_integrity.wasm
+
+    # Unified bridge
+    - name: personal_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/personal_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    # Identity vault
+    - name: identity_vault
+      path: ../target/wasm32-unknown-unknown/release/identity_vault.wasm
+      dependencies:
+        - name: identity_vault_integrity
+
+    # Health vault
+    - name: health_vault
+      path: ../target/wasm32-unknown-unknown/release/health_vault.wasm
+      dependencies:
+        - name: health_vault_integrity
+
+    # Credential wallet
+    - name: credential_wallet
+      path: ../target/wasm32-unknown-unknown/release/credential_wallet.wasm
+      dependencies:
+        - name: credential_wallet_integrity
+
+    # Unified bridge
+    - name: personal_bridge
+      path: ../target/wasm32-unknown-unknown/release/personal_bridge.wasm
+      dependencies:
+        - name: personal_bridge_integrity

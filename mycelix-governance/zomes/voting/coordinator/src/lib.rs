@@ -324,9 +324,42 @@ fn get_voter_phi_weight(voter_did: &str) -> ExternResult<PhiWeight> {
     })
 }
 
-/// Query consciousness Φ from bridge (cross-zome call to governance_bridge)
+/// Query consciousness Φ via personal_bridge credential presentation.
+///
+/// Under Fractal CivOS, governance asks the agent's Personal cluster to
+/// **prove** their Phi score via credential presentation rather than
+/// looking up a database directly.
+///
+/// Fallback: if personal cluster is unavailable, use participation-based proxy.
 fn query_consciousness_phi(voter_did: &str) -> ExternResult<f64> {
-    // Query chain for consciousness snapshots linked to this agent
+    // Phase A: Try cross-cluster call to personal_bridge for Phi credential
+    let personal_result = call(
+        CallTargetCell::OtherRole("personal".into()),
+        ZomeName::from("personal_bridge"),
+        FunctionName::from("present_phi_credential"),
+        None,
+        (),
+    );
+
+    match &personal_result {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            // Decode the CredentialPresentation and extract Phi score
+            if let Ok(presentation) = extern_io.decode::<serde_json::Value>() {
+                if let Some(data_str) = presentation.get("disclosed_data").and_then(|d| d.as_str()) {
+                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(data_str) {
+                        if let Some(phi) = data.get("phi").and_then(|p| p.as_f64()) {
+                            return Ok(phi.clamp(0.0, 1.0));
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            // Personal cluster unavailable — fall through to proxy
+        }
+    }
+
+    // Fallback: participation-based Φ proxy (pre-Fractal CivOS behavior)
     let voter_anchor = format!("consciousness:{}", voter_did);
     let anchor_hash = anchor_hash(&voter_anchor)?;
 
@@ -335,44 +368,59 @@ fn query_consciousness_phi(voter_did: &str) -> ExternResult<f64> {
         GetStrategy::default(),
     )?;
 
-    // If we have consciousness data, get the latest Φ
-    // For now, compute from participation history as proxy
     if links.is_empty() {
-        // Default Φ for new participants based on activity
         return Ok(0.3);
     }
 
-    // Calculate Φ proxy from voting consistency and engagement
     let vote_count = links.len() as f64;
     let phi_proxy = (0.3 + (vote_count / 100.0).min(0.5)).min(0.8);
 
     Ok(phi_proxy)
 }
 
-/// Query K-vector trust score
+/// Query K-vector trust score via personal_bridge credential presentation.
+///
+/// Under Fractal CivOS, K-vector entries from FL participation are stored
+/// in the agent's credential wallet. Governance calls personal_bridge to
+/// get a signed K-vector attestation.
+///
+/// Fallback: default trust score when personal cluster is unavailable.
 fn query_k_vector_trust(_voter_did: &str) -> ExternResult<f64> {
-    // Query local chain for K-vector entries
-    let filter = ChainQueryFilter::new().include_entries(true);
+    // Phase B: Try cross-cluster call to personal_bridge for K-vector credential
+    let personal_result = call(
+        CallTargetCell::OtherRole("personal".into()),
+        ZomeName::from("personal_bridge"),
+        FunctionName::from("present_k_vector"),
+        None,
+        (),
+    );
 
-    for record in query(filter)? {
-        // Look for K-vector linked to this voter
-        // This is a simplified lookup - in production would use proper links
-        if let Some(_entry_bytes) = record.entry().as_option() {
-            // Check if this is a K-vector for our voter
-            // Default trust for participants without K-vector
+    match &personal_result {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            if let Ok(presentation) = extern_io.decode::<serde_json::Value>() {
+                if let Some(data_str) = presentation.get("disclosed_data").and_then(|d| d.as_str()) {
+                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(data_str) {
+                        if let Some(trust) = data.get("k_trust").and_then(|t| t.as_f64()) {
+                            return Ok(trust.clamp(0.0, 1.0));
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            // Personal cluster unavailable — fall through to default
         }
     }
 
-    // Default K-trust for participants (would be populated by FL/consensus participation)
+    // Fallback: default K-trust for participants without personal cluster
     Ok(0.5)
 }
 
-/// Query stake weight from finance module
+/// Query stake weight from finance module.
+///
+/// DEFERRED: Requires mycelix-finance cluster (not yet scaffolded in Fractal CivOS).
+/// Uses voice credit allocation as proxy until finance cluster is available.
 fn query_stake_weight(voter_did: &str) -> ExternResult<f64> {
-    // In full implementation, this would make a cross-hApp call to mycelix-finance
-    // For now, we query local chain for any stake-related entries
-
-    // Check for payment history as stake proxy
     let voter_anchor = format!("stake:{}", voter_did);
     let anchor_hash = anchor_hash(&voter_anchor)?;
 
@@ -381,12 +429,10 @@ fn query_stake_weight(voter_did: &str) -> ExternResult<f64> {
         GetStrategy::default(),
     )?;
 
-    // Stake weight based on credit allocation (proxy for actual stake)
     if links.is_empty() {
-        return Ok(0.1); // Minimum stake weight for participants
+        return Ok(0.1);
     }
 
-    // Calculate from voice credits as proxy
     Ok(0.3)
 }
 
@@ -420,15 +466,11 @@ fn calculate_participation_score(voter_did: &str) -> ExternResult<f64> {
     Ok((base_score * 0.4 + phi_score * 0.6).min(1.0))
 }
 
-/// Query domain reputation from knowledge module
+/// Query domain reputation from knowledge module.
+///
+/// DEFERRED: Requires mycelix-knowledge cluster (not yet scaffolded in Fractal CivOS).
+/// Returns default reputation until knowledge cluster is available.
 fn query_domain_reputation(_voter_did: &str) -> ExternResult<f64> {
-    // In full implementation, cross-hApp call to mycelix-knowledge
-    // Would query:
-    // - Epistemic contributions
-    // - Fact-check accuracy
-    // - Dark spots resolved
-
-    // Default reputation for participants without knowledge contributions
     Ok(0.3)
 }
 
