@@ -271,6 +271,46 @@ fn validate_update_committee(
         ));
     }
 
+    // When transitioning to Complete, verify the DKG result
+    if committee.phase == DkgPhase::Complete {
+        // Public key must be present
+        let pk_bytes = match committee.public_key {
+            Some(ref bytes) => bytes,
+            None => {
+                return Ok(ValidateCallbackResult::Invalid(
+                    "Complete committee must have a public key".into(),
+                ));
+            }
+        };
+
+        // Verify public key is a valid secp256k1 point (33-byte compressed SEC1)
+        if feldman_dkg::Commitment::from_bytes(pk_bytes).is_err() {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Public key is not a valid secp256k1 point".into(),
+            ));
+        }
+
+        // Verify we have enough commitments (at least threshold)
+        if (committee.commitments.len() as u32) < committee.threshold {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!(
+                    "Need at least {} commitment sets, got {}",
+                    committee.threshold,
+                    committee.commitments.len()
+                ),
+            ));
+        }
+
+        // Verify each commitment set is valid
+        for (i, cs_bytes) in committee.commitments.iter().enumerate() {
+            if feldman_dkg::CommitmentSet::from_bytes(cs_bytes).is_err() {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("Invalid commitment set at index {}", i),
+                ));
+            }
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -298,6 +338,24 @@ fn validate_create_member(
         return Ok(ValidateCallbackResult::Invalid(
             "Participant ID must be positive".into(),
         ));
+    }
+
+    // If VSS commitment is provided, verify it's a valid CommitmentSet
+    if let Some(ref vss_bytes) = member.vss_commitment {
+        match feldman_dkg::CommitmentSet::from_bytes(vss_bytes) {
+            Ok(cs) => {
+                if cs.is_empty() {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "VSS commitment set must not be empty".into(),
+                    ));
+                }
+            }
+            Err(e) => {
+                return Ok(ValidateCallbackResult::Invalid(
+                    format!("Invalid VSS commitment: {}", e),
+                ));
+            }
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -351,6 +409,16 @@ fn validate_create_signature(
     if sig.signature.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Signature cannot be empty".into(),
+        ));
+    }
+
+    // Signature must be at least 64 bytes (raw ECDSA r||s minimum)
+    if sig.signature.len() < 64 {
+        return Ok(ValidateCallbackResult::Invalid(
+            format!(
+                "Signature too short: expected at least 64 bytes (ECDSA r||s), got {}",
+                sig.signature.len()
+            ),
         ));
     }
 
