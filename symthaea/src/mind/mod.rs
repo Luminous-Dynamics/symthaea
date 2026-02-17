@@ -4,6 +4,7 @@
 //! integrating perception, reasoning, memory, and action into a unified
 //! continuous-time cognitive architecture.
 
+pub mod async_mind;
 mod config;
 mod goals;
 pub mod intent;
@@ -12,6 +13,7 @@ pub mod structured_thought;
 mod tick;
 mod utils;
 
+pub use async_mind::{connect_social, AsyncMind, AsyncMindHandle};
 pub use config::*;
 pub use intent::{
     ConceptLabel, ConceptPrototype, EpistemicAssessment, IntentClassification, IntentClassifier,
