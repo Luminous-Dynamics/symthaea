@@ -94,3 +94,7 @@ path = "tests/edunet_workflow.rs"
 [[test]]
 name = "supplychain_workflow"
 path = "tests/supplychain_workflow.rs"
+
+[[test]]
+name = "personal_workflow"
+path = "tests/personal_workflow.rs"

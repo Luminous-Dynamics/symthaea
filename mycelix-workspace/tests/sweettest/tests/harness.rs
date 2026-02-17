@@ -63,6 +63,11 @@ impl DnaPaths {
     pub fn civic() -> PathBuf {
         Self::workspace_root().join("../mycelix-civic/dna/mycelix_civic.dna")
     }
+
+    /// Personal cluster DNA (identity vault + health vault + credential wallet + bridge)
+    pub fn personal() -> PathBuf {
+        Self::workspace_root().join("../mycelix-personal/dna/mycelix_personal.dna")
+    }
 }
 
 /// A test agent with conductor and cell references for Holochain 0.6 API.
