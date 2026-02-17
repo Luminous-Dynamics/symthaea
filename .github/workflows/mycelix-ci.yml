@@ -50,9 +50,6 @@ env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: '20'
   RUST_VERSION: 'stable'  # Use latest stable Rust
-  # getrandom 0.3 custom backend for WASM builds (HDK provides __getrandom_v03_custom)
-  # Zome .cargo/config.toml files provide this locally but are gitignored
-  CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
 
 jobs:
   # ============================================================================
@@ -315,6 +312,10 @@ jobs:
     defaults:
       run:
         working-directory: mycelix-core
+    env:
+      # getrandom 0.3 custom backend for WASM (HDK provides __getrandom_v03_custom)
+      # Zome .cargo/config.toml files provide this locally but are gitignored
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
 
     steps:
       - uses: actions/checkout@v4
@@ -415,6 +416,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: [holochain-zomes, unit-tests]
     timeout-minutes: 30
+    env:
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
 
     steps:
       - uses: actions/checkout@v4
@@ -828,6 +831,8 @@ jobs:
     needs: [holochain-zomes]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     timeout-minutes: 45
+    env:
+      CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
 
     steps:
       - uses: actions/checkout@v4
