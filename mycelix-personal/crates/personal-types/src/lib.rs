@@ -47,6 +47,111 @@ pub enum CredentialType {
     Domain(String),
 }
 
+// ============================================================================
+// K-Vector Trust Types
+// ============================================================================
+
+/// Trust tiers for governance participation.
+///
+/// Derived from K-Vector `trust_score()` with defined thresholds.
+/// Used by the credential wallet for trust credential issuance and
+/// by governance for voting eligibility checks.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TrustTier {
+    /// Trust score < 0.3 — Observer only, cannot vote.
+    Observer,
+    /// Trust score >= 0.3 — Basic participation.
+    Basic,
+    /// Trust score >= 0.4 — Can vote on major proposals.
+    Standard,
+    /// Trust score >= 0.6 — Can propose and vote on constitutional changes.
+    Elevated,
+    /// Trust score >= 0.8 — Full governance rights including emergency powers.
+    Guardian,
+}
+
+impl TrustTier {
+    /// Get the minimum trust score for this tier.
+    pub fn min_score(&self) -> f64 {
+        match self {
+            TrustTier::Observer => 0.0,
+            TrustTier::Basic => 0.3,
+            TrustTier::Standard => 0.4,
+            TrustTier::Elevated => 0.6,
+            TrustTier::Guardian => 0.8,
+        }
+    }
+
+    /// Determine tier from trust score.
+    ///
+    /// Accepts f64 to avoid precision loss at tier boundaries when computing
+    /// the midpoint of an f32 range.
+    pub fn from_score(score: f64) -> Self {
+        if score >= 0.8 {
+            TrustTier::Guardian
+        } else if score >= 0.6 {
+            TrustTier::Elevated
+        } else if score >= 0.4 {
+            TrustTier::Standard
+        } else if score >= 0.3 {
+            TrustTier::Basic
+        } else {
+            TrustTier::Observer
+        }
+    }
+}
+
+/// Privacy-preserving trust score range.
+///
+/// Proves the trust score falls within a range without revealing the exact value.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TrustScoreRange {
+    /// Lower bound (inclusive).
+    pub lower: f32,
+    /// Upper bound (inclusive).
+    pub upper: f32,
+}
+
+/// K-Vector component identifiers.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum KVectorComponent {
+    /// k_r: Reputation
+    Reputation,
+    /// k_a: Activity
+    Activity,
+    /// k_i: Integrity
+    Integrity,
+    /// k_p: Performance
+    Performance,
+    /// k_m: Membership duration
+    Membership,
+    /// k_s: Stake weight
+    Stake,
+    /// k_h: Historical consistency
+    History,
+    /// k_topo: Network topology contribution
+    Topology,
+}
+
+/// Status of an attestation request.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AttestationStatus {
+    /// Waiting for response.
+    Pending,
+    /// Attestation provided.
+    Fulfilled,
+    /// Request was declined.
+    Declined,
+    /// Request expired.
+    Expired,
+    /// Request was cancelled.
+    Cancelled,
+}
+
+// ============================================================================
+// Presentation Types
+// ============================================================================
+
 /// A signed attestation that can be presented via the personal bridge.
 ///
 /// This is the output format for credential presentations — the bridge
@@ -128,6 +233,63 @@ mod tests {
         let back: CredentialPresentation = serde_json::from_str(&json).unwrap();
         assert_eq!(back.credential_type, CredentialType::Identity);
         assert!(back.disclosed_data.contains("Alice"));
+    }
+
+    #[test]
+    fn trust_tier_from_score_all_boundaries() {
+        assert_eq!(TrustTier::from_score(0.0), TrustTier::Observer);
+        assert_eq!(TrustTier::from_score(0.29), TrustTier::Observer);
+        assert_eq!(TrustTier::from_score(0.3), TrustTier::Basic);
+        assert_eq!(TrustTier::from_score(0.4), TrustTier::Standard);
+        assert_eq!(TrustTier::from_score(0.6), TrustTier::Elevated);
+        assert_eq!(TrustTier::from_score(0.8), TrustTier::Guardian);
+        assert_eq!(TrustTier::from_score(1.0), TrustTier::Guardian);
+    }
+
+    #[test]
+    fn trust_tier_min_score_consistent() {
+        for tier in &[
+            TrustTier::Observer,
+            TrustTier::Basic,
+            TrustTier::Standard,
+            TrustTier::Elevated,
+            TrustTier::Guardian,
+        ] {
+            let score = tier.min_score();
+            assert_eq!(TrustTier::from_score(score), *tier);
+        }
+    }
+
+    #[test]
+    fn trust_tier_serde_roundtrip() {
+        let tier = TrustTier::Elevated;
+        let json = serde_json::to_string(&tier).unwrap();
+        let back: TrustTier = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, TrustTier::Elevated);
+    }
+
+    #[test]
+    fn trust_score_range_serde_roundtrip() {
+        let range = TrustScoreRange { lower: 0.3, upper: 0.7 };
+        let json = serde_json::to_string(&range).unwrap();
+        let back: TrustScoreRange = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, range);
+    }
+
+    #[test]
+    fn kvector_component_serde_roundtrip() {
+        let comp = KVectorComponent::Topology;
+        let json = serde_json::to_string(&comp).unwrap();
+        let back: KVectorComponent = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, KVectorComponent::Topology);
+    }
+
+    #[test]
+    fn attestation_status_serde_roundtrip() {
+        let status = AttestationStatus::Fulfilled;
+        let json = serde_json::to_string(&status).unwrap();
+        let back: AttestationStatus = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, AttestationStatus::Fulfilled);
     }
 
     #[test]
