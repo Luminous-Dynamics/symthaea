@@ -58,12 +58,17 @@ ndarray = "0.15"
 # "wasmbind" default feature, which breaks Holochain WASM zomes that depend on this SDK.
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 
+# WASM compatibility: getrandom 0.2 custom backend (avoids wasm-bindgen/js)
+# The "custom" feature removes the compile_error on wasm32-unknown-unknown.
+# In zome context, HDK provides the custom getrandom implementation.
+# In standalone SDK checks, cargo check (no link) is sufficient.
+getrandom = { version = "0.2", features = ["custom"] }
+
 # UUID generation
 # IMPORTANT: Do NOT use features=["js"] — it activates getrandom's js backend
 # (wasm-bindgen), which is incompatible with Holochain's WASM runtime.
-# UUID v4 RNG is handled via the getrandom_backend="custom" rustflag in the zome's
-# .cargo/config.toml, which routes to HDK's __getrandom_v03_custom on wasm32.
-uuid = { version = "1.0", features = ["v4", "serde"] }
+# "rng-rand" tells uuid to use rand for v4 randomness (rand uses getrandom custom backend on WASM).
+uuid = { version = "1.0", features = ["v4", "serde", "rng-rand"] }
 
 # Regex for sanitization
 regex = "1.10"

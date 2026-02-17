@@ -1,0 +1,11 @@
+# Cargo configuration for Mycelix SDK
+#
+# When building the SDK for wasm32-unknown-unknown (standalone WASM check),
+# set the getrandom v0.3 custom backend. In the actual zome context, each
+# zome's own .cargo/config.toml provides this cfg, but for standalone SDK
+# compilation checks we need it here too.
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    "--cfg", "getrandom_backend=\"custom\"",
+]

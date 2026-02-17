@@ -50,6 +50,9 @@ env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: '20'
   RUST_VERSION: 'stable'  # Use latest stable Rust
+  # getrandom 0.3 custom backend for WASM builds (HDK provides __getrandom_v03_custom)
+  # Zome .cargo/config.toml files provide this locally but are gitignored
+  CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
 
 jobs:
   # ============================================================================
@@ -233,8 +236,10 @@ jobs:
       - name: Build release (native)
         run: cargo build --release --features simulation
 
-      - name: Build release (WASM)
-        run: cargo build --release --target wasm32-unknown-unknown --features holochain
+      - name: Check compilation (WASM release)
+        # cargo check (not build) because the getrandom custom backend symbol
+        # is provided by HDK at link time, which isn't available for standalone SDK
+        run: cargo check --release --target wasm32-unknown-unknown --features holochain
 
   # ============================================================================
   # hApp Compilation Check (all individual hApp repos)

@@ -12,9 +12,12 @@ name = "bridge_coordinator"
 [dependencies]
 # Holochain Development (HDK) for business logic
 hdk = "0.6"
-# Enable wasm support for getrandom (transitive dependencies)
-getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
-getrandom = { version = "0.3", features = ["wasm_js"] }
+# WASM compatibility for getrandom (transitive dependencies)
+# getrandom 0.2: "custom" feature lets Holochain provide RNG implementation.
+#   Do NOT use "js" - it pulls wasm-bindgen which Holochain's WASM runtime rejects
+# getrandom 0.3: custom backend set via .cargo/config.toml (HDK provides __getrandom_v03_custom)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["custom"] }
+getrandom_03 = { package = "getrandom", version = "0.3" }
 
 # Integrity zome (for entry types)
 bridge_integrity = { path = "../integrity" }
