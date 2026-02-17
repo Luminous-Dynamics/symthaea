@@ -13,7 +13,7 @@ use anyhow::Result;
 
 use crate::hdc::meta_conscious_conversation::MetaConversationCore;
 use crate::language::consciousness_prompts::{
-    ConsciousnessContext, ConsciousnessPromptGenerator, RelationshipMode, SevenHarmonies,
+    ConsciousnessContext, ConsciousnessPromptGenerator, Harmony, RelationshipMode,
 };
 use crate::language::llm_organ::{LlmOrgan, LlmRequest, LlmResponse, Message, Role};
 
@@ -74,7 +74,7 @@ impl MetaConsciousLlmBridge {
         let mut ctx = ConsciousnessContext::default();
         ctx.phi = phi.clamp(0.0, 1.0);
         ctx.introspective = introspective;
-        ctx.dominant_harmony = SevenHarmonies::IntegralWisdom;
+        ctx.dominant_harmony = Harmony::IntegralWisdom;
         ctx.relationship_mode = RelationshipMode::Collaborator;
         ctx.turn_count = history.len() as u32;
 

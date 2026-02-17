@@ -94,7 +94,7 @@ name = "consciousness_benchmarks"
 harness = false
 
 [features]
-default = []
+default = ["simd"]
 embeddings = []       # Enable embedding model integration
 thread_local_cache = []  # Enable thread-local caching in Phi engine
 rayon = []            # Enable parallel computation with rayon

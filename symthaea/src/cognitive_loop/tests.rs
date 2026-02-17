@@ -2028,7 +2028,7 @@ fn test_gwt_broadcast_boosts_confidence() {
     })
     .unwrap();
 
-    let initial_confidence = service.prediction_confidence();
+    let _initial_confidence = service.prediction_confidence();
 
     // Run cycles — each broadcast adds +0.03 to prediction_confidence
     let mut any_broadcast = false;
