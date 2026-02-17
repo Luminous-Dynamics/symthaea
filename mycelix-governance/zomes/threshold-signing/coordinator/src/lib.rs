@@ -41,6 +41,7 @@ pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
         created_at: now,
         active: true,
         epoch: 1,
+        min_phi: input.min_phi,
     };
 
     let action_hash = create_entry(&EntryTypes::SigningCommittee(committee))?;
@@ -76,15 +77,67 @@ pub struct CreateCommitteeInput {
     pub threshold: u32,
     pub member_count: u32,
     pub scope: CommitteeScope,
+    /// Minimum Φ score for committee membership (consciousness gate)
+    #[serde(default)]
+    pub min_phi: Option<f64>,
 }
 
 /// Register as a committee member
 ///
 /// Called by validators who want to participate in the signing committee.
+/// If the committee has a `min_phi` threshold, the caller's consciousness
+/// score is checked via the governance bridge before registration is allowed.
 #[hdk_extern]
 pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
+
+    // If committee requires minimum Φ, verify consciousness gate
+    if let Some(committee_record) = get_committee(input.committee_id.clone())? {
+        if let Some(committee) = committee_record
+            .entry()
+            .to_app_option::<SigningCommittee>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if let Some(min_phi) = committee.min_phi {
+                // Call governance bridge to verify consciousness gate
+                let gate_result = call(
+                    CallTargetCell::Local,
+                    ZomeName::from("governance_bridge"),
+                    FunctionName::from("verify_consciousness_gate"),
+                    None,
+                    serde_json::json!({
+                        "action_type": "Voting",
+                        "action_id": null
+                    }),
+                );
+
+                match gate_result {
+                    Ok(ZomeCallResponse::Ok(extern_io)) => {
+                        // Parse the gate verification result
+                        if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+                            let phi = result.get("phi").and_then(|p| p.as_f64()).unwrap_or(0.0);
+                            if phi < min_phi {
+                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                    "Consciousness gate failed: Φ score ({:.2}) below committee minimum ({:.2})",
+                                    phi, min_phi
+                                ))));
+                            }
+                        }
+                    }
+                    _ => {
+                        // Bridge unavailable — use trust_score as Φ proxy (degraded mode)
+                        if input.trust_score < min_phi {
+                            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                "Trust score ({:.2}) below committee Φ minimum ({:.2}) (bridge unavailable)",
+                                input.trust_score, min_phi
+                            ))));
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     let member = CommitteeMember {
         committee_id: input.committee_id.clone(),
@@ -614,6 +667,7 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
         created_at: now,
         active: true,
         epoch: current_committee.epoch + 1,
+        min_phi: current_committee.min_phi,
     };
 
     let action_hash = create_entry(&EntryTypes::SigningCommittee(new_committee.clone()))?;

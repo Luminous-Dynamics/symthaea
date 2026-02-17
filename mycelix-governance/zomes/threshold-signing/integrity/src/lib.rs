@@ -44,6 +44,9 @@ pub struct SigningCommittee {
     pub active: bool,
     /// Epoch number (for key rotation)
     pub epoch: u32,
+    /// Minimum Φ (consciousness) score required to join committee (0.0-1.0)
+    #[serde(default)]
+    pub min_phi: Option<f64>,
 }
 
 /// DKG ceremony phases
@@ -251,6 +254,15 @@ fn validate_create_committee(
         return Ok(ValidateCallbackResult::Invalid(
             "New committees must start in Registration phase".into(),
         ));
+    }
+
+    // Validate min_phi if set
+    if let Some(min_phi) = committee.min_phi {
+        if !(0.0..=1.0).contains(&min_phi) {
+            return Ok(ValidateCallbackResult::Invalid(
+                format!("min_phi must be between 0.0 and 1.0, got {}", min_phi),
+            ));
+        }
     }
 
     Ok(ValidateCallbackResult::Valid)
@@ -471,6 +483,7 @@ mod tests {
             created_at: Timestamp::from_micros(0),
             active: true,
             epoch: 1,
+            min_phi: None,
         }
     }
 
@@ -582,5 +595,177 @@ mod tests {
             signed_at: Timestamp::from_micros(0),
         };
         assert!(check_signature_validity(&sig).is_ok());
+    }
+
+    // =========================================================================
+    // END-TO-END DKG INTEGRATION TEST
+    // =========================================================================
+    // Runs a real 3-of-5 feldman-dkg ceremony and validates all outputs
+    // through the integrity validators — proving the full crypto pipeline.
+
+    #[test]
+    fn test_e2e_dkg_ceremony_through_validators() {
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+
+        let threshold = 3usize;
+        let n_members = 5usize;
+
+        // Step 1: Run a real DKG ceremony
+        let config = feldman_dkg::DkgConfig::new(threshold, n_members)
+            .expect("valid DKG config");
+        let mut ceremony = feldman_dkg::DkgCeremony::new(config, 1000);
+
+        let mut rng = StdRng::seed_from_u64(42);
+
+        // Register all participants (auto-transitions to Dealing when all registered)
+        for i in 1..=(n_members as u32) {
+            ceremony
+                .add_participant(feldman_dkg::ParticipantId(i), 1000)
+                .expect("add participant");
+        }
+
+        // Each participant generates a deal
+        let mut participants: Vec<feldman_dkg::Participant> = (1..=(n_members as u32))
+            .map(|i| {
+                feldman_dkg::Participant::new(
+                    feldman_dkg::ParticipantId(i),
+                    threshold,
+                    n_members,
+                )
+                .unwrap()
+            })
+            .collect();
+
+        let deals: Vec<feldman_dkg::dealer::Deal> = participants
+            .iter_mut()
+            .map(|p| p.generate_deal(&mut rng).unwrap())
+            .collect();
+
+        // Submit all deals to the ceremony
+        for (i, deal) in deals.iter().enumerate() {
+            ceremony
+                .submit_deal(
+                    feldman_dkg::ParticipantId((i + 1) as u32),
+                    deal.clone(),
+                    1001,
+                )
+                .expect("submit deal");
+        }
+
+        // Finalize ceremony
+        let result = ceremony.finalize().expect("ceremony finalize");
+        let combined_pk = result.public_key.to_bytes();
+
+        // Step 2: Collect all commitment sets from participants
+        let commitment_sets: Vec<Vec<u8>> = deals
+            .iter()
+            .map(|deal| deal.commitments.to_bytes())
+            .collect();
+
+        // Step 3: Validate each member's VSS commitment through check_member_validity
+        for (i, cs_bytes) in commitment_sets.iter().enumerate() {
+            let mut member = make_test_member();
+            member.participant_id = (i + 1) as u32;
+            member.vss_commitment = Some(cs_bytes.clone());
+            assert!(
+                check_member_validity(&member).is_ok(),
+                "Member {}'s VSS commitment should be valid",
+                i + 1
+            );
+        }
+
+        // Step 4: Validate completed committee through check_committee_update_validity
+        let committee = SigningCommittee {
+            id: "e2e-test".into(),
+            name: "E2E Test".into(),
+            threshold: threshold as u32,
+            member_count: n_members as u32,
+            phase: DkgPhase::Complete,
+            public_key: Some(combined_pk.clone()),
+            commitments: commitment_sets.clone(),
+            scope: CommitteeScope::All,
+            created_at: Timestamp::from_micros(0),
+            active: true,
+            epoch: 1,
+            min_phi: Some(0.4),
+        };
+        assert!(
+            check_committee_update_validity(&committee).is_ok(),
+            "Completed committee with real DKG data should pass validation"
+        );
+
+        // Step 5: Verify public key is a valid secp256k1 point
+        assert_eq!(
+            combined_pk.len(),
+            33,
+            "Combined PK should be 33-byte compressed SEC1"
+        );
+        assert!(
+            feldman_dkg::Commitment::from_bytes(&combined_pk).is_ok(),
+            "Combined PK should be a valid curve point"
+        );
+
+        // Step 6: Verify committee with wrong threshold fails
+        let bad_committee = SigningCommittee {
+            threshold: 6, // more than commitments available
+            ..committee.clone()
+        };
+        assert!(
+            check_committee_update_validity(&bad_committee).is_err(),
+            "Committee with threshold > commitments should fail"
+        );
+
+        // Step 7: Verify committee with corrupt public key fails
+        let bad_pk_committee = SigningCommittee {
+            public_key: Some(vec![0xFF; 33]),
+            ..committee.clone()
+        };
+        assert!(
+            check_committee_update_validity(&bad_pk_committee).is_err(),
+            "Committee with corrupt public key should fail"
+        );
+
+        // Step 8: Verify committee with corrupt commitment set fails
+        let mut bad_commitments = commitment_sets;
+        bad_commitments[2] = vec![0xAA; 40]; // corrupt one commitment set
+        let bad_cs_committee = SigningCommittee {
+            commitments: bad_commitments,
+            ..committee
+        };
+        assert!(
+            check_committee_update_validity(&bad_cs_committee).is_err(),
+            "Committee with corrupt commitment set should fail"
+        );
+    }
+
+    #[test]
+    fn test_min_phi_validation() {
+        // Valid min_phi
+        let committee = SigningCommittee {
+            id: "test".into(),
+            name: "Test".into(),
+            threshold: 2,
+            member_count: 3,
+            phase: DkgPhase::Complete,
+            public_key: Some(make_valid_public_key()),
+            commitments: vec![
+                make_valid_commitment_set_bytes(2),
+                make_valid_commitment_set_bytes(2),
+            ],
+            scope: CommitteeScope::All,
+            created_at: Timestamp::from_micros(0),
+            active: true,
+            epoch: 1,
+            min_phi: Some(0.4),
+        };
+        assert!(check_committee_update_validity(&committee).is_ok());
+
+        // None min_phi is valid (no consciousness gate)
+        let no_phi = SigningCommittee {
+            min_phi: None,
+            ..committee.clone()
+        };
+        assert!(check_committee_update_validity(&no_phi).is_ok());
     }
 }
