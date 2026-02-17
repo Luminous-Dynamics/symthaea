@@ -44,6 +44,9 @@ impl ContinuousMind {
         // Social Coherence (Theory of Mind)
         self.process_social();
 
+        // Iroh P2P Bridge: flush outbox to network, drain inbound to inbox
+        self.sync_iroh_bridge();
+
         // Generate output if appropriate
         let output = self.generate_output();
 
@@ -282,6 +285,47 @@ impl ContinuousMind {
                 context: self.state.current_thought.clone(),
                 interaction_outcome: None,
             });
+        }
+    }
+
+    /// Sync social messages through the Iroh P2P bridge (if attached).
+    ///
+    /// 1. Flushes `social_outbox` to the network actor (non-blocking)
+    /// 2. Drains inbound network messages into `social_inbox`
+    ///
+    /// Messages arriving from the network will be processed on the *next* tick
+    /// by `process_social()` (inbox → SocialCoherence). This one-tick delay is
+    /// acceptable at 50Hz — 20ms latency is below human perception threshold.
+    fn sync_iroh_bridge(&mut self) {
+        let bridge = match &mut self.iroh_bridge {
+            Some(b) if b.is_alive() => b,
+            _ => return,
+        };
+
+        // Flush outgoing social messages to the network
+        let outgoing = std::mem::take(&mut self.social_outbox);
+        if !outgoing.is_empty() {
+            let count = outgoing.len();
+            bridge.flush_outbox(outgoing);
+            tracing::trace!(
+                target: "symthaea::mind::iroh",
+                count,
+                "Flushed social messages to Iroh bridge"
+            );
+        }
+
+        // Drain inbound messages from network into inbox
+        let incoming = bridge.drain_inbox();
+        if !incoming.is_empty() {
+            let count = incoming.len();
+            for msg in incoming {
+                self.social_inbox.push(msg);
+            }
+            tracing::trace!(
+                target: "symthaea::mind::iroh",
+                count,
+                "Drained inbound messages from Iroh bridge"
+            );
         }
     }
 
