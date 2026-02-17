@@ -66,12 +66,30 @@ pub struct ContinuousMind {
     /// Consuming code can drain this via `take_evicted()` and route items
     /// to episodic memory or the MemoryCoordinator for graduation.
     evicted_items: Vec<(ContinuousHV, u64)>,
+    /// Optional social coherence (theory of mind) system.
+    /// When enabled, the mind models other agents' mental states and
+    /// uses social reasoning to inform cooperation decisions.
+    pub(crate) social_coherence: Option<crate::brain::SocialCoherence>,
+    /// Incoming social messages from network peers.
+    pub(crate) social_inbox: Vec<SocialMessage>,
+    /// Outgoing social messages to broadcast to peers.
+    pub(crate) social_outbox: Vec<SocialMessage>,
 }
 
 impl ContinuousMind {
     /// Create a new continuous mind
     pub fn new(config: MindConfig) -> Self {
         let dim = config.dimension;
+        let social = if config.enable_social_coherence {
+            Some(crate::brain::SocialCoherence::new(
+                crate::brain::SocialCoherenceConfig {
+                    dimension: dim,
+                    ..Default::default()
+                },
+            ))
+        } else {
+            None
+        };
         Self {
             intent_classifier: IntentClassifier::new(dim),
             config,
@@ -92,6 +110,9 @@ impl ContinuousMind {
             federated_inbox: Vec::new(),
             federated_outbox: Vec::new(),
             evicted_items: Vec::new(),
+            social_coherence: social,
+            social_inbox: Vec::new(),
+            social_outbox: Vec::new(),
         }
     }
 
@@ -253,6 +274,42 @@ impl ContinuousMind {
     /// Check if federated learning is enabled.
     pub fn is_federated(&self) -> bool {
         self.federated.is_some()
+    }
+
+    // ========================================================================
+    // Social Coherence Interface
+    // ========================================================================
+
+    /// Enable social coherence after construction.
+    pub fn enable_social_coherence(&mut self) {
+        if self.social_coherence.is_none() {
+            self.social_coherence = Some(crate::brain::SocialCoherence::new(
+                crate::brain::SocialCoherenceConfig {
+                    dimension: self.config.dimension,
+                    ..Default::default()
+                },
+            ));
+        }
+    }
+
+    /// Receive a social message from a network peer.
+    pub fn receive_social(&mut self, msg: SocialMessage) {
+        self.social_inbox.push(msg);
+    }
+
+    /// Drain outgoing social messages (for network broadcast).
+    pub fn drain_social_outbox(&mut self) -> Vec<SocialMessage> {
+        std::mem::take(&mut self.social_outbox)
+    }
+
+    /// Check if social coherence is enabled.
+    pub fn is_social(&self) -> bool {
+        self.social_coherence.is_some()
+    }
+
+    /// Get a reference to the social coherence system (if enabled).
+    pub fn social_coherence(&self) -> Option<&crate::brain::SocialCoherence> {
+        self.social_coherence.as_ref()
     }
 
     // ========================================================================
@@ -731,5 +788,122 @@ mod tests {
         }
 
         assert!(mind.state.consciousness_level > 0.0);
+    }
+
+    // ====================================================================
+    // Social Coherence Integration Tests
+    // ====================================================================
+
+    #[test]
+    fn test_social_coherence_disabled_by_default() {
+        let mind = ContinuousMind::default();
+        assert!(!mind.is_social());
+        assert!(mind.social_coherence().is_none());
+    }
+
+    #[test]
+    fn test_social_coherence_enabled_via_config() {
+        let mind = ContinuousMind::new(MindConfig {
+            enable_social_coherence: true,
+            ..Default::default()
+        });
+        assert!(mind.is_social());
+        assert!(mind.social_coherence().is_some());
+    }
+
+    #[test]
+    fn test_social_coherence_enable_after_construction() {
+        let mut mind = ContinuousMind::default();
+        assert!(!mind.is_social());
+        mind.enable_social_coherence();
+        assert!(mind.is_social());
+    }
+
+    #[test]
+    fn test_social_inbox_processed_on_tick() {
+        let mut mind = ContinuousMind::new(MindConfig {
+            enable_social_coherence: true,
+            ..Default::default()
+        });
+        mind.activate();
+
+        // Send a social message
+        mind.receive_social(SocialMessage {
+            agent_id: "peer_1".to_string(),
+            behavior: ContinuousHV::random(512, 0xBEEF_0001),
+            context: ContinuousHV::random(512, 0xBEEF_0002),
+            interaction_outcome: None,
+        });
+
+        assert_eq!(mind.social_inbox.len(), 1);
+        mind.tick();
+        // Inbox should be drained after tick
+        assert_eq!(mind.social_inbox.len(), 0);
+        // Agent should be modeled now
+        let sc = mind.social_coherence().unwrap();
+        assert!(sc.get_mental_model("peer_1").is_some());
+    }
+
+    #[test]
+    fn test_social_interaction_builds_relationship() {
+        let mut mind = ContinuousMind::new(MindConfig {
+            enable_social_coherence: true,
+            ..Default::default()
+        });
+        mind.activate();
+
+        // Send cooperative interaction
+        mind.receive_social(SocialMessage {
+            agent_id: "ally_1".to_string(),
+            behavior: ContinuousHV::random(512, 0xA11E_0001),
+            context: ContinuousHV::random(512, 0xA11E_0002),
+            interaction_outcome: Some(0.9),
+        });
+        mind.tick();
+
+        let sc = mind.social_coherence().unwrap();
+        let rel = sc.get_relationship("ally_1");
+        assert!(rel.is_some(), "Relationship should be created");
+        assert!(rel.unwrap().trust > 0.5, "Trust should increase from cooperation");
+    }
+
+    #[test]
+    fn test_social_outbox_populated_on_tick() {
+        let mut mind = ContinuousMind::new(MindConfig {
+            enable_social_coherence: true,
+            ..Default::default()
+        });
+        mind.activate();
+
+        // Tick 5 times to trigger outbox export (every 5 ticks)
+        for _ in 0..5 {
+            mind.tick();
+        }
+
+        let outbox = mind.drain_social_outbox();
+        assert!(!outbox.is_empty(), "Outbox should have messages after 5 ticks");
+        assert_eq!(outbox[0].agent_id, "self");
+    }
+
+    #[test]
+    fn test_social_no_processing_when_disabled() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Inbox messages should remain when social is disabled
+        // (actually they get drained regardless but social coherence isn't updated)
+        mind.receive_social(SocialMessage {
+            agent_id: "ghost".to_string(),
+            behavior: ContinuousHV::random(512, 0xDEAD),
+            context: ContinuousHV::random(512, 0xDEAD),
+            interaction_outcome: None,
+        });
+        mind.tick();
+
+        // Social coherence is None, so no models are built
+        assert!(mind.social_coherence().is_none());
+        // Outbox should be empty since social is disabled
+        let outbox = mind.drain_social_outbox();
+        assert!(outbox.is_empty());
     }
 }

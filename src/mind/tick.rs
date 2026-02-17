@@ -41,6 +41,9 @@ impl ContinuousMind {
         // Federated Learning Gradient Exchange
         self.process_federated();
 
+        // Social Coherence (Theory of Mind)
+        self.process_social();
+
         // Generate output if appropriate
         let output = self.generate_output();
 
@@ -207,6 +210,79 @@ impl ContinuousMind {
         }
 
         None
+    }
+
+    /// Process social coherence: update mental models and broadcast self-state.
+    ///
+    /// Receives peer observations from the social inbox, feeds them to the
+    /// `SocialCoherence` engine for Theory-of-Mind modeling, updates the
+    /// self-model with our current consciousness state, and exports our
+    /// behavior embedding to the outbox for network broadcast.
+    fn process_social(&mut self) {
+        let sc = match &mut self.social_coherence {
+            Some(s) => s,
+            None => return,
+        };
+
+        // Step 1: Process incoming social messages
+        let inbox = std::mem::take(&mut self.social_inbox);
+        let mut observed = 0u64;
+        let mut interactions = 0u64;
+        for msg in inbox {
+            sc.observe_agent(&msg.agent_id, &msg.behavior, &msg.context);
+            observed += 1;
+
+            if let Some(outcome) = msg.interaction_outcome {
+                let interaction_type = if outcome >= 0.0 {
+                    crate::brain::social_coherence::InteractionType::Cooperation
+                } else {
+                    crate::brain::social_coherence::InteractionType::Conflict
+                };
+                sc.record_interaction(
+                    &msg.agent_id,
+                    interaction_type,
+                    outcome,
+                    msg.context.clone(),
+                    "observed",
+                    "peer_behavior",
+                );
+                interactions += 1;
+            }
+        }
+
+        if observed > 0 {
+            tracing::debug!(
+                target: "symthaea::mind::social",
+                observed,
+                interactions,
+                agents = sc.stats().agents_modeled,
+                "Processed social observations"
+            );
+        }
+
+        // Step 2: Update self-model with current mind state every 10 ticks
+        if self.state.tick.is_multiple_of(10) {
+            sc.update_self_model(
+                self.state.current_thought.clone(),
+                self.state.current_thought.clone(),
+                self.state.current_thought.clone(),
+            );
+        }
+
+        // Step 3: Decay trust periodically (every 50 ticks)
+        if self.state.tick.is_multiple_of(50) {
+            sc.decay_trust();
+        }
+
+        // Step 4: Export self-behavior to outbox every 5 ticks
+        if self.state.tick.is_multiple_of(5) {
+            self.social_outbox.push(super::SocialMessage {
+                agent_id: "self".to_string(),
+                behavior: self.state.current_thought.clone(),
+                context: self.state.current_thought.clone(),
+                interaction_outcome: None,
+            });
+        }
     }
 
     /// Process federated learning gradient exchange.

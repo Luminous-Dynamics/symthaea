@@ -224,6 +224,73 @@ fn bench_input_scaling(c: &mut Criterion) {
     group.finish();
 }
 
+// =============================================================================
+// SUSTAINED THROUGHPUT: validate 50Hz claim over fixed duration
+// =============================================================================
+
+fn bench_sustained_throughput(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cognitive_cycle_sustained");
+    // Use fewer samples but longer measurement time
+    group.sample_size(10);
+    group.measurement_time(std::time::Duration::from_secs(10));
+
+    let configs = [
+        (
+            "minimal_500cycles",
+            CognitiveLoopConfig {
+                async_training: false,
+                enable_surprise_exploration: false,
+                enable_prefrontal: false,
+                enable_meta_cognition: false,
+                causal_enhancement: false,
+                episodic_replay: false,
+                ..Default::default()
+            },
+        ),
+        (
+            "full_500cycles",
+            CognitiveLoopConfig {
+                async_training: false,
+                enable_surprise_exploration: true,
+                enable_prefrontal: true,
+                enable_meta_cognition: true,
+                causal_enhancement: true,
+                episodic_replay: true,
+                ..Default::default()
+            },
+        ),
+    ];
+
+    let inputs = [
+        "the sun rises in the east",
+        "cause and effect are linked",
+        "patterns emerge from chaos",
+        "consciousness arises from integration",
+        "temporal prediction drives learning",
+        "moral reasoning requires empathy",
+        "exploration balances exploitation",
+        "free energy minimization is universal",
+        "hyperdimensional binding creates meaning",
+        "precision weighting modulates attention",
+    ];
+
+    for (name, config) in &configs {
+        group.bench_with_input(BenchmarkId::new("sustained", name), config, |b, config| {
+            let mut service = CognitiveLoopService::new(config.clone()).unwrap();
+            warm_up(&mut service, 10);
+
+            b.iter(|| {
+                // Run 500 consecutive cycles with varied input (sustained load)
+                for i in 0..500 {
+                    black_box(service.cycle(inputs[i % inputs.len()]));
+                }
+            })
+        });
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_single_cycle,
@@ -231,5 +298,6 @@ criterion_group!(
     bench_subsystem_impact,
     bench_throughput,
     bench_input_scaling,
+    bench_sustained_throughput,
 );
 criterion_main!(benches);

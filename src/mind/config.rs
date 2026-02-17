@@ -22,6 +22,8 @@ pub struct MindConfig {
     pub learning_rate: f32,
     /// Minimum consciousness threshold for action
     pub min_consciousness: f64,
+    /// Enable social coherence (theory of mind for multi-agent)
+    pub enable_social_coherence: bool,
 }
 
 impl Default for MindConfig {
@@ -34,6 +36,7 @@ impl Default for MindConfig {
             learning_enabled: true,
             learning_rate: 0.01,
             min_consciousness: 0.1,
+            enable_social_coherence: false,
         }
     }
 }
@@ -179,6 +182,20 @@ pub struct Goal {
     pub progress: f32,
     /// Is active
     pub is_active: bool,
+}
+
+/// A message exchanged between agents via the social coherence system.
+#[derive(Debug, Clone)]
+pub struct SocialMessage {
+    /// Sender agent identifier.
+    pub agent_id: String,
+    /// Observed behavior embedding of the sender.
+    pub behavior: ContinuousHV,
+    /// Context embedding at time of observation.
+    pub context: ContinuousHV,
+    /// Optional interaction outcome (positive = cooperative, negative = adversarial).
+    /// When `Some`, the message is treated as an interaction record.
+    pub interaction_outcome: Option<f32>,
 }
 
 /// Statistics for the mind
