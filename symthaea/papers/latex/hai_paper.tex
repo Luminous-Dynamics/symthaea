@@ -71,7 +71,7 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (338,000 lines, 3,200+ tests) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (340,000 lines, 5,000+ tests) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -303,8 +303,8 @@ where intrinsic reward is negative prediction error. The value function is $V_\t
 
 \subsection{Experimental Setup}
 
-\textbf{Implementation:} Rust, ${\sim}338$K LOC total, 3,700+ lines core FEP.
-\textbf{Test suite:} 2,797 tests pass, 0 failures, 13 ignored (see Figure~\ref{fig:radar} for full validation radar).
+\textbf{Implementation:} Rust, ${\sim}340$K LOC main crate (452K total with sub-crates), 3,700+ lines core FEP.
+\textbf{Test suite:} 5,050+ tests pass, 0 failures, 13 ignored (see Figure~\ref{fig:radar} for full validation radar).
 \textbf{HDC Dimension:} $d = 16{,}384$ (configurable).
 \textbf{Baseline:} pymdp v0.0.8~\citep{heins2022pymdp}.
 \textbf{Tasks:} T-Maze (context inference), Grid World 3$\times$3 and 5$\times$5 (navigation).
@@ -846,9 +846,9 @@ HAI opens new directions for efficient, interpretable cognitive architectures co
 \textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\par
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
-\textbf{Lines of code:} ${\sim}338$K total, ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
-\textbf{Test suite:} 3,223+ tests, 13 ignored, 0 failures\par
-\textbf{Feature flags:} 60 (40 active in cfg attrs)\par
+\textbf{Lines of code:} ${\sim}340$K main crate (452K total with 21 sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
+\textbf{Test suite:} 5,050+ tests (3,356 unit + 916 sub-crate + 779 integration), 13 ignored, 0 failures\par
+\textbf{Feature flags:} 57 (43 with cfg gates in source)\par
 \textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par
 \textbf{Demo command:} \texttt{cargo run --example fep\_active\_inference\_demo}\par
 }
