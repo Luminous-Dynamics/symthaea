@@ -244,6 +244,13 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional dream engine for counterfactual learning
+        let dream_engine = if config.enable_dream_replay {
+            Some(crate::consciousness::dream::DreamEngine::with_defaults())
+        } else {
+            None
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -359,6 +366,7 @@ impl CognitiveLoopService {
             // Primitive-Belief Bridge for tier-level prediction error learning
             primitive_belief_bridge: PrimitiveBeliefBridge::new(),
             prev_primitive_state: None,
+            dream_engine,
             surprise_bridge,
             prefrontal,
             meta_cognition,

@@ -222,6 +222,13 @@ pub struct CognitiveLoopConfig {
     /// When true, provides coherence veto, value checking, and goal alignment
     /// via a unified NarrativeSelf + GWT + PredictiveSelf integration layer.
     pub enable_narrative_gwt: bool,
+
+    /// Enable counterfactual dream replay.
+    /// When true, the cognitive loop records high-surprise events and periodically
+    /// runs dream cycles during Cruise urgency (low-error steady state) to discover
+    /// alternative actions that would have yielded higher Phi. Accumulated wisdom
+    /// biases future action selection toward more consciousness-optimal choices.
+    pub enable_dream_replay: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -261,6 +268,7 @@ impl Default for CognitiveLoopConfig {
             enable_temporal_consciousness: false,
             enable_embodied_cognition: false,
             enable_narrative_gwt: false,
+            enable_dream_replay: false,
         }
     }
 }
