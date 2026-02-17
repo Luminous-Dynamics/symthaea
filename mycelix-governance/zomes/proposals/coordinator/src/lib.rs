@@ -955,3 +955,173 @@ fn identify_unaddressed_concerns(contributions: &[DiscussionContribution]) -> Ve
         .map(|c| c.id.clone())
         .collect()
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_contribution(id: &str, parent: Option<&str>, stance: Option<Stance>) -> DiscussionContribution {
+        DiscussionContribution {
+            id: id.to_string(),
+            proposal_id: "MIP-001".to_string(),
+            contributor: format!("did:test:{}", id),
+            content: format!("Content for {}", id),
+            harmony_tags: vec![],
+            stance,
+            parent_id: parent.map(|s| s.to_string()),
+            created_at: Timestamp::from_micros(0),
+            edited: false,
+        }
+    }
+
+    // --- calculate_max_thread_depth ---
+
+    #[test]
+    fn test_thread_depth_empty() {
+        assert_eq!(calculate_max_thread_depth(&[]), 0);
+    }
+
+    #[test]
+    fn test_thread_depth_flat_discussion() {
+        // Root-only contributions have no reply chain — max_depth stays 0
+        let contribs = vec![
+            make_contribution("a", None, None),
+            make_contribution("b", None, None),
+            make_contribution("c", None, None),
+        ];
+        assert_eq!(calculate_max_thread_depth(&contribs), 0, "No replies means depth 0");
+    }
+
+    #[test]
+    fn test_thread_depth_single_reply() {
+        let contribs = vec![
+            make_contribution("a", None, None),
+            make_contribution("b", Some("a"), None),
+        ];
+        // root(1) → b(2), max_depth updated to 2
+        assert_eq!(calculate_max_thread_depth(&contribs), 2);
+    }
+
+    #[test]
+    fn test_thread_depth_linear_chain() {
+        let contribs = vec![
+            make_contribution("a", None, None),
+            make_contribution("b", Some("a"), None),
+            make_contribution("c", Some("b"), None),
+            make_contribution("d", Some("c"), None),
+        ];
+        assert_eq!(calculate_max_thread_depth(&contribs), 4, "Linear chain a→b→c→d = depth 4");
+    }
+
+    #[test]
+    fn test_thread_depth_branching() {
+        let contribs = vec![
+            make_contribution("root", None, None),
+            make_contribution("a", Some("root"), None),
+            make_contribution("b", Some("root"), None),
+            make_contribution("a1", Some("a"), None),
+        ];
+        // root(1) → a(2) → a1(3), root(1) → b(2)
+        assert_eq!(calculate_max_thread_depth(&contribs), 3);
+    }
+
+    // --- calculate_cross_camp_engagement ---
+
+    #[test]
+    fn test_cross_camp_no_replies() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Support)),
+            make_contribution("b", None, Some(Stance::Oppose)),
+        ];
+        assert!((calculate_cross_camp_engagement(&contribs) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_cross_camp_all_same_side() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Support)),
+            make_contribution("b", Some("a"), Some(Stance::Support)),
+        ];
+        assert!((calculate_cross_camp_engagement(&contribs) - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_cross_camp_full_engagement() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Support)),
+            make_contribution("b", Some("a"), Some(Stance::Oppose)),
+        ];
+        assert!((calculate_cross_camp_engagement(&contribs) - 1.0).abs() < 1e-10,
+            "100% of replies are cross-camp");
+    }
+
+    #[test]
+    fn test_cross_camp_mixed() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Support)),
+            make_contribution("b", Some("a"), Some(Stance::Oppose)),   // cross
+            make_contribution("c", Some("a"), Some(Stance::Support)),  // same
+        ];
+        // 1 cross / 2 replies = 0.5
+        assert!((calculate_cross_camp_engagement(&contribs) - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_cross_camp_neutral_not_counted() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Support)),
+            make_contribution("b", Some("a"), Some(Stance::Neutral)),
+        ];
+        // Neutral→Support is not cross-camp (only Support↔Oppose counts)
+        assert!((calculate_cross_camp_engagement(&contribs) - 0.0).abs() < 1e-10);
+    }
+
+    // --- identify_unaddressed_concerns ---
+
+    #[test]
+    fn test_unaddressed_concerns_none() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Oppose)),
+            make_contribution("b", Some("a"), Some(Stance::Support)), // addresses concern
+        ];
+        let concerns = identify_unaddressed_concerns(&contribs);
+        assert!(concerns.is_empty(), "Opposition 'a' has a reply, so it's addressed");
+    }
+
+    #[test]
+    fn test_unaddressed_concerns_found() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Oppose)),
+            make_contribution("b", None, Some(Stance::Support)),
+        ];
+        let concerns = identify_unaddressed_concerns(&contribs);
+        assert_eq!(concerns, vec!["a"], "Opposition 'a' has no reply");
+    }
+
+    #[test]
+    fn test_unaddressed_concerns_support_not_flagged() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Support)),
+        ];
+        let concerns = identify_unaddressed_concerns(&contribs);
+        assert!(concerns.is_empty(), "Support contributions are never 'unaddressed concerns'");
+    }
+
+    #[test]
+    fn test_unaddressed_concerns_multiple() {
+        let contribs = vec![
+            make_contribution("a", None, Some(Stance::Oppose)),
+            make_contribution("b", None, Some(Stance::Oppose)),
+            make_contribution("c", None, Some(Stance::Oppose)),
+            make_contribution("d", Some("a"), Some(Stance::Support)), // addresses only 'a'
+        ];
+        let concerns = identify_unaddressed_concerns(&contribs);
+        assert_eq!(concerns.len(), 2, "b and c are unaddressed");
+        assert!(concerns.contains(&"b".to_string()));
+        assert!(concerns.contains(&"c".to_string()));
+    }
+}

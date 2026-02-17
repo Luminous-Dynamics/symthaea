@@ -305,18 +305,13 @@ pub struct CastVoteInput {
 /// Maximum voting weight cap (aligned with governance bridge integrity)
 const MAX_VOTING_WEIGHT: f64 = 1.5;
 
-/// Calculate vote weight using holistic weight calculation
+/// Pure computation of vote weight from Φ components — testable without HDK.
 ///
-/// ## Weight Cap Enforcement
+/// Formula: Reputation² × (0.7 + 0.3 × Φ) × (1 + 0.1 × Participation) × StakeModifier × DomainModifier
 ///
-/// Per Governance Charter, final voting weight is capped at MAX_VOTING_WEIGHT (1.5)
-/// to prevent any single voter from having disproportionate influence.
-fn calculate_vote_weight(voter_did: &str) -> ExternResult<f64> {
-    // Get the full Φ-weighted profile
-    let phi_weight = get_voter_phi_weight(voter_did)?;
-
-    // Calculate holistic weight using the formula:
-    // Weight = Reputation² × (0.7 + 0.3 × Φ) × (1 + 0.1 × Participation)
+/// All inputs are clamped to [0.0, 1.0]. Output is clamped to [0.1, MAX_VOTING_WEIGHT].
+/// Stake contributes at most 5% bonus per Commons Charter anti-plutocracy rule.
+pub fn compute_vote_weight(phi_weight: &PhiWeight) -> f64 {
     let reputation = phi_weight.k_trust.clamp(0.0, 1.0);
     let reputation_squared = reputation * reputation;
 
@@ -324,18 +319,58 @@ fn calculate_vote_weight(voter_did: &str) -> ExternResult<f64> {
     let participation_bonus = 1.0 + 0.1 * phi_weight.participation_score.clamp(0.0, 1.0);
 
     // Domain boundary enforcement: stake contributes at most 5% per Commons Charter
-    // Cap stake_weight contribution to prevent plutocratic influence
-    let stake_modifier = 1.0 + 0.05 * phi_weight.stake_weight.clamp(0.0, 1.0);  // Max 5% bonus
+    let stake_modifier = 1.0 + 0.05 * phi_weight.stake_weight.clamp(0.0, 1.0);
     let domain_modifier = 1.0 + 0.1 * phi_weight.domain_reputation.clamp(0.0, 1.0);
 
-    let uncapped_weight = reputation_squared
+    let uncapped = reputation_squared
         * consciousness_multiplier
         * participation_bonus
         * stake_modifier
         * domain_modifier;
 
-    // Enforce maximum voting weight cap
-    Ok(uncapped_weight.min(MAX_VOTING_WEIGHT).max(0.1))
+    uncapped.min(MAX_VOTING_WEIGHT).max(0.1)
+}
+
+/// Pure computation of tally result from pre-collected votes — testable without HDK.
+///
+/// Returns (votes_for, votes_against, abstentions, total_weight, quorum_reached, approved).
+pub fn compute_tally_result(
+    votes: &[(VoteChoice, f64)],
+    quorum_threshold: f64,
+    approval_threshold: f64,
+) -> (f64, f64, f64, f64, bool, bool) {
+    let mut votes_for = 0.0;
+    let mut votes_against = 0.0;
+    let mut abstentions = 0.0;
+
+    for (choice, weight) in votes {
+        match choice {
+            VoteChoice::For => votes_for += weight,
+            VoteChoice::Against => votes_against += weight,
+            VoteChoice::Abstain => abstentions += weight,
+        }
+    }
+
+    let total_weight = votes_for + votes_against + abstentions;
+    let quorum_reached = total_weight >= quorum_threshold;
+
+    let decisive_weight = votes_for + votes_against;
+    let approved = quorum_reached
+        && decisive_weight > 0.0
+        && (votes_for / decisive_weight) >= approval_threshold;
+
+    (votes_for, votes_against, abstentions, total_weight, quorum_reached, approved)
+}
+
+/// Calculate vote weight using holistic weight calculation
+///
+/// ## Weight Cap Enforcement
+///
+/// Per Governance Charter, final voting weight is capped at MAX_VOTING_WEIGHT (1.5)
+/// to prevent any single voter from having disproportionate influence.
+fn calculate_vote_weight(voter_did: &str) -> ExternResult<f64> {
+    let phi_weight = get_voter_phi_weight(voter_did)?;
+    Ok(compute_vote_weight(&phi_weight))
 }
 
 // ============================================================================
@@ -3070,5 +3105,156 @@ mod tests {
 
         assert!(expired.period_end <= now, "Expired credits should be filtered out");
         assert!(active.period_end > now, "Active credits should be returned");
+    }
+
+    // ========================================================================
+    // PURE FUNCTION TESTS: compute_vote_weight
+    // ========================================================================
+
+    fn make_phi_weight(phi: f64, k: f64, stake: f64, participation: f64, domain: f64) -> PhiWeight {
+        PhiWeight {
+            phi_score: phi,
+            k_trust: k,
+            stake_weight: stake,
+            participation_score: participation,
+            domain_reputation: domain,
+        }
+    }
+
+    #[test]
+    fn test_compute_vote_weight_default_participant() {
+        let w = compute_vote_weight(&PhiWeight::default_participant());
+        // phi=0.1, k=0.1, stake=0, participation=0, domain=0
+        // 0.1² × (0.7 + 0.3×0.1) × 1.0 × 1.0 × 1.0 = 0.01 × 0.73 = 0.0073
+        // Floored to 0.1 by minimum clamp
+        assert!((w - 0.1).abs() < 1e-10, "Default participant should get minimum weight 0.1, got {}", w);
+    }
+
+    #[test]
+    fn test_compute_vote_weight_high_consciousness() {
+        let w = compute_vote_weight(&make_phi_weight(0.9, 0.8, 0.5, 0.7, 0.6));
+        // reputation=0.8, reputation²=0.64
+        // consciousness_multiplier = 0.7 + 0.3×0.9 = 0.97
+        // participation_bonus = 1.0 + 0.1×0.7 = 1.07
+        // stake_modifier = 1.0 + 0.05×0.5 = 1.025
+        // domain_modifier = 1.0 + 0.1×0.6 = 1.06
+        // 0.64 × 0.97 × 1.07 × 1.025 × 1.06 ≈ 0.7221...
+        assert!(w > 0.7 && w < 0.8, "High consciousness voter should get ~0.72, got {}", w);
+        assert!(w <= MAX_VOTING_WEIGHT, "Should not exceed cap");
+    }
+
+    #[test]
+    fn test_compute_vote_weight_maximum_everything() {
+        let w = compute_vote_weight(&make_phi_weight(1.0, 1.0, 1.0, 1.0, 1.0));
+        // 1.0 × 1.0 × 1.1 × 1.05 × 1.1 = 1.2705
+        assert!(w > 1.2 && w <= MAX_VOTING_WEIGHT, "Max voter should get ~1.27, got {}", w);
+    }
+
+    #[test]
+    fn test_compute_vote_weight_clamps_out_of_range() {
+        // All inputs are clamped to [0,1], so out-of-range values produce
+        // the same result as all-1.0 (theoretical max ~1.2705, well below cap)
+        let w = compute_vote_weight(&make_phi_weight(5.0, 5.0, 5.0, 5.0, 5.0));
+        let w_max = compute_vote_weight(&make_phi_weight(1.0, 1.0, 1.0, 1.0, 1.0));
+        assert!((w - w_max).abs() < 1e-10, "Out-of-range inputs should clamp to max valid");
+        assert!(w <= MAX_VOTING_WEIGHT, "Should never exceed cap");
+    }
+
+    #[test]
+    fn test_compute_vote_weight_zero_reputation() {
+        let w = compute_vote_weight(&make_phi_weight(0.9, 0.0, 0.5, 0.5, 0.5));
+        // reputation²=0, so everything multiplied by 0
+        assert!((w - 0.1).abs() < 1e-10, "Zero reputation should give minimum weight");
+    }
+
+    #[test]
+    fn test_compute_vote_weight_stake_capped_at_5_pct() {
+        let low_stake = compute_vote_weight(&make_phi_weight(0.5, 0.8, 0.0, 0.5, 0.5));
+        let high_stake = compute_vote_weight(&make_phi_weight(0.5, 0.8, 1.0, 0.5, 0.5));
+        let ratio = high_stake / low_stake;
+        // Stake modifier ranges from 1.0 to 1.05 — max 5% increase
+        assert!(ratio <= 1.06, "Stake should contribute at most ~5% bonus, ratio was {}", ratio);
+    }
+
+    // ========================================================================
+    // PURE FUNCTION TESTS: compute_tally_result
+    // ========================================================================
+
+    #[test]
+    fn test_tally_simple_majority_approved() {
+        let votes = vec![
+            (VoteChoice::For, 0.6),
+            (VoteChoice::For, 0.5),
+            (VoteChoice::Against, 0.3),
+        ];
+        let (vf, va, ab, tw, quorum, approved) = compute_tally_result(&votes, 1.0, 0.5);
+        assert!((vf - 1.1).abs() < 1e-10);
+        assert!((va - 0.3).abs() < 1e-10);
+        assert!((ab - 0.0).abs() < 1e-10);
+        assert!((tw - 1.4).abs() < 1e-10);
+        assert!(quorum, "Total weight 1.4 >= quorum 1.0");
+        assert!(approved, "For 1.1 / (1.1+0.3) = 78.6% >= 50%");
+    }
+
+    #[test]
+    fn test_tally_quorum_not_met() {
+        let votes = vec![
+            (VoteChoice::For, 0.3),
+            (VoteChoice::Against, 0.1),
+        ];
+        let (_, _, _, _, quorum, approved) = compute_tally_result(&votes, 1.0, 0.5);
+        assert!(!quorum, "Total weight 0.4 < quorum 1.0");
+        assert!(!approved, "Cannot approve without quorum");
+    }
+
+    #[test]
+    fn test_tally_rejected() {
+        let votes = vec![
+            (VoteChoice::For, 0.2),
+            (VoteChoice::Against, 0.8),
+        ];
+        let (_, _, _, _, quorum, approved) = compute_tally_result(&votes, 0.5, 0.5);
+        assert!(quorum, "Total weight 1.0 >= quorum 0.5");
+        assert!(!approved, "For 0.2 / 1.0 = 20% < 50%");
+    }
+
+    #[test]
+    fn test_tally_abstentions_dont_count_for_approval() {
+        let votes = vec![
+            (VoteChoice::For, 0.3),
+            (VoteChoice::Abstain, 10.0),
+        ];
+        let (_, _, _, tw, quorum, approved) = compute_tally_result(&votes, 1.0, 0.5);
+        assert!((tw - 10.3).abs() < 1e-10);
+        assert!(quorum);
+        // decisive = 0.3 + 0 = 0.3, approval = 0.3/0.3 = 100%
+        assert!(approved, "100% of decisive votes are For");
+    }
+
+    #[test]
+    fn test_tally_empty_votes() {
+        let votes: Vec<(VoteChoice, f64)> = vec![];
+        let (_, _, _, tw, quorum, approved) = compute_tally_result(&votes, 0.0, 0.5);
+        assert!((tw - 0.0).abs() < 1e-10);
+        // quorum_reached = 0.0 >= 0.0 = true, but decisive_weight = 0.0 → not approved
+        assert!(!approved, "No votes means no approval");
+    }
+
+    #[test]
+    fn test_tally_supermajority_threshold() {
+        // 2/3 supermajority requirement (Constitutional tier)
+        let votes = vec![
+            (VoteChoice::For, 0.65),
+            (VoteChoice::Against, 0.35),
+        ];
+        let (_, _, _, _, _, approved) = compute_tally_result(&votes, 0.5, 0.67);
+        assert!(!approved, "65% < 67% supermajority");
+
+        let votes2 = vec![
+            (VoteChoice::For, 0.68),
+            (VoteChoice::Against, 0.32),
+        ];
+        let (_, _, _, _, _, approved2) = compute_tally_result(&votes2, 0.5, 0.67);
+        assert!(approved2, "68% >= 67% supermajority");
     }
 }

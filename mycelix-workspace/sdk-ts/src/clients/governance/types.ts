@@ -955,3 +955,739 @@ export class GovernanceError extends Error {
     this.name = 'GovernanceError';
   }
 }
+
+// ============================================================================
+// Φ-Weighted Voting Types
+// ============================================================================
+
+/**
+ * Proposal tier based on governance impact
+ * Different tiers require different Φ thresholds
+ */
+export type ProposalTier = 'Basic' | 'Major' | 'Constitutional';
+
+/**
+ * Vote choice matching Rust VoteChoice enum (For/Against/Abstain)
+ *
+ * Note: The Rust integrity zome uses For/Against/Abstain.
+ * The legacy VoteChoice type above uses Approve/Reject/Abstain.
+ * New Φ-weighted, quadratic, and verified voting methods use this type.
+ */
+export type PhiVoteChoice = 'For' | 'Against' | 'Abstain';
+
+/**
+ * Φ weight components for consciousness-integrated governance
+ */
+export interface PhiWeight {
+  /** Base Φ score from consciousness metrics (0.0-1.0) */
+  phiScore: number;
+  /** K-vector derived trust score (0.0-1.0) */
+  kTrust: number;
+  /** Stake-based weight */
+  stakeWeight: number;
+  /** Historical participation score (0.0-1.0) */
+  participationScore: number;
+  /** Reputation in relevant domain (0.0-1.0) */
+  domainReputation: number;
+}
+
+/**
+ * Φ-weighted vote with full consciousness integration
+ */
+export interface PhiWeightedVote {
+  id: string;
+  proposalId: string;
+  proposalTier: ProposalTier;
+  voter: string;
+  choice: PhiVoteChoice;
+  phiWeight: PhiWeight;
+  effectiveWeight: number;
+  reason?: string;
+  delegated: boolean;
+  delegator?: string;
+  delegationChain: string[];
+  votedAt: Timestamp;
+}
+
+/**
+ * Input for casting a Φ-weighted vote
+ */
+export interface CastPhiVoteInput {
+  proposalId: string;
+  voterDid: string;
+  tier: ProposalTier;
+  choice: PhiVoteChoice;
+  reason?: string;
+}
+
+/**
+ * Input for casting a delegated Φ-weighted vote
+ */
+export interface CastDelegatedPhiVoteInput {
+  proposalId: string;
+  delegateDid: string;
+  tier: ProposalTier;
+  choice: PhiVoteChoice;
+  reason?: string;
+}
+
+// ============================================================================
+// Quadratic Voting Types
+// ============================================================================
+
+/**
+ * Quadratic vote record - weight = √(credits spent)
+ */
+export interface QuadraticVoteRecord {
+  id: string;
+  proposalId: string;
+  voter: string;
+  choice: PhiVoteChoice;
+  creditsSpent: number;
+  effectiveWeight: number;
+  reason?: string;
+  votedAt: Timestamp;
+}
+
+/**
+ * Input for casting a quadratic vote
+ */
+export interface CastQuadraticVoteInput {
+  proposalId: string;
+  voterDid: string;
+  choice: PhiVoteChoice;
+  creditsToSpend: number;
+  reason?: string;
+}
+
+/**
+ * Voice credit balance for quadratic voting
+ */
+export interface VoiceCredits {
+  owner: string;
+  allocated: number;
+  spent: number;
+  remaining: number;
+  periodStart: Timestamp;
+  periodEnd: Timestamp;
+}
+
+/**
+ * Input for allocating voice credits
+ */
+export interface AllocateCreditsInput {
+  ownerDid: string;
+  amount: number;
+  periodEnd: Timestamp;
+}
+
+// ============================================================================
+// Delegation with Decay Types
+// ============================================================================
+
+/**
+ * Delegation decay model
+ *
+ * Rust serde: externally tagged enum
+ * - "None" → no decay
+ * - {"Linear":{"decay_days":30}} → linear
+ * - {"Exponential":{"half_life_days":14}} → exponential
+ * - {"Step":{"step_interval_days":7,"drop_per_step":0.1}} → step
+ */
+export type DelegationDecay =
+  | 'None'
+  | { Linear: { decay_days: number } }
+  | { Exponential: { half_life_days: number } }
+  | { Step: { step_interval_days: number; drop_per_step: number } };
+
+/**
+ * Delegation with decay support
+ */
+export interface DelegationWithDecay {
+  id: string;
+  delegator: string;
+  delegate: string;
+  percentage: number;
+  topics?: string[];
+  tierFilter?: ProposalTier[];
+  active: boolean;
+  decay: DelegationDecay;
+  transitive: boolean;
+  maxChainDepth: number;
+  created: Timestamp;
+  renewed: Timestamp;
+  expires?: Timestamp;
+}
+
+/**
+ * Input for creating a delegation with decay
+ */
+export interface CreateDelegationWithDecayInput {
+  delegatorDid: string;
+  delegateDid: string;
+  percentage: number;
+  topics?: string[];
+  tierFilter?: ProposalTier[];
+  decay?: DelegationDecay;
+  transitive?: boolean;
+  maxChainDepth?: number;
+  expires?: Timestamp;
+}
+
+/**
+ * Input for renewing a delegation (resets decay timer)
+ */
+export interface RenewDelegationInput {
+  originalActionHash: ActionHash;
+  newPercentage?: number;
+}
+
+/**
+ * Input for revoking a delegation
+ */
+export interface RevokeDelegationInput {
+  originalActionHash: ActionHash;
+}
+
+/**
+ * Delegation with current effective percentage
+ */
+export interface EffectiveDelegation {
+  delegation: DelegationWithDecay;
+  effectivePercentage: number;
+  isEffectivelyExpired: boolean;
+}
+
+// ============================================================================
+// Vote Tally Types
+// ============================================================================
+
+/**
+ * Input for tallying legacy votes
+ */
+export interface TallyVotesInput {
+  proposalId: string;
+  tier?: ProposalTier;
+  quorumOverride?: number;
+  approvalOverride?: number;
+}
+
+/**
+ * Legacy vote tally
+ */
+export interface VoteTally {
+  proposalId: string;
+  votesFor: number;
+  votesAgainst: number;
+  abstentions: number;
+  totalWeight: number;
+  quorumReached: boolean;
+  approved: boolean;
+  talliedAt: Timestamp;
+  finalTally: boolean;
+}
+
+/**
+ * Input for tallying Φ-weighted votes
+ */
+export interface TallyPhiVotesInput {
+  proposalId: string;
+  tier: ProposalTier;
+  eligibleVoters?: number;
+  generateReflection?: boolean;
+}
+
+/**
+ * Segment of tally for analysis
+ */
+export interface TallySegment {
+  votesFor: number;
+  votesAgainst: number;
+  abstentions: number;
+  voterCount: number;
+}
+
+/**
+ * Breakdown by voter Φ tier
+ */
+export interface PhiTierBreakdown {
+  highPhiVotes: TallySegment;
+  mediumPhiVotes: TallySegment;
+  lowPhiVotes: TallySegment;
+}
+
+/**
+ * Φ-weighted vote tally with full breakdown
+ */
+export interface PhiWeightedTally {
+  proposalId: string;
+  tier: ProposalTier;
+  phiVotesFor: number;
+  phiVotesAgainst: number;
+  phiAbstentions: number;
+  rawVotesFor: number;
+  rawVotesAgainst: number;
+  rawAbstentions: number;
+  averagePhi: number;
+  totalPhiWeight: number;
+  eligibleVoters: number;
+  quorumRequirement: number;
+  quorumReached: boolean;
+  approvalThreshold: number;
+  approved: boolean;
+  talliedAt: Timestamp;
+  finalTally: boolean;
+  phiTierBreakdown: PhiTierBreakdown;
+}
+
+/**
+ * Input for tallying quadratic votes
+ */
+export interface TallyQuadraticVotesInput {
+  proposalId: string;
+  minVoters?: number;
+}
+
+/**
+ * Quadratic vote tally
+ */
+export interface QuadraticTally {
+  proposalId: string;
+  qvFor: number;
+  qvAgainst: number;
+  totalCreditsSpent: number;
+  avgCreditsPerVoter: number;
+  voterCount: number;
+  quorumReached: boolean;
+  approved: boolean;
+  talliedAt: Timestamp;
+  finalTally: boolean;
+}
+
+// ============================================================================
+// ZK-STARK Verified Voting Types
+// ============================================================================
+
+/**
+ * Proposal type for ZK eligibility proofs
+ */
+export type ZkProposalType =
+  | 'Standard'
+  | 'Constitutional'
+  | 'ModelGovernance'
+  | 'Emergency'
+  | 'Treasury'
+  | 'Membership';
+
+/**
+ * Input for storing an eligibility proof
+ */
+export interface StoreEligibilityProofInput {
+  voterDid: string;
+  voterCommitment: number[];
+  proposalType: ZkProposalType;
+  eligible: boolean;
+  requirementsMet: number;
+  activeRequirements: number;
+  proofBytes: number[];
+  validityHours?: number;
+}
+
+/**
+ * ZK-STARK eligibility proof stored on-chain
+ */
+export interface EligibilityProof {
+  id: string;
+  voterDid: string;
+  voterCommitment: number[];
+  proposalType: ZkProposalType;
+  eligible: boolean;
+  requirementsMet: number;
+  activeRequirements: number;
+  proofBytes: number[];
+  generatedAt: Timestamp;
+  expiresAt?: Timestamp;
+}
+
+/**
+ * Input for casting a verified vote
+ */
+export interface CastVerifiedVoteInput {
+  proposalId: string;
+  voterDid: string;
+  tier: ProposalTier;
+  choice: PhiVoteChoice;
+  eligibilityProofHash: ActionHash;
+  voterCommitment: number[];
+  reason?: string;
+}
+
+/**
+ * Verified vote record
+ */
+export interface VerifiedVote {
+  id: string;
+  proposalId: string;
+  proposalTier: ProposalTier;
+  voter: string;
+  choice: PhiVoteChoice;
+  eligibilityProofHash: ActionHash;
+  voterCommitment: number[];
+  effectiveWeight: number;
+  reason?: string;
+  votedAt: Timestamp;
+}
+
+/**
+ * Input for tallying verified votes
+ */
+export interface TallyVerifiedVotesInput {
+  proposalId: string;
+  tier: ProposalTier;
+  eligibleVoters?: number;
+}
+
+/**
+ * Verified vote tally result
+ */
+export interface VerifiedVoteTallyResult {
+  proposalId: string;
+  tier: ProposalTier;
+  votesFor: number;
+  votesAgainst: number;
+  abstentions: number;
+  totalWeight: number;
+  voterCount: number;
+  quorumRequirement: number;
+  quorumReached: boolean;
+  approvalThreshold: number;
+  approvalRate: number;
+  approved: boolean;
+  talliedAt: Timestamp;
+}
+
+// ============================================================================
+// Proof Attestation Types
+// ============================================================================
+
+/**
+ * Input for storing a proof attestation from an external verifier
+ */
+export interface StoreAttestationInput {
+  proofActionHash: ActionHash;
+  proofHash: number[];
+  voterCommitment: number[];
+  proposalType: ZkProposalType;
+  verified: boolean;
+  verifierPubkey: number[];
+  signature: number[];
+  securityLevel: string;
+  verificationTimeMs: number;
+  validityHours?: number;
+}
+
+/**
+ * Proof attestation from an external verifier
+ */
+export interface ProofAttestation {
+  id: string;
+  proofHash: number[];
+  proofActionHash: ActionHash;
+  voterCommitment: number[];
+  proposalType: ZkProposalType;
+  verified: boolean;
+  verifiedAt: Timestamp;
+  expiresAt: Timestamp;
+  verifierPubkey: number[];
+  signature: number[];
+  securityLevel: string;
+  verificationTimeMs: number;
+}
+
+/**
+ * Input for casting a vote with attestation check
+ */
+export interface CastAttestedVoteInput {
+  proposalId: string;
+  voterDid: string;
+  tier: ProposalTier;
+  choice: PhiVoteChoice;
+  eligibilityProofHash: ActionHash;
+  voterCommitment: number[];
+  reason?: string;
+}
+
+// ============================================================================
+// Collective Mirror / Reflection Types
+// ============================================================================
+
+/** Agreement structure pattern */
+export type TopologyPattern = 'Mesh' | 'HubAndSpoke' | 'Polarized' | 'Monopole' | 'Unknown';
+
+/** Echo chamber risk level */
+export type EchoChamberRiskLevel = 'Low' | 'Moderate' | 'High' | 'Critical';
+
+/** Trend direction for temporal analysis */
+export type TrendDirection = 'Rising' | 'Stable' | 'Falling' | 'Unknown';
+
+/**
+ * Collective mirror reflection for a proposal's voting phase
+ */
+export interface ProposalReflection {
+  id: string;
+  proposalId: string;
+  timestamp: Timestamp;
+  voterCount: number;
+  topologyPattern: TopologyPattern;
+  centralization: number;
+  clusterCount: number;
+  absentHarmonies: string[];
+  harmonyCoverage: number;
+  averageEpistemicLevel: number;
+  echoChamberRisk: EchoChamberRiskLevel;
+  agreementVerified: boolean;
+  agreementTrend: TrendDirection;
+  centralizationTrend: TrendDirection;
+  rapidConvergenceWarning: boolean;
+  fragmentationWarning: boolean;
+  votesFor: number;
+  votesAgainst: number;
+  abstentions: number;
+  approvalRatio: number;
+  polarization: number;
+  suggestedInterventions: string[];
+  reflectionPrompts: string[];
+  needsReview: boolean;
+  summary: string;
+}
+
+// ============================================================================
+// Discussion Types (Proposals Zome)
+// ============================================================================
+
+/** Discussion contribution stance */
+export type Stance = 'Support' | 'Oppose' | 'Neutral' | 'Question';
+
+/**
+ * Input for adding a discussion contribution
+ */
+export interface AddContributionInput {
+  proposalId: string;
+  contributorDid: string;
+  content: string;
+  harmonyTags?: string[];
+  stance?: Stance;
+  parentId?: string;
+}
+
+/**
+ * Discussion contribution record
+ */
+export interface DiscussionContribution {
+  id: string;
+  proposalId: string;
+  contributor: string;
+  content: string;
+  harmonyTags: string[];
+  stance?: Stance;
+  parentId?: string;
+  createdAt: Timestamp;
+  edited: boolean;
+}
+
+/**
+ * Discussion readiness assessment
+ */
+export interface DiscussionReadiness {
+  ready: boolean;
+  reasoning: string;
+  contributorCount: number;
+  contributionCount: number;
+  harmonyDiversity: number;
+  unaddressedConcerns: string[];
+}
+
+// ============================================================================
+// Bridge Consciousness Types
+// ============================================================================
+
+/**
+ * Input for recording a consciousness snapshot
+ */
+export interface RecordSnapshotInput {
+  agentDid: string;
+  phiScore: number;
+  coherenceScore: number;
+  integrationLevel: number;
+  harmonicAlignment: number;
+  metadata?: string;
+}
+
+/**
+ * Input for verifying consciousness gate
+ */
+export interface VerifyGateInput {
+  agentDid: string;
+  requiredPhi: number;
+  requiredCoherence?: number;
+  actionType: string;
+}
+
+/**
+ * Gate verification result
+ */
+export interface GateVerificationResult {
+  passed: boolean;
+  agentDid: string;
+  currentPhi: number;
+  requiredPhi: number;
+  currentCoherence: number;
+  requiredCoherence: number;
+  reason: string;
+}
+
+/**
+ * Input for assessing value alignment
+ */
+export interface AssessAlignmentInput {
+  agentDid: string;
+  proposalId: string;
+  harmonyWeights?: Record<string, number>;
+}
+
+/**
+ * Input for getting agent snapshots
+ */
+export interface GetAgentSnapshotsInput {
+  agentDid: string;
+  limit?: number;
+}
+
+/**
+ * Phi threshold requirements
+ */
+export interface PhiThresholds {
+  basic: number;
+  major: number;
+  constitutional: number;
+  emergency: number;
+}
+
+/**
+ * Input for calculating holistic vote weight
+ */
+export interface CalculateWeightInput {
+  agentDid: string;
+  proposalType: string;
+}
+
+/**
+ * Holistic voting weight result
+ */
+export interface HolisticVotingWeight {
+  agentDid: string;
+  baseReputation: number;
+  phiMultiplier: number;
+  harmonicAlignment: number;
+  finalWeight: number;
+  components: Record<string, number>;
+}
+
+/**
+ * Input for casting a weighted consensus vote
+ */
+export interface CastWeightedVoteInput {
+  proposalId: string;
+  roundId: string;
+  choice: PhiVoteChoice;
+  confidence: number;
+  rationale?: string;
+}
+
+/**
+ * Weighted vote result
+ */
+export interface WeightedVoteResult {
+  accepted: boolean;
+  effectiveWeight: number;
+  gateResult: GateVerificationResult;
+  voteHash?: ActionHash;
+  reason?: string;
+}
+
+/**
+ * Adaptive threshold for a proposal type
+ */
+export interface AdaptiveThreshold {
+  proposalType: string;
+  baseThreshold: number;
+  adjustedThreshold: number;
+  participationFactor: number;
+  historicalApproval: number;
+}
+
+/**
+ * Participant status including streak and cooldown
+ */
+export interface ParticipantStatus {
+  agentDid: string;
+  registered: boolean;
+  reputation: number;
+  effectiveReputation: number;
+  participationStreak: number;
+  cooldownRemaining: number;
+  totalVotes: number;
+  roundsParticipated: number;
+}
+
+/**
+ * Input for updating federated reputation
+ */
+export interface UpdateFederatedReputationInput {
+  agentDid: string;
+  sourceHapp: string;
+  reputationDelta: number;
+  evidence?: string;
+}
+
+/**
+ * Input for getting round votes
+ */
+export interface GetRoundVotesInput {
+  proposalId: string;
+  roundId: string;
+}
+
+/**
+ * Input for calculating round result
+ */
+export interface CalculateRoundResultInput {
+  proposalId: string;
+  roundId: string;
+  quorumThreshold?: number;
+}
+
+/**
+ * Consensus round result
+ */
+export interface RoundResult {
+  proposalId: string;
+  roundId: string;
+  votesFor: number;
+  votesAgainst: number;
+  abstentions: number;
+  totalWeight: number;
+  voterCount: number;
+  quorumMet: boolean;
+  approved: boolean;
+  averageConfidence: number;
+}
+
+/**
+ * Input for dispatching personal cluster call
+ */
+export interface DispatchPersonalCallInput {
+  zomeName: string;
+  fnName: string;
+  payload?: string;
+}

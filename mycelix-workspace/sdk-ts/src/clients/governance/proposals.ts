@@ -17,6 +17,8 @@ import type {
   ProposalResult,
   ProposalStatus,
   ProposalType,
+  AddContributionInput,
+  DiscussionReadiness,
 } from './types';
 // GovernanceError removed (unused)
 import type { ActionHash } from '../../generated/common';
@@ -408,6 +410,102 @@ export class ProposalsClient extends ZomeClient {
     proposalId: ActionHash
   ): Promise<Array<{ status: ProposalStatus; timestamp: number; actor?: string }>> {
     return this.callZome('get_proposal_history', proposalId);
+  }
+
+  // ============================================================================
+  // Discussion System
+  // ============================================================================
+
+  /**
+   * Generate next proposal ID (e.g. MIP-0001)
+   *
+   * @returns The next sequential proposal ID
+   */
+  async generateProposalId(): Promise<string> {
+    return this.callZome<string>('generate_proposal_id', null);
+  }
+
+  /**
+   * Add a contribution to a proposal's discussion
+   *
+   * Supports threaded replies, harmony tagging, and stance signaling.
+   *
+   * @param input - Contribution parameters
+   * @returns The created contribution record
+   */
+  async addContribution(input: AddContributionInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('add_contribution', {
+      proposal_id: input.proposalId,
+      contributor_did: input.contributorDid,
+      content: input.content,
+      harmony_tags: input.harmonyTags,
+      stance: input.stance,
+      parent_id: input.parentId,
+    });
+  }
+
+  /**
+   * Get all contributions for a proposal's discussion
+   *
+   * @param proposalId - Proposal identifier
+   * @returns Array of contribution records (sorted by timestamp)
+   */
+  async getDiscussion(proposalId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_discussion', proposalId);
+  }
+
+  /**
+   * Get replies to a specific contribution
+   *
+   * @param contributionId - Contribution identifier
+   * @returns Array of reply records (sorted by timestamp)
+   */
+  async getReplies(contributionId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_replies', contributionId);
+  }
+
+  /**
+   * Generate a reflection on the discussion phase
+   *
+   * Analyzes participation, harmony coverage, stance distribution,
+   * and thread depth to mirror the discussion quality.
+   *
+   * @param proposalId - Proposal identifier
+   * @returns The discussion reflection record
+   */
+  async reflectOnDiscussion(proposalId: string): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('reflect_on_discussion', proposalId);
+  }
+
+  /**
+   * Get all discussion reflections for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns Array of reflection records
+   */
+  async getDiscussionReflections(proposalId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_discussion_reflections', proposalId);
+  }
+
+  /**
+   * Check if a proposal's discussion is ready for voting
+   *
+   * Evaluates contributor count, harmony diversity, and
+   * whether key concerns have been addressed.
+   *
+   * @param proposalId - Proposal identifier
+   * @returns Discussion readiness assessment
+   */
+  async isDiscussionReady(proposalId: string): Promise<DiscussionReadiness> {
+    const result = await this.callZome<any>('is_discussion_ready', proposalId);
+    return {
+      ready: result.ready,
+      reasoning: result.reasoning,
+      contributorCount: result.contributor_count,
+      contributionCount: result.contribution_count,
+      harmonyDiversity: result.harmony_diversity,
+      unaddressedConcerns: result.unaddressed_concerns,
+    };
   }
 
   // ============================================================================

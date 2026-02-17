@@ -17,6 +17,24 @@ import type {
   QuorumStatus,
   VotingStats,
   VoteChoice,
+  CastPhiVoteInput,
+  CastDelegatedPhiVoteInput,
+  CastQuadraticVoteInput,
+  AllocateCreditsInput,
+  VoiceCredits,
+  CreateDelegationWithDecayInput,
+  RenewDelegationInput,
+  RevokeDelegationInput,
+  EffectiveDelegation,
+  TallyVotesInput,
+  TallyPhiVotesInput,
+  TallyQuadraticVotesInput,
+  StoreEligibilityProofInput,
+  CastVerifiedVoteInput,
+  TallyVerifiedVotesInput,
+  VerifiedVoteTallyResult,
+  StoreAttestationInput,
+  CastAttestedVoteInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
 // Note: GovernanceError removed as unused
@@ -360,6 +378,488 @@ export class VotingClient extends ZomeClient {
       isActive: result.is_active,
       timeRemaining: result.time_remaining,
     };
+  }
+
+  // ============================================================================
+  // Φ-Weighted Voting
+  // ============================================================================
+
+  /**
+   * Cast a Φ-weighted vote on a proposal
+   *
+   * Voter must meet the Φ threshold for the proposal's tier:
+   * - Basic: Φ ≥ 0.3
+   * - Major: Φ ≥ 0.4
+   * - Constitutional: Φ ≥ 0.6
+   *
+   * @param input - Phi vote parameters
+   * @returns The cast Φ-weighted vote record
+   */
+  async castPhiWeightedVote(input: CastPhiVoteInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('cast_phi_weighted_vote', {
+      proposal_id: input.proposalId,
+      voter_did: input.voterDid,
+      tier: input.tier,
+      choice: input.choice,
+      reason: input.reason,
+    });
+  }
+
+  /**
+   * Cast a delegated Φ-weighted vote
+   *
+   * Resolves the delegation chain and applies transitive weight with decay.
+   *
+   * @param input - Delegated phi vote parameters
+   * @returns The cast delegated vote record
+   */
+  async castDelegatedPhiVote(input: CastDelegatedPhiVoteInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('cast_delegated_phi_vote', {
+      proposal_id: input.proposalId,
+      delegate_did: input.delegateDid,
+      tier: input.tier,
+      choice: input.choice,
+      reason: input.reason,
+    });
+  }
+
+  // ============================================================================
+  // Quadratic Voting
+  // ============================================================================
+
+  /**
+   * Cast a quadratic vote (weight = √credits)
+   *
+   * @param input - Quadratic vote parameters
+   * @returns The cast quadratic vote record
+   */
+  async castQuadraticVote(input: CastQuadraticVoteInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('cast_quadratic_vote', {
+      proposal_id: input.proposalId,
+      voter_did: input.voterDid,
+      choice: input.choice,
+      credits_to_spend: input.creditsToSpend,
+      reason: input.reason,
+    });
+  }
+
+  /**
+   * Allocate voice credits to a voter for quadratic voting
+   *
+   * @param input - Credit allocation parameters
+   * @returns The allocated credits record
+   */
+  async allocateVoiceCredits(input: AllocateCreditsInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('allocate_voice_credits', {
+      owner_did: input.ownerDid,
+      amount: input.amount,
+      period_end: input.periodEnd,
+    });
+  }
+
+  /**
+   * Query a voter's current voice credit balance
+   *
+   * @param voterDid - Voter's DID
+   * @returns Voice credit balance
+   */
+  async queryVoiceCredits(voterDid: string): Promise<VoiceCredits> {
+    const result = await this.callZome<any>('query_voice_credits', voterDid);
+    return {
+      owner: result.owner,
+      allocated: result.allocated,
+      spent: result.spent,
+      remaining: result.remaining,
+      periodStart: result.period_start,
+      periodEnd: result.period_end,
+    };
+  }
+
+  // ============================================================================
+  // Delegation with Decay
+  // ============================================================================
+
+  /**
+   * Create a delegation with configurable decay model
+   *
+   * @param input - Delegation parameters
+   * @returns The created delegation record
+   */
+  async createDelegation(input: CreateDelegationWithDecayInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('create_delegation', {
+      delegator_did: input.delegatorDid,
+      delegate_did: input.delegateDid,
+      percentage: input.percentage,
+      topics: input.topics,
+      tier_filter: input.tierFilter,
+      decay: input.decay,
+      transitive: input.transitive,
+      max_chain_depth: input.maxChainDepth,
+      expires: input.expires,
+    });
+  }
+
+  /**
+   * Renew a delegation (resets decay timer)
+   *
+   * @param input - Renewal parameters
+   * @returns The renewed delegation record
+   */
+  async renewDelegation(input: RenewDelegationInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('renew_delegation', {
+      original_action_hash: input.originalActionHash,
+      new_percentage: input.newPercentage,
+    });
+  }
+
+  /**
+   * Revoke a delegation
+   *
+   * @param input - Revocation parameters
+   * @returns The revoked delegation record
+   */
+  async revokeDelegation(input: RevokeDelegationInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('revoke_delegation', {
+      original_action_hash: input.originalActionHash,
+    });
+  }
+
+  /**
+   * Get delegations with current effective percentages (accounting for decay)
+   *
+   * @param voterDid - Voter's DID
+   * @returns Array of effective delegations
+   */
+  async getEffectiveDelegations(voterDid: string): Promise<EffectiveDelegation[]> {
+    const results = await this.callZome<any[]>('get_effective_delegations', voterDid);
+    return results.map(r => ({
+      delegation: {
+        id: r.delegation.id,
+        delegator: r.delegation.delegator,
+        delegate: r.delegation.delegate,
+        percentage: r.delegation.percentage,
+        topics: r.delegation.topics,
+        tierFilter: r.delegation.tier_filter,
+        active: r.delegation.active,
+        decay: r.delegation.decay,
+        transitive: r.delegation.transitive,
+        maxChainDepth: r.delegation.max_chain_depth,
+        created: r.delegation.created,
+        renewed: r.delegation.renewed,
+        expires: r.delegation.expires,
+      },
+      effectivePercentage: r.effective_percentage,
+      isEffectivelyExpired: r.is_effectively_expired,
+    }));
+  }
+
+  // ============================================================================
+  // Tallying
+  // ============================================================================
+
+  /**
+   * Get raw vote records for a proposal (legacy)
+   *
+   * @param proposalId - Proposal identifier
+   * @returns Array of vote records
+   */
+  async getProposalVotes(proposalId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_proposal_votes', proposalId);
+  }
+
+  /**
+   * Tally votes for a proposal with configurable thresholds
+   *
+   * @param input - Tally parameters
+   * @returns The tally record
+   */
+  async tallyVotes(input: TallyVotesInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('tally_votes', {
+      proposal_id: input.proposalId,
+      tier: input.tier,
+      quorum_override: input.quorumOverride,
+      approval_override: input.approvalOverride,
+    });
+  }
+
+  /**
+   * Tally Φ-weighted votes for a proposal
+   *
+   * Automatically advances proposal to Approved if threshold met.
+   * Optionally generates a collective mirror reflection.
+   *
+   * @param input - Phi tally parameters
+   * @returns The Φ-weighted tally record
+   */
+  async tallyPhiVotes(input: TallyPhiVotesInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('tally_phi_votes', {
+      proposal_id: input.proposalId,
+      tier: input.tier,
+      eligible_voters: input.eligibleVoters,
+      generate_reflection: input.generateReflection,
+    });
+  }
+
+  /**
+   * Tally quadratic votes for a proposal
+   *
+   * @param input - Quadratic tally parameters
+   * @returns The quadratic tally record
+   */
+  async tallyQuadraticVotes(input: TallyQuadraticVotesInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('tally_quadratic_votes', {
+      proposal_id: input.proposalId,
+      min_voters: input.minVoters,
+    });
+  }
+
+  /**
+   * Get the legacy tally for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns The tally record or null
+   */
+  async getProposalTally(proposalId: string): Promise<HolochainRecord | null> {
+    return this.callZomeOrNull<HolochainRecord>('get_proposal_tally', proposalId);
+  }
+
+  /**
+   * Get the Φ-weighted tally for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns The Φ-weighted tally record or null
+   */
+  async getPhiTally(proposalId: string): Promise<HolochainRecord | null> {
+    return this.callZomeOrNull<HolochainRecord>('get_phi_tally', proposalId);
+  }
+
+  /**
+   * Get the quadratic tally for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns The quadratic tally record or null
+   */
+  async getQuadraticTally(proposalId: string): Promise<HolochainRecord | null> {
+    return this.callZomeOrNull<HolochainRecord>('get_quadratic_tally', proposalId);
+  }
+
+  // ============================================================================
+  // ZK-STARK Verified Voting
+  // ============================================================================
+
+  /**
+   * Store an eligibility proof on-chain
+   *
+   * @param input - Proof storage parameters
+   * @returns The stored proof record
+   */
+  async storeEligibilityProof(input: StoreEligibilityProofInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('store_eligibility_proof', {
+      voter_did: input.voterDid,
+      voter_commitment: input.voterCommitment,
+      proposal_type: input.proposalType,
+      eligible: input.eligible,
+      requirements_met: input.requirementsMet,
+      active_requirements: input.activeRequirements,
+      proof_bytes: input.proofBytes,
+      validity_hours: input.validityHours,
+    });
+  }
+
+  /**
+   * Cast a vote with ZK eligibility verification
+   *
+   * Voter must have a valid, unexpired eligibility proof.
+   *
+   * @param input - Verified vote parameters
+   * @returns The cast verified vote record
+   */
+  async castVerifiedVote(input: CastVerifiedVoteInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('cast_verified_vote', {
+      proposal_id: input.proposalId,
+      voter_did: input.voterDid,
+      tier: input.tier,
+      choice: input.choice,
+      eligibility_proof_hash: input.eligibilityProofHash,
+      voter_commitment: input.voterCommitment,
+      reason: input.reason,
+    });
+  }
+
+  /**
+   * Get all verified votes for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns Array of verified vote records
+   */
+  async getVerifiedVotes(proposalId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_verified_votes', proposalId);
+  }
+
+  /**
+   * Get voter's eligibility proofs
+   *
+   * @param voterDid - Voter's DID
+   * @returns Array of proof records
+   */
+  async getVoterProofs(voterDid: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_voter_proofs', voterDid);
+  }
+
+  /**
+   * Tally verified votes for a proposal
+   *
+   * @param input - Tally parameters
+   * @returns The verified vote tally
+   */
+  async tallyVerifiedVotes(input: TallyVerifiedVotesInput): Promise<VerifiedVoteTallyResult> {
+    const result = await this.callZome<any>('tally_verified_votes', {
+      proposal_id: input.proposalId,
+      tier: input.tier,
+      eligible_voters: input.eligibleVoters,
+    });
+    return {
+      proposalId: result.proposal_id,
+      tier: result.tier,
+      votesFor: result.votes_for,
+      votesAgainst: result.votes_against,
+      abstentions: result.abstentions,
+      totalWeight: result.total_weight,
+      voterCount: result.voter_count,
+      quorumRequirement: result.quorum_requirement,
+      quorumReached: result.quorum_reached,
+      approvalThreshold: result.approval_threshold,
+      approvalRate: result.approval_rate,
+      approved: result.approved,
+      talliedAt: result.tallied_at,
+    };
+  }
+
+  // ============================================================================
+  // Proof Attestation
+  // ============================================================================
+
+  /**
+   * Store a proof attestation from an external verifier
+   *
+   * @param input - Attestation parameters
+   * @returns The stored attestation record
+   */
+  async storeProofAttestation(input: StoreAttestationInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('store_proof_attestation', {
+      proof_action_hash: input.proofActionHash,
+      proof_hash: input.proofHash,
+      voter_commitment: input.voterCommitment,
+      proposal_type: input.proposalType,
+      verified: input.verified,
+      verifier_pubkey: input.verifierPubkey,
+      signature: input.signature,
+      security_level: input.securityLevel,
+      verification_time_ms: input.verificationTimeMs,
+      validity_hours: input.validityHours,
+    });
+  }
+
+  /**
+   * Get attestations for a proof
+   *
+   * @param proofActionHash - Action hash of the proof
+   * @returns Array of attestation records
+   */
+  async getProofAttestations(proofActionHash: ActionHash): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_proof_attestations', proofActionHash);
+  }
+
+  /**
+   * Check if a proof has a valid (verified and not expired) attestation
+   *
+   * @param proofActionHash - Action hash of the proof
+   * @returns True if valid attestation exists
+   */
+  async hasValidAttestation(proofActionHash: ActionHash): Promise<boolean> {
+    return this.callZome<boolean>('has_valid_attestation', proofActionHash);
+  }
+
+  /**
+   * Get attestations by verifier
+   *
+   * @param verifierPubkey - Verifier's public key bytes
+   * @returns Array of attestation records
+   */
+  async getVerifierAttestations(verifierPubkey: number[]): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_verifier_attestations', verifierPubkey);
+  }
+
+  /**
+   * Cast a verified vote with attestation check
+   *
+   * Enhanced version that also requires a valid attestation from an external verifier.
+   *
+   * @param input - Attested vote parameters
+   * @returns The cast attested vote record
+   */
+  async castAttestedVote(input: CastAttestedVoteInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('cast_attested_vote', {
+      proposal_id: input.proposalId,
+      voter_did: input.voterDid,
+      tier: input.tier,
+      choice: input.choice,
+      eligibility_proof_hash: input.eligibilityProofHash,
+      voter_commitment: input.voterCommitment,
+      reason: input.reason,
+    });
+  }
+
+  // ============================================================================
+  // Collective Mirror Reflections
+  // ============================================================================
+
+  /**
+   * Generate a collective mirror reflection for a proposal's voting phase
+   *
+   * Analyzes topology, shadow (absent harmonies), signal integrity,
+   * and trajectory of current voting patterns.
+   *
+   * @param proposalId - Proposal identifier
+   * @returns The reflection record
+   */
+  async reflectOnProposal(proposalId: string): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('reflect_on_proposal', {
+      proposal_id: proposalId,
+    });
+  }
+
+  /**
+   * Get all collective mirror reflections for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns Array of reflection records (sorted by timestamp)
+   */
+  async getProposalReflections(proposalId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_proposal_reflections', proposalId);
+  }
+
+  /**
+   * Get the latest reflection for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns The latest reflection record or null
+   */
+  async getLatestReflection(proposalId: string): Promise<HolochainRecord | null> {
+    return this.callZomeOrNull<HolochainRecord>('get_latest_reflection', proposalId);
+  }
+
+  /**
+   * Check if a proposal needs human review based on collective sensing
+   *
+   * Returns true if echo chamber risk is high, rapid convergence detected,
+   * fragmentation warning, low harmony coverage, or high centralization.
+   *
+   * @param proposalId - Proposal identifier
+   * @returns True if review is recommended
+   */
+  async proposalNeedsReview(proposalId: string): Promise<boolean> {
+    return this.callZome<boolean>('proposal_needs_review', proposalId);
   }
 
   // ============================================================================

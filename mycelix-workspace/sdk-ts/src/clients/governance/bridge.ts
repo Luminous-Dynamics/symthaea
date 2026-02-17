@@ -16,6 +16,23 @@ import type {
   CrossHappProposal,
   BroadcastEventInput,
   ParticipationScore,
+  RecordSnapshotInput,
+  VerifyGateInput,
+  GateVerificationResult,
+  AssessAlignmentInput,
+  GetAgentSnapshotsInput,
+  PhiThresholds,
+  CalculateWeightInput,
+  HolisticVotingWeight,
+  CastWeightedVoteInput,
+  WeightedVoteResult,
+  AdaptiveThreshold,
+  ParticipantStatus,
+  UpdateFederatedReputationInput,
+  GetRoundVotesInput,
+  CalculateRoundResultInput,
+  RoundResult,
+  DispatchPersonalCallInput,
 } from './types';
 // GovernanceError removed (unused)
 import type { ActionHash } from '../../generated/common';
@@ -540,6 +557,311 @@ export class BridgeClient extends ZomeClient {
       capabilities: r.capabilities,
       registeredAt: r.registered_at,
     }));
+  }
+
+  // ============================================================================
+  // Consciousness Integration
+  // ============================================================================
+
+  /**
+   * Record a consciousness snapshot for an agent
+   *
+   * Establishes consciousness state before governance actions.
+   *
+   * @param input - Snapshot parameters
+   * @returns The snapshot record
+   */
+  async recordConsciousnessSnapshot(input: RecordSnapshotInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('record_consciousness_snapshot', {
+      agent_did: input.agentDid,
+      phi_score: input.phiScore,
+      coherence_score: input.coherenceScore,
+      integration_level: input.integrationLevel,
+      harmonic_alignment: input.harmonicAlignment,
+      metadata: input.metadata,
+    });
+  }
+
+  /**
+   * Verify consciousness gate for a governance action
+   *
+   * @param input - Gate verification parameters
+   * @returns Gate verification result
+   */
+  async verifyConsciousnessGate(input: VerifyGateInput): Promise<GateVerificationResult> {
+    const result = await this.callZome<any>('verify_consciousness_gate', {
+      agent_did: input.agentDid,
+      required_phi: input.requiredPhi,
+      required_coherence: input.requiredCoherence,
+      action_type: input.actionType,
+    });
+    return {
+      passed: result.passed,
+      agentDid: result.agent_did,
+      currentPhi: result.current_phi,
+      requiredPhi: result.required_phi,
+      currentCoherence: result.current_coherence,
+      requiredCoherence: result.required_coherence,
+      reason: result.reason,
+    };
+  }
+
+  /**
+   * Assess value alignment between an agent and a proposal
+   *
+   * @param input - Alignment assessment parameters
+   * @returns The alignment record
+   */
+  async assessValueAlignment(input: AssessAlignmentInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('assess_value_alignment', {
+      agent_did: input.agentDid,
+      proposal_id: input.proposalId,
+      harmony_weights: input.harmonyWeights,
+    });
+  }
+
+  /**
+   * Get agent's consciousness history
+   *
+   * @param agentDid - Agent's DID
+   * @returns The consciousness history record or null
+   */
+  async getAgentConsciousnessHistory(agentDid: string): Promise<HolochainRecord | null> {
+    return this.callZomeOrNull<HolochainRecord>('get_agent_consciousness_history', agentDid);
+  }
+
+  /**
+   * Get recent consciousness snapshots for an agent
+   *
+   * @param input - Query parameters
+   * @returns Array of snapshot records
+   */
+  async getAgentSnapshots(input: GetAgentSnapshotsInput): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_agent_snapshots', {
+      agent_did: input.agentDid,
+      limit: input.limit,
+    });
+  }
+
+  /**
+   * Get value alignments for a proposal
+   *
+   * @param proposalId - Proposal identifier
+   * @returns Array of alignment records
+   */
+  async getProposalAlignments(proposalId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_proposal_alignments', proposalId);
+  }
+
+  /**
+   * Get current Φ threshold requirements
+   *
+   * @returns Phi thresholds for each proposal tier
+   */
+  async getPhiThresholds(): Promise<PhiThresholds> {
+    return this.callZome<PhiThresholds>('get_phi_thresholds', null);
+  }
+
+  // ============================================================================
+  // Weighted Consensus Voting
+  // ============================================================================
+
+  /**
+   * Register as a consensus participant
+   *
+   * @returns The participant registration record
+   */
+  async registerConsensusParticipant(): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('register_consensus_participant', null);
+  }
+
+  /**
+   * Calculate holistic vote weight for an agent
+   *
+   * Uses: Reputation² x (0.7 + 0.3 x Φ) x (1 + 0.2 x HarmonicAlignment)
+   *
+   * @param input - Weight calculation parameters
+   * @returns Holistic voting weight breakdown
+   */
+  async calculateHolisticVoteWeight(input: CalculateWeightInput): Promise<HolisticVotingWeight> {
+    const result = await this.callZome<any>('calculate_holistic_vote_weight', {
+      agent_did: input.agentDid,
+      proposal_type: input.proposalType,
+    });
+    return {
+      agentDid: result.agent_did,
+      baseReputation: result.base_reputation,
+      phiMultiplier: result.phi_multiplier,
+      harmonicAlignment: result.harmonic_alignment,
+      finalWeight: result.final_weight,
+      components: result.components,
+    };
+  }
+
+  /**
+   * Cast a weighted consensus vote with consciousness gate verification
+   *
+   * @param input - Weighted vote parameters
+   * @returns Weighted vote result
+   */
+  async castWeightedVote(input: CastWeightedVoteInput): Promise<WeightedVoteResult> {
+    const result = await this.callZome<any>('cast_weighted_vote', {
+      proposal_id: input.proposalId,
+      round_id: input.roundId,
+      choice: input.choice,
+      confidence: input.confidence,
+      rationale: input.rationale,
+    });
+    return {
+      accepted: result.accepted,
+      effectiveWeight: result.effective_weight,
+      gateResult: {
+        passed: result.gate_result.passed,
+        agentDid: result.gate_result.agent_did,
+        currentPhi: result.gate_result.current_phi,
+        requiredPhi: result.gate_result.required_phi,
+        currentCoherence: result.gate_result.current_coherence,
+        requiredCoherence: result.gate_result.required_coherence,
+        reason: result.gate_result.reason,
+      },
+      voteHash: result.vote_hash,
+      reason: result.reason,
+    };
+  }
+
+  /**
+   * Get adaptive threshold for a proposal type
+   *
+   * @param proposalType - Proposal type
+   * @returns Adaptive threshold
+   */
+  async getAdaptiveThreshold(proposalType: string): Promise<AdaptiveThreshold> {
+    const result = await this.callZome<any>('get_adaptive_threshold', proposalType);
+    return {
+      proposalType: result.proposal_type,
+      baseThreshold: result.base_threshold,
+      adjustedThreshold: result.adjusted_threshold,
+      participationFactor: result.participation_factor,
+      historicalApproval: result.historical_approval,
+    };
+  }
+
+  /**
+   * Get participant's current status including streak and cooldown
+   *
+   * @returns Participant status
+   */
+  async getParticipantStatus(): Promise<ParticipantStatus> {
+    const result = await this.callZome<any>('get_participant_status', null);
+    return {
+      agentDid: result.agent_did,
+      registered: result.registered,
+      reputation: result.reputation,
+      effectiveReputation: result.effective_reputation,
+      participationStreak: result.participation_streak,
+      cooldownRemaining: result.cooldown_remaining,
+      totalVotes: result.total_votes,
+      roundsParticipated: result.rounds_participated,
+    };
+  }
+
+  /**
+   * Update federated reputation from another hApp
+   *
+   * @param input - Reputation update parameters
+   * @returns The updated reputation record
+   */
+  async updateFederatedReputation(input: UpdateFederatedReputationInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('update_federated_reputation', {
+      agent_did: input.agentDid,
+      source_happ: input.sourceHapp,
+      reputation_delta: input.reputationDelta,
+      evidence: input.evidence,
+    });
+  }
+
+  /**
+   * Get votes for a consensus round
+   *
+   * @param input - Round query parameters
+   * @returns Array of vote records
+   */
+  async getRoundVotes(input: GetRoundVotesInput): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_round_votes', {
+      proposal_id: input.proposalId,
+      round_id: input.roundId,
+    });
+  }
+
+  /**
+   * Calculate consensus round result
+   *
+   * @param input - Round calculation parameters
+   * @returns Round result
+   */
+  async calculateRoundResult(input: CalculateRoundResultInput): Promise<RoundResult> {
+    const result = await this.callZome<any>('calculate_round_result', {
+      proposal_id: input.proposalId,
+      round_id: input.roundId,
+      quorum_threshold: input.quorumThreshold,
+    });
+    return {
+      proposalId: result.proposal_id,
+      roundId: result.round_id,
+      votesFor: result.votes_for,
+      votesAgainst: result.votes_against,
+      abstentions: result.abstentions,
+      totalWeight: result.total_weight,
+      voterCount: result.voter_count,
+      quorumMet: result.quorum_met,
+      approved: result.approved,
+      averageConfidence: result.average_confidence,
+    };
+  }
+
+  // ============================================================================
+  // Personal Cluster Bridge
+  // ============================================================================
+
+  /**
+   * Dispatch a call to the personal cluster via cross-cluster bridge
+   *
+   * @param input - Personal call parameters
+   * @returns Raw response from personal cluster
+   */
+  async dispatchPersonalCall(input: DispatchPersonalCallInput): Promise<unknown> {
+    return this.callZome('dispatch_personal_call', {
+      zome_name: input.zomeName,
+      fn_name: input.fnName,
+      payload: input.payload,
+    });
+  }
+
+  /**
+   * Request a Phi credential from the personal cluster
+   *
+   * @returns Phi credential presentation
+   */
+  async requestPhiCredential(): Promise<unknown> {
+    return this.callZome('request_phi_credential', null);
+  }
+
+  /**
+   * Request K-vector trust data from the personal cluster
+   *
+   * @returns K-vector trust presentation
+   */
+  async requestKVector(): Promise<unknown> {
+    return this.callZome('request_k_vector', null);
+  }
+
+  /**
+   * Request ZK identity proof from the personal cluster
+   *
+   * @returns Identity proof without full profile disclosure
+   */
+  async requestIdentityProof(): Promise<unknown> {
+    return this.callZome('request_identity_proof', null);
   }
 
   // ============================================================================

@@ -1900,3 +1900,123 @@ fn get_agent_federated_reputation(
 
     Ok(None)
 }
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- calculate_harmony_scores ---
+
+    #[test]
+    fn test_harmony_scores_empty_content() {
+        let scores = calculate_harmony_scores("");
+        assert_eq!(scores.len(), 7, "Should always return 7 harmony scores");
+        for s in &scores {
+            assert!((s.score - 0.0).abs() < 1e-10, "{} should be 0.0 for empty content", s.harmony);
+        }
+    }
+
+    #[test]
+    fn test_harmony_scores_flourishing_keywords() {
+        let scores = calculate_harmony_scores("We care about flourishing and wellbeing of all beings");
+        let flourishing = scores.iter().find(|s| s.harmony == "Pan-Sentient Flourishing").unwrap();
+        assert!(flourishing.score > 0.0, "Should detect flourishing keywords");
+        // "flourishing", "wellbeing", "care" = 3 keywords × 0.2 = 0.6
+        assert!((flourishing.score - 0.6).abs() < 1e-10, "Expected 0.6, got {}", flourishing.score);
+    }
+
+    #[test]
+    fn test_harmony_scores_max_capped_at_1() {
+        let scores = calculate_harmony_scores(
+            "integration wholeness coherent unified resonance harmony"
+        );
+        let coherence = scores.iter().find(|s| s.harmony == "Resonant Coherence").unwrap();
+        // "integration", "wholeness", "coherent", "unified" = 4 keywords × 0.2 = 0.8
+        assert!(coherence.score <= 1.0, "Score should be capped at 1.0");
+    }
+
+    #[test]
+    fn test_harmony_scores_negative_indicators() {
+        let scores = calculate_harmony_scores("We will destroy and harm and exclude others");
+        // Every harmony gets negative score from "destroy", "harm", "exclude" = -0.9
+        for s in &scores {
+            assert!(s.score < 0.0, "{} should be negative with harmful content, got {}", s.harmony, s.score);
+        }
+    }
+
+    #[test]
+    fn test_harmony_scores_case_insensitive() {
+        let scores = calculate_harmony_scores("WISDOM and TRUTH for all");
+        let wisdom = scores.iter().find(|s| s.harmony == "Integral Wisdom").unwrap();
+        assert!(wisdom.score > 0.0, "Should match uppercase keywords");
+    }
+
+    #[test]
+    fn test_harmony_scores_mixed_positive_negative() {
+        let scores = calculate_harmony_scores("We seek wisdom and truth but may harm in the process");
+        let wisdom = scores.iter().find(|s| s.harmony == "Integral Wisdom").unwrap();
+        // "wisdom" + "truth" = 2×0.2 = 0.4, minus "harm" = -0.3 → net 0.1
+        assert!((wisdom.score - 0.1).abs() < 1e-10, "Expected 0.1, got {}", wisdom.score);
+    }
+
+    // --- determine_recommendation ---
+
+    #[test]
+    fn test_recommendation_strong_support() {
+        let rec = determine_recommendation(0.9, 0.8, &[]);
+        // combined = 0.9×0.6 + 0.8×0.4 = 0.54 + 0.32 = 0.86 > 0.7
+        assert_eq!(rec, GovernanceRecommendation::StrongSupport);
+    }
+
+    #[test]
+    fn test_recommendation_support() {
+        let rec = determine_recommendation(0.5, 0.5, &[]);
+        // combined = 0.5×0.6 + 0.5×0.4 = 0.3 + 0.2 = 0.5 (> 0.3, <= 0.7)
+        assert_eq!(rec, GovernanceRecommendation::Support);
+    }
+
+    #[test]
+    fn test_recommendation_neutral() {
+        let rec = determine_recommendation(0.0, 0.5, &[]);
+        // combined = 0.0 + 0.2 = 0.2 (> -0.3, <= 0.3)
+        assert_eq!(rec, GovernanceRecommendation::Neutral);
+    }
+
+    #[test]
+    fn test_recommendation_oppose() {
+        // -0.6×0.6 + 0.5×0.4 = -0.16 → Neutral (not strong enough)
+        let mild = determine_recommendation(-0.6, 0.5, &[]);
+        assert_eq!(mild, GovernanceRecommendation::Neutral);
+
+        // -0.8×0.6 + 0.3×0.4 = -0.36 → Oppose (> -0.7, <= -0.3)
+        let strong = determine_recommendation(-0.8, 0.3, &[]);
+        assert_eq!(strong, GovernanceRecommendation::Oppose);
+    }
+
+    #[test]
+    fn test_recommendation_strong_oppose_with_violations() {
+        let violations = vec!["Charter violation".to_string()];
+        let rec = determine_recommendation(0.9, 0.9, &violations);
+        assert_eq!(rec, GovernanceRecommendation::StrongOppose,
+            "Any violations should result in StrongOppose regardless of scores");
+    }
+
+    #[test]
+    fn test_recommendation_cannot_evaluate_low_authenticity() {
+        let rec = determine_recommendation(0.9, 0.1, &[]);
+        assert_eq!(rec, GovernanceRecommendation::CannotEvaluate,
+            "Authenticity < 0.2 should be CannotEvaluate");
+    }
+
+    #[test]
+    fn test_recommendation_boundary_authenticity() {
+        // Exactly at 0.2 boundary — should NOT be CannotEvaluate (< 0.2 triggers it)
+        let rec = determine_recommendation(0.5, 0.2, &[]);
+        assert_ne!(rec, GovernanceRecommendation::CannotEvaluate,
+            "Authenticity exactly 0.2 should be evaluated");
+    }
+}
