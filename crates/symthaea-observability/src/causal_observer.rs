@@ -7,7 +7,7 @@
  * ## Usage
  *
  * ```rust,ignore
- * use symthaea::observability::{
+ * use symthaea_observability::{
  *     CausalTraceObserver, CorrelationContext,
  * };
  *
@@ -32,7 +32,7 @@
 
 use anyhow::Result;
 
-use super::{
+use crate::{
     BrocaPipelineEvent, CorrelationContext, CrossModalBindingEvent, ErrorEvent, EventMetadata,
     GWTIntegrationEvent, LanguageStepEvent, NarrativeSelfEvent, ObserverStats, PhiMeasurementEvent,
     PrimitiveActivationEvent, ResponseGeneratedEvent, RouterSelectionEvent, SecurityCheckEvent,
@@ -310,7 +310,7 @@ impl WithCausalMetadata for BrocaPipelineEvent {
 
 #[cfg(test)]
 mod tests {
-    use super::super::NullObserver;
+    use crate::NullObserver;
     use super::*;
 
     fn make_phi_event() -> PhiMeasurementEvent {

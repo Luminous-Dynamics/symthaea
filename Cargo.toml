@@ -25,6 +25,7 @@ members = [
     "crates/symthaea-seven-harmonies",
     "crates/symthaea-consciousness-resonance",
     "crates/symthaea-embeddings",
+    "crates/symthaea-observability",
 ]
 
 
@@ -110,6 +111,7 @@ symthaea-types = { path = "crates/symthaea-types" }
 symthaea-seven-harmonies = { path = "crates/symthaea-seven-harmonies" }
 symthaea-consciousness-resonance = { path = "crates/symthaea-consciousness-resonance" }
 symthaea-embeddings = { path = "crates/symthaea-embeddings" }
+symthaea-observability = { path = "crates/symthaea-observability", optional = true }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
@@ -361,7 +363,7 @@ code_generation = ["code_understanding"]
 # ── Example & module build gates ───────────────────────────────────
 # These gate cfg blocks in src/ code and/or examples.
 integration_module = []         # Integration module (cfg-gated in lib.rs)
-observability_module = []       # Observability (cfg-gated in gwt_integration + lib.rs)
+observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 school_lookahead = []           # CfC-based lookahead in school (cfg-gated in school/mod.rs)
 physiology_module = []          # Physiology integration (cfg-gated in school/mod.rs)
 mycelix_module = []             # Mycelix governance hooks (cfg-gated in consciousness + brain)

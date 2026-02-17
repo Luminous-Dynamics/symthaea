@@ -18,11 +18,6 @@
 //!    - Epistemic uncertainty (reducible through observation)
 //!    - Aleatoric uncertainty (irreducible randomness)
 //!    - Structural uncertainty (model limitations)
-//!
-//! ## Integration with GIS
-//!
-//! Uses the `Uncertainty3D` model from `mycelix::gis::uncertainty` for
-//! comprehensive uncertainty quantification across all counterfactual inferences.
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
@@ -309,6 +304,7 @@ pub struct CounterfactualEngine {
     /// Adjacency list (for efficient traversal)
     adjacency: HashMap<String, Vec<usize>>,
     /// Configuration
+    #[allow(dead_code)]
     config: CounterfactualConfig,
 }
 
@@ -327,7 +323,7 @@ impl CounterfactualEngine {
     pub fn add_node(&mut self, node: CausalNode) {
         let id = node.id.clone();
         self.nodes.insert(id.clone(), node);
-        self.adjacency.entry(id).or_insert_with(Vec::new);
+        self.adjacency.entry(id).or_default();
     }
 
     /// Add a causal link
@@ -337,7 +333,7 @@ impl CounterfactualEngine {
         self.links.push(link);
         self.adjacency
             .entry(from)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(link_idx);
     }
 
