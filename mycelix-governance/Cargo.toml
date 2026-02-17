@@ -46,6 +46,9 @@ getrandom_03 = { package = "getrandom", version = "0.3" }
 # Feldman DKG for threshold signing (WASM-compatible, no getrandom 0.2)
 feldman-dkg = { path = "../mycelix-core/libs/feldman-dkg" }
 
+# ECDSA signature verification (secp256k1)
+k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa"] }
+
 [profile.dev]
 opt-level = "z"
 

@@ -256,62 +256,77 @@ fn validate_create_committee(
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Pure validation for committee update — testable without HDI
+pub fn check_committee_update_validity(committee: &SigningCommittee) -> Result<(), String> {
+    if committee.phase == DkgPhase::Disbanded && committee.active {
+        return Err("Cannot reactivate disbanded committee".into());
+    }
+
+    if committee.phase == DkgPhase::Complete {
+        let pk_bytes = match committee.public_key {
+            Some(ref bytes) => bytes,
+            None => {
+                return Err("Complete committee must have a public key".into());
+            }
+        };
+
+        if feldman_dkg::Commitment::from_bytes(pk_bytes).is_err() {
+            return Err("Public key is not a valid secp256k1 point".into());
+        }
+
+        if (committee.commitments.len() as u32) < committee.threshold {
+            return Err(format!(
+                "Need at least {} commitment sets, got {}",
+                committee.threshold,
+                committee.commitments.len()
+            ));
+        }
+
+        for (i, cs_bytes) in committee.commitments.iter().enumerate() {
+            if feldman_dkg::CommitmentSet::from_bytes(cs_bytes).is_err() {
+                return Err(format!("Invalid commitment set at index {}", i));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Validate committee update
 fn validate_update_committee(
     _action: Update,
     committee: SigningCommittee,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Cannot change threshold after creation
-    // (This would require checking original, simplified here)
-
-    // Cannot reactivate disbanded committee
-    if committee.phase == DkgPhase::Disbanded && committee.active {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot reactivate disbanded committee".into(),
-        ));
+    if let Err(reason) = check_committee_update_validity(&committee) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
     }
-
-    // When transitioning to Complete, verify the DKG result
-    if committee.phase == DkgPhase::Complete {
-        // Public key must be present
-        let pk_bytes = match committee.public_key {
-            Some(ref bytes) => bytes,
-            None => {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Complete committee must have a public key".into(),
-                ));
-            }
-        };
-
-        // Verify public key is a valid secp256k1 point (33-byte compressed SEC1)
-        if feldman_dkg::Commitment::from_bytes(pk_bytes).is_err() {
-            return Ok(ValidateCallbackResult::Invalid(
-                "Public key is not a valid secp256k1 point".into(),
-            ));
-        }
-
-        // Verify we have enough commitments (at least threshold)
-        if (committee.commitments.len() as u32) < committee.threshold {
-            return Ok(ValidateCallbackResult::Invalid(
-                format!(
-                    "Need at least {} commitment sets, got {}",
-                    committee.threshold,
-                    committee.commitments.len()
-                ),
-            ));
-        }
-
-        // Verify each commitment set is valid
-        for (i, cs_bytes) in committee.commitments.iter().enumerate() {
-            if feldman_dkg::CommitmentSet::from_bytes(cs_bytes).is_err() {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Invalid commitment set at index {}", i),
-                ));
-            }
-        }
-    }
-
     Ok(ValidateCallbackResult::Valid)
+}
+
+/// Pure validation for committee member — testable without HDI
+pub fn check_member_validity(member: &CommitteeMember) -> Result<(), String> {
+    if !member.member_did.starts_with("did:") {
+        return Err("Member must have a valid DID".into());
+    }
+    if member.trust_score < 0.0 {
+        return Err("Trust score cannot be negative".into());
+    }
+    if member.participant_id == 0 {
+        return Err("Participant ID must be positive".into());
+    }
+    if let Some(ref vss_bytes) = member.vss_commitment {
+        match feldman_dkg::CommitmentSet::from_bytes(vss_bytes) {
+            Ok(cs) => {
+                if cs.is_empty() {
+                    return Err("VSS commitment set must not be empty".into());
+                }
+            }
+            Err(e) => {
+                return Err(format!("Invalid VSS commitment: {}", e));
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Validate member creation
@@ -319,45 +334,9 @@ fn validate_create_member(
     _action: Create,
     member: CommitteeMember,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Member DID must be valid
-    if !member.member_did.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Member must have a valid DID".into(),
-        ));
+    if let Err(reason) = check_member_validity(&member) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
     }
-
-    // Trust score must be non-negative
-    if member.trust_score < 0.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Trust score cannot be negative".into(),
-        ));
-    }
-
-    // Participant ID must be positive
-    if member.participant_id == 0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Participant ID must be positive".into(),
-        ));
-    }
-
-    // If VSS commitment is provided, verify it's a valid CommitmentSet
-    if let Some(ref vss_bytes) = member.vss_commitment {
-        match feldman_dkg::CommitmentSet::from_bytes(vss_bytes) {
-            Ok(cs) => {
-                if cs.is_empty() {
-                    return Ok(ValidateCallbackResult::Invalid(
-                        "VSS commitment set must not be empty".into(),
-                    ));
-                }
-            }
-            Err(e) => {
-                return Ok(ValidateCallbackResult::Invalid(
-                    format!("Invalid VSS commitment: {}", e),
-                ));
-            }
-        }
-    }
-
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -379,49 +358,37 @@ fn validate_update_member(
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Pure validation for threshold signature — testable without HDI
+pub fn check_signature_validity(sig: &ThresholdSignature) -> Result<(), String> {
+    if sig.signer_count == 0 {
+        return Err("Signature must have at least one signer".into());
+    }
+    if sig.signer_count as usize != sig.signers.len() {
+        return Err("Signer count must match signers list length".into());
+    }
+    if sig.signed_content_hash.is_empty() {
+        return Err("Signed content hash cannot be empty".into());
+    }
+    if sig.signature.is_empty() {
+        return Err("Signature cannot be empty".into());
+    }
+    if sig.signature.len() < 64 {
+        return Err(format!(
+            "Signature too short: expected at least 64 bytes (ECDSA r||s), got {}",
+            sig.signature.len()
+        ));
+    }
+    Ok(())
+}
+
 /// Validate threshold signature creation
 fn validate_create_signature(
     _action: Create,
     sig: ThresholdSignature,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Must have at least one signer
-    if sig.signer_count == 0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Signature must have at least one signer".into(),
-        ));
+    if let Err(reason) = check_signature_validity(&sig) {
+        return Ok(ValidateCallbackResult::Invalid(reason));
     }
-
-    // Signer count must match signers list
-    if sig.signer_count as usize != sig.signers.len() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Signer count must match signers list length".into(),
-        ));
-    }
-
-    // Content hash must not be empty
-    if sig.signed_content_hash.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Signed content hash cannot be empty".into(),
-        ));
-    }
-
-    // Signature must not be empty
-    if sig.signature.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Signature cannot be empty".into(),
-        ));
-    }
-
-    // Signature must be at least 64 bytes (raw ECDSA r||s minimum)
-    if sig.signature.len() < 64 {
-        return Ok(ValidateCallbackResult::Invalid(
-            format!(
-                "Signature too short: expected at least 64 bytes (ECDSA r||s), got {}",
-                sig.signature.len()
-            ),
-        ));
-    }
-
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -452,4 +419,168 @@ fn validate_create_share(
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: create a valid CommitmentSet with `n` commitments and return its serialized bytes
+    fn make_valid_commitment_set_bytes(n: usize) -> Vec<u8> {
+        let commitments: Vec<feldman_dkg::Commitment> = (1..=n)
+            .map(|i| feldman_dkg::Commitment::new(&feldman_dkg::Scalar::from_u64(i as u64)))
+            .collect();
+        feldman_dkg::CommitmentSet::new(commitments).to_bytes()
+    }
+
+    /// Helper: create a valid secp256k1 public key (33-byte compressed SEC1 point)
+    fn make_valid_public_key() -> Vec<u8> {
+        feldman_dkg::Commitment::new(&feldman_dkg::Scalar::from_u64(42)).to_bytes()
+    }
+
+    /// Helper: create a minimal CommitteeMember for testing
+    fn make_test_member() -> CommitteeMember {
+        CommitteeMember {
+            committee_id: "test-committee".into(),
+            participant_id: 1,
+            agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            member_did: "did:key:z123".into(),
+            trust_score: 0.8,
+            public_share: None,
+            vss_commitment: None,
+            deal_submitted: false,
+            qualified: false,
+            registered_at: Timestamp::from_micros(0),
+        }
+    }
+
+    /// Helper: create a minimal SigningCommittee for testing
+    fn make_test_committee_complete(
+        public_key: Option<Vec<u8>>,
+        commitments: Vec<Vec<u8>>,
+    ) -> SigningCommittee {
+        SigningCommittee {
+            id: "test-committee".into(),
+            name: "Test".into(),
+            threshold: 2,
+            member_count: 3,
+            phase: DkgPhase::Complete,
+            public_key,
+            commitments,
+            scope: CommitteeScope::All,
+            created_at: Timestamp::from_micros(0),
+            active: true,
+            epoch: 1,
+        }
+    }
+
+    // --- VSS Commitment Tests ---
+
+    #[test]
+    fn test_valid_vss_commitment_accepted() {
+        let mut member = make_test_member();
+        member.vss_commitment = Some(make_valid_commitment_set_bytes(3));
+        assert!(check_member_validity(&member).is_ok());
+    }
+
+    #[test]
+    fn test_invalid_vss_commitment_rejected() {
+        let mut member = make_test_member();
+        member.vss_commitment = Some(vec![0xDE, 0xAD, 0xBE, 0xEF, 0xFF]);
+        let result = check_member_validity(&member);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid VSS commitment"));
+    }
+
+    #[test]
+    fn test_empty_vss_commitment_rejected() {
+        let mut member = make_test_member();
+        // A CommitmentSet with count=0: 4 zero bytes (BE u32 = 0)
+        member.vss_commitment = Some(vec![0, 0, 0, 0]);
+        let result = check_member_validity(&member);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must not be empty"));
+    }
+
+    // --- Committee Complete Validation Tests ---
+
+    #[test]
+    fn test_complete_committee_valid_public_key() {
+        let pk = make_valid_public_key();
+        let cs = make_valid_commitment_set_bytes(2);
+        let committee = make_test_committee_complete(Some(pk), vec![cs.clone(), cs]);
+        assert!(check_committee_update_validity(&committee).is_ok());
+    }
+
+    #[test]
+    fn test_complete_committee_invalid_public_key() {
+        // 33 garbage bytes — not a valid curve point
+        let committee = make_test_committee_complete(
+            Some(vec![0xFF; 33]),
+            vec![make_valid_commitment_set_bytes(2)],
+        );
+        let result = check_committee_update_validity(&committee);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not a valid secp256k1 point"));
+    }
+
+    #[test]
+    fn test_complete_committee_missing_public_key() {
+        let committee = make_test_committee_complete(
+            None,
+            vec![make_valid_commitment_set_bytes(2)],
+        );
+        let result = check_committee_update_validity(&committee);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("must have a public key"));
+    }
+
+    #[test]
+    fn test_complete_committee_insufficient_commitments() {
+        let pk = make_valid_public_key();
+        // threshold=2 but only 1 commitment set
+        let committee = make_test_committee_complete(
+            Some(pk),
+            vec![make_valid_commitment_set_bytes(2)],
+        );
+        let result = check_committee_update_validity(&committee);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Need at least 2"));
+    }
+
+    // --- Signature Validation Tests ---
+
+    #[test]
+    fn test_signature_too_short_rejected() {
+        let sig = ThresholdSignature {
+            id: "sig-1".into(),
+            committee_id: "test".into(),
+            signed_content_hash: vec![1; 32],
+            signed_content_description: "test".into(),
+            signature: vec![0u8; 32], // too short
+            signer_count: 1,
+            signers: vec![1],
+            verified: false,
+            signed_at: Timestamp::from_micros(0),
+        };
+        let result = check_signature_validity(&sig);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("too short"));
+    }
+
+    #[test]
+    fn test_signature_minimum_length_accepted() {
+        let sig = ThresholdSignature {
+            id: "sig-1".into(),
+            committee_id: "test".into(),
+            signed_content_hash: vec![1; 32],
+            signed_content_description: "test".into(),
+            signature: vec![0u8; 64], // minimum valid length
+            signer_count: 1,
+            signers: vec![1],
+            verified: false,
+            signed_at: Timestamp::from_micros(0),
+        };
+        assert!(check_signature_validity(&sig).is_ok());
+    }
 }

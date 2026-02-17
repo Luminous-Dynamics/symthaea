@@ -11,6 +11,7 @@
 //! 6. Threshold signatures are verified and stored
 
 use hdk::prelude::*;
+use k256::ecdsa::signature::Verifier;
 use threshold_signing_integrity::*;
 
 /// Helper to get an anchor entry hash
@@ -171,14 +172,65 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
         ))),
     };
 
+    // Validate the VSS commitment is a valid CommitmentSet before storing
+    let cs = feldman_dkg::CommitmentSet::from_bytes(&input.vss_commitment)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Invalid VSS commitment: {}", e))))?;
+    if cs.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "VSS commitment set must contain at least one commitment".into()
+        )));
+    }
+
     // Update member with deal info
     member.vss_commitment = Some(input.vss_commitment);
     member.deal_submitted = true;
 
     let action_hash = update_entry(original_hash, &EntryTypes::CommitteeMember(member))?;
 
-    // Check if all members have submitted - would advance phase in production
-    // (Simplified here - actual implementation would check all members)
+    // Auto-advance phase: check if all registered members have submitted deals
+    let all_member_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", input.committee_id))?,
+            LinkTypes::CommitteeToMember,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut all_submitted = true;
+    let mut member_count = 0u32;
+    for link in &all_member_links {
+        let ah = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(m) = record.entry().to_app_option::<CommitteeMember>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                member_count += 1;
+                if !m.deal_submitted {
+                    all_submitted = false;
+                }
+            }
+        }
+    }
+
+    // If all members submitted, advance committee phase to Dealing
+    if all_submitted && member_count > 0 {
+        if let Some(committee_record) = get_committee(input.committee_id)? {
+            if let Some(mut committee) = committee_record
+                .entry()
+                .to_app_option::<SigningCommittee>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if committee.phase == DkgPhase::Registration {
+                    committee.phase = DkgPhase::Dealing;
+                    update_entry(
+                        committee_record.action_address().clone(),
+                        &EntryTypes::SigningCommittee(committee),
+                    )?;
+                }
+            }
+        }
+    }
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated member".into())))
@@ -221,6 +273,36 @@ pub fn finalize_dkg(input: FinalizeDkgInput) -> ExternResult<Record> {
         .to_app_option()
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
+
+    // Guard: prevent double-finalize
+    if committee.phase == DkgPhase::Complete {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Committee DKG is already complete".into()
+        )));
+    }
+
+    // Validate combined public key is a valid secp256k1 point
+    feldman_dkg::Commitment::from_bytes(&input.combined_public_key)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+            format!("Invalid combined public key: {}", e)
+        )))?;
+
+    // Validate each public commitment set
+    for (i, cs_bytes) in input.public_commitments.iter().enumerate() {
+        feldman_dkg::CommitmentSet::from_bytes(cs_bytes)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                format!("Invalid commitment set at index {}: {}", i, e)
+            )))?;
+    }
+
+    // Validate sufficient qualified members
+    if (input.qualified_members.len() as u32) < committee.threshold {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Need at least {} qualified members, got {}",
+            committee.threshold,
+            input.qualified_members.len()
+        ))));
+    }
 
     // Update committee with DKG result
     committee.phase = DkgPhase::Complete;
@@ -314,10 +396,43 @@ pub struct SubmitSignatureShareInput {
 /// Combine signature shares into threshold signature
 ///
 /// Called when enough shares have been collected to meet threshold.
+/// Performs ECDSA verification against the committee's combined public key.
 #[hdk_extern]
 pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let sig_id = format!("sig:{}:{}", input.committee_id, now.as_micros());
+
+    // Verify the threshold signature against the committee's public key
+    let mut verified = false;
+    let committee_record = get_committee(input.committee_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;
+    let committee: SigningCommittee = committee_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
+
+    if let Some(ref pk_bytes) = committee.public_key {
+        // Construct verifying key from 33-byte compressed SEC1 point
+        let vkey = k256::ecdsa::VerifyingKey::from_sec1_bytes(pk_bytes)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                format!("Invalid committee public key: {}", e)
+            )))?;
+
+        // Parse signature (compact r||s format)
+        let sig = k256::ecdsa::Signature::from_slice(&input.combined_signature)
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                format!("Invalid signature format: {}", e)
+            )))?;
+
+        // Verify signature against the content hash
+        vkey.verify(&input.content_hash, &sig)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest(
+                "Threshold signature verification failed".into()
+            )))?;
+
+        verified = true;
+    }
 
     let signature = ThresholdSignature {
         id: sig_id.clone(),
@@ -327,7 +442,7 @@ pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record>
         signature: input.combined_signature,
         signer_count: input.signers.len() as u32,
         signers: input.signers,
-        verified: input.verified,
+        verified,
         signed_at: now,
     };
 
@@ -470,6 +585,13 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid committee entry".into())))?;
 
+    // Guard: can only rotate a completed committee (not mid-DKG)
+    if current_committee.phase != DkgPhase::Complete {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Can only rotate keys for a completed committee".into()
+        )));
+    }
+
     // Deactivate current committee
     let mut old_committee = current_committee.clone();
     old_committee.active = false;
@@ -512,6 +634,83 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
         (),
     )?;
 
+    // Carry forward previously-qualified members (re-register with reset DKG state)
+    let member_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", committee_id))?,
+            LinkTypes::CommitteeToMember,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let new_committee_anchor = anchor_hash(&format!("committee:{}", new_committee.id))?;
+    create_entry(&EntryTypes::Anchor(Anchor(format!("committee:{}", new_committee.id))))?;
+
+    for link in &member_links {
+        let ah = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(m) = record.entry().to_app_option::<CommitteeMember>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if m.qualified {
+                    let new_member = CommitteeMember {
+                        committee_id: new_committee.id.clone(),
+                        participant_id: m.participant_id,
+                        agent: m.agent,
+                        member_did: m.member_did,
+                        trust_score: m.trust_score,
+                        public_share: None,
+                        vss_commitment: None,
+                        deal_submitted: false,
+                        qualified: false,
+                        registered_at: now,
+                    };
+                    let member_hash = create_entry(&EntryTypes::CommitteeMember(new_member))?;
+                    create_link(
+                        new_committee_anchor.clone(),
+                        member_hash,
+                        LinkTypes::CommitteeToMember,
+                        (),
+                    )?;
+                }
+            }
+        }
+    }
+
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find new committee".into())))
+}
+
+/// Get all epochs (history) for a committee, sorted oldest-first
+#[hdk_extern]
+pub fn get_committee_history(committee_id: String) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", committee_id))?,
+            LinkTypes::EpochToCommittee,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut records = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+
+    // Sort by epoch (oldest first)
+    records.sort_by_key(|r| {
+        r.entry()
+            .to_app_option::<SigningCommittee>()
+            .ok()
+            .flatten()
+            .map(|c| c.epoch)
+            .unwrap_or(0)
+    });
+
+    Ok(records)
 }

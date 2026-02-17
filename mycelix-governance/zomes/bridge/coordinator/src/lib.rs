@@ -1578,13 +1578,21 @@ pub fn dispatch_personal_call(input: DispatchPersonalCallInput) -> ExternResult<
     }
 
     // Call the personal cluster via OtherRole
-    call(
+    match call(
         CallTargetCell::OtherRole("personal".into()),
         ZomeName::from(input.zome_name),
         FunctionName::from(input.fn_name),
         None,
         input.payload,
-    )
+    )? {
+        ZomeCallResponse::Ok(io) => Ok(io),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Network error calling personal cluster: {}", e)
+        ))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Personal cluster call failed: {:?}", other)
+        ))),
+    }
 }
 
 /// Input for dispatching a call to the personal cluster
@@ -1601,14 +1609,22 @@ pub struct DispatchPersonalCallInput {
 /// of requesting a Phi attestation for consciousness-gated governance.
 #[hdk_extern]
 pub fn request_phi_credential(_: ()) -> ExternResult<ExternIO> {
-    call(
+    match call(
         CallTargetCell::OtherRole("personal".into()),
         ZomeName::from("personal_bridge"),
         FunctionName::from("present_phi_credential"),
         None,
         ExternIO::encode(())
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    )
+    )? {
+        ZomeCallResponse::Ok(io) => Ok(io),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Network error calling personal cluster: {}", e)
+        ))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Personal cluster call failed: {:?}", other)
+        ))),
+    }
 }
 
 /// Request K-vector trust credential from agent's personal vault
@@ -1616,14 +1632,22 @@ pub fn request_phi_credential(_: ()) -> ExternResult<ExternIO> {
 /// Convenience wrapper for requesting K-vector trust data for weighted voting.
 #[hdk_extern]
 pub fn request_k_vector(_: ()) -> ExternResult<ExternIO> {
-    call(
+    match call(
         CallTargetCell::OtherRole("personal".into()),
         ZomeName::from("personal_bridge"),
         FunctionName::from("present_k_vector"),
         None,
         ExternIO::encode(())
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    )
+    )? {
+        ZomeCallResponse::Ok(io) => Ok(io),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Network error calling personal cluster: {}", e)
+        ))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Personal cluster call failed: {:?}", other)
+        ))),
+    }
 }
 
 /// Request identity proof from agent's personal vault
@@ -1631,14 +1655,22 @@ pub fn request_k_vector(_: ()) -> ExternResult<ExternIO> {
 /// Convenience wrapper for requesting ZK identity proof without full profile disclosure.
 #[hdk_extern]
 pub fn request_identity_proof(_: ()) -> ExternResult<ExternIO> {
-    call(
+    match call(
         CallTargetCell::OtherRole("personal".into()),
         ZomeName::from("personal_bridge"),
         FunctionName::from("present_identity_proof"),
         None,
         ExternIO::encode(())
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    )
+    )? {
+        ZomeCallResponse::Ok(io) => Ok(io),
+        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Network error calling personal cluster: {}", e)
+        ))),
+        other => Err(wasm_error!(WasmErrorInner::Guest(
+            format!("Personal cluster call failed: {:?}", other)
+        ))),
+    }
 }
 
 // =============================================================================
