@@ -16,6 +16,7 @@ use super::{
     AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult, ResponseStrategy,
     TrainingMethod,
 };
+use crate::consciousness::cross_modal_binding::{Modality, ModalRepresentation};
 
 impl CognitiveLoopService {
     /// Run one cognitive cycle (the core loop)
@@ -1198,77 +1199,110 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // META-COGNITION: Recursive self-modeling and learning rate modulation
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let (meta_cognitive_accuracy, meta_cognitive_depth) =
-            if let Some(ref mut meta) = self.meta_cognition {
-                // Feed actual prediction error to self-model
-                meta.update_self_model(prediction_error);
-
-                // Attempt to deepen recursion if accuracy is high enough
-                meta.deepen_recursion();
-
-                let accuracy = meta.accuracy();
-                let depth = meta.depth();
-
-                // Modulate learning rate: high self-model accuracy → boost learning
-                // (the system "knows what it doesn't know" and can learn faster)
-                if accuracy > 0.7 {
-                    let boost = 1.0 + (accuracy - 0.7) * 0.5; // up to 1.15x
-                    self.stats.effective_learning_rate *= boost;
+            if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+                if let Some(ref mut meta) = self.meta_cognition {
+                    meta.update_self_model(prediction_error);
+                    meta.deepen_recursion();
+                    let accuracy = meta.accuracy();
+                    let depth = meta.depth();
+                    if accuracy > 0.7 {
+                        let boost = 1.0 + (accuracy - 0.7) * 0.5; // up to 1.15x
+                        self.stats.effective_learning_rate *= boost;
+                    }
+                    (accuracy, depth)
+                } else {
+                    (0.0, 0)
                 }
-
-                (accuracy, depth)
             } else {
                 (0.0, 0)
             };
 
         // ═══════════════════════════════════════════════════════════════════════
         // VIRTUAL BODY: Map cognitive signals to interoceptive states
+        // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
         // ═══════════════════════════════════════════════════════════════════════
         let (body_phi_modulation, body_valence, body_arousal) =
-            if let Some(ref mut body) = self.virtual_body {
-                let signals = super::virtual_body::CognitiveSignals {
-                    prediction_error,
-                    coherence,
-                    prediction_confidence: self.prediction_confidence,
-                    unified_phi,
-                    flow_intensity: self.flow_state.intensity,
-                    in_flow: self.flow_state.in_flow,
-                    curiosity_boredom: self.curiosity_drive.boredom,
-                    fep_learning_signal: self.fep_learning_signal,
-                    error_trend: self.stats.error_trend,
-                    cycles_per_second: self.stats.cycles_per_second,
-                    target_frequency: self.config.target_frequency,
-                };
-                let state = body.update(&signals);
-                (state.phi_modulation, state.valence, state.arousal)
+            if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
+                if let Some(ref mut body) = self.virtual_body {
+                    let signals = super::virtual_body::CognitiveSignals {
+                        prediction_error,
+                        coherence,
+                        prediction_confidence: self.prediction_confidence,
+                        unified_phi,
+                        flow_intensity: self.flow_state.intensity,
+                        in_flow: self.flow_state.in_flow,
+                        curiosity_boredom: self.curiosity_drive.boredom,
+                        fep_learning_signal: self.fep_learning_signal,
+                        error_trend: self.stats.error_trend,
+                        cycles_per_second: self.stats.cycles_per_second,
+                        target_frequency: self.config.target_frequency,
+                    };
+                    let state = body.update(&signals);
+                    self.prev_body_phi_modulation = state.phi_modulation;
+                    (state.phi_modulation, state.valence, state.arousal)
+                } else {
+                    (1.0, 0.0, 0.0)
+                }
             } else {
-                (1.0, 0.0, 0.0)
+                (self.prev_body_phi_modulation, 0.0, 0.0)
             };
 
-        // Store body phi modulation for next cycle's feedback loop
-        self.prev_body_phi_modulation = body_phi_modulation;
+        // ═══════════════════════════════════════════════════════════════════════
+        // AFFECTIVE BRIDGE: Evaluate somatic markers from cognitive signals
+        // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
+        // ═══════════════════════════════════════════════════════════════════════
+        let (affective_valence, affective_arousal) =
+            if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
+                if let Some(ref mut bridge) = self.affective_bridge {
+                    let moral_score = self
+                        .last_moral_judgment
+                        .as_ref()
+                        .map(|j| j.moral_score)
+                        .unwrap_or(0.0);
+                    let affect = bridge.evaluate_from_signals(
+                        prediction_error,
+                        surprise_triggered,
+                        unified_phi,
+                        moral_score,
+                    );
+                    (affect.valence, affect.arousal)
+                } else {
+                    (0.0, 0.5)
+                }
+            } else {
+                (0.0, 0.5)
+            };
+
+        // FEEDBACK: Positive affect broadens exploration (Fredrickson 2001 broaden-and-build)
+        if affective_valence > 0.2 && self.affective_bridge.is_some() {
+            self.curiosity_drive.boredom *= 1.05;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // NARRATIVE SELF: Process experience and track self-Φ
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
-        let narrative_self_phi = if let Some(ref mut narrative) = self.narrative_self {
-            // Significance: higher when prediction error is high or moral concern detected
-            let significance = if moral_concern_detected {
-                0.8
+        let narrative_self_phi = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+            if let Some(ref mut narrative) = self.narrative_self {
+                let significance = if moral_concern_detected {
+                    0.8
+                } else {
+                    (prediction_error as f64).clamp(0.0, 1.0)
+                };
+                narrative.process_experience(
+                    &hv16_cached,
+                    input,
+                    prediction_error < self.config.learning_threshold,
+                    coherence as f64,
+                    significance,
+                );
+                narrative.self_phi()
             } else {
-                (prediction_error as f64).clamp(0.0, 1.0)
-            };
-
-            narrative.process_experience(
-                &hv16_cached,
-                input,
-                prediction_error < self.config.learning_threshold, // success
-                coherence as f64,                                  // effort ~ coherence
-                significance,
-            );
-
-            narrative.self_phi()
+                0.0
+            }
         } else {
             0.0
         };
@@ -1282,16 +1316,50 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PREDICTIVE SELF: Evaluate action safety via self-state prediction
+        // PREDICTIVE PROCESSING: Hierarchical predictive coding + precision
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
-        let predictive_self_safety = if let Some(ref mut pred_self) = self.predictive_self {
-            // Observe current state if narrative_self is available
-            if let Some(ref narrative) = self.narrative_self {
-                pred_self.observe(narrative);
+        let (predictive_free_energy, predictive_phi_modulation) =
+            if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+                if let Some(ref mut mind) = self.predictive_mind {
+                    if self.affective_bridge.is_some() {
+                        mind.precision.apply_affective_modulation(
+                            affective_arousal as f64,
+                            affective_valence as f64,
+                        );
+                    }
+                    let state = mind.process(&hv16_cached);
+                    self.prev_predictive_phi_modulation = state.phi_modulation;
+                    (state.free_energy, state.phi_modulation)
+                } else {
+                    (0.0, 1.0)
+                }
+            } else {
+                (0.0, self.prev_predictive_phi_modulation)
+            };
+
+        // FEEDBACK: Predictive phi modulation gates plasticity (Friston 2010)
+        if predictive_phi_modulation > 1.0 {
+            let boost = ((predictive_phi_modulation - 1.0) * 0.1) as f32; // up to +10%
+            self.stats.effective_learning_rate *= 1.0 + boost;
+        } else if predictive_phi_modulation < 0.8 {
+            self.stats.effective_learning_rate *= 0.9; // reduce LR when free energy is low
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PREDICTIVE SELF: Evaluate action safety via self-state prediction
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
+        // ═══════════════════════════════════════════════════════════════════════
+        let predictive_self_safety = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+            if let Some(ref mut pred_self) = self.predictive_self {
+                if let Some(ref narrative) = self.narrative_self {
+                    pred_self.observe(narrative);
+                }
+                pred_self.learn_from_outcome_raw(unified_phi, coherence as f64);
+                pred_self.confidence() as f32
+            } else {
+                0.0
             }
-            // Learn from actual outcomes
-            pred_self.learn_from_outcome_raw(unified_phi, coherence as f64);
-            pred_self.confidence() as f32
         } else {
             0.0
         };
@@ -1305,38 +1373,46 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // ATTENTION SCHEMA: Track attention state and generate control signals
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
-        let attention_schema_focus = if let Some(ref mut schema) = self.attention_schema {
-            let salience = prediction_error.max(0.1); // Prediction error as salience proxy
-            let update = schema.update(hv16_cached, salience);
-            // FEEDBACK: Attention schema modulates processing (bidirectional)
-            // Science: Graziano (2013) AST — attention schema actively shapes processing
-            let gain = if update.control_signal > 0.3 {
-                ((update.control_signal - 0.3) * 0.6).min(0.3) // up to +30%
-            } else if update.control_signal < 0.2 {
-                -0.1 // -10% when attention weak
+        let attention_schema_focus = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+            if let Some(ref mut schema) = self.attention_schema {
+                let salience = prediction_error.max(0.1);
+                let update = schema.update(hv16_cached, salience);
+                let gain = if update.control_signal > 0.3 {
+                    ((update.control_signal - 0.3) * 0.6).min(0.3)
+                } else if update.control_signal < 0.2 {
+                    -0.1
+                } else {
+                    0.0
+                };
+                self.adaptive_behavior.attention_sensitivity *= 1.0 + gain;
+                update.new_intensity
             } else {
                 0.0
-            };
-            self.adaptive_behavior.attention_sensitivity *= 1.0 + gain;
-            update.new_intensity
+            }
         } else {
             0.0
         };
 
         // ═══════════════════════════════════════════════════════════════════════
         // GWT INTEGRATION: Submit encoding to global workspace for broadcast
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
-        let gwt_broadcast = if let Some(ref mut gwt) = self.gwt {
-            let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
-            gwt.submit_strategy(
-                "cognitive_loop",
-                activation,
-                vec![hv16_cached],
-                vec!["encoder".to_string()],
-            );
-            let result = gwt.process();
-            result.broadcast_occurred
+        let gwt_broadcast = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+            if let Some(ref mut gwt) = self.gwt {
+                let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
+                gwt.submit_strategy(
+                    "cognitive_loop",
+                    activation,
+                    vec![hv16_cached],
+                    vec!["encoder".to_string()],
+                );
+                let result = gwt.process();
+                result.broadcast_occurred
+            } else {
+                false
+            }
         } else {
             false
         };
@@ -1345,6 +1421,46 @@ impl CognitiveLoopService {
         // Science: Baars (1988) — broadcast = conscious access, should amplify integration
         if gwt_broadcast {
             self.prediction_confidence = (self.prediction_confidence + 0.03).clamp(0.0, 1.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CROSS-MODAL BINDING: Bind HDC encodings across modalities
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
+        // ═══════════════════════════════════════════════════════════════════════
+        let (cross_modal_binding_strength, cross_modal_phi) =
+            if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+                if let Some(ref mut binder) = self.cross_modal_binder {
+                    use symthaea_core::hdc::unified_hv::ContinuousHV;
+                    // Use hv16_cached (BinaryHV→bipolar) for consistent 16,384 dims
+                    let linguistic_repr = ModalRepresentation::new(
+                        Modality::Linguistic,
+                        ContinuousHV::from_vec(hv16_cached.to_bipolar()),
+                        0.8,
+                        "encoder",
+                    );
+                    binder.add_representation(linguistic_repr);
+                    if self.affective_bridge.is_some() {
+                        let affect_seed = (affective_valence * 1000.0) as u64;
+                        let affective_hv =
+                            symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
+                        binder.update_modality(Modality::Affective, affective_hv);
+                    }
+                    let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);
+                    let phi = binder.cross_modal_phi();
+                    self.prev_cross_modal_phi = phi;
+                    (strength, phi)
+                } else {
+                    (0.0, 0.0)
+                }
+            } else {
+                (0.0, self.prev_cross_modal_phi)
+            };
+
+        // FEEDBACK: High cross-modal Phi boosts confidence (binding integration)
+        // Science: Treisman (1996) — coherent binding → confident perception
+        if cross_modal_phi > 0.3 {
+            let boost = ((cross_modal_phi - 0.3) * 0.05) as f32; // up to ~3.5%
+            self.prediction_confidence = (self.prediction_confidence + boost).clamp(0.0, 1.0);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1414,44 +1530,45 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // EMBODIED COGNITION: Bridge virtual body to full body schema
+        // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
         // ═══════════════════════════════════════════════════════════════════════
         let (embodied_phi_modulation, embodied_agency) =
-            if let Some(ref mut embodied) = self.embodied_cognition {
-                // Feed interoceptive state from virtual body if available
-                if let Some(ref body) = self.virtual_body {
-                    embodied.update_interoception(body.interoceptive_state().clone());
+            if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
+                if let Some(ref mut embodied) = self.embodied_cognition {
+                    if let Some(ref body) = self.virtual_body {
+                        embodied.update_interoception(body.interoceptive_state().clone());
+                    }
+                    let response = embodied.process();
+                    self.prev_embodied_phi_modulation = response.phi_modulation;
+                    (response.phi_modulation, response.sense_of_agency)
+                } else {
+                    (1.0, 0.0)
                 }
-                // Process embodied cognition cycle
-                let response = embodied.process();
-                (response.phi_modulation, response.sense_of_agency)
             } else {
-                (1.0, 0.0)
+                (self.prev_embodied_phi_modulation, 0.0)
             };
-
-        // Store embodied phi modulation for next cycle's feedback loop
-        self.prev_embodied_phi_modulation = embodied_phi_modulation;
 
         // ═══════════════════════════════════════════════════════════════════════
         // NARRATIVE-GWT INTEGRATION: Consciousness governance capstone
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
         let (narrative_gwt_veto, narrative_gwt_self_phi) =
-            if let Some(ref mut ngwt) = self.narrative_gwt {
-                let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
-
-                // Submit current cycle's content to narrative-GWT workspace
-                let veto = ngwt.submit_content(
-                    "cognitive_loop",
-                    vec![hv16_cached],
-                    input,
-                    vec!["encoder".to_string(), "temporal".to_string()],
-                    activation,
-                );
-                let vetoed = veto.map(|v| v.vetoed).unwrap_or(false);
-
-                // Process the workspace (ignition, Self-Φ tracking)
-                let _result = ngwt.process();
-
-                (vetoed, ngwt.self_phi())
+            if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
+                if let Some(ref mut ngwt) = self.narrative_gwt {
+                    let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
+                    let veto = ngwt.submit_content(
+                        "cognitive_loop",
+                        vec![hv16_cached],
+                        input,
+                        vec!["encoder".to_string(), "temporal".to_string()],
+                        activation,
+                    );
+                    let vetoed = veto.map(|v| v.vetoed).unwrap_or(false);
+                    let _result = ngwt.process();
+                    (vetoed, ngwt.self_phi())
+                } else {
+                    (false, 0.0)
+                }
             } else {
                 (false, 0.0)
             };
@@ -1593,6 +1710,12 @@ impl CognitiveLoopService {
             dream_insights,
             dream_phi_improvement,
             dream_wisdom_count,
+            predictive_free_energy,
+            predictive_phi_modulation,
+            cross_modal_binding_strength,
+            cross_modal_phi,
+            affective_valence,
+            affective_arousal,
         };
 
         tracing::debug!(

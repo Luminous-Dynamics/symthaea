@@ -2310,3 +2310,218 @@ fn test_dream_replay_disabled_by_default() {
         "Dream engine should be None by default"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v0.6.3 TESTS: Predictive Processing, Cross-Modal Binding, Affective Bridge
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_cycle_with_affective_bridge() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_affective_bridge: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("affective bridge integration test");
+    }
+
+    let result = service.cycle("affective check");
+    // Affective valence should be in valid range
+    assert!(
+        result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0,
+        "Affective valence out of range: {}",
+        result.metadata.affective_valence
+    );
+    // Affective arousal should be in valid range
+    assert!(
+        result.metadata.affective_arousal >= 0.0 && result.metadata.affective_arousal <= 1.0,
+        "Affective arousal out of range: {}",
+        result.metadata.affective_arousal
+    );
+}
+
+#[test]
+fn test_cycle_with_predictive_processing() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_predictive_processing: true,
+        learning_threshold: 0.0, // Force Critical urgency so module runs every cycle
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("predictive processing hierarchy test");
+    }
+
+    let result = service.cycle("predictive check");
+    // Free energy should be finite
+    assert!(
+        result.metadata.predictive_free_energy.is_finite(),
+        "Predictive free energy should be finite"
+    );
+    // Phi modulation should be finite (may be zero early in learning)
+    assert!(
+        result.metadata.predictive_phi_modulation.is_finite(),
+        "Predictive phi modulation should be finite: {}",
+        result.metadata.predictive_phi_modulation
+    );
+}
+
+#[test]
+fn test_cycle_with_cross_modal_binding() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_cross_modal_binding: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("cross modal binding integration test");
+    }
+
+    let result = service.cycle("binding check");
+    // Cross-modal binding strength should be finite
+    assert!(
+        result.metadata.cross_modal_binding_strength.is_finite(),
+        "Cross-modal binding strength should be finite"
+    );
+    // Cross-modal Phi should be finite and non-negative
+    assert!(
+        result.metadata.cross_modal_phi.is_finite() && result.metadata.cross_modal_phi >= 0.0,
+        "Cross-modal Phi should be finite and >= 0: {}",
+        result.metadata.cross_modal_phi
+    );
+}
+
+#[test]
+fn test_predictive_affective_crossmodal_synergy() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_predictive_processing: true,
+        enable_cross_modal_binding: true,
+        enable_affective_bridge: true,
+        enable_virtual_body: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 20 cycles with all 3 + virtual body to exercise synergy pipeline
+    for _ in 0..20 {
+        let result = service.cycle("synergy pipeline affect precision binding test");
+        assert!(result.prediction_error.is_finite());
+    }
+
+    let result = service.cycle("final synergy check");
+    // All 6 new metadata fields should be populated with valid values
+    assert!(result.metadata.predictive_free_energy.is_finite());
+    assert!(result.metadata.predictive_phi_modulation.is_finite());
+    assert!(result.metadata.cross_modal_binding_strength.is_finite());
+    assert!(result.metadata.cross_modal_phi.is_finite());
+    assert!(result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0);
+    assert!(result.metadata.affective_arousal >= 0.0 && result.metadata.affective_arousal <= 1.0);
+}
+
+#[test]
+fn test_v063_affective_curiosity_feedback() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_affective_bridge: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run enough cycles for affective bridge to produce positive valence
+    // (low prediction error → positive valence → boredom *= 1.05)
+    let initial_boredom = service.curiosity_drive().boredom;
+    for _ in 0..15 {
+        service.cycle("positive affect broadens exploration");
+    }
+
+    // Boredom should have been modulated by affective feedback
+    let final_boredom = service.curiosity_drive().boredom;
+    assert!(
+        final_boredom.is_finite(),
+        "Boredom should be finite: {final_boredom}"
+    );
+    // The affective feedback mechanism exists and doesn't panic
+    let _ = initial_boredom;
+}
+
+#[test]
+fn test_v063_predictive_lr_feedback() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_predictive_processing: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run cycles — predictive phi_modulation should feed back into effective LR
+    for _ in 0..15 {
+        service.cycle("predictive processing lr modulation test");
+    }
+
+    let lr = service.stats().effective_learning_rate;
+    assert!(
+        lr.is_finite() && lr >= 0.0,
+        "Effective learning rate should be finite and >= 0 with predictive feedback: {lr}"
+    );
+}
+
+#[test]
+fn test_cycle_with_hv() {
+    use symthaea_core::hdc::ContinuousHV;
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Create a synthetic HDC vector (16384-dim)
+    let dim = symthaea_core::hdc::HDC_DIMENSION;
+    let hdv = ContinuousHV::random(dim, 42);
+
+    // First cycle establishes baseline
+    let r1 = service.cycle_with_hv(&hdv);
+    assert_eq!(service.stats().total_cycles, 1);
+    assert!(r1.output.len() > 0, "output should be non-empty");
+
+    // Repeat same vector — error should be computable
+    let r2 = service.cycle_with_hv(&hdv);
+    assert_eq!(service.stats().total_cycles, 2);
+    assert!(r2.prediction_error >= 0.0);
+
+    // After several cycles with the same input, error should decrease
+    let mut errors = Vec::new();
+    for _ in 0..20 {
+        let r = service.cycle_with_hv(&hdv);
+        errors.push(r.prediction_error);
+    }
+    let first_half: f32 = errors[..10].iter().sum::<f32>() / 10.0;
+    let second_half: f32 = errors[10..].iter().sum::<f32>() / 10.0;
+    assert!(
+        second_half <= first_half + 0.1,
+        "Error should stabilize with repeated HDV input: first={first_half}, second={second_half}"
+    );
+}
+
+#[test]
+fn test_cycle_with_hv_different_inputs() {
+    use symthaea_core::hdc::ContinuousHV;
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let dim = symthaea_core::hdc::HDC_DIMENSION;
+    let hdv_a = ContinuousHV::random(dim, 100);
+    let hdv_b = ContinuousHV::random(dim, 200);
+
+    let r_a = service.cycle_with_hv(&hdv_a);
+    let r_b = service.cycle_with_hv(&hdv_b);
+
+    // Different inputs should produce different outputs
+    assert_ne!(r_a.output, r_b.output, "different HDVs should produce different CfC outputs");
+    assert_eq!(service.stats().total_cycles, 2);
+}

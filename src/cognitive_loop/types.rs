@@ -24,6 +24,9 @@ use std::collections::HashMap;
 /// - Stability regime: Critical+Normal, Cruise every 4th
 /// - Consciousness monitors (resonance, quantum, temporal): Normal+Critical only
 /// - Master equation: Critical every 5th, Normal every 10th, Cruise every 20th
+/// - Body awareness (virtual body, affective, embodied): Normal+Critical, Cruise every 2nd
+/// - Self models (meta-cognition, narrative, predictive mind/self): C=1, N=2, Cr=4
+/// - Workspace (attention schema, GWT, cross-modal, narrative-GWT): C=1, N=2, Cr=4
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum CycleUrgency {
     /// High prediction error or surprise — run all subsystems
@@ -196,6 +199,24 @@ pub struct CycleMetadata {
 
     /// Total accumulated wisdom entries from dreaming.
     pub dream_wisdom_count: usize,
+
+    /// Predictive processing free energy (0.0 when off).
+    pub predictive_free_energy: f64,
+
+    /// Predictive processing phi modulation (1.0 when off — neutral).
+    pub predictive_phi_modulation: f64,
+
+    /// Cross-modal binding strength (0.0 when off).
+    pub cross_modal_binding_strength: f32,
+
+    /// Cross-modal integration Phi (0.0 when off).
+    pub cross_modal_phi: f64,
+
+    /// Affective bridge valence (-1 to 1, 0.0 when off).
+    pub affective_valence: f32,
+
+    /// Affective bridge arousal (0 to 1, 0.5 when off — neutral).
+    pub affective_arousal: f32,
 }
 
 /// Result of a single cognitive cycle
