@@ -12527,6 +12527,7 @@ dependencies = [
  "symthaea-phi-search",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
+ "symthaea-seven-harmonies",
  "symthaea-stt",
  "symthaea-types",
  "symthaea-wisdom",
@@ -12746,6 +12747,15 @@ dependencies = [
  "rustfft",
  "symphonia",
  "walkdir",
+]
+
+[[package]]
+name = "symthaea-seven-harmonies"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "symthaea-core",
+ "symthaea-types",
 ]
 
 [[package]]

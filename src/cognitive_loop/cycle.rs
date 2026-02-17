@@ -1036,6 +1036,32 @@ impl CognitiveLoopService {
             false
         };
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // META-COGNITION: Recursive self-modeling and learning rate modulation
+        // ═══════════════════════════════════════════════════════════════════════
+        let (meta_cognitive_accuracy, meta_cognitive_depth) =
+            if let Some(ref mut meta) = self.meta_cognition {
+                // Feed actual prediction error to self-model
+                meta.update_self_model(prediction_error);
+
+                // Attempt to deepen recursion if accuracy is high enough
+                meta.deepen_recursion();
+
+                let accuracy = meta.accuracy();
+                let depth = meta.depth();
+
+                // Modulate learning rate: high self-model accuracy → boost learning
+                // (the system "knows what it doesn't know" and can learn faster)
+                if accuracy > 0.7 {
+                    let boost = 1.0 + (accuracy - 0.7) * 0.5; // up to 1.15x
+                    self.stats.effective_learning_rate *= boost;
+                }
+
+                (accuracy, depth)
+            } else {
+                (0.0, 0)
+            };
+
         // Build cycle metadata for observability
         let metadata = super::CycleMetadata {
             surprise_triggered,
@@ -1047,6 +1073,8 @@ impl CognitiveLoopService {
             reasoning_plan_action,
             reasoning_plan_confidence,
             reasoning_narrative,
+            meta_cognitive_accuracy,
+            meta_cognitive_depth,
         };
 
         tracing::debug!(

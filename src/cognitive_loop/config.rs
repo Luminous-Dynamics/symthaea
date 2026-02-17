@@ -162,6 +162,12 @@ pub struct CognitiveLoopConfig {
     /// and uses prefrontal gating to modulate learning and exploration.
     /// High memory utilization triggers inhibition (prefrontal_veto in metadata).
     pub enable_prefrontal: bool,
+
+    /// Enable meta-cognitive self-modeling.
+    /// When true, the cognitive loop maintains a model of its own prediction error
+    /// tendencies and uses self-model accuracy to modulate learning rate.
+    /// High self-model accuracy → deeper recursion and faster learning.
+    pub enable_meta_cognition: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -190,6 +196,7 @@ impl Default for CognitiveLoopConfig {
             episodic_replay_config: crate::memory::episodic_replay::EpisodicReplayConfig::default(),
             enable_surprise_exploration: false,
             enable_prefrontal: false,
+            enable_meta_cognition: false,
         }
     }
 }
