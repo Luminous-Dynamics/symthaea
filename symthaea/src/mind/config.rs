@@ -185,7 +185,7 @@ pub struct Goal {
 }
 
 /// A message exchanged between agents via the social coherence system.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SocialMessage {
     /// Sender agent identifier.
     pub agent_id: String,

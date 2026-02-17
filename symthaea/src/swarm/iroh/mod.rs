@@ -39,9 +39,11 @@
 //! - `iroh::EndpointId` - 32-byte public key identifying an endpoint
 //! - `iroh::EndpointAddr` - Address containing EndpointId + relay info + direct addrs
 
+pub(crate) mod bridge;
 mod streaming;
 mod ticket;
 
+pub use bridge::{IrohBridgeActor, IrohBridgeHandle};
 pub use streaming::{StreamConfig, TensorStream};
 pub use ticket::TicketManager;
 

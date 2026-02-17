@@ -101,7 +101,7 @@ pub use holochain::{
 };
 
 // Iroh types (stub when feature disabled, real when enabled)
-pub use iroh::{IrohChannel, IrohNode, StreamConfig, TensorStream};
+pub use iroh::{IrohBridgeActor, IrohBridgeHandle, IrohChannel, IrohNode, StreamConfig, TensorStream};
 
 // Handshake types
 pub use handshake::{HandshakeError, HandshakeResult, HybridHandshake, SwarmMessageExt};
