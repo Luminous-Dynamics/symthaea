@@ -4,6 +4,14 @@
 //! Enhanced with Φ-weighted voting, quadratic voting, and delegation decay
 //! Per GIS v4.0 integration plan
 
+#![allow(
+    clippy::manual_clamp,
+    clippy::manual_range_contains,
+    clippy::unnecessary_cast,
+    clippy::assertions_on_constants,
+    clippy::neg_cmp_op_on_partial_ord
+)]
+
 use hdk::prelude::*;
 use voting_integrity::*;
 
@@ -3234,7 +3242,7 @@ mod tests {
     #[test]
     fn test_tally_empty_votes() {
         let votes: Vec<(VoteChoice, f64)> = vec![];
-        let (_, _, _, tw, quorum, approved) = compute_tally_result(&votes, 0.0, 0.5);
+        let (_, _, _, tw, _quorum, approved) = compute_tally_result(&votes, 0.0, 0.5);
         assert!((tw - 0.0).abs() < 1e-10);
         // quorum_reached = 0.0 >= 0.0 = true, but decisive_weight = 0.0 → not approved
         assert!(!approved, "No votes means no approval");

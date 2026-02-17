@@ -1,4 +1,4 @@
-#![allow(clippy::manual_range_contains)]
+#![allow(clippy::manual_range_contains, clippy::useless_vec)]
 //! Governance Bridge Integrity Zome
 //!
 //! Entry types for cross-hApp governance queries and voting verification.
@@ -3046,7 +3046,7 @@ mod consciousness_weighted_consensus_tests {
             .map(|(w, _)| w)
             .sum();
 
-        let weighted_rejections: f64 = weights
+        let _weighted_rejections: f64 = weights
             .iter()
             .filter(|(_, d)| matches!(d, VoteDecision::Reject))
             .map(|(w, _)| w)

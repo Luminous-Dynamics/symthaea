@@ -29,9 +29,13 @@ serde_json = "1.0"
 # Async runtime
 tokio = { version = "1.0", features = ["sync", "time"], optional = true }
 
-# WASM compatibility - getrandom 0.2 needs "js" feature for wasm32-unknown-unknown target
-# (rand 0.8 -> rand_core 0.6 -> getrandom 0.2; the "js" feature only activates on wasm32)
-getrandom = { version = "0.2", features = ["js"] }
+# IMPORTANT: Do NOT add getrandom directly with features=["js"] here.
+# This SDK is compiled into Holochain WASM zomes (wasm32-unknown-unknown), where the
+# Holochain runtime does NOT have Web Crypto API. The "js" feature pulls in wasm-bindgen
+# which is incompatible with Holochain's WASM runtime (rejects wasm-bindgen imports).
+# The transitive getrandom dep (via rand 0.8 → rand_core 0.6 → getrandom 0.2) is handled
+# by the getrandom_backend="custom" rustflag in the zome's .cargo/config.toml, which
+# routes randomness to HDK's __getrandom_v03_custom symbol on wasm32-unknown-unknown.
 
 # Cryptography
 sha2 = "0.10"
@@ -55,7 +59,11 @@ ndarray = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std", "oldtime", "serde"] }
 
 # UUID generation
-uuid = { version = "1.0", features = ["v4", "serde", "js"] }
+# IMPORTANT: Do NOT use features=["js"] — it activates getrandom's js backend
+# (wasm-bindgen), which is incompatible with Holochain's WASM runtime.
+# UUID v4 RNG is handled via the getrandom_backend="custom" rustflag in the zome's
+# .cargo/config.toml, which routes to HDK's __getrandom_v03_custom on wasm32.
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Regex for sanitization
 regex = "1.10"
