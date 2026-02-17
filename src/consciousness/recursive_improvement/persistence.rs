@@ -510,7 +510,7 @@ impl PersistenceManager {
             let file = fs::File::create(&temp_path)?;
             let writer = BufWriter::new(file);
             serde_json::to_writer_pretty(writer, &self.current)
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+                .map_err(io::Error::other)?;
         }
 
         fs::rename(&temp_path, &path)?;

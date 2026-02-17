@@ -180,6 +180,29 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // 1.2 Adaptive Urgency: determine how many subsystems run this cycle
+        // ═══════════════════════════════════════════════════════════════════════
+        if prediction_error < self.config.learning_threshold {
+            self.consecutive_low_error = self.consecutive_low_error.saturating_add(1);
+        } else {
+            self.consecutive_low_error = 0;
+        }
+        let urgency = super::CycleUrgency::from_state(
+            prediction_error,
+            self.config.learning_threshold,
+            surprise_triggered,
+            self.consecutive_low_error,
+        );
+
+        // FEEDBACK: Quantum coherence boosts exploration (prev cycle)
+        // Science: Lambert (2013) — quantum coherence enhances biological search
+        if self.prev_quantum_coherence > 0.5 {
+            let coherence_boost = (self.prev_quantum_coherence - 0.5) as f32 * 0.2;
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + coherence_boost).clamp(0.0, 1.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // 1a. Memory System Integration: Recall relevant episodic memories
         // ═══════════════════════════════════════════════════════════════════════
         // Use HDC embedding to query episodic memory for context
@@ -263,7 +286,15 @@ impl CognitiveLoopService {
         let input_array = Array1::from_vec(compressed_state.clone());
 
         // 4. Step CfC forward with current input
-        let delta_t = self.config.cfc_config.delta_t;
+        // FEEDBACK: Resonance frequency modulates CfC time constant (prev cycle)
+        // Science: Buzsáki (2006) — neural oscillations modulate processing speed
+        let resonance_tau_factor = if self.prev_resonance_frequency > 0.0 {
+            let deviation = (self.prev_resonance_frequency - 0.5).clamp(-0.5, 0.5);
+            1.0 - (deviation as f32 * 0.1) // ±5% modulation
+        } else {
+            1.0
+        };
+        let delta_t = self.config.cfc_config.delta_t * resonance_tau_factor;
         let _ = self.temporal_network.step(&input_array, delta_t);
 
         // 5. Get multi-scale predictions using CfC's O(1) predict_forward
@@ -437,10 +468,11 @@ impl CognitiveLoopService {
         // Run enhanced FEP cycle for motor system integration and learning signals.
         // Optimization: run every 4th cycle unless surprised or high prediction error,
         // since the enhanced bridge overlaps with the primary FEP agent.
+        // Urgency-adaptive scheduling: Critical=always, Normal=every 4th, Cruise=every 8th
         let run_enhanced = surprise_triggered
             || is_surprised
             || prediction_error > self.config.learning_threshold
-            || self.stats.total_cycles % 4 == 0;
+            || urgency.should_run(self.stats.total_cycles, 1, 4, 8);
         let enhanced_result = if run_enhanced {
             let r = self.enhanced_fep_bridge.cycle(
                 prediction_error as f64,
@@ -699,7 +731,8 @@ impl CognitiveLoopService {
         let effective_lr = (self
             .curiosity_drive
             .effective_learning_rate(semantic_modulated_lr)
-            * self.fep_lr_boost)
+            * self.fep_lr_boost
+            * (1.0 + self.mce_lr_boost))
             .clamp(0.0, 0.01); // Hard cap: reduced from 0.05 to 0.01 to prevent oscillation with cyclic patterns
 
         // 11. Learn if error is significant AND we have a previous state AND not paused
@@ -870,19 +903,20 @@ impl CognitiveLoopService {
             rayon_join(
                 // -- Branch A: Stability Regime + Semantic Memory + Causal Enhancement --
                 || {
-                    // Stability regime: CfC dynamics for primitives
-                    // Frequently-used primitives crystallize, rarely-used stay fluid
-                    let timestamp = pp_total_cycles as f64 * delta_t as f64;
-                    let (_regime_state, transitions) =
-                        stability_regime.process_input(&hv16_cached, delta_t, timestamp);
+                    // Stability regime: urgency-adaptive (Critical=always, Normal=always, Cruise=every 4th)
+                    if urgency.should_run(pp_total_cycles, 1, 1, 4) {
+                        let timestamp = pp_total_cycles as f64 * delta_t as f64;
+                        let (_regime_state, transitions) =
+                            stability_regime.process_input(&hv16_cached, delta_t, timestamp);
 
-                    for transition in &transitions {
-                        if let RegimeTransition::Crystallized {
-                            primitive_name,
-                            encoding,
-                        } = transition
-                        {
-                            discovery_service.seed_neighbor_exploration(primitive_name, encoding);
+                        for transition in &transitions {
+                            if let RegimeTransition::Crystallized {
+                                primitive_name,
+                                encoding,
+                            } = transition
+                            {
+                                discovery_service.seed_neighbor_exploration(primitive_name, encoding);
+                            }
                         }
                     }
 
@@ -1187,6 +1221,14 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // FEEDBACK: Narrative self-Phi modulates prediction confidence (identity coherence)
+        // Science: Gallagher (2000) — strong narrative identity stabilizes learning
+        if narrative_self_phi > 0.5 {
+            self.prediction_confidence = (self.prediction_confidence * 1.02).clamp(0.0, 1.0);
+        } else if narrative_self_phi > 0.0 && narrative_self_phi < 0.2 {
+            self.prediction_confidence = (self.prediction_confidence * 0.95).clamp(0.0, 1.0);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // PREDICTIVE SELF: Evaluate action safety via self-state prediction
         // ═══════════════════════════════════════════════════════════════════════
@@ -1254,33 +1296,37 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // CONSCIOUSNESS RESONANCE: Extract harmonic modes from Phi time-series
+        // CONSCIOUSNESS MONITORS: Skip in Cruise mode (measurement-only, no feedback)
         // ═══════════════════════════════════════════════════════════════════════
-        let resonance_frequency = if let Some(ref mut resonance) = self.consciousness_resonance {
-            // Build 7-dimension consciousness vector for resonance analysis
-            let dims = [
-                unified_phi,                    // Phi
-                coherence as f64,               // Broadcast
-                self.prefrontal.as_ref()
-                    .map(|p| p.stats().avg_memory_utilization as f64)
-                    .unwrap_or(0.5),            // Working Memory
-                self.adaptive_behavior.attention_sensitivity as f64, // Attention
-                (self.stats.total_cycles.min(100) as f64 / 100.0),  // Recurrence
-                body_phi_modulation,            // Embodiment
-                self.prediction_confidence as f64, // Knowledge
-            ];
-            let state = resonance.analyze(dims);
-            state.dominant_frequency
+        let resonance_frequency = if urgency.run_consciousness_monitors() {
+            if let Some(ref mut resonance) = self.consciousness_resonance {
+                let dims = [
+                    unified_phi,
+                    coherence as f64,
+                    self.prefrontal.as_ref()
+                        .map(|p| p.stats().avg_memory_utilization as f64)
+                        .unwrap_or(0.5),
+                    self.adaptive_behavior.attention_sensitivity as f64,
+                    (self.stats.total_cycles.min(100) as f64 / 100.0),
+                    body_phi_modulation,
+                    self.prediction_confidence as f64,
+                ];
+                let state = resonance.analyze(dims);
+                state.dominant_frequency
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
 
-        // ═══════════════════════════════════════════════════════════════════════
-        // QUANTUM COHERENCE: Monitor CfC hidden states for superposition
-        // ═══════════════════════════════════════════════════════════════════════
-        let quantum_coherence_level = if let Some(ref mut qc) = self.quantum_coherence {
-            qc.observe(&hv16_cached, unified_phi);
-            qc.coherence()
+        let quantum_coherence_level = if urgency.run_consciousness_monitors() {
+            if let Some(ref mut qc) = self.quantum_coherence {
+                qc.observe(&hv16_cached, unified_phi);
+                qc.coherence()
+            } else {
+                0.0
+            }
         } else {
             0.0
         };
@@ -1289,17 +1335,20 @@ impl CognitiveLoopService {
         // TEMPORAL CONSCIOUSNESS: Track Phi trajectory, continuity, identity
         // ═══════════════════════════════════════════════════════════════════════
         let (temporal_coherence_score, temporal_discontinuity) =
-            if let Some(ref mut temporal) = self.temporal_consciousness {
-                // Pass narrative_self and predictive_self refs for identity coherence
-                temporal.observe(
-                    &hv16_cached,
-                    unified_phi,
-                    self.narrative_self.as_ref(),
-                    self.predictive_self.as_ref(),
-                );
-                let coherence = temporal.overall_temporal_coherence();
-                let healthy = temporal.is_temporally_healthy();
-                (coherence, !healthy)
+            if urgency.run_consciousness_monitors() {
+                if let Some(ref mut temporal) = self.temporal_consciousness {
+                    temporal.observe(
+                        &hv16_cached,
+                        unified_phi,
+                        self.narrative_self.as_ref(),
+                        self.predictive_self.as_ref(),
+                    );
+                    let coherence = temporal.overall_temporal_coherence();
+                    let healthy = temporal.is_temporally_healthy();
+                    (coherence, !healthy)
+                } else {
+                    (0.0, false)
+                }
             } else {
                 (0.0, false)
             };
@@ -1417,7 +1466,8 @@ impl CognitiveLoopService {
         // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
         // the 8-factor ConsciousnessInputs: Phi, Broadcast, WorkingMemory,
         // Attention, Recurrence, Embodiment, Knowledge, Synchrony.
-        let consciousness_level = if self.stats.total_cycles % 10 == 0 {
+        // Urgency-adaptive: Critical=every 5th, Normal=every 10th, Cruise=every 20th
+        let consciousness_level = if urgency.should_run(self.stats.total_cycles, 5, 10, 20) {
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
                 phi: unified_phi,
                 broadcast: coherence as f64, // coherence ~ global workspace broadcast
@@ -1435,10 +1485,26 @@ impl CognitiveLoopService {
                 knowledge: self.prediction_confidence as f64,
                 synchrony: (0.3 + self.flow_state.intensity as f64 * 0.7).clamp(0.1, 1.0),
             };
-            self.master_equation.compute(&inputs).consciousness_level
+            let level = self.master_equation.compute(&inputs).consciousness_level;
+
+            // FEEDBACK: MCE consciousness level boosts learning rate (decaying)
+            // Science: Dehaene (2014) — conscious access improves encoding
+            if level > 0.0 {
+                self.mce_lr_boost = (level * 0.1) as f32; // up to +10%
+            } else {
+                self.mce_lr_boost *= 0.9; // decay over ~9 cycles
+            }
+
+            level
         } else {
+            // Decay MCE LR boost between MCE firings
+            self.mce_lr_boost *= 0.9;
             0.0
         };
+
+        // Store resonance frequency and quantum coherence for next cycle's feedback
+        self.prev_resonance_frequency = resonance_frequency;
+        self.prev_quantum_coherence = quantum_coherence_level;
 
         // Build cycle metadata for observability
         let metadata = super::CycleMetadata {
@@ -1471,6 +1537,7 @@ impl CognitiveLoopService {
             narrative_gwt_self_phi,
             living_mind_vitality,
             living_mind_coherence,
+            urgency,
         };
 
         tracing::debug!(

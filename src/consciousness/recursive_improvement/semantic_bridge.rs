@@ -337,7 +337,7 @@ impl SemanticBridge {
     ) -> LatentConsciousnessState {
         // Extract key features from embedding
         let phi = embedding
-            .get(0)
+            .first()
             .copied()
             .unwrap_or(0.5)
             .abs()

@@ -429,7 +429,7 @@ impl CompositionGrammar {
         let prefs = self
             .type_preferences
             .entry(prefix)
-            .or_insert_with(HashMap::new);
+            .or_default();
         let count = *prefs.get(&comp_type).unwrap_or(&0.0);
         prefs.insert(comp_type, count + 1.0);
     }
@@ -676,7 +676,7 @@ impl CompositionParameters {
     /// Create from a parameter vector
     pub fn from_vec(v: &[f64]) -> Self {
         Self {
-            weight: v.get(0).copied().unwrap_or(1.0).clamp(0.0, 2.0),
+            weight: v.first().copied().unwrap_or(1.0).clamp(0.0, 2.0),
             confidence_threshold: v.get(1).copied().unwrap_or(0.5).clamp(0.0, 1.0),
             convergence_threshold: v.get(2).copied().unwrap_or(0.99).clamp(0.0, 1.0),
             max_iterations: (v.get(3).copied().unwrap_or(0.1) * 100.0).clamp(1.0, 100.0) as usize,

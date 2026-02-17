@@ -5,6 +5,77 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+// ═══════════════════════════════════════════════════════════════════════════════
+// CYCLE URGENCY — adaptive subsystem scheduling
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Urgency level controlling how many subsystems run each cycle.
+///
+/// Instead of fixed "every Nth cycle" throttling, urgency adapts to the
+/// system's current needs:
+/// - **Critical**: High error or surprise — run everything for maximum adaptation
+/// - **Normal**: Standard processing — run most subsystems
+/// - **Cruise**: Low error, stable state — skip expensive subsystems to save compute
+///
+/// Subsystems decide per-urgency whether to run:
+/// - Core pipeline (HDC→CfC→predict→learn): always runs
+/// - Moral evaluation: Critical+Normal (skip in Cruise unless new input)
+/// - Enhanced FEP: Critical always, Normal every 4th, Cruise every 8th
+/// - Stability regime: Critical+Normal, Cruise every 4th
+/// - Consciousness monitors (resonance, quantum, temporal): Normal+Critical only
+/// - Master equation: Critical every 5th, Normal every 10th, Cruise every 20th
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum CycleUrgency {
+    /// High prediction error or surprise — run all subsystems
+    Critical,
+    /// Standard processing
+    #[default]
+    Normal,
+    /// Low error, stable state — minimal subsystem overhead
+    Cruise,
+}
+
+impl CycleUrgency {
+    /// Compute urgency from current cycle state.
+    ///
+    /// - `prediction_error`: current cycle's prediction error
+    /// - `learning_threshold`: config threshold for "significant" error
+    /// - `surprise_triggered`: whether the surprise bridge triggered this cycle
+    /// - `consecutive_low_error`: how many consecutive cycles have had error < threshold
+    pub fn from_state(
+        prediction_error: f32,
+        learning_threshold: f32,
+        surprise_triggered: bool,
+        consecutive_low_error: u32,
+    ) -> Self {
+        if surprise_triggered || prediction_error > learning_threshold * 3.0 {
+            CycleUrgency::Critical
+        } else if prediction_error > learning_threshold || consecutive_low_error < 10 {
+            CycleUrgency::Normal
+        } else {
+            CycleUrgency::Cruise
+        }
+    }
+
+    /// Whether this urgency level should run a subsystem at the given cycle interval.
+    /// Returns true if the subsystem should run this cycle.
+    #[inline]
+    pub fn should_run(&self, cycle: usize, critical_interval: usize, normal_interval: usize, cruise_interval: usize) -> bool {
+        let interval = match self {
+            CycleUrgency::Critical => critical_interval,
+            CycleUrgency::Normal => normal_interval,
+            CycleUrgency::Cruise => cruise_interval,
+        };
+        interval == 0 || cycle % interval == 0
+    }
+
+    /// Whether to run expensive consciousness monitors (resonance, quantum, temporal).
+    #[inline]
+    pub fn run_consciousness_monitors(&self) -> bool {
+        matches!(self, CycleUrgency::Critical | CycleUrgency::Normal)
+    }
+}
+
 /// Metadata about internal decision-making during a cycle.
 ///
 /// Provides observability into which subsystems influenced the cycle's output,
@@ -102,6 +173,20 @@ pub struct CycleMetadata {
 
     /// Self-Phi from the narrative-GWT integration (0.0 = off/not enabled).
     pub narrative_gwt_self_phi: f64,
+
+    /// Unified Living Mind vitality (0.0 to 1.0).
+    /// Measures overall "aliveness" of the system via life-mind continuity.
+    /// 0.0 when full_consciousness feature is not enabled.
+    pub living_mind_vitality: f64,
+
+    /// Unified Living Mind coherence (0.0 to 1.0).
+    /// Measures integration quality of autopoietic, enactive, and predictive subsystems.
+    /// 0.0 when full_consciousness feature is not enabled.
+    pub living_mind_coherence: f64,
+
+    /// Cycle urgency level (Critical/Normal/Cruise).
+    /// Determines how many subsystems ran this cycle.
+    pub urgency: CycleUrgency,
 }
 
 /// Result of a single cognitive cycle

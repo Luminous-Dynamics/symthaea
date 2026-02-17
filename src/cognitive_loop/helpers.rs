@@ -422,6 +422,9 @@ impl CognitiveLoopService {
         self.external_reward = 0.0;
         self.prev_body_phi_modulation = 1.0;
         self.prev_embodied_phi_modulation = 1.0;
+        self.prev_resonance_frequency = 0.0;
+        self.prev_quantum_coherence = 0.0;
+        self.mce_lr_boost = 0.0;
         self.narrative_veto_active = false;
     }
 }

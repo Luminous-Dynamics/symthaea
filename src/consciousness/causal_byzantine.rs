@@ -582,7 +582,7 @@ impl CausalByzantineDefense {
             original: CounterfactualScenario {
                 features: features.clone(),
                 thresholds: original_thresholds,
-                outcome: original_outcome.clone(),
+                outcome: *original_outcome,
                 confidence: features.overall_suspicion,
             },
             counterfactual: CounterfactualScenario {

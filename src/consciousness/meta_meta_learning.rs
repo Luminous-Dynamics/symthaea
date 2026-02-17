@@ -81,7 +81,7 @@ impl OptimizationHyperparameters {
     /// Create from vector
     pub fn from_vec(v: &[f64]) -> Self {
         Self {
-            learning_rate: v.get(0).copied().unwrap_or(0.01).clamp(0.001, 0.5),
+            learning_rate: v.first().copied().unwrap_or(0.01).clamp(0.001, 0.5),
             momentum: v.get(1).copied().unwrap_or(0.9).clamp(0.0, 0.99),
             exploration_rate: v.get(2).copied().unwrap_or(0.3).clamp(0.0, 1.0),
             beam_width: (v.get(3).copied().unwrap_or(1.0) * 100.0).clamp(10.0, 500.0) as usize,

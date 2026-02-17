@@ -1022,7 +1022,7 @@ impl IntrinsicMotivationSystem {
             if let Some(grounding) = self.primitive_groundings.get(drive_type) {
                 let weight = drive_state.tension * drive_state.importance;
                 if weight > 0.01 {
-                    encodings.push(grounding.primitive_encoding.clone());
+                    encodings.push(grounding.primitive_encoding);
                 }
             }
         }
