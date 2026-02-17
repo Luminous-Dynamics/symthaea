@@ -56,6 +56,7 @@ pub enum ProposalStatus {
     Active,
     Ended,
     Approved,
+    Signed,
     Rejected,
     Executed,
     Cancelled,
@@ -267,6 +268,7 @@ pub struct Timelock {
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum TimelockStatus {
     Pending,
+    Ready,
     Executed,
     Cancelled,
     Failed,
@@ -288,7 +290,7 @@ pub struct Execution {
 pub enum ExecutionStatus {
     Success,
     Failed,
-    Partial,
+    PartialSuccess,
 }
 
 /// Input mirror for create_timelock
@@ -320,6 +322,7 @@ pub struct Council {
     pub supermajority: f64,
     pub can_spawn_children: bool,
     pub max_delegation_depth: u8,
+    pub signing_committee_id: Option<String>,
     pub status: CouncilStatus,
     pub created_at: Timestamp,
     pub last_activity: Timestamp,
@@ -397,6 +400,8 @@ pub struct CreateCouncilInput {
     pub supermajority: f64,
     pub can_spawn_children: bool,
     pub max_delegation_depth: u8,
+    #[serde(default)]
+    pub signing_committee_id: Option<String>,
 }
 
 /// Input mirror for join_council
@@ -424,6 +429,87 @@ pub struct AddContributionInput {
     pub harmony_tags: Option<Vec<String>>,
     pub stance: Option<Stance>,
     pub parent_id: Option<String>,
+}
+
+// ============================================================================
+// Threshold-Signing Mirror Types
+// ============================================================================
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum DkgPhase {
+    Registration,
+    Dealing,
+    Verification,
+    Complete,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SigningCommittee {
+    pub id: String,
+    pub name: String,
+    pub threshold: u32,
+    pub min_members: u32,
+    pub max_members: u32,
+    pub phase: DkgPhase,
+    pub epoch: u32,
+    pub public_key: Option<Vec<u8>>,
+    pub public_commitments: Vec<Vec<u8>>,
+    pub qualified_members: Vec<String>,
+    pub created_at: Timestamp,
+    pub created_by: String,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CommitteeMember {
+    pub committee_id: String,
+    pub participant_id: u32,
+    pub agent: String,
+    pub member_did: String,
+    pub trust_score: f64,
+    pub public_share: Option<Vec<u8>>,
+    pub vss_commitment: Option<Vec<u8>>,
+    pub deal_submitted: bool,
+    pub qualified: bool,
+    pub registered_at: Timestamp,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct ThresholdSignature {
+    pub committee_id: String,
+    pub content_hash: Vec<u8>,
+    pub combined_signature: Vec<u8>,
+    pub signer_count: u32,
+    pub signer_ids: Vec<u32>,
+    pub verified: bool,
+    pub created_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CreateCommitteeInput {
+    pub name: String,
+    pub threshold: u32,
+    pub min_members: u32,
+    pub max_members: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RegisterMemberInput {
+    pub committee_id: String,
+    pub member_did: String,
+    pub trust_score: f64,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct MarkTimelockReadyInput {
+    pub timelock_id: String,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct UpdateParameterInput {
+    pub parameter: String,
+    pub value: String,
+    #[serde(default)]
+    pub proposal_id: Option<String>,
 }
 
 // ============================================================================
@@ -471,7 +557,7 @@ fn make_proposal(id: &str, author_did: &str, proposal_type: ProposalType) -> Pro
         description: "This is a comprehensive test proposal for the governance system.".to_string(),
         proposal_type,
         author: author_did.to_string(),
-        status: ProposalStatus::Active,
+        status: ProposalStatus::Draft,
         actions: serde_json::json!({"action": "test"}).to_string(),
         discussion_url: Some("https://discourse.mycelix.net/proposals/test".to_string()),
         voting_starts,
@@ -1483,6 +1569,243 @@ mod execution_tests {
 
         println!("=== test_get_proposal_timelock PASSED ===\n");
     }
+
+    // ========================================================================
+    // Phase 5 Tests: Threshold-Signing, Execution Pipeline, Constitution
+    // ========================================================================
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_create_signing_committee() {
+        println!("=== test_create_signing_committee ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("mycelix-governance", &[dna.clone()])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        let input = CreateCommitteeInput {
+            name: "Treasury Signers".to_string(),
+            threshold: 2,
+            min_members: 3,
+            max_members: 5,
+        };
+
+        let record: Record = conductor
+            .call(&cell.zome("threshold_signing"), "create_committee", input)
+            .await;
+
+        let committee: SigningCommittee =
+            decode_entry(&record).expect("Failed to decode committee");
+        assert_eq!(committee.name, "Treasury Signers");
+        assert_eq!(committee.threshold, 2);
+        assert_eq!(committee.min_members, 3);
+        assert_eq!(committee.max_members, 5);
+        assert_eq!(committee.phase, DkgPhase::Registration);
+        assert_eq!(committee.epoch, 1);
+        assert!(committee.public_key.is_none());
+
+        println!("=== test_create_signing_committee PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_register_committee_member() {
+        println!("=== test_register_committee_member ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("mycelix-governance", &[dna.clone()])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create committee first
+        let committee_input = CreateCommitteeInput {
+            name: "Test Signers".to_string(),
+            threshold: 2,
+            min_members: 2,
+            max_members: 5,
+        };
+        let committee_record: Record = conductor
+            .call(&cell.zome("threshold_signing"), "create_committee", committee_input)
+            .await;
+        let committee: SigningCommittee = decode_entry(&committee_record).unwrap();
+
+        // Register a member
+        let member_input = RegisterMemberInput {
+            committee_id: committee.id.clone(),
+            member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+            trust_score: 0.85,
+        };
+        let member_record: Record = conductor
+            .call(&cell.zome("threshold_signing"), "register_member", member_input)
+            .await;
+
+        let member: CommitteeMember = decode_entry(&member_record).expect("decode member");
+        assert_eq!(member.committee_id, committee.id);
+        assert!(!member.deal_submitted);
+        assert!(!member.qualified);
+        assert_eq!(member.trust_score, 0.85);
+
+        println!("=== test_register_committee_member PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_mark_timelock_ready() {
+        println!("=== test_mark_timelock_ready ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("mycelix-governance", &[dna.clone()])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create a timelock
+        let create_input = CreateTimelockInput {
+            proposal_id: "MIP-READY-01".to_string(),
+            actions: serde_json::json!([{"type": "EmitEvent", "event": "test"}]).to_string(),
+            duration_hours: 1,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("execution"), "create_timelock", create_input)
+            .await;
+
+        // Get it to find the ID
+        let retrieved: Option<Record> = conductor
+            .call(
+                &cell.zome("execution"),
+                "get_proposal_timelock",
+                "MIP-READY-01".to_string(),
+            )
+            .await;
+        let timelock: Timelock = decode_entry(&retrieved.unwrap()).unwrap();
+        assert_eq!(timelock.status, TimelockStatus::Pending);
+
+        // Mark as ready
+        let ready_input = MarkTimelockReadyInput {
+            timelock_id: timelock.id.clone(),
+        };
+        let ready_record: Record = conductor
+            .call(&cell.zome("execution"), "mark_timelock_ready", ready_input)
+            .await;
+
+        let ready_timelock: Timelock = decode_entry(&ready_record).expect("decode ready timelock");
+        assert_eq!(ready_timelock.status, TimelockStatus::Ready);
+        assert_eq!(ready_timelock.proposal_id, "MIP-READY-01");
+
+        println!("=== test_mark_timelock_ready PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_update_parameter_preserves_type() {
+        println!("=== test_update_parameter_preserves_type ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("mycelix-governance", &[dna.clone()])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Set a parameter with Float type
+        let set_input = SetParameterInput {
+            name: "quorum_threshold".to_string(),
+            value: "\"0.5\"".to_string(),
+            value_type: ParameterType::Float,
+            description: "Minimum quorum for standard proposals".to_string(),
+            min_value: Some("\"0.1\"".to_string()),
+            max_value: Some("\"1.0\"".to_string()),
+            proposal_id: None,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("constitution"), "set_parameter", set_input)
+            .await;
+
+        // Update the value via update_parameter (which should preserve Float type)
+        let update_input = UpdateParameterInput {
+            parameter: "quorum_threshold".to_string(),
+            value: "\"0.6\"".to_string(),
+            proposal_id: Some("MIP-PARAM-01".to_string()),
+        };
+        let updated_record: Record = conductor
+            .call(&cell.zome("constitution"), "update_parameter", update_input)
+            .await;
+
+        let param: GovernanceParameter = decode_entry(&updated_record).expect("decode param");
+        assert_eq!(param.name, "quorum_threshold");
+        assert_eq!(param.value, "\"0.6\"");
+        // Key assertion: type should be preserved as Float, not reset to String
+        assert_eq!(param.value_type, ParameterType::Float);
+
+        println!("=== test_update_parameter_preserves_type PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_proposal_status_requires_draft() {
+        println!("=== test_proposal_status_requires_draft ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("mycelix-governance", &[dna.clone()])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create a proposal (must start as Draft per Phase 4 integrity validation)
+        let author_did = format!("did:mycelix:{}", app.agent_pubkey());
+        let proposal = make_proposal("MIP-DRAFT-01", ProposalType::Standard, &author_did);
+        assert_eq!(proposal.status, ProposalStatus::Draft, "Helper should create Draft proposals");
+
+        let record: Record = conductor
+            .call(&cell.zome("proposals"), "create_proposal", proposal)
+            .await;
+
+        let created: Proposal = decode_entry(&record).expect("decode proposal");
+        assert_eq!(created.status, ProposalStatus::Draft);
+
+        println!("=== test_proposal_status_requires_draft PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_get_all_committees() {
+        println!("=== test_get_all_committees ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("mycelix-governance", &[dna.clone()])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create two committees
+        for name in ["Committee A", "Committee B"] {
+            let input = CreateCommitteeInput {
+                name: name.to_string(),
+                threshold: 2,
+                min_members: 3,
+                max_members: 5,
+            };
+            let _: Record = conductor
+                .call(&cell.zome("threshold_signing"), "create_committee", input)
+                .await;
+        }
+
+        let all: Vec<Record> = conductor
+            .call(&cell.zome("threshold_signing"), "get_all_committees", ())
+            .await;
+
+        assert!(all.len() >= 2, "Should have at least 2 committees");
+
+        println!("=== test_get_all_committees PASSED ===\n");
+    }
 }
 
 // ============================================================================
@@ -1547,5 +1870,131 @@ mod unit_tests {
             let deserialized: Stance = serde_json::from_str(&json).expect("deserialize");
             assert_eq!(stance, deserialized);
         }
+    }
+
+    #[test]
+    fn test_dkg_phase_serialization() {
+        let phases = vec![
+            DkgPhase::Registration,
+            DkgPhase::Dealing,
+            DkgPhase::Verification,
+            DkgPhase::Complete,
+        ];
+
+        for phase in phases {
+            let json = serde_json::to_string(&phase).expect("serialize");
+            let deserialized: DkgPhase = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(phase, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_timelock_status_includes_ready() {
+        let statuses = vec![
+            TimelockStatus::Pending,
+            TimelockStatus::Ready,
+            TimelockStatus::Executed,
+            TimelockStatus::Cancelled,
+            TimelockStatus::Failed,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).expect("serialize");
+            let deserialized: TimelockStatus = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(status, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_proposal_status_includes_signed() {
+        let statuses = vec![
+            ProposalStatus::Draft,
+            ProposalStatus::Active,
+            ProposalStatus::Ended,
+            ProposalStatus::Approved,
+            ProposalStatus::Signed,
+            ProposalStatus::Rejected,
+            ProposalStatus::Executed,
+            ProposalStatus::Cancelled,
+            ProposalStatus::Failed,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).expect("serialize");
+            let deserialized: ProposalStatus = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(status, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_execution_status_partial_success() {
+        let statuses = vec![
+            ExecutionStatus::Success,
+            ExecutionStatus::Failed,
+            ExecutionStatus::PartialSuccess,
+        ];
+
+        for status in statuses {
+            let json = serde_json::to_string(&status).expect("serialize");
+            let deserialized: ExecutionStatus = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(status, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_amendment_type_all_8_variants() {
+        let types = vec![
+            AmendmentType::AddArticle,
+            AmendmentType::ModifyArticle,
+            AmendmentType::RemoveArticle,
+            AmendmentType::AddRight,
+            AmendmentType::ModifyRight,
+            AmendmentType::RemoveRight,
+            AmendmentType::ModifyPreamble,
+            AmendmentType::ModifyProcess,
+        ];
+
+        assert_eq!(types.len(), 8, "Must have all 8 amendment types");
+        for at in types {
+            let json = serde_json::to_string(&at).expect("serialize");
+            let deserialized: AmendmentType = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(at, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_constitution_amendment_status_all_variants() {
+        let statuses = vec![
+            ConstitutionAmendmentStatus::Draft,
+            ConstitutionAmendmentStatus::Deliberation,
+            ConstitutionAmendmentStatus::Voting,
+            ConstitutionAmendmentStatus::Ratified,
+            ConstitutionAmendmentStatus::Rejected,
+            ConstitutionAmendmentStatus::Withdrawn,
+        ];
+
+        assert_eq!(statuses.len(), 6, "Must have all 6 amendment status variants");
+        for status in statuses {
+            let json = serde_json::to_string(&status).expect("serialize");
+            let deserialized: ConstitutionAmendmentStatus = serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(status, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_create_committee_input_serialization() {
+        let input = CreateCommitteeInput {
+            name: "Test Committee".to_string(),
+            threshold: 3,
+            min_members: 5,
+            max_members: 10,
+        };
+
+        let json = serde_json::to_string(&input).expect("serialize");
+        let deserialized: CreateCommitteeInput = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(deserialized.name, "Test Committee");
+        assert_eq!(deserialized.threshold, 3);
+        assert_eq!(deserialized.min_members, 5);
+        assert_eq!(deserialized.max_members, 10);
     }
 }

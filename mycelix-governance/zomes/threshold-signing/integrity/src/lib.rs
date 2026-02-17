@@ -188,13 +188,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SignatureShare(share) => validate_create_share(action, share),
             },
             OpEntry::UpdateEntry {
-                app_entry, action, ..
+                app_entry, action, original_action_hash, ..
             } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::SigningCommittee(committee) => {
                     validate_update_committee(action, committee)
                 }
-                EntryTypes::CommitteeMember(member) => validate_update_member(action, member),
+                EntryTypes::CommitteeMember(member) => validate_update_member(action, member, original_action_hash),
                 EntryTypes::ThresholdSignature(_) => Ok(ValidateCallbackResult::Invalid(
                     "Threshold signatures cannot be updated".into(),
                 )),
@@ -359,9 +359,40 @@ fn validate_create_member(
 fn validate_update_member(
     _action: Update,
     member: CommitteeMember,
+    original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Cannot change participant ID
-    // (Would check against original in production)
+    // Fetch original member to enforce immutable fields
+    let original_record = must_get_valid_record(original_action_hash)?;
+    let original_member: CommitteeMember = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to deserialize original member: {}", e
+        ))))?
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest(
+            "Original member record has no entry".into()
+        )))?;
+
+    // participant_id is immutable — cannot change after creation
+    if member.participant_id != original_member.participant_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change participant_id after creation".into(),
+        ));
+    }
+
+    // committee_id is immutable — cannot move member between committees
+    if member.committee_id != original_member.committee_id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change committee_id after creation".into(),
+        ));
+    }
+
+    // agent is immutable — cannot reassign member identity
+    if member.agent != original_member.agent {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change agent after creation".into(),
+        ));
+    }
 
     // Trust score must remain non-negative
     if member.trust_score < 0.0 {

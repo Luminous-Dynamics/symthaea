@@ -2,7 +2,7 @@
  * Governance hApp Client for the Master SDK (Phase 3)
  *
  * Complete TypeScript client for the Mycelix Governance hApp providing access
- * to all 7 governance zomes:
+ * to all 10 governance zomes:
  *
  * - **dao** - DAO creation, membership, and management
  * - **proposals** - Proposal lifecycle (create, activate, vote, finalize)
@@ -60,6 +60,9 @@ import { DelegationClient } from './delegation';
 import { TreasuryClient } from './treasury';
 import { ExecutionClient } from './execution';
 import { BridgeClient } from './bridge';
+import { CouncilsClient } from './councils';
+import { ConstitutionClient } from './constitution';
+import { ThresholdSigningClient } from './threshold-signing';
 import { GovernanceError } from './types';
 // Note: Client config types are exported via re-exports below
 import type { ActionHash } from '../../generated/common';
@@ -154,6 +157,15 @@ export class GovernanceClient {
   /** Cross-hApp bridge operations */
   public readonly bridge: BridgeClient;
 
+  /** Holonic council management */
+  public readonly councils: CouncilsClient;
+
+  /** Constitutional charter and amendments */
+  public readonly constitution: ConstitutionClient;
+
+  /** Threshold signing and DKG ceremonies */
+  public readonly thresholdSigning: ThresholdSigningClient;
+
   // Internal state
   private readonly _client: AppClient;
   private readonly _config: Required<GovernanceClientConfig>;
@@ -181,9 +193,12 @@ export class GovernanceClient {
       ...baseConfig,
       sourceHapp: this._config.sourceHapp,
     });
+    this.councils = new CouncilsClient(client, baseConfig);
+    this.constitution = new ConstitutionClient(client, baseConfig);
+    this.thresholdSigning = new ThresholdSigningClient(client, baseConfig);
 
     if (this._config.debug) {
-      console.log('[governance-sdk] Client initialized with 7 zome clients');
+      console.log('[governance-sdk] Client initialized with 10 zome clients');
     }
   }
 
@@ -518,6 +533,9 @@ export { DelegationClient, type DelegationClientConfig } from './delegation';
 export { TreasuryClient, type TreasuryClientConfig } from './treasury';
 export { ExecutionClient, type ExecutionClientConfig } from './execution';
 export { BridgeClient, type BridgeClientConfig } from './bridge';
+export { CouncilsClient, type CouncilsClientConfig } from './councils';
+export { ConstitutionClient, type ConstitutionClientConfig } from './constitution';
+export { ThresholdSigningClient, type ThresholdSigningClientConfig } from './threshold-signing';
 
 // Types
 export * from './types';
