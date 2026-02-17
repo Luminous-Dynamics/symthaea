@@ -419,5 +419,7 @@ impl CognitiveLoopService {
         self.self_reflection.reset(); // Preserves learned thresholds
         self.fep_agent = ActiveInferenceAgent::new(self.fep_agent.config.clone());
         self.coherence_tracker.reset();
+        self.external_reward = 0.0;
+        self.prev_body_phi_modulation = 1.0;
     }
 }

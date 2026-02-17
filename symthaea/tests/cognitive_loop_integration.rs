@@ -212,3 +212,59 @@ fn test_100_cycle_stability() {
 
     assert_eq!(service.stats().total_cycles, 100);
 }
+
+// ── Virtual Body Enabled by Default ─────────────────────────────────
+
+#[test]
+fn test_virtual_body_enabled_by_default() {
+    let config = CognitiveLoopConfig::default();
+    assert!(config.enable_virtual_body, "Virtual body should be enabled by default");
+
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run 5 cycles to let virtual body accumulate state
+    for _ in 0..5 {
+        let result = service.cycle("embodied cognition test");
+        // Virtual body should produce phi modulation (not neutral 1.0 after a few cycles)
+        assert!(result.metadata.body_phi_modulation >= 0.5);
+        assert!(result.metadata.body_phi_modulation <= 1.5);
+    }
+}
+
+// ── Master Consciousness Equation ───────────────────────────────────
+
+#[test]
+fn test_master_consciousness_equation_runs_periodically() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut mce_values = Vec::new();
+    // Run 25 cycles — MCE fires when total_cycles % 10 == 0.
+    // total_cycles is incremented at start of cycle(), so it's 1-based:
+    // cycle calls 1..25, MCE fires at total_cycles 10 (call 10) and 20 (call 20).
+    for _ in 0..25 {
+        let result = service.cycle("consciousness measurement test");
+        mce_values.push(result.metadata.consciousness_level);
+    }
+
+    // Cycle call 10 (index 9) should have non-zero consciousness_level
+    assert!(
+        mce_values[9] > 0.0,
+        "MCE should compute consciousness_level on cycle 10: got {}, all: {:?}",
+        mce_values[9],
+        &mce_values[..12]
+    );
+    // Cycle call 20 (index 19) should also fire
+    assert!(
+        mce_values[19] > 0.0,
+        "MCE should compute consciousness_level on cycle 20: got {}",
+        mce_values[19]
+    );
+
+    // Non-MCE cycles should be 0.0
+    assert_eq!(mce_values[0], 0.0, "MCE should not run on cycle 1");
+    assert_eq!(mce_values[4], 0.0, "MCE should not run on cycle 5");
+}

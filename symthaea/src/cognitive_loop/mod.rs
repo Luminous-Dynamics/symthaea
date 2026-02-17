@@ -138,8 +138,17 @@ pub mod virtual_body;
 use crate::causal::CausalLoopEnhancer;
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
+use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::brain::prefrontal::PrefrontalCortex;
+use crate::consciousness::attention_schema::AttentionSchema;
+use crate::consciousness::consciousness_resonance::ResonanceAnalyzer;
+use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
 use crate::consciousness::narrative_self::NarrativeSelfModel;
+use crate::consciousness::predictive_self::PredictiveSelfModel;
+use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
+use crate::consciousness::temporal_consciousness::TemporalConsciousnessAnalyzer;
+use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
+use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 use crate::exploration::SurpriseExplorationBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
@@ -402,14 +411,62 @@ pub struct CognitiveLoopService {
     /// and tracks self-Φ (integrated information of the self-model).
     narrative_self: Option<NarrativeSelfModel>,
 
+    /// Predictive self-model for action safety evaluation.
+    /// When enabled, predicts future self-states and evaluates action safety.
+    predictive_self: Option<PredictiveSelfModel>,
+
+    /// Attention schema (AST) for self-modeling attention state.
+    /// When enabled, tracks attention focus, shifts, and generates control signals.
+    attention_schema: Option<AttentionSchema>,
+
+    /// Global Workspace Theory integration.
+    /// When enabled, submits encodings to workspace for conscious broadcast.
+    gwt: Option<UnifiedGlobalWorkspace>,
+
+    /// Consciousness resonance monitor.
+    /// When enabled, extracts harmonic modes from Phi time-series.
+    consciousness_resonance: Option<ResonanceAnalyzer>,
+
+    /// Quantum coherence observer.
+    /// When enabled, monitors CfC hidden states for superposition richness.
+    quantum_coherence: Option<QuantumCoherenceAnalyzer>,
+
+    /// Temporal consciousness analyzer.
+    /// When enabled, tracks Phi trajectory, continuity, Husserlian time,
+    /// and temporal identity coherence across cycles.
+    temporal_consciousness: Option<TemporalConsciousnessAnalyzer>,
+
+    /// Embodied cognition analyzer.
+    /// When enabled, bridges virtual body interoceptive state to body schema,
+    /// sensorimotor engine, and affordance detection.
+    embodied_cognition: Option<EmbodiedConsciousnessAnalyzer>,
+
+    /// Narrative-GWT integration (consciousness governance capstone).
+    /// When enabled, provides coherence veto, value checking, goal alignment
+    /// via a unified NarrativeSelf + GWT + PredictiveSelf integration.
+    narrative_gwt: Option<NarrativeGWTIntegration>,
+
     /// Relational Phi from dyad computation (set externally by Symthaea facade).
     /// Blended into unified_phi at 15% weight when > 0.
     relational_phi: f64,
+
+    /// External reward signal injected by environment (0.0 = none).
+    /// Blended with internal prediction-error-based reward at 50% weight.
+    /// Resets to 0.0 after consumption.
+    external_reward: f32,
 
     /// Virtual body adapter for embodied cognition.
     /// When enabled, maps cognitive signals to interoceptive states and produces
     /// a phi_modulation factor that scales consciousness from somatic feedback.
     virtual_body: Option<virtual_body::VirtualBody>,
+
+    /// Previous cycle's body phi modulation (fed back into next cycle's unified_phi)
+    prev_body_phi_modulation: f64,
+
+    /// Master Consciousness Equation (MCE) — comprehensive consciousness metric.
+    /// C(t) = σ(softmin(Φ, B, W, A, R, E, K; τ)) × weighted_sum × S × ρ(t) × M × N × Soc
+    /// Runs every 10th cycle to provide richer consciousness measurement than Phi alone.
+    master_equation: MasterConsciousnessEquation,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

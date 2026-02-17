@@ -54,11 +54,17 @@ All 8 types defined at `src/consciousness/fep_active_inference.rs:2278`:
 ## Reproducing Paper Results
 
 ```bash
+# Unified reproduction script (all paper-cited benchmarks in one run)
+cargo run --example reproduce_all_benchmarks
+
+# Ablation baselines (HDC-only vs CfC-only vs Full vs HDC-LTC)
+cargo run --example ablation_baselines
+
 # Run FEP active inference tests
 cargo test test_fep_active_inference --release
 
-# Run benchmarks (Table 2)
-cargo bench --bench fep_temporal_benchmark
+# T-Maze with reward loop (v0.6+)
+cargo test --lib -- t_maze --release
 
 # Run Grid World
 cargo test gridworld --release -p symthaea-core
@@ -80,7 +86,7 @@ cargo test test_integrated_pipelines --release
 
 | Paper Claim | Status | Notes |
 |---|---|---|
-| T-Maze benchmark (§4.2) | Python only | Rust benchmark uses synthetic temporal patterns, not actual T-Maze. Python comparison at `validation/pymdp_comparison_benchmark.py` |
+| T-Maze benchmark (§4.2) | Rust + Python | Rust T-Maze now has reward loop (`provide_reward()` → FEP TD learner). Python comparison at `validation/pymdp_comparison_benchmark.py` |
 | Eq. 17 precision-weighted binding | Implemented | `ContinuousHV::bind_precision()` implements exact sigmoid-gated binding. Semantic gap: FEP precision gating uses scalar attenuation rather than element-wise sigmoid |
 | Feature flag count (§A) | Corrected | Updated from 57 to 48 features (41 with cfg gates) after removing dead `school_module` flag |
 | Phi proxy correlation (rho=0.50) | Empirical only | Validated across 15 topologies but lacks theoretical justification for why CfC tau diversity tracks causal architecture |

@@ -56,6 +56,52 @@ pub struct CycleMetadata {
 
     /// Virtual body affect arousal (0 to 1)
     pub body_arousal: f32,
+
+    /// Master Consciousness Equation level (0.0 to 1.0).
+    /// Comprehensive consciousness metric combining Phi, broadcast, working memory,
+    /// attention, recurrence, embodiment, knowledge, narrative, and social factors.
+    /// Updated every 10th cycle; 0.0 when not yet computed.
+    pub consciousness_level: f64,
+
+    /// Predictive self-model safety score (1.0 = safe, 0.0 = unsafe).
+    /// 0.0 when predictive self is not enabled.
+    pub predictive_self_safety: f32,
+
+    /// Attention schema focus intensity (0.0 to 1.0).
+    /// 0.0 when attention schema is not enabled.
+    pub attention_schema_focus: f32,
+
+    /// Whether a GWT broadcast occurred this cycle.
+    pub gwt_broadcast: bool,
+
+    /// Consciousness resonance dominant frequency (Hz).
+    /// 0.0 when resonance is not enabled or no history.
+    pub resonance_frequency: f64,
+
+    /// Quantum coherence level (0.0 to 1.0).
+    /// 0.0 when quantum coherence is not enabled.
+    pub quantum_coherence_level: f64,
+
+    /// Temporal consciousness coherence (0.0 to 1.0).
+    /// 0.0 when temporal consciousness is not enabled.
+    pub temporal_coherence_score: f64,
+
+    /// Whether temporal consciousness analysis detected a discontinuity.
+    pub temporal_discontinuity: bool,
+
+    /// Embodied cognition phi modulation (1.0 = neutral).
+    /// 1.0 when embodied cognition is not enabled.
+    pub embodied_phi_modulation: f64,
+
+    /// Embodied cognition agency score (0.0 to 1.0).
+    /// 0.0 when embodied cognition is not enabled.
+    pub embodied_agency: f64,
+
+    /// Whether the narrative-GWT integration vetoed this cycle's action.
+    pub narrative_gwt_veto: bool,
+
+    /// Self-Phi from the narrative-GWT integration (0.0 = off/not enabled).
+    pub narrative_gwt_self_phi: f64,
 }
 
 /// Result of a single cognitive cycle

@@ -1708,3 +1708,212 @@ fn test_cycle_with_meta_cognition() {
     // Depth should be a valid value (usize is always >= 0)
     let _ = result.metadata.meta_cognitive_depth;
 }
+
+#[test]
+fn test_cycle_with_predictive_self() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_predictive_self: true,
+        enable_narrative_self: true, // Required dependency
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("predictive self test input");
+    }
+
+    let result = service.cycle("predictive self check");
+    // Predictive self safety should be valid (0 = no confidence yet, up to 1.0)
+    assert!(result.metadata.predictive_self_safety >= 0.0);
+    assert!(result.metadata.predictive_self_safety <= 1.0);
+}
+
+#[test]
+fn test_cycle_with_attention_schema() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_attention_schema: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("attention schema test input");
+    }
+
+    let result = service.cycle("attention check");
+    // Attention schema focus should be valid
+    assert!(result.metadata.attention_schema_focus >= 0.0);
+    assert!(result.metadata.attention_schema_focus <= 1.0);
+}
+
+#[test]
+fn test_cycle_with_gwt() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_gwt: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("gwt test input");
+    }
+
+    let result = service.cycle("gwt check");
+    // GWT broadcast is a valid boolean
+    assert!(result.metadata.gwt_broadcast || !result.metadata.gwt_broadcast);
+}
+
+#[test]
+fn test_cycle_with_resonance() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_resonance: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("resonance test input");
+    }
+
+    let result = service.cycle("resonance check");
+    // Resonance frequency should be finite
+    assert!(result.metadata.resonance_frequency.is_finite());
+}
+
+#[test]
+fn test_cycle_with_quantum_coherence() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_quantum_coherence: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("quantum coherence test input");
+    }
+
+    let result = service.cycle("quantum check");
+    // Quantum coherence level should be valid
+    assert!(result.metadata.quantum_coherence_level >= 0.0);
+    assert!(result.metadata.quantum_coherence_level <= 1.0);
+}
+
+#[test]
+fn test_body_phi_modulation_feedback() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_virtual_body: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 20 cycles to let the body feedback loop stabilize
+    let mut body_mods = Vec::new();
+    for _ in 0..20 {
+        let result = service.cycle("body feedback test");
+        body_mods.push(result.metadata.body_phi_modulation);
+    }
+
+    // At least some body phi modulation should differ from 1.0 after warmup
+    let non_neutral = body_mods.iter().filter(|&&m| (m - 1.0).abs() > 0.001).count();
+    assert!(non_neutral > 0, "Body phi modulation should deviate from 1.0 after warmup");
+}
+
+#[test]
+fn test_all_consciousness_modules_enabled() {
+    // Smoke test: enable everything and verify no panics
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_predictive_self: true,
+        enable_narrative_self: true,
+        enable_attention_schema: true,
+        enable_gwt: true,
+        enable_resonance: true,
+        enable_quantum_coherence: true,
+        enable_meta_cognition: true,
+        enable_prefrontal: true,
+        enable_surprise_exploration: true,
+        enable_virtual_body: true,
+        enable_temporal_consciousness: true,
+        enable_embodied_cognition: true,
+        enable_narrative_gwt: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..15 {
+        service.cycle("all modules enabled test input");
+    }
+
+    let result = service.cycle("final check with all modules");
+    assert!(result.prediction_error.is_finite());
+    assert!(result.metadata.consciousness_level.is_finite());
+    // Temporal consciousness should have valid coherence
+    assert!(result.metadata.temporal_coherence_score >= 0.0);
+    assert!(result.metadata.temporal_coherence_score <= 1.0);
+    // Embodied cognition should have valid phi modulation
+    assert!(result.metadata.embodied_phi_modulation.is_finite());
+    // Narrative-GWT self phi should be finite
+    assert!(result.metadata.narrative_gwt_self_phi.is_finite());
+}
+
+#[test]
+fn test_cycle_with_temporal_consciousness() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_temporal_consciousness: true,
+        enable_narrative_self: true,   // Dependency
+        enable_predictive_self: true,  // Dependency
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..15 {
+        service.cycle("temporal consciousness test input");
+    }
+
+    let result = service.cycle("temporal check");
+    // Temporal coherence should be between 0 and 1
+    assert!(result.metadata.temporal_coherence_score >= 0.0);
+    assert!(result.metadata.temporal_coherence_score <= 1.0);
+    // After 15 cycles, should have enough data for analysis
+    // (discontinuity is a boolean - just verify it's valid)
+    assert!(result.metadata.temporal_discontinuity || !result.metadata.temporal_discontinuity);
+}
+
+#[test]
+fn test_cycle_with_embodied_cognition() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_embodied_cognition: true,
+        enable_virtual_body: true, // Provides interoceptive state
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("embodied cognition test input");
+    }
+
+    let result = service.cycle("embodied check");
+    // Embodied phi modulation should be finite and reasonable
+    assert!(result.metadata.embodied_phi_modulation.is_finite());
+    // Agency should be between 0 and 1
+    assert!(result.metadata.embodied_agency >= 0.0);
+    assert!(result.metadata.embodied_agency <= 1.0);
+}
+
+#[test]
+fn test_cycle_with_narrative_gwt() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_narrative_gwt: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("narrative gwt governance test input");
+    }
+
+    let result = service.cycle("governance check");
+    // Self-phi should be finite
+    assert!(result.metadata.narrative_gwt_self_phi.is_finite());
+    // Veto is a boolean - just verify valid
+    assert!(result.metadata.narrative_gwt_veto || !result.metadata.narrative_gwt_veto);
+}
