@@ -1,3 +1,9 @@
+#![allow(
+    clippy::absurd_extreme_comparisons,
+    clippy::manual_range_contains,
+    clippy::needless_range_loop,
+    clippy::manual_is_multiple_of
+)]
 //! K-Vector Zero-Knowledge Proofs
 //!
 //! This crate provides STARK-based zero-knowledge proofs for validating
