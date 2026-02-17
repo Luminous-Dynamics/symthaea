@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/finance/treasury
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   Treasury,
   CreateTreasuryInput,
@@ -27,6 +27,7 @@ import type {
   JoinPoolInput,
   PoolContributionInput,
 } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'treasury';

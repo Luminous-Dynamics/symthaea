@@ -12,12 +12,14 @@
  * @module @mycelix/sdk/clients/housing
  */
 
-import { AppClient, AppWebsocket } from '@holochain/client';
-import { UnitsClient } from './units';
-import { MembershipClient } from './membership';
+import { type AppClient, AppWebsocket } from '@holochain/client';
+
 import { FinancesClient } from './finances';
 import { HousingGovernanceClient } from './governance';
+import { MembershipClient } from './membership';
 import { HousingError } from './types';
+import { UnitsClient } from './units';
+
 import type { ActionHash } from '../../generated/common';
 
 // ============================================================================

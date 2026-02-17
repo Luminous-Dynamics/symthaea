@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/housing/units
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   Building,
   RegisterBuildingInput,
@@ -16,6 +16,7 @@ import type {
   AssignOccupantInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface UnitsClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

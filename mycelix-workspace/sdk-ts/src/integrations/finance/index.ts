@@ -102,15 +102,15 @@ export type {
 // Legacy Mock Services (for testing/development)
 // ============================================================================
 
+
+import { LocalBridge } from '../../bridge/index.js';
+import { type MycelixClient } from '../../client/index.js';
 import {
   createReputation,
   recordPositive,
   reputationValue,
   type ReputationScore,
 } from '../../matl/index.js';
-
-import { LocalBridge } from '../../bridge/index.js';
-import { MycelixClient } from '../../client/index.js';
 import { FinanceValidators } from '../../utils/validation.js';
 
 // ============================================================================

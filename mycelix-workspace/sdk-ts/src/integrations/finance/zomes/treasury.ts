@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/finance/zomes/treasury
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { FinanceSdkError } from '../types';
+
 import type {
   Treasury,
   CreateTreasuryInput,
@@ -14,7 +15,7 @@ import type {
   ProposeAllocationInput,
   AllocationStatus,
 } from '../types';
-import { FinanceSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Treasury client
@@ -104,7 +105,7 @@ export class TreasuryClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

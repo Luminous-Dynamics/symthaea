@@ -8,8 +8,9 @@
  * @module @mycelix/sdk/clients/identity/education
  */
 
-import type { AppClient, ActionHash } from '@holochain/client';
+import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
 import { ZomeClient } from '../../core/zome-client.js';
+
 import type {
   AcademicCredential,
   EpistemicClaimReference,
@@ -20,7 +21,8 @@ import type {
   DnssecStatus,
   IdentityClientConfig,
 } from './types.js';
-import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
+import type { AppClient, ActionHash } from '@holochain/client';
+
 
 /**
  * Academic credential record wrapper

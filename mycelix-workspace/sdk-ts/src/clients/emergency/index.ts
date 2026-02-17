@@ -11,11 +11,13 @@
  * @module @mycelix/sdk/clients/emergency
  */
 
-import { AppClient, AppWebsocket } from '@holochain/client';
-import { IncidentsClient } from './incidents';
+import { type AppClient, AppWebsocket } from '@holochain/client';
+
 import { CoordinationClient } from './coordination';
+import { IncidentsClient } from './incidents';
 import { SheltersClient } from './shelters';
 import { EmergencyError } from './types';
+
 import type { ActionHash } from '../../generated/common';
 
 // ============================================================================

@@ -10,11 +10,11 @@
  * @see docs/architecture/uess/UESS-01-CORE.md §3.1
  */
 
+import { createPersistenceAdapter, type PersistenceAdapter } from './persistence.js';
 import { hash } from '../../security/index.js';
 
 import type { StorageMetadata } from '../types.js';
 import type { StorageBackendAdapter } from './memory.js';
-import { createPersistenceAdapter, type PersistenceAdapter } from './persistence.js';
 
 // =============================================================================
 // Local Storage Entry

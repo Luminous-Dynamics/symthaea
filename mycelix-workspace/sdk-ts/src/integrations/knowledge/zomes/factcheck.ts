@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/knowledge/zomes/factcheck
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { KnowledgeSdkError } from '../types';
+
 import type {
   FactCheckRequest,
   SubmitFactCheckInput,
@@ -19,7 +20,7 @@ import type {
   KnowledgeAuthority,
   Claim,
 } from '../types';
-import { KnowledgeSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the FactCheck client
@@ -105,7 +106,7 @@ export class FactCheckClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

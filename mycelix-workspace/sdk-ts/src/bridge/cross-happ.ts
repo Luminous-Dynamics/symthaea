@@ -205,7 +205,7 @@ export class CrossHappBridge {
 
     for (const happId of contextHapps) {
       if (cached?.[happId]) {
-        const value = reputationValue(cached[happId]!);
+        const value = reputationValue(cached[happId]);
         scores[happId] = value;
         totalScore += value;
         count++;

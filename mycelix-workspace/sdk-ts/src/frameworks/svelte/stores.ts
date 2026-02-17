@@ -610,7 +610,7 @@ export async function castVote(
     id: `vote-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     proposal_id: proposalId,
     voter_did: did,
-    choice: voteChoice as 'Yes' | 'No' | 'Abstain',
+    choice: voteChoice,
     weight: weight || 1,
   });
 

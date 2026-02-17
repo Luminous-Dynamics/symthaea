@@ -8,15 +8,19 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
 } from '@holochain/client';
-import { ProjectsClient } from './zomes/projects';
-import { ParticipantsClient } from './zomes/participants';
-import { TradingClient } from './zomes/trading';
+
+import { EnergySdkError } from './types';
 import { CreditsClient } from './zomes/credits';
-import { InvestmentsClient } from './zomes/investments';
 import { GridClient } from './zomes/grid';
+import { InvestmentsClient } from './zomes/investments';
+import { ParticipantsClient } from './zomes/participants';
+import { ProjectsClient } from './zomes/projects';
+import { TradingClient } from './zomes/trading';
+import { RetryPolicy, RetryPolicies, type RetryOptions } from '../../common/retry';
+
 import type {
   EnergyProject,
   EnergyParticipant,
@@ -30,8 +34,7 @@ import type {
   EnergySource,
   EnergyEvent,
 } from './types';
-import { EnergySdkError } from './types';
-import { RetryPolicy, RetryPolicies, type RetryOptions } from '../../common/retry';
+
 
 /**
  * Configuration for the Energy client

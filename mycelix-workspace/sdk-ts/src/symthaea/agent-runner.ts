@@ -455,7 +455,7 @@ export class AgentRunner {
             name: intentDef.name,
             confidence: hasRequired ? 0.85 : 0.7,
             requiredEntities: intentDef.requiredEntities,
-            providedEntities: providedEntities as ExtractedEntity['type'][],
+            providedEntities: providedEntities,
             complete: hasRequired,
           };
         }

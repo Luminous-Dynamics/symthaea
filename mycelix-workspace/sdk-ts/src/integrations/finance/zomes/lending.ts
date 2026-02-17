@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/finance/zomes/lending
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { FinanceSdkError } from '../types';
+
 import type {
   Loan,
   LoanStatus,
@@ -21,7 +22,7 @@ import type {
   LoanDefaultInput,
   DefaultResult,
 } from '../types';
-import { FinanceSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Lending client
@@ -119,7 +120,7 @@ export class LendingClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

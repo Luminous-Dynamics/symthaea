@@ -6,14 +6,15 @@
  * @module @mycelix/sdk/integrations/governance/zomes/dao
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { GovernanceSdkError } from '../types';
+
 import type {
   Dao,
   CreateDaoInput,
   UpdateDaoInput,
   Membership,
 } from '../types';
-import { GovernanceSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the DAO client
@@ -97,7 +98,7 @@ export class DaoClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

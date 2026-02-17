@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/care/timebank
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   ServiceOffer,
   CreateServiceOfferInput,
@@ -19,6 +19,7 @@ import type {
   TimeBalance,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface TimebankClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

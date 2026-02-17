@@ -27,8 +27,9 @@
  */
 
 import { mycelix } from './stores.js';
-import type { Mycelix } from '../../core/index.js';
+
 import type { Readable, AsyncState } from './stores.js';
+import type { Mycelix } from '../../core/index.js';
 
 // =============================================================================
 // Types

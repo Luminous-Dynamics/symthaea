@@ -5,8 +5,8 @@
  * Supports multiple aggregation algorithms with trust-weighted contributions.
  */
 
-import * as matl from '../matl/index.js';
 import { FederatedLearningError, ErrorCode } from '../errors.js';
+import * as matl from '../matl/index.js';
 
 // ============================================================================
 // Validation Helpers

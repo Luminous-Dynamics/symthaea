@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/finance/payments
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   Payment,
   SendPaymentInput,
@@ -17,6 +17,7 @@ import type {
   Receipt,
   CreateEscrowPaymentInput,
 } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'payments';

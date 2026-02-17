@@ -4,7 +4,8 @@
  * Cast votes and tally results across all voting mechanisms.
  */
 
-import { ActionHash, Record as HolochainRecord } from '@holochain/client';
+import { type ActionHash, type Record as HolochainRecord } from '@holochain/client';
+
 import type { DAOClient } from './client';
 import type {
   Vote,

@@ -34,6 +34,7 @@
  * ```
  */
 
+import { LocalBridge } from '../../bridge/index.js';
 import {
   claim,
   EmpiricalLevel,
@@ -41,7 +42,6 @@ import {
   MaterialityLevel,
   type EpistemicClaim,
 } from '../../epistemic/index.js';
-
 import {
   createReputation,
   recordPositive,
@@ -49,7 +49,6 @@ import {
   type ReputationScore,
 } from '../../matl/index.js';
 
-import { LocalBridge } from '../../bridge/index.js';
 
 // ============================================================================
 // W3C VC 2.0 Academic Credential Types
@@ -365,7 +364,7 @@ export class AcademicCredentialService {
     // Revocation check
     const revocation = this.revocations.get(credential.id);
     const isRevoked = revocation !== undefined;
-    if (isRevoked) errors.push(`Credential revoked: ${revocation!.reason}`);
+    if (isRevoked) errors.push(`Credential revoked: ${revocation.reason}`);
 
     const overallValid =
       structureValid && issuerValid && proofValid && commitmentValid && !isRevoked;

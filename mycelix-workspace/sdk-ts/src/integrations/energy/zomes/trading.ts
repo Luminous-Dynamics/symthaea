@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/energy/zomes/trading
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { EnergySdkError } from '../types';
+
 import type {
   EnergyTrade,
   CreateTradeInput,
@@ -18,7 +19,7 @@ import type {
   AvailableEnergy,
   AvailableEnergyQuery,
 } from '../types';
-import { EnergySdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for the Trading client
@@ -97,7 +98,7 @@ export class TradingClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

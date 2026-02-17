@@ -8,9 +8,12 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
 } from '@holochain/client';
+
+import { RetryPolicy, RetryPolicies, type RetryOptions } from '../common/retry';
+
 import {
   PublicationClient,
   AttributionClient,
@@ -23,7 +26,6 @@ import {
   type ContentType,
   type VerificationStatus,
 } from './index';
-import { RetryPolicy, RetryPolicies, type RetryOptions } from '../common/retry';
 
 /**
  * Media SDK Error
@@ -219,7 +221,7 @@ export class MycelixMediaClient {
     input: Parameters<PublicationClient['publish']>[0]
   ): Promise<{ content: Content; attribution: Attribution }> {
     const record = await this.publication.publish(input);
-    const content = record.entry.Present as Content;
+    const content = record.entry.Present;
 
     const attrRecord = await this.attribution.addAttribution({
       content_id: content.id,
@@ -227,7 +229,7 @@ export class MycelixMediaClient {
       role: 'Author',
       royalty_percentage: 100,
     });
-    const attribution = attrRecord.entry.Present as Attribution;
+    const attribution = attrRecord.entry.Present;
 
     return { content, attribution };
   }
@@ -250,7 +252,7 @@ export class MycelixMediaClient {
       return null;
     }
 
-    const content = record.entry.Present as Content;
+    const content = record.entry.Present;
 
     const [attrRecords, fcRecords, endRecords, status] = await Promise.all([
       this.attribution.getAttributions(contentId),
@@ -261,9 +263,9 @@ export class MycelixMediaClient {
 
     return {
       content,
-      attributions: attrRecords.map(r => r.entry.Present as Attribution),
-      factChecks: fcRecords.map(r => r.entry.Present as FactCheck),
-      endorsements: endRecords.map(r => r.entry.Present as Endorsement),
+      attributions: attrRecords.map(r => r.entry.Present),
+      factChecks: fcRecords.map(r => r.entry.Present),
+      endorsements: endRecords.map(r => r.entry.Present),
       verificationStatus: status,
     };
   }
@@ -285,13 +287,13 @@ export class MycelixMediaClient {
 
     if (query.tag) {
       const records = await this.publication.getContentByTag(query.tag);
-      results = records.map(r => r.entry.Present as Content);
+      results = records.map(r => r.entry.Present);
     } else if (query.type) {
       const records = await this.publication.getContentByType(query.type);
-      results = records.map(r => r.entry.Present as Content);
+      results = records.map(r => r.entry.Present);
     } else if (query.authorDid) {
       const records = await this.publication.getContentByAuthor(query.authorDid);
-      results = records.map(r => r.entry.Present as Content);
+      results = records.map(r => r.entry.Present);
     }
 
     // Filter by verification status
@@ -325,7 +327,7 @@ export class MycelixMediaClient {
     contentByType: Record<ContentType, number>;
   }> {
     const records = await this.publication.getContentByAuthor(creatorDid);
-    const contents = records.map(r => r.entry.Present as Content);
+    const contents = records.map(r => r.entry.Present);
 
     const contentByType: Record<string, number> = {};
     let totalViews = 0;

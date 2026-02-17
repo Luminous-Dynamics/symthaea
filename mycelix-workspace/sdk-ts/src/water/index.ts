@@ -24,7 +24,6 @@ import {
   type GovernanceRule,
   type CommonsWisdom,
 } from '../commons/index.js';
-
 import {
   claim,
   EmpiricalLevel,
@@ -32,7 +31,6 @@ import {
   MaterialityLevel,
   type EpistemicClaim,
 } from '../epistemic/index.js';
-
 import {
   createReputation,
   recordPositive,

@@ -4,7 +4,8 @@
  * Proposal creation and management.
  */
 
-import { ActionHash, AgentPubKey, Record as HolochainRecord } from '@holochain/client';
+import { type ActionHash, type AgentPubKey, type Record as HolochainRecord } from '@holochain/client';
+
 import type { DAOClient } from './client';
 import type {
   Proposal,

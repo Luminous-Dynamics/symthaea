@@ -8,8 +8,8 @@
  * @module signals
  */
 
+import { type MycelixClient } from '../client/index.js';
 import { SignalHandler, type HolochainSignal } from '../utils/index.js';
-import { MycelixClient } from '../client/index.js';
 
 // ============================================================================
 // Common Signal Types

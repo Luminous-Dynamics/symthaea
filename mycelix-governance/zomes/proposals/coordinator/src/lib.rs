@@ -608,7 +608,7 @@ pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
     let max_thread_depth = calculate_max_thread_depth(&contributions);
 
     // === HARMONY ANALYSIS ===
-    let all_harmonies = vec![
+    let all_harmonies = [
         "ResonantCoherence",
         "PanSentientFlourishing",
         "IntegralWisdom",

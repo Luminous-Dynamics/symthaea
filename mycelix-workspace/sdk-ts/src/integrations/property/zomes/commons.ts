@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/property/zomes/commons
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { PropertySdkError } from '../types';
+
 import type {
   Commons,
   CommonsType,
@@ -15,7 +16,7 @@ import type {
   CommonsUsage,
   CreateCommonsInput,
 } from '../types';
-import { PropertySdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Commons client
@@ -106,7 +107,7 @@ export class CommonsClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

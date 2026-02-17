@@ -69,7 +69,8 @@ export {
 // Bridge Client (Holochain Zome Calls)
 // ============================================================================
 
-import { MycelixClient } from '../../client/index.js';
+import { type MycelixClient } from '../../client/index.js';
+
 import type { LegacyEnergySource } from './legacy.js';
 
 const ENERGY_ROLE = 'energy';

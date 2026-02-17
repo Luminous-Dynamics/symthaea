@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/knowledge/zomes/claims
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { KnowledgeSdkError } from '../types';
+
 import type {
   Claim,
   SubmitClaimInput,
@@ -18,7 +19,7 @@ import type {
   AddSourceInput,
   CiteSourceInput,
 } from '../types';
-import { KnowledgeSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Claims client
@@ -111,7 +112,7 @@ export class ClaimsClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

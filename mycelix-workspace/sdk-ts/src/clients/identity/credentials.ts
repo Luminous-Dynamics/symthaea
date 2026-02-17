@@ -7,8 +7,9 @@
  * @module @mycelix/sdk/clients/identity/credentials
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
 import { ZomeClient } from '../../core/zome-client.js';
+
 import type {
   VerifiableCredential,
   VerifiablePresentation,
@@ -25,7 +26,8 @@ import type {
   UpdateRequestStatusInput,
   IdentityClientConfig,
 } from './types.js';
-import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+
 
 /**
  * Verifiable Credential Client

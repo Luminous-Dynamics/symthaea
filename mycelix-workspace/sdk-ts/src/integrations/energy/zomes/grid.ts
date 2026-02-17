@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/energy/zomes/grid
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { EnergySdkError } from '../types';
+
 import type {
   GridStatus,
   GridAlert,
@@ -16,7 +17,7 @@ import type {
   CommunityEnergySummary,
   EnergyPriority,
 } from '../types';
-import { EnergySdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for the Grid client
@@ -93,7 +94,7 @@ export class GridClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

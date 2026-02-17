@@ -8,9 +8,12 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
 } from '@holochain/client';
+
+import { RetryPolicy, RetryPolicies, type RetryOptions } from '../common/retry';
+
 import {
   CasesClient,
   EvidenceClient,
@@ -27,7 +30,6 @@ import {
   type CaseCategory,
   type DecisionOutcome,
 } from './index';
-import { RetryPolicy, RetryPolicies, type RetryOptions } from '../common/retry';
 
 /**
  * Justice SDK Error
@@ -224,7 +226,7 @@ export class MycelixJusticeClient {
       return null;
     }
 
-    const case_ = caseRecord.entry.Present as Case;
+    const case_ = caseRecord.entry.Present;
 
     const [evidenceRecords, decisionRecord] = await Promise.all([
       this.evidence.getEvidenceForCase(caseId),
@@ -237,9 +239,9 @@ export class MycelixJusticeClient {
 
     return {
       case_,
-      evidence: evidenceRecords.map(r => r.entry.Present as Evidence),
-      decision: decisionRecord ? decisionRecord.entry.Present as Decision : null,
-      enforcements: enforcementRecords.map(r => r.entry.Present as Enforcement),
+      evidence: evidenceRecords.map(r => r.entry.Present),
+      decision: decisionRecord ? decisionRecord.entry.Present : null,
+      enforcements: enforcementRecords.map(r => r.entry.Present),
     };
   }
 
@@ -259,8 +261,8 @@ export class MycelixJusticeClient {
       this.cases.getCasesByRespondent(did),
     ]);
 
-    const asComplainant = complainantRecords.map(r => r.entry.Present as Case);
-    const asRespondent = respondentRecords.map(r => r.entry.Present as Case);
+    const asComplainant = complainantRecords.map(r => r.entry.Present);
+    const asRespondent = respondentRecords.map(r => r.entry.Present);
 
     return {
       asComplainant,
@@ -293,8 +295,8 @@ export class MycelixJusticeClient {
     const byPhase: Record<string, number> = {};
     let pending = 0;
     let resolved = 0;
-    let wonAsComplainant = 0;
-    let wonAsRespondent = 0;
+    const wonAsComplainant = 0;
+    const wonAsRespondent = 0;
 
     for (const case_ of allCases) {
       byCategory[case_.category] = (byCategory[case_.category] || 0) + 1;
@@ -337,8 +339,8 @@ export class MycelixJusticeClient {
     ]);
 
     return {
-      mediators: mediatorRecords.map(r => r.entry.Present as MediatorProfile),
-      arbitrators: arbitratorRecords.map(r => r.entry.Present as ArbitratorProfile),
+      mediators: mediatorRecords.map(r => r.entry.Present),
+      arbitrators: arbitratorRecords.map(r => r.entry.Present),
     };
   }
 
@@ -357,7 +359,7 @@ export class MycelixJusticeClient {
     evidence: Evidence[];
   }> {
     const caseRecord = await this.cases.fileCase(caseInput);
-    const case_ = caseRecord.entry.Present as Case;
+    const case_ = caseRecord.entry.Present;
 
     const evidence: Evidence[] = [];
     if (initialEvidence && initialEvidence.length > 0) {
@@ -366,7 +368,7 @@ export class MycelixJusticeClient {
           ...ev,
           case_id: case_.id,
         });
-        evidence.push(evRecord.entry.Present as Evidence);
+        evidence.push(evRecord.entry.Present);
       }
     }
 

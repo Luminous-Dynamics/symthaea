@@ -29,23 +29,37 @@
  */
 
 import {
-  KVector,
-  AgentOutput,
-  AgentVote,
+  type DomainRegistry,
+  translateAttestation,
+  defaultDomainRegistry,
+  DOMAIN_CODE_REVIEW,
+} from './domains.js';
+// Note: TrustDomain removed as unused
+import {
+  type ProofStatement,
+  type KVectorCommitment,
+  type ProverConfig,
+  generateSimulatedProof,
+  trustAbove,
+} from './proofs.js';
+import {
+  type KVector,
+  type AgentOutput,
+  type AgentVote,
   DerivationType,
-  ProvenanceNode,
-  ProvenanceChain,
-  PhiConsensusResult,
+  type ProvenanceNode,
+  type ProvenanceChain,
+  type PhiConsensusResult,
   PhiConsensusStatus,
-  RegisteredOutput,
-  ConsensusOutcome,
-  TrustUpdate,
-  TrustAttestation,
-  TrustDelta,
+  type RegisteredOutput,
+  type ConsensusOutcome,
+  type TrustUpdate,
+  type TrustAttestation,
+  type TrustDelta,
   TrustDirection,
-  PipelineConfig,
-  PipelineResult,
-  TranslatedAttestation,
+  type PipelineConfig,
+  type PipelineResult,
+  type TranslatedAttestation,
   TrustPipelineError,
   TrustPipelineErrorCode,
   DEFAULT_PIPELINE_CONFIG,
@@ -53,20 +67,6 @@ import {
   applyTrustDelta,
   createUniformKVector,
 } from './types.js';
-import {
-  DomainRegistry,
-  translateAttestation,
-  defaultDomainRegistry,
-  DOMAIN_CODE_REVIEW,
-} from './domains.js';
-// Note: TrustDomain removed as unused
-import {
-  ProofStatement,
-  KVectorCommitment,
-  ProverConfig,
-  generateSimulatedProof,
-  trustAbove,
-} from './proofs.js';
 // Note: TrustProof, verifySimulatedProof removed as unused
 
 // ============================================================================

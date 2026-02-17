@@ -21,8 +21,9 @@
  * ```
  */
 
-import type { IdentityResolver, Identity } from './index.js';
 import { BehaviorSubject } from '../reactive/index.js';
+
+import type { IdentityResolver, Identity } from './index.js';
 
 // =============================================================================
 // Types

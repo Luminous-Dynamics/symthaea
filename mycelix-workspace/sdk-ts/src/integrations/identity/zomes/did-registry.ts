@@ -5,7 +5,8 @@
  * Implements W3C DID Core Specification (did:mycelix method).
  */
 
-import type { AppClient, AgentPubKey, Record as HolochainRecord } from '@holochain/client';
+import { IdentitySdkError, IdentitySdkErrorCode } from '../types.js';
+
 import type {
   DidDocument,
   DidDeactivation,
@@ -14,7 +15,7 @@ import type {
   ServiceEndpoint,
   UpdateDidInput,
 } from '../types.js';
-import { IdentitySdkError, IdentitySdkErrorCode } from '../types.js';
+import type { AppClient, AgentPubKey, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * DID Registry Zome Client

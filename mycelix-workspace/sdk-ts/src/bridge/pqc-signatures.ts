@@ -22,6 +22,7 @@ import {
   SecurityError,
   SecurityErrorCode,
 } from '../security/index.js';
+
 import type { BridgeMessage, HappId } from './cross-happ.js';
 
 /** Alias for backward compatibility */

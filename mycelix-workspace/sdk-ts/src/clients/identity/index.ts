@@ -113,16 +113,17 @@ export * from './types.js';
 // UNIFIED CLIENT FACTORY
 // =============================================================================
 
-import type { AppClient } from '@holochain/client';
-import { DidClient } from './did.js';
-import { CredentialsClient } from './credentials.js';
-import { RecoveryClient } from './recovery.js';
 import { BridgeClient } from './bridge.js';
-import { SchemaClient } from './schema.js';
-import { RevocationClient } from './revocation.js';
-import { TrustClient } from './trust.js';
+import { CredentialsClient } from './credentials.js';
+import { DidClient } from './did.js';
 import { EducationClient } from './education.js';
+import { RecoveryClient } from './recovery.js';
+import { RevocationClient } from './revocation.js';
+import { SchemaClient } from './schema.js';
+import { TrustClient } from './trust.js';
+
 import type { IdentityClientConfig } from './types.js';
+import type { AppClient } from '@holochain/client';
 
 /**
  * Unified Identity Client

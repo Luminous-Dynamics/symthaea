@@ -50,6 +50,14 @@
  */
 
 import {
+  LocalBridge,
+  createReputationQuery,
+} from '../../bridge/index.js';
+import {
+  FLCoordinator,
+  AggregationMethod,
+} from '../../fl/index.js';
+import {
   createReputation,
   recordPositive,
   recordNegative,
@@ -58,15 +66,7 @@ import {
   type ReputationScore,
 } from '../../matl/index.js';
 
-import {
-  FLCoordinator,
-  AggregationMethod,
-} from '../../fl/index.js';
 
-import {
-  LocalBridge,
-  createReputationQuery,
-} from '../../bridge/index.js';
 
 // ============================================================================
 // Marketplace-Specific Types

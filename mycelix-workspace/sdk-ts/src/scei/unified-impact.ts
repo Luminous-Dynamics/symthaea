@@ -16,8 +16,8 @@
  * @module scei/unified-impact
  */
 
-import type { AgentPubKey } from '@holochain/client';
 import type { ResourceDomain } from '../metabolism/cross-domain-dashboard.js';
+import type { AgentPubKey } from '@holochain/client';
 
 // ============================================================================
 // SCEI Dimensions

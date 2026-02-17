@@ -10,10 +10,10 @@
 
 import { computeCID } from './memory.js';
 
-import type { StorageMetadata, SchemaIdentity } from '../types.js';
-import type { EpistemicClassification } from '../../epistemic/types.js';
 import type { StorageBackendAdapter } from './memory.js';
 import type { MycelixClient } from '../../client/index.js';
+import type { EpistemicClassification } from '../../epistemic/types.js';
+import type { StorageMetadata, SchemaIdentity } from '../types.js';
 
 // =============================================================================
 // DHT Backend Configuration

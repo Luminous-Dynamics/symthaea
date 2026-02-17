@@ -7,8 +7,8 @@
  * @module @mycelix/sdk/clients/finance/staking
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   TriAssetStake,
   CreateStakeInput,
@@ -22,6 +22,7 @@ import type {
   RevealPreimageInput,
   AddSignatureInput,
 } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'staking';

@@ -598,7 +598,7 @@ export function useWallet(currency: string = 'MYC'): UseWalletReturn {
       const balanceMap: Record<string, bigint> = {};
 
       for (const [key, value] of Object.entries(result || {})) {
-        balanceMap[key] = typeof value === 'bigint' ? value : BigInt(value as number);
+        balanceMap[key] = typeof value === 'bigint' ? value : BigInt(value);
       }
 
       balances.value = balanceMap;

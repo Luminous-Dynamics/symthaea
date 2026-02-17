@@ -7,12 +7,12 @@
  * @module innovations/examples/workflow-constitutional-integration
  */
 
+import { getConstitutionalGovernor } from '../constitutional-ai/index.js';
 import {
   createWorkflow,
   createOrchestrator,
   type WorkflowContext,
 } from '../self-healing-workflows/index.js';
-import { getConstitutionalGovernor } from '../constitutional-ai/index.js';
 
 /**
  * Mock hApp responses

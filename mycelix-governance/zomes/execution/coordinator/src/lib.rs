@@ -303,7 +303,7 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
                 }
                 _ => {
                     // Threshold-signing zome not installed — graceful degradation
-                    let _ = emit_signal(&serde_json::json!({
+                    let _ = emit_signal(serde_json::json!({
                         "type": "GovernanceWarning",
                         "warning": "threshold_signing_unavailable",
                         "message": format!(
@@ -506,7 +506,7 @@ impl GovernanceAction {
             }
             GovernanceAction::EmitEvent { event, payload } => {
                 // Emit as a governance signal to connected clients
-                let _ = emit_signal(&serde_json::json!({
+                let _ = emit_signal(serde_json::json!({
                     "type": "GovernanceActionExecuted",
                     "event": event,
                     "payload": payload,

@@ -8,12 +8,16 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
 } from '@holochain/client';
+
+import { KnowledgeSdkError } from './types';
 import { ClaimsClient } from './zomes/claims';
-import { GraphClient } from './zomes/graph';
 import { FactCheckClient } from './zomes/factcheck';
+import { GraphClient } from './zomes/graph';
+import { RetryPolicy, RetryPolicies, type RetryOptions } from '../../common/retry';
+
 import type {
   Claim,
   ClaimCluster,
@@ -22,8 +26,7 @@ import type {
   SearchFilters,
   Citation,
 } from './types';
-import { KnowledgeSdkError } from './types';
-import { RetryPolicy, RetryPolicies, type RetryOptions } from '../../common/retry';
+
 
 /**
  * Configuration for the Knowledge client

@@ -13,15 +13,15 @@
  * @module integrations/identity
  */
 
+
+import { LocalBridge } from '../../bridge/index.js';
+import { type MycelixClient } from '../../client/index.js';
 import {
   createReputation,
   recordPositive,
   isTrustworthy,
   type ReputationScore,
 } from '../../matl/index.js';
-
-import { LocalBridge } from '../../bridge/index.js';
-import { MycelixClient } from '../../client/index.js';
 import { IdentityValidators } from '../../utils/validation.js';
 
 // ============================================================================

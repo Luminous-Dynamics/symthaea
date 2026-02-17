@@ -12,22 +12,22 @@
  * @module integrations/knowledge
  */
 
+
+
+import { LocalBridge } from '../../bridge/index.js';
+import { type MycelixClient } from '../../client/index.js';
+import {
+  EmpiricalLevel,
+  type NormativeLevel,
+  MaterialityLevel,
+  type EpistemicClassification,
+} from '../../epistemic/index.js';
 import {
   createReputation,
   recordPositive,
   recordNegative,
   type ReputationScore,
 } from '../../matl/index.js';
-
-import {
-  EmpiricalLevel,
-  NormativeLevel,
-  MaterialityLevel,
-  type EpistemicClassification,
-} from '../../epistemic/index.js';
-
-import { LocalBridge } from '../../bridge/index.js';
-import { MycelixClient } from '../../client/index.js';
 import { KnowledgeValidators } from '../../utils/validation.js';
 
 // ============================================================================

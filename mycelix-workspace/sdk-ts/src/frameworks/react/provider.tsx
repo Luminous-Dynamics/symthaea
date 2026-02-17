@@ -26,6 +26,7 @@
  */
 
 import * as React from 'react';
+
 import type { Mycelix, MycelixConfig } from '../../core/index.js';
 
 // =============================================================================
@@ -218,7 +219,6 @@ export function MycelixProvider({
         });
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const contextValue = React.useMemo<MycelixContextValue>(

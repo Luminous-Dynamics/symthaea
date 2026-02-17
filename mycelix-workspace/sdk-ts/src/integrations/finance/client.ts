@@ -8,15 +8,18 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
 
 } from '@holochain/client';
-import { WalletClient } from './zomes/wallet';
+
+import { FinanceSdkError } from './types';
 import { CreditClient } from './zomes/credit';
+import { EscrowClient } from './zomes/escrow';
 import { LendingClient } from './zomes/lending';
 import { TreasuryClient } from './zomes/treasury';
-import { EscrowClient } from './zomes/escrow';
+import { WalletClient } from './zomes/wallet';
+
 import type {
   Wallet,
   Transaction,
@@ -26,7 +29,7 @@ import type {
   Escrow,
   FinancialSummary,
 } from './types';
-import { FinanceSdkError } from './types';
+
 
 /**
  * Configuration for the Finance client

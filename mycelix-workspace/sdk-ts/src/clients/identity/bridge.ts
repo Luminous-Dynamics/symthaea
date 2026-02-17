@@ -7,8 +7,9 @@
  * @module @mycelix/sdk/clients/identity/bridge
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
 import { ZomeClient } from '../../core/zome-client.js';
+
 import type {
   HappRegistration,
   IdentityVerificationResult,
@@ -22,7 +23,8 @@ import type {
   TrustCheckInput,
   IdentityClientConfig,
 } from './types.js';
-import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+
 
 /**
  * hApp registration record wrapper

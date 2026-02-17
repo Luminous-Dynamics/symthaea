@@ -8,18 +8,20 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
 } from '@holochain/client';
+
+import { GovernanceSdkError } from './types';
 import { DaoClient } from './zomes/dao';
+import { DelegationClient } from './zomes/delegation';
 import { ProposalClient } from './zomes/proposal';
 import { VotingClient } from './zomes/voting';
-import { DelegationClient } from './zomes/delegation';
+
 import type {
   ParticipationScore,
   GovernanceEvent,
 } from './types';
-import { GovernanceSdkError } from './types';
 
 /**
  * Configuration for the Governance client

@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/emergency/coordination
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   Team,
   FormTeamInput,
@@ -17,6 +17,7 @@ import type {
   CheckInInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface CoordinationClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

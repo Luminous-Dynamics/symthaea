@@ -6,14 +6,15 @@
  * @module @mycelix/sdk/integrations/property/zomes/lien
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { PropertySdkError } from '../types';
+
 import type {
   Lien,
   LienType,
   LienStatus,
   PlaceLienInput,
 } from '../types';
-import { PropertySdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Lien client
@@ -95,7 +96,7 @@ export class LienClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

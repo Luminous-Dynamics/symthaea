@@ -11,11 +11,13 @@
  * @module @mycelix/sdk/clients/water
  */
 
-import { AppClient, AppWebsocket } from '@holochain/client';
+import { type AppClient, AppWebsocket } from '@holochain/client';
+
 import { FlowClient } from './flow';
 import { PurityClient } from './purity';
 import { StewardClient } from './steward';
 import { WaterError } from './types';
+
 import type { ActionHash } from '../../generated/common';
 
 // ============================================================================

@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/water/steward
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   Watershed,
   DefineWatershedInput,
@@ -18,6 +18,7 @@ import type {
   FileDisputeInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface StewardClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

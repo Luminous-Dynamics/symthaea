@@ -4,7 +4,8 @@
  * Classification, DKG claims, and dispute resolution.
  */
 
-import { AgentPubKey, Record as HolochainRecord } from '@holochain/client';
+import { type AgentPubKey, type Record as HolochainRecord } from '@holochain/client';
+
 import type { DAOClient } from './client';
 import type {
   EpistemicClassification,

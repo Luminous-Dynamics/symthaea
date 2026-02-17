@@ -54,28 +54,26 @@ export {
   type MoralUncertainty,
 } from '../epistemic/gis.js';
 
-import type {
-  CreateAgentRequest,
-  CreateAgentResponse,
-  UpdateAgentRequest,
-  AgentSummary,
-  ListAgentsResponse,
-  KVectorHistoryResponse,
-  EventsResponse,
-  EscalationSummary,
-  EscalationResolutionResponse,
-  CalibrationSummary,
-  ApiError,
-} from './types.js';
 
 import {
   AgentClass,
-  AgentStatus,
+  type AgentStatus,
   MIN_KREDIT_CAP,
   MAX_KREDIT_CAP,
   MAX_SPONSOR_DID_LENGTH,
   MAX_AGENT_ID_LENGTH,
-} from './types.js';
+ type KVectorValues ,
+  type CreateAgentRequest,
+  type CreateAgentResponse,
+  type UpdateAgentRequest,
+  type AgentSummary,
+  type ListAgentsResponse,
+  type KVectorHistoryResponse,
+  type EventsResponse,
+  type EscalationSummary,
+  type EscalationResolutionResponse,
+  type CalibrationSummary,
+  type ApiError} from './types.js';
 
 // =============================================================================
 // Validation
@@ -475,7 +473,6 @@ export class AgentApiError extends Error {
 // Trust Score Utilities
 // =============================================================================
 
-import type { KVectorValues } from './types.js';
 
 /**
  * Compute trust score from K-Vector values

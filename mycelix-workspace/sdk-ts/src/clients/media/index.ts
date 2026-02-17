@@ -44,6 +44,7 @@ import {
   CurationClient,
   type ZomeCallable,
 } from '../../media/index.js';
+
 import type { AppClient } from '@holochain/client';
 
 export class MediaClient {

@@ -5,8 +5,9 @@
  * Implements the MFDI specification v1.0 with 9 factor types and 5 assurance levels.
  */
 
-import type { AppClient } from '@holochain/client';
 import { IdentitySdkError, IdentitySdkErrorCode } from '../types.js';
+
+import type { AppClient } from '@holochain/client';
 
 // =============================================================================
 // Types

@@ -4,13 +4,15 @@
  * Unified client for all DAO operations.
  */
 
-import { AppClient, AgentPubKey, CellId } from '@holochain/client';
-import { GovernanceClient } from './governance';
+import { type AppClient, type AgentPubKey, type CellId } from '@holochain/client';
+
+import { ConvictionClient } from './conviction';
+import { DelegationClient } from './delegation';
 import { EpistemicClient } from './epistemic';
+import { GovernanceClient } from './governance';
 import { IdentityClient } from './identity';
 import { VotingClient } from './voting';
-import { DelegationClient } from './delegation';
-import { ConvictionClient } from './conviction';
+
 import type {
   Proposal,
   MemberProfile,

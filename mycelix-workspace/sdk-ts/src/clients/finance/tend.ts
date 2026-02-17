@@ -12,8 +12,8 @@
  * @module @mycelix/sdk/clients/finance/tend
  */
 
-import type { AppClient } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   RecordExchangeInput,
   ExchangeRecord,
@@ -24,6 +24,7 @@ import type {
   ServiceRequest,
   CreateRequestInput,
 } from './types.js';
+import type { AppClient } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'tend';

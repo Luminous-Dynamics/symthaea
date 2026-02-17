@@ -6,10 +6,11 @@
  * @module @mycelix/sdk/clients/care/circles
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type { CareCircle, CreateCareCircleInput, CircleMember } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface CirclesClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

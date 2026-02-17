@@ -825,7 +825,7 @@ export class FoodSovereigntyService {
     if (!pickupLocation) throw new Error('Pickup location not found');
 
     // Calculate pricing
-    let pricePerWeek = share.pricePerWeek;
+    const pricePerWeek = share.pricePerWeek;
     const seasonWeeks = this.calculateSeasonWeeks(farm.csa.seasonStart, farm.csa.seasonEnd);
 
     // Apply work trade discount

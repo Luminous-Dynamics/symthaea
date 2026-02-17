@@ -11,10 +11,11 @@
  * @module @mycelix/sdk/clients/care
  */
 
-import { AppClient, AppWebsocket } from '@holochain/client';
-import { TimebankClient } from './timebank';
+import { type AppClient, AppWebsocket } from '@holochain/client';
+
 import { CirclesClient } from './circles';
 import { MatchingClient } from './matching';
+import { TimebankClient } from './timebank';
 import { CareError } from './types';
 
 // ============================================================================

@@ -8,13 +8,12 @@
  * @module integrations/energy/legacy
  */
 
+import { LocalBridge } from '../../bridge/index.js';
 import {
   createReputation,
   recordPositive,
   type ReputationScore,
 } from '../../matl/index.js';
-
-import { LocalBridge } from '../../bridge/index.js';
 import { EnergyValidators } from '../../utils/validation.js';
 
 // ============================================================================

@@ -8,8 +8,8 @@
  * @module trust/types
  */
 
-import type { EmpiricalLevel, NormativeLevel, MaterialityLevel } from '../epistemic/types.js';
 import type { HarmonicLevel } from '../epistemic/gis.js';
+import type { EmpiricalLevel, NormativeLevel, MaterialityLevel } from '../epistemic/types.js';
 
 // ============================================================================
 // K-Vector Types

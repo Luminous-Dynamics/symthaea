@@ -11,8 +11,8 @@
  * @deprecated Use CGC, TEND, or HEARTH modules for new development
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   CreditProfile,
   CreateProfileInput,
@@ -24,6 +24,7 @@ import type {
   UpdateMatlInput,
   ScoreRangeInput,
 } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'credit_scoring';

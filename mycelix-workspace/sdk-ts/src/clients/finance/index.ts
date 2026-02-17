@@ -43,19 +43,20 @@
  * ```
  */
 
-import type { AppClient } from '@holochain/client';
+import { BridgeClient } from './bridge.js';
+import { CgcClient } from './cgc.js';
+import { CreditScoringClient } from './credit-scoring.js';
+import { HearthClient } from './hearth.js';
+import { LendingClient } from './lending.js';
+import { PaymentsClient } from './payments.js';
+import { TendClient } from './tend.js';
+import { TreasuryClient } from './treasury.js';
+
 import type { ZomeClientConfig } from '../../core/zome-client.js';
+import type { AppClient } from '@holochain/client';
 
 // Zome Clients
-import { LendingClient } from './lending.js';
-import { CreditScoringClient } from './credit-scoring.js';
-import { PaymentsClient } from './payments.js';
-import { TreasuryClient } from './treasury.js';
-import { CgcClient } from './cgc.js';
-import { TendClient } from './tend.js';
-import { HearthClient } from './hearth.js';
 import { StakingClient } from './staking.js';
-import { BridgeClient } from './bridge.js';
 
 // =============================================================================
 // Barrel Exports - Zome Clients

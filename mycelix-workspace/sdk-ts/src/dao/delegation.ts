@@ -4,7 +4,8 @@
  * Liquid democracy with domain-specific delegation and cycle detection.
  */
 
-import { AgentPubKey, Record as HolochainRecord } from '@holochain/client';
+import { type AgentPubKey, type Record as HolochainRecord } from '@holochain/client';
+
 import type { DAOClient } from './client';
 import type {
   Delegation,

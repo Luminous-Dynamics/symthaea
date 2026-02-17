@@ -7,9 +7,10 @@
  * @module @mycelix/sdk/core/zome-client
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { SdkError, SdkErrorCode, ZomeCallError } from './errors.js';
-import { withRetryAndTimeout, RetryConfig } from './retry.js';
+import { withRetryAndTimeout, type RetryConfig } from './retry.js';
+
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for a zome client

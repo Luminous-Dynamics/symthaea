@@ -7,8 +7,9 @@
  * @module innovations/examples/epistemic-civic-integration
  */
 
-import { createCivicFeedbackLoop, type JusticeDecision } from '../civic-feedback-loop/index.js';
 import { EmpiricalLevel, NormativeLevel, MaterialityLevel } from '../../integrations/epistemic-markets/index.js';
+import { createCivicFeedbackLoop, type JusticeDecision } from '../civic-feedback-loop/index.js';
+
 import type { EpistemicClaim } from '../epistemic-agents/index.js';
 
 /**

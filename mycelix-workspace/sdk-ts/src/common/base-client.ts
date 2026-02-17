@@ -6,8 +6,9 @@
  * @module @mycelix/sdk/common/base-client
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { SdkError } from './errors';
+
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Base configuration for all clients
@@ -78,7 +79,7 @@ export abstract class BaseZomeClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   /**

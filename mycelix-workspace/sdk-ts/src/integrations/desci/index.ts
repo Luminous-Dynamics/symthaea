@@ -42,6 +42,12 @@
  */
 
 import { LocalBridge, createReputationQuery } from '../../bridge/index.js';
+import {
+  EmpiricalLevel,
+  NormativeLevel,
+  MaterialityLevel,
+  type EpistemicClassification,
+} from '../../epistemic/index.js';
 import { FLCoordinator, AggregationMethod } from '../../fl/index.js';
 import {
   createReputation,
@@ -51,12 +57,6 @@ import {
   isTrustworthy,
   type ReputationScore,
 } from '../../matl/index.js';
-import {
-  EmpiricalLevel,
-  NormativeLevel,
-  MaterialityLevel,
-  type EpistemicClassification,
-} from '../../epistemic/index.js';
 
 // ============================================================================
 // DeSci-Specific Types
@@ -277,7 +277,7 @@ export class DeSciService {
     // Calculate epistemic classification
     let empirical = EmpiricalLevel.E1_Testimonial;
     let normative = NormativeLevel.N1_Communal;
-    let materiality = MaterialityLevel.M2_Persistent;
+    const materiality = MaterialityLevel.M2_Persistent;
 
     if (input.preregistered) {
       empirical = EmpiricalLevel.E3_Cryptographic;

@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/water/purity
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   QualityReading,
   SubmitQualityReadingInput,
@@ -15,6 +15,7 @@ import type {
   RaiseAlertInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface PurityClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

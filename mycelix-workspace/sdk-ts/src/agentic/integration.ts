@@ -11,22 +11,6 @@
  * @module agentic/integration
  */
 
-import type { KVectorValues } from './types.js';
-import { AgentClass, AgentStatus } from './types.js';
-import { computeTrustScore, calculateKreditFromTrust } from './index.js';
-import {
-  type DPConfig,
-  createDefaultDPConfig,
-  PrivateTrustAnalytics,
-  type TrustDistribution,
-} from './differential-privacy.js';
-import {
-  type DashboardConfig,
-  createDefaultDashboardConfig,
-  Dashboard,
-  type LiveMetrics,
-  AlertSeverity,
-} from './dashboard.js';
 import {
   type AdaptiveConfig,
   createDefaultAdaptiveConfig,
@@ -37,10 +21,28 @@ import {
   createDefaultFeedbackContext,
 } from './adaptive-thresholds.js';
 import {
+  type DashboardConfig,
+  createDefaultDashboardConfig,
+  Dashboard,
+  type LiveMetrics,
+  AlertSeverity,
+} from './dashboard.js';
+import {
+  type DPConfig,
+  createDefaultDPConfig,
+  PrivateTrustAnalytics,
+  type TrustDistribution,
+} from './differential-privacy.js';
+import { AgentClass, AgentStatus } from './types.js';
+import {
   VerificationEngine,
   type SystemState,
   type InvariantCheckResult,
 } from './verification.js';
+
+import { computeTrustScore, calculateKreditFromTrust } from './index.js';
+
+import type { KVectorValues } from './types.js';
 
 // =============================================================================
 // Agent Types (Simplified for Integration)

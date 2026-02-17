@@ -5,7 +5,8 @@
  * Implements VC Data Model 2.0 specification.
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { IdentitySdkError, IdentitySdkErrorCode } from '../types.js';
+
 import type {
   VerifiableCredential,
   VerifiablePresentation,
@@ -21,7 +22,7 @@ import type {
   RequestCredentialInput,
   UpdateRequestStatusInput,
 } from '../types.js';
-import { IdentitySdkError, IdentitySdkErrorCode } from '../types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Verifiable Credential Zome Client

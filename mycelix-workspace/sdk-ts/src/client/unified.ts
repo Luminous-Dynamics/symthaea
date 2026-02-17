@@ -7,19 +7,20 @@
  * @module @mycelix/sdk/client/unified
  */
 
-import { AppClient, AppWebsocket } from '@holochain/client';
+import { type AppClient, AppWebsocket } from '@holochain/client';
+
 import { SdkError } from '../common/errors';
 
 // Import all domain clients
-import { MycelixIdentityClient } from '../integrations/identity/client';
-import { MycelixGovernanceClient } from '../integrations/governance/client';
-import { MycelixFinanceClient } from '../integrations/finance/client';
-import { MycelixPropertyClient } from '../integrations/property/client';
 import { MycelixEnergyClient } from '../integrations/energy/client';
-import { MycelixKnowledgeClient } from '../integrations/knowledge/client';
+import { MycelixFinanceClient } from '../integrations/finance/client';
+import { MycelixGovernanceClient } from '../integrations/governance/client';
 import { MycelixHealthClient } from '../integrations/health/client';
-import { MycelixMediaClient } from '../media/client';
+import { MycelixIdentityClient } from '../integrations/identity/client';
+import { MycelixKnowledgeClient } from '../integrations/knowledge/client';
+import { MycelixPropertyClient } from '../integrations/property/client';
 import { MycelixJusticeClient } from '../justice/client';
+import { MycelixMediaClient } from '../media/client';
 
 /**
  * Unified client error

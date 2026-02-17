@@ -12,14 +12,13 @@
  * @module integrations/media
  */
 
+import { LocalBridge } from '../../bridge/index.js';
 import {
   createReputation,
   recordPositive,
   recordNegative,
   type ReputationScore,
 } from '../../matl/index.js';
-
-import { LocalBridge } from '../../bridge/index.js';
 import { MediaValidators } from '../../utils/validation.js';
 
 // ============================================================================
@@ -484,7 +483,7 @@ export function resetMediaService(): void {
 // Bridge Zome Types (matching Rust media_bridge zome)
 // ============================================================================
 
-import { MycelixClient } from '../../client/index.js';
+import { type MycelixClient } from '../../client/index.js';
 
 /** Content reference for cross-hApp */
 export interface ContentReference {

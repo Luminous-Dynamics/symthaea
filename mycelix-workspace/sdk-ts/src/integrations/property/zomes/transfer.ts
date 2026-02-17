@@ -6,13 +6,14 @@
  * @module @mycelix/sdk/integrations/property/zomes/transfer
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { PropertySdkError } from '../types';
+
 import type {
   Transfer,
   TransferStatus,
   InitiateTransferInput,
 } from '../types';
-import { PropertySdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Transfer client
@@ -94,7 +95,7 @@ export class TransferClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

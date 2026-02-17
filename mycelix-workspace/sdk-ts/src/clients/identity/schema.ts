@@ -7,8 +7,9 @@
  * @module @mycelix/sdk/clients/identity/schema
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
 import { ZomeClient } from '../../core/zome-client.js';
+
 import type {
   CredentialSchema,
   SchemaEndorsement,
@@ -16,7 +17,8 @@ import type {
   EndorseSchemaInput,
   IdentityClientConfig,
 } from './types.js';
-import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+
 
 /**
  * Schema record wrapper

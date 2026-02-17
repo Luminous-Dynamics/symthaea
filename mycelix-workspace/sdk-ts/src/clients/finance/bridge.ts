@@ -7,8 +7,8 @@
  * @module @mycelix/sdk/clients/finance/bridge
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   CreditResult,
   QueryCreditInput,
@@ -19,6 +19,7 @@ import type {
   FinanceBridgeEvent,
   BroadcastFinanceEventInput,
 } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'bridge';

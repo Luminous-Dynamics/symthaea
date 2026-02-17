@@ -9,14 +9,14 @@
  */
 
 import {
-  KVector,
+  type KVector,
   KVectorDimension,
   KVECTOR_WEIGHTS,
   kvectorToArray,
   kvectorFromArray,
   isVerified,
-  TrustAttestation,
-  TranslatedAttestation,
+  type TrustAttestation,
+  type TranslatedAttestation,
 } from './types.js';
 // Note: computeTrustScore removed as unused
 

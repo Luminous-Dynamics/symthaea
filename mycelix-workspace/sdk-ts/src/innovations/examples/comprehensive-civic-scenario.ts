@@ -7,12 +7,13 @@
  * @module innovations/examples/comprehensive-civic-scenario
  */
 
-import { TrustMarketService, type MultiDimensionalTrustStake } from '../trust-markets/index.js';
-import { PrivateQueryService } from '../private-queries/index.js';
-import { createCivicFeedbackLoop, type JusticeDecision } from '../civic-feedback-loop/index.js';
-import { createWorkflow, createOrchestrator, type WorkflowContext } from '../self-healing-workflows/index.js';
-import { getConstitutionalGovernor } from '../constitutional-ai/index.js';
 import { EmpiricalLevel, NormativeLevel, MaterialityLevel } from '../../integrations/epistemic-markets/index.js';
+import { createCivicFeedbackLoop, type JusticeDecision } from '../civic-feedback-loop/index.js';
+import { getConstitutionalGovernor } from '../constitutional-ai/index.js';
+import { PrivateQueryService } from '../private-queries/index.js';
+import { createWorkflow, createOrchestrator, type WorkflowContext } from '../self-healing-workflows/index.js';
+import { TrustMarketService, type MultiDimensionalTrustStake } from '../trust-markets/index.js';
+
 import type { EpistemicClaim } from '../epistemic-agents/index.js';
 
 const applicantProfile = {

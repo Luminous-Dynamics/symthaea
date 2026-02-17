@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/water/flow
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   WaterSource,
   RegisterWaterSourceInput,
@@ -18,6 +18,7 @@ import type {
   WaterUsageRecord,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface FlowClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

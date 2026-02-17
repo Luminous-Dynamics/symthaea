@@ -51,13 +51,9 @@
  */
 
 import {
-  createReputation,
-  recordPositive,
-  recordNegative,
-  reputationValue,
-  type ReputationScore,
-} from '../../matl/index.js';
-
+  LocalBridge,
+  createReputationQuery,
+} from '../../bridge/index.js';
 import {
   claim,
   EmpiricalLevel,
@@ -65,11 +61,15 @@ import {
   MaterialityLevel,
   type EpistemicClaim,
 } from '../../epistemic/index.js';
-
 import {
-  LocalBridge,
-  createReputationQuery,
-} from '../../bridge/index.js';
+  createReputation,
+  recordPositive,
+  recordNegative,
+  reputationValue,
+  type ReputationScore,
+} from '../../matl/index.js';
+
+
 
 // ============================================================================
 // Mail-Specific Types

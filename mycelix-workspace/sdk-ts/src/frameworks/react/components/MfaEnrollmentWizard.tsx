@@ -26,7 +26,9 @@
  */
 
 import * as React from 'react';
+
 import { useMfaEnroll, useMfaState } from '../hooks.js';
+
 import type { FactorType, EnrolledFactor, EnrollFactorInput } from '../hooks.js';
 
 // =============================================================================

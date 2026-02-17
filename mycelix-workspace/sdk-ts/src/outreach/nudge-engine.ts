@@ -9,8 +9,8 @@
  * @module outreach/nudge-engine
  */
 
-import type { LifeEvent, LifeEventType } from './life-events.js';
 import type { EligibilityPrediction, BenefitProgram } from './eligibility.js';
+import type { LifeEvent, LifeEventType } from './life-events.js';
 
 /**
  * Delivery channels for nudges

@@ -411,7 +411,7 @@ export class MusicRoyaltyService {
     const profile = this.artistProfiles.get(artistId) || {};
 
     // Count unique collaborators
-    let collaboratorSet = new Set<string>();
+    const collaboratorSet = new Set<string>();
     for (const track of this.tracks.values()) {
       if (track.artists.some((a) => a.artistId === artistId)) {
         track.artists.forEach((a) => {

@@ -14,6 +14,7 @@
  * @module commons
  */
 
+import { LocalBridge } from '../bridge/index.js';
 import {
   claim,
   EmpiricalLevel,
@@ -21,7 +22,6 @@ import {
   MaterialityLevel,
   type EpistemicClaim,
 } from '../epistemic/index.js';
-
 import {
   createReputation,
   recordPositive,
@@ -30,7 +30,6 @@ import {
   type ReputationScore,
 } from '../matl/index.js';
 
-import { LocalBridge } from '../bridge/index.js';
 
 // ============================================================================
 // Resource Types

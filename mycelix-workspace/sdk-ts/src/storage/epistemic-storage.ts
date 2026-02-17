@@ -15,11 +15,10 @@ import {
 } from '../epistemic/types.js';
 import { MycelixError, ErrorCode, ValidationError } from '../errors.js';
 import { hash, secureUUID } from '../security/index.js';
-import { LocalBackend } from './backends/local.js';
-import { MemoryBackend, type StorageBackendAdapter } from './backends/memory.js';
 import { DHTBackend, type DHTBackendConfig, type HolochainClient } from './backends/dht.js';
 import { IPFSBackend, type IPFSBackendConfig } from './backends/ipfs.js';
-import { StorageRouter, type ClassificationRouter, DEFAULT_ROUTER_CONFIG } from './router.js';
+import { LocalBackend } from './backends/local.js';
+import { MemoryBackend, type StorageBackendAdapter } from './backends/memory.js';
 import {
   StorageMetricsCollector,
   StorageTracer,
@@ -29,6 +28,7 @@ import {
   type StorageMetricsSnapshot,
   type HealthCheckResult,
 } from './observability.js';
+import { StorageRouter, type ClassificationRouter, DEFAULT_ROUTER_CONFIG } from './router.js';
 import {
   type StorageReceipt,
   type StoredData,

@@ -15,17 +15,9 @@
  */
 
 import {
-  AgentRunner,
-  KnowledgeRetriever,
-  DEFAULT_AGENT_CONFIG,
-} from '../../symthaea/agent-runner.js';
-import type {
-  AgentConfig,
-  AgentResponse,
-  ConversationContext,
-  KnowledgeSource,
-  CivicAgentDomain,
-} from '../../symthaea/types.js';
+  type CalibrationEngine,
+  getCalibrationEngine,
+} from '../../calibration/engine.js';
 import {
   EmpiricalLevel,
   NormativeLevel,
@@ -34,16 +26,25 @@ import {
   toClassificationCode,
 } from '../../integrations/epistemic-markets/index.js';
 import {
-  CalibrationEngine,
-  getCalibrationEngine,
-} from '../../calibration/engine.js';
-import {
   createReputation,
   recordPositive,
   recordNegative,
   reputationValue,
   type ReputationScore,
 } from '../../matl/index.js';
+import {
+  AgentRunner,
+  type KnowledgeRetriever,
+  DEFAULT_AGENT_CONFIG,
+} from '../../symthaea/agent-runner.js';
+
+import type {
+  AgentConfig,
+  AgentResponse,
+  ConversationContext,
+  KnowledgeSource,
+  CivicAgentDomain,
+} from '../../symthaea/types.js';
 
 // ============================================================================
 // TYPES

@@ -4,7 +4,7 @@
  * All TypeScript types corresponding to Rust entry types.
  */
 
-import { ActionHash, AgentPubKey, Timestamp, Record as HolochainRecord } from '@holochain/client';
+import { type ActionHash, type AgentPubKey, type Timestamp, type Record as HolochainRecord } from '@holochain/client';
 
 // Re-export for convenience
 export type { ActionHash, AgentPubKey, Timestamp, HolochainRecord };

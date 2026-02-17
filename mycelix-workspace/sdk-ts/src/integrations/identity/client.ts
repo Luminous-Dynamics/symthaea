@@ -30,12 +30,15 @@
  * ```
  */
 
-import { AppClient, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
-import { DidRegistryClient } from './zomes/did-registry.js';
-import { VerifiableCredentialClient } from './zomes/verifiable-credential.js';
-import { MfaClient } from './zomes/mfa.js';
-import { IdentityBridgeClient } from './index.js';
+import { type AppClient, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
+
 import { IdentitySdkError, IdentitySdkErrorCode, DEFAULT_IDENTITY_CONFIG } from './types.js';
+import { DidRegistryClient } from './zomes/did-registry.js';
+import { MfaClient } from './zomes/mfa.js';
+import { VerifiableCredentialClient } from './zomes/verifiable-credential.js';
+
+import { IdentityBridgeClient } from './index.js';
+
 import type { IdentityConfig } from './types.js';
 
 /**

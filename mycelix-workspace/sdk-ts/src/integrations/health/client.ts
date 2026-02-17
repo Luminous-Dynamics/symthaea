@@ -9,10 +9,12 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
-} from '@holochain/client';
-import type { ActionHash, AgentPubKey, Timestamp } from '@holochain/client';
+ type ActionHash, type AgentPubKey, type Timestamp } from '@holochain/client';
+
+import { RetryPolicy, RetryPolicies, type RetryOptions } from '../../common/retry';
+
 import type {
   Patient,
   Provider,
@@ -30,7 +32,6 @@ import type {
   DataCategory,
   DataPermission,
 } from './index';
-import { RetryPolicy, RetryPolicies, type RetryOptions } from '../../common/retry';
 
 /**
  * Health SDK Error

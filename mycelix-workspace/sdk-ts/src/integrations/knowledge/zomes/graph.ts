@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/knowledge/zomes/graph
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { KnowledgeSdkError } from '../types';
+
 import type {
   ClaimRelation,
 
@@ -26,7 +27,7 @@ import type {
 
   Claim,
 } from '../types';
-import { KnowledgeSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Graph client
@@ -118,7 +119,7 @@ export class GraphClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

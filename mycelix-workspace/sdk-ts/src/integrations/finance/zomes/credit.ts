@@ -6,14 +6,15 @@
  * @module @mycelix/sdk/integrations/finance/zomes/credit
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { FinanceSdkError } from '../types';
+
 import type {
   CreditScore,
   CreditScoreResult,
   CreditCalculationInput,
   CreditTier,
 } from '../types';
-import { FinanceSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Credit client
@@ -107,7 +108,7 @@ export class CreditClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

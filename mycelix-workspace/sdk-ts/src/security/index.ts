@@ -5,7 +5,7 @@
  * and secure handling of sensitive data for Byzantine-resistant systems.
  */
 
-import { MycelixError, validate, ErrorCode } from '../errors.js';
+import { MycelixError, validate, type ErrorCode } from '../errors.js';
 
 // ============================================================================
 // Security Error Types

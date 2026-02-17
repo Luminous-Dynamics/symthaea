@@ -4,7 +4,8 @@
  * Time-weighted voting for continuous funding proposals.
  */
 
-import { ActionHash, Record } from '@holochain/client';
+import { type ActionHash, type Record } from '@holochain/client';
+
 import type { DAOClient } from './client';
 import type { ConvictionVote, ConvictionSummary } from './types';
 

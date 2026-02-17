@@ -9,6 +9,12 @@
  * @module bridge/epistemic-evidence
  */
 
+import { getCrossHappBridge } from './cross-happ.js';
+import {
+  type Evidence as JusticeEvidence,
+  type EvidenceType as JusticeEvidenceType,
+  type CaseCategory,
+} from '../justice/index.js';
 import {
   type EpistemicPosition,
   type FactCheckResult,
@@ -17,13 +23,7 @@ import {
   type ClaimType,
 } from '../knowledge/index.js';
 
-import {
-  type Evidence as JusticeEvidence,
-  type EvidenceType as JusticeEvidenceType,
-  type CaseCategory,
-} from '../justice/index.js';
 
-import { getCrossHappBridge } from './cross-happ.js';
 
 // ============================================================================
 // Epistemic Evidence Types

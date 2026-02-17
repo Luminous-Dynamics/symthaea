@@ -532,14 +532,14 @@ impl HolisticVotingWeight {
         };
 
         let calculation_breakdown = format!(
-            "{}² × (0.7 + 0.3×{}) × (1 + 0.2×{}) = {} × {} × {} = {}{}",
-            format!("{:.3}", reputation),
-            format!("{:.3}", phi),
-            format!("{:.3}", harmonic_alignment.max(0.0)),
-            format!("{:.4}", reputation_squared),
-            format!("{:.4}", consciousness_multiplier),
-            format!("{:.4}", harmonic_bonus),
-            format!("{:.4}", final_weight),
+            "{:.3}² × (0.7 + 0.3×{:.3}) × (1 + 0.2×{:.3}) = {:.4} × {:.4} × {:.4} = {:.4}{}",
+            reputation,
+            phi,
+            harmonic_alignment.max(0.0),
+            reputation_squared,
+            consciousness_multiplier,
+            harmonic_bonus,
+            final_weight,
             cap_note
         );
 
@@ -762,15 +762,13 @@ impl FederatedReputation {
         ).clamp(0.0, 1.0);
 
         // Weighted aggregation with domain boundary caps enforced
-        let aggregated = (
+        (
             identity_score * DOMAIN_CAP_IDENTITY +
             knowledge_score * DOMAIN_CAP_KNOWLEDGE +
             finance_score * DOMAIN_CAP_FINANCE +      // 5% cap enforced
             fl_score * DOMAIN_CAP_FL +
             governance_score * DOMAIN_CAP_GOVERNANCE
-        ).clamp(0.0, 1.0);
-
-        aggregated
+        ).clamp(0.0, 1.0)
     }
 
     /// Create initial federated reputation for new participant

@@ -7,8 +7,9 @@
  * @module @mycelix/sdk/clients/identity/did
  */
 
-import type { AppClient, AgentPubKey, Record as HolochainRecord } from '@holochain/client';
+import { IdentitySdkError, IdentitySdkErrorCode, DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
 import { ZomeClient } from '../../core/zome-client.js';
+
 import type {
   DidDocument,
   DidDeactivation,
@@ -18,7 +19,8 @@ import type {
   ServiceEndpoint,
   IdentityClientConfig,
 } from './types.js';
-import { IdentitySdkError, IdentitySdkErrorCode, DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
+import type { AppClient, AgentPubKey, Record as HolochainRecord } from '@holochain/client';
+
 
 /**
  * DID Registry Client

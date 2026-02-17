@@ -7,8 +7,9 @@
  * @module @mycelix/sdk/clients/identity/recovery
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
 import { ZomeClient } from '../../core/zome-client.js';
+
 import type {
   RecoveryConfig,
   RecoveryRequest,
@@ -18,7 +19,8 @@ import type {
   VoteOnRecoveryInput,
   IdentityClientConfig,
 } from './types.js';
-import { DEFAULT_IDENTITY_CLIENT_CONFIG } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+
 
 /**
  * Recovery record wrapper

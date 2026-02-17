@@ -48,6 +48,7 @@ import {
   TrialsClient,
   InsuranceClient,
 } from '../../integrations/health/client.js';
+
 import type { AppClient } from '@holochain/client';
 
 export class HealthClient {

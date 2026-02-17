@@ -12,8 +12,8 @@
  * @module @mycelix/sdk/clients/finance/cgc
  */
 
-import type { AppClient } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   CgcAllocationStatus,
   GiftCgcInput,
@@ -22,6 +22,7 @@ import type {
   CulturalAlias,
   RegisterAliasInput,
 } from './types.js';
+import type { AppClient } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'cgc';

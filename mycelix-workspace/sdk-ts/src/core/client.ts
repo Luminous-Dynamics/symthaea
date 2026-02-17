@@ -31,25 +31,26 @@
  * ```
  */
 
-import { AppClient, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
+import { type AppClient, AppWebsocket, encodeHashToBase64 } from '@holochain/client';
+
 import {
-  SdkError,
+  type SdkError,
   NetworkError,
 } from './errors.js';
-import { withRetry, RetryConfig } from './retry.js';
+import { withRetry, type RetryConfig } from './retry.js';
 
 // Import hApp clients (these will be lazily instantiated)
 // Note: These imports will be updated as the individual clients are migrated
 // to use the core patterns
-import type { MycelixIdentityClient } from '../integrations/identity/client.js';
-import type { MycelixGovernanceClient } from '../integrations/governance/client.js';
-import type { MycelixFinanceClient } from '../integrations/finance/client.js';
-import type { MycelixPropertyClient } from '../integrations/property/client.js';
-import type { MycelixKnowledgeClient } from '../integrations/knowledge/client.js';
 import type { MycelixEnergyClient } from '../integrations/energy/client.js';
-import type { MycelixMediaClient } from '../media/client.js';
-import type { MycelixJusticeClient } from '../justice/client.js';
+import type { MycelixFinanceClient } from '../integrations/finance/client.js';
+import type { MycelixGovernanceClient } from '../integrations/governance/client.js';
 import type { MycelixHealthClient } from '../integrations/health/client.js';
+import type { MycelixIdentityClient } from '../integrations/identity/client.js';
+import type { MycelixKnowledgeClient } from '../integrations/knowledge/client.js';
+import type { MycelixPropertyClient } from '../integrations/property/client.js';
+import type { MycelixJusticeClient } from '../justice/client.js';
+import type { MycelixMediaClient } from '../media/client.js';
 
 /**
  * Configuration for the Mycelix client

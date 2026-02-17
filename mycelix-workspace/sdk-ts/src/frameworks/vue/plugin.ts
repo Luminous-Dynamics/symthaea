@@ -40,8 +40,9 @@
  * ```
  */
 
-import type { Mycelix, MycelixConfig } from '../../core/index.js';
 import { useMycelix, useIdentity } from './composables.js';
+
+import type { Mycelix, MycelixConfig } from '../../core/index.js';
 
 // =============================================================================
 // Types
@@ -163,7 +164,7 @@ export const MycelixPlugin: Plugin = {
       return;
     }
 
-    const { autoConnect = true, onConnect, onError, onDisconnect, ...config } = options;
+    const { autoConnect = true, onConnect, onError, onDisconnect: _onDisconnect, ...config } = options;
 
     // Get the composable
     const { mycelix, connect, disconnect, status } = useMycelix(config);

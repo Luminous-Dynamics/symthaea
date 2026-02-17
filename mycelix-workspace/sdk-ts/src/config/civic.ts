@@ -24,7 +24,7 @@ import {
   DEFAULT_CLIENT_CONFIG,
   DEFAULT_LOG_CONFIG,
   initConfig,
-  ConfigManager,
+  type ConfigManager,
 } from './index.js';
 
 // ============================================================================

@@ -6,8 +6,8 @@
  * @module @mycelix/sdk/clients/housing/membership
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   Member,
   SubmitApplicationInput,
@@ -17,6 +17,7 @@ import type {
   RecordRentPaymentInput,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface MembershipClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

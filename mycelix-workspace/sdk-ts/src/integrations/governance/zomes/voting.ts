@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/governance/zomes/voting
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { GovernanceSdkError } from '../types';
+
 import type {
   Vote,
   CastVoteInput,
@@ -16,7 +17,7 @@ import type {
   QuorumStatus,
   VotingStats,
 } from '../types';
-import { GovernanceSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Voting client
@@ -118,7 +119,7 @@ export class VotingClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

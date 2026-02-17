@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/finance/zomes/escrow
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { FinanceSdkError } from '../types';
+
 import type {
   Escrow,
   EscrowType,
@@ -16,7 +17,7 @@ import type {
   DisputeEscrowInput,
   DisputeResult,
 } from '../types';
-import { FinanceSdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Default configuration for the Escrow client
@@ -109,7 +110,7 @@ export class EscrowClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

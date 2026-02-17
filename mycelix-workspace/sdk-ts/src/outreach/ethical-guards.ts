@@ -15,9 +15,9 @@
  * @module outreach/ethical-guards
  */
 
+import type { EligibilityPrediction } from './eligibility.js';
 import type { LifeEvent, LifeEventType } from './life-events.js';
 import type { Nudge, NudgeChannel, NudgeUrgency } from './nudge-engine.js';
-import type { EligibilityPrediction } from './eligibility.js';
 
 /**
  * Ethical violation types

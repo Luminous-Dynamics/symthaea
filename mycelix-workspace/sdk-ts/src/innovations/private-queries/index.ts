@@ -10,18 +10,19 @@
  * @module @mycelix/sdk/innovations/private-queries
  */
 
-import type { HappId } from '../../bridge/cross-happ';
 import {
   initializeFHEClient,
   type FHEClient,
 } from '../../fhe/client';
-import type { Ciphertext, EncryptedAggregation } from '../../fhe/types';
 import {
   initializeSecureAggregator,
   ShamirSecretSharing,
   type SecureAggregator,
   type SecretShare,
 } from '../../fhe/secure-aggregation';
+
+import type { HappId } from '../../bridge/cross-happ';
+import type { Ciphertext, EncryptedAggregation } from '../../fhe/types';
 import type { PrivacyBudget } from '../../fl-hub/types';
 
 // =============================================================================
@@ -449,7 +450,7 @@ export class PrivateQueryService {
 
       // Add differential privacy noise
       const noiseResult = await this.addDifferentialPrivacy(
-        aggregation!,
+        aggregation,
         query.privacyBudget
       );
 
@@ -465,11 +466,11 @@ export class PrivateQueryService {
         queryType: (query.originalType ?? query.type) as PrivateQueryType,
         value: decrypted,
         confidenceInterval: {
-          lower: (decrypted as number[])[0] - zScore * noiseStdDev,
-          upper: (decrypted as number[])[0] + zScore * noiseStdDev,
+          lower: (decrypted)[0] - zScore * noiseStdDev,
+          upper: (decrypted)[0] + zScore * noiseStdDev,
           confidence: 0.95,
         },
-        recordCount: aggregation!.participants,
+        recordCount: aggregation.participants,
         computedAt: Date.now(),
       };
 

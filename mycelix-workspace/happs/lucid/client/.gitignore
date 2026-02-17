@@ -1,0 +1,3 @@
+# Override root dist/ ignore — dist is committed here (pre-built package)
+!dist/
+node_modules/

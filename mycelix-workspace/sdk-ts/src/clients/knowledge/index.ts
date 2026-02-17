@@ -94,6 +94,7 @@ import {
   KnowledgeBridgeClient,
   type ZomeCallable,
 } from '../../knowledge/index.js';
+
 import type { AppClient } from '@holochain/client';
 
 export class KnowledgeClient {

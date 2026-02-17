@@ -17,8 +17,8 @@
  * @module wallet/cross-domain-credits
  */
 
-import type { AgentPubKey } from '@holochain/client';
 import type { ResourceDomain } from '../metabolism/cross-domain-dashboard.js';
+import type { AgentPubKey } from '@holochain/client';
 
 // ============================================================================
 // Credit Types
@@ -429,7 +429,7 @@ export class ResourceCreditsService {
     return {
       owner,
       totalAvailable: Object.values(wallet.balances).reduce((sum, b) => sum + b.available, 0),
-      primaryDomain: primaryDomain as ResourceDomain,
+      primaryDomain: primaryDomain,
       lowBalanceDomains,
       pendingTransactions: wallet.transactions.filter(t => t.status === 'pending').length,
       tier: wallet.tier,

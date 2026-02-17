@@ -6,10 +6,11 @@
  * @module @mycelix/sdk/clients/emergency/shelters
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type { Shelter, RegisterShelterInput } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 export interface SheltersClientConfig extends Partial<ZomeClientConfig> {
   roleName?: string;

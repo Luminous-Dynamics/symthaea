@@ -37,7 +37,9 @@
  */
 
 import * as React from 'react';
+
 import { useAssuranceLevel } from '../hooks.js';
+
 import type { AssuranceLevel, DID } from '../hooks.js';
 
 // =============================================================================

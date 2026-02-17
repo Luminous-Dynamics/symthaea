@@ -14,8 +14,8 @@
  * @module @mycelix/sdk/clients/finance/hearth
  */
 
-import type { AppClient } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   CommonsPool,
   CreateCommonsPoolInput,
@@ -28,6 +28,7 @@ import type {
   AllocationVote,
   VoteInput,
 } from './types.js';
+import type { AppClient } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'hearth';

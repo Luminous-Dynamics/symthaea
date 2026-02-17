@@ -985,7 +985,20 @@ export { MycelixFinanceClient } from './integrations/finance/client';
 export type { FinanceClientConfig, FinanceConnectionOptions } from './integrations/finance/client';
 
 export { MycelixGovernanceClient } from './integrations/governance/client';
-export type { GovernanceClientConfig, GovernanceConnectionOptions } from './integrations/governance/client';
+export type { GovernanceClientConfig as LegacyGovernanceClientConfig, GovernanceConnectionOptions } from './integrations/governance/client';
+
+// Phase 3: Full 10-zome GovernanceClient (dao, proposals, voting, delegation, treasury, execution, bridge, councils, constitution, threshold-signing)
+export { GovernanceClient, type GovernanceClientConfig } from './clients/governance/index.js';
+export { DAOClient } from './clients/governance/dao';
+export { ProposalsClient } from './clients/governance/proposals';
+export { VotingClient } from './clients/governance/voting';
+export { DelegationClient } from './clients/governance/delegation';
+export { TreasuryClient } from './clients/governance/treasury';
+export { ExecutionClient } from './clients/governance/execution';
+export { BridgeClient as GovernanceBridgeClient } from './clients/governance/bridge';
+export { CouncilsClient } from './clients/governance/councils';
+export { ConstitutionClient } from './clients/governance/constitution';
+export { ThresholdSigningClient } from './clients/governance/threshold-signing';
 
 export { MycelixPropertyClient } from './integrations/property/client';
 export type { PropertyClientConfig, PropertyConnectionOptions } from './integrations/property/client';

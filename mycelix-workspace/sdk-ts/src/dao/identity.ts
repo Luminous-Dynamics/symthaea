@@ -4,7 +4,8 @@
  * Member registration, verification, and profile management.
  */
 
-import { ActionHash, AgentPubKey, Record } from '@holochain/client';
+import { type ActionHash, type AgentPubKey, type Record } from '@holochain/client';
+
 import type { DAOClient } from './client';
 import type {
   MemberProfile,

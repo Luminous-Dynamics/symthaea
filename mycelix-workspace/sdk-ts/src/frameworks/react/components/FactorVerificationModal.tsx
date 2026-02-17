@@ -34,7 +34,9 @@
  */
 
 import * as React from 'react';
+
 import { useMfaVerify } from '../hooks.js';
+
 import type { FactorType, MfaVerificationResult, VerificationChallenge, VerificationProof } from '../hooks.js';
 
 // =============================================================================

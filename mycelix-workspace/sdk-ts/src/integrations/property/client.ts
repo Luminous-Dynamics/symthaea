@@ -8,14 +8,17 @@
  */
 
 import {
-  AppClient,
+  type AppClient,
   AppWebsocket,
 
 } from '@holochain/client';
+
+import { PropertySdkError } from './types';
+import { CommonsClient } from './zomes/commons';
+import { LienClient } from './zomes/lien';
 import { RegistryClient } from './zomes/registry';
 import { TransferClient } from './zomes/transfer';
-import { LienClient } from './zomes/lien';
-import { CommonsClient } from './zomes/commons';
+
 import type {
   Asset,
   Transfer,
@@ -29,7 +32,7 @@ import type {
   PropertyEvent,
   PropertyEventType,
 } from './types';
-import { PropertySdkError } from './types';
+
 
 /**
  * Configuration for the Property client

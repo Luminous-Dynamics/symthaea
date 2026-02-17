@@ -38,7 +38,9 @@
  */
 
 import * as React from 'react';
+
 import { useMycelix, useMycelixContext } from './provider.js';
+
 import type { Mycelix } from '../../core/index.js';
 
 // =============================================================================
@@ -429,7 +431,7 @@ export function useWallet(currency: string = 'MYC'): UseWalletReturn {
 
       const balanceMap = new Map<string, bigint>();
       for (const [key, value] of Object.entries(balances || {})) {
-        balanceMap.set(key, BigInt(value as number));
+        balanceMap.set(key, BigInt(value));
       }
       setWallet({
         id: did,

@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/energy/zomes/credits
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { EnergySdkError } from '../types';
+
 import type {
   EnergyCredit,
   IssueCreditInput,
@@ -15,7 +16,7 @@ import type {
   RetireCarbonInput,
   EnergySource,
 } from '../types';
-import { EnergySdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for the Credits client
@@ -96,7 +97,7 @@ export class CreditsClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

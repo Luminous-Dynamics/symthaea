@@ -6,7 +6,8 @@
  * @module @mycelix/sdk/integrations/energy/zomes/projects
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
+import { EnergySdkError } from '../types';
+
 import type {
   EnergyProject,
   RegisterProjectInput,
@@ -16,7 +17,7 @@ import type {
   EnergySource,
   ProjectStatus,
 } from '../types';
-import { EnergySdkError } from '../types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for the Projects client
@@ -97,7 +98,7 @@ export class ProjectsClient {
         'Record does not contain an entry'
       );
     }
-    return (record.entry as unknown as { Present: { entry: T } }).Present.entry as T;
+    return (record.entry as unknown as { Present: { entry: T } }).Present.entry;
   }
 
   // ============================================================================

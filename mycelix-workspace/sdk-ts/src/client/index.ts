@@ -4,8 +4,10 @@
  * WebSocket-based connection to Holochain conductor for real hApp communication.
  */
 
-import { AppClient, AppWebsocket, AdminWebsocket } from '@holochain/client';
+import { type AppClient, AppWebsocket, AdminWebsocket } from '@holochain/client';
+
 import type { HappReputationScore } from '../bridge/index.js';
+
 import { ConnectionError, ErrorCode, validate } from '../errors.js';
 
 /** Connection state for event handling */
@@ -525,6 +527,7 @@ import {
   MycelixEcosystemClient as _MycelixEcosystemClient,
   MycelixEcosystemClientError as _MycelixClientError,
 } from './unified';
+
 import type {
   MycelixClientConfig as _EcosystemClientConfig,
   RetryConfig as _RetryConfig,

@@ -11,17 +11,19 @@
  * @module @mycelix/sdk/innovations/trust-markets
  */
 
-import type { HappId } from '../../bridge/cross-happ';
 import { CalibrationEngine } from '../../calibration/engine';
-import type { CalibrationReport } from '../../calibration/types';
 import {
   EmpiricalLevel,
   NormativeLevel,
   MaterialityLevel,
   type EpistemicPosition,
   getRecommendedResolution,
-  ResolutionMechanism,
+  type ResolutionMechanism,
 } from '../../integrations/epistemic-markets';
+
+import type { HappId } from '../../bridge/cross-happ';
+import type { CalibrationReport } from '../../calibration/types';
+
 
 // =============================================================================
 // TRUST MARKET TYPES

@@ -11,8 +11,8 @@
  * @deprecated Use TEND, HEARTH, or CGC modules for new development
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client.js';
+
 import type {
   Loan,
   LoanOffer,
@@ -27,6 +27,7 @@ import type {
   PrivacyCreditProof,
   ProofType,
 } from './types.js';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 const FINANCE_ROLE = 'finance';
 const ZOME_NAME = 'lending';

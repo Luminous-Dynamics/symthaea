@@ -44,6 +44,7 @@ import {
   EnforcementClient,
   type ZomeCallable,
 } from '../../justice/index.js';
+
 import type { AppClient } from '@holochain/client';
 
 export class JusticeClient {
