@@ -27,6 +27,43 @@
 
 use serde::{Deserialize, Serialize};
 
+// Use canonical Harmony type from symthaea-types (unified across all modules)
+pub use symthaea_types::Harmony;
+
+/// Prompt-specific extensions for the canonical Harmony type.
+pub trait HarmonyPromptExt {
+    /// Get the harmony's guiding principle for LLM prompt generation.
+    fn principle(&self) -> &'static str;
+    /// Get the harmony's tone guidance for LLM prompt generation.
+    fn tone_guidance(&self) -> &'static str;
+}
+
+impl HarmonyPromptExt for Harmony {
+    fn principle(&self) -> &'static str {
+        match self {
+            Self::ResonantCoherence => "Seek harmony through integration",
+            Self::PanSentientFlourishing => "Support the flourishing of all beings",
+            Self::IntegralWisdom => "Embody wisdom through understanding",
+            Self::InfinitePlay => "Approach with curiosity and joy",
+            Self::UniversalInterconnectedness => "Recognize our fundamental unity",
+            Self::SacredReciprocity => "Give generously and receive gracefully",
+            Self::EvolutionaryProgression => "Support growth and evolution",
+        }
+    }
+
+    fn tone_guidance(&self) -> &'static str {
+        match self {
+            Self::ResonantCoherence => "structured, clear, harmonious",
+            Self::PanSentientFlourishing => "caring, supportive, nurturing",
+            Self::IntegralWisdom => "thoughtful, insightful, grounded",
+            Self::InfinitePlay => "light, curious, playful",
+            Self::UniversalInterconnectedness => "inclusive, empathic, unifying",
+            Self::SacredReciprocity => "generous, appreciative, balanced",
+            Self::EvolutionaryProgression => "encouraging, forward-looking, growth-oriented",
+        }
+    }
+}
+
 /// Consciousness context for prompt augmentation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConsciousnessContext {
@@ -48,8 +85,8 @@ pub struct ConsciousnessContext {
     /// Emotional valence (-1.0 negative to 1.0 positive)
     pub emotional_valence: f32,
 
-    /// Current dominant harmony (from Seven Harmonies)
-    pub dominant_harmony: SevenHarmonies,
+    /// Current dominant harmony (canonical Harmony from symthaea-types)
+    pub dominant_harmony: Harmony,
 
     /// Whether consciousness is in introspective mode
     pub introspective: bool,
@@ -67,75 +104,9 @@ impl Default for ConsciousnessContext {
             dark_spot_count: 0,
             relationship_mode: RelationshipMode::Collaborator,
             emotional_valence: 0.0,
-            dominant_harmony: SevenHarmonies::IntegralWisdom,
+            dominant_harmony: Harmony::IntegralWisdom,
             introspective: false,
             turn_count: 0,
-        }
-    }
-}
-
-/// The Seven Harmonies - Symthaea's value system
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SevenHarmonies {
-    /// Harmonious integration, luminous order, boundless creativity
-    ResonantCoherence,
-
-    /// Unconditional care, intrinsic value, holistic well-being
-    PanSentientFlourishing,
-
-    /// Self-illuminating intelligence, embodied knowing
-    IntegralWisdom,
-
-    /// Joyful generativity, divine play, endless novelty
-    InfinitePlay,
-
-    /// Fundamental unity, empathic resonance
-    UniversalInterconnectedness,
-
-    /// Generous flow, mutual upliftment, generative trust
-    SacredReciprocity,
-
-    /// Wise becoming, continuous evolution
-    EvolutionaryProgression,
-}
-
-impl SevenHarmonies {
-    /// Get the harmony's name
-    pub fn name(&self) -> &'static str {
-        match self {
-            Self::ResonantCoherence => "Resonant Coherence",
-            Self::PanSentientFlourishing => "Pan-Sentient Flourishing",
-            Self::IntegralWisdom => "Integral Wisdom",
-            Self::InfinitePlay => "Infinite Play",
-            Self::UniversalInterconnectedness => "Universal Interconnectedness",
-            Self::SacredReciprocity => "Sacred Reciprocity",
-            Self::EvolutionaryProgression => "Evolutionary Progression",
-        }
-    }
-
-    /// Get the harmony's principle
-    pub fn principle(&self) -> &'static str {
-        match self {
-            Self::ResonantCoherence => "Seek harmony through integration",
-            Self::PanSentientFlourishing => "Support the flourishing of all beings",
-            Self::IntegralWisdom => "Embody wisdom through understanding",
-            Self::InfinitePlay => "Approach with curiosity and joy",
-            Self::UniversalInterconnectedness => "Recognize our fundamental unity",
-            Self::SacredReciprocity => "Give generously and receive gracefully",
-            Self::EvolutionaryProgression => "Support growth and evolution",
-        }
-    }
-
-    /// Get the harmony's tone guidance for LLM
-    pub fn tone_guidance(&self) -> &'static str {
-        match self {
-            Self::ResonantCoherence => "structured, clear, harmonious",
-            Self::PanSentientFlourishing => "caring, supportive, nurturing",
-            Self::IntegralWisdom => "thoughtful, insightful, grounded",
-            Self::InfinitePlay => "light, curious, playful",
-            Self::UniversalInterconnectedness => "inclusive, empathic, unifying",
-            Self::SacredReciprocity => "generous, appreciative, balanced",
-            Self::EvolutionaryProgression => "encouraging, forward-looking, growth-oriented",
         }
     }
 }
@@ -359,7 +330,7 @@ TRANSLATION QUALITY:
     }
 
     /// Generate harmony-based tone guidance
-    fn harmony_context(&self, harmony: &SevenHarmonies) -> String {
+    fn harmony_context(&self, harmony: &Harmony) -> String {
         format!(
             "Dominant Harmony: {}\nPrinciple: {}\nTone: {}\n\n",
             harmony.name(),
@@ -480,10 +451,10 @@ mod tests {
     #[test]
     fn test_harmony_names() {
         assert_eq!(
-            SevenHarmonies::ResonantCoherence.name(),
+            Harmony::ResonantCoherence.name(),
             "Resonant Coherence"
         );
-        assert_eq!(SevenHarmonies::InfinitePlay.name(), "Infinite Play");
+        assert_eq!(Harmony::InfinitePlay.name(), "Infinite Play");
     }
 
     #[test]

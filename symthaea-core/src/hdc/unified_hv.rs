@@ -233,9 +233,22 @@ impl ContinuousHV {
         }
 
         let dim = hvs[0].values.len();
+
+        #[cfg(feature = "simd")]
+        {
+            // SIMD path requires uniform dimensions; fall through to scalar if mismatched
+            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+            if uniform {
+                let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
+                let weights = vec![1.0f32; hvs.len()];
+                let values = crate::hdc::simd_continuous::bundle_simd(&slices, &weights);
+                return Self { values };
+            }
+        }
+
         let inv_n = 1.0 / hvs.len() as f32;
 
-        // Accumulate row-by-row for better cache locality
+        // Scalar fallback: accumulate row-by-row for better cache locality
         let mut values = vec![0.0f32; dim];
         for hv in hvs {
             for (acc, &v) in values.iter_mut().zip(hv.values.iter()) {
@@ -258,31 +271,34 @@ impl ContinuousHV {
             return Self::zero(HDC_DIMENSION);
         }
 
+        let dim = hvs[0].values.len();
+
         #[cfg(feature = "simd")]
         {
-            let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
-            let values = crate::hdc::simd_continuous::bundle_simd(&slices, weights);
-            Self { values }
+            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+            if uniform {
+                let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
+                let values = crate::hdc::simd_continuous::bundle_simd(&slices, weights);
+                return Self { values };
+            }
         }
 
-        #[cfg(not(feature = "simd"))]
-        {
-            let dim = hvs[0].values.len();
-            let weight_sum: f32 = weights.iter().sum();
+        // Scalar fallback (also used when dimensions are non-uniform)
+        let weight_sum: f32 = weights.iter().sum();
 
-            let values: Vec<f32> = (0..dim)
-                .map(|i| {
-                    let weighted_sum: f32 = hvs
-                        .iter()
-                        .zip(weights.iter())
-                        .map(|(hv, w)| hv.values[i] * w)
-                        .sum();
-                    weighted_sum / weight_sum
-                })
-                .collect();
+        let values: Vec<f32> = (0..dim)
+            .map(|i| {
+                let weighted_sum: f32 = hvs
+                    .iter()
+                    .zip(weights.iter())
+                    .filter(|(hv, _)| i < hv.values.len())
+                    .map(|(hv, w)| hv.values[i] * w)
+                    .sum();
+                weighted_sum / weight_sum
+            })
+            .collect();
 
-            Self { values }
-        }
+        Self { values }
     }
 
     /// Cosine similarity in range [-1, 1]
@@ -484,6 +500,19 @@ impl ContinuousHV {
         }
 
         let dim = hvs[0].values.len();
+
+        #[cfg(feature = "simd")]
+        {
+            // SIMD path requires uniform dimensions; fall through to scalar if mismatched
+            let uniform = hvs.iter().all(|hv| hv.values.len() == dim);
+            if uniform {
+                let slices: Vec<&[f32]> = hvs.iter().map(|hv| hv.values.as_slice()).collect();
+                let weights = vec![1.0f32; hvs.len()];
+                let values = crate::hdc::simd_continuous::bundle_simd(&slices, &weights);
+                return Self { values };
+            }
+        }
+
         let inv_n = 1.0 / hvs.len() as f32;
 
         let mut values = vec![0.0f32; dim];
