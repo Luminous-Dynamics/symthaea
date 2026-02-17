@@ -36,6 +36,15 @@ target/
 mycelix-core/.archive/
 **/vsv-core/src/weights.rs
 
+# Holochain toolchain binaries (installed by nix, should never be committed)
+# Use specific paths to avoid matching directories named holochain/
+mycelix-marketplace/backend/holochain
+mycelix-marketplace/backend/lair-keystore
+mycelix-marketplace/backend/hc
+mycelix-mail/backend/holochain
+mycelix-mail/backend/lair-keystore
+mycelix-mail/backend/hc
+
 # === Python ===
 __pycache__/
 *.py[cod]

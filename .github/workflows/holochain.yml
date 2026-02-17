@@ -74,8 +74,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -182,8 +180,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -267,8 +263,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -324,8 +318,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -390,8 +382,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -456,8 +446,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -750,8 +738,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -818,8 +804,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
@@ -961,8 +945,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Install Nix
         uses: cachix/install-nix-action@v27
