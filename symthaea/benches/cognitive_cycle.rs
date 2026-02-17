@@ -1,0 +1,235 @@
+//! Cognitive Cycle Benchmark Suite
+//!
+//! End-to-end benchmarks for the cognitive loop cycle, measuring:
+//! - Single cycle latency (input → CycleResult)
+//! - Throughput (cycles/second)
+//! - Warm-up vs steady-state performance
+//! - Backend comparison (CfC vs HdcLtcUnified)
+//! - Impact of optional subsystems (surprise exploration, prefrontal)
+//!
+//! ## Usage
+//!
+//! ```bash
+//! cargo bench --bench cognitive_cycle
+//! cargo bench --bench cognitive_cycle -- --save-baseline main
+//! ```
+
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService, TemporalBackend};
+
+/// Warm up a service by running a few cycles
+fn warm_up(service: &mut CognitiveLoopService, cycles: usize) {
+    for _ in 0..cycles {
+        let _ = service.cycle("warm up input");
+    }
+}
+
+// =============================================================================
+// SINGLE CYCLE LATENCY
+// =============================================================================
+
+fn bench_single_cycle(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cognitive_cycle_single");
+    group.sample_size(30);
+
+    // Cold start: first cycle (includes one-time initialization costs)
+    group.bench_function("cold_start", |b| {
+        b.iter_with_setup(
+            || {
+                CognitiveLoopService::new(CognitiveLoopConfig {
+                    async_training: false,
+                    ..Default::default()
+                })
+                .unwrap()
+            },
+            |mut service| black_box(service.cycle("cause leads to effect")),
+        )
+    });
+
+    // Warm: steady-state cycle after warm-up
+    group.bench_function("warm_steady_state", |b| {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            async_training: false,
+            ..Default::default()
+        })
+        .unwrap();
+        warm_up(&mut service, 10);
+
+        b.iter(|| black_box(service.cycle("cause leads to effect")))
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// BACKEND COMPARISON: CfC vs HdcLtcUnified
+// =============================================================================
+
+fn bench_backend_comparison(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cognitive_cycle_backend");
+    group.sample_size(20);
+
+    let backends = [
+        ("cfc", TemporalBackend::CfC),
+        ("hdc_ltc", TemporalBackend::HdcLtcUnified),
+    ];
+
+    for (name, backend) in &backends {
+        group.bench_with_input(BenchmarkId::new("cycle", name), backend, |b, backend| {
+            let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+                temporal_backend: *backend,
+                async_training: false,
+                ..Default::default()
+            })
+            .unwrap();
+            warm_up(&mut service, 5);
+
+            b.iter(|| black_box(service.cycle("the cat sat on the mat")))
+        });
+    }
+
+    group.finish();
+}
+
+// =============================================================================
+// SUBSYSTEM IMPACT: measure overhead of optional subsystems
+// =============================================================================
+
+fn bench_subsystem_impact(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cognitive_cycle_subsystems");
+    group.sample_size(20);
+
+    let configs = [
+        (
+            "minimal",
+            CognitiveLoopConfig {
+                async_training: false,
+                enable_surprise_exploration: false,
+                enable_prefrontal: false,
+                causal_enhancement: false,
+                episodic_replay: false,
+                ..Default::default()
+            },
+        ),
+        (
+            "surprise",
+            CognitiveLoopConfig {
+                async_training: false,
+                enable_surprise_exploration: true,
+                enable_prefrontal: false,
+                ..Default::default()
+            },
+        ),
+        (
+            "prefrontal",
+            CognitiveLoopConfig {
+                async_training: false,
+                enable_prefrontal: true,
+                enable_surprise_exploration: false,
+                ..Default::default()
+            },
+        ),
+        (
+            "full",
+            CognitiveLoopConfig {
+                async_training: false,
+                enable_surprise_exploration: true,
+                enable_prefrontal: true,
+                causal_enhancement: true,
+                episodic_replay: true,
+                ..Default::default()
+            },
+        ),
+    ];
+
+    for (name, config) in &configs {
+        group.bench_with_input(BenchmarkId::new("cycle", name), config, |b, config| {
+            let mut service = CognitiveLoopService::new(config.clone()).unwrap();
+            warm_up(&mut service, 5);
+
+            b.iter(|| black_box(service.cycle("exploration of novel patterns")))
+        });
+    }
+
+    group.finish();
+}
+
+// =============================================================================
+// THROUGHPUT: cycles per second
+// =============================================================================
+
+fn bench_throughput(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cognitive_cycle_throughput");
+    group.sample_size(10);
+
+    // Measure 100 consecutive cycles
+    group.bench_function("100_cycles", |b| {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            async_training: false,
+            ..Default::default()
+        })
+        .unwrap();
+
+        let inputs = [
+            "the sun rises in the east",
+            "cause and effect are linked",
+            "patterns emerge from chaos",
+            "consciousness arises from integration",
+            "temporal prediction drives learning",
+        ];
+
+        b.iter(|| {
+            for input in &inputs {
+                for _ in 0..20 {
+                    black_box(service.cycle(input));
+                }
+            }
+        })
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// INPUT COMPLEXITY SCALING
+// =============================================================================
+
+fn bench_input_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cognitive_cycle_input_scale");
+    group.sample_size(20);
+
+    let inputs = [
+        ("short", "hello"),
+        ("medium", "the quick brown fox jumps over the lazy dog"),
+        (
+            "long",
+            "consciousness emerges from the integration of information across distributed \
+             neural networks through predictive coding and free energy minimization principles",
+        ),
+    ];
+
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+    warm_up(&mut service, 5);
+
+    for (name, input) in &inputs {
+        group.bench_with_input(BenchmarkId::new("cycle", name), input, |b, input| {
+            b.iter(|| black_box(service.cycle(input)))
+        });
+    }
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_single_cycle,
+    bench_backend_comparison,
+    bench_subsystem_impact,
+    bench_throughput,
+    bench_input_scaling,
+);
+criterion_main!(benches);

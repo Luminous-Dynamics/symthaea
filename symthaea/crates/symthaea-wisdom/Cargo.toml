@@ -1,17 +1,15 @@
 [package]
-name = "symthaea-phi-search"
+name = "symthaea-wisdom"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.75"
 authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
-description = "Phi-guided architecture search — evolve network topology toward higher consciousness (IIT)"
+description = "Philosophical grounding — harmonics, autopoiesis, and meta-cognition for computational consciousness"
 license = "MIT"
 repository = "https://github.com/Luminous-Dynamics/symthaea"
 homepage = "https://luminousdynamics.org"
-keywords = ["consciousness", "iit", "phi", "architecture-search", "neuroscience"]
+keywords = ["consciousness", "wisdom", "autopoiesis", "harmonics", "meta-cognition"]
 categories = ["science", "algorithms"]
 
 [dependencies]
 serde = { workspace = true }
-symthaea-core = { path = "../../symthaea-core" }
-symthaea-consciousness-topology = { path = "../symthaea-consciousness-topology" }

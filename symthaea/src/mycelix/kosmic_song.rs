@@ -70,9 +70,9 @@ use super::gis::{
 use std::time::SystemTime;
 
 // Import real types from the crate's consciousness infrastructure
-use crate::consciousness::seven_harmonies::{
-    AlignmentResult, Harmony as CoreHarmony, SevenHarmonies,
-};
+// NOTE: Harmony is now the same type everywhere (symthaea_types::Harmony),
+// so no From bridge is needed.
+use crate::consciousness::seven_harmonies::{AlignmentResult, SevenHarmonies};
 use symthaea_core::hdc::spectral_connectivity::ConnectivityCalculator;
 use symthaea_core::hdc::{
     ConsciousnessTopology as HdcConsciousnessTopology, ContinuousHV, TopologyType, HDC_DIMENSION,
@@ -83,40 +83,6 @@ pub type Timestamp = SystemTime;
 
 /// Agent identifier
 pub type AgentId = String;
-
-// ============================================================================
-// Harmony Bridge: GIS Harmony ↔ Core Harmony (seven_harmonies.rs)
-// ============================================================================
-
-/// Convert GIS Harmony to Core Harmony (for semantic HDC encoding)
-impl From<Harmony> for CoreHarmony {
-    fn from(h: Harmony) -> Self {
-        match h {
-            Harmony::ResonantCoherence => CoreHarmony::ResonantCoherence,
-            Harmony::PanSentientFlourishing => CoreHarmony::PanSentientFlourishing,
-            Harmony::IntegralWisdom => CoreHarmony::IntegralWisdom,
-            Harmony::InfinitePlay => CoreHarmony::InfinitePlay,
-            Harmony::UniversalInterconnectedness => CoreHarmony::UniversalInterconnectedness,
-            Harmony::SacredReciprocity => CoreHarmony::SacredReciprocity,
-            Harmony::EvolutionaryProgression => CoreHarmony::EvolutionaryProgression,
-        }
-    }
-}
-
-/// Convert Core Harmony to GIS Harmony
-impl From<CoreHarmony> for Harmony {
-    fn from(h: CoreHarmony) -> Self {
-        match h {
-            CoreHarmony::ResonantCoherence => Harmony::ResonantCoherence,
-            CoreHarmony::PanSentientFlourishing => Harmony::PanSentientFlourishing,
-            CoreHarmony::IntegralWisdom => Harmony::IntegralWisdom,
-            CoreHarmony::InfinitePlay => Harmony::InfinitePlay,
-            CoreHarmony::UniversalInterconnectedness => Harmony::UniversalInterconnectedness,
-            CoreHarmony::SacredReciprocity => Harmony::SacredReciprocity,
-            CoreHarmony::EvolutionaryProgression => Harmony::EvolutionaryProgression,
-        }
-    }
-}
 
 /// ConsciousnessTopology wrapper that bridges to crate::hdc::ConsciousnessTopology
 ///
@@ -706,14 +672,13 @@ impl KosmicSong {
 
         // Update harmonic profile based on alignment scores
         for alignment in result.harmonies() {
-            let gis_harmony: Harmony = alignment.harmony.into();
-            let current = self.harmonic_profile.activation(gis_harmony);
+            let current = self.harmonic_profile.activation(alignment.harmony);
 
             // Slightly adjust profile based on action alignment patterns
             // Positive alignment reinforces, negative alignment weakens
             let adjustment = alignment.alignment() * 0.01;
             self.harmonic_profile
-                .set_activation(gis_harmony, current + adjustment);
+                .set_activation(alignment.harmony, current + adjustment);
         }
 
         // Update moral uncertainty if violations detected
@@ -742,10 +707,7 @@ impl KosmicSong {
         let mut harmonies_system = SevenHarmonies::new();
         let result = harmonies_system.evaluate_action(action_description);
 
-        result.best_alignment().map(|a| {
-            let gis_harmony: Harmony = a.harmony.into();
-            (gis_harmony, a.alignment())
-        })
+        result.best_alignment().map(|a| (a.harmony, a.alignment()))
     }
 
     /// Get the HDC encoding of the current resonant harmony
@@ -754,8 +716,7 @@ impl KosmicSong {
     /// useful for similarity comparisons with other semantic vectors.
     pub fn resonant_harmony_encoding(&self) -> Option<crate::hdc::BinaryHV> {
         let harmonies_system = SevenHarmonies::new();
-        let core_harmony: CoreHarmony = self.resonant_harmony.into();
-        harmonies_system.get(core_harmony).map(|e| e.encoding)
+        harmonies_system.get(self.resonant_harmony).map(|e| e.encoding)
     }
 
     // === Private helpers ===

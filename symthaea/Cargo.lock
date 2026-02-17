@@ -12513,9 +12513,11 @@ dependencies = [
  "sha3",
  "strsim",
  "symthaea-causal-reasoning",
+ "symthaea-consciousness-topology",
  "symthaea-core",
  "symthaea-dream",
  "symthaea-enactive",
+ "symthaea-exploration",
  "symthaea-factor-graph",
  "symthaea-fep",
  "symthaea-field-dynamics",
@@ -12526,6 +12528,8 @@ dependencies = [
  "symthaea-sensorimotor",
  "symthaea-sentinel",
  "symthaea-stt",
+ "symthaea-types",
+ "symthaea-wisdom",
  "syn 2.0.114",
  "tempfile",
  "thiserror 1.0.69",
@@ -12550,6 +12554,13 @@ dependencies = [
  "proptest",
  "serde",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-consciousness-topology"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -12609,6 +12620,13 @@ version = "0.1.0"
 dependencies = [
  "serde",
  "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-exploration"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -12701,6 +12719,7 @@ name = "symthaea-phi-search"
 version = "0.1.0"
 dependencies = [
  "serde",
+ "symthaea-consciousness-topology",
  "symthaea-core",
 ]
 
@@ -12750,6 +12769,21 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toml",
+]
+
+[[package]]
+name = "symthaea-types"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "symthaea-wisdom"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
