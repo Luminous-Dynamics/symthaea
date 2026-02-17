@@ -475,7 +475,7 @@ mod vote_tests {
 
         assert_eq!(vote.decision, VoteDecision::Approve);
         assert_eq!(vote.round, 1);
-        assert_eq!(vote.voter_id, "validator-1");
+        assert_eq!(vote.voter, "validator-1");
     }
 
     #[test]

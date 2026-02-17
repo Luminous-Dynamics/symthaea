@@ -142,8 +142,8 @@ impl SecurityLevel {
                 8,   // keep blowup for security
                 0,   // no grinding
                 winterfell::FieldExtension::None,
-                12,  // higher folding (fewer FRI rounds)
-                47,  // larger remainder (faster final round)
+                16,  // higher folding (fewer FRI rounds) — must be power of 2
+                63,  // larger remainder (faster final round) — must be (2^n)-1
                 BatchingMethod::Linear,
                 BatchingMethod::Linear,
             ),

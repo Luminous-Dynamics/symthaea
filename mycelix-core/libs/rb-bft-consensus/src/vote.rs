@@ -137,6 +137,18 @@ impl Vote {
             && self.has_valid_signature()
     }
 
+    /// Get the weighted value of this vote (reputation² weight)
+    ///
+    /// This is the absolute voting weight regardless of decision.
+    pub fn weighted_value(&self) -> f32 {
+        self.weight
+    }
+
+    /// Get the voter ID (alias for voter field)
+    pub fn voter_id(&self) -> &str {
+        &self.voter
+    }
+
     /// Get the effective weight for consensus calculation
     pub fn effective_weight(&self) -> f32 {
         match self.decision {

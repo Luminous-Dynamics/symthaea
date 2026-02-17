@@ -248,6 +248,23 @@ impl ValidatorSet {
         Ok(())
     }
 
+    /// Get the number of validators in the set (including inactive)
+    pub fn len(&self) -> usize {
+        self.validators.len()
+    }
+
+    /// Check if the validator set is empty
+    pub fn is_empty(&self) -> bool {
+        self.validators.is_empty()
+    }
+
+    /// Get total voting weight (alias for total_weight)
+    ///
+    /// Sum of reputation² for all active, eligible validators.
+    pub fn total_voting_weight(&self) -> f32 {
+        self.total_weight
+    }
+
     /// Iterator over all validators
     pub fn iter(&self) -> impl Iterator<Item = &ValidatorNode> {
         self.validators.iter()

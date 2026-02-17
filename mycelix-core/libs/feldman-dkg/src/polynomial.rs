@@ -93,7 +93,8 @@ impl Polynomial {
 
         // Horner's method: evaluate from highest degree down
         for coeff in self.coefficients.iter().rev() {
-            result = result * x.clone() + coeff.clone();
+            result *= x.clone();
+            result += coeff.clone();
         }
 
         result
@@ -130,8 +131,8 @@ pub fn lagrange_interpolate_at_zero(
 
         for (j, (x_j, _)) in points.iter().enumerate() {
             if i != j {
-                numerator = numerator * x_j.clone();
-                denominator = denominator * (x_j.clone() - x_i.clone());
+                numerator *= x_j.clone();
+                denominator *= x_j.clone() - x_i.clone();
             }
         }
 
@@ -142,7 +143,7 @@ pub fn lagrange_interpolate_at_zero(
         }
 
         let basis = numerator * denominator.invert()?;
-        result = result + (y_i.clone() * basis);
+        result += y_i.clone() * basis;
     }
 
     Ok(result)
@@ -161,8 +162,8 @@ pub fn lagrange_coefficient(
     for (j, &idx) in participant_indices.iter().enumerate() {
         if i != j {
             let x_j = Scalar::from_u64(idx as u64);
-            numerator = numerator * x_j.clone();
-            denominator = denominator * (x_j - x_i.clone());
+            numerator *= x_j.clone();
+            denominator *= x_j - x_i.clone();
         }
     }
 

@@ -479,7 +479,7 @@ impl DkgCeremony {
             }
 
             if let Some(share) = deal.get_share(id.0) {
-                combined_value = combined_value + share.value.clone();
+                combined_value += share.value.clone();
             }
         }
 

@@ -169,8 +169,8 @@ impl CommitmentSet {
 
         for commitment in &self.commitments {
             // Add C_j * i^j
-            right = right + (commitment.0 * i_power.inner());
-            i_power = i_power * i.clone();
+            right += commitment.0 * i_power.inner();
+            i_power *= i.clone();
         }
 
         left == right
@@ -230,7 +230,7 @@ impl CommitmentSet {
 
         let mut combined = ProjectivePoint::IDENTITY;
         for set in sets {
-            combined = combined + set.secret_commitment().0;
+            combined += set.secret_commitment().0;
         }
 
         Ok(Commitment(combined))

@@ -111,7 +111,7 @@ impl ShareSet {
 
         let mut combined = Scalar::zero();
         for share in &self.shares {
-            combined = combined + share.value.clone();
+            combined += share.value.clone();
         }
         Ok(combined)
     }

@@ -68,6 +68,13 @@ impl ValidatorKeypair {
         ConsensusSignature::new(signature.to_bytes(), self.public_key_bytes())
     }
 
+    /// Verify a signature against a message using this keypair's public key
+    ///
+    /// Returns true if the signature is valid for the given message.
+    pub fn verify(&self, message: &[u8], signature: &ConsensusSignature) -> bool {
+        signature.verify(message).is_ok()
+    }
+
     /// Sign with a domain separator to prevent cross-protocol attacks
     pub fn sign_with_domain(&self, domain: &str, message: &[u8]) -> ConsensusSignature {
         let mut hasher = Sha256::new();

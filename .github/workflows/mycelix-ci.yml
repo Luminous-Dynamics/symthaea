@@ -255,8 +255,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          submodules: recursive
+
+      - name: Init submodules (best-effort)
+        continue-on-error: true
+        run: git submodule update --init --recursive
 
       - name: Check path exists
         id: check_path
