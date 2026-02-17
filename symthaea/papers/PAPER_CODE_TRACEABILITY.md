@@ -8,11 +8,11 @@ Maps sections of `papers/latex/hai_neurips2026.tex` to their implementation in t
 |---|---|---|---|
 | §3.1 Free Energy in HV Space | Accuracy/Complexity via cosine similarity | `src/consciousness/fep_active_inference.rs` (free energy computation) | `tests/test_integrated_pipelines.rs` |
 | §3.1 Eq. 3–5 | $A = -\frac{1}{2}\pi_s(1-\cos)^2$, $C = \frac{1}{2}\pi_p(1-\cos)$, $F = C - A$ | `src/consciousness/fep_active_inference.rs` | `cargo test test_fep_active_inference` |
-| §3.2 Precision-Weighted Binding | $\text{bind}_\pi(\mathbf{h}_1, \mathbf{h}_2, \pi) = (\mathbf{h}_1 \otimes \mathbf{h}_2) \odot \sigma(\pi)$ | `src/consciousness/fep_active_inference.rs`, `src/consciousness/predictive_processing.rs` | Precision gating tests in same files |
+| §3.2 Precision-Weighted Binding (Eq. 17) | $\text{bind}_\pi(\mathbf{h}_1, \mathbf{h}_2, \pi) = (\mathbf{h}_1 \otimes \mathbf{h}_2) \odot \sigma(\pi)$ | `symthaea-core/src/hdc/unified_hv.rs:bind_precision()` (explicit Eq. 17); `src/consciousness/fep_active_inference.rs` (precision gating); `src/consciousness/predictive_processing.rs` (precision-weighted errors) | `symthaea-core/src/hdc/unified_hv.rs` (3 tests), precision gating tests |
 | §3.3 Belief Updating | Gradient descent on $F$: $\mathbf{h}_q += \eta \nabla F$ | `symthaea-core/src/hdc/predictive_coding.rs:predict_and_update()` | `symthaea-core/src/hdc/predictive_coding.rs` (tests mod) |
 | §3.4 Motor Commands (Table 1) | 8 EFE-derived command types | `src/consciousness/fep_active_inference.rs:2278` (`enum MotorCommandType`) | Same file, `tests` mod |
 | §4.1 Implementation | Rust, $d=16{,}384$ | `symthaea-core/src/hdc/mod.rs` (`HDC_DIMENSION = 16_384`) | `cargo test --workspace --lib` |
-| §4.2 T-Maze Benchmark | Inference/action timing vs pymdp | `src/benchmarks/fep_temporal_benchmark.rs` | `tests/test_integrated_pipelines.rs` |
+| §4.2 T-Maze Benchmark | Inference/action timing vs pymdp | `src/benchmarks/fep_temporal_benchmark.rs` (Rust: synthetic temporal patterns); `validation/pymdp_comparison_benchmark.py` (Python: actual T-Maze vs pymdp) | `tests/test_integrated_pipelines.rs` |
 | §4.2 Grid World | 3×3 and 5×5 grids | `symthaea-core/src/core/gridworld.rs` | Same file |
 | §4.3 Ablation: Dimension | 1K–64K dimension sweep | `src/benchmarks/fep_temporal_benchmark.rs` | Benchmark scripts |
 | §4.3 Ablation: Precision Init | $\pi \in [0.1, 5.0]$ | `src/consciousness/fep_active_inference.rs` (precision config) | — |
@@ -75,3 +75,12 @@ cargo test test_integrated_pipelines --release
 | Fig 2 | Free energy convergence | `src/benchmarks/fep_temporal_benchmark.rs` |
 | Fig 3 | Precision dynamics | `src/consciousness/fep_active_inference.rs` (precision tracking) |
 | Fig 4 | Scaling analysis | `src/benchmarks/fep_temporal_benchmark.rs` |
+
+## Known Gaps
+
+| Paper Claim | Status | Notes |
+|---|---|---|
+| T-Maze benchmark (§4.2) | Python only | Rust benchmark uses synthetic temporal patterns, not actual T-Maze. Python comparison at `validation/pymdp_comparison_benchmark.py` |
+| Eq. 17 precision-weighted binding | Implemented | `ContinuousHV::bind_precision()` implements exact sigmoid-gated binding. Semantic gap: FEP precision gating uses scalar attenuation rather than element-wise sigmoid |
+| Feature flag count (§A) | Corrected | Updated from 57 to 48 features (41 with cfg gates) after removing dead `school_module` flag |
+| Phi proxy correlation (rho=0.50) | Empirical only | Validated across 15 topologies but lacks theoretical justification for why CfC tau diversity tracks causal architecture |

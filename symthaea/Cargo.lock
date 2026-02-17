@@ -12513,9 +12513,11 @@ dependencies = [
  "sha3",
  "strsim",
  "symthaea-causal-reasoning",
+ "symthaea-consciousness-resonance",
  "symthaea-consciousness-topology",
  "symthaea-core",
  "symthaea-dream",
+ "symthaea-embeddings",
  "symthaea-enactive",
  "symthaea-exploration",
  "symthaea-factor-graph",
@@ -12553,6 +12555,14 @@ name = "symthaea-causal-reasoning"
 version = "0.1.0"
 dependencies = [
  "proptest",
+ "serde",
+ "symthaea-core",
+]
+
+[[package]]
+name = "symthaea-consciousness-resonance"
+version = "0.1.0"
+dependencies = [
  "serde",
  "symthaea-core",
 ]
@@ -12613,6 +12623,17 @@ dependencies = [
  "rand 0.8.5",
  "rand_chacha 0.3.1",
  "serde",
+]
+
+[[package]]
+name = "symthaea-embeddings"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "serde",
+ "symthaea-core",
 ]
 
 [[package]]

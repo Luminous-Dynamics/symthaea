@@ -261,6 +261,12 @@ impl CognitiveLoopService {
         self.prediction_confidence > 0.4
     }
 
+    /// Set the relational Phi from an external dyad computation.
+    /// This is called by the Symthaea facade after computing Phi_dyad.
+    pub fn set_relational_phi(&mut self, phi: f64) {
+        self.relational_phi = phi;
+    }
+
     // ========== Flow State Methods ==========
 
     /// Check if currently in flow state

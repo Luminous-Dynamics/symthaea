@@ -168,6 +168,19 @@ pub struct CognitiveLoopConfig {
     /// tendencies and uses self-model accuracy to modulate learning rate.
     /// High self-model accuracy → deeper recursion and faster learning.
     pub enable_meta_cognition: bool,
+
+    /// Enable narrative self-model.
+    /// When true, the cognitive loop maintains a three-level autobiographical
+    /// self-model (proto/core/autobio). Each cycle's experience is processed
+    /// and self-Φ is used to modulate reasoning confidence.
+    pub enable_narrative_self: bool,
+
+    /// Enable virtual body for embodied cognition.
+    /// When true, the cognitive loop maintains a virtual interoceptive body
+    /// that maps prediction error, flow state, curiosity, and other signals
+    /// to somatic states (heart rate, breathing, fatigue, etc.). The resulting
+    /// phi_modulation factor scales consciousness via somatic marker feedback.
+    pub enable_virtual_body: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -197,6 +210,8 @@ impl Default for CognitiveLoopConfig {
             enable_surprise_exploration: false,
             enable_prefrontal: false,
             enable_meta_cognition: false,
+            enable_narrative_self: false,
+            enable_virtual_body: false,
         }
     }
 }

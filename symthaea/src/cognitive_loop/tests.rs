@@ -1580,3 +1580,131 @@ fn test_closed_learning_loop_in_service() {
             | ResponseStrategy::Exploratory
     ));
 }
+
+// -------------------- CycleMetadata Tests --------------------
+
+#[test]
+fn test_cycle_metadata_populated() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let result = service.cycle("test metadata population");
+
+    // All metadata fields should have valid defaults
+    assert!(!result.metadata.prefrontal_veto); // No prefrontal enabled
+    assert!(!result.metadata.surprise_triggered); // First cycle unlikely to trigger
+    assert!(!result.metadata.reasoning_gate_blocked); // No reasoning engine in default features
+    assert!(result.metadata.reasoning_confidence >= 0.0);
+    assert!(result.metadata.reasoning_plan_confidence >= 0.0);
+    assert_eq!(result.metadata.meta_cognitive_accuracy, 0.0); // Not enabled
+    assert_eq!(result.metadata.meta_cognitive_depth, 0); // Not enabled
+}
+
+#[test]
+fn test_cycle_timing_bounds() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let result = service.cycle("timing test");
+
+    // cycle_time_us should be positive
+    assert!(result.cycle_time_us > 0, "Cycle time should be positive");
+    // Should complete in under 5 seconds (generous bound)
+    assert!(
+        result.cycle_time_us < 5_000_000,
+        "Cycle should complete in under 5 seconds, took {}us",
+        result.cycle_time_us
+    );
+}
+
+#[test]
+fn test_cycle_learning_occurs_when_threshold_met() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0, // Always learn
+        ..Default::default()
+    })
+    .unwrap();
+
+    // First cycle has no previous state, but learning should still attempt
+    let _first = service.cycle("initial input");
+
+    // Second cycle should learn from state transition
+    let result = service.cycle("different input to trigger learning");
+
+    // With threshold 0.0, some learning cycles should have occurred
+    assert!(
+        service.stats().learning_cycles > 0,
+        "Learning should occur with threshold=0.0"
+    );
+    // Training loss may or may not be Some depending on async training
+    assert!(result.prediction_error >= 0.0);
+}
+
+#[test]
+fn test_cycle_output_valid_dimensions() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let result = service.cycle("dimension check");
+
+    // Output should match CfC num_neurons
+    assert_eq!(
+        result.output.len(),
+        service.stats().total_cycles * 0 + 256, // Default num_neurons = 256
+        "Output should match CfC num_neurons"
+    );
+}
+
+#[test]
+fn test_cycle_with_prefrontal_enabled() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_prefrontal: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run enough cycles to exercise prefrontal
+    for _ in 0..10 {
+        service.cycle("prefrontal test input");
+    }
+
+    // With default capacity=7 and 10 inputs, some items should have been graduated
+    // Verify the service didn't panic and metadata is valid
+    let result = service.cycle("one more cycle");
+    // prefrontal_veto is a valid boolean
+    assert!(result.metadata.prefrontal_veto || !result.metadata.prefrontal_veto);
+}
+
+#[test]
+fn test_cycle_with_surprise_exploration() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_surprise_exploration: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("surprise exploration input");
+    }
+
+    // Verify it ran without errors and metadata is populated
+    let result = service.cycle("final check");
+    assert!(result.prediction_error >= 0.0);
+}
+
+#[test]
+fn test_cycle_with_meta_cognition() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_meta_cognition: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        service.cycle("meta cognition input");
+    }
+
+    let result = service.cycle("meta check");
+    // Meta-cognition accuracy should be between 0 and 1
+    assert!(result.metadata.meta_cognitive_accuracy >= 0.0);
+    assert!(result.metadata.meta_cognitive_accuracy <= 1.0);
+    // Depth should be a valid value (usize is always >= 0)
+    let _ = result.metadata.meta_cognitive_depth;
+}

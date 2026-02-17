@@ -310,8 +310,8 @@ pub mod voice;
 // Resonant speech (enabled - 0 errors)
 pub mod resonant_speech;
 
-// Embeddings (enabling - self-contained module)
-pub mod embeddings;
+// Embeddings (extracted to symthaea-embeddings crate)
+pub use symthaea_embeddings as embeddings;
 
 // Benchmarks (enabled - API fixes complete)
 pub mod benchmarks;

@@ -23,6 +23,8 @@ members = [
     "crates/symthaea-wisdom",
     "crates/symthaea-types",
     "crates/symthaea-seven-harmonies",
+    "crates/symthaea-consciousness-resonance",
+    "crates/symthaea-embeddings",
 ]
 
 
@@ -106,6 +108,8 @@ symthaea-exploration = { path = "crates/symthaea-exploration" }
 symthaea-wisdom = { path = "crates/symthaea-wisdom" }
 symthaea-types = { path = "crates/symthaea-types" }
 symthaea-seven-harmonies = { path = "crates/symthaea-seven-harmonies" }
+symthaea-consciousness-resonance = { path = "crates/symthaea-consciousness-resonance" }
+symthaea-embeddings = { path = "crates/symthaea-embeddings" }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
@@ -362,7 +366,6 @@ school_lookahead = []           # CfC-based lookahead in school (cfg-gated in sc
 physiology_module = []          # Physiology integration (cfg-gated in school/mod.rs)
 mycelix_module = []             # Mycelix governance hooks (cfg-gated in consciousness + brain)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
-school_module = []              # School/learning examples
 
 [dev-dependencies]
 criterion = "0.5"

@@ -130,6 +130,34 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings --allow rustdoc::broken-intra-doc-links
 
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [check]
+    defaults:
+      run:
+        working-directory: symthaea
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Cache cargo registry & build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            symthaea/target
+          key: ${{ runner.os }}-cargo-integ-${{ hashFiles('symthaea/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-integ-
+      - name: Run integration tests
+        run: cargo test --test '*' -- --test-threads=2
+        env:
+          RUST_BACKTRACE: 1
+        timeout-minutes: 30
+
   features:
     name: Feature Matrix
     runs-on: ubuntu-latest
@@ -209,12 +237,20 @@ jobs:
             ${{ runner.os }}-cargo-subcrates-
       - name: Test sub-crates (fast path)
         run: |
-          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies; do
+          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies symthaea-consciousness-resonance symthaea-embeddings symthaea-dynamics symthaea-sentinel symthaea-perception symthaea-stt; do
             echo "::group::$crate"
             cargo clippy -p $crate --lib -- -D warnings
             cargo test -p $crate --lib
             echo "::endgroup::"
           done
+      - name: Test symthaea-core
+        run: |
+          cargo clippy -p symthaea-core --lib -- -D warnings
+          cargo test -p symthaea-core --lib
+      - name: Test symthaea-nix
+        run: |
+          cargo clippy -p symthaea-nix --lib -- -D warnings
+          cargo test -p symthaea-nix --lib
 
   msrv:
     name: MSRV Check (1.75)

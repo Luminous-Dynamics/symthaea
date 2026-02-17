@@ -44,6 +44,18 @@ pub struct CycleMetadata {
 
     /// Meta-cognitive recursion depth (0 = off, 1 = basic, 2+ = recursive self-modeling)
     pub meta_cognitive_depth: u8,
+
+    /// Narrative self-model's integrated information (0.0 = off/no self, >0 = active self-Φ)
+    pub narrative_self_phi: f64,
+
+    /// Virtual body phi modulation (1.0 = neutral, >1 = body boosts consciousness)
+    pub body_phi_modulation: f64,
+
+    /// Virtual body affect valence (-1 to 1)
+    pub body_valence: f32,
+
+    /// Virtual body affect arousal (0 to 1)
+    pub body_arousal: f32,
 }
 
 /// Result of a single cognitive cycle

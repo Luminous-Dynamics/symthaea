@@ -457,7 +457,7 @@ pub mod phi_validation;
 // ── Tier 4: Dynamics & Field ───────────────────────────────────────────────
 pub use symthaea_field_dynamics as consciousness_field_dynamics;
 pub mod consciousness_holography;
-pub mod consciousness_resonance;
+pub use symthaea_consciousness_resonance as consciousness_resonance;
 pub use symthaea_consciousness_topology as consciousness_topology;
 pub mod dissipative_consciousness;
 pub mod embodied_cognition;

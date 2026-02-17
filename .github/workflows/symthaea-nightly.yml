@@ -175,6 +175,18 @@ jobs:
         run: cargo bench --bench memory_benchmark -- --quick --output-format=bencher 2>&1 | tee /tmp/bench-memory.txt
       - name: Consciousness benchmarks
         run: cargo bench --bench consciousness -- --quick --output-format=bencher 2>&1 | tee /tmp/bench-consciousness.txt
+      - name: Cognitive cycle benchmark (regression check)
+        run: |
+          # Save baseline on first run, compare on subsequent
+          if [ -d "target/criterion/cognitive_cycle_single" ]; then
+            cargo bench --bench cognitive_cycle -- --quick --output-format=bencher 2>&1 | tee /tmp/bench-cognitive.txt
+            # Check for regressions >15% in output
+            if grep -q "regressed" /tmp/bench-cognitive.txt; then
+              echo "::warning::Benchmark regression detected in cognitive_cycle"
+            fi
+          else
+            cargo bench --bench cognitive_cycle -- --quick --save-baseline nightly --output-format=bencher 2>&1 | tee /tmp/bench-cognitive.txt
+          fi
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
