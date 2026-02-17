@@ -71,7 +71,7 @@ Code is available at \url{https://github.com/Luminous-Dynamics/symthaea}.
 % ============================================================================
 % Author Summary (required by PLoS Computational Biology)
 \section*{Author Summary}
-Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (346,000 lines across 24 workspace crates, 7,100+ tests, 51 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
+Brains must constantly predict what will happen next and decide what to do---a process formalized as ``active inference.'' Current computer implementations of this theory require expensive matrix calculations that scale poorly. We show that the same principles can be implemented using \emph{hyperdimensional computing}, a brain-inspired approach that represents information as very long random vectors (16,384 dimensions). Our system, called Hyperdimensional Active Inference (HAI), replaces costly matrix operations with simple vector operations that run in linear time. On navigation tasks, HAI is 8 times faster than existing software while succeeding where prior methods fail. We validate the approach across 17 domains: HAI achieves 93\% accuracy on an ethical reasoning benchmark using only vector algebra (no large language model), identifies speakers from speech with 95\% accuracy, analyzes the \emph{C.~elegans} worm's neural wiring diagram, and detects malicious participants in distributed machine learning with 34\% tolerance. The entire system is implemented in Rust (343,000 lines across 25 workspace crates, 7,100+ tests, 51 feature flags) and released as open-source software, demonstrating that biologically-inspired computation can be both theoretically rigorous and practically efficient.
 
 % ============================================================================
 \section{Introduction}
@@ -523,6 +523,10 @@ Two recent additions illustrate how the predictive coding loop supports meta-cog
 
 \textbf{Adaptive urgency throttling.} The cognitive loop classifies each cycle into three urgency tiers based on prediction error magnitude: \emph{Critical} (error $> 0.7$; all subsystems active), \emph{Normal} (default; standard scheduling), and \emph{Cruise} (persistent low error $< 0.3$ for $\geq 5$ consecutive cycles; non-essential subsystems run at reduced frequency). This three-tier scheduling reduces per-cycle computational cost during stable operation while preserving full responsiveness to novel stimuli. The dream engine is specifically gated to run during Cruise, converting idle capacity into offline learning.
 
+\subsection{Multi-Agent Federation via P2P Transport}
+
+The social coherence subsystem enables Theory-of-Mind reasoning: each agent maintains mental models of observed peers (beliefs, desires, intentions) and modulates its own behavior based on inferred social context. An Iroh QUIC transport bridge connects the synchronous cognitive loop (50~Hz) to the asynchronous P2P network via bounded message-passing channels, enabling real-time social message exchange without blocking the inference path. Outbound social messages are flushed to the network after each \texttt{process\_social()} call; inbound messages from peers are drained into the social inbox for processing on the next tick. This one-tick delay (${\sim}20$~ms) is below human perception threshold and enables lock-free integration of distributed social signals into the consciousness pipeline.
+
 \subsection{When HDC Approximation Fails}
 \label{sec:hdc-fails}
 
@@ -870,8 +874,8 @@ HAI opens new directions for efficient, interpretable cognitive architectures co
 \textbf{Repository:} \url{https://github.com/Luminous-Dynamics/symthaea}\par
 \textbf{Language:} Rust (Edition 2021)\par
 \textbf{Dependencies:} ndarray, nalgebra, rand, burn (optional GPU), duckdb\par
-\textbf{Lines of code:} ${\sim}346$K main crate (24 workspace crates, 17 extracted sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
-\textbf{Test suite:} 7,100+ tests (2,751 main lib + 3,473 core lib + ${\sim}870$ integration/sub-crate), 40 ignored, 0 failures\par
+\textbf{Lines of code:} ${\sim}343$K main crate (25 workspace crates, 18 extracted sub-crates), ${\sim}3{,}700$ core FEP, ${\sim}17{,}700$ mathematical foundations, ${\sim}8{,}100$ code understanding\par
+\textbf{Test suite:} 7,100+ tests (2,760 main lib + 3,473 core lib + ${\sim}870$ integration/sub-crate), 39 ignored, 0 failures\par
 \textbf{Feature flags:} 51 (42 with cfg gates in source; remainder are binary-build bundles and meta-groups)\par
 \textbf{Test command:} \texttt{cargo test test\_fep\_active\_inference}\par
 \textbf{Demo command:} \texttt{cargo run --example fep\_active\_inference\_demo}\par
