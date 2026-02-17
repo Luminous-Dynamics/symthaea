@@ -3,6 +3,12 @@
 use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::autopoietic_consciousness::{AutopoieticConfig, AutopoieticConsciousness};
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::enactive_cognition::EnactiveCognition;
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::brain::prefrontal::PrefrontalCortex;
 use crate::consciousness::attention_schema::AttentionSchema;
 use crate::consciousness::consciousness_resonance::{ResonanceAnalyzer, ResonanceConfig};
@@ -369,7 +375,20 @@ impl CognitiveLoopService {
             external_reward: 0.0,
             virtual_body,
             prev_body_phi_modulation: 1.0,
+            prev_embodied_phi_modulation: 1.0,
+            narrative_veto_active: false,
             master_equation: MasterConsciousnessEquation::default(),
+            // Unified Living Mind: life-mind continuity (full_consciousness only)
+            #[cfg(feature = "full_consciousness")]
+            unified_living_mind: UnifiedLivingMind::new(),
+            #[cfg(feature = "full_consciousness")]
+            autopoietic: {
+                let mut ap = AutopoieticConsciousness::new(AutopoieticConfig::default());
+                ap.initialize(); // Bootstrap boundary + processing + memory + self-model components
+                ap
+            },
+            #[cfg(feature = "full_consciousness")]
+            enactive: EnactiveCognition::new(),
         })
     }
 

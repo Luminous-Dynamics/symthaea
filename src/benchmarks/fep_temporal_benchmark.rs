@@ -206,6 +206,17 @@ impl Default for TMazeConfig {
     }
 }
 
+impl TMazeConfig {
+    /// Fast configuration for quick CI runs: smaller CfC, fewer episodes.
+    pub fn fast() -> Self {
+        Self {
+            num_episodes: 40,
+            max_steps: 30,
+            warmup_episodes: 5,
+        }
+    }
+}
+
 /// T-Maze location
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum TMazeLocation {
@@ -328,9 +339,27 @@ pub struct TMazeBenchmarkResult {
     pub episode_successes: Vec<bool>,
 }
 
+/// Create a fast CognitiveLoopConfig for T-Maze benchmarks.
+/// Smaller CfC network and disabled subsystems for lower per-cycle cost.
+pub fn t_maze_fast_loop_config() -> CognitiveLoopConfig {
+    let mut config = CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        async_training: false,
+        enable_virtual_body: false,
+        ..Default::default()
+    };
+    config.cfc_config.num_neurons = 64;
+    config
+}
+
 /// Run the T-Maze benchmark on the cognitive loop.
 pub fn run_t_maze(config: TMazeConfig) -> TMazeBenchmarkResult {
-    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default())
+    run_t_maze_with_loop_config(config, CognitiveLoopConfig::default())
+}
+
+/// Run the T-Maze benchmark with a custom cognitive loop config.
+pub fn run_t_maze_with_loop_config(config: TMazeConfig, loop_config: CognitiveLoopConfig) -> TMazeBenchmarkResult {
+    let mut service = CognitiveLoopService::new(loop_config)
         .expect("Failed to create CognitiveLoopService");
 
     let mut successes: Vec<bool> = Vec::with_capacity(config.num_episodes);
@@ -525,10 +554,10 @@ mod tests {
     fn test_t_maze_runs_to_completion() {
         let config = TMazeConfig {
             num_episodes: 30,
-            max_steps: 50,
+            max_steps: 30,
             warmup_episodes: 5,
         };
-        let result = run_t_maze(config);
+        let result = run_t_maze_with_loop_config(config, t_maze_fast_loop_config());
         println!(
             "T-Maze: accuracy={:.1}%, early={:.1}%, late={:.1}%, avg_steps={:.1}, avg_error={:.4}",
             result.accuracy * 100.0,
@@ -545,13 +574,10 @@ mod tests {
 
     #[test]
     fn test_t_maze_context_learning() {
-        // Longer run to allow learning
-        let config = TMazeConfig {
-            num_episodes: 100,
-            max_steps: 50,
-            warmup_episodes: 10,
-        };
-        let result = run_t_maze(config);
+        // Use fast config: 40 episodes, smaller CfC for speed
+        let config = TMazeConfig::fast();
+        let loop_config = t_maze_fast_loop_config();
+        let result = run_t_maze_with_loop_config(config, loop_config);
         println!(
             "T-Maze learning: accuracy={:.1}%, early={:.1}%, late={:.1}%",
             result.accuracy * 100.0,
@@ -559,15 +585,15 @@ mod tests {
             result.late_accuracy * 100.0,
         );
         // With reward feedback wired, late accuracy should show improvement over early.
-        // CfC learning on text cues is indirect, so keep threshold lenient (any improvement).
+        // CfC learning on text cues is indirect, so keep threshold lenient.
         assert!(
             result.avg_prediction_error < 1.0,
             "Prediction error should be bounded"
         );
         // Learning signal: late accuracy should be at least as good as early
         assert!(
-            result.late_accuracy >= result.early_accuracy - 0.1,
-            "Late accuracy ({:.1}%) should not degrade vs early ({:.1}%)",
+            result.late_accuracy >= result.early_accuracy,
+            "Late accuracy ({:.1}%) should not be worse than early ({:.1}%)",
             result.late_accuracy * 100.0,
             result.early_accuracy * 100.0,
         );

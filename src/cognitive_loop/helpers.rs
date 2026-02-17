@@ -421,5 +421,7 @@ impl CognitiveLoopService {
         self.coherence_tracker.reset();
         self.external_reward = 0.0;
         self.prev_body_phi_modulation = 1.0;
+        self.prev_embodied_phi_modulation = 1.0;
+        self.narrative_veto_active = false;
     }
 }
