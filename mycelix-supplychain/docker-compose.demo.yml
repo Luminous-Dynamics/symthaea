@@ -1,0 +1,86 @@
+# Mycelix ERP - One-Command Demo
+# Usage: docker compose -f docker-compose.demo.yml up
+#
+# This will start:
+#   - PostgreSQL database with demo data
+#   - Mycelix ERP API server
+#   - Web Dashboard (coming soon)
+#
+# API available at: http://localhost:8080
+# Dashboard at: http://localhost:3000
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database with auto-initialization
+  postgres:
+    image: postgres:16-alpine
+    container_name: mycelix-demo-db
+    environment:
+      POSTGRES_DB: mycelix
+      POSTGRES_USER: mycelix
+      POSTGRES_PASSWORD: demo_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - demo_postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycelix -d mycelix"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    networks:
+      - mycelix-demo
+
+  # Mycelix ERP API Server
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.service
+    container_name: mycelix-demo-api
+    environment:
+      DATABASE_URL: postgresql://mycelix:demo_password@postgres:5432/mycelix
+      FIN_DATABASE_URL: postgresql://mycelix:demo_password@postgres:5432/mycelix
+      RUST_LOG: info,mycelix_erp_service=debug
+      PORT: 8080
+      JWT_SECRET: demo_jwt_secret_change_in_production_32chars
+      JWT_ISSUER: mycelix-erp-demo
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    networks:
+      - mycelix-demo
+
+  # Web Dashboard
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    container_name: mycelix-demo-dashboard
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - mycelix-demo
+
+volumes:
+  demo_postgres_data:
+    driver: local
+
+networks:
+  mycelix-demo:
+    driver: bridge

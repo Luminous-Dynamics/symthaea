@@ -1,0 +1,23 @@
+[package]
+name = "knowledge_integrity"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Knowledge Roots integrity zome - defines the decentralized curriculum graph"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "knowledge_integrity"
+
+[dependencies]
+# Holochain Integrity (HDI) for entry definitions
+hdi.workspace = true
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true

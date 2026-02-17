@@ -1,0 +1,169 @@
+# =============================================================================
+# ALERTMANAGER CONFIGURATION - MYCELIX PRODUCTION
+# =============================================================================
+#
+# Production alerting configuration with PagerDuty, Slack, and email integration.
+# All secrets should be provided via environment variables.
+#
+# Required environment variables:
+#   - PAGERDUTY_SERVICE_KEY: PagerDuty integration key
+#   - SLACK_WEBHOOK_URL: Slack incoming webhook URL
+#   - SMTP_PASSWORD: SMTP authentication password
+#
+# Usage: docker compose --profile alerting up -d
+# =============================================================================
+
+global:
+  # SMTP settings for email alerts
+  smtp_smarthost: '${SMTP_HOST:smtp.sendgrid.net}:587'
+  smtp_from: 'alerts@mycelix.net'
+  smtp_auth_username: 'apikey'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+  # Slack settings
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+
+  # Time to wait before sending alert again
+  resolve_timeout: 5m
+
+# =============================================================================
+# ROUTING
+# =============================================================================
+
+route:
+  # Default receiver
+  receiver: 'default-receiver'
+
+  # Group alerts by these labels
+  group_by: ['alertname', 'job']
+
+  # Wait before sending grouped alerts
+  group_wait: 30s
+
+  # Wait before sending new alerts in existing group
+  group_interval: 5m
+
+  # Wait before re-sending alert
+  repeat_interval: 4h
+
+  # Child routes for specific alert handling
+  routes:
+    # Security alerts - highest priority, dedicated routing
+    - match:
+        team: security
+      receiver: 'security-receiver'
+      group_wait: 10s
+      repeat_interval: 30m
+      continue: false
+
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+
+    # Warning alerts - less urgent
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      group_wait: 1m
+      repeat_interval: 4h
+
+    # Info alerts - for logging only
+    - match:
+        severity: info
+      receiver: 'default-receiver'
+
+# =============================================================================
+# RECEIVERS
+# =============================================================================
+
+receivers:
+  # Default receiver - Slack notification
+  - name: 'default-receiver'
+    slack_configs:
+      - channel: '#mycelix-alerts-info'
+        send_resolved: true
+        title: '{{ .Status | toUpper }}: {{ .CommonAnnotations.summary }}'
+        text: '{{ .CommonAnnotations.description }}'
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+
+  # Critical alerts receiver - PagerDuty + Slack + Email
+  - name: 'critical-receiver'
+    # PagerDuty for immediate on-call response
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        send_resolved: true
+        severity: critical
+        description: '{{ .CommonAnnotations.summary }}'
+        details:
+          description: '{{ .CommonAnnotations.description }}'
+          runbook_url: '{{ .CommonAnnotations.runbook_url }}'
+          dashboard_url: '{{ .CommonAnnotations.dashboard_url }}'
+
+    # Slack for team visibility
+    slack_configs:
+      - channel: '#mycelix-critical'
+        send_resolved: true
+        title: ':rotating_light: {{ .Status | toUpper }}: {{ .CommonAnnotations.summary }}'
+        text: |
+          *Description:* {{ .CommonAnnotations.description }}
+          *Runbook:* {{ .CommonAnnotations.runbook_url }}
+          *Dashboard:* {{ .CommonAnnotations.dashboard_url }}
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+    # Email for audit trail
+    email_configs:
+      - to: 'oncall@mycelix.net'
+        send_resolved: true
+        headers:
+          Subject: '[CRITICAL] {{ .CommonAnnotations.summary }}'
+
+  # Warning alerts receiver - Slack only
+  - name: 'warning-receiver'
+    slack_configs:
+      - channel: '#mycelix-alerts'
+        send_resolved: true
+        title: ':warning: {{ .Status | toUpper }}: {{ .CommonAnnotations.summary }}'
+        text: |
+          *Description:* {{ .CommonAnnotations.description }}
+          *Runbook:* {{ .CommonAnnotations.runbook_url }}
+        color: '{{ if eq .Status "firing" }}warning{{ else }}good{{ end }}'
+
+  # Security alerts receiver - PagerDuty + dedicated Slack
+  - name: 'security-receiver'
+    pagerduty_configs:
+      - service_key: '${PAGERDUTY_SERVICE_KEY}'
+        send_resolved: true
+        severity: critical
+        class: security
+        description: 'SECURITY: {{ .CommonAnnotations.summary }}'
+
+    slack_configs:
+      - channel: '#mycelix-security'
+        send_resolved: true
+        title: ':shield: SECURITY {{ .Status | toUpper }}: {{ .CommonAnnotations.summary }}'
+        text: |
+          *Description:* {{ .CommonAnnotations.description }}
+          *Runbook:* {{ .CommonAnnotations.runbook_url }}
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+    email_configs:
+      - to: 'security@mycelix.net'
+        send_resolved: true
+        headers:
+          Subject: '[SECURITY] {{ .CommonAnnotations.summary }}'
+
+# =============================================================================
+# INHIBITION RULES
+# =============================================================================
+
+inhibit_rules:
+  # If a critical alert fires, inhibit warning alerts for the same job
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'job']

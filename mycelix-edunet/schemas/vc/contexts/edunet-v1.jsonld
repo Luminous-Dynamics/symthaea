@@ -1,0 +1,71 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@protected": true,
+
+    "EduNet": "https://mycelix.org/edunet#",
+    "schema": "https://schema.org/",
+    "xsd": "http://www.w3.org/2001/XMLSchema#",
+
+    "EduAchievementCredential": {
+      "@id": "EduNet:EduAchievementCredential",
+      "@context": {
+        "courseId": {
+          "@id": "EduNet:courseId",
+          "@type": "xsd:string"
+        },
+        "modelId": {
+          "@id": "EduNet:modelId",
+          "@type": "xsd:string"
+        },
+        "rubricId": {
+          "@id": "EduNet:rubricId",
+          "@type": "xsd:string"
+        },
+        "score": {
+          "@id": "schema:score",
+          "@type": "xsd:decimal"
+        },
+        "scoreBand": {
+          "@id": "EduNet:scoreBand",
+          "@type": "xsd:string"
+        },
+        "completionDate": {
+          "@id": "schema:endDate",
+          "@type": "xsd:dateTime"
+        },
+        "skills": {
+          "@id": "schema:skills",
+          "@type": "xsd:string",
+          "@container": "@set"
+        }
+      }
+    },
+
+    "FederatedLearningProvenance": {
+      "@id": "EduNet:FederatedLearningProvenance",
+      "@context": {
+        "roundId": {
+          "@id": "EduNet:roundId",
+          "@type": "xsd:string"
+        },
+        "modelHash": {
+          "@id": "EduNet:modelHash",
+          "@type": "xsd:string"
+        },
+        "parentModelHash": {
+          "@id": "EduNet:parentModelHash",
+          "@type": "xsd:string"
+        },
+        "contributorCount": {
+          "@id": "EduNet:contributorCount",
+          "@type": "xsd:integer"
+        },
+        "aggregationMethod": {
+          "@id": "EduNet:aggregationMethod",
+          "@type": "xsd:string"
+        }
+      }
+    }
+  }
+}

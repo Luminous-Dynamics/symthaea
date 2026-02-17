@@ -1,0 +1,7 @@
+{
+  "registry/record_archive/100": 918270000.0,
+  "proof/prove_loss_delta": 1320.5,
+  "proof/verify_loss_delta": 1008.5,
+  "ipfs/upload_bytes": 209360.0,
+  "end_to_end/prove+upload": 242140.0
+}

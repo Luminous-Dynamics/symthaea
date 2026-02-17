@@ -1,0 +1,94 @@
+# Stage 1 Set C: Bulyan Theory Compliance Validation
+#
+# Research Goal: Is 20% vs 30% Byzantine significant for Bulyan?
+#
+# Configuration:
+# - Data: Extreme non-IID (hardest case)
+# - Byzantine: 20% (2/10 clients) - theory compliant for Bulyan (f < n/3)
+# - Attacks: All 7 attack types
+# - Defense: Bulyan only
+#
+# Total: 7 attacks × 1 defense = 7 experiments
+#
+# Expected Outcome: Validate Bulyan achieves high accuracy when f < n/3 constraint is met
+# Context: Previous runs with 30% Byzantine violated f < n/3 (3 > 10/3=3.33)
+
+experiment_name: "stage1_set_c_bulyan_theory_validation"
+description: "Validate Bulyan theoretical guarantees under f < n/3 constraint"
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+# Extreme non-IID (hardest case)
+data_split:
+  type: "dirichlet"
+  alpha: 0.1
+  num_clients: 10
+  seed: 42
+
+training:
+  num_rounds: 50
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+
+# CRITICAL: 20% Byzantine (2/10) to satisfy f < n/3
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 50
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 2  # 20% - theory compliant (2 < 10/3 ≈ 3.33)
+
+byzantine:
+  num_byzantine: 2  # 20% Byzantine
+
+  # Test all 7 attacks to ensure Bulyan robustness
+  attack_types:
+    - gaussian_noise
+    - sign_flip
+    - label_flip
+    - targeted_poison
+    - model_replacement
+    - adaptive
+    - sybil
+
+  severity: 1.0
+  enable_peer_context: true
+
+baselines:
+  # Bulyan only (testing theoretical guarantees)
+  - name: "bulyan"
+    params:
+      num_byzantine: 2  # Must match federated.num_byzantine
+
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+
+device: "cuda"
+
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - byzantine_detection_rate  # Measure detection success
+  per_round: true
+  final_model: false
+  attack_analysis: true
+  theory_validation: true  # Special flag to track f < n/3 compliance
+
+# Notes:
+# - Bulyan guarantees robustness when f < n/4 (most conservative)
+# - We test at f < n/3 (2 < 3.33) which is more relaxed but still within theory
+# - Compare results with Set A where Bulyan failed at f=3 (30%)
+#
+# Estimated time: 7 attacks × 1 defense × 50 rounds × ~10 min = ~35 hours
+# (Can run serially since only one defense)

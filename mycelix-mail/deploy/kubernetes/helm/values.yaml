@@ -1,0 +1,257 @@
+# Mycelix Mail Helm Values
+# Default configuration for Kubernetes deployment
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+
+global:
+  # Domain for ingress
+  domain: mail.example.com
+
+  # Image pull secrets
+  imagePullSecrets: []
+
+  # Storage class for persistent volumes
+  storageClass: ""
+
+# =============================================================================
+# API Server
+# =============================================================================
+
+api:
+  replicaCount: 2
+
+  image:
+    repository: mycelix/mail-api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+  # Environment variables
+  env: {}
+
+  # Pod annotations
+  podAnnotations: {}
+
+  # Service configuration
+  service:
+    type: ClusterIP
+    port: 8080
+
+# =============================================================================
+# Web Frontend
+# =============================================================================
+
+web:
+  replicaCount: 2
+
+  image:
+    repository: mycelix/mail-web
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+# =============================================================================
+# Sync Worker
+# =============================================================================
+
+syncWorker:
+  replicaCount: 2
+
+  image:
+    repository: mycelix/mail-api
+    tag: "latest"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# =============================================================================
+# Email Worker
+# =============================================================================
+
+emailWorker:
+  replicaCount: 2
+
+  image:
+    repository: mycelix/mail-api
+    tag: "latest"
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+# =============================================================================
+# Ingress
+# =============================================================================
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: 50m
+  tls:
+    enabled: true
+    secretName: mycelix-tls
+
+# =============================================================================
+# PostgreSQL
+# =============================================================================
+
+postgresql:
+  enabled: true
+  auth:
+    username: mycelix
+    database: mycelix
+    existingSecret: mycelix-postgres-secret
+  primary:
+    persistence:
+      size: 20Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+# =============================================================================
+# Redis
+# =============================================================================
+
+redis:
+  enabled: true
+  auth:
+    existingSecret: mycelix-redis-secret
+  master:
+    persistence:
+      size: 5Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# =============================================================================
+# Meilisearch
+# =============================================================================
+
+meilisearch:
+  enabled: true
+  auth:
+    existingMasterKeySecret: mycelix-meilisearch-secret
+  persistence:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+# =============================================================================
+# Ollama (Optional AI)
+# =============================================================================
+
+ollama:
+  enabled: false
+  image:
+    repository: ollama/ollama
+    tag: latest
+  persistence:
+    size: 50Gi
+  resources:
+    requests:
+      memory: 4Gi
+    limits:
+      memory: 16Gi
+  gpu:
+    enabled: false
+    count: 1
+
+# =============================================================================
+# Monitoring
+# =============================================================================
+
+monitoring:
+  enabled: false
+
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+
+  prometheusRule:
+    enabled: true
+
+# =============================================================================
+# Backups
+# =============================================================================
+
+backup:
+  enabled: false
+  schedule: "0 2 * * *"  # 2 AM daily
+  retention: 30
+  s3:
+    bucket: ""
+    endpoint: ""
+    existingSecret: mycelix-backup-secret
+
+# =============================================================================
+# Security
+# =============================================================================
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+networkPolicy:
+  enabled: true

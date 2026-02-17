@@ -1,0 +1,42 @@
+# MNIST Non-IID Experiment Configuration
+# Compare FedAvg vs FedProx vs SCAFFOLD on non-IID data
+
+experiment_name: "mnist_non_iid_dirichlet_01"
+output_dir: "results/non_iid"
+
+# Dataset configuration
+dataset:
+  name: "mnist"
+  data_dir: "datasets"
+
+# Model configuration
+model:
+  architecture: "simple_cnn"
+  params:
+    num_classes: 10
+
+# Data split configuration
+data_split:
+  type: "dirichlet"  # Non-IID split
+  alpha: 0.1  # Highly non-IID (lower = more heterogeneous)
+  seed: 42
+
+# Federated learning configuration
+federated:
+  num_clients: 10
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 5  # More local epochs for non-IID
+  fraction_clients: 1.0
+  mu: 0.01  # FedProx proximal term
+
+# Training configuration
+training:
+  num_rounds: 200  # More rounds needed for non-IID
+  eval_every: 10
+
+# Baselines to compare (focus on non-IID methods)
+baselines:
+  - fedavg
+  - fedprox
+  - scaffold

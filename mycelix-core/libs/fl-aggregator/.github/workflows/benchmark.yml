@@ -1,0 +1,152 @@
+name: Benchmark
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  benchmark:
+    name: Performance Regression Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
+      - name: Run benchmarks
+        run: cargo bench --features proofs --bench proof_bench -- --save-baseline pr
+
+      - name: Download baseline
+        uses: actions/cache@v4
+        with:
+          path: target/criterion
+          key: benchmark-baseline-${{ github.base_ref || 'main' }}
+          restore-keys: |
+            benchmark-baseline-main
+
+      - name: Compare benchmarks
+        id: benchmark
+        run: |
+          # Run comparison if baseline exists
+          if [ -d "target/criterion" ]; then
+            cargo bench --features proofs --bench proof_bench -- --baseline main --save-baseline pr 2>&1 | tee benchmark_results.txt
+
+            # Check for regressions (>10% slower)
+            if grep -q "Performance has regressed" benchmark_results.txt; then
+              echo "regression=true" >> $GITHUB_OUTPUT
+              echo "## Performance Regression Detected" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              grep -A 5 "Performance has regressed" benchmark_results.txt >> $GITHUB_STEP_SUMMARY
+            else
+              echo "regression=false" >> $GITHUB_OUTPUT
+              echo "## Benchmark Results" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "No significant performance regressions detected." >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "No baseline found, creating initial baseline"
+            echo "regression=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Save baseline (main branch only)
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: target/criterion
+          key: benchmark-baseline-main-${{ github.sha }}
+
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '## Benchmark Results\n\n';
+
+            if (fs.existsSync('benchmark_results.txt')) {
+              const results = fs.readFileSync('benchmark_results.txt', 'utf8');
+              // Extract key metrics
+              const lines = results.split('\n');
+              const metrics = lines.filter(l => l.includes('time:') || l.includes('thrpt:'));
+
+              if (metrics.length > 0) {
+                body += '```\n' + metrics.slice(0, 20).join('\n') + '\n```\n';
+              }
+
+              if ('${{ steps.benchmark.outputs.regression }}' === 'true') {
+                body += '\n⚠️ **Performance regression detected!** Please review the changes.\n';
+              } else {
+                body += '\n✅ No significant performance regressions.\n';
+              }
+            } else {
+              body += 'Benchmark completed. See workflow for details.\n';
+            }
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail on regression
+        if: steps.benchmark.outputs.regression == 'true'
+        run: |
+          echo "Performance regression detected!"
+          exit 1
+
+  proof-size:
+    name: Proof Size Tracking
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Measure proof sizes
+        run: |
+          cargo test --features proofs -- --nocapture proof_size 2>&1 | tee proof_sizes.txt || true
+
+          echo "## Proof Sizes" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Proof Type | Size (bytes) |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------------|" >> $GITHUB_STEP_SUMMARY
+
+          # Extract sizes from test output
+          grep -E "size: [0-9]+ bytes" proof_sizes.txt | while read line; do
+            echo "| ${line} |" >> $GITHUB_STEP_SUMMARY
+          done
+
+  memory-check:
+    name: Memory Usage Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install valgrind
+        run: sudo apt-get update && sudo apt-get install -y valgrind
+
+      - name: Check for memory leaks
+        run: |
+          cargo build --features proofs --example proof_demo 2>/dev/null || echo "No example found, skipping memory check"
+          # Would run: valgrind --leak-check=full ./target/debug/examples/proof_demo

@@ -1,0 +1,25 @@
+[package]
+name = "messaging_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "messaging"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+# Shared utilities
+mycelix_common = { path = "../../../crates/mycelix_common" }
+
+# Link to integrity zome
+messaging_integrity = { path = "../integrity" }
+
+# Link to other zomes
+reputation_integrity = { path = "../../reputation/integrity" }
+
+# Monitoring and metrics
+monitoring = { path = "../../monitoring" }

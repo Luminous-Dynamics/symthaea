@@ -1,0 +1,73 @@
+# Mycelix Testnet - Terraform Variables Example
+# Copy this file to terraform.tfvars and customize for your deployment
+
+# ============================================
+# GENERAL CONFIGURATION
+# ============================================
+
+environment    = "testnet"
+cloud_provider = "gcp"  # Options: gcp, aws, azure
+
+# ============================================
+# GCP CONFIGURATION
+# ============================================
+
+gcp_project_id = "your-gcp-project-id"
+gcp_region     = "us-east1"
+
+# ============================================
+# AWS CONFIGURATION
+# ============================================
+
+# aws_region = "us-east-1"
+
+# ============================================
+# AZURE CONFIGURATION
+# ============================================
+
+# azure_location        = "eastus"
+# azure_subscription_id = "your-subscription-id"
+
+# ============================================
+# KUBERNETES CONFIGURATION
+# ============================================
+
+kubernetes_version = "1.28"
+node_count         = 3
+node_machine_type  = "n2-standard-4"  # GCP: n2-standard-4, AWS: m5.xlarge, Azure: Standard_D4s_v3
+node_disk_size_gb  = 100
+
+# ============================================
+# MYCELIX CONFIGURATION
+# ============================================
+
+fl_node_count     = 5
+enable_faucet     = true
+enable_monitoring = true
+
+# ============================================
+# NETWORKING
+# ============================================
+
+domain_name = "testnet.mycelix.network"
+enable_ssl  = true
+ssl_email   = "ops@mycelix.network"
+
+# ============================================
+# DATABASE CONFIGURATION
+# ============================================
+
+postgres_tier         = "db-custom-2-4096"
+postgres_disk_size_gb = 50
+redis_memory_gb       = 1
+
+# ============================================
+# TAGS
+# ============================================
+
+tags = {
+  Project     = "mycelix"
+  Environment = "testnet"
+  ManagedBy   = "terraform"
+  Team        = "platform"
+}

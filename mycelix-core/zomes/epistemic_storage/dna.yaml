@@ -1,0 +1,49 @@
+---
+# Epistemic Storage DNA Configuration
+# DHT Backend for the Unified Epistemic Storage System (UESS)
+
+manifest_version: "0"
+name: epistemic_storage
+integrity:
+  network_seed: ~
+  properties:
+    # Epistemic Classification Defaults
+    epistemic:
+      # E-axis (Empirical): How verifiable is this data?
+      # E0: Subjective, E1: Observable, E2: Privately Verified, E3: Cryptographic, E4: Reproducible
+      default_empirical: 1
+      max_empirical: 4
+
+      # N-axis (Normative): Who has authority over this data?
+      # N0: Personal, N1: Communal, N2: Network, N3: Axiomatic
+      default_normative: 0
+      max_normative: 3
+
+      # M-axis (Materiality): How long should this data persist?
+      # M0: Ephemeral, M1: Temporal, M2: Persistent, M3: Foundational
+      default_materiality: 2
+      max_materiality: 3
+
+    # Storage Limits
+    storage:
+      max_key_length: 256
+      max_entry_size_bytes: 10485760  # 10 MB
+      default_ttl_days: 365
+
+    # Replication Targets by Materiality
+    replication:
+      m0_target_holders: 1
+      m1_target_holders: 2
+      m2_target_holders: 3
+      m3_target_holders: 5
+
+  zomes:
+    - name: epistemic_storage_integrity
+      path: target/wasm32-unknown-unknown/release/epistemic_storage_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: epistemic_storage
+      path: target/wasm32-unknown-unknown/release/epistemic_storage_coordinator.wasm
+      dependencies:
+        - name: epistemic_storage_integrity

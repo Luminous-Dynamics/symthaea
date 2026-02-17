@@ -1,0 +1,29 @@
+# Build artifacts
+target/
+**/target/
+
+# Generated Holochain artefacts
+*.wasm
+*.dna
+
+# Rust / cargo metadata
+Cargo.lock
+*.profraw
+
+# Node / web artifacts
+node_modules/
+dist/
+.parcel-cache/
+.vite/
+
+# Python / virtualenv
+.venv/
+__pycache__/
+*.pyc
+
+# Misc
+.DS_Store
+.idea/
+.vscode/
+.env
+*.log

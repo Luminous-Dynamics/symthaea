@@ -1,0 +1,62 @@
+# Mycelix Supply Chain Service Configuration
+# Copy to app.toml and customize
+
+[service]
+host = "0.0.0.0"
+port = 8080
+log_level = "info"
+
+[database]
+# SQLite (default for development)
+type = "sqlite"
+path = "data/claims.db"
+
+# PostgreSQL (production)
+# type = "postgres"
+# host = "localhost"
+# port = 5432
+# database = "supplychain"
+# username = "mycelix"
+# password = "changeme"
+# max_connections = 10
+
+[crypto]
+# Key management
+# In production, integrate with HSM/KMS
+key_type = "ed25519"
+# seed_file = "/secure/path/to/seed.key"
+
+[dkg]
+# DKG integration (when available)
+enabled = false
+# api_url = "http://localhost:9000"
+# node_did = "did:mycelix:node:example"
+# publish_timeout_secs = 30
+
+[api]
+# API configuration
+cors_enabled = true
+cors_allowed_origins = ["http://localhost:3000", "https://dashboard.example.com"]
+rate_limit_requests_per_minute = 100
+
+# Authentication (optional)
+# auth_enabled = true
+# api_keys = ["key1", "key2"]
+
+[monitoring]
+# Metrics and tracing
+metrics_enabled = true
+metrics_port = 9090
+# sentry_dsn = "https://..."
+
+[adapters]
+# Adapter configuration
+[adapters.mqtt]
+enabled = false
+# broker = "mqtt://localhost:1883"
+# topics = ["supplychain/events/#"]
+
+[adapters.webhook]
+enabled = false
+# listen_port = 8081
+# secret = "webhook-secret"

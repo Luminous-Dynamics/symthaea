@@ -1,0 +1,414 @@
+# =============================================================================
+# Mycelix-Core CLI Tools Dockerfile
+# =============================================================================
+# Command-line interface for managing and monitoring Mycelix
+
+FROM python:3.11-slim-bookworm
+
+LABEL maintainer="Mycelix Team"
+LABEL description="Mycelix-Core CLI Tools"
+LABEL version="0.1.0"
+
+WORKDIR /app
+
+# Install dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    jq \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 mycelix
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    httpx==0.26.0 \
+    click==8.1.7 \
+    rich==13.7.0 \
+    pydantic==2.5.3 \
+    tabulate==0.9.0
+
+# Create CLI application
+RUN cat > mycelix_cli.py << 'CLI_CODE'
+#!/usr/bin/env python3
+"""
+Mycelix-Core CLI
+Command-line interface for managing the Mycelix federated learning system
+"""
+
+import os
+import sys
+import json
+import time
+from typing import Optional
+
+import click
+import httpx
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich import print as rprint
+from tabulate import tabulate
+
+console = Console()
+
+# Default coordinator URL
+COORDINATOR_URL = os.getenv("COORDINATOR_URL", "http://coordinator:8080")
+
+
+def get_client():
+    """Get HTTP client"""
+    return httpx.Client(base_url=COORDINATOR_URL, timeout=30.0)
+
+
+def format_uptime(seconds: float) -> str:
+    """Format uptime in human readable format"""
+    days, remainder = divmod(int(seconds), 86400)
+    hours, remainder = divmod(remainder, 3600)
+    minutes, secs = divmod(remainder, 60)
+    parts = []
+    if days > 0:
+        parts.append(f"{days}d")
+    if hours > 0:
+        parts.append(f"{hours}h")
+    if minutes > 0:
+        parts.append(f"{minutes}m")
+    parts.append(f"{secs}s")
+    return " ".join(parts)
+
+
+@click.group()
+@click.option('--url', envvar='COORDINATOR_URL', default=COORDINATOR_URL,
+              help='Coordinator URL')
+@click.pass_context
+def cli(ctx, url):
+    """Mycelix-Core CLI - Federated Learning Management"""
+    ctx.ensure_object(dict)
+    ctx.obj['url'] = url
+
+
+@cli.command()
+@click.pass_context
+def status(ctx):
+    """Show system status"""
+    try:
+        with get_client() as client:
+            response = client.get("/status")
+            response.raise_for_status()
+            data = response.json()
+
+        # Create status panel
+        status_text = f"""
+[bold green]Status:[/bold green] {data['status'].upper()}
+[bold]Version:[/bold] {data['version']}
+[bold]Coordinator ID:[/bold] {data['coordinator_id']}
+[bold]Uptime:[/bold] {format_uptime(data['uptime_seconds'])}
+
+[bold cyan]Federated Learning[/bold cyan]
+  Current Round: {data['current_round']}
+  Active Nodes: {data['active_nodes']}
+  Total Aggregations: {data['total_aggregations']}
+  Byzantine Detections: {data['byzantine_detections']}
+
+[bold cyan]Model[/bold cyan]
+  Version: {data['model_version']}
+  Convergence Score: {data['convergence_score']:.4f}
+"""
+
+        console.print(Panel(status_text, title="Mycelix System Status", border_style="green"))
+
+        # Services table
+        if data.get('services'):
+            table = Table(title="Service Status")
+            table.add_column("Service", style="cyan")
+            table.add_column("Status", style="green")
+            table.add_column("Details")
+
+            for service, info in data['services'].items():
+                status = info.get('status', 'unknown')
+                details = ', '.join(f"{k}={v}" for k, v in info.items() if k != 'status')
+                status_style = "green" if status == "healthy" else "yellow"
+                table.add_row(service, f"[{status_style}]{status}[/{status_style}]", details)
+
+            console.print(table)
+
+    except httpx.RequestError as e:
+        console.print(f"[red]Error connecting to coordinator: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.pass_context
+def health(ctx):
+    """Check system health"""
+    try:
+        with get_client() as client:
+            response = client.get("/health")
+            response.raise_for_status()
+            data = response.json()
+
+        if data.get('status') == 'healthy':
+            console.print("[bold green]System is healthy[/bold green]")
+        else:
+            console.print(f"[bold yellow]System status: {data.get('status')}[/bold yellow]")
+
+    except httpx.RequestError as e:
+        console.print(f"[bold red]System is unhealthy: {e}[/bold red]")
+        sys.exit(1)
+
+
+@cli.group()
+def nodes():
+    """Manage FL nodes"""
+    pass
+
+
+@nodes.command('list')
+@click.pass_context
+def list_nodes(ctx):
+    """List all registered nodes"""
+    try:
+        with get_client() as client:
+            response = client.get("/nodes")
+            response.raise_for_status()
+            data = response.json()
+
+        nodes = data.get('nodes', [])
+
+        if not nodes:
+            console.print("[yellow]No nodes registered[/yellow]")
+            return
+
+        table = Table(title=f"Registered Nodes ({len(nodes)})")
+        table.add_column("Node ID", style="cyan")
+        table.add_column("Status")
+        table.add_column("Rounds", justify="right")
+        table.add_column("Trust Score", justify="right")
+        table.add_column("Last Seen")
+
+        for node in nodes:
+            status = node.get('status', 'unknown')
+            status_style = "green" if status == "active" else "red"
+            trust = node.get('trust_score', 0)
+            trust_style = "green" if trust > 0.7 else ("yellow" if trust > 0.3 else "red")
+
+            last_seen = node.get('last_seen', 0)
+            ago = time.time() - last_seen
+            if ago < 60:
+                last_seen_str = f"{int(ago)}s ago"
+            elif ago < 3600:
+                last_seen_str = f"{int(ago/60)}m ago"
+            else:
+                last_seen_str = f"{int(ago/3600)}h ago"
+
+            table.add_row(
+                node.get('node_id', 'unknown'),
+                f"[{status_style}]{status}[/{status_style}]",
+                str(node.get('rounds_participated', 0)),
+                f"[{trust_style}]{trust:.2f}[/{trust_style}]",
+                last_seen_str
+            )
+
+        console.print(table)
+
+    except httpx.RequestError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@nodes.command('show')
+@click.argument('node_id')
+@click.pass_context
+def show_node(ctx, node_id):
+    """Show details for a specific node"""
+    try:
+        with get_client() as client:
+            response = client.get(f"/nodes/{node_id}")
+            response.raise_for_status()
+            data = response.json()
+
+        console.print(Panel(
+            json.dumps(data, indent=2),
+            title=f"Node: {node_id}",
+            border_style="cyan"
+        ))
+
+    except httpx.HTTPStatusError as e:
+        if e.response.status_code == 404:
+            console.print(f"[red]Node '{node_id}' not found[/red]")
+        else:
+            console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.group()
+def rounds():
+    """Manage training rounds"""
+    pass
+
+
+@rounds.command('new')
+@click.pass_context
+def new_round(ctx):
+    """Start a new training round"""
+    try:
+        with get_client() as client:
+            response = client.post("/rounds/new")
+            response.raise_for_status()
+            data = response.json()
+
+        console.print(f"[green]New round started: {data['round_id']}[/green]")
+
+    except httpx.RequestError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@rounds.command('status')
+@click.argument('round_id', type=int)
+@click.pass_context
+def round_status(ctx, round_id):
+    """Check status of a specific round"""
+    try:
+        with get_client() as client:
+            response = client.get(f"/rounds/{round_id}/status")
+            response.raise_for_status()
+            data = response.json()
+
+        console.print(Panel(
+            f"""
+[bold]Round ID:[/bold] {data['round_id']}
+[bold]Updates Received:[/bold] {data['updates_received']}
+[bold]Participating Nodes:[/bold] {', '.join(data['participating_nodes']) or 'None'}
+""",
+            title=f"Round {round_id} Status",
+            border_style="cyan"
+        ))
+
+    except httpx.RequestError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.group()
+def analytics():
+    """View analytics and metrics"""
+    pass
+
+
+@analytics.command('convergence')
+@click.pass_context
+def convergence(ctx):
+    """Show model convergence metrics"""
+    try:
+        with get_client() as client:
+            response = client.get("/analytics/convergence")
+            response.raise_for_status()
+            data = response.json()
+
+        console.print(Panel(
+            f"""
+[bold]Current Convergence Score:[/bold] {data['current_score']:.6f}
+[bold]Total Rounds:[/bold] {data['total_rounds']}
+[bold]Model Version:[/bold] {data['model_version']}
+""",
+            title="Model Convergence",
+            border_style="green"
+        ))
+
+    except httpx.RequestError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@analytics.command('byzantine')
+@click.pass_context
+def byzantine(ctx):
+    """Show Byzantine detection statistics"""
+    try:
+        with get_client() as client:
+            response = client.get("/analytics/byzantine")
+            response.raise_for_status()
+            data = response.json()
+
+        console.print(f"\n[bold]Byzantine Detection Statistics[/bold]")
+        console.print(f"Total Detections: {data['total_detections']}")
+        console.print(f"Detection Threshold: {data['threshold']}")
+        console.print()
+
+        trust_scores = data.get('trust_scores', {})
+        if trust_scores:
+            table = Table(title="Node Trust Scores")
+            table.add_column("Node ID", style="cyan")
+            table.add_column("Trust Score", justify="right")
+            table.add_column("Status")
+
+            for node_id, score in sorted(trust_scores.items(), key=lambda x: x[1]):
+                if score > 0.7:
+                    status = "[green]Trusted[/green]"
+                elif score > 0.3:
+                    status = "[yellow]Suspicious[/yellow]"
+                else:
+                    status = "[red]Untrusted[/red]"
+                table.add_row(node_id, f"{score:.3f}", status)
+
+            console.print(table)
+        else:
+            console.print("[yellow]No trust score data available[/yellow]")
+
+    except httpx.RequestError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+@cli.command()
+@click.option('--interval', '-i', default=5, help='Refresh interval in seconds')
+@click.pass_context
+def watch(ctx, interval):
+    """Watch system status in real-time"""
+    console.print("[bold]Watching Mycelix status... (Ctrl+C to stop)[/bold]\n")
+
+    try:
+        while True:
+            console.clear()
+            ctx.invoke(status)
+            console.print(f"\n[dim]Refreshing every {interval}s... Press Ctrl+C to stop[/dim]")
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Stopped watching[/yellow]")
+
+
+@cli.command()
+@click.pass_context
+def metrics(ctx):
+    """Show Prometheus metrics"""
+    try:
+        with get_client() as client:
+            response = client.get("/metrics")
+            response.raise_for_status()
+
+        console.print(Panel(
+            response.text[:2000] + ("..." if len(response.text) > 2000 else ""),
+            title="Prometheus Metrics",
+            border_style="blue"
+        ))
+
+    except httpx.RequestError as e:
+        console.print(f"[red]Error: {e}[/red]")
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    cli()
+CLI_CODE
+
+# Make CLI executable
+RUN chmod +x mycelix_cli.py && \
+    ln -s /app/mycelix_cli.py /usr/local/bin/mycelix
+
+# Set permissions
+RUN chown -R mycelix:mycelix /app
+
+USER mycelix
+
+# Default command shows help
+CMD ["python", "mycelix_cli.py", "--help"]

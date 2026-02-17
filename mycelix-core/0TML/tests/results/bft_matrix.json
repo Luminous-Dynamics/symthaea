@@ -1,0 +1,96 @@
+{
+  "generated_at": "2025-10-28T17:23:49.759695+00:00",
+  "matrix": [
+    {
+      "byzantine_percent": 0,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "accuracy": 1.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "true_negatives": 100,
+      "false_negatives": 0,
+      "source": "bft_results_0_byz.json"
+    },
+    {
+      "byzantine_percent": 10,
+      "detection_rate": 1.0,
+      "false_positive_rate": 0.0,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 10,
+      "false_positives": 0,
+      "true_negatives": 90,
+      "false_negatives": 0,
+      "source": "bft_results_10_byz.json"
+    },
+    {
+      "byzantine_percent": 20,
+      "detection_rate": 1.0,
+      "false_positive_rate": 0.0,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 4,
+      "false_positives": 0,
+      "true_negatives": 16,
+      "false_negatives": 0,
+      "source": "bft_results_20_byz.json"
+    },
+    {
+      "byzantine_percent": 30,
+      "detection_rate": 1.0,
+      "false_positive_rate": 0.0,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 6,
+      "false_positives": 0,
+      "true_negatives": 14,
+      "false_negatives": 0,
+      "source": "bft_results_30_byz.json"
+    },
+    {
+      "byzantine_percent": 33,
+      "detection_rate": 1.0,
+      "false_positive_rate": 0.0,
+      "accuracy": 1.0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "true_positives": 7,
+      "false_positives": 0,
+      "true_negatives": 13,
+      "false_negatives": 0,
+      "source": "bft_results_33_byz.json"
+    },
+    {
+      "byzantine_percent": 40,
+      "detection_rate": 0.75,
+      "false_positive_rate": 0.0,
+      "accuracy": 0.9,
+      "precision": 1.0,
+      "recall": 0.75,
+      "true_positives": 30,
+      "false_positives": 0,
+      "true_negatives": 60,
+      "false_negatives": 10,
+      "source": "bft_results_40_byz.json"
+    },
+    {
+      "byzantine_percent": 50,
+      "detection_rate": 0.6,
+      "false_positive_rate": 0.0,
+      "accuracy": 0.8,
+      "precision": 1.0,
+      "recall": 0.6,
+      "true_positives": 30,
+      "false_positives": 0,
+      "true_negatives": 50,
+      "false_negatives": 20,
+      "source": "bft_results_50_byz.json"
+    }
+  ]
+}

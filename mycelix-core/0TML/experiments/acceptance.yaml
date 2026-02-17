@@ -1,0 +1,67 @@
+# AEGIS Gen-5 Acceptance Criteria
+# These thresholds define "submission-grade" results for MLSys/ICML 2026
+
+E1_byzantine_tolerance:
+  description: "Byzantine attack detection and robust accuracy"
+  min_clean_acc_no_attack: 0.85  # At 0% adversaries
+  min_robust_acc_at_30_byz: 0.75  # At 30% adversaries
+  min_auc: 0.85  # Detection AUC
+  max_fpr_at_tpr90: 0.15  # FPR when TPR=90%
+
+E2_noniid_robustness:
+  description: "Non-IID data distribution resilience (Dirichlet α)"
+  max_drop_alpha_1_to_0_1: 0.12  # Accuracy drop from α=1.0 to α=0.1 ≤ 12%
+  min_auc_alpha_0_1: 0.85  # Detection AUC at α=0.1
+  max_fpr_at_tpr90_alpha_0_1: 0.15  # FPR @ TPR=90% at α=0.1
+  min_robust_acc_alpha_0_1: 0.70  # Robust acc at α=0.1 with 20% Byz
+
+E3_backdoor_resilience:
+  description: "Backdoor attack mitigation"
+  max_asr_aegis: 0.25  # Attack success rate ≤ 25%
+  asr_ratio_vs_median: 0.5  # AEGIS ASR ≤ 50% of Median's ASR
+  min_clean_acc: 0.80  # Clean accuracy maintained
+  min_auc: 0.85  # Backdoor detection AUC
+
+E4_overhead_scaling:
+  description: "Computational and communication overhead"
+  max_overhead_vs_median_20: 1.3  # ≤ 1.3× Median at 20% Byz
+  max_overhead_vs_median_40: 1.5  # ≤ 1.5× Median at 40% Byz
+  max_wall_time_per_round_ms: 500  # ≤ 500ms per round
+  max_bytes_per_round_mb: 10  # ≤ 10MB per round
+
+E5_convergence:
+  description: "Convergence speed under attack"
+  conv_ratio_vs_median_no_attack: 1.2  # ≤ 1.2× rounds vs Median at 0% Byz
+  min_gain_vs_median_at_20_byz: 0.05  # +5pp robust acc vs Median at 20% Byz
+  min_final_acc_no_attack: 0.90  # Final accuracy ≥ 90% at 0% Byz
+  min_robust_acc_20_byz: 0.75  # Robust accuracy ≥ 75% at 20% Byz
+
+E6_temporal_detection:
+  description: "Multi-round temporal attack detection"
+  max_detect_latency_rounds: 4  # Detect within 4 rounds of attack start
+  min_temporal_auc: 0.90  # Temporal detection AUC ≥ 0.90
+  max_false_alarm_rate: 0.10  # ≤ 10% false alarms before attack
+
+E7_active_learning:
+  description: "Two-pass active learning speedup"
+  min_speedup_vs_always_deep: 2.0  # ≥ 2× faster than always-deep
+  max_robust_acc_loss: 0.01  # ≤ 1% accuracy loss vs always-deep
+  max_wall_time_increase_pct: 10  # ≤ 10% wall time increase overall
+
+E8_self_healing:
+  description: "Self-healing recovery from Byzantine surge"
+  min_recovery_fraction: 0.95  # Recover to ≥ 95% of pre-surge robust acc
+  max_recovery_rounds: 7  # Recovery within 7 rounds
+  min_surge_detection_rate: 0.90  # Detect surge with ≥ 90% confidence
+
+E9_layer_ablation:
+  description: "Per-layer contribution analysis"
+  min_delta_per_layer_asr: 0.05  # Each layer reduces ASR by ≥ 5pp
+  min_delta_per_layer_auc: 0.03  # Each layer improves AUC by ≥ 3pp
+  min_full_stack_auc: 0.90  # Full L1-L7 achieves ≥ 0.90 AUC
+
+# Global thresholds (apply to all experiments)
+global:
+  min_reproducibility_ci_overlap: 0.80  # 80% CI overlap across seeds
+  max_variance_coefficient: 0.15  # CV ≤ 15% for key metrics
+  min_seeds: 3  # At least 3 seeds per configuration

@@ -1,0 +1,43 @@
+[package]
+name = "mycelix-homomorphic"
+version = "0.1.0"
+edition = "2021"
+description = "Pure Rust homomorphic encryption for Mycelix Federated Learning"
+license = "Apache-2.0"
+repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"
+keywords = ["homomorphic-encryption", "cryptography", "federated-learning", "privacy"]
+categories = ["cryptography", "science"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# Big integer arithmetic
+num-bigint = { version = "0.4", features = ["rand", "serde"] }
+num-traits = "0.2"
+num-integer = "0.1"
+num-modular = "0.6"
+
+# Random number generation
+rand = "0.8"
+rand_core = "0.6"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+
+# Parallel computation (optional)
+rayon = { version = "1.10", optional = true }
+
+[features]
+default = []
+parallel = ["rayon"]
+
+[dev-dependencies]
+criterion = "0.5"

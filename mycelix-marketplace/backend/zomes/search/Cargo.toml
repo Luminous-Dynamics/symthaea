@@ -1,0 +1,21 @@
+[package]
+name = "search"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+
+# For text processing
+regex = "1"
+unicode-segmentation = "1"
+
+# For stemming
+rust-stemmers = "1"
+
+[dev-dependencies]

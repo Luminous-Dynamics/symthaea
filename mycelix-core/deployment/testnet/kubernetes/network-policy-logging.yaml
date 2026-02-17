@@ -1,0 +1,334 @@
+# NetworkPolicy Audit Logging Configuration
+#
+# This file configures network policy logging for traffic analysis and security auditing.
+# Choose the appropriate section based on your CNI plugin (Calico, Cilium, or generic).
+#
+# NOTE: NetworkPolicy logging requires CNI plugin support. Standard Kubernetes
+# NetworkPolicy does not support logging natively.
+
+---
+# =============================================================================
+# Option 1: Calico GlobalNetworkPolicy with Logging
+# =============================================================================
+# Requires: Calico CNI with Felix logging enabled
+# Documentation: https://docs.tigera.io/calico/latest/network-policy/policy-rules/log
+
+apiVersion: projectcalico.org/v3
+kind: GlobalNetworkPolicy
+metadata:
+  name: audit-denied-traffic
+spec:
+  # Log all denied traffic globally
+  selector: all()
+  types:
+    - Ingress
+    - Egress
+  ingress:
+    - action: Log
+      metadata:
+        annotations:
+          audit: "denied-ingress"
+    - action: Deny
+  egress:
+    - action: Log
+      metadata:
+        annotations:
+          audit: "denied-egress"
+    - action: Deny
+  # Apply after all other policies (order 9999 = last)
+  order: 9999
+
+---
+# Calico-specific logging for the mycelix namespace
+apiVersion: projectcalico.org/v3
+kind: NetworkPolicy
+metadata:
+  name: log-mycelix-traffic
+  namespace: mycelix-testnet
+spec:
+  selector: all()
+  types:
+    - Ingress
+    - Egress
+  ingress:
+    # Log and allow traffic from FL nodes
+    - action: Log
+      source:
+        selector: app == 'fl-node'
+      metadata:
+        annotations:
+          audit: "fl-node-ingress"
+    - action: Allow
+      source:
+        selector: app == 'fl-node'
+  egress:
+    # Log external egress
+    - action: Log
+      destination:
+        notNets:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
+      metadata:
+        annotations:
+          audit: "external-egress"
+    - action: Allow
+
+---
+# =============================================================================
+# Option 2: Cilium Hubble Configuration
+# =============================================================================
+# Requires: Cilium CNI with Hubble enabled
+# Documentation: https://docs.cilium.io/en/stable/observability/hubble/
+
+# Enable Hubble for flow visibility (add to Cilium ConfigMap)
+# This is typically done during Cilium installation:
+#
+# helm upgrade cilium cilium/cilium \
+#   --namespace kube-system \
+#   --set hubble.enabled=true \
+#   --set hubble.relay.enabled=true \
+#   --set hubble.ui.enabled=true \
+#   --set hubble.metrics.enabled="{dns,drop,tcp,flow,port-distribution,icmp,httpV2}"
+
+# Cilium Network Policy with visibility annotations
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: mycelix-network-visibility
+  namespace: mycelix-testnet
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycelix
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app: fl-node
+      toPorts:
+        - ports:
+            - port: "9000"
+              protocol: TCP
+            - port: "9001"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            app: postgres
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            app: redis
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+    # Allow DNS
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+
+---
+# =============================================================================
+# Option 3: Generic Audit Logging via Sidecar (Works with any CNI)
+# =============================================================================
+# Uses a tcpdump sidecar to capture and log network traffic
+# This is a fallback option when CNI doesn't support native logging
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: network-audit-config
+  namespace: mycelix-testnet
+data:
+  capture.sh: |
+    #!/bin/sh
+    # Network traffic capture script for audit logging
+    # Captures connection metadata (not payload) for security audit
+
+    INTERFACE=${CAPTURE_INTERFACE:-eth0}
+    LOG_FILE=/var/log/network-audit/connections.log
+
+    echo "Starting network audit capture on $INTERFACE"
+
+    # Capture TCP connection attempts (SYN packets) and log metadata
+    tcpdump -i $INTERFACE -n -l 'tcp[tcpflags] & (tcp-syn) != 0' 2>/dev/null | \
+    while read line; do
+      echo "$(date -Iseconds) $line" >> $LOG_FILE
+      # Rotate log if > 100MB
+      if [ $(stat -f%z $LOG_FILE 2>/dev/null || stat -c%s $LOG_FILE) -gt 104857600 ]; then
+        mv $LOG_FILE ${LOG_FILE}.1
+        gzip ${LOG_FILE}.1 &
+      fi
+    done
+
+---
+# Example sidecar injection patch for network auditing
+# Apply with: kubectl patch deployment <name> --patch-file network-audit-sidecar.yaml
+
+# network-audit-sidecar.yaml (use as patch template)
+# spec:
+#   template:
+#     spec:
+#       containers:
+#         - name: network-audit
+#           image: alpine:3.19
+#           command: ["/bin/sh", "/scripts/capture.sh"]
+#           securityContext:
+#             capabilities:
+#               add: ["NET_RAW", "NET_ADMIN"]
+#             runAsUser: 0
+#           volumeMounts:
+#             - name: audit-scripts
+#               mountPath: /scripts
+#             - name: audit-logs
+#               mountPath: /var/log/network-audit
+#       volumes:
+#         - name: audit-scripts
+#           configMap:
+#             name: network-audit-config
+#             defaultMode: 0755
+#         - name: audit-logs
+#           emptyDir: {}
+
+---
+# =============================================================================
+# Fluentd/Fluent Bit Configuration for Log Collection
+# =============================================================================
+# Collects network policy logs and forwards to central logging
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-network-config
+  namespace: mycelix-testnet
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Log_Level     info
+        Parsers_File  parsers.conf
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/calico/felix/*.log
+        Tag               calico.felix
+        Parser            json
+        Refresh_Interval  10
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/network-audit/*.log
+        Tag               network.audit
+        Parser            syslog
+        Refresh_Interval  10
+
+    [FILTER]
+        Name    grep
+        Match   calico.felix
+        Regex   msg deny|log
+
+    [OUTPUT]
+        Name              es
+        Match             *
+        Host              elasticsearch.logging.svc.cluster.local
+        Port              9200
+        Index             network-audit
+        Type              _doc
+        Logstash_Format   On
+        Logstash_Prefix   netpol
+        Retry_Limit       5
+
+  parsers.conf: |
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+
+    [PARSER]
+        Name        syslog
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<message>.+)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S%z
+
+---
+# =============================================================================
+# Prometheus Metrics for NetworkPolicy Monitoring
+# =============================================================================
+# Track denied connections and policy violations
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: network-policy-alerts
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+spec:
+  groups:
+    - name: network-policy
+      rules:
+        # Alert on high rate of denied connections
+        - alert: HighNetworkPolicyDenials
+          expr: |
+            sum(rate(calico_denied_packets_total{namespace="mycelix-testnet"}[5m])) > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High rate of network policy denials"
+            description: "More than 100 packets/sec being denied by network policies"
+
+        # Alert on unexpected external connections
+        - alert: UnexpectedExternalConnection
+          expr: |
+            sum(rate(hubble_flows_processed_total{
+              namespace="mycelix-testnet",
+              destination=~"(?!10\\.|172\\.16\\.|192\\.168\\.).*",
+              verdict="DROPPED"
+            }[5m])) > 10
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Unexpected external connection attempts"
+            description: "Pods attempting connections to unexpected external IPs"
+
+        # Track DNS queries (potential data exfiltration vector)
+        - alert: HighDNSQueryRate
+          expr: |
+            sum(rate(hubble_dns_queries_total{namespace="mycelix-testnet"}[5m])) > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Unusually high DNS query rate"
+            description: "DNS query rate exceeds 1000 queries/sec - potential tunneling"
+
+---
+# Installation Notes:
+#
+# For Calico:
+#   1. Enable Felix logging: calicoctl patch felixconfiguration default -p '{"spec":{"policySyncPathPrefix":"/var/log/calico"}}'
+#   2. Apply this file: kubectl apply -f network-policy-logging.yaml
+#   3. Verify logs: kubectl exec -n calico-system calico-node-xxx -- cat /var/log/calico/felix/felix.log
+#
+# For Cilium:
+#   1. Enable Hubble: helm upgrade cilium cilium/cilium --set hubble.enabled=true
+#   2. Access Hubble UI: kubectl port-forward -n kube-system svc/hubble-ui 12000:80
+#   3. CLI access: hubble observe --namespace mycelix-testnet
+#
+# For Generic (sidecar):
+#   1. Apply ConfigMap: kubectl apply -f network-policy-logging.yaml
+#   2. Patch deployment with sidecar
+#   3. View logs: kubectl logs <pod> -c network-audit

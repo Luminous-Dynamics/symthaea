@@ -1,0 +1,14 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "gen7-zkstark"
+version = "0.1.0"
+description = "zkSTARK proof generation for Gen-7 HYPERION-FL gradient provenance"
+requires-python = ">=3.8"
+license = { text = "Apache-2.0" }
+
+[tool.maturin]
+module-name = "gen7_zkstark"
+python-source = "../python"

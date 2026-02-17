@@ -1,0 +1,224 @@
+version: '3.8'
+
+# ZeroTrustML Phase 10 - Hybrid PostgreSQL + Holochain + ZK-PoC
+# Extends Phase 9 with immutable audit trail and privacy-preserving validation
+
+services:
+  # ================================================
+  # Phase 9 Services (PostgreSQL, Prometheus, Grafana)
+  # ================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: zerotrustml-postgres
+    environment:
+      POSTGRES_DB: ${ZEROTRUSTML_DB_NAME:-zerotrustml}
+      POSTGRES_USER: ${ZEROTRUSTML_DB_USER:-zerotrustml}
+      POSTGRES_PASSWORD: ${ZEROTRUSTML_DB_PASSWORD:?ZEROTRUSTML_DB_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql:ro
+      - ./scripts/init_db_phase10.sql:/docker-entrypoint-initdb.d/02_phase10.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zerotrustml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # ================================================
+  # Phase 10: Holochain Conductor
+  # ================================================
+
+  holochain:
+    image: holochain/holochain:0.5.6
+    container_name: zerotrustml-holochain
+    ports:
+      - "8888:8888"  # Admin WebSocket interface
+      - "8889:8889"  # App WebSocket interface
+    volumes:
+      # DNA and hApp bundles (read-only)
+      - ./holochain/dna:/dna:ro
+      - ./holochain/happ:/happ:ro
+
+      # Conductor configuration
+      - ./conductor-minimal.yaml:/conductor-config.yaml:ro
+
+      # Persistent Holochain data
+      - holochain_data:/data
+
+      # Holochain binaries (if using custom build)
+      - ./holochain-binary:/usr/local/bin/holochain:ro
+    command: >
+      holochain -c /conductor-config.yaml
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_ADMIN_PORT=8888
+      - HOLOCHAIN_APP_PORT=8889
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # ================================================
+  # Phase 10: ZeroTrustML Node (Hybrid Mode)
+  # ================================================
+
+  zerotrustml-node:
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+    container_name: zerotrustml-node
+    depends_on:
+      postgres:
+        condition: service_healthy
+      holochain:
+        condition: service_healthy
+    ports:
+      - "8765:8765"  # WebSocket for FL clients
+      - "9090:9090"  # Prometheus metrics
+    volumes:
+      - ./config/node.yaml:/app/config/node.yaml:ro
+      - node_logs:/app/logs
+      - node_models:/app/models
+    environment:
+      # Phase identification
+      - ZEROTRUSTML_PHASE=10
+      - ZEROTRUSTML_NODE_ID=${ZEROTRUSTML_NODE_ID:-fl-node-001}
+
+      # PostgreSQL connection
+      - ZEROTRUSTML_DB_HOST=postgres
+      - ZEROTRUSTML_DB_PORT=5432
+      - ZEROTRUSTML_DB_NAME=${ZEROTRUSTML_DB_NAME:-zerotrustml}
+      - ZEROTRUSTML_DB_USER=${ZEROTRUSTML_DB_USER:-zerotrustml}
+      - ZEROTRUSTML_DB_PASSWORD=${ZEROTRUSTML_DB_PASSWORD}
+
+      # Phase 10: Holochain connection
+      - HOLOCHAIN_ENABLED=true
+      - HOLOCHAIN_ADMIN_URL=ws://holochain:8888
+      - HOLOCHAIN_APP_URL=ws://holochain:8889
+      - HOLOCHAIN_CONDUCTOR_TIMEOUT=30
+
+      # Phase 10: ZK-PoC settings
+      - ZKPOC_ENABLED=true
+      - ZKPOC_POGQ_THRESHOLD=0.35
+      - ZKPOC_REQUIRE_ENCRYPTION=true
+      - ZKPOC_HIPAA_MODE=${ZKPOC_HIPAA_MODE:-false}
+      - ZKPOC_GDPR_MODE=${ZKPOC_GDPR_MODE:-false}
+
+      # Hybrid bridge settings
+      - HYBRID_BRIDGE_ENABLED=true
+      - HYBRID_BRIDGE_SYNC_PRIORITY=critical_only
+      - HYBRID_BRIDGE_RETRY_MAX=3
+      - HYBRID_BRIDGE_RETRY_DELAY=5
+
+      # Logging
+      - ZEROTRUSTML_LOG_LEVEL=${ZEROTRUSTML_LOG_LEVEL:-INFO}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9090/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # ================================================
+  # Monitoring: Prometheus (with Phase 10 metrics)
+  # ================================================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zerotrustml-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts/zerotrustml.rules:/etc/prometheus/zerotrustml.rules:ro
+      - ./monitoring/alerts/phase10.rules:/etc/prometheus/phase10.rules:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=90d'
+      - '--web.enable-lifecycle'
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # ================================================
+  # Monitoring: Grafana (with Phase 10 dashboards)
+  # ================================================
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zerotrustml-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+    depends_on:
+      - prometheus
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # ================================================
+  # Backup: PostgreSQL Daily Backups
+  # ================================================
+
+  postgres-backup:
+    image: postgres:15-alpine
+    container_name: zerotrustml-postgres-backup
+    volumes:
+      - ./backups:/backups
+      - ./scripts/backup-postgres.sh:/backup.sh:ro
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=${ZEROTRUSTML_DB_NAME:-zerotrustml}
+      - POSTGRES_USER=${ZEROTRUSTML_DB_USER:-zerotrustml}
+      - PGPASSWORD=${ZEROTRUSTML_DB_PASSWORD}
+    command: >
+      sh -c 'while true; do
+        /backup.sh;
+        echo "Next backup in 24 hours...";
+        sleep 86400;
+      done'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  holochain_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  node_logs:
+    driver: local
+  node_models:
+    driver: local
+
+networks:
+  zerotrustml-network:
+    driver: bridge

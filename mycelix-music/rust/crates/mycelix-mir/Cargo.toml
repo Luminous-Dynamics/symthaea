@@ -1,0 +1,29 @@
+[package]
+name = "mycelix-mir"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Music Information Retrieval - chord detection, beat tracking, source separation"
+
+[dependencies]
+mycelix-audio = { path = "../mycelix-audio" }
+mycelix-ml = { path = "../mycelix-ml" }
+
+# Math and DSP
+ndarray.workspace = true
+realfft.workspace = true
+num-traits.workspace = true
+
+# Core dependencies
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+rayon.workspace = true
+
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

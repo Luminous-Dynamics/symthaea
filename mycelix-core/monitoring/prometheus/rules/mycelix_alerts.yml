@@ -1,0 +1,492 @@
+# Mycelix Alert Rules
+# Comprehensive alerting for Federated Learning, Byzantine detection, and infrastructure
+
+groups:
+  # ============================================
+  # Byzantine Attack Detection Alerts
+  # ============================================
+  - name: byzantine_detection
+    interval: 15s
+    rules:
+      - alert: ByzantineAttackDetected
+        expr: rate(mycelix_fl_byzantine_detected_total[5m]) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Active Byzantine attack detected"
+          description: "High rate of Byzantine node detections ({{ $value | humanize }}/sec). Possible coordinated attack in progress."
+          runbook_url: "https://docs.mycelix.io/runbooks/byzantine-attack"
+          action: "1. Check /byzantine endpoint for details. 2. Review node reputation scores. 3. Consider enabling stricter validation."
+
+      - alert: SybilAttackSuspected
+        expr: |
+          (rate(mycelix_fl_byzantine_detected_total[1m]) > 1)
+          AND
+          (increase(mycelix_fl_active_nodes[5m]) > 10)
+        for: 2m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Possible Sybil attack in progress"
+          description: "Rapid increase in Byzantine detections ({{ $value }}/sec) coinciding with new node registrations. May indicate Sybil attack."
+          runbook_url: "https://docs.mycelix.io/runbooks/sybil-attack"
+
+      - alert: HighByzantineRatio
+        expr: mycelix_fl_byzantine_ratio > 0.35
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Byzantine ratio exceeds safe threshold"
+          description: "Byzantine ratio is {{ $value | humanizePercentage }}, approaching the 45% theoretical limit. System resilience degraded."
+          runbook_url: "https://docs.mycelix.io/runbooks/high-byzantine-ratio"
+
+      - alert: ByzantineDetectionDegraded
+        expr: histogram_quantile(0.95, rate(mycelix_fl_detection_latency_ms_bucket[5m])) > 500
+        for: 3m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Byzantine detection latency too high"
+          description: "95th percentile detection latency is {{ $value | humanizeDuration }}. Target is <100ms."
+
+      - alert: DetectorDisagreement
+        expr: |
+          stddev(mycelix_fl_detector_score{detector=~"multi_layer|shapley|hyperfeel"}) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Byzantine detectors showing high disagreement"
+          description: "Detection algorithms are producing inconsistent results. May indicate novel attack or misconfiguration."
+
+  # ============================================
+  # FL Training Progress Alerts
+  # ============================================
+  - name: fl_training
+    interval: 30s
+    rules:
+      - alert: TrainingStalled
+        expr: increase(mycelix_fl_rounds_total[15m]) == 0
+        for: 15m
+        labels:
+          severity: critical
+          category: training
+        annotations:
+          summary: "FL training has stalled"
+          description: "No training rounds completed in 15 minutes. Check coordinator and node connectivity."
+          runbook_url: "https://docs.mycelix.io/runbooks/training-stalled"
+
+      - alert: LowGradientAcceptance
+        expr: |
+          rate(mycelix_fl_gradients_healed_total[5m]) /
+          (rate(mycelix_fl_gradients_received_total[5m]) + 0.001) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          category: training
+        annotations:
+          summary: "High gradient healing rate"
+          description: "{{ $value | humanizePercentage }} of gradients require healing. May indicate data quality issues or attacks."
+
+      - alert: GradientAggregationFailure
+        expr: rate(mycelix_fl_errors_total{type="aggregation"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+          category: training
+        annotations:
+          summary: "Gradient aggregation failures occurring"
+          description: "Aggregation errors detected at {{ $value }}/sec. Training may be corrupted."
+
+      - alert: RoundLatencyHigh
+        expr: histogram_quantile(0.95, rate(mycelix_fl_round_latency_ms_bucket[5m])) > 30000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "FL round latency exceeds 30 seconds"
+          description: "95th percentile round latency is {{ $value | humanizeDuration }}. Consider reducing batch size or node count."
+
+      - alert: LowNodeParticipation
+        expr: mycelix_fl_active_nodes < 5
+        for: 5m
+        labels:
+          severity: warning
+          category: availability
+        annotations:
+          summary: "Low node participation in FL training"
+          description: "Only {{ $value }} active nodes. Minimum recommended is 10 for Byzantine resilience."
+
+      - alert: CompressionRatioAbnormal
+        expr: mycelix_fl_compression_ratio < 0.1 OR mycelix_fl_compression_ratio > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Abnormal gradient compression ratio"
+          description: "Compression ratio is {{ $value }}. Expected range is 0.1-100x."
+
+  # ============================================
+  # Node Health Alerts
+  # ============================================
+  - name: node_health
+    interval: 30s
+    rules:
+      - alert: NodeDown
+        expr: up{job=~"mycelix-fl-coordinator|zerotrustml|holochain"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Critical Mycelix service is down"
+          description: "{{ $labels.job }} on {{ $labels.instance }} has been down for over 1 minute."
+          runbook_url: "https://docs.mycelix.io/runbooks/node-down"
+
+      - alert: NodeDisconnected
+        expr: |
+          increase(mycelix_fl_node_disconnections_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          category: network
+        annotations:
+          summary: "High rate of node disconnections"
+          description: "{{ $value }} node disconnections in last 5 minutes. Check network stability."
+
+      - alert: NodeReputationDegraded
+        expr: mycelix_fl_node_reputation < 0.5
+        for: 10m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Node reputation score degraded"
+          description: "Node {{ $labels.node_id }} has reputation {{ $value }}. Below 0.3 will result in exclusion."
+
+      - alert: HighMemoryUsage
+        expr: |
+          (process_resident_memory_bytes{job=~"mycelix-fl-coordinator|zerotrustml"} /
+           (16 * 1024 * 1024 * 1024)) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High memory usage on {{ $labels.job }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} of 16GB limit."
+
+      - alert: HighCPUUsage
+        expr: |
+          rate(process_cpu_seconds_total{job=~"mycelix-fl-coordinator|zerotrustml"}[5m]) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High CPU usage on {{ $labels.job }}"
+          description: "CPU usage is {{ $value | humanizePercentage }}."
+
+  # ============================================
+  # Holochain / DHT Alerts
+  # ============================================
+  - name: holochain
+    interval: 30s
+    rules:
+      - alert: HolochainConductorDown
+        expr: up{job="holochain"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Holochain conductor is down"
+          description: "Immutable audit trail and DHT operations unavailable."
+          runbook_url: "https://docs.mycelix.io/runbooks/holochain-down"
+
+      - alert: HolochainWriteLatencyHigh
+        expr: histogram_quantile(0.95, rate(holochain_write_duration_ms_bucket[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Holochain write latency exceeds 1 second"
+          description: "95th percentile write latency is {{ $value }}ms. DHT may be congested."
+
+      - alert: HolochainDHTGrowthExcessive
+        expr: rate(holochain_dht_entries_total[1h]) > 10000
+        for: 1h
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Rapid DHT growth detected"
+          description: "DHT growing at {{ $value }}/hour. Consider archival strategy."
+
+      - alert: HybridBridgeSyncBacklog
+        expr: hybrid_bridge_pending > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Hybrid bridge sync backlog building"
+          description: "{{ $value }} records pending Holochain sync."
+
+      - alert: HybridBridgeIntegrityError
+        expr: increase(hybrid_bridge_integrity_errors_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Data integrity violation detected"
+          description: "Mismatch between PostgreSQL and Holochain data. Possible tampering or corruption."
+          runbook_url: "https://docs.mycelix.io/runbooks/integrity-violation"
+
+  # ============================================
+  # Storage Backend Alerts
+  # ============================================
+  - name: storage
+    interval: 30s
+    rules:
+      - alert: PostgreSQLDown
+        expr: up{job="postgresql"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "PostgreSQL database is unreachable"
+          description: "Primary storage backend is down. Immediate attention required."
+
+      - alert: PostgreSQLConnectionPoolExhausted
+        expr: pg_stat_activity_count >= pg_settings_max_connections * 0.9
+        for: 2m
+        labels:
+          severity: critical
+          category: capacity
+        annotations:
+          summary: "PostgreSQL connection pool nearly exhausted"
+          description: "{{ $value }} active connections approaching max."
+
+      - alert: PostgreSQLSlowQueries
+        expr: rate(pg_stat_statements_mean_time_ms[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Slow PostgreSQL queries detected"
+          description: "Mean query time is {{ $value }}ms. Check query optimizer."
+
+      - alert: PostgreSQLReplicationLag
+        expr: pg_replication_lag_seconds > 30
+        for: 5m
+        labels:
+          severity: warning
+          category: availability
+        annotations:
+          summary: "PostgreSQL replication lag detected"
+          description: "Replica is {{ $value }} seconds behind primary."
+
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "Redis cache is unreachable"
+          description: "Caching layer is down. Performance will be degraded."
+
+      - alert: RedisMemoryHigh
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Redis memory usage exceeds 90%"
+          description: "Redis using {{ $value | humanizePercentage }} of max memory. Consider eviction or scaling."
+
+      - alert: StorageLatencyHigh
+        expr: |
+          histogram_quantile(0.95, rate(mycelix_storage_operation_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Storage operation latency high"
+          description: "95th percentile storage latency is {{ $value }}s for {{ $labels.backend }}:{{ $labels.operation }}."
+
+      - alert: StorageErrorRateHigh
+        expr: |
+          rate(mycelix_storage_errors_total[5m]) /
+          (rate(mycelix_storage_operations_total[5m]) + 0.001) > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          category: reliability
+        annotations:
+          summary: "High storage error rate"
+          description: "{{ $value | humanizePercentage }} of storage operations are failing."
+
+  # ============================================
+  # Privacy and Compliance Alerts
+  # ============================================
+  - name: compliance
+    interval: 60s
+    rules:
+      - alert: PrivacyViolationDetected
+        expr: increase(mycelix_privacy_violations_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: compliance
+        annotations:
+          summary: "Privacy violation detected"
+          description: "{{ $value }} privacy violations detected. Immediate investigation required."
+          runbook_url: "https://docs.mycelix.io/runbooks/privacy-violation"
+
+      - alert: UnencryptedDataTransmission
+        expr: increase(mycelix_unencrypted_transmissions_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Unencrypted data transmission detected"
+          description: "Data transmitted without encryption. Security breach potential."
+
+      - alert: AuditTrailGap
+        expr: time() - mycelix_last_audit_entry_timestamp > 600
+        for: 5m
+        labels:
+          severity: warning
+          category: compliance
+        annotations:
+          summary: "Gap in audit trail detected"
+          description: "No audit entries for {{ $value | humanizeDuration }}. Compliance risk."
+
+      - alert: ZKProofVerificationFailureHigh
+        expr: |
+          rate(mycelix_zkproof_failures_total[5m]) /
+          (rate(mycelix_zkproof_verifications_total[5m]) + 0.001) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High ZK proof verification failure rate"
+          description: "{{ $value | humanizePercentage }} of ZK proofs failing verification."
+
+  # ============================================
+  # Network Health Alerts
+  # ============================================
+  - name: network
+    interval: 30s
+    rules:
+      - alert: HighNetworkLatency
+        expr: |
+          histogram_quantile(0.95, rate(mycelix_network_latency_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+          category: network
+        annotations:
+          summary: "High network latency between services"
+          description: "95th percentile network latency is {{ $value }}s."
+
+      - alert: NetworkPartitionSuspected
+        expr: |
+          count(up{job="mycelix-fl-nodes"} == 1) <
+          (count(up{job="mycelix-fl-nodes"}) * 0.5)
+        for: 5m
+        labels:
+          severity: critical
+          category: network
+        annotations:
+          summary: "Possible network partition detected"
+          description: "Less than 50% of FL nodes are reachable. Network may be partitioned."
+
+      - alert: MessageQueueBacklog
+        expr: mycelix_message_queue_size > 10000
+        for: 5m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Message queue backlog growing"
+          description: "{{ $value }} messages in queue. Processing may be falling behind."
+
+  # ============================================
+  # Infrastructure Alerts
+  # ============================================
+  - name: infrastructure
+    interval: 60s
+    rules:
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} /
+           node_filesystem_size_bytes{mountpoint="/"}) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          category: capacity
+        annotations:
+          summary: "Disk space running low"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining on {{ $labels.instance }}."
+
+      - alert: DiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{mountpoint="/"} /
+           node_filesystem_size_bytes{mountpoint="/"}) < 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: capacity
+        annotations:
+          summary: "Disk space critically low"
+          description: "Only {{ $value | humanizePercentage }} disk space remaining. Immediate action required."
+
+      - alert: SystemMemoryPressure
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "System memory pressure high"
+          description: "System memory usage is {{ $value | humanizePercentage }}."
+
+      - alert: HighSystemLoad
+        expr: node_load15 / on(instance) count(node_cpu_seconds_total{mode="idle"}) by (instance) > 2
+        for: 15m
+        labels:
+          severity: warning
+          category: resources
+        annotations:
+          summary: "High system load average"
+          description: "15-minute load average is {{ $value }}x the number of CPUs."
+
+      - alert: ContainerRestartLooping
+        expr: increase(container_start_time_seconds[1h]) > 5
+        for: 10m
+        labels:
+          severity: warning
+          category: stability
+        annotations:
+          summary: "Container restart loop detected"
+          description: "Container {{ $labels.name }} has restarted {{ $value }} times in the last hour."

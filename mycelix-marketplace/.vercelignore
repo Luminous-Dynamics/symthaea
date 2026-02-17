@@ -1,0 +1,56 @@
+# Dependencies (will be installed during build)
+frontend/node_modules
+node_modules
+
+# Build outputs (will be built during deployment)
+frontend/.svelte-kit
+frontend/build
+.svelte-kit
+build
+dist
+target
+
+# Development files
+.git
+.github
+.vscode
+.idea
+
+# Documentation (not needed for deployment)
+*.md
+!README.md
+
+# Logs and temp files
+*.log
+.DS_Store
+*.swp
+.vercel
+
+# Test files
+tests
+test-results
+playwright-report
+coverage
+
+# Large documentation files
+BUILD_IN_PROGRESS_SUMMARY.md
+CURRENT_STATUS_BUILDING.md
+DISCOVERY_NOVEMBER_11_2025.md
+GITHUB_CONFIGURATION_COMPLETE.md
+GITHUB_REPOSITORY_SETUP_COMPLETE.md
+GITHUB_SETUP.md
+HANDOFF_NOVEMBER_11_2025.md
+MANUAL_TESTING_CHECKLIST.md
+NEXT_STEPS.md
+NIX_ENVIRONMENT_SETUP_IN_PROGRESS.md
+PHASE_*.md
+POST_PUBLISH_GUIDE.md
+PROJECT_STATUS_NOVEMBER_11_2025.md
+PUBLICATION_SUCCESS.md
+QUICK_START_PHASE_5.md
+REPOSITORY_READY_SUMMARY.md
+SESSION_SUMMARY_*.md
+TYPE_SAFETY_STATUS_NOV_11_2025.md
+VERCEL_DEPLOYMENT_GUIDE.md
+COMPLETE_SETUP_SUMMARY.md
+FINAL_DEPLOYMENT_CHECKLIST.md

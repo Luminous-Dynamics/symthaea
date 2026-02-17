@@ -1,0 +1,148 @@
+# Mycelix Ultimate Demo Configuration
+# ====================================
+# The best FL system ever created - configuration
+
+demo:
+  # Network configuration
+  num_nodes: 100
+  byzantine_fraction: 0.45
+  num_rounds: 100
+
+  # Gradient simulation
+  gradient_dim: 1000000  # 1M parameters (simulating real models)
+  model_type: "simulated"  # simulated | mnist | cifar10
+
+  # Display settings
+  refresh_rate_ms: 100
+  show_live_metrics: true
+  show_node_details: false
+
+  # Seed for reproducibility
+  random_seed: 42
+
+hyperfeel:
+  # Compression settings
+  enabled: true
+  dimension: 16384  # HV16 = 2KB
+  compression_target: 2000  # 2000x target
+  use_causal: true
+  use_temporal: true
+  use_phi: true
+  quantize_bits: 8
+
+detection:
+  # Multi-layer detection stack
+  enable_zkstark: false  # Requires gen7_zkstark module
+  enable_pogq: true
+  enable_shapley: true
+  enable_hypervector: true
+  enable_self_healing: true
+
+  # Thresholds
+  pogq_threshold: 0.5
+  shapley_threshold: 0.1
+  hv_epsilon: 0.5
+  healing_threshold: 0.3
+  min_layers_for_byzantine: 2
+
+privacy:
+  # Differential privacy settings
+  enabled: true
+  epsilon: 1.0
+  delta: 1.0e-5
+  max_grad_norm: 1.0
+  noise_multiplier: 1.0
+  noise_type: "gaussian"  # gaussian | laplace
+
+attacks:
+  # Attack configuration for testing
+  enabled: true
+  types:
+    - gradient_scaling
+    - sign_flip
+    - gaussian_noise
+    - adaptive
+    - cartel
+    - little_is_enough
+
+  # Attack parameters
+  intensity_range: [0.5, 2.0]
+  stealth_range: [0.3, 0.8]
+  adaptive_rate: 0.1
+  cartel_coordination: true
+
+aggregation:
+  # Aggregation method
+  method: "reputation_weighted"  # reputation_weighted | median | trimmed_mean
+
+  # Reputation settings
+  initial_reputation: 0.5
+  reputation_decay: 0.01
+  reputation_boost: 0.05
+
+performance:
+  # Performance targets
+  target_latency_p99_ms: 1.0
+  target_throughput_grad_per_sec: 2000
+  target_memory_gb: 2.0
+
+  # Optimization
+  use_parallel: true
+  batch_size: 10
+
+cross_zome:
+  # Cross-zome integration (simulated)
+  enabled: true
+  bridge_enabled: true
+  smart_contract_anchoring: true
+  holochain_dht: true
+
+scenarios:
+  full_stack:
+    description: "Complete system demonstration"
+    num_rounds: 100
+    byzantine_fraction: 0.45
+
+  byzantine:
+    description: "45% Byzantine adversary demonstration"
+    num_rounds: 50
+    byzantine_fractions: [0.1, 0.2, 0.3, 0.4, 0.45]
+    attack_types_per_phase:
+      - ["gradient_scaling"]
+      - ["sign_flip", "gaussian_noise"]
+      - ["adaptive"]
+      - ["cartel"]
+      - ["adaptive", "cartel", "little_is_enough"]
+
+  privacy:
+    description: "Privacy features showcase"
+    num_rounds: 50
+    epsilons: [10.0, 5.0, 1.0, 0.5, 0.1]
+    show_tradeoff: true
+
+  scale:
+    description: "Scalability demonstration"
+    node_counts: [10, 50, 100, 500]
+    rounds_per_scale: 20
+    measure_throughput: true
+    measure_latency: true
+
+visualization:
+  # Terminal UI settings
+  style: "bold"
+  colors:
+    header: "cyan"
+    success: "green"
+    warning: "yellow"
+    error: "red"
+    info: "blue"
+
+  # Panel settings
+  show_detection_panel: true
+  show_performance_panel: true
+  show_convergence_panel: true
+  show_privacy_panel: true
+
+  # Progress bar
+  progress_style: "bar.complete"
+  progress_color: "green"

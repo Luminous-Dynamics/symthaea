@@ -1,0 +1,6 @@
+timestamp,round,node_id,ground_truth,classification,fp_type,pogq_score,cos_anchor,committee_score,reputation,status,notes
+2025-10-27T23:45:00,0,1,honest,byzantine,persistent_fp,0.441,0.12,1.000,0.500,needs_review,Low cosine but high committee - investigate
+2025-10-27T23:45:00,0,5,honest,byzantine,edge_case,0.441,-0.15,0.950,0.500,needs_review,Negative cosine with high PoGQ
+2025-10-27T23:45:00,1,1,honest,byzantine,persistent_fp,0.441,0.10,0.985,0.250,needs_review,Same node flagged twice
+2025-10-27T23:45:00,2,8,honest,byzantine,isolated_fp,0.441,-0.25,0.800,0.500,needs_review,One-time false positive
+2025-10-27T23:45:00,3,1,honest,byzantine,persistent_fp,0.441,0.08,0.970,0.125,reviewed,Confirmed label skew victim - widened threshold

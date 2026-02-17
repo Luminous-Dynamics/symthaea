@@ -1,0 +1,234 @@
+# Default values for zerotrustml
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Deployment configuration
+replicaCount: 3
+
+image:
+  repository: zerotrustml/node
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service configuration
+service:
+  type: ClusterIP
+  networkPort: 9000
+  metricsPort: 9090
+  gossipPort: 9001
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations: {}
+  hosts:
+    - host: zerotrustml.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Resource limits
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "2Gi"
+    cpu: "2000m"
+
+# Autoscaling configuration
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  customMetrics:
+    - type: Pods
+      pods:
+        metric:
+          name: gradients_processed_per_second
+        target:
+          type: AverageValue
+          averageValue: "100"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 60
+        - type: Pods
+          value: 5
+          periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+        - type: Pods
+          value: 10
+          periodSeconds: 30
+      selectPolicy: Max
+
+# ZeroTrustML configuration
+config:
+  node:
+    listenPort: 9000
+    enableTLS: true
+    enableSigning: true
+    enableAuthentication: true
+
+  performance:
+    enableCompression: true
+    compressionAlgorithm: "zstd"
+    compressionLevel: 3
+    enableBatchValidation: true
+    batchSize: 32
+    enableRedisCache: true
+    cacheTTL: 3600
+
+  monitoring:
+    enablePrometheus: true
+    prometheusPort: 9090
+    enableTopologyMonitoring: true
+    enableGrafana: false
+
+  networking:
+    enableGossip: true
+    gossipFanout: 3
+    gossipInterval: 1.0
+    enableSharding: true
+    numShards: 10
+    shardReplication: 2
+
+  storage:
+    backend: "memory"
+    enableCheckpointing: false
+
+  logging:
+    level: "INFO"
+    format: "json"
+    output: "stdout"
+
+# Redis configuration
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  persistence:
+    enabled: false
+    size: 8Gi
+
+# Prometheus monitoring
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 15s
+    scrapeTimeout: 10s
+
+# Node affinity and tolerations
+nodeSelector: {}
+
+tolerations: []
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - zerotrustml
+          topologyKey: kubernetes.io/hostname
+
+# Security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
+
+# Health checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: metrics
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: metrics
+  initialDelaySeconds: 10
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Multi-region configuration
+multiRegion:
+  enabled: false
+  regions:
+    - name: us-east
+      replicaCount: 5
+    - name: eu-west
+      replicaCount: 5
+    - name: ap-southeast
+      replicaCount: 3
+
+# Network policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: zerotrustml
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9001
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: zerotrustml
+      ports:
+        - protocol: TCP
+          port: 9000
+        - protocol: TCP
+          port: 9001

@@ -1,0 +1,26 @@
+data_root_path: /tmp/holochain_zerotrustml
+keystore:
+  type: danger_test_keystore
+dpki:
+  network_seed: ''
+  no_dpki: true
+network:
+  transport_pool:
+  - type: quic
+    bind_to: 127.0.0.1:0
+  bootstrap_url: https://bootstrap.holo.host
+  signal_url: wss://signal.holo.host
+  tuning_params:
+    gossip_loop_iteration_delay_ms: 1000
+    default_rpc_single_timeout_ms: 30000
+    default_rpc_multi_remote_agent_count: 2
+    agent_info_expires_after_ms: 1200000
+    tls_in_mem_session_storage: 512
+    proxy_keepalive_ms: 30000
+    proxy_to_expire_ms: 60000
+admin_interfaces:
+- driver:
+    type: websocket
+    port: 8888
+    allowed_origins: '*'
+db_sync_strategy: Resilient

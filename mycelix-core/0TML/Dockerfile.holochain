@@ -1,0 +1,33 @@
+FROM debian:12-slim
+
+# Install dependencies including xz-utils for liblzma
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    netcat-traditional \
+    xz-utils \
+    liblzma5 \
+    libstdc++6 \
+    lsb-release \
+    procps \
+    && rm -rf /var/lib/apt/lists/*
+
+# Enable IPv6 (needed for Holochain networking)
+RUN echo "net.ipv6.conf.all.disable_ipv6 = 0" >> /etc/sysctl.conf
+
+# Copy patched holochain binary (with standard Linux dynamic linker)
+COPY ./holochain-binary-patched /usr/local/bin/holochain
+RUN chmod +x /usr/local/bin/holochain
+
+# Create data directory
+RUN mkdir -p /data
+
+# Copy conductor configuration
+COPY holochain/conductor-config-no-bind.yaml /conductor-config.yaml
+
+WORKDIR /data
+
+# Expose admin and app ports
+EXPOSE 8888 8889
+
+# Default command
+CMD ["holochain", "-c", "/conductor-config.yaml"]

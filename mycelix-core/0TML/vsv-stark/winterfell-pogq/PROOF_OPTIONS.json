@@ -1,0 +1,65 @@
+{
+  "security_parameters": {
+    "conjectured_security_bits": 127,
+    "security_model": "FRI soundness under standard assumptions",
+    "rationale": "127-bit security provides cryptographically strong guarantees. Maximum achievable with our AIR configuration (44 columns, 32 rows, 40 constraints)."
+  },
+  "stark_parameters": {
+    "num_queries": 80,
+    "blowup_factor": 16,
+    "grinding_factor": 16,
+    "fri_folding_factor": 8,
+    "fri_max_remainder_degree": 31,
+    "field_extension": "None",
+    "fri_remainder_batching": "Linear",
+    "composition_poly_batching": "Linear"
+  },
+  "air_configuration": {
+    "trace_width": 44,
+    "num_constraints": 40,
+    "trace_columns": {
+      "core_state": 12,
+      "bit_decomposition": 32,
+      "breakdown": {
+        "ema": 1,
+        "counters": 2,
+        "quarantine_flag": 1,
+        "witness_score": 1,
+        "parameters": 3,
+        "round_number": 1,
+        "remainder": 1,
+        "selectors": 2,
+        "rem_t_bits": 16,
+        "x_t_bits": 16
+      }
+    }
+  },
+  "range_checks": {
+    "strategy": "LEAN (Lightweight Efficient Attack-resistant Narrowed)",
+    "checked_values": ["rem_t", "x_t", "quar_t"],
+    "rem_t_range": "[0, 2^16)",
+    "x_t_range": "[0, 2^16)",
+    "quar_t_range": "{0, 1}",
+    "method": "bit decomposition with boolean constraints"
+  },
+  "performance_targets": {
+    "prove_time_ms": "2.0-3.5",
+    "verify_time_ms": "0.7-1.0",
+    "proof_size_kb": "35-45",
+    "speedup_vs_zkvm": "13000-23000x",
+    "size_reduction_vs_zkvm": "5-6x"
+  },
+  "toolchain": {
+    "winterfell_version": "0.13.1",
+    "rust_version": "1.83.0",
+    "field": "f128::BaseElement",
+    "hash_function": "Blake3_256",
+    "commitment_scheme": "MerkleTree"
+  },
+  "reproducibility": {
+    "git_repository": "luminous-dynamics/zero-trustml",
+    "commit_sha": "TBD",
+    "build_command": "cargo build --release",
+    "benchmark_command": "cargo run --release --bin lean-benchmarks"
+  }
+}

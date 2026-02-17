@@ -1,0 +1,13 @@
+---
+manifest_version: "1"
+name: mycelix-test
+integrity:
+  network_seed: null
+  properties: null
+  zomes:
+    - name: hello
+      bundled: "zomes/hello/target/wasm32-unknown-unknown/release/hello.wasm"
+    - name: messages
+      bundled: "zomes/messages/target/wasm32-unknown-unknown/release/messages.wasm"
+coordinator:
+  zomes: []

@@ -1,0 +1,117 @@
+{
+  "results": [
+    {
+      "seed": 101,
+      "config": "aegis_only",
+      "config_name": "AEGIS-only",
+      "byz_frac": 0.5,
+      "clean_acc": 0.0,
+      "auc": 0.46194879089615937,
+      "wall_time": 0.7080998420715332
+    },
+    {
+      "seed": 202,
+      "config": "aegis_only",
+      "config_name": "AEGIS-only",
+      "byz_frac": 0.5,
+      "clean_acc": 0.01,
+      "auc": 0.42420874822190613,
+      "wall_time": 0.6892492771148682
+    },
+    {
+      "seed": 303,
+      "config": "aegis_only",
+      "config_name": "AEGIS-only",
+      "byz_frac": 0.5,
+      "clean_acc": 0.005,
+      "auc": 0.42185554171855544,
+      "wall_time": 0.8629329204559326
+    },
+    {
+      "seed": 101,
+      "config": "gen7_only",
+      "config_name": "Gen7-only",
+      "byz_frac": 0.5,
+      "clean_acc": 0.868,
+      "auc": 1.0,
+      "wall_time": 4.549171209335327
+    },
+    {
+      "seed": 202,
+      "config": "gen7_only",
+      "config_name": "Gen7-only",
+      "byz_frac": 0.5,
+      "clean_acc": 0.867,
+      "auc": 1.0,
+      "wall_time": 3.6377406120300293
+    },
+    {
+      "seed": 303,
+      "config": "gen7_only",
+      "config_name": "Gen7-only",
+      "byz_frac": 0.5,
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 3.453305959701538
+    },
+    {
+      "seed": 101,
+      "config": "gen7_aegis",
+      "config_name": "Gen7+AEGIS",
+      "byz_frac": 0.5,
+      "clean_acc": 0.868,
+      "auc": 1.0,
+      "wall_time": 2.7872262001037598
+    },
+    {
+      "seed": 202,
+      "config": "gen7_aegis",
+      "config_name": "Gen7+AEGIS",
+      "byz_frac": 0.5,
+      "clean_acc": 0.867,
+      "auc": 1.0,
+      "wall_time": 2.9541730880737305
+    },
+    {
+      "seed": 303,
+      "config": "gen7_aegis",
+      "config_name": "Gen7+AEGIS",
+      "byz_frac": 0.5,
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 3.327435255050659
+    }
+  ],
+  "summary": {
+    "aegis_only": {
+      "mean_acc": 0.005,
+      "std_acc": 0.004082482904638631,
+      "mean_auc": 0.4360043602788736,
+      "accs": [
+        0.0,
+        0.01,
+        0.005
+      ]
+    },
+    "gen7_only": {
+      "mean_acc": 0.867,
+      "std_acc": 0.0008164965809277268,
+      "mean_auc": 1.0,
+      "accs": [
+        0.868,
+        0.867,
+        0.866
+      ]
+    },
+    "gen7_aegis": {
+      "mean_acc": 0.867,
+      "std_acc": 0.0008164965809277268,
+      "mean_auc": 1.0,
+      "accs": [
+        0.868,
+        0.867,
+        0.866
+      ]
+    }
+  }
+}

@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mycelix Protocol: System Architecture Infographic</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .flow-box {
+            border: 2px solid #4A5568;
+            padding: 1rem;
+            text-align: center;
+            border-radius: 0.5rem;
+            background-color: #2D3748;
+            color: #E2E8F0;
+        }
+        .flow-arrow {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 1rem 0;
+            color: #718096;
+            font-size: 2rem;
+            font-weight: bold;
+        }
+        .timeline-item {
+            position: relative;
+            padding-bottom: 2.5rem;
+            padding-left: 2.5rem;
+        }
+        .timeline-item:before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 5px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: #00A6FB;
+            border: 4px solid #2D3748;
+            z-index: 10;
+        }
+        .timeline-item:not(:last-child):after {
+            content: '';
+            position: absolute;
+            left: 9px;
+            top: 25px;
+            width: 2px;
+            height: 100%;
+            background-color: #4A5568;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-200">
+
+    <div class="container mx-auto p-4 md:p-8">
+
+        <header class="text-center mb-16">
+            <h1 class="text-4xl md:text-6xl font-extrabold mb-4" style="color: #00A6FB;">Mycelix Protocol</h1>
+            <p class="text-xl md:text-2xl text-gray-400 max-w-4xl mx-auto">A Roadmap-Aware Architecture for a Sovereign, Scalable, and Secure Decentralized Future.</p>
+        </header>
+
+        <section id="key-metrics" class="mb-20">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="bg-gray-800 p-8 rounded-lg shadow-2xl text-center">
+                    <p class="text-5xl font-bold" style="color: #73BC2D;">1000x</p>
+                    <p class="mt-2 text-lg text-gray-400">Higher Throughput than L1</p>
+                </div>
+                <div class="bg-gray-800 p-8 rounded-lg shadow-2xl text-center">
+                    <p class="text-5xl font-bold" style="color: #F5A800;">100x</p>
+                    <p class="mt-2 text-lg text-gray-400">Lower Gas Fees via Layer-2</p>
+                </div>
+                <div class="bg-gray-800 p-8 rounded-lg shadow-2xl text-center">
+                    <p class="text-5xl font-bold" style="color: #DC3956;">Phase 2</p>
+                    <p class="mt-2 text-lg text-gray-400">Evolution to ZK-Proofs</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-4">The Hybrid Architecture</h2>
+            <p class="text-lg text-gray-400 text-center max-w-3xl mx-auto mb-12">Mycelix combines the agent-centric power of Holochain for scalability with the settlement finality of Layer-2 blockchains. This pragmatic approach ensures both user sovereignty and interoperability.</p>
+            <div class="bg-gray-800 p-8 rounded-lg shadow-2xl">
+                <div class="flow-box font-bold" style="border-color: #00A6FB;">Industry Adapters Layer</div>
+                <div class="flow-arrow">▼</div>
+                <div class="flow-box font-bold" style="border-color: #73BC2D;">Meta-Core Services</div>
+                <div class="flow-arrow">▼</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 my-4">
+                    <div class="flow-box">
+                        <h4 class="font-bold">Holochain (P2P Layer)</h4>
+                        <p class="text-sm">Agent-Centric DHT, Source Chains</p>
+                    </div>
+                    <div class="flow-box">
+                        <h4 class="font-bold">Layer-2 (Settlement)</h4>
+                        <p class="text-sm">EVM Smart Contracts, Global Finality</p>
+                    </div>
+                </div>
+                <div class="flow-arrow">▼</div>
+                <div class="flow-box font-bold" style="border-color: #DC3956;">Cross-Chain Bridge</div>
+            </div>
+        </section>
+
+        <section id="bridge-evolution" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-4">A Tale of Two Phases: The Mycelix Bridge</h2>
+            <p class="text-lg text-gray-400 text-center max-w-3xl mx-auto mb-12">The bridge is the heart of cross-chain interoperability, designed to evolve from a secure, verifiable system to a trustless, mathematically guaranteed ZK-Bridge.</p>
+            <div class="bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl">
+                <p class="text-center text-gray-300 mb-6 font-semibold">The upgrade to a ZK-Rollup architecture provides an exponential leap in scalability, moving the practical daily swap limit from thousands to hundreds of thousands.</p>
+                <div class="chart-container">
+                    <canvas id="bridgeScalabilityChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="core-services" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-4">Meta-Core Services</h2>
+            <p class="text-lg text-gray-400 text-center max-w-3xl mx-auto mb-12">A suite of foundational services provides universal functionality to all industry-specific applications built on the protocol.</p>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div class="bg-gray-800 p-6 rounded-lg shadow-2xl flex flex-col items-center">
+                    <h3 class="text-xl font-bold mb-4" style="color: #73BC2D;">Dynamic Reputation</h3>
+                     <p class="text-center text-gray-400 text-sm mb-4">A time-decaying score based on contributions, validated actions, and a jury-based appeal mechanism to ensure fairness and prevent Sybil attacks.</p>
+                    <div class="chart-container" style="height: 250px; max-height: 250px;">
+                        <canvas id="reputationChart"></canvas>
+                    </div>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-lg shadow-2xl flex flex-col items-center">
+                    <h3 class="text-xl font-bold mb-4" style="color: #00A6FB;">Identity Management</h3>
+                     <p class="text-center text-gray-400 text-sm mb-4">Built on a Self-Sovereign Identity (SSI) model, users control their data via Verifiable Credentials, enabling selective disclosure and ultimate privacy.</p>
+                    <div class="flex flex-col items-center justify-center h-full">
+                        <span class="text-6xl mb-4">🛡️</span>
+                        <p class="font-bold text-lg">Verifiable Credentials</p>
+                        <p class="text-gray-400">User-Controlled Data</p>
+                    </div>
+                </div>
+                <div class="bg-gray-800 p-6 rounded-lg shadow-2xl flex flex-col items-center md:col-span-2 lg:col-span-1">
+                    <h3 class="text-xl font-bold mb-4" style="color: #F5A800;">Currency Exchange</h3>
+                     <p class="text-center text-gray-400 text-sm mb-4">An on-chain AMM or Order Book facilitates seamless value transfer between the Holochain P2P layer and the L2 settlement layer via the cross-chain bridge.</p>
+                    <div class="flex flex-col items-center justify-center h-full">
+                         <span class="text-6xl mb-4">🔄</span>
+                        <p class="font-bold text-lg">AMM / Order Book</p>
+                        <p class="text-gray-400">Cross-Chain Liquidity</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="scalability" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-4">Scalability & Performance Analysis</h2>
+            <p class="text-lg text-gray-400 text-center max-w-3xl mx-auto mb-12">The architecture is designed to avoid bottlenecks. Most activity occurs on Holochain's horizontally scaling P2P layer, with only final settlement crossing the bridge to the L2.</p>
+            <div class="bg-gray-800 p-6 md:p-8 rounded-lg shadow-2xl">
+                 <p class="text-center text-gray-300 mb-6 font-semibold">Holochain's agent-centric design allows for thousands of TPS per application, while the ZK-Bridge eliminates the settlement layer as a bottleneck.</p>
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <section id="security" class="mb-20">
+            <h2 class="text-3xl font-bold text-center mb-4">Security: A Defense-in-Depth Model</h2>
+            <p class="text-lg text-gray-400 text-center max-w-3xl mx-auto mb-12">Security is never reliant on a single mechanism. Mycelix employs economic, cryptographic, and operational layers to mitigate threats, evolving towards pure mathematical guarantees with ZK-proofs.</p>
+            <div class="bg-gray-800 p-6 rounded-lg shadow-2xl overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="border-b border-gray-600">
+                            <th class="p-4">Attack Vector</th>
+                            <th class="p-4">Phase 1 Mitigation</th>
+                            <th class="p-4">Phase 2 Enhancement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-gray-700">
+                            <td class="p-4 font-semibold" style="color: #DC3956;">Validator Collusion</td>
+                            <td class="p-4">Economic Slashing + Merkle Proofs</td>
+                            <td class="p-4 text-green-400">Eliminated (No validators needed)</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="p-4 font-semibold" style="color: #DC3956;">Sybil Attacks</td>
+                            <td class="p-4">Reputation-Gated Onboarding</td>
+                            <td class="p-4 text-green-400">ZK-Proofs of Reputation</td>
+                        </tr>
+                        <tr class="border-b border-gray-700">
+                            <td class="p-4 font-semibold" style="color: #DC3956;">Data Poisoning</td>
+                            <td class="p-4">PoGQ Validation + Reputation</td>
+                            <td class="p-4 text-green-400">ZK-Verified Eligibility Criteria</td>
+                        </tr>
+                        <tr>
+                            <td class="p-4 font-semibold" style="color: #DC3956;">Front-running (MEV)</td>
+                            <td class="p-4">Private Mempool Submission</td>
+                            <td class="p-4 text-green-400">Inherent in ZK-Proof Privacy</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+         <section id="roadmap" class="mb-16">
+            <h2 class="text-3xl font-bold text-center mb-4">Deployment Roadmap</h2>
+            <p class="text-lg text-gray-400 text-center max-w-3xl mx-auto mb-12">Mycelix follows a phased deployment, beginning with a robust and tested production-ready architecture, while actively developing the next generation of trustless infrastructure.</p>
+            <div class="bg-gray-800 p-8 rounded-lg shadow-2xl max-w-2xl mx-auto">
+                 <div class="timeline">
+                    <div class="timeline-item">
+                        <h4 class="font-bold text-lg mb-1" style="color: #00A6FB;">Phase 1: Verifiable Bridge (Current)</h4>
+                        <p class="text-gray-400">Production deployment on Polygon PoS. Security model based on staked validators, economic slashing, and on-chain Merkle proof verification. Architecture complete and ready for mainnet.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4 class="font-bold text-lg mb-1" style="color: #F5A800;">Phase 2: ZK-Bridge R&D (Active)</h4>
+                        <p class="text-gray-400">Parallel research and development into ZK-SNARK provers and Circom circuits. The goal is to build a trustless ZK-Rollup architecture to replace the validator network.</p>
+                    </div>
+                    <div class="timeline-item">
+                        <h4 class="font-bold text-lg mb-1" style="color: #73BC2D;">Phase 2.5: Gradual Migration</h4>
+                        <p class="text-gray-400">A planned, gradual migration path from Phase 1 validators to Phase 2 provers, ensuring backward compatibility and a seamless transition for the network and its users.</p>
+                    </div>
+                     <div class="timeline-item">
+                        <h4 class="font-bold text-lg mb-1" style="color: #DC3956;">Perfection: The Trust Layer</h4>
+                        <p class="text-gray-400">The ultimate evolution of the bridge to a state of maximal security, privacy, and efficiency, where all cross-chain state transitions are guaranteed by pure mathematics.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <footer class="text-center mt-16 pt-8 border-t border-gray-700">
+            <p class="text-gray-500">Mycelix Protocol Infographic</p>
+        </footer>
+
+    </div>
+
+    <script>
+        const processLabels = (labels) => {
+            const charLimit = 16;
+            return labels.map(label => {
+                if (typeof label === 'string' && label.length > charLimit) {
+                    const words = label.split(' ');
+                    const newLabel = [];
+                    let currentLine = '';
+                    words.forEach(word => {
+                        if ((currentLine + word).length > charLimit) {
+                            newLabel.push(currentLine.trim());
+                            currentLine = '';
+                        }
+                        currentLine += word + ' ';
+                    });
+                    newLabel.push(currentLine.trim());
+                    return newLabel;
+                }
+                return label;
+            });
+        };
+
+        const tooltipTitleCallback = function(tooltipItems) {
+            const item = tooltipItems[0];
+            let label = item.chart.data.labels[item.dataIndex];
+            if (Array.isArray(label)) {
+                return label.join(' ');
+            } else {
+                return label;
+            }
+        };
+
+        const chartDefaultOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#E2E8F0',
+                        font: {
+                            family: "'Inter', sans-serif"
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        title: tooltipTitleCallback
+                    },
+                    bodyFont: {
+                        family: "'Inter', sans-serif"
+                    },
+                    titleFont: {
+                        family: "'Inter', sans-serif"
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    ticks: {
+                        color: '#9CA3AF',
+                        font: { family: "'Inter', sans-serif" }
+                    },
+                    grid: {
+                        color: '#4A5568'
+                    }
+                },
+                x: {
+                    ticks: {
+                        color: '#9CA3AF',
+                        font: { family: "'Inter', sans-serif" }
+                    },
+                    grid: {
+                        color: '#4A5568'
+                    }
+                }
+            }
+        };
+
+        const chartDefaultOptionsNoY = {
+            ...chartDefaultOptions,
+             scales: {
+                y: {
+                    display: false
+                },
+                x: {
+                    ticks: {
+                        color: '#9CA3AF',
+                        font: { family: "'Inter', sans-serif" }
+                    },
+                    grid: {
+                        color: '#4A5568'
+                    }
+                }
+            }
+        }
+
+
+        const bridgeCtx = document.getElementById('bridgeScalabilityChart').getContext('2d');
+        new Chart(bridgeCtx, {
+            type: 'bar',
+            data: {
+                labels: processLabels(['Phase 1: Verifiable Bridge', 'Phase 2: ZK-Bridge']),
+                datasets: [{
+                    label: 'Practical Swaps per Day',
+                    data: [1000, 100000],
+                    backgroundColor: ['#F5A800', '#73BC2D'],
+                    borderColor: ['#F5A800', '#73BC2D'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                ...chartDefaultOptions,
+                scales: {
+                    y: {
+                        type: 'logarithmic',
+                        ticks: {
+                            color: '#9CA3AF',
+                            font: { family: "'Inter', sans-serif" }
+                        },
+                        grid: {
+                            color: '#4A5568'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            color: '#9CA3AF',
+                            font: { family: "'Inter', sans-serif" }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        const reputationCtx = document.getElementById('reputationChart').getContext('2d');
+        new Chart(reputationCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Contributions', 'Time Decay', 'Appeals System'],
+                datasets: [{
+                    label: 'Reputation Score Components',
+                    data: [60, 25, 15],
+                    backgroundColor: ['#73BC2D', '#F5A800', '#00A6FB'],
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                 responsive: true,
+                 maintainAspectRatio: false,
+                 plugins: {
+                    legend: {
+                        position: 'top',
+                        labels: {
+                            color: '#E2E8F0',
+                            font: {
+                                family: "'Inter', sans-serif"
+                            }
+                        }
+                    },
+                    tooltip: {
+                         callbacks: {
+                            title: tooltipTitleCallback
+                         }
+                    }
+                 }
+            }
+        });
+
+        const performanceCtx = document.getElementById('performanceChart').getContext('2d');
+        new Chart(performanceCtx, {
+            type: 'bar',
+            data: {
+                labels: processLabels(['Standard L2 Contract Ops', 'Holochain Adapter (per App)', 'Bridge Phase 2 (ZK-Rollup)']),
+                datasets: [{
+                    label: 'Transactions per Second (TPS)',
+                    data: [30, 2000, 5000],
+                    backgroundColor: ['#DC3956', '#00A6FB', '#73BC2D'],
+                    borderWidth: 1,
+
+                }]
+            },
+            options: {
+                 ...chartDefaultOptionsNoY,
+                 indexAxis: 'y'
+            }
+        });
+
+    </script>
+</body>
+</html>

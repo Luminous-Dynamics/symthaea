@@ -1,0 +1,39 @@
+[package]
+name = "mycelix-redis-ratelimit"
+version = "0.1.0"
+edition = "2021"
+description = "Distributed rate limiting using Redis for Mycelix services"
+license = "Apache-2.0"
+repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"
+keywords = ["rate-limiting", "redis", "distributed", "throttling"]
+categories = ["web-programming", "caching"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# Redis client
+redis = { version = "0.27", features = ["tokio-comp", "connection-manager", "cluster-async"] }
+
+# Async runtime
+tokio = { version = "1", features = ["rt", "time", "sync"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# Logging
+tracing = "0.1"
+
+# Time utilities
+chrono = { version = "0.4", features = ["serde"] }
+
+# Async trait
+async-trait = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+tokio-test = "0.4"

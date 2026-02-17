@@ -1,0 +1,22 @@
+---
+# Epistemic Storage hApp Bundle
+# Unified Epistemic Storage System - DHT Backend
+
+manifest_version: "0"
+name: epistemic_storage
+description: |
+  DHT backend for the Unified Epistemic Storage System (UESS).
+  Provides M2 (Persistent) storage with E-N-M epistemic classification,
+  content-addressed lookup via CID, and automatic DHT replication.
+
+roles:
+  - name: epistemic_storage
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./workdir/epistemic_storage.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

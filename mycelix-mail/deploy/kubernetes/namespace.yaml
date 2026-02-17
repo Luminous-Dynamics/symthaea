@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix-mail
+  labels:
+    app.kubernetes.io/name: mycelix-mail
+    app.kubernetes.io/part-of: mycelix
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: mycelix-mail-quota
+  namespace: mycelix-mail
+spec:
+  hard:
+    requests.cpu: "8"
+    requests.memory: 16Gi
+    limits.cpu: "16"
+    limits.memory: 32Gi
+    persistentvolumeclaims: "10"
+---
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: mycelix-mail-limits
+  namespace: mycelix-mail
+spec:
+  limits:
+    - default:
+        cpu: "500m"
+        memory: "512Mi"
+      defaultRequest:
+        cpu: "100m"
+        memory: "128Mi"
+      type: Container

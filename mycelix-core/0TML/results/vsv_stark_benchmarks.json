@@ -1,0 +1,72 @@
+{
+  "metadata": {
+    "benchmark_date": "2025-11-09 15:02:09",
+    "mock_mode": true,
+    "vsv_stark_dir": "/srv/luminous-dynamics/Mycelix-Core/0TML/vsv-stark",
+    "risc_zero_version": "3.0.3"
+  },
+  "proof_generation": {
+    "test_name": "proof_generation",
+    "num_operations": 10,
+    "duration_seconds": 41.494269609451294,
+    "throughput_ops_per_sec": 0.24099713271545972,
+    "latency_mean_ms": 4147.66872111564,
+    "latency_p50_ms": 4157.435684473923,
+    "latency_p95_ms": 5461.417031551358,
+    "latency_p99_ms": 5627.924739286138,
+    "proof_size_bytes": 221254
+  },
+  "proof_verification": {
+    "test_name": "proof_verification",
+    "num_operations": 100,
+    "duration_seconds": 12.024682760238647,
+    "throughput_ops_per_sec": 8.31622771210767,
+    "latency_mean_ms": 120.06209143477002,
+    "latency_p50_ms": 110.25721486480485,
+    "latency_p95_ms": 172.93147471233362,
+    "latency_p99_ms": 177.34210402251898,
+    "proof_size_bytes": 0
+  },
+  "comparison": {
+    "vsv_stark": {
+      "method": "RISC Zero STARK",
+      "sign_time_ms": 4000,
+      "verify_time_ms": 120,
+      "signature_size_bytes": 221254,
+      "security_bits": 128,
+      "properties": "Zero-knowledge, succinct verification",
+      "privacy": "Full - no data revealed",
+      "notes": "Proves correct computation, not just signature"
+    },
+    "ecdsa": {
+      "method": "ECDSA (secp256k1)",
+      "sign_time_ms": 0.5,
+      "verify_time_ms": 1.5,
+      "signature_size_bytes": 64,
+      "security_bits": 128,
+      "properties": "Standard digital signature",
+      "privacy": "None - data must be public",
+      "notes": "Fast but reveals all inputs"
+    },
+    "ed25519": {
+      "method": "Ed25519",
+      "sign_time_ms": 0.3,
+      "verify_time_ms": 0.8,
+      "signature_size_bytes": 64,
+      "security_bits": 128,
+      "properties": "Fast modern signature",
+      "privacy": "None - data must be public",
+      "notes": "Fastest traditional crypto"
+    },
+    "rsa_2048": {
+      "method": "RSA-2048",
+      "sign_time_ms": 2.0,
+      "verify_time_ms": 0.1,
+      "signature_size_bytes": 256,
+      "security_bits": 112,
+      "properties": "Legacy standard",
+      "privacy": "None - data must be public",
+      "notes": "Slower, larger signatures"
+    }
+  }
+}

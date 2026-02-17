@@ -1,0 +1,97 @@
+{
+  "dashboard": {
+    "title": "ZeroTrustML Byzantine Detection",
+    "tags": ["zerotrustml", "byzantine", "security"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Byzantine Detections (Total)",
+        "type": "stat",
+        "gridPos": {"x": 0, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "sum(zerotrustml_byzantine_detected_total)",
+            "legendFormat": "Total Detections"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Blacklisted Nodes",
+        "type": "stat",
+        "gridPos": {"x": 6, "y": 0, "w": 6, "h": 4},
+        "targets": [
+          {
+            "expr": "zerotrustml_blacklisted_nodes",
+            "legendFormat": "Blacklisted"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Reputation Scores",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 4, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "zerotrustml_reputation_score",
+            "legendFormat": "Node {{node_id}}"
+          }
+        ],
+        "yaxes": [
+          {"min": 0, "max": 1, "format": "short"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Gradient Validation Results",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 10, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "sum by (result) (rate(zerotrustml_gradients_validated_total[5m]))",
+            "legendFormat": "{{result}}"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Byzantine Detection Timeline",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 16, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "rate(zerotrustml_byzantine_detected_total[1m])",
+            "legendFormat": "Detector {{detector_node_id}}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Validation Success Rate",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(zerotrustml_gradients_validated_total{result=\"valid\"}[5m])) / sum(rate(zerotrustml_gradients_validated_total[5m]))",
+            "legendFormat": "Success Rate"
+          }
+        ],
+        "options": {
+          "min": 0,
+          "max": 1,
+          "thresholds": [
+            {"value": 0, "color": "red"},
+            {"value": 0.7, "color": "yellow"},
+            {"value": 0.9, "color": "green"}
+          ]
+        }
+      }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

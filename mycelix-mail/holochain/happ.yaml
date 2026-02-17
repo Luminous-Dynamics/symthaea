@@ -1,0 +1,27 @@
+---
+manifest_version: "0"
+name: mycelix_mail
+description: |
+  Mycelix Mail - Decentralized secure email on Holochain.
+  Features DHT storage, CRDT sync, P2P delivery, and cross-cell federation.
+roles:
+  - name: main
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_mail_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+  - name: identity
+    provisioning:
+      strategy: create
+      deferred: true
+    dna:
+      path: ../../mycelix-identity/dna/mycelix_identity_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

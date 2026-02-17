@@ -1,0 +1,42 @@
+[package]
+name = "federated_learning_integrity"
+version = "0.2.0"
+edition = "2021"
+description = "Integrity zome for Mycelix Federated Learning - Entry types and validation"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Holochain 0.6 - Integrity zomes use hdi
+hdi = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+holochain_serialized_bytes = "0.0.56"
+
+# WASM compatibility
+# getrandom 0.2: "custom" feature lets Holochain provide RNG implementation.
+#   Do NOT use "js" - it pulls wasm-bindgen which Holochain's WASM runtime rejects
+#   (__wbindgen_placeholder__.__wbindgen_describe: unknown import)
+# getrandom 0.3: custom backend set via .cargo/config.toml (HDK provides __getrandom_v03_custom)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["custom"] }
+getrandom_03 = { package = "getrandom", version = "0.3" }
+
+# Pin rmp and rmp-serde to compatible versions (0.8.15+ requires edition2024)
+rmp = "=0.8.14"
+rmp-serde = "=1.3.0"
+
+# Pin indexmap to version compatible with Rust 1.81
+indexmap = "=2.2.6"
+
+# Cryptography for commitment verification
+sha2 = "0.10"
+
+# Mycelix Core Types - K-Vector, E/N/M/H Classification, Trust
+mycelix-core-types = { path = "../../../libs/mycelix-core-types", features = ["serde"] }
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'

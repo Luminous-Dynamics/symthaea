@@ -1,0 +1,50 @@
+[package]
+name = "mycelix-otel-tracing"
+version = "0.1.0"
+edition = "2021"
+description = "OpenTelemetry tracing and metrics for Mycelix services"
+license = "Apache-2.0"
+repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"
+keywords = ["opentelemetry", "tracing", "observability", "metrics", "distributed-tracing"]
+categories = ["development-tools::profiling", "development-tools::debugging"]
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+# OpenTelemetry core
+opentelemetry = { version = "0.27" }
+opentelemetry_sdk = { version = "0.27", features = ["rt-tokio"] }
+
+# Exporters
+opentelemetry-otlp = { version = "0.27", features = ["tonic", "metrics", "logs"] }
+opentelemetry-jaeger-propagator = "0.27"
+
+# Prometheus metrics
+opentelemetry-prometheus = { version = "0.27" }
+prometheus = "0.14"
+
+# Tracing integration
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.28"
+
+# Async runtime
+tokio = { version = "1", features = ["rt", "macros"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# HTTP server for Prometheus endpoint
+axum = { version = "0.7", optional = true }
+
+[features]
+default = []
+prometheus-endpoint = ["axum"]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }

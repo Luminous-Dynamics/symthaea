@@ -1,0 +1,171 @@
+version: '3.8'
+
+# Production Docker Compose Configuration
+# Usage: docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # ==========================================================
+  # PostgreSQL - Production database
+  # ==========================================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: mycelix-postgres-prod
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:-mycelix_music}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - backend
+
+  # ==========================================================
+  # Redis - Production cache
+  # ==========================================================
+  redis:
+    image: redis:7-alpine
+    container_name: mycelix-redis-prod
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    networks:
+      - backend
+
+  # ==========================================================
+  # Backend API (Production)
+  # ==========================================================
+  api:
+    build:
+      context: .
+      dockerfile: ./apps/api/Dockerfile
+    image: ${REGISTRY:-ghcr.io}/mycelix/api:${TAG:-latest}
+    container_name: mycelix-api-prod
+    restart: always
+    ports:
+      - "3100:3100"
+    environment:
+      NODE_ENV: production
+      PORT: 3100
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mycelix_music}
+      REDIS_URL: redis://redis:6379
+      CERAMIC_URL: ${CERAMIC_URL:-http://ceramic:7007}
+      IPFS_API_URL: ${IPFS_API_URL:-http://ipfs:5001}
+      RPC_URL: ${RPC_URL:?RPC_URL is required}
+      ROUTER_ADDRESS: ${ROUTER_ADDRESS:?ROUTER_ADDRESS is required}
+      FLOW_TOKEN_ADDRESS: ${FLOW_TOKEN_ADDRESS}
+      CSV_EXPORT_LIMIT: ${CSV_EXPORT_LIMIT:-50000}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3100/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - backend
+      - frontend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ==========================================================
+  # Frontend (Production)
+  # ==========================================================
+  web:
+    build:
+      context: .
+      dockerfile: ./apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required}
+        NEXT_PUBLIC_PRIVY_APP_ID: ${NEXT_PUBLIC_PRIVY_APP_ID}
+        NEXT_PUBLIC_ROUTER_ADDRESS: ${NEXT_PUBLIC_ROUTER_ADDRESS}
+        NEXT_PUBLIC_FLOW_TOKEN_ADDRESS: ${NEXT_PUBLIC_FLOW_TOKEN_ADDRESS}
+        NEXT_PUBLIC_CHAIN_ID: ${NEXT_PUBLIC_CHAIN_ID:-100}
+        NEXT_PUBLIC_RPC_URL: ${NEXT_PUBLIC_RPC_URL:-https://rpc.gnosischain.com}
+    image: ${REGISTRY:-ghcr.io}/mycelix/web:${TAG:-latest}
+    container_name: mycelix-web-prod
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: "0.0.0.0"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 384M
+        reservations:
+          cpus: '0.1'
+          memory: 192M
+    networks:
+      - frontend
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  backend:
+    name: mycelix-backend
+    internal: true
+  frontend:
+    name: mycelix-frontend

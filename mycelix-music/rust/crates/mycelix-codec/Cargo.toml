@@ -1,0 +1,40 @@
+[package]
+name = "mycelix-codec"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Native audio codecs for encoding/decoding without FFmpeg dependency"
+
+[features]
+default = ["vorbis"]
+vorbis = ["ogg", "lewton"]
+opus-native = ["opus"]
+mp3-native = ["mp3lame-encoder", "minimp3"]
+all-native = ["vorbis", "opus-native", "mp3-native"]
+
+[dependencies]
+mycelix-audio = { path = "../mycelix-audio" }
+
+# Vorbis/OGG (pure Rust, always available)
+ogg = { workspace = true, optional = true }
+lewton = { workspace = true, optional = true }
+
+# Opus (requires libopus)
+opus = { workspace = true, optional = true }
+
+# MP3 (requires native libraries)
+mp3lame-encoder = { workspace = true, optional = true }
+minimp3 = { workspace = true, optional = true }
+
+# Core dependencies
+bytes.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

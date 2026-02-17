@@ -1,0 +1,112 @@
+---
+# Holochain hApp Manifest
+# ZeroTrustML Reputation - Distributed Reputation System for ML Agents
+
+manifest_version: "1"
+name: zerotrustml-reputation
+description: |
+  Distributed reputation system for tracking and validating ML agent behavior
+  within the Mycelix-Core network. Implements consensus-based reputation scoring,
+  behavioral attestations, and stake-weighted credibility metrics.
+
+roles:
+  - id: reputation_ledger
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/zerotrustml-reputation.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          # Reputation scoring configuration
+          initial_reputation: 50
+          min_reputation: 0
+          max_reputation: 100
+          decay_rate_per_day: 0.01
+          # Consensus parameters
+          min_attestations_required: 3
+          attestation_weight_by_reputation: true
+          # Anti-gaming measures
+          sybil_resistance_enabled: true
+          rate_limit_attestations_per_hour: 10
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: behavioral_proofs
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/behavioral-proofs.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          proof_validity_hours: 72
+          require_zkp: true
+          proof_types:
+            - model_accuracy
+            - inference_latency
+            - resource_efficiency
+            - privacy_compliance
+        origin_time: ~
+      version: ~
+      clone_limit: 5
+
+  - id: stake_registry
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/stake-registry.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          min_stake_amount: 100
+          unstaking_delay_days: 7
+          slashing_enabled: true
+          slashing_percentage: 10
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+membrane_proofs:
+  reputation_ledger: null
+  behavioral_proofs: null
+  stake_registry: null
+
+meta:
+  author: Mycelix Core Team
+  repository: https://github.com/Luminous-Dynamics/Mycelix-Core
+  license: Apache-2.0
+  version: "0.1.0"
+  holochain_version: "0.3.x"
+
+  dependencies:
+    - name: zerotrustml-identity
+      version: ">=0.1.0"
+      required: true
+
+  integrations:
+    - zerotrustml-identity
+    - zerotrustml-governance
+    - mycelix-marketplace
+
+  entry_points:
+    submit_attestation:
+      zome: reputation_ledger
+      fn: submit_attestation
+      description: Submit a reputation attestation for an agent
+    query_reputation:
+      zome: reputation_ledger
+      fn: get_agent_reputation
+      description: Query the reputation score of an agent
+    stake_reputation:
+      zome: stake_registry
+      fn: stake_on_agent
+      description: Stake reputation tokens on an agent's behavior
+    submit_proof:
+      zome: behavioral_proofs
+      fn: submit_behavioral_proof
+      description: Submit a zero-knowledge behavioral proof

@@ -1,0 +1,15 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc bd6183eea09c9702b56de3718884158ac7c17b48faac795adb899d91d6ea8f55 # shrinks to gradient = [0.0, 0.0, 0.0, 0.0, 0.0]
+cc 9b9019805fa4b9101c28e2fde659696ef5ada55e5ecef49c617ae40a9e62fb9a # shrinks to contrib = 0.3398248
+cc a7b372a8b7aa671ccf470de86a7b1c48e4736e1587a280e42596b3b6b4f3463a # shrinks to gradient = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+cc 555bdd150598e69e92119db59014a7c883e073294da1ff768b2e3cc2cad08d7f # shrinks to contrib1 = 0.0, contrib2 = 0.27098012, contrib3 = 0.14315899
+cc 405e7a0d34f875e57946af61ea641dbfb1a7f9dcd6abba8a9cf91dae744fba4a # shrinks to matl = 0.0, stake = 0.0, age = 0, assurance = 0
+cc 2ff8cd595981fff428127cab11df3237493cde162f5ff6e189c7c73803c307e7 # shrinks to leaf_idx = 7
+cc 4a2bfa974f363bfcf1fe7f8571408bcba526fb04d816a75b0ddec38e2c04727d # shrinks to leaf_idx = 3
+cc ecf3f805744f5ee75f63e8c3be6fa15cbc0bd945ad8558d56e590a949481c30b # shrinks to seed = 91
+cc 6b8315f79c92ce38f95b69826b0ab9580af5ab6e3946ca69539e26679715f319 # shrinks to v1 = 13, v2 = 2

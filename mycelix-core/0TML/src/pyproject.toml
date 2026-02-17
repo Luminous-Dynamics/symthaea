@@ -1,0 +1,98 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mycelix-fl"
+version = "1.1.0"
+description = "Byzantine-Resistant Federated Learning with 45% BFT tolerance"
+readme = "../README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.9"
+authors = [
+    {name = "Luminous Dynamics", email = "dev@luminousdynamics.org"}
+]
+maintainers = [
+    {name = "Tristan Stoltz", email = "tristan.stoltz@evolvingresonantcocreationism.com"}
+]
+keywords = [
+    "federated-learning",
+    "byzantine-fault-tolerance",
+    "hypervector",
+    "machine-learning",
+    "phi-measurement",
+    "shapley-values",
+    "distributed-ml",
+    "privacy-preserving"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Security :: Cryptography",
+    "Typing :: Typed",
+]
+dependencies = [
+    "numpy>=1.21.0",
+]
+
+[project.optional-dependencies]
+rust = ["zerotrustml-core>=0.1.0"]
+pytorch = ["torch>=2.0.0"]
+tensorflow = ["tensorflow>=2.10.0"]
+jax = ["jax>=0.4.0", "jaxlib>=0.4.0"]
+all = [
+    "zerotrustml-core>=0.1.0",
+    "torch>=2.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+mycelix-verify = "mycelix_fl.verify_rust:verify"
+
+[project.urls]
+Homepage = "https://mycelix.net"
+Repository = "https://github.com/Luminous-Dynamics/mycelix"
+Documentation = "https://mycelix.net/docs"
+Changelog = "https://github.com/Luminous-Dynamics/mycelix/blob/main/CHANGELOG.md"
+"Bug Tracker" = "https://github.com/Luminous-Dynamics/mycelix/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mycelix_fl*"]
+
+[tool.setuptools.package-data]
+mycelix_fl = ["py.typed"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501"]  # Line too long (handled by formatter)
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

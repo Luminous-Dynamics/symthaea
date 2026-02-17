@@ -1,0 +1,18 @@
+
+\begin{table}[t]
+\centering
+\caption{Holochain DHT Performance Comparison}
+\label{tab:holochain_performance}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Platform} & \textbf{TPS} & \textbf{Latency (p95)} & \textbf{Cost/Gradient} \\
+\midrule
+Holochain (DHT) & 3503 & 173ms & \$0.00 \\
+Polygon (L2) & 1000 & 5000ms & \$0.05 \\
+Ethereum (L1) & 15 & 30000ms & \$20.00 \\
+IPFS (storage) & 500 & 300ms & \$0.0005* \\
+\bottomrule
+\end{tabular}
+\\[0.5em]
+\footnotesize *Storage only, no validation capability
+\end{table}

@@ -1,0 +1,25 @@
+[package]
+name = "edunet-agg"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Robust aggregation algorithms for federated learning in Mycelix EduNet"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+statrs.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+anyhow.workspace = true
+criterion.workspace = true
+rand.workspace = true
+rand_chacha.workspace = true
+rand_distr.workspace = true
+
+[[bench]]
+name = "aggregation_bench"
+harness = false

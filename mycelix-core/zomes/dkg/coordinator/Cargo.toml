@@ -1,0 +1,34 @@
+[package]
+name = "dkg_coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "DKG (Distributed Knowledge Graph) Coordinator Zome - Truth Ledger API"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Holochain 0.6 - Coordinator zomes use hdk
+hdk = "0.6"
+serde = { version = "1.0", features = ["derive"] }
+holochain_serialized_bytes = "0.0.56"
+
+# Local integrity zome
+dkg_integrity = { path = "../integrity" }
+
+# Enable wasm support for getrandom (transitive dependencies)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+# Pin rmp and rmp-serde to compatible versions
+rmp = "=0.8.14"
+rmp-serde = "=1.3.0"
+
+# Pin indexmap to version compatible with Rust 1.81
+indexmap = "=2.2.6"
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'

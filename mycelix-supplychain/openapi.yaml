@@ -1,0 +1,1242 @@
+openapi: 3.0.3
+info:
+  title: Mycelix Supply Chain ERP API
+  description: |
+    # Mycelix ERP - The World's First Blockchain-Auditable ERP
+
+    **Mycelix ERP** combines traditional enterprise resource planning with blockchain-powered supply chain verification.
+
+    ## Key Features
+    - **Supply Chain Module (SCM)**: Track products from origin to customer with cryptographic proof
+    - **Finance Module (FIN)**: Double-entry bookkeeping with automatic validation
+    - **Blockchain Integration**: Holochain-based tamper-proof provenance
+    - **Modern API**: RESTful design with JSON responses
+
+    ## Authentication
+    Currently in development. All endpoints are open for demo purposes.
+
+    ## Rate Limiting
+    Not yet implemented. Will be added in v1.0.
+
+    ## Support
+    - Email: support@mycelix.net
+    - Docs: https://github.com/luminous-dynamics/mycelix-supplychain
+    - Slack: mycelix-community.slack.com
+
+  version: 0.1.0
+  contact:
+    name: Mycelix Support
+    email: support@mycelix.net
+    url: https://mycelix.net
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8000/v1
+    description: Local development server
+  - url: https://api.mycelix.net/v1
+    description: Production server (coming soon)
+
+tags:
+  - name: Health
+    description: Service health and status
+  - name: Supply Chain
+    description: Product events and provenance tracking
+  - name: Finance - Customers
+    description: Customer account management
+  - name: Finance - Vendors
+    description: Vendor/supplier management
+  - name: Finance - Invoices
+    description: Accounts receivable (AR) invoicing
+  - name: Finance - Bills
+    description: Accounts payable (AP) bills
+  - name: Finance - Payments
+    description: Payment processing
+  - name: Finance - Reports
+    description: Financial reporting and analytics
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check if the service is running and responsive
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                    example: "0.1.0"
+
+  /events:
+    post:
+      tags:
+        - Supply Chain
+      summary: Create supply chain event
+      description: |
+        Record a new event in the supply chain (harvest, shipment, processing, etc.)
+
+        All events are cryptographically signed and stored on the blockchain for tamper-proof audit trails.
+      operationId: createEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+            examples:
+              harvest:
+                summary: Farm harvest event
+                value:
+                  event_type: "HARVEST"
+                  product_id: "ethiopian-yirgacheffe-2024"
+                  location: "Yirgacheffe, Ethiopia"
+                  timestamp: "2024-01-15T08:00:00Z"
+                  actor: "Koke Washing Station"
+                  metadata:
+                    variety: "Heirloom"
+                    altitude: "1900-2200m"
+              shipment:
+                summary: Shipping event
+                value:
+                  event_type: "SHIPMENT"
+                  product_id: "laptop-12345"
+                  location: "Port of Los Angeles"
+                  timestamp: "2024-02-01T14:30:00Z"
+                  actor: "Maersk Shipping"
+                  metadata:
+                    container: "CONT-2024-001"
+                    destination: "Rotterdam"
+      responses:
+        '201':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Invalid request body
+        '500':
+          description: Server error
+
+  /provenance/{product_id}:
+    get:
+      tags:
+        - Supply Chain
+      summary: Get product provenance
+      description: |
+        Retrieve the complete history of a product from origin to current location.
+
+        Returns all events in chronological order with cryptographic verification.
+      operationId: getProvenance
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          description: Unique identifier for the product
+          schema:
+            type: string
+          example: "ethiopian-yirgacheffe-2024"
+      responses:
+        '200':
+          description: Provenance retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Provenance'
+        '404':
+          description: Product not found
+
+  /passport/{product_id}:
+    get:
+      tags:
+        - Supply Chain
+      summary: Get product passport (QR-friendly)
+      description: |
+        Get a consumer-friendly product passport suitable for QR codes.
+
+        Includes human-readable journey summary and verification link.
+      operationId: getPassport
+      parameters:
+        - name: product_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Passport generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductPassport'
+
+  # ============================================
+  # FINANCE MODULE - CUSTOMERS
+  # ============================================
+
+  /fin/customers:
+    post:
+      tags:
+        - Finance - Customers
+      summary: Create customer
+      description: Create a new customer account for accounts receivable
+      operationId: createCustomer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '201':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+
+    get:
+      tags:
+        - Finance - Customers
+      summary: List customers
+      description: Get all customers with optional filtering
+      operationId: listCustomers
+      parameters:
+        - name: type
+          in: query
+          description: Filter by customer type
+          schema:
+            type: string
+            enum: [retail, wholesale, corporate, startup]
+        - name: active_only
+          in: query
+          description: Only return active customers
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: List of customers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Customer'
+
+  /fin/customers/{id}:
+    get:
+      tags:
+        - Finance - Customers
+      summary: Get customer by ID
+      operationId: getCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Customer found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '404':
+          description: Customer not found
+
+    put:
+      tags:
+        - Finance - Customers
+      summary: Update customer
+      operationId: updateCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCustomerRequest'
+      responses:
+        '200':
+          description: Customer updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+
+    delete:
+      tags:
+        - Finance - Customers
+      summary: Delete customer
+      description: Soft delete a customer (marks as inactive)
+      operationId: deleteCustomer
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Customer deleted
+
+  # ============================================
+  # FINANCE MODULE - VENDORS
+  # ============================================
+
+  /fin/vendors:
+    post:
+      tags:
+        - Finance - Vendors
+      summary: Create vendor
+      description: Create a new vendor/supplier for accounts payable
+      operationId: createVendor
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVendorRequest'
+      responses:
+        '201':
+          description: Vendor created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+
+    get:
+      tags:
+        - Finance - Vendors
+      summary: List vendors
+      operationId: listVendors
+      responses:
+        '200':
+          description: List of vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vendor'
+
+  /fin/vendors/{id}:
+    get:
+      tags:
+        - Finance - Vendors
+      summary: Get vendor by ID
+      operationId: getVendor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Vendor found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+
+  # ============================================
+  # FINANCE MODULE - INVOICES (AR)
+  # ============================================
+
+  /fin/invoices:
+    post:
+      tags:
+        - Finance - Invoices
+      summary: Create invoice
+      description: |
+        Create a new sales invoice (accounts receivable).
+
+        Automatically generates journal entries for:
+        - Debit: Accounts Receivable
+        - Credit: Revenue
+      operationId: createInvoice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInvoiceRequest'
+      responses:
+        '201':
+          description: Invoice created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+
+    get:
+      tags:
+        - Finance - Invoices
+      summary: List invoices
+      operationId: listInvoices
+      parameters:
+        - name: customer_id
+          in: query
+          description: Filter by customer
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by payment status
+          schema:
+            type: string
+            enum: [draft, pending, paid, overdue, cancelled]
+      responses:
+        '200':
+          description: List of invoices
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Invoice'
+
+  /fin/invoices/{id}:
+    get:
+      tags:
+        - Finance - Invoices
+      summary: Get invoice by ID
+      operationId: getInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+
+  /fin/invoices/{id}/void:
+    post:
+      tags:
+        - Finance - Invoices
+      summary: Void invoice
+      description: Cancel an invoice and reverse journal entries
+      operationId: voidInvoice
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Invoice voided
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Invoice'
+
+  # ============================================
+  # FINANCE MODULE - BILLS (AP)
+  # ============================================
+
+  /fin/bills:
+    post:
+      tags:
+        - Finance - Bills
+      summary: Create bill
+      description: |
+        Create a vendor bill (accounts payable).
+
+        Automatically generates journal entries for:
+        - Debit: Expense/COGS
+        - Credit: Accounts Payable
+      operationId: createBill
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBillRequest'
+      responses:
+        '201':
+          description: Bill created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+
+    get:
+      tags:
+        - Finance - Bills
+      summary: List bills
+      operationId: listBills
+      parameters:
+        - name: vendor_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [draft, pending, paid, overdue]
+      responses:
+        '200':
+          description: List of bills
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Bill'
+
+  /fin/bills/{id}:
+    get:
+      tags:
+        - Finance - Bills
+      summary: Get bill by ID
+      operationId: getBill
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Bill found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Bill'
+
+  # ============================================
+  # FINANCE MODULE - PAYMENTS
+  # ============================================
+
+  /fin/payments:
+    post:
+      tags:
+        - Finance - Payments
+      summary: Record payment
+      description: |
+        Record a payment against an invoice or bill.
+
+        Automatically:
+        - Updates invoice/bill payment status
+        - Creates bank/cash journal entry
+        - Reduces accounts receivable/payable
+      operationId: createPayment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+      responses:
+        '201':
+          description: Payment recorded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+    get:
+      tags:
+        - Finance - Payments
+      summary: List payments
+      operationId: listPayments
+      parameters:
+        - name: invoice_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: bill_id
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: List of payments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Payment'
+
+  /fin/payments/{id}:
+    get:
+      tags:
+        - Finance - Payments
+      summary: Get payment by ID
+      operationId: getPayment
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+
+  # ============================================
+  # FINANCE MODULE - REPORTS
+  # ============================================
+
+  /fin/reports/trial-balance:
+    get:
+      tags:
+        - Finance - Reports
+      summary: Trial balance report
+      description: |
+        Get trial balance showing all accounts with debits and credits.
+
+        Used to verify that total debits = total credits.
+      operationId: getTrialBalance
+      parameters:
+        - name: as_of_date
+          in: query
+          description: Report as of this date (defaults to now)
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Trial balance generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrialBalanceReport'
+
+  /fin/reports/income-statement:
+    get:
+      tags:
+        - Finance - Reports
+      summary: Income statement (P&L)
+      description: |
+        Profit & Loss statement showing revenue and expenses.
+      operationId: getIncomeStatement
+      parameters:
+        - name: start_date
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: end_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Income statement generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IncomeStatementReport'
+
+  /fin/reports/balance-sheet:
+    get:
+      tags:
+        - Finance - Reports
+      summary: Balance sheet
+      description: |
+        Balance sheet showing assets, liabilities, and equity.
+      operationId: getBalanceSheet
+      parameters:
+        - name: as_of_date
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Balance sheet generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceSheetReport'
+
+  /fin/reports/ar-aging:
+    get:
+      tags:
+        - Finance - Reports
+      summary: Accounts receivable aging
+      description: |
+        AR aging report showing outstanding invoices by age.
+
+        Categories: Current, 1-30 days, 31-60 days, 61-90 days, 90+ days
+      operationId: getARAgeing
+      responses:
+        '200':
+          description: AR aging report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ARAgingReport'
+
+  /fin/reports/ap-aging:
+    get:
+      tags:
+        - Finance - Reports
+      summary: Accounts payable aging
+      description: AP aging report showing outstanding bills
+      operationId: getAPAgeing
+      responses:
+        '200':
+          description: AP aging report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/APAgingReport'
+
+# ============================================
+# COMPONENTS (SCHEMAS)
+# ============================================
+
+components:
+  schemas:
+    # Supply Chain Models
+    CreateEventRequest:
+      type: object
+      required:
+        - event_type
+        - product_id
+        - location
+        - timestamp
+        - actor
+      properties:
+        event_type:
+          type: string
+          description: Type of supply chain event
+          enum:
+            - HARVEST
+            - SHIPMENT
+            - PROCESSING
+            - STORAGE
+            - QUALITY_CHECK
+            - INVENTORY_ADD
+            - INVENTORY_REMOVE
+            - DELIVERY
+          example: "HARVEST"
+        product_id:
+          type: string
+          description: Unique product identifier
+          example: "ethiopian-yirgacheffe-2024"
+        location:
+          type: string
+          description: Geographic location of event
+          example: "Yirgacheffe, Ethiopia"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the event occurred
+        actor:
+          type: string
+          description: Who performed the action
+          example: "Koke Washing Station"
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Event-specific custom data
+          example:
+            variety: "Heirloom"
+            altitude: "1900-2200m"
+
+    Event:
+      type: object
+      properties:
+        event_id:
+          type: string
+          format: uuid
+        event_type:
+          type: string
+        product_id:
+          type: string
+        location:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+        signature:
+          type: string
+          description: Cryptographic signature (SHA-256)
+          example: "a3f8d9e2..."
+        blockchain_hash:
+          type: string
+          description: Holochain entry hash
+          example: "uhCkk..."
+
+    Provenance:
+      type: object
+      properties:
+        product_id:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        verified:
+          type: boolean
+          description: Whether blockchain verification passed
+        verification_timestamp:
+          type: string
+          format: date-time
+
+    ProductPassport:
+      type: object
+      properties:
+        product_id:
+          type: string
+        product_name:
+          type: string
+        journey:
+          type: array
+          items:
+            type: object
+            properties:
+              stage:
+                type: string
+              location:
+                type: string
+              date:
+                type: string
+                format: date
+        qr_code_url:
+          type: string
+          format: uri
+          example: "https://mycelix.net/passport/scan?id=..."
+        verification_link:
+          type: string
+          format: uri
+
+    # Finance Models
+    CreateCustomerRequest:
+      type: object
+      required:
+        - name
+        - email
+        - type
+      properties:
+        name:
+          type: string
+          example: "Acme Corporation"
+        email:
+          type: string
+          format: email
+          example: "billing@acme.com"
+        type:
+          type: string
+          enum: [retail, wholesale, corporate, startup, government]
+        payment_terms_days:
+          type: integer
+          minimum: 0
+          maximum: 365
+          default: 30
+          example: 30
+        credit_limit:
+          type: string
+          pattern: '^\d+\.\d{2}$'
+          example: "50000.00"
+
+    Customer:
+      allOf:
+        - $ref: '#/components/schemas/CreateCustomerRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    UpdateCustomerRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        payment_terms_days:
+          type: integer
+        credit_limit:
+          type: string
+
+    CreateVendorRequest:
+      type: object
+      required:
+        - name
+        - email
+        - type
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        type:
+          type: string
+          enum: [supplier, contractor, consultant, service_provider]
+        payment_terms_days:
+          type: integer
+          default: 30
+
+    Vendor:
+      allOf:
+        - $ref: '#/components/schemas/CreateVendorRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            created_at:
+              type: string
+              format: date-time
+
+    LineItem:
+      type: object
+      required:
+        - description
+        - quantity
+        - unit_price
+        - account_code
+      properties:
+        description:
+          type: string
+          example: "Professional Services - 10 hours"
+        quantity:
+          type: integer
+          minimum: 1
+          example: 1
+        unit_price:
+          type: string
+          pattern: '^\d+\.\d{2}$'
+          example: "150.00"
+        account_code:
+          type: string
+          description: General ledger account code
+          example: "4000"
+
+    CreateInvoiceRequest:
+      type: object
+      required:
+        - customer_id
+        - items
+        - due_date
+      properties:
+        customer_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+          minItems: 1
+        due_date:
+          type: string
+          format: date
+          example: "2024-03-15"
+        notes:
+          type: string
+          example: "Net 30 terms"
+
+    Invoice:
+      allOf:
+        - $ref: '#/components/schemas/CreateInvoiceRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            invoice_number:
+              type: string
+              example: "INV-2024-001"
+            subtotal:
+              type: string
+            tax:
+              type: string
+              default: "0.00"
+            total:
+              type: string
+            amount_paid:
+              type: string
+            amount_due:
+              type: string
+            status:
+              type: string
+              enum: [draft, pending, paid, partially_paid, overdue, cancelled]
+            created_at:
+              type: string
+              format: date-time
+
+    CreateBillRequest:
+      type: object
+      required:
+        - vendor_id
+        - items
+        - due_date
+      properties:
+        vendor_id:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineItem'
+        due_date:
+          type: string
+          format: date
+        notes:
+          type: string
+
+    Bill:
+      allOf:
+        - $ref: '#/components/schemas/CreateBillRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            bill_number:
+              type: string
+            total:
+              type: string
+            amount_paid:
+              type: string
+            amount_due:
+              type: string
+            status:
+              type: string
+              enum: [draft, pending, paid, partially_paid, overdue]
+            created_at:
+              type: string
+              format: date-time
+
+    CreatePaymentRequest:
+      type: object
+      required:
+        - amount
+        - payment_method
+      properties:
+        invoice_id:
+          type: string
+          format: uuid
+          description: Pay against an invoice (AR)
+        bill_id:
+          type: string
+          format: uuid
+          description: Pay against a bill (AP)
+        amount:
+          type: string
+          pattern: '^\d+\.\d{2}$'
+        payment_method:
+          type: string
+          enum:
+            - cash
+            - check
+            - credit_card
+            - bank_transfer
+            - wire_transfer
+            - ach
+        reference:
+          type: string
+          description: Transaction reference (check #, confirmation #, etc.)
+          example: "CHK-12345"
+
+    Payment:
+      allOf:
+        - $ref: '#/components/schemas/CreatePaymentRequest'
+        - type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            payment_date:
+              type: string
+              format: date-time
+            created_at:
+              type: string
+              format: date-time
+
+    # Report Models
+    TrialBalanceReport:
+      type: object
+      properties:
+        as_of_date:
+          type: string
+          format: date
+        accounts:
+          type: array
+          items:
+            type: object
+            properties:
+              account_code:
+                type: string
+              account_name:
+                type: string
+              debit:
+                type: string
+              credit:
+                type: string
+        total_debits:
+          type: string
+        total_credits:
+          type: string
+        balanced:
+          type: boolean
+
+    IncomeStatementReport:
+      type: object
+      properties:
+        period_start:
+          type: string
+          format: date
+        period_end:
+          type: string
+          format: date
+        revenue:
+          type: string
+        cost_of_goods_sold:
+          type: string
+        gross_profit:
+          type: string
+        operating_expenses:
+          type: string
+        net_income:
+          type: string
+
+    BalanceSheetReport:
+      type: object
+      properties:
+        as_of_date:
+          type: string
+          format: date
+        assets:
+          type: object
+          properties:
+            current_assets:
+              type: string
+            fixed_assets:
+              type: string
+            total_assets:
+              type: string
+        liabilities:
+          type: object
+          properties:
+            current_liabilities:
+              type: string
+            long_term_liabilities:
+              type: string
+            total_liabilities:
+              type: string
+        equity:
+          type: object
+          properties:
+            retained_earnings:
+              type: string
+            total_equity:
+              type: string
+
+    ARAgingReport:
+      type: object
+      properties:
+        as_of_date:
+          type: string
+          format: date
+        aging_buckets:
+          type: array
+          items:
+            type: object
+            properties:
+              bucket:
+                type: string
+                enum: [current, "1-30", "31-60", "61-90", "90+"]
+              amount:
+                type: string
+        total_outstanding:
+          type: string
+
+    APAgingReport:
+      type: object
+      properties:
+        as_of_date:
+          type: string
+          format: date
+        aging_buckets:
+          type: array
+          items:
+            type: object
+            properties:
+              bucket:
+                type: string
+              amount:
+                type: string
+        total_outstanding:
+          type: string
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token authentication (coming in v1.0)
+
+        For now, all endpoints are open for demo purposes.
+
+# Apply security globally (when implemented)
+# security:
+#   - bearerAuth: []

@@ -1,0 +1,15 @@
+\begin{table}[h]
+\centering
+\caption{Byzantine Algorithm Comparison for H-FL}
+\begin{tabular}{|l|c|c|c|c|}
+\hline
+Algorithm & Avg Accuracy & Speed (100 agents) & Breaking Point & Complexity \\
+\hline
+Krum & 89.2\% & 95ms & 45\% & O(n²d) \\
+Multi-Krum & 86.7\% & 98ms & 40\% & O(n²d) \\
+Median & 72.3\% & 8ms & 50\% & O(nd) \\
+Trimmed Mean & 78.5\% & 15ms & 35\% & O(nd log n) \\
+\hline
+\end{tabular}
+\label{tab:byzantine_comparison}
+\end{table}

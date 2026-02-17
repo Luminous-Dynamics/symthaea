@@ -1,0 +1,109 @@
+# Mycelix Validator Node Dockerfile
+#
+# Multi-stage build for optimized production image
+#
+# Build: docker build -f deployment/docker/Dockerfile.validator -t mycelix/validator .
+# Run:   docker run -d --name validator mycelix/validator
+
+# ====================
+# Build Stage
+# ====================
+FROM rust:1.75-bookworm AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    cmake \
+    protobuf-compiler \
+    libssl-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cache dependencies
+COPY libs/Cargo.toml libs/Cargo.lock ./libs/
+COPY libs/rb-bft-consensus/Cargo.toml ./libs/rb-bft-consensus/
+COPY libs/feldman-dkg/Cargo.toml ./libs/feldman-dkg/
+COPY libs/mycelix-core-types/Cargo.toml ./libs/mycelix-core-types/
+
+# Create dummy source files for dependency caching
+RUN mkdir -p libs/rb-bft-consensus/src libs/feldman-dkg/src libs/mycelix-core-types/src \
+    && echo "fn main() {}" > libs/rb-bft-consensus/src/main.rs \
+    && echo "fn main() {}" > libs/feldman-dkg/src/lib.rs \
+    && echo "fn main() {}" > libs/mycelix-core-types/src/lib.rs
+
+WORKDIR /build/libs
+RUN cargo build --release --package rb-bft-consensus 2>/dev/null || true
+
+# Copy actual source code
+WORKDIR /build
+COPY libs/ ./libs/
+
+# Build validator binary
+WORKDIR /build/libs
+RUN cargo build --release --package rb-bft-consensus --bin validator
+
+# ====================
+# Runtime Stage
+# ====================
+FROM debian:bookworm-slim AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r mycelix && useradd -r -g mycelix mycelix
+
+# Create directories
+RUN mkdir -p /app /data /config \
+    && chown -R mycelix:mycelix /app /data /config
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /build/libs/target/release/validator /app/validator
+
+# Copy configuration files
+COPY deployment/config/validator.toml /config/validator.toml
+
+# Set ownership
+RUN chown -R mycelix:mycelix /app /config
+
+# Switch to non-root user
+USER mycelix
+
+# Environment variables
+ENV RUST_LOG=info,rb_bft_consensus=debug
+ENV CONFIG_PATH=/config/validator.toml
+ENV DATA_DIR=/data
+
+# Expose ports
+EXPOSE 9000/tcp
+EXPOSE 9090/tcp
+EXPOSE 8080/tcp
+EXPOSE 50051/tcp
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8080/health/live || exit 1
+
+# Labels
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG VCS_REF
+
+LABEL org.opencontainers.image.title="Mycelix Validator" \
+      org.opencontainers.image.description="Mycelix consensus validator node" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="Luminous Dynamics" \
+      org.opencontainers.image.source="https://github.com/mycelix/core"
+
+# Entrypoint
+ENTRYPOINT ["/app/validator"]
+CMD ["--config", "/config/validator.toml"]

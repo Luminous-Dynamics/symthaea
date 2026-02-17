@@ -1,0 +1,121 @@
+# Byzantine Attack Robustness Experiment
+# Tests all 7 attack types against Byzantine-robust aggregation methods
+#
+# Research Goal: Validate that our Byzantine-robust baselines (Krum, Multi-Krum,
+# Bulyan, Median) can withstand sophisticated attacks beyond simple Gaussian noise.
+#
+# Expected Results:
+# - FedAvg should fail catastrophically against most attacks
+# - Krum/Multi-Krum should resist distance-based attacks but struggle with adaptive
+# - Bulyan should be most robust (designed for f < n/4 Byzantine clients)
+# - Median should provide middle-ground protection
+
+experiment_name: "mnist_byzantine_attacks"
+description: "Comprehensive Byzantine attack testing against robust aggregation"
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+data_split:
+  type: "iid"
+  num_clients: 10
+
+training:
+  num_rounds: 100
+  local_epochs: 5
+  batch_size: 32
+  learning_rate: 0.01
+
+# Byzantine client configuration
+byzantine:
+  # Standard assumption: f < n/3 for Byzantine fault tolerance
+  # With 10 clients, 3 Byzantine = 30% (challenging but realistic)
+  num_byzantine: 3
+
+  # Attack types to test (each will be a separate experiment run)
+  attack_types:
+    - gaussian_noise      # Baseline: random noise (current implementation)
+    - sign_flip           # Negate gradients (harder to detect)
+    - label_flip          # Train on corrupted labels (subtle)
+    - targeted_poison     # Backdoor-style attack (amplified gradients)
+    - model_replacement   # Send random weights (most obvious)
+    - adaptive            # Evade distance-based detection (vs Krum)
+    - sybil               # Coordinated multi-client attack
+
+  # Attack severity (1.0 = standard, >1.0 = stronger)
+  severity: 1.0
+
+  # For attacks that need context (adaptive, sybil)
+  # This will be populated at runtime
+  enable_peer_context: true
+
+baselines:
+  # Non-robust baseline (should fail)
+  - name: "fedavg"
+    params:
+      mu: 0.0
+
+  # Byzantine-robust aggregation methods
+  - name: "krum"
+    params:
+      # Krum selects single closest gradient
+      # Should resist distance-based attacks but vulnerable to adaptive
+      num_byzantine: 3
+
+  - name: "multikrum"
+    params:
+      # Multi-Krum averages k closest gradients
+      # More robust than Krum, harder to game
+      num_byzantine: 3
+      k: 7  # Select top 7 of 10 clients
+
+  - name: "bulyan"
+    params:
+      # Bulyan: Most robust (designed for f < n/4)
+      # Should resist all attacks when f=3 < 10/4=2.5... wait, we violate this!
+      # Interesting: we're testing beyond theoretical guarantees
+      num_byzantine: 3
+
+  - name: "median"
+    params:
+      # Coordinate-wise median
+      # Robust to outliers, should handle most attacks
+      pass: {}
+
+# Model architecture (simple CNN for MNIST)
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+  architecture:
+    - conv2d: {in: 1, out: 32, kernel: 5}
+    - relu: {}
+    - maxpool2d: {kernel: 2}
+    - conv2d: {in: 32, out: 64, kernel: 5}
+    - relu: {}
+    - maxpool2d: {kernel: 2}
+    - flatten: {}
+    - linear: {in: 1024, out: 512}
+    - relu: {}
+    - linear: {in: 512, out: 10}
+
+device: "cuda"  # Use GPU for faster experiments
+
+# Results to save
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - attack_success_rate  # Measure of attack effectiveness
+
+  per_round: true
+  final_model: true
+  attack_analysis: true  # Generate attack effectiveness table
+
+# Experiment matrix will be:
+# 7 attack types × 5 baselines = 35 runs
+# Estimated time: ~2-3 hours on GPU

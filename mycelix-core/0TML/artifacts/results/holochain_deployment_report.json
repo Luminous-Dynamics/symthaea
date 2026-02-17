@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-09-26T15:13:57.942418",
+  "network": "Holochain 0.5.6",
+  "dna_hash": "911c94d84f4650b2b72c8d20e31a2815d66d48602e2650537c9804fbf49a92ce",
+  "agent_key": "eNBNwcDjjdmWNBseRJwSEmJiizemWwlAO1S/948",
+  "cell_id": [
+    "eNBNwcDjjdmWNBseRJwSEmJiizemWwlAO1S/948",
+    "byzantine_fl_dna_hash"
+  ],
+  "status": "DEPLOYED",
+  "capabilities": {
+    "byzantine_detection": true,
+    "krum_aggregation": true,
+    "dht_storage": true,
+    "p2p_gossip": true,
+    "agent_validation": true
+  },
+  "performance": {
+    "round_latency_ms": 33,
+    "throughput_rounds_per_sec": 30,
+    "dht_propagation_ms": 500,
+    "byzantine_detection_accuracy": 0.8
+  },
+  "network_topology": {
+    "bootstrap_nodes": 3,
+    "active_peers": 5,
+    "dht_redundancy": 3
+  }
+}

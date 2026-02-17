@@ -1,0 +1,40 @@
+# Ablation Study: PoGQ v4.1 WITHOUT Mondrian Conformal
+# =======================================================
+# Test impact of removing per-bucket thresholds
+# Baseline: v4.1 uses 3 profiles (label, norm, direction)
+# Ablation: Use global threshold only
+
+experiment:
+  name: ablation_no_mondrian
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1_no_mondrian   # Global conformal only
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: 0.10
+  mondrian_enabled: false      # ❌ DISABLED
+  mondrian_profiles: []        # No bucketing
+  adaptive_hybrid: false       # Requires Mondrian
+  ema_beta: 0.85
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02

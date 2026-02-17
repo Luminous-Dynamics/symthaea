@@ -1,0 +1,43 @@
+# US East Region Configuration
+replicaCount: 5
+
+config:
+  networking:
+    numShards: 20
+    shardReplication: 3
+
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "1000m"
+  limits:
+    memory: "4Gi"
+    cpu: "4000m"
+
+autoscaling:
+  minReplicas: 5
+  maxReplicas: 150
+
+nodeSelector:
+  topology.kubernetes.io/region: us-east-1
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - us-east-1a
+          - us-east-1b
+          - us-east-1c
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - zerotrustml
+      topologyKey: kubernetes.io/hostname

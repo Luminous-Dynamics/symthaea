@@ -1,0 +1,38 @@
+[package]
+name = "feldman-dkg"
+version = "0.1.0"
+edition = "2021"
+description = "Feldman's Verifiable Secret Sharing for Distributed Key Generation"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Elliptic curve cryptography (secp256k1)
+# default-features=false to avoid k256/std → elliptic-curve/std → rand_core/std → getrandom 0.2 on WASM
+k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa"] }
+elliptic-curve = { version = "0.13", default-features = false, features = ["sec1"] }
+
+# Hashing
+sha2 = "0.10"
+
+# Random number generation (rand_core only — no getrandom activation)
+rand_core = "0.6"
+
+# Secure memory handling
+zeroize = { version = "1.7", features = ["derive"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+
+# Error handling
+thiserror = "2.0"
+
+# rand 0.8 only on native (activates getrandom 0.2 which is incompatible with wasm32)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+rand = "0.8"
+
+[dev-dependencies]
+rand = "0.8"
+
+[features]
+default = []
+std = []

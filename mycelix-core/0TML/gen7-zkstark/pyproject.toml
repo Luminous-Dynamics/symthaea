@@ -1,0 +1,44 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "gen7-zkstark"
+version = "0.1.0"
+description = "zkSTARK proof generation for Gen-7 HYPERION-FL gradient provenance"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "Apache-2.0"}
+keywords = ["zkstark", "federated-learning", "zero-knowledge", "risc0"]
+authors = [
+    {name = "Luminous Dynamics", email = "tristan.stoltz@evolvingresonantcocreationism.com"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "numpy>=1.21",
+]
+
+[project.urls]
+homepage = "https://github.com/Luminous-Dynamics/mycelix"
+repository = "https://github.com/Luminous-Dynamics/mycelix"
+
+[tool.maturin]
+# Use lib-Cargo.toml instead of default Cargo.toml (which is workspace config)
+manifest-path = "lib-Cargo.toml"
+# No python-source needed - this is a pure Rust extension module
+module-name = "gen7_zkstark"

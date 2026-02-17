@@ -1,0 +1,6 @@
+aiohttp==3.9.1
+asyncio==3.4.3
+dataclasses==0.6
+typing==3.7.4.3
+matplotlib==3.8.2
+numpy==2.4.2

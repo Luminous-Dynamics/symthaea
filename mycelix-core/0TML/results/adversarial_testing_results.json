@@ -1,0 +1,85 @@
+{
+  "test_date": "2025-10-27T17:47:58.290002",
+  "pogq_threshold": 0.7,
+  "total_trials": 700,
+  "total_detected": 500,
+  "total_missed": 200,
+  "overall_detection_rate": 0.7142857142857143,
+  "detection_by_category": {
+    "stealthy_attacks": 0.6666666666666666,
+    "adaptive_attacks": 1.0,
+    "reputation_attacks": 0.5
+  },
+  "detailed_results": [
+    {
+      "attack_name": "Noise-Masked Poisoning (Stealthy)",
+      "num_trials": 100,
+      "detected": 0,
+      "missed": 100,
+      "detection_rate": 0.0,
+      "avg_pogq_when_detected": 0.0,
+      "avg_pogq_when_missed": 0.7655962482489481,
+      "threshold": 0.7
+    },
+    {
+      "attack_name": "Slow Degradation - Early Rounds (Building Rep)",
+      "num_trials": 100,
+      "detected": 100,
+      "missed": 0,
+      "detection_rate": 1.0,
+      "avg_pogq_when_detected": 0.5893391528682029,
+      "avg_pogq_when_missed": 0.0,
+      "threshold": 0.7
+    },
+    {
+      "attack_name": "Slow Degradation - Late Rounds (Attack Phase)",
+      "num_trials": 100,
+      "detected": 0,
+      "missed": 100,
+      "detection_rate": 0.0,
+      "avg_pogq_when_detected": 0.0,
+      "avg_pogq_when_missed": 0.8497389921099286,
+      "threshold": 0.7
+    },
+    {
+      "attack_name": "Targeted Neuron Attack (Backdoor-like)",
+      "num_trials": 100,
+      "detected": 100,
+      "missed": 0,
+      "detection_rate": 1.0,
+      "avg_pogq_when_detected": 0.0444007036120665,
+      "avg_pogq_when_missed": 0.0,
+      "threshold": 0.7
+    },
+    {
+      "attack_name": "Statistical Mimicry (Match Honest Stats)",
+      "num_trials": 100,
+      "detected": 100,
+      "missed": 0,
+      "detection_rate": 1.0,
+      "avg_pogq_when_detected": 0.521007063889298,
+      "avg_pogq_when_missed": 0.0,
+      "threshold": 0.7
+    },
+    {
+      "attack_name": "Adaptive Noise - High Detection Pressure",
+      "num_trials": 100,
+      "detected": 100,
+      "missed": 0,
+      "detection_rate": 1.0,
+      "avg_pogq_when_detected": 0.003511295787435283,
+      "avg_pogq_when_missed": 0.0,
+      "threshold": 0.7
+    },
+    {
+      "attack_name": "Adaptive Noise - Low Detection Pressure",
+      "num_trials": 100,
+      "detected": 100,
+      "missed": 0,
+      "detection_rate": 1.0,
+      "avg_pogq_when_detected": 0.36845970217284907,
+      "avg_pogq_when_missed": 0.0,
+      "threshold": 0.7
+    }
+  ]
+}

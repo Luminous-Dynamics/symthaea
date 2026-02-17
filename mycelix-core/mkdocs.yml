@@ -1,0 +1,225 @@
+# MkDocs Configuration for Mycelix Protocol Documentation
+# Generates a beautiful interactive documentation site
+
+site_name: Mycelix Protocol
+site_description: Byzantine-Resistant Federated Learning + Agent-Centric Economy + Constitutional Governance
+site_author: Luminous Dynamics
+site_url: https://mycelix.net
+
+# Repository
+repo_name: Luminous-Dynamics/mycelix
+repo_url: https://github.com/Luminous-Dynamics/mycelix
+edit_uri: edit/main/docs/
+
+# Copyright
+copyright: Copyright &copy; 2025 Luminous Dynamics - Apache 2.0 License
+
+# Configuration
+theme:
+  name: material
+
+  # Color scheme
+  palette:
+    # Light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+  # Features
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - header.autohide
+    - navigation.expand
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.instant.progress
+    - navigation.path  # Breadcrumbs
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+    - toc.integrate
+
+  # Logo and icons
+  logo: Logos/mycelix-icon.svg
+  favicon: Logos/mycelix-icon.svg
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+# Extensions
+markdown_extensions:
+  # Python Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+
+  # Python Markdown Extensions
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+# Plugins
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+      lang:
+        - en
+      pipeline:
+        - stemmer
+        - stopWordFilter
+        - trimmer
+  - minify:
+      minify_html: true
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: timeago
+  - tags
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/Luminous-Dynamics/mycelix
+    - icon: fontawesome/solid/globe
+      link: https://mycelix.net
+
+  version:
+    provider: mike
+    default: latest
+
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX  # Replace with actual GA4 ID
+
+  # Announcement bar
+  announce:
+    text: "🎉 <strong>v5.3 Documentation Live!</strong> New Interactive Playground, Healthcare FL Tutorial, and 45% Byzantine Tolerance visualization 🛡️"
+    dismissable: true
+
+# Navigation
+nav:
+  - Home: index.md
+
+  - Constitutional Framework:
+      - Overview: 02-charters/README.md
+      - Constitution: 01-constitution/README.md
+      - Spore Constitution v0.24: architecture/THE MYCELIX SPORE CONSTITUTION (v0.24).md
+      - Charters:
+          - Epistemic Charter v2.0: architecture/THE EPISTEMIC CHARTER (v2.0).md
+          - Governance Charter v1.0: architecture/THE GOVERNANCE CHARTER (v1.0).md
+          - Economic Charter v1.0: architecture/THE ECONOMIC CHARTER (v1.0).md
+          - Commons Charter v1.0: architecture/THE COMMONS CHARTER (v1.0).md
+
+  - Architecture:
+      - Overview: 03-architecture/README.md
+      - Visual Diagrams: 03-architecture/visual_diagrams.md
+      - Integrated System v5.2: architecture/Mycelix Protocol_ Integrated System Architecture v5.2.md
+      - Base Spec v1.0: architecture/mycelix_base_spec.md
+      - MATL Architecture: 0TML/docs/06-architecture/matl_architecture.md
+      - SDK Design: architecture/Designing Mycelix Protocol SDK.md
+      - SDK: 04-sdk/README.md
+      - ADRs:
+          - Overview: adr/README.md
+          - ADR-002 Epistemic Cube: adr/002-epistemic-cube-3d-model.md
+
+  - Zero-TrustML (0TML):
+      - Overview: 0TML/docs/README.md
+      - Architecture: 0TML/docs/06-architecture/README.md
+
+  - Tutorials:
+      - Overview: tutorials/README.md
+      - 5-Minute Quick Start: tutorials/quick_start.md
+      - MATL Integration: tutorials/matl_integration.md
+      - Healthcare FL: tutorials/healthcare_federated_learning.md
+      - Interactive Playground: interactive/playground.md
+
+  - Research:
+      - Whitepaper: whitepaper/POGQ_WHITEPAPER_OUTLINE.md
+      - Section 3 (PoGQ): whitepaper/POGQ_WHITEPAPER_SECTION_3_DRAFT.md
+      - Grants: grants/ARCHITECTURE_COMPARISON_FOR_GRANTS.md
+
+  - Operations:
+      - Deployment Guide: DEPLOYMENT_GUIDE.md
+      - Documentation Versioning: deployment/versioning.md
+      - Production Runbook: 0TML/docs/PRODUCTION_OPERATIONS_RUNBOOK.md
+
+  - Roadmap:
+      - Overview: 05-roadmap/README.md
+      - Improvement Plan (Nov 2025): 05-roadmap/IMPROVEMENT_PLAN_NOV2025.md
+      - v5.3 → v6.0: architecture/Mycelix_Roadmap_v5.3_to_v6.0.md
+      - MATL 12-Month Plan: roadmap/matl_execution_plan.md
+
+  - About:
+      - FAQ: faq.md
+      - Version History: VERSION_HISTORY.md
+      - Contributing: CONTRIBUTING.md
+
+# Extra CSS
+extra_css:
+  - stylesheets/extra.css
+
+# Extra JavaScript
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js
+  - javascripts/interactive-widgets.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js

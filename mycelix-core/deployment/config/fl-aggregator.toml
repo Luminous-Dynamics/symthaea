@@ -1,0 +1,208 @@
+# Mycelix FL Aggregator Configuration
+#
+# This configuration file controls the behavior of the FL aggregator node.
+# Environment variables can override any setting.
+
+[node]
+# Unique identifier for this node
+# id = "fl-aggregator-0"
+
+# Human-readable name
+name = "Mycelix FL Aggregator"
+
+# Network identifier
+network = "testnet"
+
+# Cache directory for model storage
+cache_dir = "/cache"
+
+# Log level
+log_level = "info"
+
+# Log format
+log_format = "json"
+
+[server]
+# HTTP API listen address
+listen_addr = "0.0.0.0:8081"
+
+# Maximum request body size (100 MB)
+max_body_size = 104857600
+
+# Request timeout in seconds
+request_timeout_secs = 300
+
+# Enable CORS
+cors_enabled = true
+
+# CORS allowed origins
+cors_origins = ["*"]
+
+[aggregation]
+# Aggregation algorithm: weighted_median, trimmed_mean, fedavg
+algorithm = "weighted_median"
+
+# Minimum participants required for aggregation
+min_participants = 3
+
+# Maximum participants per round
+max_participants = 100
+
+# Aggregation timeout in seconds
+timeout_secs = 300
+
+# Use trust-weighted aggregation
+trust_weighted = true
+
+# Trim percentage for trimmed_mean (0.0 - 0.5)
+trim_percentage = 0.1
+
+[byzantine]
+# Enable Byzantine detection
+enabled = true
+
+# Detection algorithms (comma-separated)
+# Options: cosine_similarity, magnitude_check, label_skew, ensemble
+algorithms = ["cosine_similarity", "magnitude_check", "ensemble"]
+
+# Cosine similarity threshold for detection
+cosine_threshold = -0.5
+
+# Maximum allowed gradient magnitude
+max_magnitude = 10.0
+
+# Label skew detection bounds
+label_skew_min = -0.5
+label_skew_max = 0.95
+
+# Ensemble voting threshold (fraction of detectors)
+ensemble_threshold = 0.5
+
+# Action on detection: exclude, flag, report
+detection_action = "exclude"
+
+[privacy]
+# Enable differential privacy
+dp_enabled = true
+
+# DP epsilon value
+dp_epsilon = 1.0
+
+# DP delta value
+dp_delta = 0.00001
+
+# Noise mechanism: gaussian, laplace
+noise_mechanism = "gaussian"
+
+# Gradient clipping norm
+clip_norm = 1.0
+
+[zk_proofs]
+# Enable ZK proof verification
+enabled = true
+
+# Proof mode: fast, standard, high
+proof_mode = "fast"
+
+# Verification timeout in seconds
+verification_timeout_secs = 30
+
+# Cache verified proofs
+cache_proofs = true
+
+# Proof cache size (number of proofs)
+cache_size = 1000
+
+[trust]
+# Trust score source: local, holochain, hybrid
+trust_source = "hybrid"
+
+# Minimum trust score to participate
+min_trust_score = 0.3
+
+# Trust update interval in seconds
+update_interval_secs = 60
+
+# MATL trust formula weights
+matl_pogq_weight = 0.4
+matl_tcdm_weight = 0.3
+matl_entropy_weight = 0.3
+
+[storage]
+# Model storage backend: local, s3
+backend = "s3"
+
+# S3 bucket for models (set via S3_MODELS_BUCKET env var)
+# s3_bucket = "mycelix-testnet-models"
+
+# S3 region
+s3_region = "us-east-1"
+
+# Local storage path (if backend = local)
+local_path = "/cache/models"
+
+# Maximum model size in bytes (1 GB)
+max_model_size = 1073741824
+
+# Model retention days
+retention_days = 30
+
+[database]
+# Database URL (set via DATABASE_URL env var)
+pool_size = 20
+connect_timeout_secs = 30
+query_timeout_secs = 120
+
+[redis]
+# Redis URL (set via REDIS_URL env var)
+pool_size = 10
+key_prefix = "mycelix:fl:"
+
+# Queue names
+submission_queue = "fl:submissions"
+result_queue = "fl:results"
+
+[metrics]
+enabled = true
+listen_addr = "0.0.0.0:9091"
+path = "/metrics"
+
+# Custom FL metrics
+track_round_duration = true
+track_participant_count = true
+track_byzantine_detections = true
+track_gradient_statistics = true
+
+[health]
+listen_addr = "0.0.0.0:8082"
+liveness_path = "/health/live"
+readiness_path = "/health/ready"
+
+# Readiness checks
+check_database = true
+check_redis = true
+check_storage = true
+
+[coordinator]
+# FL Coordinator address
+addr = "fl-coordinator.mycelix-fl:8083"
+
+# Registration retry interval in seconds
+retry_interval_secs = 10
+
+# Heartbeat interval in seconds
+heartbeat_interval_secs = 30
+
+[rate_limiting]
+# Enable rate limiting
+enabled = true
+
+# Maximum submissions per minute per participant
+max_submissions_per_minute = 10
+
+# Maximum total submissions per minute
+max_total_per_minute = 1000
+
+[tracing]
+enabled = false
+sampling_rate = 0.1

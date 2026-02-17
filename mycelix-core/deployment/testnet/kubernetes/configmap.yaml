@@ -1,0 +1,139 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mycelix-config
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+data:
+  MYCELIX_NETWORK: "testnet"
+  MYCELIX_LOG_LEVEL: "info"
+  METRICS_ENABLED: "true"
+  METRICS_PORT: "9090"
+  FL_GRADIENT_AGGREGATION: "fedavg"
+  FL_MIN_PARTICIPANTS: "3"
+  RATE_LIMIT_ENABLED: "true"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "100"
+  RATE_LIMIT_BURST: "20"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mycelix-genesis
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+data:
+  genesis.json: |
+    {
+      "network": {
+        "name": "mycelix-testnet",
+        "chain_id": "mycelix-testnet-v1",
+        "version": "1.0.0",
+        "genesis_time": "2026-01-08T00:00:00Z"
+      },
+      "consensus": {
+        "algorithm": "federated_byzantine",
+        "min_validators": 3,
+        "max_validators": 100,
+        "block_time_ms": 5000,
+        "round_timeout_ms": 30000
+      },
+      "federated_learning": {
+        "aggregation_method": "fedavg",
+        "min_participants": 3,
+        "max_participants_per_round": 50,
+        "round_duration_seconds": 300,
+        "gradient_compression": true,
+        "differential_privacy": {
+          "enabled": true,
+          "epsilon": 1.0,
+          "delta": 1e-5,
+          "noise_multiplier": 1.1
+        },
+        "secure_aggregation": {
+          "enabled": true,
+          "threshold": 0.67
+        }
+      },
+      "tokenomics": {
+        "token_name": "MYCEL",
+        "token_symbol": "MYC",
+        "decimals": 18,
+        "initial_supply": "1000000000000000000000000000",
+        "rewards": {
+          "gradient_submission": "1000000000000000000",
+          "block_validation": "500000000000000000",
+          "model_improvement": "10000000000000000000"
+        }
+      },
+      "rate_limiting": {
+        "global": {
+          "requests_per_second": 1000,
+          "burst_size": 100
+        },
+        "per_node": {
+          "requests_per_minute": 100,
+          "burst_size": 20
+        }
+      },
+      "network_parameters": {
+        "max_message_size_bytes": 10485760,
+        "heartbeat_interval_seconds": 30,
+        "peer_discovery_interval_seconds": 60,
+        "max_peers": 50,
+        "gossip_fanout": 6
+      }
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/instance: testnet
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+      external_labels:
+        network: 'mycelix-testnet'
+        environment: 'testnet'
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'mycelix-bootstrap'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - mycelix-testnet
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: bootstrap
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: metrics
+            action: keep
+
+      - job_name: 'mycelix-fl-nodes'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - mycelix-testnet
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            regex: fl-node
+            action: keep
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            regex: metrics
+            action: keep

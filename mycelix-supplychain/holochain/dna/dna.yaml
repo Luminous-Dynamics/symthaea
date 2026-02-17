@@ -1,0 +1,28 @@
+---
+manifest_version: "0"
+name: supplychain
+integrity:
+  network_seed: "00000000-0000-0000-0000-000000000000"
+  properties: ~
+  zomes:
+    - name: claims_integrity
+      path: ../target/wasm32-unknown-unknown/release/claims_integrity.wasm
+    - name: verification_integrity
+      path: ../target/wasm32-unknown-unknown/release/verification_integrity.wasm
+    - name: bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/bridge_integrity.wasm
+coordinator:
+  zomes:
+    - name: claims_coordinator
+      path: ../target/wasm32-unknown-unknown/release/claims_coordinator.wasm
+      dependencies:
+        - name: claims_integrity
+    - name: verification_coordinator
+      path: ../target/wasm32-unknown-unknown/release/verification_coordinator.wasm
+      dependencies:
+        - name: verification_integrity
+        - name: claims_integrity
+    - name: bridge_coordinator
+      path: ../target/wasm32-unknown-unknown/release/bridge_coordinator.wasm
+      dependencies:
+        - name: bridge_integrity

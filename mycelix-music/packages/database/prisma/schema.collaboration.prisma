@@ -1,0 +1,266 @@
+// ============================================================
+// COLLABORATIVE CREATION STUDIO
+// ============================================================
+// Extends the main schema with collaboration features
+// "Google Docs for music" - real-time stem sharing and versioning
+
+model Project {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  description   String?
+
+  // Owner (initiator)
+  ownerId       String
+
+  // Project settings
+  isPublic      Boolean  @default(false)
+  allowForks    Boolean  @default(true)
+  status        ProjectStatus @default(DRAFT)
+
+  // Audio properties
+  bpm           Int?
+  key           String?  // e.g., "C major", "A minor"
+  genre         String?
+
+  // Cover/visual
+  coverArt      String?
+
+  // Forking
+  forkedFromId  String?
+
+  // Timestamps
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  stems         Stem[]
+  versions      ProjectVersion[]
+  collaborators ProjectCollaborator[]
+  comments      ProjectComment[]
+  invites       ProjectInvite[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([forkedFromId])
+}
+
+enum ProjectStatus {
+  DRAFT
+  IN_PROGRESS
+  REVIEW
+  MIXING
+  MASTERING
+  COMPLETE
+  PUBLISHED
+  ARCHIVED
+}
+
+model Stem {
+  id            String   @id @default(cuid())
+  projectId     String
+
+  // Stem info
+  name          String   // e.g., "Vocals", "Bass", "Drums"
+  type          StemType
+  color         String?  // For UI visualization
+
+  // Audio file
+  audioUrl      String
+  waveformData  Json?
+  duration      Float    // seconds
+
+  // Position in arrangement
+  startTime     Float    @default(0)  // seconds from project start
+
+  // Mix settings
+  volume        Float    @default(1.0)
+  pan           Float    @default(0)   // -1 to 1
+  muted         Boolean  @default(false)
+  solo          Boolean  @default(false)
+
+  // Effects chain (stored as JSON)
+  effects       Json?
+
+  // Contributor
+  contributorId String
+
+  // Version tracking
+  versionId     String?  // Which version this stem belongs to
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([contributorId])
+}
+
+enum StemType {
+  VOCALS
+  DRUMS
+  BASS
+  GUITAR
+  KEYS
+  SYNTH
+  STRINGS
+  BRASS
+  PERCUSSION
+  FX
+  SAMPLE
+  OTHER
+}
+
+model ProjectVersion {
+  id            String   @id @default(cuid())
+  projectId     String
+
+  // Version info
+  versionNumber Int
+  name          String?  // e.g., "v1.0", "Final Mix", "Alt Ending"
+  description   String?
+
+  // Snapshot of stem states
+  stemSnapshot  Json     // Full state of all stems at this version
+
+  // Mixed down audio (optional)
+  mixdownUrl    String?
+
+  // Who created this version
+  createdById   String
+
+  // Parent version (for branching)
+  parentVersionId String?
+
+  createdAt     DateTime @default(now())
+
+  @@unique([projectId, versionNumber])
+  @@index([projectId])
+}
+
+model ProjectCollaborator {
+  id            String   @id @default(cuid())
+  projectId     String
+  userId        String
+
+  // Role and permissions
+  role          CollaboratorRole @default(CONTRIBUTOR)
+  canEdit       Boolean  @default(true)
+  canInvite     Boolean  @default(false)
+  canPublish    Boolean  @default(false)
+
+  // Contribution tracking (for royalty splits)
+  contributionPercent Float?  // Manual override
+  autoCalculated      Boolean @default(true)
+
+  // Timestamps
+  joinedAt      DateTime @default(now())
+  lastActiveAt  DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@index([userId])
+}
+
+enum CollaboratorRole {
+  OWNER
+  PRODUCER
+  CONTRIBUTOR
+  VIEWER
+}
+
+model ProjectComment {
+  id            String   @id @default(cuid())
+  projectId     String
+  userId        String
+
+  // Comment content
+  content       String
+
+  // Timestamp reference (comment at specific point in track)
+  timestamp     Float?   // seconds
+  stemId        String?  // If commenting on specific stem
+
+  // Threading
+  parentId      String?
+
+  // Resolution (for feedback)
+  resolved      Boolean  @default(false)
+  resolvedById  String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model ProjectInvite {
+  id            String   @id @default(cuid())
+  projectId     String
+
+  // Invite details
+  email         String?
+  walletAddress String?
+
+  role          CollaboratorRole @default(CONTRIBUTOR)
+
+  // Invite token
+  token         String   @unique
+
+  // Status
+  status        InviteStatus @default(PENDING)
+
+  // Who sent it
+  invitedById   String
+
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  acceptedAt    DateTime?
+
+  @@index([projectId])
+  @@index([token])
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+// ============================================================
+// REAL-TIME COLLABORATION EVENTS
+// ============================================================
+
+model CollaborationSession {
+  id            String   @id @default(cuid())
+  projectId     String
+
+  // Active participants
+  participants  Json     // Array of { userId, joinedAt, cursorPosition }
+
+  // Session state
+  isActive      Boolean  @default(true)
+
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+
+  @@index([projectId])
+}
+
+model CollaborationEvent {
+  id            String   @id @default(cuid())
+  sessionId     String
+  userId        String
+
+  // Event type and data
+  eventType     String   // "stem_added", "volume_changed", "comment_added", etc.
+  eventData     Json
+
+  // For undo/redo
+  previousState Json?
+
+  createdAt     DateTime @default(now())
+
+  @@index([sessionId])
+  @@index([createdAt])
+}

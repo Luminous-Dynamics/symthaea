@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/part-of: mycelix-platform
+---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: mycelix-quota
+  namespace: mycelix
+spec:
+  hard:
+    requests.cpu: "50"
+    requests.memory: 100Gi
+    limits.cpu: "100"
+    limits.memory: 200Gi
+    persistentvolumeclaims: "20"
+    services.loadbalancers: "5"

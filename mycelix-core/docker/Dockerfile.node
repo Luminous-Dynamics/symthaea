@@ -1,0 +1,266 @@
+# =============================================================================
+# Mycelix-Core FL Node Dockerfile
+# =============================================================================
+# Simulated federated learning client node for testing and development
+
+FROM python:3.11-slim-bookworm
+
+LABEL maintainer="Mycelix Team"
+LABEL description="Mycelix-Core Federated Learning Node"
+LABEL version="0.1.0"
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 mycelix
+
+# Install Python dependencies
+RUN pip install --no-cache-dir \
+    httpx==0.26.0 \
+    numpy==1.26.3 \
+    pydantic==2.5.3 \
+    structlog==24.1.0 \
+    prometheus-client==0.19.0
+
+# Create the FL node application
+RUN cat > node.py << 'NODE_CODE'
+"""
+Mycelix-Core Federated Learning Node
+Simulated FL client for testing the coordinator
+"""
+
+import asyncio
+import os
+import time
+import random
+import hashlib
+import secrets
+from typing import Dict, List, Optional, Any
+
+import httpx
+import numpy as np
+import structlog
+from prometheus_client import Counter, Gauge, start_http_server
+
+# Configure logging
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer()
+    ]
+)
+logger = structlog.get_logger()
+
+# Metrics
+UPDATES_SENT = Counter('mycelix_node_updates_sent_total', 'Total updates sent')
+TRAINING_TIME = Gauge('mycelix_node_training_time_seconds', 'Last training time')
+NODE_STATUS = Gauge('mycelix_node_status', 'Node operational status')
+
+class FederatedLearningNode:
+    """Simulated FL Node that participates in federated learning"""
+
+    def __init__(
+        self,
+        node_id: str,
+        coordinator_url: str,
+        model_size: int = 1000,
+        byzantine_mode: bool = False
+    ):
+        self.node_id = node_id
+        self.coordinator_url = coordinator_url.rstrip('/')
+        self.model_size = model_size
+        self.byzantine_mode = byzantine_mode
+
+        # Simulated local model weights
+        self.local_weights = np.random.randn(model_size).astype(np.float32)
+
+        # Training state
+        self.current_round = 0
+        self.registered = False
+        self.client = httpx.AsyncClient(timeout=30.0)
+
+        logger.info(
+            "Node initialized",
+            node_id=self.node_id,
+            coordinator=self.coordinator_url,
+            byzantine=self.byzantine_mode
+        )
+
+    async def register(self) -> bool:
+        """Register with the coordinator"""
+        try:
+            response = await self.client.post(
+                f"{self.coordinator_url}/nodes/register",
+                json={
+                    "node_id": self.node_id,
+                    "capabilities": {
+                        "model_size": self.model_size,
+                        "compute_power": random.uniform(0.5, 1.0),
+                        "data_samples": random.randint(100, 10000)
+                    }
+                }
+            )
+            response.raise_for_status()
+            result = response.json()
+            self.current_round = result.get("current_round", 0)
+            self.registered = True
+            NODE_STATUS.set(1)
+            logger.info("Registered with coordinator", node_id=self.node_id)
+            return True
+        except Exception as e:
+            logger.error("Registration failed", error=str(e))
+            NODE_STATUS.set(0)
+            return False
+
+    def simulate_local_training(self) -> tuple[List[float], Dict[str, float]]:
+        """Simulate local model training and return gradients"""
+        start_time = time.time()
+
+        # Simulate training time (0.5-3 seconds)
+        training_duration = random.uniform(0.5, 3.0)
+        time.sleep(training_duration)
+
+        # Generate simulated gradients
+        if self.byzantine_mode:
+            # Byzantine node: send malicious gradients
+            gradients = np.random.randn(self.model_size) * 100  # Abnormally large
+        else:
+            # Normal training: simulate gradient descent
+            # Add some noise to simulate real training
+            gradients = self.local_weights * 0.01 + np.random.randn(self.model_size) * 0.001
+
+        # Simulate metrics
+        metrics = {
+            "loss": random.uniform(0.1, 2.0),
+            "accuracy": random.uniform(0.6, 0.99),
+            "samples_processed": random.randint(100, 1000),
+            "training_time": training_duration
+        }
+
+        TRAINING_TIME.set(time.time() - start_time)
+
+        return gradients.tolist(), metrics
+
+    async def submit_update(self, round_id: int) -> bool:
+        """Submit model update for a round"""
+        try:
+            gradients, metrics = self.simulate_local_training()
+
+            response = await self.client.post(
+                f"{self.coordinator_url}/rounds/{round_id}/submit",
+                json={
+                    "node_id": self.node_id,
+                    "round_id": round_id,
+                    "gradients": gradients,
+                    "metrics": metrics,
+                    "timestamp": time.time()
+                }
+            )
+            response.raise_for_status()
+
+            UPDATES_SENT.inc()
+            logger.info(
+                "Update submitted",
+                node_id=self.node_id,
+                round_id=round_id,
+                loss=metrics["loss"]
+            )
+            return True
+
+        except Exception as e:
+            logger.error("Update submission failed", error=str(e), round_id=round_id)
+            return False
+
+    async def check_round_status(self) -> Optional[int]:
+        """Check current round from coordinator"""
+        try:
+            response = await self.client.get(f"{self.coordinator_url}/status")
+            response.raise_for_status()
+            status = response.json()
+            return status.get("current_round", 0)
+        except Exception as e:
+            logger.warning("Failed to check round status", error=str(e))
+            return None
+
+    async def run_training_loop(self, interval: float = 10.0):
+        """Main training loop"""
+        while True:
+            try:
+                if not self.registered:
+                    await self.register()
+                    await asyncio.sleep(5)
+                    continue
+
+                # Check for new round
+                current_round = await self.check_round_status()
+
+                if current_round is not None and current_round > self.current_round:
+                    self.current_round = current_round
+                    await self.submit_update(current_round)
+
+                await asyncio.sleep(interval + random.uniform(-2, 2))
+
+            except Exception as e:
+                logger.error("Training loop error", error=str(e))
+                await asyncio.sleep(5)
+
+    async def close(self):
+        """Cleanup resources"""
+        await self.client.aclose()
+
+
+async def main():
+    """Main entry point"""
+    # Configuration from environment
+    node_id = os.getenv("NODE_ID", f"node-{secrets.token_hex(4)}")
+    coordinator_url = os.getenv("COORDINATOR_URL", "http://coordinator:8080")
+    model_size = int(os.getenv("MODEL_SIZE", "1000"))
+    byzantine_mode = os.getenv("BYZANTINE_MODE", "false").lower() == "true"
+    metrics_port = int(os.getenv("METRICS_PORT", "9100"))
+    training_interval = float(os.getenv("TRAINING_INTERVAL", "10"))
+
+    # Start Prometheus metrics server
+    start_http_server(metrics_port)
+    logger.info("Metrics server started", port=metrics_port)
+
+    # Initialize and run node
+    node = FederatedLearningNode(
+        node_id=node_id,
+        coordinator_url=coordinator_url,
+        model_size=model_size,
+        byzantine_mode=byzantine_mode
+    )
+
+    try:
+        # Wait for coordinator to be ready
+        logger.info("Waiting for coordinator to be ready...")
+        await asyncio.sleep(10)
+
+        await node.run_training_loop(interval=training_interval)
+    except KeyboardInterrupt:
+        logger.info("Shutting down node")
+    finally:
+        await node.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
+NODE_CODE
+
+# Set permissions
+RUN chown -R mycelix:mycelix /app
+
+USER mycelix
+
+# Expose metrics port
+EXPOSE 9100
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:9100/metrics || exit 1
+
+# Run the node
+CMD ["python", "node.py"]

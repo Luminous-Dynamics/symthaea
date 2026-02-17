@@ -1,0 +1,74 @@
+[
+  {
+    "seed": 101,
+    "alpha": 0.1,
+    "byz_frac": 0.5,
+    "attack_type": "sign_flip",
+    "aggregator": "aegis",
+    "clean_acc": 0.1,
+    "auc": 0.4092524791999701,
+    "wall_time": 4.154076099395752,
+    "status": "failed",
+    "rounds": 50
+  },
+  {
+    "seed": 101,
+    "alpha": 0.1,
+    "byz_frac": 0.5,
+    "attack_type": "sign_flip",
+    "aggregator": "aegis_gen7",
+    "clean_acc": 0.63,
+    "auc": 1.0,
+    "wall_time": 15.632888555526733,
+    "status": "failed",
+    "rounds": 50
+  },
+  {
+    "seed": 202,
+    "alpha": 0.1,
+    "byz_frac": 0.5,
+    "attack_type": "sign_flip",
+    "aggregator": "aegis",
+    "clean_acc": 0.096,
+    "auc": 0.4288623455559984,
+    "wall_time": 4.057711601257324,
+    "status": "failed",
+    "rounds": 50
+  },
+  {
+    "seed": 202,
+    "alpha": 0.1,
+    "byz_frac": 0.5,
+    "attack_type": "sign_flip",
+    "aggregator": "aegis_gen7",
+    "clean_acc": 0.623,
+    "auc": 1.0,
+    "wall_time": 14.099457263946533,
+    "status": "failed",
+    "rounds": 50
+  },
+  {
+    "seed": 303,
+    "alpha": 0.1,
+    "byz_frac": 0.5,
+    "attack_type": "sign_flip",
+    "aggregator": "aegis",
+    "clean_acc": 0.104,
+    "auc": 0.4254156562675561,
+    "wall_time": 3.4106945991516113,
+    "status": "failed",
+    "rounds": 50
+  },
+  {
+    "seed": 303,
+    "alpha": 0.1,
+    "byz_frac": 0.5,
+    "attack_type": "sign_flip",
+    "aggregator": "aegis_gen7",
+    "clean_acc": 0.652,
+    "auc": 1.0,
+    "wall_time": 13.545400619506836,
+    "status": "failed",
+    "rounds": 50
+  }
+]

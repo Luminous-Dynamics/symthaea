@@ -1,0 +1,29 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential"],
+  "issuer": "did:mycelix:org:ethiopian-organic-cert",
+  "issuanceDate": "2025-01-16T10:00:00Z",
+  "credentialSubject": {
+    "eventType": "CERTIFIED",
+    "productId": "COFFEE-CHERRIES-ETHIOPIAN-YIRGACHEFFE",
+    "batchId": "BATCH-2025-HARVEST-001",
+    "quantity": 5000.0,
+    "unit": "kg",
+    "facility": {
+      "id": "CERT-ETHIOPIAN-ORGANIC",
+      "name": "Ethiopian Organic Certification Authority",
+      "location": {
+        "country": "Ethiopia",
+        "region": "Addis Ababa"
+      }
+    },
+    "timestamp": "2025-01-16T10:00:00Z",
+    "certification": {
+      "certType": "ORGANIC",
+      "certBody": "Ethiopian Organic Certification Authority",
+      "certId": "ETH-ORG-2025-001234",
+      "validUntil": "2026-01-16T00:00:00Z",
+      "standard": "EU Organic Regulation 834/2007"
+    }
+  }
+}

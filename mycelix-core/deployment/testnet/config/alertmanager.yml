@@ -1,0 +1,108 @@
+# Mycelix Testnet - Alertmanager Configuration
+global:
+  # Global SMTP settings (configure for email alerts)
+  # smtp_smarthost: 'smtp.example.com:587'
+  # smtp_from: 'alertmanager@mycelix.network'
+  # smtp_auth_username: 'alertmanager'
+  # smtp_auth_password: 'password'
+
+  # Slack webhook (configure for Slack alerts)
+  # slack_api_url: 'https://hooks.slack.com/services/XXX/YYY/ZZZ'
+
+  resolve_timeout: 5m
+
+# Route tree
+route:
+  group_by: ['alertname', 'severity', 'node_type']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-receiver'
+
+  routes:
+    # Critical alerts - immediate notification
+    - match:
+        severity: critical
+      receiver: 'critical-receiver'
+      group_wait: 10s
+      repeat_interval: 1h
+      continue: true
+
+    # Warning alerts - batch notifications
+    - match:
+        severity: warning
+      receiver: 'warning-receiver'
+      group_wait: 1m
+      repeat_interval: 4h
+
+    # Bootstrap node specific alerts
+    - match:
+        node_type: bootstrap
+      receiver: 'infrastructure-receiver'
+      group_wait: 10s
+
+# Inhibition rules
+inhibit_rules:
+  # If a node is down, inhibit all other alerts for that node
+  - source_match:
+      alertname: 'NodeDown'
+    target_match_re:
+      alertname: '.*'
+    equal: ['instance']
+
+  # If bootstrap is down, inhibit peer connectivity alerts
+  - source_match:
+      alertname: 'BootstrapNodeDown'
+    target_match:
+      alertname: 'LowPeerCount'
+
+  # If PostgreSQL is down, inhibit related alerts
+  - source_match:
+      alertname: 'PostgresDown'
+    target_match_re:
+      alertname: 'PostgresHigh.*'
+
+# Receivers
+receivers:
+  - name: 'default-receiver'
+    # Webhook for generic notifications
+    webhook_configs:
+      - url: 'http://localhost:9095/webhook'
+        send_resolved: true
+
+  - name: 'critical-receiver'
+    # Configure actual notification channels here
+    # Example webhook configuration:
+    webhook_configs:
+      - url: 'http://localhost:9095/webhook/critical'
+        send_resolved: true
+    # Example Slack configuration:
+    # slack_configs:
+    #   - channel: '#mycelix-alerts-critical'
+    #     send_resolved: true
+    #     title: '{{ .Status | toUpper }} - Critical Alert'
+    #     text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+    # Example email configuration:
+    # email_configs:
+    #   - to: 'oncall@mycelix.network'
+    #     send_resolved: true
+
+  - name: 'warning-receiver'
+    webhook_configs:
+      - url: 'http://localhost:9095/webhook/warning'
+        send_resolved: true
+    # slack_configs:
+    #   - channel: '#mycelix-alerts'
+    #     send_resolved: true
+
+  - name: 'infrastructure-receiver'
+    webhook_configs:
+      - url: 'http://localhost:9095/webhook/infrastructure'
+        send_resolved: true
+    # slack_configs:
+    #   - channel: '#mycelix-infrastructure'
+    #     send_resolved: true
+
+# Templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

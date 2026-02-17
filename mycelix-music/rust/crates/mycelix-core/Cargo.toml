@@ -1,0 +1,46 @@
+[package]
+name = "mycelix-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Unified API surface integrating all Mycelix components"
+
+[dependencies]
+# Internal crates
+mycelix-audio = { path = "../mycelix-audio" }
+mycelix-codec = { path = "../mycelix-codec" }
+mycelix-ml = { path = "../mycelix-ml" }
+mycelix-mir = { path = "../mycelix-mir" }
+mycelix-protocol = { path = "../mycelix-protocol" }
+mycelix-search = { path = "../mycelix-search" }
+mycelix-spatial = { path = "../mycelix-spatial" }
+mycelix-streaming = { path = "../mycelix-streaming" }
+mycelix-realtime = { path = "../mycelix-realtime" }
+
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+uuid.workspace = true
+bytes.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.10"
+
+[features]
+default = []
+full = ["native-codecs", "ml-inference", "spatial-audio"]
+native-codecs = ["mycelix-codec/all-native"]
+ml-inference = []
+spatial-audio = []

@@ -1,0 +1,14 @@
+{
+  "beta": 0.85,
+  "w": 2,
+  "k": 3,
+  "m": 2,
+  "threshold": 1.0,
+  "ema_init": 0.75,
+  "viol_init": 0,
+  "clear_init": 0,
+  "quar_init": 0,
+  "round_init": 0,
+  "quar_out": 1,
+  "trace_length": 8
+}

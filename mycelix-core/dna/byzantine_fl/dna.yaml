@@ -1,0 +1,10 @@
+manifest_version: "1"
+name: byzantine_fl
+integrity:
+  network_seed: "byzantine-fl-2025"
+  properties: ~
+  zomes:
+    - name: fl_coordinator
+      bundled: ../../../target/wasm32-unknown-unknown/release/byzantine_fl.wasm
+      dependencies: []
+      dylib: ~

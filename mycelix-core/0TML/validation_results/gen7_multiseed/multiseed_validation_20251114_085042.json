@@ -1,0 +1,390 @@
+{
+  "experiment": "Gen7 Multi-Seed Validation",
+  "date": "2025-11-14T08:50:42.055885",
+  "seeds": [
+    101,
+    202,
+    303,
+    404,
+    505
+  ],
+  "byz_fracs": [
+    0.35,
+    0.4,
+    0.45,
+    0.5
+  ],
+  "aggregators": [
+    "aegis",
+    "aegis_gen7"
+  ],
+  "dataset_config": {
+    "n_clients": 50,
+    "noniid_alpha": 1.0,
+    "n_train": 6000,
+    "n_test": 1000,
+    "seed": 42
+  },
+  "results": [
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.746,
+      "auc": 0.4868827160493827,
+      "wall_time": 0.5957310199737549,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.867,
+      "auc": 1.0,
+      "wall_time": 2.6275768280029297,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.556,
+      "auc": 0.4361306324927656,
+      "wall_time": 0.6633257865905762,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.865,
+      "auc": 1.0,
+      "wall_time": 2.6814966201782227,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.106,
+      "auc": 0.4422895622895623,
+      "wall_time": 0.6977212429046631,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.874,
+      "auc": 1.0,
+      "wall_time": 2.745013952255249,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.5,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.46194879089615937,
+      "wall_time": 0.7149782180786133,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.5,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.868,
+      "auc": 1.0,
+      "wall_time": 2.979801893234253,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.795,
+      "auc": 0.4781691522762952,
+      "wall_time": 0.9076526165008545,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.869,
+      "auc": 1.0,
+      "wall_time": 3.180838108062744,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.598,
+      "auc": 0.45376877497588536,
+      "wall_time": 0.6626548767089844,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.869,
+      "auc": 1.0,
+      "wall_time": 3.034194231033325,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.077,
+      "auc": 0.4492896960978242,
+      "wall_time": 0.7636246681213379,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.87,
+      "auc": 1.0,
+      "wall_time": 2.767402410507202,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.5,
+      "aggregator": "aegis",
+      "clean_acc": 0.01,
+      "auc": 0.42420874822190613,
+      "wall_time": 0.7557563781738281,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.5,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.867,
+      "auc": 1.0,
+      "wall_time": 2.713479518890381,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.824,
+      "auc": 0.48546002723205606,
+      "wall_time": 0.8471882343292236,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.86,
+      "auc": 1.0,
+      "wall_time": 2.9996840953826904,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.662,
+      "auc": 0.4635983647972073,
+      "wall_time": 0.6777365207672119,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 2.91645884513855,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.292,
+      "auc": 0.43056737271058165,
+      "wall_time": 0.7024128437042236,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 2.7576637268066406,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.5,
+      "aggregator": "aegis",
+      "clean_acc": 0.005,
+      "auc": 0.42185554171855544,
+      "wall_time": 0.6655845642089844,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.5,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 2.966042995452881,
+      "status": "success"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.719,
+      "auc": 0.4343171296296296,
+      "wall_time": 0.704697847366333,
+      "status": "failed"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.87,
+      "auc": 1.0,
+      "wall_time": 3.352973222732544,
+      "status": "success"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.513,
+      "auc": 0.409323116219668,
+      "wall_time": 0.8565735816955566,
+      "status": "failed"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.869,
+      "auc": 1.0,
+      "wall_time": 2.7900540828704834,
+      "status": "success"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.154,
+      "auc": 0.41817611190817794,
+      "wall_time": 0.6910200119018555,
+      "status": "failed"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.867,
+      "auc": 1.0,
+      "wall_time": 2.721625804901123,
+      "status": "success"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.5,
+      "aggregator": "aegis",
+      "clean_acc": 0.001,
+      "auc": 0.3967964404894327,
+      "wall_time": 0.7333059310913086,
+      "status": "failed"
+    },
+    {
+      "seed": 404,
+      "byz_frac": 0.5,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.873,
+      "auc": 1.0,
+      "wall_time": 2.8981330394744873,
+      "status": "success"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.818,
+      "auc": 0.4859540680436203,
+      "wall_time": 0.7337799072265625,
+      "status": "success"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.855,
+      "auc": 1.0,
+      "wall_time": 2.5781986713409424,
+      "status": "success"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.743,
+      "auc": 0.5128016209246639,
+      "wall_time": 0.6415016651153564,
+      "status": "failed"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.867,
+      "auc": 1.0,
+      "wall_time": 2.7339165210723877,
+      "status": "success"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.469,
+      "auc": 0.5022222222222221,
+      "wall_time": 0.696317195892334,
+      "status": "failed"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.862,
+      "auc": 1.0,
+      "wall_time": 2.809567928314209,
+      "status": "success"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.5,
+      "aggregator": "aegis",
+      "clean_acc": 0.226,
+      "auc": 0.5015566625155666,
+      "wall_time": 0.7066078186035156,
+      "status": "failed"
+    },
+    {
+      "seed": 505,
+      "byz_frac": 0.5,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.87,
+      "auc": 1.0,
+      "wall_time": 2.657374382019043,
+      "status": "success"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+# Default owners for everything in the repo
+*                    @Luminous-Dynamics/maintainers
+
+# Web application
+/apps/web/*          @Luminous-Dynamics/core-devs
+
+# Rust crates and zomes
+/crates/*            @Luminous-Dynamics/core-devs
+/zomes/*             @Luminous-Dynamics/core-devs
+
+# Schemas and protocols
+/schemas/*           @Luminous-Dynamics/maintainers
+
+# Documentation and governance
+/docs/*              @Luminous-Dynamics/maintainers
+/GOVERNANCE.md       @Luminous-Dynamics/maintainers
+/SECURITY.md         @Luminous-Dynamics/maintainers
+
+# CI/CD and infrastructure
+/.github/*           @Luminous-Dynamics/maintainers

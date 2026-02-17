@@ -1,0 +1,25 @@
+False Positive Cluster Analysis
+================================================================================
+
+|                                                   
+│                 A                                 
+│                                                   
+│                                                   
+│                                                   
+|                                                   
+│                       A                           
+│                                                   
+│                                         C         
+│                                                   
+|                    A                              
+│                                                   
+│                                C                  
+│                A   AA     C     C                 
+│A  A A    A  A   A        B  C  C          C       
+|          A       A       CC     C          C    C 
+│A      A  A   A       B   BBC    C  B       CC  C  
+│    A    A  A  BA  B    B    C     BC       C  CC  
+│  A   A A   A    B  B    B B BB              C     
+│               B    B B BBB   B                    
+|              B    B      B BB         B           
+└──────────────────────────────────────────────────┘

@@ -1,0 +1,48 @@
+[package]
+name = "mycelix-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Command-line interface for Mycelix-DeSci"
+
+[[bin]]
+name = "mycelix"
+path = "src/main.rs"
+
+[dependencies]
+# CLI framework
+clap = { version = "4.4", features = ["derive", "env", "wrap_help"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json"] }
+
+# Async runtime
+tokio = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# Table formatting
+comfy-table = "7.1"
+
+# Terminal colors and styling
+colored = "2.1"
+
+# Progress indicators
+indicatif = "0.17"
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+hex = "0.4"
+
+# Configuration
+dirs = "5.0"
+toml = "0.8"

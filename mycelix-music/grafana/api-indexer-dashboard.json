@@ -1,0 +1,89 @@
+{
+  "title": "Mycelix API & Indexer",
+  "timezone": "browser",
+  "panels": [
+    {
+      "type": "stat",
+      "title": "API p95 latency",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(api_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 0, "w": 8, "h": 6 }
+    },
+    {
+      "type": "stat",
+      "title": "Indexer lag (blocks)",
+      "targets": [
+        {
+          "expr": "indexer_lag_blocks",
+          "legendFormat": "lag"
+        }
+      ],
+      "gridPos": { "x": 8, "y": 0, "w": 8, "h": 6 }
+    },
+    {
+      "type": "graph",
+      "title": "API request duration (p50/p95)",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(api_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(api_request_duration_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 6, "w": 12, "h": 8 }
+    },
+    {
+      "type": "graph",
+      "title": "API request rate",
+      "targets": [
+        {
+          "expr": "sum(rate(api_request_duration_seconds_count[5m])) by (method)",
+          "legendFormat": "{{method}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 14, "w": 12, "h": 8 }
+    },
+    {
+      "type": "stat",
+      "title": "Upload quota blocks (5m)",
+      "targets": [
+        {
+          "expr": "sum(increase(upload_quota_blocks_total[5m])) by (kind)",
+          "legendFormat": "{{kind}}"
+        }
+      ],
+      "gridPos": { "x": 0, "y": 22, "w": 8, "h": 6 }
+    },
+    {
+      "type": "graph",
+      "title": "Indexer poison (count)",
+      "targets": [
+        {
+          "expr": "increase(indexer_poison_total[5m])",
+          "legendFormat": "poison"
+        }
+      ],
+      "gridPos": { "x": 8, "y": 22, "w": 10, "h": 6 }
+    },
+    {
+      "type": "stat",
+      "title": "Retry queue",
+      "targets": [
+        {
+          "expr": "indexer_retry_queue_length",
+          "legendFormat": "len"
+        }
+      ],
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 6 }
+    }
+  ],
+  "schemaVersion": 38,
+  "version": 1
+}

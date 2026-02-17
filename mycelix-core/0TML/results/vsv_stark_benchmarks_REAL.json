@@ -1,0 +1,71 @@
+{
+  "metadata": {
+    "benchmark_date": "2025-11-09 16:06:43",
+    "prover_path": "/tmp/vsv-prover/release/host",
+    "prover_size_mb": 154.690688,
+    "num_rounds": 3,
+    "mode": "REAL INTEGRATED (PoGQ + RISC Zero)"
+  },
+  "proof_results": [
+    {
+      "round_number": 0,
+      "proof_generation_ms": 47554.61668968201,
+      "verification_ms": 88.30612466233507,
+      "proof_size_bytes": 221254,
+      "journal_size_bytes": 22,
+      "quarantine_decision": 0,
+      "success": true,
+      "error": ""
+    },
+    {
+      "round_number": 1,
+      "proof_generation_ms": 45462.73922920227,
+      "verification_ms": 96.20921506950023,
+      "proof_size_bytes": 221254,
+      "journal_size_bytes": 22,
+      "quarantine_decision": 0,
+      "success": true,
+      "error": ""
+    },
+    {
+      "round_number": 2,
+      "proof_generation_ms": 46901.84235572815,
+      "verification_ms": 90.47079597059508,
+      "proof_size_bytes": 221254,
+      "journal_size_bytes": 22,
+      "quarantine_decision": 0,
+      "success": true,
+      "error": ""
+    }
+  ],
+  "comparison": {
+    "vsv_stark_real": {
+      "proof_generation_ms": 46639.73275820414,
+      "proof_generation_std_ms": 873.8855410374349,
+      "verification_ms": 91.66204523414346,
+      "proof_size_bytes": 221254.0,
+      "zero_knowledge": true,
+      "post_quantum": true,
+      "byzantine_detection": true,
+      "notes": "REAL measurements from actual RISC Zero STARK prover"
+    },
+    "ecdsa_secp256k1": {
+      "proof_generation_ms": 0.5,
+      "verification_ms": 1.0,
+      "proof_size_bytes": 64,
+      "zero_knowledge": false,
+      "post_quantum": false,
+      "byzantine_detection": false,
+      "notes": "Traditional ECDSA, no privacy or Byzantine detection"
+    },
+    "rsa_2048": {
+      "proof_generation_ms": 2.0,
+      "verification_ms": 0.1,
+      "proof_size_bytes": 256,
+      "zero_knowledge": false,
+      "post_quantum": false,
+      "byzantine_detection": false,
+      "notes": "RSA signatures, vulnerable to quantum attacks"
+    }
+  }
+}

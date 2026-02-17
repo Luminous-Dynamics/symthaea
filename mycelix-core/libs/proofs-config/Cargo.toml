@@ -1,0 +1,22 @@
+[package]
+name = "proofs-config"
+version = "0.1.0"
+edition = "2021"
+authors = ["Mycelix Network"]
+description = "Centralized configuration for Mycelix ZK proof systems"
+license = "MIT"
+repository = "https://github.com/luminous-dynamics/Mycelix-Core"
+
+[features]
+default = []
+# Enable Winterfell ProofOptions generation
+winterfell = ["dep:winterfell"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+
+# Optional: Winterfell integration for proof options generation
+winterfell = { version = "0.13", optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"

@@ -1,0 +1,106 @@
+name: MATL Regression Matrix
+
+on:
+  schedule:
+    - cron: "30 2 * * *"  # daily 02:30 UTC
+  workflow_dispatch:
+
+jobs:
+  matl-matrix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Run MATL attack matrix (iid + label_skew)
+        env:
+          ATTACK_DISTRIBUTIONS: iid,label_skew
+          LABEL_SKEW_ALPHA: "0.2"
+          LABEL_SKEW_COMMITTEE_PERCENTILE: "8"
+          ML_DETECTOR_PATH: models/byzantine_detector_logged_v3
+          USE_ML_DETECTOR: "1"
+        run: |
+          chmod +x run_attack_matrix.sh
+          ./run_attack_matrix.sh
+
+      - name: Summarise label-skew baseline
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          matrix_path = Path("0TML/tests/results/bft_attack_matrix.json")
+          data = json.loads(matrix_path.read_text())
+          label_skew_runs = [
+              run for run in data.get("runs", [])
+              if run.get("distribution") == "label_skew"
+          ]
+
+          lines = ["### Label-Skew Regression Snapshot", ""]
+          if not label_skew_runs:
+              lines.append("No label-skew scenarios were recorded.")
+          else:
+              lines.append("Attack | α | BFT % | Detection % | FP % | Success")
+              lines.append("--- | --- | --- | --- | --- | ---")
+              for run in sorted(label_skew_runs, key=lambda r: (r.get("attack_type"), r.get("bft_ratio", 0.0))):
+                  attack = run.get("attack_type", "?")
+                  alpha = run.get("label_skew_alpha", "-")
+                  ratio = int(round(run.get("bft_ratio", 0) * 100))
+                  det = run.get("final_detection_rate", 0.0)
+                  fp = run.get("final_false_positive_rate", 0.0)
+                  ok = "✅" if run.get("success") else "⚠️"
+                  lines.append(f"{attack} | {alpha} | {ratio}% | {det:.1f}% | {fp:.1f}% | {ok}")
+
+          summary_path = Path(os.environ["GITHUB_STEP_SUMMARY"])
+          summary_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
+
+      - name: Verify IID scenarios meet targets
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          matrix_path = Path("0TML/tests/results/bft_attack_matrix.json")
+          data = json.loads(matrix_path.read_text())
+          experimental = {"temporal_drift", "entropy_smoothing"}
+          failures = []
+          for run in data.get("runs", []):
+              if run.get("distribution") != "iid":
+                  continue
+              if run.get("attack_type") in experimental:
+                  continue
+              det = run.get("final_detection_rate", 0.0)
+              fp = run.get("final_false_positive_rate", 100.0)
+              if det < 95.0 or fp > 5.0:
+                  failures.append({
+                      "attack": run.get("attack_type"),
+                      "ratio": run.get("bft_ratio"),
+                      "detection": det,
+                      "false_positive": fp,
+                  })
+          if failures:
+              import sys
+              print("MATL regression detected in IID scenarios:")
+              for item in failures:
+                  print(item)
+              sys.exit(1)
+          PY
+
+      - name: Export Prometheus metrics
+        run: |
+          python scripts/export_bft_metrics.py --matrix 0TML/tests/results/bft_attack_matrix.json --output artifacts/matl_metrics.prom
+
+      - name: Upload BFT artefacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: matl-bft-matrix
+          path: |
+            0TML/tests/results/bft_attack_matrix.json
+            artifacts/matl_metrics.prom
+            0TML/tests/results/bft_attack_*.json

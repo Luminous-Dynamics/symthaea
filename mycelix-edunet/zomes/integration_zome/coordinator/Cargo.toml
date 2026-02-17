@@ -1,0 +1,26 @@
+[package]
+name = "integration_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Integration coordinator zome - orchestrates cross-zome learning experiences"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "integration_coordinator"
+
+[dependencies]
+# Holochain Development Kit (HDK) for coordinator logic
+hdk.workspace = true
+
+# Our integrity zome
+integration_integrity = { path = "../integrity" }
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true

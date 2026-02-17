@@ -1,0 +1,85 @@
+[tool.poetry]
+name = "mycelix"
+version = "1.0.0"
+description = "Byzantine-Resilient Federated Learning - CLI and Core Library"
+authors = ["Luminous Dynamics <team@luminous-dynamics.org>", "Tristan Stoltz <tristan.stoltz@gmail.com>"]
+readme = "README.md"
+license = "MIT"
+homepage = "https://mycelix.net"
+repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"
+documentation = "https://docs.mycelix.net"
+keywords = ["federated-learning", "byzantine", "machine-learning", "distributed", "privacy"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: System :: Distributed Computing",
+]
+packages = [
+    { include = "mycelix_cli" },
+]
+
+[tool.poetry.scripts]
+mycelix = "mycelix_cli.cli:app"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.14"
+numpy = "^2.4.2"
+typer = "^0.12.0"
+rich = "^13.7.0"
+pyyaml = "^6.0"
+websockets = "^15.0.0"
+aiohttp = "^3.12.0"
+msgpack = "^1.1.0"
+psutil = "^5.9.0"
+# Optional ML dependencies (install via extras: cpu / gpu)
+torch = {version = "^2.10.0", optional = true}
+torchvision = {version = "^0.25.0", optional = true}
+scikit-learn = {version = "^1.8.0", optional = true}
+pandas = {version = "^2.0.0", optional = true}
+matplotlib = {version = "^3.7.0", optional = true}
+tqdm = {version = "^4.66.0", optional = true}
+
+[tool.poetry.extras]
+cpu = ["torch", "torchvision", "scikit-learn", "pandas", "matplotlib", "tqdm"]
+gpu = ["torch", "torchvision", "scikit-learn", "pandas", "matplotlib", "tqdm"]
+all = ["torch", "torchvision", "scikit-learn", "pandas", "matplotlib", "tqdm"]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=8.4.2,<9.0.0)",
+    "pytest-asyncio (>=1.2.0,<2.0.0)",
+    "py-solc-x (>=2.0.4,<3.0.0)",
+    "web3 (>=7.14.0,<8.0.0)"
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "D", "UP"]
+ignore = ["D100", "D104"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

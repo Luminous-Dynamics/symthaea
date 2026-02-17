@@ -1,0 +1,18 @@
+{
+  "name": "holochain-mycelix",
+  "version": "1.0.0",
+  "main": "signaling-server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "express": "^5.1.0",
+    "gun": "^0.2020.1241",
+    "socket.io": "^4.8.1",
+    "ws": "^8.18.3"
+  }
+}

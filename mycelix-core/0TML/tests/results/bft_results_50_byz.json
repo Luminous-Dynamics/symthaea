@@ -1,0 +1,11 @@
+{
+  "detection_rate": 0.6,
+  "false_positive_rate": 0.0,
+  "accuracy": 0.8,
+  "precision": 1.0,
+  "recall": 0.6,
+  "true_positives": 30,
+  "false_positives": 0,
+  "true_negatives": 50,
+  "false_negatives": 20
+}

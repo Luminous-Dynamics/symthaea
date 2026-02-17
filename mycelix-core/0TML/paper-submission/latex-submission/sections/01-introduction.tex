@@ -1,0 +1,70 @@
+\section{Introduction}
+
+\subsection{The Byzantine Barrier in Federated Learning}
+
+Federated learning~\cite{mcmahan2017communication} enables collaborative machine learning across distributed devices without centralizing sensitive data, addressing critical privacy concerns in healthcare~\cite{rieke2020future}, finance~\cite{long2020federated}, and mobile applications~\cite{hard2018federated}. However, this decentralized paradigm introduces a fundamental security challenge: \textbf{Byzantine nodes} can submit malicious gradients to corrupt the global model~\cite{lamport1982byzantine}.
+
+Traditional Byzantine-robust aggregation methods---Multi-KRUM~\cite{blanchard2017machine}, Median~\cite{yin2018byzantine}, Trimmed Mean~\cite{yin2018byzantine}, Bulyan~\cite{mhamdi2018machine}---rely on \textbf{peer-comparison}: analyzing gradient similarity and magnitude relative to other participants. These methods share a common assumption: Byzantine nodes represent an \textbf{honest minority} (typically $f < n/3$ where $f$ is Byzantine count and $n$ is total nodes). This $\sim$33\% threshold emerges from classical Byzantine consensus theory~\cite{castro1999practical, lamport1982byzantine}.
+
+\textbf{The Critical Problem}: When Byzantine ratios exceed this threshold, peer-comparison methods experience \textbf{detector inversion}---Byzantine gradients become the statistical ``majority,'' causing honest gradients to appear as outliers. The detector flags honest nodes while accepting Byzantine ones, resulting in catastrophic failure.
+
+\textbf{Real-World Scenarios}: High Byzantine ratios (35--50\%) are plausible in:
+\begin{itemize}
+    \item \textbf{Sybil attacks}~\cite{fung2018mitigating}: Single adversaries masquerading as multiple clients
+    \item \textbf{Coordinated attacks}: Collusion among malicious participants
+    \item \textbf{Compromised devices}: Malware infections in IoT federated networks
+    \item \textbf{Adversarial clients}: Deliberate model poisoning~\cite{bagdasaryan2020backdoor}
+\end{itemize}
+
+\subsection{The Centralization Paradox}
+
+Existing Byzantine-robust federated learning systems face a paradoxical design flaw: while distributing computation to preserve privacy, they rely on \textbf{centralized aggregation servers} for gradient aggregation and model updates~\cite{kairouz2019advances, li2020federated}. This creates multiple vulnerabilities:
+
+\begin{enumerate}
+    \item \textbf{Single Point of Failure}: Compromised aggregation servers can arbitrarily corrupt the global model
+    \item \textbf{Trust Assumption}: Clients must trust the server to aggregate correctly and not exfiltrate model information
+    \item \textbf{Denial of Service}: Central servers are natural DDoS targets
+    \item \textbf{Scalability Bottleneck}: All gradients flow through a single node
+\end{enumerate}
+
+Recent blockchain-based federated learning proposals~\cite{kim2019blockchained, qu2021decentralized, li2020blockchain} attempt decentralization but suffer from high transaction costs (gas fees), low throughput (15--100 TPS), and lack built-in Byzantine detection at the consensus layer.
+
+\subsection{Contributions}
+
+This paper presents \textbf{Zero-TrustML}, a Byzantine-robust federated learning system that eliminates centralized aggregation while maintaining competitive detection performance through three primary contributions:
+
+\textbf{C1. Holochain DHT Integration for Decentralized Infrastructure}
+
+\begin{itemize}
+    \item First production-ready Byzantine-robust federated learning system with \textbf{no centralized aggregation server}
+    \item Holochain Distributed Hash Table (DHT) for gradient storage and validation, eliminating single points of failure
+    \item \textbf{Performance}: 10,127 TPS throughput, 89ms median latency, zero transaction costs---three orders of magnitude faster than blockchain alternatives
+    \item \textbf{Agent-Centric Validation}: Distributed validation across $\sqrt{N}$ peers rather than a single trusted server
+    \item \textbf{Production Code}: Open-source zomes (WebAssembly modules) for gradient storage, reputation tracking, and validation
+\end{itemize}
+
+\textbf{C2. Adaptive Threshold Algorithm for Heterogeneous Data}
+
+\begin{itemize}
+    \item \textbf{Gap+MAD Method}: Outlier-robust threshold selection requiring no manual tuning for non-IID data
+    \item Automatically adjusts to data heterogeneity (Dirichlet $\alpha$=0.1 label skew)
+    \item \textbf{Empirical Results}: 91\% FPR reduction compared to fixed thresholds (84.6\% → 7.7\%)
+    \item Works with multiple detection metrics (loss-based PoGQ and direction-based FLTrust)
+    \item First demonstration of bimodal gap detection for Byzantine threshold selection
+\end{itemize}
+
+\textbf{C3. Comparative Evaluation of Server-Side Validation Methods}
+
+\begin{itemize}
+    \item Head-to-head comparison of \textbf{PoGQ} (loss-based quality) and \textbf{FLTrust} (direction-based trust) on identical heterogeneous data
+    \item \textbf{Key Finding}: Both methods achieve perfect detection (100\% TPR) at 20--30\% BFT; FLTrust maintains superiority at higher ratios (40--50\%)
+    \item \textbf{Empirical Demonstration of Peer-Comparison Failure}: Mode 0 achieves 100\% FPR (flags all honest nodes) at 35\% BFT due to detector inversion
+    \item Validation across MNIST and FEMNIST with realistic non-IID distributions
+    \item Insights on loss-based vs. direction-based metrics in high-BFT regimes
+\end{itemize}
+
+\textbf{Broader Impact}: This work demonstrates that Byzantine-robust federated learning can operate without centralized trust assumptions, addressing critical gaps in privacy-preserving collaborative ML for healthcare, finance, and edge computing. Our decentralized architecture maintains competitive detection performance while eliminating single points of failure.
+
+\subsection{Paper Organization}
+
+Section~\ref{sec:related} reviews related work in Byzantine-robust federated learning, fail-safe systems, and decentralized architectures. Section~\ref{sec:design} presents the Zero-TrustML system design including ground truth detection, adaptive thresholds, and Holochain integration. Section~\ref{sec:experiments} describes experimental methodology. Section~\ref{sec:results} presents empirical results demonstrating Mode 1 effectiveness and Mode 0 failure. Section~\ref{sec:discussion} discusses implications, limitations, and future work. Section~\ref{sec:conclusion} concludes.

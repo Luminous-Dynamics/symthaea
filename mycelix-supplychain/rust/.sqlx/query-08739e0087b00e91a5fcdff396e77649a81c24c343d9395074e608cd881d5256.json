@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COUNT(*) as total_locations,\n                COUNT(DISTINCT zone) as zone_count\n            FROM inv_locations\n            WHERE tenant_id = $1 AND warehouse_id = $2 AND is_active = true\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_locations",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "zone_count",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "08739e0087b00e91a5fcdff396e77649a81c24c343d9395074e608cd881d5256"
+}

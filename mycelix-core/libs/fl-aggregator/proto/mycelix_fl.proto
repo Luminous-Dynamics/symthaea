@@ -1,0 +1,433 @@
+// Mycelix Federated Learning - Unified API
+//
+// Supports both traditional gradient-based FL and HDC-based FL (Symthaea)
+//
+// Version: 1.0.0
+// Date: 2026-01-11
+
+syntax = "proto3";
+
+package mycelix.fl.v1;
+
+option java_package = "com.mycelix.fl.v1";
+option go_package = "github.com/luminous-dynamics/mycelix/fl/v1";
+
+// =============================================================================
+// Core Services
+// =============================================================================
+
+// Main FL coordination service
+service FederatedLearning {
+    // Node lifecycle
+    rpc RegisterNode(RegisterNodeRequest) returns (RegisterNodeResponse);
+    rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+    rpc UnregisterNode(UnregisterNodeRequest) returns (UnregisterNodeResponse);
+
+    // Contribution submission (unified for all payload types)
+    rpc Submit(SubmitRequest) returns (SubmitResponse);
+    rpc SubmitStream(stream SubmitChunk) returns (SubmitResponse);  // For large payloads
+
+    // Aggregation
+    rpc GetAggregated(GetAggregatedRequest) returns (GetAggregatedResponse);
+    rpc WatchRounds(WatchRoundsRequest) returns (stream RoundEvent);
+
+    // Bidirectional coordination (real-time FL)
+    rpc Coordinate(stream NodeMessage) returns (stream CoordinatorMessage);
+
+    // Status & metrics
+    rpc GetStatus(GetStatusRequest) returns (GetStatusResponse);
+    rpc GetMetrics(GetMetricsRequest) returns (GetMetricsResponse);
+}
+
+// =============================================================================
+// Payload Types (Unified)
+// =============================================================================
+
+// Unified payload envelope - supports all FL paradigms
+message Payload {
+    oneof data {
+        DenseGradient dense = 1;           // Traditional FL: raw float array
+        HyperEncodedGradient hyper = 2;    // HyperFeel: compressed hypervector
+        BinaryHypervector binary_hv = 3;    // Symthaea: native binary HDC
+        SparseGradient sparse = 4;          // Sparse: indices + values
+        QuantizedGradient quantized = 5;    // Quantized: reduced precision
+    }
+}
+
+// Traditional dense gradient (Array1<f32> equivalent)
+message DenseGradient {
+    repeated float values = 1 [packed = true];  // Gradient values
+    uint64 dimension = 2;                        // Expected dimension
+}
+
+// HyperFeel-encoded gradient (2000x compression)
+message HyperEncodedGradient {
+    bytes hypervector = 1;              // 16,384 × i8 = 16KB
+    uint32 dimension = 2;               // Always 16384 for HyperFeel
+    EncodingMetadata encoding = 3;      // How it was encoded
+    PhiMetrics phi = 4;                 // Integrated information metrics
+}
+
+// Symthaea native binary hypervector
+message BinaryHypervector {
+    bytes data = 1;                     // 16,384 bits = 2KB
+    uint32 dimension = 2;               // Bit dimension (typically 16384)
+}
+
+// Sparse gradient (for communication efficiency)
+message SparseGradient {
+    repeated uint32 indices = 1 [packed = true];
+    repeated float values = 2 [packed = true];
+    uint64 full_dimension = 3;
+    float sparsity_ratio = 4;
+}
+
+// Quantized gradient (reduced precision)
+message QuantizedGradient {
+    bytes data = 1;                     // Quantized values
+    uint32 bits_per_value = 2;          // 1, 2, 4, or 8
+    float scale = 3;                    // Dequantization scale
+    float zero_point = 4;               // Dequantization offset
+    uint64 dimension = 5;
+}
+
+// =============================================================================
+// Metadata Types
+// =============================================================================
+
+// Encoding metadata for HyperFeel
+message EncodingMetadata {
+    string encoder_version = 1;         // e.g., "hyperfeel-v2"
+    uint32 quantize_bits = 2;           // Typically 8
+    uint64 original_size = 3;           // Original gradient size in bytes
+    float compression_ratio = 4;        // e.g., 2000.0
+    int64 projection_seed = 5;          // Random projection seed
+    bool use_causal = 6;                // Causal encoding enabled
+    bool use_temporal = 7;              // Temporal encoding enabled
+}
+
+// Phi (integrated information) metrics
+message PhiMetrics {
+    float phi_before = 1;               // Φ before training step
+    float phi_after = 2;                // Φ after training step
+    float phi_gain = 3;                 // phi_after - phi_before
+    float epistemic_confidence = 4;     // Confidence in measurement
+    map<string, float> components = 5;  // Layer-wise breakdown
+}
+
+// Layer metadata for gradients
+message LayerMetadata {
+    uint32 layer_index = 1;
+    string layer_name = 2;
+    uint64 size = 3;
+    string dtype = 4;
+}
+
+// =============================================================================
+// Authentication & Signing
+// =============================================================================
+
+// Node identity (DID-based)
+message NodeIdentity {
+    string did = 1;                     // e.g., "did:mycelix:node123"
+    bytes public_key = 2;               // Dilithium5 public key
+    uint32 assurance_level = 3;         // E0-E4 identity assurance
+}
+
+// Cryptographic signature
+message Signature {
+    bytes data = 1;                     // Signature bytes
+    SignatureAlgorithm algorithm = 2;
+    int64 timestamp = 3;                // Signing timestamp
+    bytes nonce = 4;                    // 32-byte replay prevention
+}
+
+enum SignatureAlgorithm {
+    SIGNATURE_ALGORITHM_UNSPECIFIED = 0;
+    DILITHIUM5 = 1;                     // Post-quantum (default)
+    ED25519 = 2;                        // Classical fallback
+    ECDSA_P256 = 3;                     // Legacy compatibility
+}
+
+// =============================================================================
+// Submission Messages
+// =============================================================================
+
+message SubmitRequest {
+    NodeIdentity node = 1;
+    uint64 round = 2;
+    Payload payload = 3;
+    Signature signature = 4;
+
+    // Optional proofs
+    bytes pogq_proof = 5;               // Proof of Gradient Quality
+    bytes zkstark_proof = 6;            // zkSTARK validity proof
+
+    // Metadata
+    int64 timestamp = 7;
+    map<string, string> metadata = 8;
+}
+
+// Streaming submission for large payloads
+message SubmitChunk {
+    oneof content {
+        SubmitHeader header = 1;
+        bytes chunk_data = 2;
+        SubmitTrailer trailer = 3;
+    }
+}
+
+message SubmitHeader {
+    NodeIdentity node = 1;
+    uint64 round = 2;
+    PayloadType payload_type = 3;
+    uint64 total_size = 4;
+    uint32 chunk_count = 5;
+}
+
+message SubmitTrailer {
+    Signature signature = 1;
+    bytes checksum = 2;                 // SHA3-256 of full payload
+}
+
+enum PayloadType {
+    PAYLOAD_TYPE_UNSPECIFIED = 0;
+    DENSE_GRADIENT = 1;
+    HYPER_ENCODED = 2;
+    BINARY_HYPERVECTOR = 3;
+    SPARSE_GRADIENT = 4;
+    QUANTIZED_GRADIENT = 5;
+}
+
+message SubmitResponse {
+    bool accepted = 1;
+    string error_message = 2;
+    uint64 round = 3;
+    uint32 submissions_received = 4;
+    uint32 submissions_expected = 5;
+    bool round_complete = 6;
+}
+
+// =============================================================================
+// Aggregation Messages
+// =============================================================================
+
+message GetAggregatedRequest {
+    uint64 round = 1;
+    PayloadType preferred_format = 2;   // Requested output format
+    bool include_proofs = 3;
+}
+
+message GetAggregatedResponse {
+    uint64 round = 1;
+    Payload aggregated = 2;
+    AggregationMetadata metadata = 3;
+
+    // Byzantine detection results
+    repeated string byzantine_nodes = 4;
+    repeated string healed_nodes = 5;
+
+    // Proofs
+    bytes aggregation_proof = 6;
+}
+
+message AggregationMetadata {
+    string algorithm = 1;               // "krum", "median", "shapley", etc.
+    uint32 participants = 2;
+    uint32 excluded = 3;
+    float byzantine_ratio = 4;
+    int64 aggregation_time_ms = 5;
+    map<string, float> shapley_values = 6;  // Node contribution scores
+}
+
+// =============================================================================
+// Real-time Coordination
+// =============================================================================
+
+message WatchRoundsRequest {
+    uint64 start_round = 1;             // 0 = current round
+    repeated string event_types = 2;    // Filter by event type
+}
+
+message RoundEvent {
+    uint64 round = 1;
+    RoundEventType type = 2;
+    int64 timestamp = 3;
+
+    oneof details {
+        RoundStarted started = 4;
+        SubmissionReceived submission = 5;
+        RoundCompleted completed = 6;
+        ByzantineDetected byzantine = 7;
+    }
+}
+
+enum RoundEventType {
+    ROUND_EVENT_TYPE_UNSPECIFIED = 0;
+    ROUND_STARTED = 1;
+    SUBMISSION_RECEIVED = 2;
+    ROUND_COMPLETED = 3;
+    BYZANTINE_DETECTED = 4;
+    NODE_HEALED = 5;
+}
+
+message RoundStarted {
+    uint32 expected_nodes = 1;
+    int64 deadline = 2;
+}
+
+message SubmissionReceived {
+    string node_did = 1;
+    PayloadType payload_type = 2;
+    uint64 size_bytes = 3;
+}
+
+message RoundCompleted {
+    uint32 participants = 1;
+    uint32 byzantine_count = 2;
+    float aggregation_time_ms = 3;
+}
+
+message ByzantineDetected {
+    string node_did = 1;
+    string reason = 2;
+    float confidence = 3;
+}
+
+// Bidirectional coordination messages
+message NodeMessage {
+    oneof content {
+        SubmitRequest submit = 1;
+        HeartbeatRequest heartbeat = 2;
+        ReadySignal ready = 3;
+    }
+}
+
+message CoordinatorMessage {
+    oneof content {
+        SubmitResponse submit_ack = 1;
+        RoundEvent event = 2;
+        ModelUpdate model = 3;
+        CoordinatorCommand command = 4;
+    }
+}
+
+message ReadySignal {
+    uint64 round = 1;
+}
+
+message ModelUpdate {
+    uint64 round = 1;
+    Payload aggregated = 2;
+}
+
+message CoordinatorCommand {
+    CommandType type = 1;
+    map<string, string> params = 2;
+}
+
+enum CommandType {
+    COMMAND_TYPE_UNSPECIFIED = 0;
+    START_ROUND = 1;
+    ABORT_ROUND = 2;
+    PAUSE = 3;
+    RESUME = 4;
+}
+
+// =============================================================================
+// Node Management
+// =============================================================================
+
+message RegisterNodeRequest {
+    NodeIdentity node = 1;
+    NodeCapabilities capabilities = 2;
+}
+
+message NodeCapabilities {
+    repeated PayloadType supported_payloads = 1;
+    bool supports_streaming = 2;
+    bool supports_proofs = 3;
+    uint64 max_gradient_dimension = 4;
+    string framework = 5;               // "pytorch", "tensorflow", "jax", etc.
+}
+
+message RegisterNodeResponse {
+    bool accepted = 1;
+    string error_message = 2;
+    string session_token = 3;           // For subsequent requests
+    uint64 current_round = 4;
+}
+
+message HeartbeatRequest {
+    string session_token = 1;
+    int64 timestamp = 2;
+}
+
+message HeartbeatResponse {
+    bool ok = 1;
+    uint64 current_round = 2;
+    RoundState round_state = 3;
+}
+
+enum RoundState {
+    ROUND_STATE_UNSPECIFIED = 0;
+    PENDING = 1;
+    COLLECTING = 2;
+    AGGREGATING = 3;
+    COMPLETE = 4;
+}
+
+message UnregisterNodeRequest {
+    string session_token = 1;
+}
+
+message UnregisterNodeResponse {
+    bool ok = 1;
+}
+
+// =============================================================================
+// Status & Metrics
+// =============================================================================
+
+message GetStatusRequest {}
+
+message GetStatusResponse {
+    uint64 current_round = 1;
+    RoundState round_state = 2;
+    uint32 registered_nodes = 3;
+    uint32 submissions_this_round = 4;
+    uint32 expected_this_round = 5;
+    int64 round_start_time = 6;
+    string aggregation_algorithm = 7;
+}
+
+message GetMetricsRequest {
+    bool include_histograms = 1;
+}
+
+message GetMetricsResponse {
+    // Counters
+    uint64 total_rounds = 1;
+    uint64 total_submissions = 2;
+    uint64 total_byzantine_detected = 3;
+    uint64 total_healed = 4;
+
+    // Gauges
+    uint32 active_nodes = 5;
+    float average_latency_ms = 6;
+    float byzantine_ratio = 7;
+
+    // Compression stats
+    float average_compression_ratio = 8;
+    uint64 bytes_saved = 9;
+
+    // Histograms (optional)
+    map<string, Histogram> histograms = 10;
+}
+
+message Histogram {
+    repeated double bucket_bounds = 1;
+    repeated uint64 bucket_counts = 2;
+    double sum = 3;
+    uint64 count = 4;
+}

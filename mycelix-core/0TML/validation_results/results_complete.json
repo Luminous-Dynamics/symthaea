@@ -1,0 +1,301 @@
+{
+  "manifest": {
+    "validation_id": "AEGIS-GEN5-20251112-093604",
+    "state_hash": "17782d23cfec0d01",
+    "git_commit": "a26775d3380f51f0929e8967f4a13ba6c2960cb9"
+  },
+  "results": [
+    {
+      "run_id": "AEGIS-phase-a-E2_noniid_robustness-seed101-20251112-093604",
+      "experiment": "E2_noniid_robustness",
+      "config": {
+        "alpha": 1.0,
+        "adversary_rate": 0.2,
+        "seed": 101
+      },
+      "metrics": {
+        "clean_acc": 0.671,
+        "robust_acc": 0.671,
+        "auc": 0.8267217126400426,
+        "fpr_at_tpr90": 0.41226215644820297,
+        "alpha": 1.0,
+        "adversary_rate": 0.2,
+        "convergence_round": 5,
+        "flags_per_round": 7.45
+      },
+      "runtime": 6.906147003173828
+    },
+    {
+      "run_id": "AEGIS-phase-a-E2_noniid_robustness-seed101-20251112-093611",
+      "experiment": "E2_noniid_robustness",
+      "config": {
+        "alpha": 0.5,
+        "adversary_rate": 0.2,
+        "seed": 101
+      },
+      "metrics": {
+        "clean_acc": 0.662,
+        "robust_acc": 0.662,
+        "auc": 0.8183982287626309,
+        "fpr_at_tpr90": 0.4418604651162791,
+        "alpha": 0.5,
+        "adversary_rate": 0.2,
+        "convergence_round": 5,
+        "flags_per_round": 7.5
+      },
+      "runtime": 0.678297758102417
+    },
+    {
+      "run_id": "AEGIS-phase-a-E2_noniid_robustness-seed101-20251112-093612",
+      "experiment": "E2_noniid_robustness",
+      "config": {
+        "alpha": 0.3,
+        "adversary_rate": 0.2,
+        "seed": 101
+      },
+      "metrics": {
+        "clean_acc": 0.634,
+        "robust_acc": 0.634,
+        "auc": 0.8191473423115979,
+        "fpr_at_tpr90": 0.47357293868921774,
+        "alpha": 0.3,
+        "adversary_rate": 0.2,
+        "convergence_round": 7,
+        "flags_per_round": 7.45
+      },
+      "runtime": 0.5036327838897705
+    },
+    {
+      "run_id": "AEGIS-phase-a-E2_noniid_robustness-seed202-20251112-093613",
+      "experiment": "E2_noniid_robustness",
+      "config": {
+        "alpha": 0.1,
+        "adversary_rate": 0.2,
+        "seed": 202
+      },
+      "metrics": {
+        "clean_acc": 0.598,
+        "robust_acc": 0.598,
+        "auc": 0.7995432155579417,
+        "fpr_at_tpr90": 0.46750524109014674,
+        "alpha": 0.1,
+        "adversary_rate": 0.2,
+        "convergence_round": 6,
+        "flags_per_round": 5.9
+      },
+      "runtime": 1.050098180770874
+    },
+    {
+      "run_id": "AEGIS-phase-a-E2_noniid_robustness-seed303-20251112-093614",
+      "experiment": "E2_noniid_robustness",
+      "config": {
+        "alpha": 0.1,
+        "adversary_rate": 0.2,
+        "seed": 303
+      },
+      "metrics": {
+        "clean_acc": 0.2,
+        "robust_acc": 0.2,
+        "auc": 0.5,
+        "fpr_at_tpr90": 0.1,
+        "alpha": 0.1,
+        "adversary_rate": 0.2,
+        "convergence_round": 5,
+        "flags_per_round": 0.0
+      },
+      "runtime": 0.8377695083618164
+    },
+    {
+      "run_id": "AEGIS-phase-a-E3_backdoor_resilience-seed101-20251112-093614",
+      "experiment": "E3_backdoor_resilience",
+      "config": {
+        "byz_frac": 0.2,
+        "seed": 101
+      },
+      "metrics": {
+        "asr_aegis": 0.185,
+        "asr_median": 0.19,
+        "asr_ratio": 0.9736842105263158,
+        "clean_acc_aegis": 0.657,
+        "clean_acc_median": 0.655,
+        "robust_acc_aegis": 0.5962275,
+        "robust_acc_median": 0.592775,
+        "auc": 0.6892843468562202,
+        "fpr_at_tpr90": 0.7315010570824524
+      },
+      "runtime": 1.178067684173584
+    },
+    {
+      "run_id": "AEGIS-phase-a-E3_backdoor_resilience-seed202-20251112-093616",
+      "experiment": "E3_backdoor_resilience",
+      "config": {
+        "byz_frac": 0.2,
+        "seed": 202
+      },
+      "metrics": {
+        "asr_aegis": 0.064,
+        "asr_median": 0.148,
+        "asr_ratio": 0.43243243243243246,
+        "clean_acc_aegis": 0.649,
+        "clean_acc_median": 0.648,
+        "robust_acc_aegis": 0.628232,
+        "robust_acc_median": 0.600048,
+        "auc": 0.7019651957525865,
+        "fpr_at_tpr90": 0.7169811320754716
+      },
+      "runtime": 1.2183258533477783
+    },
+    {
+      "run_id": "AEGIS-phase-a-E3_backdoor_resilience-seed303-20251112-093617",
+      "experiment": "E3_backdoor_resilience",
+      "config": {
+        "byz_frac": 0.2,
+        "seed": 303
+      },
+      "metrics": {
+        "asr_aegis": 0.31,
+        "asr_median": 0.321,
+        "asr_ratio": 0.9657320872274143,
+        "clean_acc_aegis": 0.658,
+        "clean_acc_median": 0.654,
+        "robust_acc_aegis": 0.55601,
+        "robust_acc_median": 0.549033,
+        "auc": 0.6546765222482436,
+        "fpr_at_tpr90": 0.7848360655737705
+      },
+      "runtime": 1.2313072681427002
+    },
+    {
+      "run_id": "AEGIS-phase-a-E5_federated_convergence-seed101-20251112-093618",
+      "experiment": "E5_federated_convergence",
+      "config": {
+        "aggregator": "aegis",
+        "adversary_rate": 0.0,
+        "seed": 101
+      },
+      "metrics": {
+        "final_acc": 0.669,
+        "robust_acc": 0.669,
+        "convergence_round": 5,
+        "auc": NaN,
+        "acc_at_round_10": 0.667,
+        "acc_at_round_20": 0.669,
+        "acc_at_round_30": 0.0,
+        "acc_at_round_40": 0.669,
+        "aggregator": "aegis",
+        "adversary_rate": 0.0
+      },
+      "runtime": 0.5432095527648926
+    },
+    {
+      "run_id": "AEGIS-phase-a-E5_federated_convergence-seed101-20251112-093619",
+      "experiment": "E5_federated_convergence",
+      "config": {
+        "aggregator": "median",
+        "adversary_rate": 0.0,
+        "seed": 101
+      },
+      "metrics": {
+        "final_acc": 0.669,
+        "robust_acc": 0.669,
+        "convergence_round": 5,
+        "auc": 0.5,
+        "acc_at_round_10": 0.667,
+        "acc_at_round_20": 0.669,
+        "acc_at_round_30": 0.0,
+        "acc_at_round_40": 0.669,
+        "aggregator": "median",
+        "adversary_rate": 0.0
+      },
+      "runtime": 0.5010311603546143
+    },
+    {
+      "run_id": "AEGIS-phase-a-E5_federated_convergence-seed101-20251112-093619",
+      "experiment": "E5_federated_convergence",
+      "config": {
+        "aggregator": "aegis",
+        "adversary_rate": 0.2,
+        "seed": 101
+      },
+      "metrics": {
+        "final_acc": 0.671,
+        "robust_acc": 0.671,
+        "convergence_round": 5,
+        "auc": 0.8267217126400426,
+        "acc_at_round_10": 0.668,
+        "acc_at_round_20": 0.671,
+        "acc_at_round_30": 0.0,
+        "acc_at_round_40": 0.671,
+        "aggregator": "aegis",
+        "adversary_rate": 0.2
+      },
+      "runtime": 0.6103782653808594
+    },
+    {
+      "run_id": "AEGIS-phase-a-E5_federated_convergence-seed101-20251112-093620",
+      "experiment": "E5_federated_convergence",
+      "config": {
+        "aggregator": "median",
+        "adversary_rate": 0.2,
+        "seed": 101
+      },
+      "metrics": {
+        "final_acc": 0.667,
+        "robust_acc": 0.667,
+        "convergence_round": 5,
+        "auc": 0.5,
+        "acc_at_round_10": 0.66,
+        "acc_at_round_20": 0.667,
+        "acc_at_round_30": 0.0,
+        "acc_at_round_40": 0.667,
+        "aggregator": "median",
+        "adversary_rate": 0.2
+      },
+      "runtime": 0.5247635841369629
+    },
+    {
+      "run_id": "AEGIS-phase-a-E5_federated_convergence-seed202-20251112-093620",
+      "experiment": "E5_federated_convergence",
+      "config": {
+        "aggregator": "aegis",
+        "adversary_rate": 0.2,
+        "seed": 202
+      },
+      "metrics": {
+        "final_acc": 0.671,
+        "robust_acc": 0.671,
+        "convergence_round": 6,
+        "auc": 0.7962366416116992,
+        "acc_at_round_10": 0.665,
+        "acc_at_round_20": 0.671,
+        "acc_at_round_30": 0.0,
+        "acc_at_round_40": 0.671,
+        "aggregator": "aegis",
+        "adversary_rate": 0.2
+      },
+      "runtime": 0.5210881233215332
+    },
+    {
+      "run_id": "AEGIS-phase-a-E5_federated_convergence-seed202-20251112-093621",
+      "experiment": "E5_federated_convergence",
+      "config": {
+        "aggregator": "median",
+        "adversary_rate": 0.2,
+        "seed": 202
+      },
+      "metrics": {
+        "final_acc": 0.668,
+        "robust_acc": 0.668,
+        "convergence_round": 5,
+        "auc": 0.5,
+        "acc_at_round_10": 0.666,
+        "acc_at_round_20": 0.668,
+        "acc_at_round_30": 0.0,
+        "acc_at_round_40": 0.668,
+        "aggregator": "median",
+        "adversary_rate": 0.2
+      },
+      "runtime": 0.48715758323669434
+    }
+  ]
+}

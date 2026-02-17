@@ -1,0 +1,64 @@
+# Example Kubernetes deployment values
+# Copy to values.yaml and customize for your environment
+
+provenance:
+  image:
+    repository: mycelix/provenance-service
+    tag: 0.1.0
+    pullPolicy: IfNotPresent
+
+  replicas: 3
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  env:
+    RUST_LOG: info
+    # DATABASE_URL: "postgres://user:pass@postgres:5432/supplychain"
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: standard
+
+dashboard:
+  image:
+    repository: mycelix/supplychain-dashboard
+    tag: 0.1.0
+
+  replicas: 2
+
+  env:
+    NEXT_PUBLIC_API_URL: "http://provenance-service"
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+  hosts:
+    - host: api.supplychain.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: provenance-tls
+      hosts:
+        - api.supplychain.example.com
+
+postgres:
+  enabled: false
+  host: postgres
+  port: 5432
+  database: supplychain
+  username: mycelix
+  # password: stored in secret
+
+mqtt:
+  enabled: false
+  broker: mqtt://mqtt-broker:1883

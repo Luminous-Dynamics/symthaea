@@ -1,0 +1,97 @@
+{
+  "course_id": "spanish-beginner-2025",
+  "title": "Spanish for Beginners",
+  "description": "Learn Spanish from scratch with interactive lessons, personalized AI tutoring, and community support. Master basic vocabulary, grammar, and conversational skills through federated learning that adapts to your pace.",
+  "creator": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+  "tags": [
+    "language-learning",
+    "spanish",
+    "beginner",
+    "conversational",
+    "federated-learning"
+  ],
+  "model_id": "spanish-learning-model-v1",
+  "difficulty": "beginner",
+  "estimated_hours": 50,
+  "language": "en",
+  "target_language": "es",
+  "prerequisites": [],
+  "learning_outcomes": [
+    "Understand and use basic Spanish vocabulary (500+ words)",
+    "Construct simple sentences using present tense",
+    "Introduce yourself and hold basic conversations",
+    "Ask and answer common questions about daily life",
+    "Read and understand simple texts"
+  ],
+  "syllabus": [
+    {
+      "module": 1,
+      "title": "Greetings and Introductions",
+      "topics": ["Hello/Goodbye", "My name is...", "Numbers 1-20", "Asking 'How are you?'"],
+      "estimated_hours": 5
+    },
+    {
+      "module": 2,
+      "title": "Family and Relationships",
+      "topics": ["Family members", "Describing people", "Possessive adjectives", "Numbers 20-100"],
+      "estimated_hours": 6
+    },
+    {
+      "module": 3,
+      "title": "Daily Routines",
+      "topics": ["Common verbs", "Present tense", "Telling time", "Days of the week"],
+      "estimated_hours": 7
+    },
+    {
+      "module": 4,
+      "title": "Food and Dining",
+      "topics": ["Food vocabulary", "Ordering at a restaurant", "Likes and dislikes", "Quantities"],
+      "estimated_hours": 6
+    },
+    {
+      "module": 5,
+      "title": "Directions and Places",
+      "topics": ["Locations", "Giving directions", "Prepositions", "Question words"],
+      "estimated_hours": 6
+    },
+    {
+      "module": 6,
+      "title": "Shopping and Money",
+      "topics": ["Clothing", "Colors", "Prices", "Making purchases"],
+      "estimated_hours": 5
+    },
+    {
+      "module": 7,
+      "title": "Weather and Seasons",
+      "topics": ["Weather vocabulary", "Seasons", "Months", "Making plans"],
+      "estimated_hours": 5
+    },
+    {
+      "module": 8,
+      "title": "Hobbies and Free Time",
+      "topics": ["Activities", "Expressing preferences", "Future plans", "Cultural notes"],
+      "estimated_hours": 5
+    },
+    {
+      "module": 9,
+      "title": "Travel and Transportation",
+      "topics": ["Modes of transport", "Booking tickets", "Hotel vocabulary", "Asking for help"],
+      "estimated_hours": 5
+    }
+  ],
+  "fl_enabled": true,
+  "fl_config": {
+    "personalization": true,
+    "rounds_per_module": 2,
+    "min_samples_per_round": 50,
+    "privacy_level": "standard"
+  },
+  "created_at": 1731600000,
+  "updated_at": 1731683400,
+  "metadata": {
+    "certification_available": true,
+    "community_size": 1247,
+    "average_rating": 4.7,
+    "completion_rate": 0.68
+  }
+}

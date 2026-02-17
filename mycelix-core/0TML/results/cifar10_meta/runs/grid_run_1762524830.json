@@ -1,0 +1,70 @@
+[
+  {
+    "config": {
+      "val_batches": 8,
+      "ref_lr": 0.0001,
+      "mad_multiplier": 3.5,
+      "loss_fn": "mse_logits",
+      "val_size": 2000,
+      "dispersion": "biweight",
+      "winsorize": 0.05,
+      "threshold_mode": "robust",
+      "ema_alpha": 0.7,
+      "freeze_bn": true,
+      "relative_improvement": true,
+      "grad_clip": 1.0,
+      "hybrid_lambda": 0.5
+    },
+    "seed_metrics": [
+      {
+        "seed": 42,
+        "detection_rate": 0.0,
+        "fpr": 0.07692307692307693,
+        "threshold": 0.4470198048805934,
+        "mean_quality": 0.5116203595456756,
+        "auroc": 0.7142857142857143,
+        "auprc": 0.5894248608534323,
+        "cohen_d": -0.8017572671270693,
+        "class_counts": {
+          "0": 200,
+          "1": 200,
+          "2": 200,
+          "3": 200,
+          "4": 200,
+          "5": 200,
+          "6": 200,
+          "7": 200,
+          "8": 200,
+          "9": 200
+        }
+      },
+      {
+        "seed": 123,
+        "detection_rate": 0.0,
+        "fpr": 0.0,
+        "threshold": 0.4264792084588658,
+        "mean_quality": 0.4956902138533984,
+        "auroc": 0.4615384615384615,
+        "auprc": 0.4413301352929836,
+        "cohen_d": -0.049716252813273805,
+        "class_counts": {
+          "0": 200,
+          "1": 200,
+          "2": 200,
+          "3": 200,
+          "4": 200,
+          "5": 200,
+          "6": 200,
+          "7": 200,
+          "8": 200,
+          "9": 200
+        }
+      }
+    ],
+    "mean_detection": 0.0,
+    "std_detection": 0.0,
+    "mean_fpr": 0.038461538461538464,
+    "std_fpr": 0.038461538461538464,
+    "aborted_by_rule": true
+  }
+]

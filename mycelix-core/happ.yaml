@@ -1,0 +1,39 @@
+---
+# Mycelix Core hApp Bundle
+# Holochain-Federated Learning Network with Byzantine Defense
+
+manifest_version: "0"
+name: mycelix_hfl_network
+description: |
+  Holochain-Federated Learning Network with Byzantine Defense.
+  Core infrastructure for the Mycelix Civilizational OS.
+
+roles:
+  - name: mycelix_agent
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          network_name: "Mycelix Consciousness Network"
+          max_agents: 10000
+          reputation_threshold: 100
+      clone_limit: 0
+
+  - name: h_fl_participant
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/h_fl.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          network_name: "H-FL Training Network"
+          min_agents_for_round: 5
+          byzantine_tolerance: 0.2
+          defense_algorithm: "Krum"
+      clone_limit: 0

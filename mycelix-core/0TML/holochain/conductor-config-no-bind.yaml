@@ -1,0 +1,24 @@
+---
+# ZeroTrustML Holochain Conductor - Config without bind_address
+# Matching the working configuration from old conductors
+
+data_root_path: /data/holochain-zerotrustml
+
+network:
+  bootstrap_url: https://dev-test-bootstrap2.holochain.org/
+  signal_url: wss://dev-test-bootstrap2.holochain.org/
+  target_arc_factor: 1
+
+# Admin interface - NO bind_address, only allowed_origins
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      allowed_origins: '*'
+
+# Keystore
+keystore:
+  type: lair_server_in_proc
+  lair_root: /data/holochain-zerotrustml/lair
+
+db_sync_strategy: Fast

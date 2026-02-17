@@ -1,0 +1,116 @@
+{{ define "mycelix.title" }}
+[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "mycelix.text" }}
+{{ if gt (len .Alerts.Firing) 0 }}
+*Firing Alerts:*
+{{ range .Alerts.Firing }}
+  - *Alert:* {{ .Labels.alertname }}
+  - *Severity:* {{ .Labels.severity }}
+  - *Service:* {{ .Labels.service }}
+  - *Summary:* {{ .Annotations.summary }}
+  - *Description:* {{ .Annotations.description }}
+  - *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}
+  {{ if .Annotations.runbook_url }}
+  - *Runbook:* {{ .Annotations.runbook_url }}
+  {{ end }}
+  ---
+{{ end }}
+{{ end }}
+
+{{ if gt (len .Alerts.Resolved) 0 }}
+*Resolved Alerts:*
+{{ range .Alerts.Resolved }}
+  - *Alert:* {{ .Labels.alertname }}
+  - *Severity:* {{ .Labels.severity }}
+  - *Service:* {{ .Labels.service }}
+  - *Resolved at:* {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}
+  ---
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{ define "mycelix.email.subject" }}
+[Mycelix {{ .Status | toUpper }}] {{ .GroupLabels.alertname }} - {{ .CommonLabels.severity }}
+{{ end }}
+
+{{ define "mycelix.email.html" }}
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    .header { padding: 10px; border-radius: 5px; margin-bottom: 20px; }
+    .header.firing { background-color: #f44336; color: white; }
+    .header.resolved { background-color: #4CAF50; color: white; }
+    .alert { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+    .alert.critical { border-left: 5px solid #f44336; }
+    .alert.warning { border-left: 5px solid #ff9800; }
+    .label { font-weight: bold; }
+    .runbook-link { background-color: #2196F3; color: white; padding: 10px 20px;
+                    text-decoration: none; border-radius: 5px; display: inline-block; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="header {{ .Status }}">
+    <h1>Mycelix Alert: {{ .GroupLabels.alertname }}</h1>
+    <p>Status: {{ .Status | toUpper }}</p>
+  </div>
+
+  {{ if gt (len .Alerts.Firing) 0 }}
+  <h2>Firing Alerts</h2>
+  {{ range .Alerts.Firing }}
+  <div class="alert {{ .Labels.severity }}">
+    <p><span class="label">Alert:</span> {{ .Labels.alertname }}</p>
+    <p><span class="label">Severity:</span> {{ .Labels.severity }}</p>
+    <p><span class="label">Service:</span> {{ .Labels.service }}</p>
+    <p><span class="label">Summary:</span> {{ .Annotations.summary }}</p>
+    <p><span class="label">Description:</span> {{ .Annotations.description }}</p>
+    <p><span class="label">Started:</span> {{ .StartsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+    {{ if .Annotations.resolution }}
+    <p><span class="label">Resolution:</span> {{ .Annotations.resolution }}</p>
+    {{ end }}
+    {{ if .Annotations.runbook_url }}
+    <a href="{{ .Annotations.runbook_url }}" class="runbook-link">View Runbook</a>
+    {{ end }}
+  </div>
+  {{ end }}
+  {{ end }}
+
+  {{ if gt (len .Alerts.Resolved) 0 }}
+  <h2>Resolved Alerts</h2>
+  {{ range .Alerts.Resolved }}
+  <div class="alert">
+    <p><span class="label">Alert:</span> {{ .Labels.alertname }}</p>
+    <p><span class="label">Resolved at:</span> {{ .EndsAt.Format "2006-01-02 15:04:05 MST" }}</p>
+  </div>
+  {{ end }}
+  {{ end }}
+
+  <hr>
+  <p style="color: #666; font-size: 12px;">
+    This alert was sent by Mycelix Alertmanager.<br>
+    <a href="http://alertmanager:9093">Alertmanager Console</a> |
+    <a href="http://grafana:3000">Grafana</a>
+  </p>
+</body>
+</html>
+{{ end }}
+
+{{ define "slack.mycelix.title" }}
+{{ if eq .Status "firing" }}:rotating_light:{{ else }}:white_check_mark:{{ end }} [{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}
+{{ end }}
+
+{{ define "slack.mycelix.text" }}
+*Cluster:* {{ .CommonLabels.cluster }}
+*Service:* {{ .CommonLabels.service }}
+{{ range .Alerts }}
+*Alert:* {{ .Labels.alertname }}
+*Severity:* {{ .Labels.severity }}
+*Summary:* {{ .Annotations.summary }}
+{{ if .Annotations.description }}*Description:* {{ .Annotations.description }}{{ end }}
+{{ if .Annotations.resolution }}*Resolution:* {{ .Annotations.resolution }}{{ end }}
+---
+{{ end }}
+{{ end }}

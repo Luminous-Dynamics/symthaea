@@ -1,0 +1,212 @@
+name: Publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no actual publish)'
+        required: false
+        default: 'true'
+
+jobs:
+  # Build and test before publishing
+  validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: holochain/client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: holochain/client
+        run: npm ci
+
+      - name: Type check
+        working-directory: holochain/client
+        run: npm run typecheck
+
+      - name: Lint
+        working-directory: holochain/client
+        run: npm run lint
+
+      - name: Test
+        working-directory: holochain/client
+        run: npm run test:run
+
+      - name: Build
+        working-directory: holochain/client
+        run: npm run build
+
+  # Publish to npm
+  publish-npm:
+    name: Publish to npm
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: holochain/client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: holochain/client
+        run: npm ci
+
+      - name: Build
+        working-directory: holochain/client
+        run: npm run build
+
+      - name: Publish (dry run)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
+        working-directory: holochain/client
+        run: npm publish --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true')
+        working-directory: holochain/client
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Publish to GitHub Packages
+  publish-gpr:
+    name: Publish to GitHub Packages
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@mycelix'
+          cache: 'npm'
+          cache-dependency-path: holochain/client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: holochain/client
+        run: npm ci
+
+      - name: Build
+        working-directory: holochain/client
+        run: npm run build
+
+      - name: Update package name for GPR
+        working-directory: holochain/client
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.name = '@${{ github.repository_owner }}/holochain-client';
+            pkg.publishConfig = {
+              registry: 'https://npm.pkg.github.com'
+            };
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+
+      - name: Publish (dry run)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run == 'true'
+        working-directory: holochain/client
+        run: npm publish --dry-run
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true')
+        working-directory: holochain/client
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Create release notes
+  release-notes:
+    name: Update Release Notes
+    needs: [publish-npm, publish-gpr]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update release with package links
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const release = context.payload.release;
+
+            const body = release.body + `
+
+            ## Install
+
+            \`\`\`bash
+            # From npm
+            npm install @mycelix/holochain-client@${release.tag_name.replace('v', '')}
+
+            # From GitHub Packages
+            npm install @${owner}/holochain-client@${release.tag_name.replace('v', '')}
+            \`\`\`
+
+            ## Links
+
+            - [npm package](https://www.npmjs.com/package/@mycelix/holochain-client)
+            - [GitHub Package](https://github.com/${owner}/${repo}/packages)
+            - [Documentation](https://docs.mycelix.mail)
+            `;
+
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: release.id,
+              body
+            });
+
+  # Notify on success
+  notify:
+    name: Notify
+    needs: [publish-npm, publish-gpr]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check status
+        id: status
+        run: |
+          if [[ "${{ needs.publish-npm.result }}" == "success" && "${{ needs.publish-gpr.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify success
+        if: steps.status.outputs.status == 'success'
+        run: echo "Successfully published to npm and GitHub Packages!"
+
+      - name: Notify failure
+        if: steps.status.outputs.status == 'failure'
+        run: |
+          echo "Publishing failed!"
+          exit 1

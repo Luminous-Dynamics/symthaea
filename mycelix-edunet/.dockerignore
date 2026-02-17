@@ -1,0 +1,78 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs/
+LICENSE
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+CONTRIBUTORS.md
+SECURITY.md
+GOVERNANCE.md
+
+# CI/CD
+.github/
+.pre-commit-config.yaml
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+target/
+**/target/
+dist/
+build/
+*.dna
+*.happ
+*.webhapp
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Test files
+tests/
+benches/
+**/*_test.rs
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Examples
+examples/
+
+# Scripts
+scripts/
+
+# Temp files
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Cache
+.cache/
+.npm/
+.cargo/
+
+# Coverage
+coverage/
+*.profraw
+*.profdata
+
+# Holochain
+.hc*
+conductor-config.yaml

@@ -1,0 +1,132 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE inv_warehouses SET\n                code = COALESCE($3, code),\n                name = COALESCE($4, name),\n                warehouse_type = COALESCE($5, warehouse_type),\n                address_line1 = COALESCE($6, address_line1),\n                address_line2 = COALESCE($7, address_line2),\n                city = COALESCE($8, city),\n                state = COALESCE($9, state),\n                postal_code = COALESCE($10, postal_code),\n                country = COALESCE($11, country),\n                contact_name = COALESCE($12, contact_name),\n                contact_email = COALESCE($13, contact_email),\n                contact_phone = COALESCE($14, contact_phone),\n                updated_at = $15\n            WHERE tenant_id = $1 AND id = $2\n            RETURNING\n                id, tenant_id, code, name, warehouse_type,\n                address_line1, address_line2, city, state, postal_code, country,\n                contact_name, contact_email, contact_phone,\n                is_active, created_at, updated_at\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "warehouse_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "address_line1",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "address_line2",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "city",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "state",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "postal_code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "country",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "contact_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "contact_email",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "contact_phone",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 14,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 15,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 16,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Varchar",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "c5e9ff871c1ae50eb82cb77ec77b2be1483d47f06db90baca32c5e969b29c2d0"
+}

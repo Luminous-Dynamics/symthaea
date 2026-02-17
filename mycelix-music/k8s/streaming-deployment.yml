@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: streaming
+  namespace: mycelix
+  labels:
+    app: streaming
+    app.kubernetes.io/name: streaming
+    app.kubernetes.io/component: transcoding
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: streaming
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: streaming
+    spec:
+      containers:
+        - name: streaming
+          image: mycelix/streaming:latest
+          ports:
+            - containerPort: 3003
+              name: http
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "3003"
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: redis-host
+            - name: REDIS_PORT
+              value: "6379"
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: s3-bucket
+            - name: S3_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: s3-region
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: mycelix-secrets
+                  key: aws-access-key
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: mycelix-secrets
+                  key: aws-secret-key
+            - name: CDN_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: cdn-url
+            - name: TRANSCODE_CONCURRENCY
+              value: "2"
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: 2000m
+              memory: 4Gi
+          volumeMounts:
+            - name: transcode-temp
+              mountPath: /tmp/mycelix-transcode
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3003
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: transcode-temp
+          emptyDir:
+            sizeLimit: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: streaming
+  namespace: mycelix
+spec:
+  type: ClusterIP
+  selector:
+    app: streaming
+  ports:
+    - port: 80
+      targetPort: 3003
+      name: http
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: streaming-hpa
+  namespace: mycelix
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: streaming
+  minReplicas: 1
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60

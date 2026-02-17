@@ -1,0 +1,159 @@
+apiVersion: 1
+
+groups:
+  - name: bft_monitoring
+    interval: 5m
+    rules:
+      - uid: high_fp_rate
+        title: High False Positive Rate
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: matl_false_positive_rate_percent{distribution="label_skew"} > 10
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: False positive rate for {{distribution}} {{attack}} is {{$value}}% (threshold: 10%)
+          summary: Label skew detection has high false positive rate
+        labels:
+          severity: warning
+          component: bft_detection
+
+      - uid: low_detection_rate
+        title: Low Byzantine Detection Rate
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: matl_detection_rate_percent < 90
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: Detection rate is {{$value}}% (threshold: 90%)
+          summary: Byzantine detection is failing to catch attacks
+        labels:
+          severity: critical
+          component: bft_detection
+
+      - uid: regression_failure
+        title: BFT Regression Test Failed
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: matl_regression_success == 0
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 1m
+        annotations:
+          description: Regression test failed for {{distribution}} {{attack}}
+          summary: BFT regression test failure detected
+        labels:
+          severity: critical
+          component: ci_cd
+
+      - uid: fp_rate_trending_up
+        title: False Positive Rate Trending Upward
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 3600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                (
+                  matl_false_positive_rate_percent{distribution="label_skew"} -
+                  matl_false_positive_rate_percent{distribution="label_skew"} offset 1h
+                ) > 5
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 10m
+        annotations:
+          description: FP rate increased by {{$value}}% in the last hour
+          summary: Label skew FP rate is degrading
+        labels:
+          severity: warning
+          component: bft_detection
+
+      - uid: honest_reputation_collapse
+        title: Honest Node Reputation Collapse
+        condition: A
+        data:
+          - refId: A
+            queryType: ''
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              expr: |
+                avg(matl_false_positive_rate_percent{distribution="label_skew"}) > 50
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: Average FP rate is {{$value}}%, indicating reputation spiral
+          summary: Honest nodes losing reputation systematically
+        labels:
+          severity: critical
+          component: reputation_system
+
+contactPoints:
+  - name: slack_alerts
+    type: slack
+    settings:
+      url: ${SLACK_WEBHOOK_URL}
+      recipient: '#bft-monitoring'
+      title: '{{ .GroupLabels.alertname }}'
+      text: '{{ range .Alerts }}{{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}'
+
+  - name: email_alerts
+    type: email
+    settings:
+      addresses: ${ALERT_EMAIL_ADDRESSES}
+      singleEmail: false
+
+policies:
+  - receiver: slack_alerts
+    group_by: ['alertname', 'distribution']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    matchers:
+      - severity =~ "warning|critical"

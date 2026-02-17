@@ -1,0 +1,108 @@
+# AEGIS Gen-5 Evaluation Configuration
+# Non-IID (Dirichlet α=1.0), Budget=0.20, Mixed Attacks
+
+experiment: E1_byzantine_tolerance
+description: "Non-IID (alpha=1.0), budget=0.20, mixed attacks"
+
+# Dataset configuration
+data:
+  partition: dirichlet
+  alpha: 1.0
+  dataset: cifar10
+
+# Federation parameters
+federation:
+  clients: 50
+  rounds: 200
+  participation: 0.2
+  local_epochs: 5
+  batch_size: 32
+  learning_rate: 0.01
+
+# AEGIS Gen-5 Defense Configuration
+defense:
+  system: AEGIS-Gen5
+  layers: [1,2,3,5,6,7]   # Layer 4 optional for this run
+
+  # Layer 1: Meta-Learning Ensemble
+  l1:
+    num_methods: 3
+    learning_rate: 0.001
+    momentum: 0.9
+
+  # Layer 2: Causal Attribution
+  l2:
+    enable_explanations: true
+
+  # Layer 3: Uncertainty Quantification
+  l3:
+    alpha: 0.10
+    buffer_size: 1000
+
+  # Layer 5: Active Learning Inspector
+  l5:
+    query_budget: 0.20
+    selector: "uncertainty+diversity"
+    first_pass_threshold: 0.7
+
+  # Layer 6: Multi-Round Temporal Detection
+  l6:
+    temporal_window: 20
+
+    # CUSUM for sleeper agents
+    sleeper_cusum:
+      baseline: "fixed"
+      k: 5.0
+      h: 10.0
+
+    # Coordination detection
+    coordination:
+      correlation_threshold: 0.7
+      min_rounds: 10
+
+    # Bayesian reputation
+    reputation:
+      prior_alpha: 1.0
+      prior_beta: 1.0
+
+  # Layer 7: Self-Healing Mechanism
+  l7:
+    bft_tolerance: 0.45
+    healing_threshold: 0.40
+    sustained_rounds: 3
+    quarantine_weight: 0.10
+    recovery_rate: 0.05
+    quarantine_halflife: 8
+    recovery_mode: "exp"
+
+# Attack configuration
+attacks:
+  # Byzantine adversary rates to test
+  rate: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5]
+
+  # Attack types
+  types:
+    - sign_flip
+    - scaling
+    - gaussian_noise
+    - backdoor
+
+# Metrics to report
+metrics:
+  report:
+    - TPR          # True Positive Rate
+    - FPR          # False Positive Rate
+    - AUPRC        # Area Under Precision-Recall Curve
+    - MTTR         # Mean Time To Recovery
+    - runtime      # Execution time
+    - queries      # Active learning queries used
+
+# Reproducibility seeds
+seeds: [101, 202, 303, 404, 505]
+
+# Output configuration
+output:
+  save_checkpoints: true
+  checkpoint_interval: 10
+  save_gradients: false
+  log_level: INFO

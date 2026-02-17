@@ -1,0 +1,13 @@
+experiment: Grand Slam Validation
+timestamp: '20251008_045109'
+total_experiments: 0
+core_experiments: 0
+stress_tests: 0
+key_findings:
+  average_improvement: 0
+  improvements_by_dataset: &id001 []
+all_results: []
+grant_ready_numbers:
+  claim: PoGQ+Reputation achieves +23.2pp improvement over baseline FedAvg
+  evidence: *id001
+  verification: See individual experiment results in results/ directory

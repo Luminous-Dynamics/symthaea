@@ -1,0 +1,68 @@
+\section{Related Work}
+\label{sec:related}
+
+\subsection{Byzantine-Robust Federated Learning}
+
+\textbf{Aggregation-Based Defenses}: Early Byzantine-robust aggregation methods assume honest majorities and use statistical filtering:
+
+\begin{itemize}
+    \item \textbf{Multi-KRUM}~\cite{blanchard2017machine}: Selects $k$ gradients with smallest average Euclidean distance to others. Proven robust to $f < (n-k-2)/2$ Byzantine nodes, implying $\sim$33\% ceiling for $k$=1.
+
+    \item \textbf{Trimmed Mean / Median}~\cite{yin2018byzantine}: Coordinate-wise aggregation removing extreme values. Requires $f < n/2 - 1$, theoretical 50\% ceiling but assumes independent Byzantine attacks.
+
+    \item \textbf{Bulyan}~\cite{mhamdi2018machine}: Combines Multi-KRUM with trimmed mean for stronger guarantees. Still requires $f < n/3$.
+
+    \item \textbf{FABA}~\cite{munoz2019byzantine}: Iterative filtering based on gradient similarity. Struggles with coordinated attacks.
+\end{itemize}
+
+\textbf{Detection-Based Approaches}: Some works focus on identifying malicious clients:
+
+\begin{itemize}
+    \item \textbf{FoolsGold}~\cite{fung2018mitigating}: Detects Sybil attacks via gradient history similarity.
+    \item \textbf{RLR}~\cite{fung2020limitations}: Local validation of gradient quality.
+    \item \textbf{AUROR}~\cite{shen2016auror}: Reputation-based filtering. Vulnerable to Sleeper Agents~\cite{bagdasaryan2020backdoor}.
+\end{itemize}
+
+\subsection{Comparison with FLTrust}
+
+FLTrust~\cite{cao2021fltrust} is the most closely related work, also using server-side validation to detect Byzantine clients. FLTrust computes trust scores via cosine similarity between client gradients and a trusted server gradient, then performs adaptive normalization for aggregation.
+
+Our work differs in two key dimensions:
+
+\textbf{(1) Validation Metric}: While FLTrust uses gradient direction similarity (cosine), our PoGQ approach measures loss improvement on a validation set. This captures gradient \emph{utility} rather than \emph{alignment}. Our head-to-head comparison (Section V-C) shows that both approaches achieve perfect detection at 20--30\% BFT, but FLTrust demonstrates superior robustness at higher Byzantine ratios (40--50\%). This suggests direction-based metrics are more resilient to Byzantine diversity than utility-based metrics in high-BFT regimes.
+
+\textbf{(2) System Architecture}: While FLTrust relies on a centralized server for gradient collection and validation, our system (Section IV) implements fully decentralized validation using Holochain's DHT. This eliminates the single point of failure and trust assumptions inherent in centralized architectures, albeit with the trade-off of distributing validation across $\sqrt{N}$ peers rather than a single trusted entity.
+
+Our contribution is not improving upon FLTrust's detection algorithm, but rather demonstrating that server-side validation approaches (including FLTrust and PoGQ) can be deployed in fully decentralized architectures with competitive performance.
+
+\textbf{Limitation}: Peer-comparison methods assume $f < n/3$ and provide no mechanism to detect when this assumption is violated.
+
+\subsection{Byzantine Consensus and BFT Systems}
+
+Classical distributed systems research established the $f < n/3$ bound:
+
+\begin{itemize}
+    \item \textbf{Byzantine Generals}~\cite{lamport1982byzantine}: Proved $n \geq 3f+1$ necessity.
+    \item \textbf{PBFT}~\cite{castro1999practical}: Efficient Byzantine consensus for state machine replication.
+    \item \textbf{HoneyBadgerBFT}~\cite{miller2016honey}: Asynchronous BFT with optimal $f < n/3$ resilience.
+\end{itemize}
+
+\subsection{Stateful Byzantine Attacks}
+
+Recent work on \textbf{adaptive attacks}:
+\begin{itemize}
+    \item Backdoor Attacks~\cite{bagdasaryan2020backdoor}, Sleeper Agents~\cite{chen2020devil}
+    \item Model Poisoning~\cite{jagielski2018manipulating}, Gradient Scaling~\cite{bhagoji2019analyzing}
+\end{itemize}
+
+\subsection{Decentralized Federated Learning}
+
+Blockchain approaches suffer from high costs and low throughput~\cite{kim2019blockchained, qu2021decentralized, li2020blockchain}. IPFS~\cite{nguyen2021privacy} provides storage but no validation.
+
+\textbf{Our Contribution}: Holochain DHT achieves $\sim$10,000 TPS with zero transaction costs and embedded validation.
+
+\subsection{Adaptive Thresholds}
+
+Statistical methods include Z-scores~\cite{chandola2009anomaly}, Isolation Forests~\cite{liu2008isolation}, and robust statistics with MAD~\cite{rousseeuw1993alternatives, hampel1986robust}.
+
+\textbf{Our Contribution}: Gap-based adaptive threshold using MAD, automatically handling heterogeneous data.

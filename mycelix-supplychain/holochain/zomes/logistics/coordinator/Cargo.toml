@@ -1,0 +1,14 @@
+[package]
+name = "logistics_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "logistics_coordinator"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+holochain_serialized_bytes.workspace = true
+logistics_integrity = { path = "../integrity" }

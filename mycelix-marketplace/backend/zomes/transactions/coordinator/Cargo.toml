@@ -1,0 +1,26 @@
+[package]
+name = "transactions_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "transactions_coordinator"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+# Shared utilities
+mycelix_common = { path = "../../../crates/mycelix_common" }
+
+transactions_integrity = { path = "../integrity" }
+listings_integrity = { path = "../../listings/integrity" }
+reputation_integrity = { path = "../../reputation/integrity" }
+
+# Security utilities
+security = { path = "../../security" }
+
+# Monitoring and metrics
+monitoring = { path = "../../monitoring" }

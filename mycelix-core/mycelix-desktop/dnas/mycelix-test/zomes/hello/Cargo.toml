@@ -1,0 +1,20 @@
+[package]
+name = "hello"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+# Empty workspace to prevent being included in parent workspace
+[workspace]
+
+[dependencies]
+hdk = "0.5.6"
+serde = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+overflow-checks = true

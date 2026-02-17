@@ -1,0 +1,222 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(trust_attestations_total{job=\"mycelix-api\"})",
+          "legendFormat": "Total Attestations",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Trust Attestations",
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(trust_attestations_created_total{job=\"mycelix-api\"}[24h]))",
+          "legendFormat": "New/24h",
+          "refId": "A"
+        }
+      ],
+      "title": "New Attestations (24h)",
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "avg(trust_score_average{job=\"mycelix-api\"})",
+          "legendFormat": "Avg Trust Score",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Trust Score",
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(holochain_connected_peers{job=\"mycelix-api\"})",
+          "legendFormat": "Holochain Peers",
+          "refId": "A"
+        }
+      ],
+      "title": "Connected Holochain Peers",
+      "type": "stat"
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(trust_attestations_created_total{job=\"mycelix-api\"}[1h])) by (context)",
+          "legendFormat": "{{context}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Attestations by Context",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.5, sum(rate(trust_score_bucket{job=\"mycelix-api\"}[5m])) by (le))",
+          "legendFormat": "Median",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.9, sum(rate(trust_score_bucket{job=\"mycelix-api\"}[5m])) by (le))",
+          "legendFormat": "P90",
+          "refId": "B"
+        }
+      ],
+      "title": "Trust Score Distribution",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "id": 7,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(trust_path_lookups_total{job=\"mycelix-api\"}[5m]))",
+          "legendFormat": "Path Lookups/sec",
+          "refId": "A"
+        }
+      ],
+      "title": "Trust Path Lookups",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "id": 8,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "avg(trust_path_length{job=\"mycelix-api\"})",
+          "legendFormat": "Avg Path Length",
+          "refId": "A"
+        },
+        {
+          "expr": "max(trust_path_length{job=\"mycelix-api\"})",
+          "legendFormat": "Max Path Length",
+          "refId": "B"
+        }
+      ],
+      "title": "Trust Path Lengths",
+      "type": "timeseries"
+    },
+    {
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "id": 9,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "single", "sort": "none" }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(pq_signature_verifications_total{job=\"mycelix-api\",result=\"success\"}[5m]))",
+          "legendFormat": "Successful Verifications",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(pq_signature_verifications_total{job=\"mycelix-api\",result=\"failure\"}[5m]))",
+          "legendFormat": "Failed Verifications",
+          "refId": "B"
+        }
+      ],
+      "title": "Post-Quantum Signature Verifications",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 38,
+  "tags": ["mycelix", "trust", "holochain"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Mycelix Mail - Trust Network Dashboard",
+  "uid": "mycelix-trust",
+  "version": 1
+}

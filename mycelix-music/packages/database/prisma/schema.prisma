@@ -1,0 +1,609 @@
+// Mycelix Music Platform Database Schema
+// A regenerative music ecosystem
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// USERS & IDENTITY
+// ============================================================
+
+model User {
+  id            String    @id @default(cuid())
+  address       String    @unique // Ethereum address
+  name          String?
+  email         String?   @unique
+  avatar        String?
+  banner        String?
+  bio           String?
+  role          UserRole  @default(LISTENER)
+  subscription  SubscriptionTier @default(FREE)
+  verified      Boolean   @default(false)
+
+  // Social links
+  website       String?
+  twitter       String?
+  instagram     String?
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastActiveAt  DateTime  @default(now())
+
+  // Relations
+  songs         Song[]
+  playlists     Playlist[]
+  likes         Like[]
+  plays         Play[]
+  follows       Follow[]  @relation("follower")
+  followers     Follow[]  @relation("following")
+  comments      Comment[]
+  notifications Notification[]
+  sessions      Session[]
+
+  // Library
+  likedSongs    SongLike[]
+  savedPlaylists SavedPlaylist[]
+
+  // Web3
+  nftOwnership  NFTOwnership[]
+  royaltyShares RoyaltyShare[]
+  tips          Tip[]         @relation("tipper")
+  tipsReceived  Tip[]         @relation("tippee")
+
+  // Subscriptions
+  subscriptionTx    String?
+  subscriptionStart DateTime?
+  subscriptionEnd   DateTime?
+
+  @@index([address])
+  @@index([role])
+}
+
+enum UserRole {
+  LISTENER
+  ARTIST
+  CURATOR
+  MODERATOR
+  ADMIN
+}
+
+enum SubscriptionTier {
+  FREE
+  BASIC
+  PREMIUM
+  ARTIST_PRO
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  userAgent String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ============================================================
+// MUSIC CONTENT
+// ============================================================
+
+model Song {
+  id            String    @id @default(cuid())
+  title         String
+  slug          String    @unique
+
+  // Artist
+  artistId      String
+  artist        User      @relation(fields: [artistId], references: [id])
+
+  // Audio files
+  originalFile  String    // IPFS hash or S3 key
+  hlsManifest   String?   // HLS playlist URL
+  waveform      Json?     // Waveform data for visualization
+  duration      Int       // Duration in seconds
+
+  // Metadata
+  genre         String
+  subGenre      String?
+  tags          String[]
+  description   String?
+  lyrics        String?
+  lyricsSync    Json?     // Synced lyrics timing data
+  credits       Json?     // Production credits
+
+  // Release info
+  releaseDate   DateTime  @default(now())
+  explicit      Boolean   @default(false)
+
+  // Cover art
+  coverArt      String?
+  coverArtColor String?   // Dominant color for UI
+
+  // Stats (denormalized for performance)
+  playCount     Int       @default(0)
+  likeCount     Int       @default(0)
+  saveCount     Int       @default(0)
+
+  // Status
+  status        SongStatus @default(PROCESSING)
+
+  // Web3
+  tokenId       String?   // If minted as NFT
+  contractAddress String?
+  royaltySplits Json?     // Royalty distribution config
+
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  plays         Play[]
+  likes         SongLike[]
+  comments      Comment[]
+  playlistTracks PlaylistTrack[]
+  recommendations SongRecommendation[] @relation("sourceSong")
+  similarTo     SongRecommendation[] @relation("similarSong")
+
+  // Album relation (optional)
+  albumId       String?
+  album         Album?    @relation(fields: [albumId], references: [id])
+  trackNumber   Int?
+
+  @@index([artistId])
+  @@index([genre])
+  @@index([releaseDate])
+  @@index([playCount])
+  @@index([status])
+}
+
+enum SongStatus {
+  PROCESSING
+  PENDING_REVIEW
+  PUBLISHED
+  REJECTED
+  ARCHIVED
+}
+
+model Album {
+  id          String   @id @default(cuid())
+  title       String
+  artistId    String
+  coverArt    String?
+  releaseDate DateTime @default(now())
+  description String?
+  type        AlbumType @default(ALBUM)
+
+  songs       Song[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([artistId])
+}
+
+enum AlbumType {
+  SINGLE
+  EP
+  ALBUM
+  COMPILATION
+}
+
+// ============================================================
+// PLAYLISTS
+// ============================================================
+
+model Playlist {
+  id          String    @id @default(cuid())
+  name        String
+  slug        String    @unique
+  description String?
+  coverArt    String?
+
+  // Owner
+  creatorId   String
+  creator     User      @relation(fields: [creatorId], references: [id])
+
+  // Settings
+  isPublic    Boolean   @default(true)
+  collaborative Boolean @default(false)
+
+  // Generated playlists
+  isGenerated Boolean   @default(false)
+  generationType GeneratedPlaylistType?
+
+  // Stats
+  followerCount Int     @default(0)
+  totalDuration Int     @default(0)
+
+  // Relations
+  tracks      PlaylistTrack[]
+  savedBy     SavedPlaylist[]
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([creatorId])
+  @@index([isPublic])
+}
+
+enum GeneratedPlaylistType {
+  DAILY_MIX
+  DISCOVER_WEEKLY
+  RELEASE_RADAR
+  GENRE_MIX
+  ARTIST_RADIO
+  SONG_RADIO
+}
+
+model PlaylistTrack {
+  id          String   @id @default(cuid())
+  playlistId  String
+  playlist    Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  position    Int
+  addedById   String?
+  addedAt     DateTime @default(now())
+
+  @@unique([playlistId, songId])
+  @@index([playlistId, position])
+}
+
+model SavedPlaylist {
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playlistId String
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  savedAt    DateTime @default(now())
+
+  @@id([userId, playlistId])
+}
+
+// ============================================================
+// ENGAGEMENT & SOCIAL
+// ============================================================
+
+model Play {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id])
+  songId      String
+  song        Song     @relation(fields: [songId], references: [id])
+
+  // Play details
+  duration    Int      // Seconds listened
+  completed   Boolean  @default(false)
+  source      PlaySource @default(WEB)
+  context     String?  // Playlist ID, album ID, or "radio"
+
+  // Location (anonymized)
+  country     String?
+
+  playedAt    DateTime @default(now())
+
+  @@index([songId, playedAt])
+  @@index([userId, playedAt])
+}
+
+enum PlaySource {
+  WEB
+  MOBILE
+  DESKTOP
+  API
+  EMBED
+}
+
+model SongLike {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId    String
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+  likedAt   DateTime @default(now())
+
+  @@id([userId, songId])
+}
+
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  targetType LikeTarget
+  targetId  String
+  createdAt DateTime @default(now())
+
+  @@unique([userId, targetType, targetId])
+  @@index([targetType, targetId])
+}
+
+enum LikeTarget {
+  SONG
+  PLAYLIST
+  COMMENT
+}
+
+model Follow {
+  followerId  String
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId String
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@id([followerId, followingId])
+  @@index([followingId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  songId    String
+  song      Song     @relation(fields: [songId], references: [id], onDelete: Cascade)
+
+  content   String
+  timestamp Int?     // Optional: timestamp in song for timed comments
+
+  parentId  String?
+  parent    Comment? @relation("replies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("replies")
+
+  likeCount Int      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([songId])
+  @@index([userId])
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      NotificationType
+  title     String
+  message   String
+  data      Json?
+  actionUrl String?
+
+  read      Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+enum NotificationType {
+  NEW_FOLLOWER
+  SONG_LIKE
+  PLAYLIST_LIKE
+  COMMENT
+  MENTION
+  NEW_RELEASE
+  ROYALTY_PAYMENT
+  MILESTONE
+  SYSTEM
+}
+
+// ============================================================
+// RECOMMENDATIONS & DISCOVERY
+// ============================================================
+
+model SongRecommendation {
+  id            String @id @default(cuid())
+  sourceSongId  String
+  sourceSong    Song   @relation("sourceSong", fields: [sourceSongId], references: [id], onDelete: Cascade)
+  similarSongId String
+  similarSong   Song   @relation("similarSong", fields: [similarSongId], references: [id], onDelete: Cascade)
+
+  score         Float  // Similarity score 0-1
+  reason        String? // e.g., "similar genre", "same listeners"
+
+  @@unique([sourceSongId, similarSongId])
+  @@index([sourceSongId, score])
+}
+
+model UserTaste {
+  id       String @id @default(cuid())
+  userId   String @unique
+
+  // Aggregated preferences
+  topGenres     Json   // { genre: weight }
+  topArtists    Json   // { artistId: weight }
+  audioFeatures Json   // { energy: 0.7, valence: 0.5, ... }
+
+  // Listening patterns
+  peakHours     Json   // { hour: playCount }
+
+  updatedAt DateTime @updatedAt
+}
+
+// ============================================================
+// WEB3 & MONETIZATION
+// ============================================================
+
+model NFTOwnership {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+
+  contractAddress String
+  tokenId     String
+  songId      String?
+
+  // Ownership details
+  acquiredAt  DateTime @default(now())
+  acquiredPrice String? // In wei
+  txHash      String?
+
+  // If this NFT grants special access
+  perks       Json?
+
+  @@unique([contractAddress, tokenId])
+  @@index([userId])
+}
+
+model RoyaltyShare {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  songId    String
+
+  // Share percentage (basis points, 10000 = 100%)
+  shareBps  Int
+  role      String   // "artist", "producer", "writer", etc.
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, songId])
+}
+
+model RoyaltyPayment {
+  id        String   @id @default(cuid())
+  songId    String
+  recipientAddress String
+
+  amount    String   // In wei
+  currency  String   @default("ETH")
+  txHash    String
+
+  period    String   // e.g., "2024-01"
+  playCount Int
+
+  paidAt    DateTime @default(now())
+
+  @@index([songId])
+  @@index([recipientAddress])
+}
+
+model Tip {
+  id          String   @id @default(cuid())
+  tipperId    String
+  tipper      User     @relation("tipper", fields: [tipperId], references: [id])
+  recipientId String
+  recipient   User     @relation("tippee", fields: [recipientId], references: [id])
+
+  amount      String   // In wei
+  currency    String   @default("ETH")
+  txHash      String
+  message     String?
+
+  songId      String?  // Optional: tip for specific song
+
+  createdAt   DateTime @default(now())
+
+  @@index([recipientId])
+  @@index([tipperId])
+}
+
+// ============================================================
+// MODERATION & REPORTS
+// ============================================================
+
+model Report {
+  id          String   @id @default(cuid())
+  reporterId  String
+
+  targetType  ReportTarget
+  targetId    String
+
+  reason      ReportReason
+  description String?
+
+  status      ReportStatus @default(PENDING)
+  resolvedBy  String?
+  resolvedAt  DateTime?
+  resolution  String?
+
+  createdAt   DateTime @default(now())
+
+  @@index([status])
+  @@index([targetType, targetId])
+}
+
+enum ReportTarget {
+  SONG
+  USER
+  COMMENT
+  PLAYLIST
+}
+
+enum ReportReason {
+  COPYRIGHT
+  HARASSMENT
+  SPAM
+  INAPPROPRIATE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+  ESCALATED
+}
+
+// ============================================================
+// ANALYTICS (Aggregated)
+// ============================================================
+
+model DailyStats {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+
+  // Global stats
+  totalPlays      Int @default(0)
+  uniqueListeners Int @default(0)
+  newUsers        Int @default(0)
+  newSongs        Int @default(0)
+
+  // Top content
+  topSongs    Json? // Array of { songId, plays }
+  topArtists  Json? // Array of { artistId, plays }
+  topGenres   Json? // Array of { genre, plays }
+
+  createdAt   DateTime @default(now())
+
+  @@unique([date])
+}
+
+model ArtistStats {
+  id          String   @id @default(cuid())
+  artistId    String
+  date        DateTime @db.Date
+
+  plays       Int @default(0)
+  uniqueListeners Int @default(0)
+  newFollowers Int @default(0)
+
+  // Revenue
+  royaltiesEarned String? // In wei
+  tipsReceived    String? // In wei
+
+  // Top songs for this period
+  topSongs    Json?
+
+  // Listener demographics
+  countries   Json?
+
+  @@unique([artistId, date])
+  @@index([artistId])
+}

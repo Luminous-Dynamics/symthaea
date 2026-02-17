@@ -1,0 +1,258 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "search": "Search",
+    "clear": "Clear",
+    "confirm": "Confirm",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "more": "More",
+    "less": "Less",
+    "all": "All",
+    "none": "None",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "nav": {
+    "home": "Home",
+    "library": "Library",
+    "search": "Search",
+    "playlists": "Playlists",
+    "artists": "Artists",
+    "albums": "Albums",
+    "settings": "Settings",
+    "profile": "Profile",
+    "studio": "Studio"
+  },
+  "auth": {
+    "login": "Log In",
+    "logout": "Log Out",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "resetPassword": "Reset Password",
+    "createAccount": "Create Account",
+    "welcomeBack": "Welcome back!",
+    "loggedInAs": "Logged in as {{name}}"
+  },
+  "player": {
+    "play": "Play",
+    "pause": "Pause",
+    "next": "Next track",
+    "previous": "Previous track",
+    "shuffle": "Shuffle",
+    "shuffleOn": "Shuffle on",
+    "shuffleOff": "Shuffle off",
+    "repeat": "Repeat",
+    "repeatOff": "Repeat off",
+    "repeatAll": "Repeat all",
+    "repeatOne": "Repeat one",
+    "volume": "Volume",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "queue": "Queue",
+    "nowPlaying": "Now Playing",
+    "upNext": "Up Next",
+    "addToQueue": "Add to queue",
+    "removeFromQueue": "Remove from queue",
+    "clearQueue": "Clear queue",
+    "lyrics": "Lyrics",
+    "fullscreen": "Fullscreen"
+  },
+  "library": {
+    "title": "Your Library",
+    "songs": "Songs",
+    "albums": "Albums",
+    "artists": "Artists",
+    "playlists": "Playlists",
+    "recentlyPlayed": "Recently Played",
+    "likedSongs": "Liked Songs",
+    "downloads": "Downloads",
+    "empty": "Your library is empty",
+    "addSome": "Start adding some music!"
+  },
+  "track": {
+    "play": "Play {{title}}",
+    "addToPlaylist": "Add to playlist",
+    "removeFromPlaylist": "Remove from playlist",
+    "like": "Like",
+    "unlike": "Unlike",
+    "share": "Share",
+    "download": "Download",
+    "goToArtist": "Go to artist",
+    "goToAlbum": "Go to album",
+    "duration": "Duration: {{duration}}",
+    "plays": {
+      "one": "{{count}} play",
+      "other": "{{count}} plays"
+    }
+  },
+  "playlist": {
+    "create": "Create Playlist",
+    "newPlaylist": "New Playlist",
+    "name": "Playlist name",
+    "description": "Description",
+    "public": "Public",
+    "private": "Private",
+    "tracks": {
+      "one": "{{count}} track",
+      "other": "{{count}} tracks"
+    },
+    "duration": "{{duration}} total",
+    "createdBy": "Created by {{name}}",
+    "playAll": "Play All",
+    "shuffle": "Shuffle Play",
+    "addTracks": "Add Tracks",
+    "editDetails": "Edit Details",
+    "deletePlaylist": "Delete Playlist",
+    "deleteConfirm": "Are you sure you want to delete this playlist?"
+  },
+  "artist": {
+    "follow": "Follow",
+    "unfollow": "Unfollow",
+    "followers": {
+      "one": "{{count}} follower",
+      "other": "{{count}} followers"
+    },
+    "monthlyListeners": {
+      "one": "{{count}} monthly listener",
+      "other": "{{count}} monthly listeners"
+    },
+    "topTracks": "Popular",
+    "discography": "Discography",
+    "relatedArtists": "Fans also like",
+    "about": "About"
+  },
+  "album": {
+    "by": "by {{artist}}",
+    "released": "Released {{date}}",
+    "tracks": {
+      "one": "{{count}} track",
+      "other": "{{count}} tracks"
+    }
+  },
+  "search": {
+    "placeholder": "What do you want to listen to?",
+    "results": "Search results for \"{{query}}\"",
+    "noResults": "No results found for \"{{query}}\"",
+    "tryAgain": "Try different keywords",
+    "topResult": "Top Result",
+    "songs": "Songs",
+    "artists": "Artists",
+    "albums": "Albums",
+    "playlists": "Playlists",
+    "recentSearches": "Recent searches",
+    "clearRecent": "Clear recent searches"
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "Account",
+    "profile": "Profile",
+    "subscription": "Subscription",
+    "playback": "Playback",
+    "audioQuality": "Audio Quality",
+    "crossfade": "Crossfade",
+    "normalizeVolume": "Normalize volume",
+    "equalizer": "Equalizer",
+    "notifications": "Notifications",
+    "pushNotifications": "Push Notifications",
+    "emailNotifications": "Email Notifications",
+    "appearance": "Appearance",
+    "theme": "Theme",
+    "themeDark": "Dark",
+    "themeLight": "Light",
+    "themeSystem": "System",
+    "language": "Language",
+    "privacy": "Privacy",
+    "dataUsage": "Data Usage",
+    "about": "About",
+    "version": "Version {{version}}",
+    "termsOfService": "Terms of Service",
+    "privacyPolicy": "Privacy Policy",
+    "licenses": "Open Source Licenses"
+  },
+  "studio": {
+    "title": "Studio",
+    "newProject": "New Project",
+    "openProject": "Open Project",
+    "saveProject": "Save Project",
+    "export": "Export",
+    "import": "Import",
+    "tracks": "Tracks",
+    "addTrack": "Add Track",
+    "mixer": "Mixer",
+    "effects": "Effects",
+    "master": "Master",
+    "tempo": "Tempo",
+    "bpm": "BPM",
+    "timeSignature": "Time Signature",
+    "key": "Key",
+    "loop": "Loop",
+    "record": "Record",
+    "stop": "Stop",
+    "solo": "Solo",
+    "mute": "Mute",
+    "pan": "Pan",
+    "volume": "Volume",
+    "unsavedChanges": "You have unsaved changes",
+    "saveBeforeLeaving": "Save your project before leaving?"
+  },
+  "notifications": {
+    "trackLiked": "You liked \"{{title}}\"",
+    "trackAddedToPlaylist": "Added to {{playlist}}",
+    "playlistCreated": "Playlist created",
+    "downloadComplete": "Download complete",
+    "downloadFailed": "Download failed",
+    "networkError": "Network error. Please try again.",
+    "offlineMode": "You're offline",
+    "backOnline": "You're back online"
+  },
+  "errors": {
+    "general": "Something went wrong",
+    "network": "Network error. Please check your connection.",
+    "notFound": "Not found",
+    "unauthorized": "Please log in to continue",
+    "forbidden": "You don't have permission to do that",
+    "serverError": "Server error. Please try again later.",
+    "playbackFailed": "Playback failed",
+    "loadingFailed": "Failed to load"
+  },
+  "time": {
+    "justNow": "Just now",
+    "minutesAgo": {
+      "one": "{{count}} minute ago",
+      "other": "{{count}} minutes ago"
+    },
+    "hoursAgo": {
+      "one": "{{count}} hour ago",
+      "other": "{{count}} hours ago"
+    },
+    "daysAgo": {
+      "one": "{{count}} day ago",
+      "other": "{{count}} days ago"
+    },
+    "weeksAgo": {
+      "one": "{{count}} week ago",
+      "other": "{{count}} weeks ago"
+    }
+  },
+  "accessibility": {
+    "skipToContent": "Skip to main content",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "loading": "Loading content",
+    "audioPlayer": "Audio player",
+    "volumeSlider": "Volume slider, current value {{value}}%",
+    "progressSlider": "Playback progress, {{current}} of {{total}}",
+    "playbackSpeed": "Playback speed"
+  }
+}

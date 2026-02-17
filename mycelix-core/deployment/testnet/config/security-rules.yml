@@ -1,0 +1,202 @@
+# =============================================================================
+# Mycelix Security Alerting Rules
+# =============================================================================
+# Security-focused alerts for detecting attacks, anomalies, and policy violations.
+# =============================================================================
+
+groups:
+  - name: mycelix_security_alerts
+    interval: 15s
+    rules:
+      # Byzantine behavior detection
+      - alert: PotentialByzantineNode
+        expr: mycelix_trust_score < 0.3 and mycelix_trust_score > 0
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Potential Byzantine node detected"
+          description: "Node {{ $labels.node_id }} has trust score {{ $value }}, below threshold."
+          runbook_url: "https://docs.mycelix.network/runbooks/byzantine-node"
+
+      - alert: ByzantineNodeConfirmed
+        expr: mycelix_trust_score == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Byzantine node confirmed - trust score zero"
+          description: "Node {{ $labels.node_id }} has been marked as Byzantine (trust=0)."
+          runbook_url: "https://docs.mycelix.network/runbooks/byzantine-node"
+
+      # Sybil attack detection
+      - alert: RapidNodeJoins
+        expr: increase(mycelix_nodes_joined_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Rapid node joins detected - possible Sybil attack"
+          description: "{{ $value }} nodes joined in the last 5 minutes."
+          runbook_url: "https://docs.mycelix.network/runbooks/sybil-attack"
+
+      - alert: SuspiciousPeerPattern
+        expr: count(mycelix_peer_ip_address) by (ip_prefix) > 20
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Suspicious peer pattern detected"
+          description: "Many peers ({{ $value }}) from same IP prefix. Possible Sybil attack."
+          runbook_url: "https://docs.mycelix.network/runbooks/sybil-attack"
+
+      # Gradient poisoning detection
+      - alert: GradientPoisoningAttempt
+        expr: increase(mycelix_gradients_poisoning_detected_total[5m]) > 0
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Gradient poisoning attempt detected"
+          description: "{{ $value }} poisoning attempts detected in the last 5 minutes."
+          runbook_url: "https://docs.mycelix.network/runbooks/gradient-poisoning"
+
+      - alert: AbnormalGradientMagnitude
+        expr: mycelix_gradient_magnitude > mycelix_gradient_magnitude_threshold * 3
+        for: 2m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Abnormal gradient magnitude detected"
+          description: "Gradient from {{ $labels.node_id }} has magnitude {{ $value }}, 3x above threshold."
+          runbook_url: "https://docs.mycelix.network/runbooks/gradient-poisoning"
+
+      # Authentication and access
+      - alert: HighFailedAuthAttempts
+        expr: rate(mycelix_auth_failures_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "High rate of authentication failures"
+          description: "{{ $value }} auth failures per second. Possible brute force attack."
+          runbook_url: "https://docs.mycelix.network/runbooks/auth-failures"
+
+      - alert: AdminAPIAccess
+        expr: increase(mycelix_admin_api_calls_total[5m]) > 0 unless on() (hour() >= 9 and hour() <= 18)
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Admin API access outside business hours"
+          description: "Admin API called {{ $value }} times outside normal hours."
+          runbook_url: "https://docs.mycelix.network/runbooks/admin-access"
+
+      # DKG ceremony monitoring
+      - alert: DKGCeremonyAnomaly
+        expr: mycelix_dkg_invalid_shares_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Invalid DKG shares detected"
+          description: "{{ $value }} invalid shares in DKG ceremony. Possible attack."
+          runbook_url: "https://docs.mycelix.network/runbooks/dkg-anomaly"
+
+      - alert: DKGCeremonyTimeout
+        expr: mycelix_dkg_ceremony_duration_seconds > 300
+        for: 1m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "DKG ceremony taking too long"
+          description: "DKG ceremony has been running for {{ $value }}s (expected <60s)."
+          runbook_url: "https://docs.mycelix.network/runbooks/dkg-anomaly"
+
+  - name: mycelix_network_security
+    interval: 30s
+    rules:
+      # Network anomalies
+      - alert: UnusualTrafficPattern
+        expr: rate(mycelix_network_bytes_received_total[5m]) > 100000000
+        for: 5m
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Unusual network traffic pattern"
+          description: "Receiving {{ $value | humanize }}B/s, well above normal."
+          runbook_url: "https://docs.mycelix.network/runbooks/network-anomaly"
+
+      - alert: ConnectionFlood
+        expr: rate(mycelix_connections_total[1m]) > 100
+        for: 2m
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Connection flood detected"
+          description: "{{ $value }} new connections/second. Possible DoS attack."
+          runbook_url: "https://docs.mycelix.network/runbooks/connection-flood"
+
+      # TLS/Certificate issues
+      - alert: CertificateExpiringSoon
+        expr: (mycelix_tls_cert_expiry_seconds - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "TLS certificate expiring soon"
+          description: "Certificate expires in {{ $value }} days."
+          runbook_url: "https://docs.mycelix.network/runbooks/certificate-renewal"
+
+      - alert: CertificateExpired
+        expr: mycelix_tls_cert_expiry_seconds < time()
+        labels:
+          severity: critical
+        annotations:
+          summary: "TLS certificate has expired"
+          description: "Certificate expired {{ $value | humanizeDuration }} ago."
+          runbook_url: "https://docs.mycelix.network/runbooks/certificate-renewal"
+
+  - name: mycelix_smart_contract_security
+    interval: 60s
+    rules:
+      # Smart contract monitoring
+      - alert: UnexpectedContractCall
+        expr: increase(mycelix_contract_calls_total{function="pause"}[5m]) > 0
+        labels:
+          severity: critical
+          team: security
+        annotations:
+          summary: "Emergency pause function called"
+          description: "Contract pause function was invoked."
+          runbook_url: "https://docs.mycelix.network/runbooks/contract-pause"
+
+      - alert: LargeTokenTransfer
+        expr: mycelix_token_transfer_amount > 1000000000000000000000000
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Large token transfer detected"
+          description: "Transfer of {{ $value }} tokens (>1M) detected."
+          runbook_url: "https://docs.mycelix.network/runbooks/large-transfer"
+
+      - alert: ReputationSlashing
+        expr: increase(mycelix_reputation_slashed_total[5m]) > 0
+        labels:
+          severity: warning
+          team: security
+        annotations:
+          summary: "Reputation slashing event"
+          description: "{{ $value }} slashing events in the last 5 minutes."
+          runbook_url: "https://docs.mycelix.network/runbooks/slashing"

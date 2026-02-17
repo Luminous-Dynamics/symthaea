@@ -1,0 +1,100 @@
+# Mycelix Testnet - Prometheus Configuration
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    network: 'mycelix-testnet'
+    environment: 'testnet'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - /etc/prometheus/alerting-rules.yml
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # Bootstrap Node
+  - job_name: 'mycelix-bootstrap'
+    static_configs:
+      - targets: ['bootstrap:9090']
+        labels:
+          node_type: 'bootstrap'
+          node_id: 'bootstrap-primary'
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Seed FL Nodes
+  - job_name: 'mycelix-fl-seeds'
+    static_configs:
+      - targets:
+        - 'fl-seed-1:9090'
+        - 'fl-seed-2:9090'
+        - 'fl-seed-3:9090'
+        - 'fl-seed-4:9090'
+        - 'fl-seed-5:9090'
+        labels:
+          node_type: 'seed'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    relabel_configs:
+      - source_labels: [__address__]
+        regex: '(.+):9090'
+        target_label: node_id
+        replacement: '${1}'
+
+  # Faucet Service
+  - job_name: 'mycelix-faucet'
+    static_configs:
+      - targets: ['faucet:8080']
+        labels:
+          service: 'faucet'
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # PostgreSQL (via postgres_exporter if deployed)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+        labels:
+          service: 'postgres'
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+        labels:
+          service: 'redis'
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # Docker containers (if cadvisor is running)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # Dynamic node discovery via file-based SD
+  - job_name: 'mycelix-dynamic-nodes'
+    file_sd_configs:
+      - files:
+        - /etc/prometheus/file_sd/nodes.json
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__meta_filepath]
+        target_label: discovery_file

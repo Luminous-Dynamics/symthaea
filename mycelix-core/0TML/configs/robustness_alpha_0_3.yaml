@@ -1,0 +1,45 @@
+# Non-IID Robustness Study: α=0.3 (Moderate Heterogeneity)
+# =========================================================
+# Test PoGQ v4.1 conformal prediction under moderate label skew
+# α=0.3 → realistic non-IID scenario (our baseline)
+# This is a control condition - should match main experiment results
+
+experiment:
+  name: robustness_alpha_0_3
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3  # ⚡ MODERATE heterogeneity (baseline)
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: 0.10
+  mondrian_enabled: true
+  mondrian_profiles: ["label", "norm", "direction"]
+  adaptive_hybrid: true
+  ema_beta: 0.85
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02
+
+# Expected behavior:
+# - Should closely match main experiment results
+# - Balanced bucket sizes for Mondrian conformal
+# - Moderate adaptive hybrid switching

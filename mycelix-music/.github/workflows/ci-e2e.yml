@@ -1,0 +1,79 @@
+name: CI E2E (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_for:
+        description: "Target: manual/label/nightly"
+        required: false
+        default: "manual"
+  pull_request:
+    types: [labeled]
+  schedule:
+    - cron: "0 6 * * *" # daily
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'run-e2e')
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: mycelix
+          POSTGRES_PASSWORD: mycelix_dev_pass
+          POSTGRES_DB: mycelix_music
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mycelix"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://mycelix:mycelix_dev_pass@localhost:5432/mycelix_music
+      REDIS_URL: redis://localhost:6379
+      API_ADMIN_KEY: ci-admin-key
+      RPC_URL: http://127.0.0.1:8545
+      API_CHAIN_RPC_URL: http://127.0.0.1:8545
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright (Chromium)
+        run: npx playwright install --with-deps chromium
+
+      - name: Run CI harness (Anvil + deploy + indexer + API + Web + smoke)
+        run: ./scripts/ci-e2e.sh
+
+      - name: Upload CI artifacts (logs + metrics)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mycelix-ci-logs
+          path: /tmp/mycelix-ci

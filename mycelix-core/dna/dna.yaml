@@ -1,0 +1,16 @@
+---
+manifest_version: "0"
+name: h-fl
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: h_fl_integrity
+      path: h_fl/h_fl.wasm
+
+coordinator:
+  zomes:
+    - name: h_fl
+      path: h_fl/h_fl.wasm
+      dependencies:
+        - name: h_fl_integrity

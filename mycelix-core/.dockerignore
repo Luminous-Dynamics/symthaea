@@ -1,0 +1,31 @@
+# Ignore build artifacts
+target/
+federated-learning/target/
+*.log
+conductor-data/
+local-conductor-data/
+test-conductor-env/
+.hc
+
+# Ignore test files not needed in container
+test-*.py
+test-*.js
+test-*.sh
+*.pyc
+
+# Ignore documentation during build
+*.md
+docs/
+
+# Git
+.git/
+.gitignore
+
+# Temporary files
+*.swp
+*.tmp
+*~
+
+# Keep only essential files for running
+# The flake.nix and Cargo files are needed
+# The source code is needed for tests

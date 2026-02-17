@@ -1,0 +1,186 @@
+# Mycelix Validator Configuration
+#
+# This configuration file controls the behavior of the Mycelix validator node.
+# Environment variables can override any setting using the format:
+# MYCELIX_SECTION_KEY (e.g., MYCELIX_CONSENSUS_BYZANTINE_THRESHOLD)
+
+[node]
+# Unique identifier for this node (auto-generated if not set)
+# id = "validator-0"
+
+# Human-readable name for this node
+name = "Mycelix Validator"
+
+# Network to connect to
+network = "testnet"
+
+# Data directory for persistent storage
+data_dir = "/data"
+
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+# Log format: json, pretty
+log_format = "json"
+
+[network]
+# P2P listen address
+listen_addr = "0.0.0.0:9000"
+
+# External address advertised to peers (set via environment)
+# external_addr = "1.2.3.4:9000"
+
+# Bootstrap nodes (comma-separated list)
+# bootstrap_nodes = ["node1.testnet.mycelix.io:9000", "node2.testnet.mycelix.io:9000"]
+
+# Maximum number of peers
+max_peers = 50
+
+# Connection timeout in seconds
+connect_timeout_secs = 30
+
+# Ping interval in seconds
+ping_interval_secs = 60
+
+[consensus]
+# Consensus algorithm: rb-bft
+algorithm = "rb-bft"
+
+# Byzantine fault tolerance threshold (0.45 = 45%)
+byzantine_threshold = 0.45
+
+# Block time in milliseconds
+block_time_ms = 5000
+
+# Maximum block size in bytes (4 MB)
+max_block_size = 4194304
+
+# Minimum validators required for consensus
+min_validators = 5
+
+# View change timeout in seconds
+view_change_timeout_secs = 30
+
+# Enable reputation-weighted voting
+reputation_weighted = true
+
+[consensus.slashing]
+# Enable slashing for Byzantine behavior
+enabled = true
+
+# Downtime threshold before slashing (in blocks)
+downtime_threshold_blocks = 100
+
+# Double signing penalty (fraction of stake)
+double_sign_penalty = 0.05
+
+# Downtime penalty (fraction of stake)
+downtime_penalty = 0.001
+
+[reputation]
+# Initial reputation score for new validators
+initial_score = 0.5
+
+# Minimum reputation to participate in consensus
+min_score = 0.1
+
+# Reputation decay rate per epoch
+decay_rate = 0.01
+
+# Recovery bonus for good behavior
+recovery_bonus = 0.05
+
+# Maximum reputation score
+max_score = 1.0
+
+[database]
+# Database URL (set via environment variable DATABASE_URL)
+# url = "postgresql://user:pass@host:5432/mycelix"
+
+# Connection pool size
+pool_size = 10
+
+# Connection timeout in seconds
+connect_timeout_secs = 30
+
+# Query timeout in seconds
+query_timeout_secs = 60
+
+[redis]
+# Redis URL (set via environment variable REDIS_URL)
+# url = "redis://host:6379"
+
+# Connection pool size
+pool_size = 5
+
+# Key prefix for this node
+key_prefix = "mycelix:validator:"
+
+[metrics]
+# Enable Prometheus metrics
+enabled = true
+
+# Metrics listen address
+listen_addr = "0.0.0.0:9090"
+
+# Metrics path
+path = "/metrics"
+
+# Include detailed histograms
+detailed_histograms = true
+
+[health]
+# Health check listen address
+listen_addr = "0.0.0.0:8080"
+
+# Liveness probe path
+liveness_path = "/health/live"
+
+# Readiness probe path
+readiness_path = "/health/ready"
+
+# Startup probe path
+startup_path = "/health/started"
+
+[grpc]
+# gRPC server listen address
+listen_addr = "0.0.0.0:50051"
+
+# Maximum message size in bytes (16 MB)
+max_message_size = 16777216
+
+# Enable reflection for debugging
+enable_reflection = true
+
+[keys]
+# Key storage directory
+key_dir = "/data/keys"
+
+# Key derivation path
+derivation_path = "m/44'/60'/0'/0/0"
+
+# Use HSM for key storage (requires HSM configuration)
+use_hsm = false
+
+[fl]
+# Enable FL participation
+enabled = true
+
+# FL coordinator address
+coordinator_addr = "fl-coordinator.mycelix-fl:8083"
+
+# Maximum gradient size in bytes (100 MB)
+max_gradient_size = 104857600
+
+# Submission timeout in seconds
+submission_timeout_secs = 60
+
+[tracing]
+# Enable distributed tracing
+enabled = false
+
+# Jaeger endpoint
+# jaeger_endpoint = "http://jaeger:14268/api/traces"
+
+# Sampling rate (0.0 - 1.0)
+sampling_rate = 0.1

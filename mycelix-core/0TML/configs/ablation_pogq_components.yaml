@@ -1,0 +1,58 @@
+# Ablation Study: PoGQ Component Analysis
+# Tests each component's contribution to detection performance
+#
+# 6 variants × 3 datasets × 3 seeds = 54 experiments (~6-7 hours)
+
+experiment:
+  name: ablation_pogq_components
+  seeds: [42, 123, 456]  # Multiple seeds for statistical robustness
+
+data:
+  datasets:
+    - name: mnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+    - name: FEMNIST
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.35  # 35% BFT (sweet spot where Mode 0 fails)
+  attacks:
+    - sign_flip  # Use sign_flip for all ablations (consistent baseline)
+
+# 6 PoGQ variants testing each component
+defenses:
+  # Baseline: Full PoGQ v4.1
+  - pogq_v4_1_full
+
+  # Ablation 1: Without PCA (use raw gradients)
+  - pogq_v4_1_no_pca
+
+  # Ablation 2: Without Conformal (use fixed threshold)
+  - pogq_v4_1_no_conformal
+
+  # Ablation 3: Without Mondrian (use global conformal only)
+  - pogq_v4_1_no_mondrian
+
+  # Ablation 4: Without EMA (use raw scores)
+  - pogq_v4_1_no_ema
+
+  # Ablation 5: Without Hysteresis (direct quarantine)
+  - pogq_v4_1_no_hysteresis
+
+training:
+  num_rounds: 100
+  eval_every: 10
+
+statistics:
+  alpha: 0.10  # Target FPR for conformal prediction
+  confidence_level: 0.95
+
+output:
+  base_dir: results/ablation_pogq
+  save_artifacts: true
+  generate_plots: true

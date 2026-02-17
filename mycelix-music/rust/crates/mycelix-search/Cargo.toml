@@ -1,0 +1,33 @@
+[package]
+name = "mycelix-search"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Audio similarity search using HNSW indexing for nearest neighbor queries"
+
+[dependencies]
+mycelix-audio = { path = "../mycelix-audio" }
+mycelix-ml = { path = "../mycelix-ml" }
+
+# Vector search
+hnsw.workspace = true
+simsimd.workspace = true
+
+# Math
+ndarray.workspace = true
+
+# Core dependencies
+tokio.workspace = true
+async-trait.workspace = true
+rayon.workspace = true
+parking_lot.workspace = true
+
+serde.workspace = true
+bincode.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

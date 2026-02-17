@@ -1,0 +1,286 @@
+# Mycelix FL Node Deployment
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fl-aggregator
+  namespace: mycelix-fl
+  labels:
+    app.kubernetes.io/name: fl-aggregator
+    app.kubernetes.io/component: federated-learning
+    app.kubernetes.io/part-of: mycelix
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fl-aggregator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fl-aggregator
+        app.kubernetes.io/component: federated-learning
+        app.kubernetes.io/part-of: mycelix
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9091"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fl-node-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: fl-aggregator
+                topologyKey: topology.kubernetes.io/zone
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: role
+                    operator: In
+                    values:
+                      - fl-node
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: fl-aggregator
+      containers:
+        - name: fl-aggregator
+          image: ghcr.io/mycelix/fl-aggregator:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: 8081
+              protocol: TCP
+            - name: metrics
+              containerPort: 9091
+              protocol: TCP
+            - name: health
+              containerPort: 8082
+              protocol: TCP
+          env:
+            - name: FL_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials
+                  key: url
+            - name: S3_MODELS_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: fl-config
+                  key: models_bucket
+            - name: RUST_LOG
+              value: "info,fl_aggregator=debug"
+          envFrom:
+            - configMapRef:
+                name: fl-config
+          resources:
+            requests:
+              cpu: "4"
+              memory: "12Gi"
+            limits:
+              cpu: "8"
+              memory: "28Gi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: health
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: models-cache
+              mountPath: /cache
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: models-cache
+          emptyDir:
+            sizeLimit: 50Gi
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fl-coordinator
+  namespace: mycelix-fl
+  labels:
+    app.kubernetes.io/name: fl-coordinator
+    app.kubernetes.io/component: federated-learning
+    app.kubernetes.io/part-of: mycelix
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fl-coordinator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fl-coordinator
+        app.kubernetes.io/component: federated-learning
+        app.kubernetes.io/part-of: mycelix
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9092"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: fl-node-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      nodeSelector:
+        role: fl-node
+      containers:
+        - name: fl-coordinator
+          image: ghcr.io/mycelix/fl-coordinator:latest
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+            - name: metrics
+              containerPort: 9092
+              protocol: TCP
+            - name: health
+              containerPort: 8084
+              protocol: TCP
+          env:
+            - name: COORDINATOR_ID
+              value: "primary"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: database-credentials
+                  key: url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: redis-credentials
+                  key: url
+            - name: FL_ROUND_DURATION_SECS
+              value: "300"
+            - name: MIN_PARTICIPANTS
+              value: "3"
+            - name: RUST_LOG
+              value: "info,fl_coordinator=debug"
+          envFrom:
+            - configMapRef:
+                name: fl-config
+          resources:
+            requests:
+              cpu: "1"
+              memory: "4Gi"
+            limits:
+              cpu: "2"
+              memory: "8Gi"
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: health
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: health
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fl-aggregator
+  namespace: mycelix-fl
+  labels:
+    app.kubernetes.io/name: fl-aggregator
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8081
+      targetPort: http
+    - name: metrics
+      port: 9091
+      targetPort: metrics
+  selector:
+    app.kubernetes.io/name: fl-aggregator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fl-coordinator
+  namespace: mycelix-fl
+  labels:
+    app.kubernetes.io/name: fl-coordinator
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8083
+      targetPort: http
+    - name: metrics
+      port: 9092
+      targetPort: metrics
+  selector:
+    app.kubernetes.io/name: fl-coordinator

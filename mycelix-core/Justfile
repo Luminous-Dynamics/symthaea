@@ -1,0 +1,109 @@
+set shell := ["bash", "-c"]
+
+# Mycelix-Core Development Commands
+# Run `just` or `just help` to see available recipes
+
+default: help
+
+help:
+	@just --list
+
+# === Development Environment ===
+
+# Enter the full development shell (nix develop)
+dev:
+	nix develop
+
+# Install Poetry-managed virtualenv (after nix develop)
+install:
+	cd 0TML && poetry install
+
+# === Testing ===
+
+# Run pytest suite
+test *args:
+	cd 0TML && poetry run pytest {{args}}
+
+# Run pytest inside CI shell
+ci-tests:
+	nix develop .#ci --command bash -c 'cd 0TML && pytest'
+
+# Run tests with coverage report
+test-cov:
+	cd 0TML && poetry run pytest --cov=src --cov-report=html
+
+# Run Byzantine attack tests
+test-byzantine:
+	cd 0TML && poetry run pytest tests/test_byzantine*.py -v
+
+# === Code Quality ===
+
+# Run static analysis (ruff + mypy)
+lint:
+	cd 0TML && poetry run ruff check src tests
+
+# Format code with black
+format:
+	cd 0TML && poetry run black src tests
+
+# Format and lint
+check: format lint
+
+# === Holochain ===
+
+# Start Holochain conductor
+hc-start:
+	cd 0TML/holochain && ./start-conductor.sh
+
+# Stop Holochain conductor
+hc-stop:
+	pkill -f "holochain.*conductor" || true
+
+# Build all zomes
+build-zomes:
+	cd 0TML/holochain && cargo build --release
+
+# === Federated Learning ===
+
+# Run FL coordinator
+fl-coordinator:
+	cd 0TML && poetry run python src/zerotrustml/coordinator.py
+
+# Run FL client with node ID
+fl-client node_id:
+	cd 0TML && poetry run python src/zerotrustml/client.py --node-id {{node_id}}
+
+# Run benchmarks
+bench:
+	cd 0TML && poetry run python benchmark_backends.py
+
+# === Desktop App ===
+
+# Build desktop app
+build-desktop:
+	cd mycelix-desktop && npm install && npm run build
+
+# Run desktop app in dev mode
+dev-desktop:
+	cd mycelix-desktop && npm run tauri dev
+
+# === Cleanup ===
+
+# Clean all build artifacts (saves disk space)
+clean:
+	find . -type d -name "target" -not -path "./.archive/*" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "node_modules" -not -path "./.archive/*" -exec rm -rf {} + 2>/dev/null || true
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@echo "✓ Cleaned build artifacts"
+
+# Show disk usage
+du:
+	@du -sh */ .archive/ 2>/dev/null | sort -h
+
+# === Utilities ===
+
+# Check project health
+health:
+	@echo "=== Disk Usage ===" && du -sh .
+	@echo "\n=== Git Status ===" && git status --short
+	@echo "\n=== Recent Commits ===" && git log --oneline -5

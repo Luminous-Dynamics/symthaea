@@ -1,0 +1,7 @@
+---
+installed_app_id: byzantine-fl-node3
+agent_key: ~
+bundle:
+  path: test-happ/test_happ.happ
+membrane_proofs: {}
+network_seed: byzantine-fl-network

@@ -1,0 +1,36 @@
+[package]
+name = "credential_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Credential coordinator zome - implements W3C Verifiable Credentials business logic"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "credential_coordinator"
+
+[dependencies]
+# Holochain Development (HDK) for business logic
+hdk.workspace = true
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Integrity zome (for entry types)
+credential_integrity = { path = "../integrity" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Cryptographic operations
+ed25519-dalek = "2.1"
+sha2 = "0.10"
+base64 = "0.21"
+blake3.workspace = true
+
+# Time handling
+chrono.workspace = true
+
+# Note: mycelix-sdk removed - rand 0.8 dependency causes getrandom 0.2 issues in WASM

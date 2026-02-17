@@ -1,0 +1,44 @@
+[workspace]
+resolver = "2"
+
+members = [
+  "crates/mycelix_common",
+  # Phase 1: Core marketplace zomes (refactored and tested)
+  "zomes/listings/integrity",
+  "zomes/listings/coordinator",
+  "zomes/reputation/integrity",
+  "zomes/reputation/coordinator",
+  "zomes/transactions/integrity",
+  "zomes/transactions/coordinator",
+  "zomes/arbitration/integrity",
+  "zomes/arbitration/coordinator",
+  "zomes/messaging/integrity",
+  "zomes/messaging/coordinator",
+  # Phase 2: Additional zomes (migrated to HDK 0.6.0/HDI 0.7.0)
+  "zomes/notifications/integrity",
+  "zomes/notifications/coordinator",
+  "zomes/security/integrity",
+  "zomes/security/coordinator",
+  "zomes/search/integrity",
+  "zomes/search/coordinator",
+]
+
+# Utility libraries (not Holochain zomes):
+# - zomes/monitoring (metrics aggregation library - used by coordinators)
+# Note: security and search are now proper zomes with integrity/coordinator split
+
+[workspace.dependencies]
+# Holochain 0.6.0 dependencies
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_serialized_bytes = "=0.0.56"
+serde = "=1.0.219"  # Match holochain_serialized_bytes requirement
+
+# Additional utilities
+thiserror = "1"
+
+[profile.release]
+opt-level = "z"        # Optimize for size (WASM)
+lto = true             # Link-time optimization
+codegen-units = 1      # Better optimization
+strip = true           # Remove debug symbols

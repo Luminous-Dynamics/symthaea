@@ -1,0 +1,24 @@
+[package]
+name = "integration_integrity"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Integration integrity zome - connects all EduNet zomes for coordinated learning"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "integration_integrity"
+
+[dependencies]
+# Holochain Integrity (HDI) for entry definitions
+hdi.workspace = true
+
+# Core types (NO other integrity zomes - they conflict with HDI symbols)
+# Inter-zome communication happens at the coordinator level via `call`
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true

@@ -1,0 +1,30 @@
+apiVersion: v2
+name: mycelix-mail
+description: A privacy-first, trust-centric email platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - email
+  - privacy
+  - trust
+  - collaboration
+home: https://github.com/mycelix/mail
+sources:
+  - https://github.com/mycelix/mail
+maintainers:
+  - name: Mycelix Team
+    email: hello@mycelix.dev
+dependencies:
+  - name: postgresql
+    version: "13.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+  - name: meilisearch
+    version: "0.x.x"
+    repository: https://meilisearch.github.io/meilisearch-kubernetes
+    condition: meilisearch.enabled

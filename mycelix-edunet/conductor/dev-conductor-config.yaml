@@ -1,0 +1,45 @@
+---
+# Mycelix EduNet - Development Conductor Configuration
+# Holochain 0.6 compatible
+
+# Environment variables (set these before running)
+# CONDUCTOR_CONFIG_DIR - base path for conductor data
+# LAIR_CONNECTION_URL - lair keystore connection URL
+
+# Keystore configuration
+keystore:
+  type: lair_server_in_proc
+  lair_root: null  # Will use default ~/.local/share/lair
+
+# Database directory for source chains
+environment_path: ./conductor/databases
+
+# Network configuration
+network:
+  bootstrap_service: "https://bootstrap.holo.host"
+  transport_pool:
+    - type: quic
+      bind_to: "kitsune-quic://0.0.0.0:0"
+  tuning_params:
+    gossip_loop_iteration_delay_ms: 10
+    default_rpc_single_timeout_ms: 30000
+    default_rpc_multi_remote_agent_count: 3
+    default_notify_timeout_ms: 30000
+    default_notify_remote_agent_count: 3
+    gossip_inbound_target_mbps: 100
+    gossip_outbound_target_mbps: 100
+    gossip_historic_outbound_target_mbps: 100
+    gossip_historic_inbound_target_mbps: 100
+
+# Admin interface (for conductor control)
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 4444
+
+# App interfaces (for client connections)
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      allowed_origins: "*"

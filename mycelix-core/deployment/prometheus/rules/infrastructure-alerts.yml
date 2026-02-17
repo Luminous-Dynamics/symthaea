@@ -1,0 +1,345 @@
+# =============================================================================
+# PROMETHEUS ALERT RULES - INFRASTRUCTURE MONITORING
+# =============================================================================
+#
+# Infrastructure and operational alerts for production deployment:
+#   - Node health (CPU, memory, disk)
+#   - Database health (PostgreSQL, Redis)
+#   - Kubernetes health
+#   - Certificate expiry
+#   - Backup health
+#
+# =============================================================================
+
+groups:
+  # ===========================================================================
+  # NODE HEALTH ALERTS
+  # ===========================================================================
+  - name: infrastructure_node_health
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # HighCPUUsage - Warning when CPU usage exceeds 80% for 5 minutes
+      # -----------------------------------------------------------------------
+      - alert: HighCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: |
+            CPU usage is {{ $value | printf "%.1f" }}% on {{ $labels.instance }}.
+            This may impact FL processing performance.
+          runbook_url: "https://docs.mycelix.io/runbooks/high-cpu"
+
+      # -----------------------------------------------------------------------
+      # CriticalCPUUsage - Critical when CPU exceeds 95% for 2 minutes
+      # -----------------------------------------------------------------------
+      - alert: CriticalCPUUsage
+        expr: |
+          100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[2m])) * 100) > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "Critical CPU usage on {{ $labels.instance }}"
+          description: |
+            CPU usage is {{ $value | printf "%.1f" }}% on {{ $labels.instance }}.
+            System may become unresponsive. Immediate action required.
+          runbook_url: "https://docs.mycelix.io/runbooks/critical-cpu"
+
+      # -----------------------------------------------------------------------
+      # HighMemoryUsage - Warning when memory exceeds 85%
+      # -----------------------------------------------------------------------
+      - alert: HighMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: |
+            Memory usage is {{ $value | printf "%.1f" }}% on {{ $labels.instance }}.
+          runbook_url: "https://docs.mycelix.io/runbooks/high-memory"
+
+      # -----------------------------------------------------------------------
+      # CriticalMemoryUsage - Critical when memory exceeds 95%
+      # -----------------------------------------------------------------------
+      - alert: CriticalMemoryUsage
+        expr: |
+          (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "Critical memory usage on {{ $labels.instance }}"
+          description: |
+            Memory usage is {{ $value | printf "%.1f" }}% on {{ $labels.instance }}.
+            OOM killer may activate. Immediate action required.
+          runbook_url: "https://docs.mycelix.io/runbooks/critical-memory"
+
+      # -----------------------------------------------------------------------
+      # DiskSpaceLow - Warning when disk space below 20%
+      # -----------------------------------------------------------------------
+      - alert: DiskSpaceLow
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} /
+           node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+          description: |
+            Disk space is {{ $value | printf "%.1f" }}% free on {{ $labels.mountpoint }}.
+          runbook_url: "https://docs.mycelix.io/runbooks/low-disk"
+
+      # -----------------------------------------------------------------------
+      # DiskSpaceCritical - Critical when disk space below 10%
+      # -----------------------------------------------------------------------
+      - alert: DiskSpaceCritical
+        expr: |
+          (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} /
+           node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}:{{ $labels.mountpoint }}"
+          description: |
+            Disk space is {{ $value | printf "%.1f" }}% free on {{ $labels.mountpoint }}.
+            System may fail to write logs or data. Immediate action required.
+          runbook_url: "https://docs.mycelix.io/runbooks/critical-disk"
+
+  # ===========================================================================
+  # DATABASE HEALTH ALERTS
+  # ===========================================================================
+  - name: infrastructure_database_health
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # PostgresDown - Critical when PostgreSQL is unreachable
+      # -----------------------------------------------------------------------
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+          team: platform
+        annotations:
+          summary: "PostgreSQL is down on {{ $labels.instance }}"
+          description: |
+            PostgreSQL database is not responding.
+            FL state persistence is unavailable.
+          runbook_url: "https://docs.mycelix.io/runbooks/postgres-down"
+
+      # -----------------------------------------------------------------------
+      # PostgresHighConnections - Warning when connections exceed 80%
+      # -----------------------------------------------------------------------
+      - alert: PostgresHighConnections
+        expr: |
+          sum(pg_stat_activity_count) by (instance) /
+          pg_settings_max_connections > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+          team: platform
+        annotations:
+          summary: "PostgreSQL connection pool nearly exhausted on {{ $labels.instance }}"
+          description: |
+            {{ $value | humanizePercentage }} of max connections in use.
+            New connections may be rejected soon.
+          runbook_url: "https://docs.mycelix.io/runbooks/postgres-connections"
+
+      # -----------------------------------------------------------------------
+      # RedisDown - Critical when Redis is unreachable
+      # -----------------------------------------------------------------------
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: cache
+          team: platform
+        annotations:
+          summary: "Redis is down on {{ $labels.instance }}"
+          description: |
+            Redis cache is not responding.
+            FL caching layer is unavailable.
+          runbook_url: "https://docs.mycelix.io/runbooks/redis-down"
+
+      # -----------------------------------------------------------------------
+      # RedisHighMemory - Warning when Redis memory exceeds 80%
+      # -----------------------------------------------------------------------
+      - alert: RedisHighMemory
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: cache
+          team: platform
+        annotations:
+          summary: "Redis memory usage high on {{ $labels.instance }}"
+          description: |
+            Redis memory usage is {{ $value | humanizePercentage }}.
+            Eviction may begin soon.
+          runbook_url: "https://docs.mycelix.io/runbooks/redis-memory"
+
+  # ===========================================================================
+  # KUBERNETES HEALTH ALERTS
+  # ===========================================================================
+  - name: infrastructure_kubernetes_health
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # PodCrashLooping - Critical when pod keeps restarting
+      # -----------------------------------------------------------------------
+      - alert: PodCrashLooping
+        expr: |
+          increase(kube_pod_container_status_restarts_total{namespace="mycelix-testnet"}[1h]) > 5
+        for: 5m
+        labels:
+          severity: critical
+          component: kubernetes
+          team: platform
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: |
+            Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted
+            {{ $value | printf "%.0f" }} times in the last hour.
+          runbook_url: "https://docs.mycelix.io/runbooks/pod-crashloop"
+
+      # -----------------------------------------------------------------------
+      # PodNotReady - Warning when pod stays not ready
+      # -----------------------------------------------------------------------
+      - alert: PodNotReady
+        expr: |
+          kube_pod_status_ready{namespace="mycelix-testnet", condition="true"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+          team: platform
+        annotations:
+          summary: "Pod {{ $labels.pod }} not ready"
+          description: |
+            Pod {{ $labels.pod }} has been not ready for more than 5 minutes.
+          runbook_url: "https://docs.mycelix.io/runbooks/pod-not-ready"
+
+      # -----------------------------------------------------------------------
+      # PVCAlmostFull - Warning when PVC usage exceeds 80%
+      # -----------------------------------------------------------------------
+      - alert: PVCAlmostFull
+        expr: |
+          kubelet_volume_stats_used_bytes{namespace="mycelix-testnet"} /
+          kubelet_volume_stats_capacity_bytes{namespace="mycelix-testnet"} > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: kubernetes
+          team: platform
+        annotations:
+          summary: "PVC {{ $labels.persistentvolumeclaim }} almost full"
+          description: |
+            PVC {{ $labels.persistentvolumeclaim }} is {{ $value | humanizePercentage }} full.
+          runbook_url: "https://docs.mycelix.io/runbooks/pvc-full"
+
+  # ===========================================================================
+  # CERTIFICATE ALERTS
+  # ===========================================================================
+  - name: infrastructure_certificates
+    interval: 1h
+    rules:
+      # -----------------------------------------------------------------------
+      # CertificateExpiringSoon - Warning 30 days before expiry
+      # -----------------------------------------------------------------------
+      - alert: CertificateExpiringSoon
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 30
+        for: 1h
+        labels:
+          severity: warning
+          component: certificates
+          team: platform
+        annotations:
+          summary: "TLS certificate expiring soon for {{ $labels.instance }}"
+          description: |
+            Certificate for {{ $labels.instance }} expires in {{ $value | printf "%.0f" }} days.
+          runbook_url: "https://docs.mycelix.io/runbooks/certificate-expiring"
+
+      # -----------------------------------------------------------------------
+      # CertificateExpiringCritical - Critical 7 days before expiry
+      # -----------------------------------------------------------------------
+      - alert: CertificateExpiringCritical
+        expr: |
+          (probe_ssl_earliest_cert_expiry - time()) / 86400 < 7
+        for: 1h
+        labels:
+          severity: critical
+          component: certificates
+          team: platform
+        annotations:
+          summary: "TLS certificate expiring very soon for {{ $labels.instance }}"
+          description: |
+            Certificate for {{ $labels.instance }} expires in {{ $value | printf "%.0f" }} days.
+            Immediate renewal required.
+          runbook_url: "https://docs.mycelix.io/runbooks/certificate-expiring-critical"
+
+  # ===========================================================================
+  # BACKUP HEALTH ALERTS
+  # ===========================================================================
+  - name: infrastructure_backup_health
+    interval: 1h
+    rules:
+      # -----------------------------------------------------------------------
+      # BackupMissing - Critical when backup hasn't run in 24h
+      # -----------------------------------------------------------------------
+      - alert: BackupMissing
+        expr: |
+          time() - mycelix_backup_last_success_timestamp_seconds > 86400
+        for: 1h
+        labels:
+          severity: critical
+          component: backup
+          team: platform
+        annotations:
+          summary: "Backup has not completed in 24 hours"
+          description: |
+            Last successful backup was {{ $value | humanizeDuration }} ago.
+            Data protection is at risk.
+          runbook_url: "https://docs.mycelix.io/runbooks/backup-missing"
+
+      # -----------------------------------------------------------------------
+      # BackupFailed - Critical when last backup failed
+      # -----------------------------------------------------------------------
+      - alert: BackupFailed
+        expr: mycelix_backup_last_status != 1
+        for: 5m
+        labels:
+          severity: critical
+          component: backup
+          team: platform
+        annotations:
+          summary: "Last backup failed"
+          description: |
+            The most recent backup attempt failed.
+            Manual investigation required.
+          runbook_url: "https://docs.mycelix.io/runbooks/backup-failed"

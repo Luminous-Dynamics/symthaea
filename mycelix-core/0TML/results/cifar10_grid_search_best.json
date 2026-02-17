@@ -1,0 +1,46 @@
+{
+  "config": {
+    "val_batches": 4,
+    "ref_lr": 0.0005,
+    "mad_multiplier": 3.0,
+    "loss_fn": "mse_logits",
+    "val_size": 1000,
+    "dispersion": "mad",
+    "winsorize": 0.05,
+    "threshold_mode": "robust",
+    "ema_alpha": 0.2,
+    "freeze_bn": true,
+    "relative_improvement": true,
+    "grad_clip": null,
+    "hybrid_lambda": null
+  },
+  "seed_metrics": [
+    {
+      "seed": 42,
+      "detection_rate": 0.0,
+      "fpr": 0.07692307692307693,
+      "threshold": 0.4918805378390474,
+      "mean_quality": 0.5023817996261789,
+      "auroc": 0.2637362637362637,
+      "auprc": 0.27484039070173527,
+      "cohen_d": 0.5019879629156349,
+      "class_counts": {
+        "0": 100,
+        "1": 100,
+        "2": 100,
+        "3": 100,
+        "4": 100,
+        "5": 100,
+        "6": 100,
+        "7": 100,
+        "8": 100,
+        "9": 100
+      }
+    }
+  ],
+  "mean_detection": 0.0,
+  "std_detection": 0.0,
+  "mean_fpr": 0.07692307692307693,
+  "std_fpr": 0.0,
+  "aborted_by_rule": true
+}

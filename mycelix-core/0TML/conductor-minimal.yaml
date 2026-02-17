@@ -1,0 +1,19 @@
+# Minimal Conductor Configuration for Testing
+# Version: 0.5.6 compatible
+
+data_root_path: /tmp/holochain_test
+
+keystore:
+  type: danger_test_keystore
+
+dpki:
+  network_seed: ''
+  no_dpki: true
+
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      allowed_origins: '*'
+
+db_sync_strategy: Fast

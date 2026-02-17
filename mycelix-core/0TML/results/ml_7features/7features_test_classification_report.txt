@@ -1,0 +1,8 @@
+              precision    recall  f1-score   support
+
+      Honest       1.00      1.00      1.00       200
+   Byzantine       1.00      1.00      1.00        50
+
+    accuracy                           1.00       250
+   macro avg       1.00      1.00      1.00       250
+weighted avg       1.00      1.00      1.00       250

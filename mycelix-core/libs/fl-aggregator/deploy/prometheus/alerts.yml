@@ -1,0 +1,129 @@
+# Prometheus alerting rules for proof service
+
+groups:
+  - name: proof_service_alerts
+    rules:
+      # High error rate
+      - alert: ProofGenerationHighErrorRate
+        expr: |
+          sum(rate(proof_generation_errors_total[5m]))
+          /
+          sum(rate(proof_generation_total[5m]))
+          > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High proof generation error rate"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+      # Slow proof generation
+      - alert: ProofGenerationSlow
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(proof_generation_duration_seconds_bucket[5m])) by (le, proof_type)
+          ) > 5
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow proof generation for {{ $labels.proof_type }}"
+          description: "P95 generation time is {{ $value | humanizeDuration }}"
+
+      # Verification failures
+      - alert: HighVerificationFailureRate
+        expr: |
+          sum(rate(proof_verification_failures_total[5m]))
+          /
+          sum(rate(proof_verification_total[5m]))
+          > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High verification failure rate"
+          description: "{{ $value | humanizePercentage }} of verifications are failing"
+
+      # Cache hit rate too low
+      - alert: LowCacheHitRate
+        expr: |
+          sum(rate(proof_cache_hits_total[15m]))
+          /
+          (sum(rate(proof_cache_hits_total[15m])) + sum(rate(proof_cache_misses_total[15m])))
+          < 0.5
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low proof cache hit rate"
+          description: "Cache hit rate is {{ $value | humanizePercentage }}"
+
+      # Service down
+      - alert: ProofServiceDown
+        expr: up{job="proof-service"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Proof service is down"
+          description: "The proof service has been unreachable for more than 1 minute"
+
+      # High queue depth
+      - alert: HighQueueDepth
+        expr: proof_queue_depth > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High proof queue depth"
+          description: "Queue depth is {{ $value }}, indicating possible backlog"
+
+      # Memory pressure (if GPU metrics available)
+      - alert: HighGpuMemoryUsage
+        expr: gpu_memory_used_bytes / (1024 * 1024 * 1024) > 7  # 7GB threshold
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High GPU memory usage"
+          description: "GPU memory usage is {{ $value | humanize1024 }}B"
+
+      # Anchoring delays
+      - alert: AnchoringDelayed
+        expr: proof_anchoring_pending > 50
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Many pending proof anchors"
+          description: "{{ $value }} proofs are waiting to be anchored"
+
+  - name: slo_alerts
+    rules:
+      # SLO: 99% of proofs generated within 10 seconds
+      - alert: ProofGenerationSLOBreach
+        expr: |
+          sum(rate(proof_generation_duration_seconds_bucket{le="10"}[1h]))
+          /
+          sum(rate(proof_generation_duration_seconds_count[1h]))
+          < 0.99
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Proof generation SLO breach"
+          description: "Only {{ $value | humanizePercentage }} of proofs are generated within 10s target"
+
+      # SLO: 99.9% of verifications succeed
+      - alert: VerificationSLOBreach
+        expr: |
+          sum(rate(proof_verification_success_total[1h]))
+          /
+          sum(rate(proof_verification_total[1h]))
+          < 0.999
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Verification success rate SLO breach"
+          description: "Verification success rate is {{ $value | humanizePercentage }}"

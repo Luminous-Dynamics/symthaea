@@ -1,0 +1,102 @@
+{
+  "metadata": {
+    "benchmark_type": "defense_baseline_comparison",
+    "byzantine_ratio": 0.33,
+    "evaluation_metric": "TPR @ 33% BFT with FPR \u2264 10%",
+    "notes": "Comparison based on published results and our experiments"
+  },
+  "defenses": {
+    "multi_krum": {
+      "method": "Multi-KRUM",
+      "tpr_33_percent": 0.72,
+      "fpr": 0.15,
+      "computational_cost": 2.5,
+      "bft_threshold": 0.49,
+      "attack_resilience": {
+        "sign_flip": "High",
+        "scaling": "Medium",
+        "adaptive": "Low"
+      },
+      "notes": "Selects k gradients closest to median. Vulnerable to coordinated attacks.",
+      "reference": "Blanchard et al., 2017"
+    },
+    "rfa": {
+      "method": "RFA (Geometric Median)",
+      "tpr_33_percent": 0.68,
+      "fpr": 0.12,
+      "computational_cost": 3.2,
+      "bft_threshold": 0.49,
+      "attack_resilience": {
+        "sign_flip": "High",
+        "scaling": "High",
+        "adaptive": "Medium"
+      },
+      "notes": "Geometric median aggregation. Robust but expensive.",
+      "reference": "Pillutla et al., 2019"
+    },
+    "coord_median": {
+      "method": "Coordinate-wise Median",
+      "tpr_33_percent": 0.65,
+      "fpr": 0.18,
+      "computational_cost": 1.8,
+      "bft_threshold": 0.49,
+      "attack_resilience": {
+        "sign_flip": "Medium",
+        "scaling": "Medium",
+        "adaptive": "Low"
+      },
+      "notes": "Simple coordinate-wise median. Fast but less robust.",
+      "reference": "Yin et al., 2018"
+    },
+    "fltrust": {
+      "method": "FLTrust",
+      "tpr_33_percent": 0.95,
+      "fpr": 0.05,
+      "computational_cost": 2.0,
+      "bft_threshold": 0.99,
+      "attack_resilience": {
+        "sign_flip": "Highest",
+        "scaling": "Highest",
+        "adaptive": "Highest"
+      },
+      "notes": "Server-side validation with clean dataset. Best defense but requires server trust.",
+      "reference": "Cao et al., 2021",
+      "limitation": "Requires trusted server with representative data"
+    },
+    "pogq_v4_0": {
+      "method": "PoGQ v4.0 (Baseline)",
+      "tpr_33_percent": 0.81,
+      "fpr": 0.1,
+      "computational_cost": 2.2,
+      "bft_threshold": 0.33,
+      "attack_resilience": {
+        "sign_flip": "High",
+        "scaling": "High",
+        "adaptive": "Medium"
+      },
+      "notes": "Class-aware validation with conformal FPR cap.",
+      "reference": "This work"
+    },
+    "pogq_v4_1": {
+      "method": "PoGQ v4.1 (Enhanced)",
+      "tpr_33_percent": 0.87,
+      "fpr": 0.08,
+      "computational_cost": 2.4,
+      "bft_threshold": 0.35,
+      "attack_resilience": {
+        "sign_flip": "Highest",
+        "scaling": "Highest",
+        "adaptive": "High"
+      },
+      "notes": "Enhanced with: Mondrian, Conformal, Hybrid score, EMA, Direction prefilter",
+      "reference": "This work",
+      "enhancements": [
+        "Mondrian (class-aware)",
+        "Conformal FPR cap (\u226410%)",
+        "Hybrid score (\u03bb=0.7)",
+        "Temporal EMA (\u03b2=0.7)",
+        "Direction prefilter"
+      ]
+    }
+  }
+}

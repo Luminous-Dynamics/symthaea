@@ -1,0 +1,184 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: bootstrap
+  namespace: mycelix-testnet
+  labels:
+    app: bootstrap
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: bootstrap
+spec:
+  type: ClusterIP
+  ports:
+    - name: p2p
+      port: 9000
+      targetPort: p2p
+      protocol: TCP
+    - name: api
+      port: 9001
+      targetPort: api
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: bootstrap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bootstrap-external
+  namespace: mycelix-testnet
+  labels:
+    app: bootstrap
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: bootstrap
+  annotations:
+    # For cloud load balancers
+    # GKE: cloud.google.com/load-balancer-type: "External"
+    # AWS: service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  ports:
+    - name: p2p
+      port: 9000
+      targetPort: p2p
+      protocol: TCP
+    - name: api
+      port: 9001
+      targetPort: api
+      protocol: TCP
+  selector:
+    app: bootstrap
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fl-nodes
+  namespace: mycelix-testnet
+  labels:
+    app: fl-node
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: fl-node
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for StatefulSet
+  ports:
+    - name: p2p
+      port: 9000
+      targetPort: p2p
+      protocol: TCP
+    - name: api
+      port: 9001
+      targetPort: api
+      protocol: TCP
+    - name: metrics
+      port: 9090
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app: fl-node
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: faucet
+  namespace: mycelix-testnet
+  labels:
+    app: faucet
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: faucet
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: faucet
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: mycelix-testnet
+  labels:
+    app: postgres
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: database
+spec:
+  type: ClusterIP
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: postgres
+      protocol: TCP
+  selector:
+    app: postgres
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-master
+  namespace: mycelix-testnet
+  labels:
+    app: redis
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: cache
+spec:
+  type: ClusterIP
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: redis
+      protocol: TCP
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: mycelix-testnet
+  labels:
+    app: prometheus
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: prometheus
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: mycelix-testnet
+  labels:
+    app: grafana
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: monitoring
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http
+      protocol: TCP
+  selector:
+    app: grafana

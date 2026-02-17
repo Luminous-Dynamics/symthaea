@@ -1,0 +1,18 @@
+
+\begin{table}[t]
+\centering
+\caption{VSV-STARK Performance Comparison}
+\label{tab:vsv_stark_performance}
+\begin{tabular}{lrrr}
+\toprule
+\textbf{Method} & \textbf{Sign/Prove (ms)} & \textbf{Verify (ms)} & \textbf{Size (bytes)} \\
+\midrule
+VSV-STARK & 4157 & 110 & 221,254 \\
+ECDSA (secp256k1) & 0.5 & 1.5 & 64 \\
+Ed25519 & 0.3 & 0.8 & 64 \\
+RSA-2048 & 2.0 & 0.1 & 256 \\
+\bottomrule
+\end{tabular}
+\\[0.5em]
+\footnotesize VSV-STARK provides zero-knowledge privacy, traditional crypto does not
+\end{table}

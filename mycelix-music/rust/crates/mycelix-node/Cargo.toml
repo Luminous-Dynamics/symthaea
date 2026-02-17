@@ -1,0 +1,31 @@
+[package]
+name = "mycelix-node"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Node.js bindings for Mycelix Music Platform Rust core"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mycelix-audio = { path = "../mycelix-audio" }
+mycelix-streaming = { path = "../mycelix-streaming" }
+mycelix-realtime = { path = "../mycelix-realtime" }
+
+napi.workspace = true
+napi-derive.workspace = true
+
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+bytes.workspace = true
+
+[build-dependencies]
+napi-build = "2.1"
+
+[profile.release]
+lto = true

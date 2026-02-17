@@ -1,0 +1,48 @@
+[package]
+name = "mycelix-mail-desktop"
+version = "0.1.0"
+description = "Mycelix Mail Desktop Application"
+authors = ["Mycelix Team"]
+license = "MIT"
+repository = "https://github.com/mycelix/mycelix-mail"
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [
+    "macos-private-api",
+    "tray-icon",
+    "image-png",
+] }
+tauri-plugin-shell = "2.0"
+tauri-plugin-dialog = "2.0"
+tauri-plugin-notification = "2.0"
+tauri-plugin-fs = "2.0"
+tauri-plugin-os = "2.0"
+tauri-plugin-process = "2.0"
+tauri-plugin-updater = "2.0"
+tauri-plugin-deep-link = "2.0"
+tauri-plugin-single-instance = "2.0"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+keyring = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+env_logger = "0.10"
+
+[features]
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

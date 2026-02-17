@@ -1,0 +1,17 @@
+[package]
+name = "host"
+version = "0.1.0"
+edition = "2021"
+description = "Host program for gradient validity proof generation"
+
+[dependencies]
+methods = { path = "../methods" }
+gradient-proof-core = { path = "../core" }
+risc0-zkvm = { version = "^3.0.3" }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+sha2 = "0.10"
+bincode = "1.3"
+
+[dev-dependencies]
+sha2 = "0.10"

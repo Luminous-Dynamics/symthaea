@@ -1,0 +1,29 @@
+{
+  "test_start": "2025-10-23T18:33:03-05:00",
+  "configuration": {
+    "num_conductors": 20,
+    "byzantine_percentage": 0,
+    "test_rounds": 5,
+    "deployment_type": "docker"
+  },
+  "conductor_status": {
+    "running": 20,
+    "total": 20,
+    "success_rate": 100.0
+  },
+  "zome_deployment": {
+    "deployed": 20,
+    "total": 20,
+    "success_rate": 100.0
+  },
+  "performance": {
+    "rounds_completed": 5,
+    "total_duration_seconds": 9,
+    "average_round_duration": 1.80
+  },
+  "final_summary": {
+    "overall_result": "PASS",
+    "byzantine_detected": 0,
+    "false_positives": 0
+  }
+}

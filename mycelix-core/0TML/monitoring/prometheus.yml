@@ -1,0 +1,65 @@
+# Prometheus Configuration for ZeroTrustML Phase 9
+# Scrapes metrics from ZeroTrustML nodes and exporters
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'zerotrustml-production'
+    phase: '9'
+
+# Alertmanager configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          # - alertmanager:9093
+
+# Load alerting rules
+rule_files:
+  - '/etc/prometheus/alerts/*.rules'
+
+# Scrape configurations
+scrape_configs:
+  # ZeroTrustML Node Metrics
+  - job_name: 'zerotrustml'
+    static_configs:
+      - targets:
+          - 'zerotrustml-node:9090'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: []
+        target_label: job
+        replacement: 'zerotrustml-node'
+
+  # PostgreSQL Exporter (optional - if postgres_exporter is added)
+  - job_name: 'postgres'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - source_labels: []
+        target_label: job
+        replacement: 'postgresql'
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets:
+          - 'localhost:9090'
+
+  # Node Exporter (system metrics - if added)
+  - job_name: 'node'
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+
+# Remote write configuration (optional - for long-term storage)
+# remote_write:
+#   - url: "https://prometheus-remote-storage.example.com/api/v1/write"
+#     basic_auth:
+#       username: zerotrustml
+#       password: <password>

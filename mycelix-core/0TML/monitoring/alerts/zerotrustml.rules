@@ -1,0 +1,98 @@
+groups:
+  - name: trustml_alerts
+    interval: 30s
+    rules:
+      # Node Health Alerts
+      - alert: NodeDown
+        expr: up{job="trustml"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "TrustML node {{ $labels.instance }} is down"
+          description: "Node has been down for more than 1 minute."
+
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="trustml"} > 14e9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 14GB: {{ $value | humanize }}B"
+
+      # Byzantine Detection Alerts
+      - alert: HighByzantineActivity
+        expr: rate(trustml_byzantine_detected_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Byzantine activity detected"
+          description: "Byzantine detection rate is {{ $value | humanizePercentage }} per second"
+
+      - alert: SybilAttackSuspected
+        expr: rate(trustml_byzantine_detected_total[1m]) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Possible Sybil attack in progress"
+          description: "Unusually high Byzantine detection rate: {{ $value | humanizePercentage }}"
+
+      # Database Alerts
+      - alert: DatabaseConnectionPoolExhausted
+        expr: trustml_db_connections_active >= trustml_db_connections_max
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Database connection pool exhausted"
+          description: "All {{ $value }} database connections are in use"
+
+      - alert: SlowDatabaseQueries
+        expr: histogram_quantile(0.95, trustml_db_query_duration_seconds) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow database queries detected"
+          description: "95th percentile query time: {{ $value | humanizeDuration }}"
+
+      # Performance Alerts
+      - alert: HighGradientAggregationLatency
+        expr: histogram_quantile(0.95, trustml_aggregation_duration_seconds) > 5.0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow gradient aggregation"
+          description: "95th percentile aggregation time: {{ $value | humanizeDuration }}"
+
+      - alert: LowGradientAcceptanceRate
+        expr: rate(trustml_gradients_accepted_total[5m]) / rate(trustml_gradients_submitted_total[5m]) < 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low gradient acceptance rate"
+          description: "Only {{ $value | humanizePercentage }} of gradients are being accepted"
+
+      # Credit System Alerts
+      - alert: CreditIssuanceStalled
+        expr: rate(trustml_credits_issued_total[10m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "No credits issued in 10 minutes"
+          description: "Credit issuance may be stalled"
+
+      - alert: HighTransactionFailureRate
+        expr: rate(trustml_transaction_failures_total[5m]) / rate(trustml_transaction_attempts_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High transaction failure rate"
+          description: "{{ $value | humanizePercentage }} of transactions are failing"

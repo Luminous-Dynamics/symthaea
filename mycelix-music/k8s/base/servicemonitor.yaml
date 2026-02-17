@@ -1,0 +1,104 @@
+---
+# ServiceMonitor for Prometheus Operator to scrape API metrics
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-metrics
+  labels:
+    app.kubernetes.io/name: mycelix-api
+    release: prometheus  # Match your Prometheus Operator release label
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mycelix-api
+  namespaceSelector:
+    matchNames:
+      - mycelix-music
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      honorLabels: true
+
+---
+# PrometheusRule for alerting
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: mycelix-alerts
+  labels:
+    app.kubernetes.io/name: mycelix-music
+    release: prometheus
+spec:
+  groups:
+    - name: mycelix.rules
+      rules:
+        # High error rate alert
+        - alert: MycelixHighErrorRate
+          expr: |
+            sum(rate(http_requests_total{job="mycelix-api",status=~"5.."}[5m]))
+            /
+            sum(rate(http_requests_total{job="mycelix-api"}[5m])) > 0.05
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High error rate on Mycelix API"
+            description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes"
+
+        # API latency alert
+        - alert: MycelixHighLatency
+          expr: |
+            histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{job="mycelix-api"}[5m])) by (le))
+            > 2
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency on Mycelix API"
+            description: "95th percentile latency is {{ $value }}s"
+
+        # Pod not ready
+        - alert: MycelixPodNotReady
+          expr: |
+            kube_pod_status_ready{namespace="mycelix-music",condition="true"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Mycelix pod not ready"
+            description: "Pod {{ $labels.pod }} has been not ready for 5 minutes"
+
+        # Indexer lag alert
+        - alert: MycelixIndexerLag
+          expr: |
+            mycelix_indexer_lag_blocks > 100
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Mycelix indexer is falling behind"
+            description: "Indexer is {{ $value }} blocks behind chain head"
+
+        # Database connection issues
+        - alert: MycelixDatabaseUnhealthy
+          expr: |
+            mycelix_health_check{component="database"} == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Mycelix database connection unhealthy"
+            description: "Database health check failing for 2 minutes"
+
+        # Redis connection issues
+        - alert: MycelixRedisUnhealthy
+          expr: |
+            mycelix_health_check{component="redis"} == 0
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Mycelix Redis connection unhealthy"
+            description: "Redis health check failing for 2 minutes"

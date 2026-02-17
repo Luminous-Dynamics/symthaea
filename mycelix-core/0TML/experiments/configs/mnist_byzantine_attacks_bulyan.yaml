@@ -1,0 +1,104 @@
+# Byzantine Attack Robustness Experiment - Bulyan-Specific
+# Tests all 7 attack types against Bulyan with theory-compliant Byzantine ratio
+#
+# Research Goal: Validate Bulyan's theoretical guarantees under f < n/3 constraint
+# With 10 clients, max safe f = 2 (20% Byzantine clients)
+#
+# Expected Results:
+# - Bulyan should successfully resist ALL attacks when f=2 < n/3
+# - This validates the theoretical safety guarantees
+# - Provides comparison data vs 30% Byzantine (high-stress) scenario
+
+experiment_name: "byzantine_bulyan_validation"
+description: "Bulyan defense testing with theory-compliant 20% Byzantine ratio"
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+data_split:
+  type: "iid"
+  num_clients: 10
+
+training:
+  num_rounds: 10  # ⚡ Quick validation
+  local_epochs: 1  # ⚡ Quick validation
+  batch_size: 32
+  learning_rate: 0.01
+
+# Federated learning configuration (required by runner.py)
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 10
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 2  # ✅ Theory-compliant: 2 < 10/3
+
+# Byzantine client configuration
+byzantine:
+  # Theory-compliant: f=2 < n/3 for Bulyan safety guarantees
+  # With 10 clients, 2 Byzantine = 20% (within theoretical bounds)
+  num_byzantine: 2  # ✅ CHANGED from 3 to 2
+
+  # Attack types to test (each will be a separate experiment run)
+  attack_types:
+    - gaussian_noise      # Baseline: random noise
+    - sign_flip           # Negate gradients (harder to detect)
+    - label_flip          # Train on corrupted labels (subtle)
+    - targeted_poison     # Backdoor-style attack (amplified gradients)
+    - model_replacement   # Send random weights (most obvious)
+    - adaptive            # Evade distance-based detection
+    - sybil               # Coordinated multi-client attack
+
+  # Attack severity (1.0 = standard, >1.0 = stronger)
+  severity: 1.0
+
+  # For attacks that need context (adaptive, sybil)
+  enable_peer_context: true
+
+baselines:
+  # ONLY test Bulyan (all other baselines removed)
+  - name: "bulyan"
+    params:
+      # Bulyan: Most robust (designed for f < n/3)
+      # Should resist all attacks when f=2 < 10/3=3.33 ✅
+      num_byzantine: 2  # ✅ CHANGED from 3 to 2
+
+# Model architecture (simple CNN for MNIST)
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+  architecture:
+    - conv2d: {in: 1, out: 32, kernel: 5}
+    - relu: {}
+    - maxpool2d: {kernel: 2}
+    - conv2d: {in: 32, out: 64, kernel: 5}
+    - relu: {}
+    - maxpool2d: {kernel: 2}
+    - flatten: {}
+    - linear: {in: 1024, out: 512}
+    - relu: {}
+    - linear: {in: 512, out: 10}
+
+device: "cuda"  # Use GPU for faster experiments
+
+# Results to save
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - attack_success_rate  # Measure of attack effectiveness
+
+  per_round: true
+  final_model: true
+  attack_analysis: true  # Generate attack effectiveness table
+
+# Experiment matrix:
+# 7 attack types × 1 baseline (Bulyan) = 7 runs
+# Estimated time: ~30-45 minutes on GPU

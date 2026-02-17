@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix-music
+  labels:
+    app.kubernetes.io/name: mycelix-music
+    app.kubernetes.io/managed-by: kustomize
+    # Pod Security Standards (Kubernetes 1.25+)
+    # Enforce restricted profile - most secure
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest

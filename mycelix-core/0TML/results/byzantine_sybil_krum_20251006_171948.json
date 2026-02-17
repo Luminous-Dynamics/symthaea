@@ -1,0 +1,345 @@
+{
+  "config": {
+    "baselines": [
+      {
+        "name": "krum",
+        "params": {
+          "num_byzantine": 3
+        }
+      }
+    ],
+    "byzantine": {
+      "attack_type": "sybil",
+      "attack_types": [
+        "gaussian_noise",
+        "sign_flip",
+        "label_flip",
+        "targeted_poison",
+        "model_replacement",
+        "adaptive",
+        "sybil"
+      ],
+      "enable_peer_context": true,
+      "num_byzantine": 3,
+      "severity": 1.0
+    },
+    "data_split": {
+      "num_clients": 10,
+      "type": "iid"
+    },
+    "dataset": {
+      "name": "mnist",
+      "num_test": 10000,
+      "num_train": 60000
+    },
+    "description": "Byzantine attack: sybil vs krum",
+    "device": "cuda",
+    "experiment_name": "byzantine_sybil_krum",
+    "federated": {
+      "batch_size": 32,
+      "fraction_clients": 1.0,
+      "learning_rate": 0.01,
+      "local_epochs": 1,
+      "num_byzantine": 3,
+      "num_clients": 10,
+      "num_rounds": 10
+    },
+    "model": {
+      "architecture": [
+        {
+          "conv2d": {
+            "in": 1,
+            "kernel": 5,
+            "out": 32
+          }
+        },
+        {
+          "relu": {}
+        },
+        {
+          "maxpool2d": {
+            "kernel": 2
+          }
+        },
+        {
+          "conv2d": {
+            "in": 32,
+            "kernel": 5,
+            "out": 64
+          }
+        },
+        {
+          "relu": {}
+        },
+        {
+          "maxpool2d": {
+            "kernel": 2
+          }
+        },
+        {
+          "flatten": {}
+        },
+        {
+          "linear": {
+            "in": 1024,
+            "out": 512
+          }
+        },
+        {
+          "relu": {}
+        },
+        {
+          "linear": {
+            "in": 512,
+            "out": 10
+          }
+        }
+      ],
+      "params": {
+        "num_classes": 10
+      },
+      "type": "simple_cnn"
+    },
+    "save": {
+      "attack_analysis": true,
+      "final_model": true,
+      "metrics": [
+        "train_loss",
+        "train_accuracy",
+        "test_loss",
+        "test_accuracy",
+        "attack_success_rate"
+      ],
+      "per_round": true
+    },
+    "training": {
+      "batch_size": 32,
+      "learning_rate": 0.01,
+      "local_epochs": 1,
+      "num_rounds": 10
+    }
+  },
+  "baselines": {
+    "krum": {
+      "rounds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "train_loss": [
+        1.3978312868387142,
+        0.48092281255633273,
+        0.3365804540350082,
+        0.26081806926571943,
+        0.2146467670223656,
+        0.194108614172945,
+        0.16011802655486193,
+        0.14850973467679418,
+        0.12749571406698607,
+        0.11381937201788768
+      ],
+      "train_accuracy": [
+        0.582,
+        0.8505,
+        0.8993333333333333,
+        0.9198333333333333,
+        0.935,
+        0.9431666666666667,
+        0.9481666666666667,
+        0.9556666666666667,
+        0.963,
+        0.9648333333333333
+      ],
+      "test_loss": [
+        0.5982888437117251,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.10967874213065297
+      ],
+      "test_accuracy": [
+        0.8028,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.9663
+      ]
+    }
+  },
+  "metadata": {
+    "start_time": "2025-10-06T17:16:43.877507",
+    "device": "cuda",
+    "end_time": "2025-10-06T17:19:48.866759"
+  },
+  "split_stats": {
+    "num_clients": 10,
+    "samples_per_client": [
+      6000,
+      6000,
+      6000,
+      6000,
+      6000,
+      6000,
+      6000,
+      6000,
+      6000,
+      6000
+    ],
+    "total_samples": 60000,
+    "min_samples": 6000,
+    "max_samples": 6000,
+    "mean_samples": 6000.0,
+    "class_distribution": [
+      [
+        624,
+        654,
+        572,
+        589,
+        580,
+        551,
+        580,
+        633,
+        585,
+        632
+      ],
+      [
+        551,
+        668,
+        602,
+        630,
+        596,
+        553,
+        597,
+        666,
+        575,
+        562
+      ],
+      [
+        630,
+        672,
+        585,
+        627,
+        550,
+        549,
+        610,
+        638,
+        570,
+        569
+      ],
+      [
+        559,
+        678,
+        563,
+        638,
+        608,
+        562,
+        629,
+        579,
+        575,
+        609
+      ],
+      [
+        592,
+        657,
+        598,
+        593,
+        596,
+        552,
+        606,
+        642,
+        551,
+        613
+      ],
+      [
+        600,
+        671,
+        625,
+        596,
+        553,
+        544,
+        582,
+        623,
+        630,
+        576
+      ],
+      [
+        590,
+        696,
+        609,
+        626,
+        644,
+        533,
+        545,
+        611,
+        574,
+        572
+      ],
+      [
+        605,
+        659,
+        588,
+        667,
+        576,
+        511,
+        562,
+        615,
+        587,
+        630
+      ],
+      [
+        583,
+        713,
+        627,
+        587,
+        555,
+        536,
+        598,
+        635,
+        579,
+        587
+      ],
+      [
+        589,
+        674,
+        589,
+        578,
+        584,
+        530,
+        609,
+        623,
+        625,
+        599
+      ]
+    ],
+    "class_imbalance": [
+      0.05253570214625479,
+      0.06788061415292129,
+      0.06570979970885452,
+      0.06252555033299943,
+      0.05285199460127625,
+      0.060909769331364244,
+      0.07656515018088988,
+      0.07335984369303596,
+      0.07802421276615214,
+      0.059146710249457946
+    ],
+    "mean_class_imbalance": 0.06495093471632064
+  }
+}

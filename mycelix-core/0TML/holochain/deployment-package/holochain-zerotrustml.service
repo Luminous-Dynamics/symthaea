@@ -1,0 +1,36 @@
+[Unit]
+Description=Holochain TrustML Conductor
+Documentation=https://developer.holochain.org/
+After=network.target
+
+[Service]
+Type=simple
+User=holochain
+Group=holochain
+WorkingDirectory=/opt/trustml/holochain
+
+# IMPORTANT: Update this path to match your installation
+# If using Nix: run "which holochain" to find the correct path
+# If using Cargo: /home/holochain/.cargo/bin/holochain
+ExecStart=/usr/bin/holochain --config-path /opt/trustml/holochain/conductor-config-minimal.yaml
+
+Restart=always
+RestartSec=10
+StartLimitBurst=5
+StartLimitInterval=300
+
+StandardOutput=append:/var/log/holochain/conductor.log
+StandardError=append:/var/log/holochain/conductor.error.log
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/holochain/trustml
+ReadWritePaths=/var/log/holochain
+
+LimitNOFILE=65535
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

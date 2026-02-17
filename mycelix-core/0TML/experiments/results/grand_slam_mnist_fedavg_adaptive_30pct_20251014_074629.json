@@ -1,0 +1,5 @@
+{
+  "error": "runner.run() returned None",
+  "final_accuracy": 0.0,
+  "byzantine_detection_rate": 0.0
+}

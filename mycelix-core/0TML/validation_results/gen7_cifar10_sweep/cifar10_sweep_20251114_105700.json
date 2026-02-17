@@ -1,0 +1,275 @@
+{
+  "experiment": "Gen7 CIFAR-10 Dataset Generalization Test",
+  "date": "2025-11-14T10:57:00.039244",
+  "seeds": [
+    101,
+    202,
+    303
+  ],
+  "byz_ratios": [
+    0.35,
+    0.4,
+    0.45,
+    0.5
+  ],
+  "attack": "sign_flip",
+  "aggregators": [
+    "aegis",
+    "aegis_gen7"
+  ],
+  "dataset_config": {
+    "n_clients": 50,
+    "noniid_alpha": 1.0,
+    "n_train": 2500,
+    "n_test": 500,
+    "seed": 42
+  },
+  "emnist_baseline": {
+    "0.35": 0.864,
+    "0.4": 0.867,
+    "0.45": 0.868,
+    "0.5": 0.869
+  },
+  "results": [
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.232,
+      "auc": 0.4760561342592593,
+      "wall_time": 1.897679090499878,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.314,
+      "auc": 1.0,
+      "wall_time": 10.440616607666016,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.204,
+      "auc": 0.4579716136144413,
+      "wall_time": 1.8079311847686768,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.31,
+      "auc": 1.0,
+      "wall_time": 9.807608842849731,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.156,
+      "auc": 0.4325701459034792,
+      "wall_time": 1.8298344612121582,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.31,
+      "auc": 1.0,
+      "wall_time": 10.017194271087646,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.5,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.086,
+      "auc": 0.45419185633001424,
+      "wall_time": 1.692852258682251,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.5,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.29,
+      "auc": 1.0,
+      "wall_time": 9.904560804367065,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.35,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.254,
+      "auc": 0.5399087519623234,
+      "wall_time": 2.8624966144561768,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.35,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.32,
+      "auc": 1.0,
+      "wall_time": 10.31105089187622,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.4,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.216,
+      "auc": 0.5009186532543292,
+      "wall_time": 1.6958305835723877,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.4,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.314,
+      "auc": 1.0,
+      "wall_time": 9.635433435440063,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.45,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.172,
+      "auc": 0.496111310915303,
+      "wall_time": 1.8345248699188232,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.45,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.322,
+      "auc": 1.0,
+      "wall_time": 9.60065507888794,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.5,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.13,
+      "auc": 0.5230929943100996,
+      "wall_time": 1.7008781433105469,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "byz_frac": 0.5,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.302,
+      "auc": 1.0,
+      "wall_time": 9.949164390563965,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.35,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.23,
+      "auc": 0.4693882513129741,
+      "wall_time": 1.974365472793579,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.35,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.302,
+      "auc": 1.0,
+      "wall_time": 10.430653095245361,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.4,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.162,
+      "auc": 0.4463965826098939,
+      "wall_time": 1.777158260345459,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.4,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.294,
+      "auc": 1.0,
+      "wall_time": 11.331400632858276,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.45,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.138,
+      "auc": 0.4312614750794859,
+      "wall_time": 2.453916072845459,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.45,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.298,
+      "auc": 1.0,
+      "wall_time": 13.26914930343628,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.5,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis",
+      "clean_acc": 0.152,
+      "auc": 0.49441825297989683,
+      "wall_time": 2.0879695415496826,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "byz_frac": 0.5,
+      "attack_type": "sign_flip",
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.296,
+      "auc": 1.0,
+      "wall_time": 12.198692083358765,
+      "status": "failed"
+    }
+  ]
+}

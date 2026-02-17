@@ -1,0 +1,43 @@
+---
+# Mycelix Music DNA
+# Zero-cost streaming through agent-centric architecture
+
+manifest_version: "0"
+name: mycelix_music
+integrity:
+  network_seed: ~
+  properties:
+    # Royalty distribution
+    platform_fee_rate: 0.03
+    artist_share: 0.70
+    label_share: 0.20
+
+  zomes:
+    - name: catalog_integrity
+      path: target/wasm32-unknown-unknown/release/catalog_integrity.wasm
+    - name: plays_integrity
+      path: target/wasm32-unknown-unknown/release/plays_integrity.wasm
+    - name: balances_integrity
+      path: target/wasm32-unknown-unknown/release/balances_integrity.wasm
+    - name: trust_integrity
+      path: target/wasm32-unknown-unknown/release/trust_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: catalog
+      path: target/wasm32-unknown-unknown/release/catalog.wasm
+      dependencies:
+        - name: catalog_integrity
+    - name: plays
+      path: target/wasm32-unknown-unknown/release/plays.wasm
+      dependencies:
+        - name: plays_integrity
+        - name: catalog_integrity
+    - name: balances
+      path: target/wasm32-unknown-unknown/release/balances.wasm
+      dependencies:
+        - name: balances_integrity
+    - name: trust
+      path: target/wasm32-unknown-unknown/release/trust.wasm
+      dependencies:
+        - name: trust_integrity

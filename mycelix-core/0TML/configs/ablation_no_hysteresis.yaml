@@ -1,0 +1,40 @@
+# Ablation Study: PoGQ v4.1 WITHOUT Hysteresis
+# ===============================================
+# Test impact of removing quarantine state persistence
+# Baseline: v4.1 uses k=2 violations, m=3 clears
+# Ablation: Immediate quarantine/release (k=1, m=1)
+
+experiment:
+  name: ablation_no_hysteresis
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1_no_hysteresis   # Immediate state transitions
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: 0.10
+  mondrian_enabled: true
+  mondrian_profiles: ["label", "norm", "direction"]
+  adaptive_hybrid: true
+  ema_beta: 0.85
+  hysteresis_k: 1               # ❌ DISABLED (immediate quarantine)
+  hysteresis_m: 1               # ❌ DISABLED (immediate release)
+
+statistics:
+  alpha: 0.10
+  margin: 0.02

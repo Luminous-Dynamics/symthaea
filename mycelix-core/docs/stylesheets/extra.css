@@ -1,0 +1,676 @@
+/* Mycelix Protocol - Custom Styling */
+
+/* ============================================================================
+   Enhanced Code Blocks with Copy Button
+   ============================================================================ */
+
+.highlight {
+    border-radius: 8px;
+    margin: 1.5em 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.highlight code {
+    font-size: 0.9em;
+    line-height: 1.6;
+}
+
+/* Enhanced copy button styling */
+.md-clipboard {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.25s;
+}
+
+.highlight:hover .md-clipboard {
+    opacity: 1;
+}
+
+.md-clipboard:hover {
+    background-color: rgba(103, 126, 234, 0.15) !important;
+}
+
+.md-clipboard:active {
+    background-color: rgba(103, 126, 234, 0.3) !important;
+}
+
+/* Success state for copy button */
+.md-clipboard--copied {
+    opacity: 1 !important;
+    color: #00e676 !important;
+}
+
+/* ============================================================================
+   Call-out Boxes
+   ============================================================================ */
+
+.admonition {
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin: 1.5em 0;
+}
+
+.admonition.tip {
+    border-left: 4px solid #00e676;
+}
+
+.admonition.warning {
+    border-left: 4px solid #ff9800;
+}
+
+.admonition.danger {
+    border-left: 4px solid #f44336;
+}
+
+.admonition.info {
+    border-left: 4px solid #2196f3;
+}
+
+/* ============================================================================
+   Tables
+   ============================================================================ */
+
+table {
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    margin: 1.5em 0;
+}
+
+thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+thead th {
+    padding: 12px;
+    font-weight: 600;
+}
+
+tbody tr:nth-child(even) {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+tbody td {
+    padding: 10px 12px;
+}
+
+/* ============================================================================
+   Navigation Breadcrumbs
+   ============================================================================ */
+
+.md-path {
+    font-size: 0.85em;
+    color: var(--md-default-fg-color--light);
+    margin-bottom: 1em;
+}
+
+.md-path a {
+    color: var(--md-accent-fg-color);
+    text-decoration: none;
+}
+
+.md-path a:hover {
+    text-decoration: underline;
+}
+
+/* ============================================================================
+   Headers with Anchors
+   ============================================================================ */
+
+h1, h2, h3, h4 {
+    position: relative;
+}
+
+.headerlink {
+    opacity: 0;
+    transition: opacity 0.2s;
+    margin-left: 0.5em;
+}
+
+h1:hover .headerlink,
+h2:hover .headerlink,
+h3:hover .headerlink,
+h4:hover .headerlink {
+    opacity: 0.5;
+}
+
+.headerlink:hover {
+    opacity: 1 !important;
+}
+
+/* ============================================================================
+   Mermaid Diagrams
+   ============================================================================ */
+
+.mermaid {
+    background-color: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 1.5em 0;
+    overflow-x: auto;
+}
+
+[data-md-color-scheme="light"] .mermaid {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* ============================================================================
+   Tutorial Styling
+   ============================================================================ */
+
+.tutorial-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin: 1.5em 0;
+}
+
+.tutorial-header h2 {
+    color: white;
+    margin-top: 0;
+}
+
+/* ============================================================================
+   Code Examples with Highlights
+   ============================================================================ */
+
+code.language-python mark,
+code.language-javascript mark {
+    background-color: rgba(255, 235, 59, 0.3);
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+/* ============================================================================
+   Search Improvements
+   ============================================================================ */
+
+.md-search__scrollwrap {
+    max-height: 60vh;
+}
+
+.md-search-result__article {
+    padding: 12px;
+    border-radius: 6px;
+}
+
+.md-search-result__article:hover {
+    background-color: rgba(103, 126, 234, 0.1);
+}
+
+/* ============================================================================
+   Footer Navigation
+   ============================================================================ */
+
+.md-footer__link {
+    padding: 16px;
+}
+
+.md-footer__title {
+    font-size: 0.9em;
+    font-weight: 600;
+}
+
+/* ============================================================================
+   TOC Styling
+   ============================================================================ */
+
+.md-nav__item--active > .md-nav__link {
+    font-weight: 600;
+    color: var(--md-accent-fg-color);
+}
+
+.md-nav__link:hover {
+    color: var(--md-accent-fg-color);
+}
+
+/* ============================================================================
+   Badges and Tags
+   ============================================================================ */
+
+.badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: 600;
+    margin: 0 4px;
+}
+
+.badge-success {
+    background-color: #c6f6d5;
+    color: #22543d;
+}
+
+.badge-warning {
+    background-color: #feebc8;
+    color: #7c2d12;
+}
+
+.badge-info {
+    background-color: #bee3f8;
+    color: #2c5282;
+}
+
+.badge-research {
+    background-color: #e9d8fd;
+    color: #44337a;
+}
+
+/* ============================================================================
+   Performance Metrics Tables
+   ============================================================================ */
+
+.metrics-table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.metrics-table th {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    text-align: left;
+    padding: 12px;
+}
+
+.metrics-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.metrics-table tr:hover {
+    background-color: rgba(103, 126, 234, 0.05);
+}
+
+.metric-value {
+    font-weight: 700;
+    color: #667eea;
+    font-size: 1.1em;
+}
+
+.metric-improvement {
+    color: #00e676;
+    font-weight: 600;
+}
+
+/* ============================================================================
+   Announcement Bar
+   ============================================================================ */
+
+.md-announce {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.md-announce__inner {
+    color: white;
+    font-weight: 500;
+}
+
+/* ============================================================================
+   Responsive Improvements
+   ============================================================================ */
+
+@media screen and (max-width: 76.1875em) {
+    .md-nav--primary .md-nav__title {
+        background-color: var(--md-primary-fg-color);
+    }
+}
+
+@media screen and (max-width: 44.9375em) {
+    .highlight {
+        margin: 1em -0.8rem;
+        border-radius: 0;
+    }
+
+    table {
+        font-size: 0.85em;
+    }
+
+    /* Mobile-optimized interactive widgets */
+    .interactive-widget {
+        padding: 16px;
+        margin: 16px -0.8rem;
+        border-radius: 0;
+    }
+
+    .widget-controls {
+        gap: 12px;
+    }
+
+    .control-group {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .control-group label {
+        min-width: auto;
+        font-size: 0.9em;
+    }
+
+    .control-group input[type="range"] {
+        width: 100%;
+    }
+
+    .widget-results {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .result-card {
+        padding: 12px;
+    }
+
+    .widget-visualization canvas {
+        max-width: 100%;
+        height: auto !important;
+        width: 100% !important;
+    }
+
+    .widget-button {
+        width: 100%;
+        padding: 14px 20px;
+        font-size: 1em;
+    }
+
+    #simulation-log {
+        max-height: 150px;
+        font-size: 0.8em;
+    }
+
+    .attack-grid {
+        grid-template-columns: 1fr;
+    }
+
+    /* Mobile-friendly back to top button */
+    #back-to-top {
+        bottom: 20px !important;
+        right: 20px !important;
+        width: 45px !important;
+        height: 45px !important;
+        font-size: 20px !important;
+    }
+
+    /* Mobile copy button adjustments */
+    .md-clipboard {
+        opacity: 1 !important; /* Always visible on mobile */
+        top: 4px;
+        right: 4px;
+    }
+}
+
+/* ============================================================================
+   Interactive Widgets
+   ============================================================================ */
+
+.interactive-widget {
+    background: rgba(103, 126, 234, 0.05);
+    border: 2px solid rgba(103, 126, 234, 0.3);
+    border-radius: 12px;
+    padding: 24px;
+    margin: 24px 0;
+    /* Touch-friendly improvements */
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.interactive-widget h3 {
+    margin-top: 0;
+    color: var(--md-accent-fg-color);
+}
+
+.widget-controls {
+    display: grid;
+    gap: 16px;
+    margin: 20px 0;
+}
+
+.control-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.control-group label {
+    min-width: 180px;
+    font-weight: 600;
+}
+
+.control-group input[type="range"] {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(103, 126, 234, 0.2);
+    outline: none;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    /* Touch-friendly larger tap target */
+    box-shadow: 0 2px 8px rgba(103, 126, 234, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.control-group input[type="range"]::-webkit-slider-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(103, 126, 234, 0.6);
+}
+
+.control-group input[type="range"]::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: #667eea;
+    cursor: pointer;
+    /* Touch-friendly larger tap target */
+    box-shadow: 0 2px 8px rgba(103, 126, 234, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+    border: none;
+}
+
+.control-group input[type="range"]::-moz-range-thumb:hover {
+    transform: scale(1.2);
+    box-shadow: 0 4px 12px rgba(103, 126, 234, 0.6);
+}
+
+.control-group span {
+    min-width: 60px;
+    font-weight: 700;
+    color: var(--md-accent-fg-color);
+}
+
+.widget-results {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin: 24px 0;
+}
+
+.result-card {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 16px;
+    text-align: center;
+}
+
+.result-card h4 {
+    margin: 0 0 8px 0;
+    font-size: 0.9em;
+    color: var(--md-default-fg-color--light);
+}
+
+.result-value {
+    font-size: 1.8em;
+    font-weight: 700;
+    color: var(--md-accent-fg-color);
+}
+
+.widget-visualization {
+    margin: 24px 0;
+    display: flex;
+    justify-content: center;
+}
+
+.widget-visualization canvas {
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.widget-explanation {
+    margin-top: 20px;
+    padding: 16px;
+    background: rgba(255, 193, 7, 0.1);
+    border-left: 4px solid #ffc107;
+    border-radius: 4px;
+}
+
+.widget-button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    /* Touch-friendly minimum size (44x44px is WCAG standard) */
+    min-height: 44px;
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.widget-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(103, 126, 234, 0.4);
+}
+
+.widget-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+#simulation-log {
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    padding: 16px;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: monospace;
+    font-size: 0.9em;
+}
+
+.attack-grid {
+    display: grid;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.attack-card {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.attack-card:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.attack-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    opacity: 0.3;
+    transition: width 0.3s;
+}
+
+.attack-info {
+    position: relative;
+    z-index: 1;
+}
+
+.attack-info h4 {
+    margin: 0 0 8px 0;
+}
+
+.attack-info p {
+    margin: 4px 0;
+    font-size: 0.9em;
+}
+
+.attack-details {
+    margin-top: 20px;
+    padding: 16px;
+    background: rgba(103, 126, 234, 0.1);
+    border-radius: 8px;
+    min-height: 60px;
+}
+
+/* ============================================================================
+   Edit Page Action
+   ============================================================================ */
+
+.md-content__button {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white !important;
+    border-radius: 6px;
+    padding: 8px 16px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(103, 126, 234, 0.3);
+}
+
+.md-content__button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(103, 126, 234, 0.5);
+    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+}
+
+.md-content__button svg {
+    fill: white !important;
+}
+
+/* ============================================================================
+   Print Styles
+   ============================================================================ */
+
+@media print {
+    .md-header,
+    .md-nav,
+    .md-footer,
+    .md-sidebar {
+        display: none !important;
+    }
+
+    .md-content {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    pre, .highlight {
+        border: 1px solid #ddd;
+        page-break-inside: avoid;
+    }
+
+    .interactive-widget {
+        display: none !important;
+    }
+}

@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: zerotrustml-metrics
+  labels:
+    app: zerotrustml
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: zerotrustml
+      component: node
+  endpoints:
+  - port: metrics
+    interval: 15s
+    path: /metrics
+    scheme: http

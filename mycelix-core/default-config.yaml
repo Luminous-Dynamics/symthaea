@@ -1,0 +1,13 @@
+warning: Git tree '/srv/luminous-dynamics' is dirty
+🍄 Holochain Mycelix Development Environment
+✅ Holochain holochain 0.6.0-dev.23
+✅ hc holochain_cli 0.6.0-dev.23
+
+Commands:
+  holochain -c conductor-config.yaml  - Start conductor
+  hc app pack ./happ                  - Build hApp
+  hc app install                      - Install hApp
+[1;34mhc-conductor-config:[0m Admin port set to: 0
+[1;34mhc-conductor-config:[0m Config ConductorConfig { tracing_override: None, data_root_path: Some(DataRootPath("/srv/luminous-dynamics/Mycelix-Core/vvW4f-8TzzK1Da9peqIM3")), keystore: LairServerInProc { lair_root: Some(KeystorePath("/srv/luminous-dynamics/Mycelix-Core/vvW4f-8TzzK1Da9peqIM3/ks")) }, admin_interfaces: Some([AdminInterfaceConfig { driver: Websocket { port: 0, danger_bind_addr: None, allowed_origins: Any } }]), network: NetworkConfig { base64_auth_material: None, bootstrap_url: Url2 { url: "https://dev-test-bootstrap2.holochain.org/" }, signal_url: Url2 { url: "wss://dev-test-bootstrap2.holochain.org/" }, webrtc_config: None, target_arc_factor: 1, report: None, advanced: None }, request_timeout_s: 60, db_sync_strategy: Resilient, tuning_params: None, tracing_scope: None }
+[1;34mhc-conductor-config:[0m Created directory at: [1;4;48;5;254;38;5;4m/srv/luminous-dynamics/Mycelix-Core/vvW4f-8TzzK1Da9peqIM3[0m [1mKeep this path to rerun the same sandbox.[0m It has also been saved to a file called `.hc` in your current working directory.
+[1;34mhc-conductor-config:[0m Created config at /srv/luminous-dynamics/Mycelix-Core/vvW4f-8TzzK1Da9peqIM3/conductor-config.yaml

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  labels:
+    app.kubernetes.io/name: mycelix-api
+data:
+  ceramic-url: "http://ceramic:7007"
+  ipfs-api-url: "http://ipfs:5001"
+  rpc-url: "https://rpc.gnosischain.com"
+  router-address: ""
+  flow-token-address: ""

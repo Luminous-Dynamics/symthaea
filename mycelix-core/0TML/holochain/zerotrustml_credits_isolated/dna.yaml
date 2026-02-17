@@ -1,0 +1,9 @@
+---
+manifest_version: "1"
+name: zerotrustml_credits
+integrity:
+  zomes:
+    - name: zerotrustml_credits_integrity
+      bundled: "target/wasm32-unknown-unknown/release/zerotrustml_credits_isolated.wasm"
+coordinator:
+  zomes: []

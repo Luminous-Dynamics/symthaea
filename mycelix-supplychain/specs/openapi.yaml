@@ -1,0 +1,603 @@
+openapi: 3.0.3
+info:
+  title: Mycelix SupplyChain API
+  version: 0.4.0
+  description: |
+    Verifiable supply-chain provenance API. Convert ERP/IoT events into signed
+    DKG claims and portable VCs with lineage proofs.
+
+    Version 0.4.0 adds:
+    - Batch event ingestion (up to 100 events per request)
+    - Lineage query endpoints (upstream/downstream traversal)
+    - Advanced search and filtering with pagination
+    - Performance optimizations with database indexes
+  contact:
+    name: Luminous Dynamics
+    url: https://github.com/Luminous-Dynamics/mycelix-supplychain
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://api.mycelix.example.com
+    description: Production (example)
+
+tags:
+  - name: events
+    description: Supply chain event ingestion
+  - name: claims
+    description: DKG claim resolution and lineage
+  - name: verification
+    description: VC and lineage verification
+  - name: health
+    description: Service health and status
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      tags: [health]
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: 0.1.0
+
+  /v1/events:
+    post:
+      summary: Ingest a supply-chain event
+      tags: [events]
+      description: |
+        Submit a supply chain event (PRODUCED, TRANSFORMED, SHIPPED, RECEIVED, CERTIFIED).
+        The service will create a Verifiable Credential, sign it, create a DKG claim with
+        lineage links, and return the claim ID and VC.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SupplyEvent'
+            examples:
+              produced:
+                summary: Batch produced
+                externalValue: './examples/batch_produced.json'
+              shipped:
+                summary: Shipment departed
+                externalValue: './examples/shipment_departed.json'
+      responses:
+        '201':
+          description: Event processed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [vc_jwt, claim_id, lineage_hash]
+                properties:
+                  vc_jwt:
+                    type: string
+                    description: Signed Verifiable Credential (JWT format)
+                  claim_id:
+                    type: string
+                    description: DKG claim identifier
+                  lineage_hash:
+                    type: string
+                    description: Hash linking to previous claims
+                  previous_claims:
+                    type: array
+                    items:
+                      type: string
+                    description: IDs of parent claims in lineage
+        '400':
+          description: Invalid event data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/events/batch:
+    post:
+      summary: Ingest multiple events in a batch
+      tags: [events]
+      description: |
+        High-volume batch ingestion supporting up to 100 events per request.
+        Supports two processing modes:
+        - **best-effort**: Process all valid events, return partial results (default)
+        - **atomic**: All events must succeed or entire batch fails
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [events]
+              properties:
+                events:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/SupplyEvent'
+                  minItems: 1
+                  maxItems: 100
+                  description: Array of supply chain events to process
+                mode:
+                  type: string
+                  enum: [best-effort, atomic]
+                  default: best-effort
+                  description: Processing mode (best-effort or atomic)
+            examples:
+              best_effort:
+                summary: Best-effort batch processing
+                value:
+                  events:
+                    - "@context": ["https://www.w3.org/2018/credentials/v1"]
+                      type: ["VerifiableCredential"]
+                      issuer: "did:mycelix:org:factory-a"
+                      issuanceDate: "2025-11-16T10:00:00Z"
+                      credentialSubject:
+                        eventType: "PRODUCED"
+                        productId: "SKU-001"
+                        batchId: "BATCH-001"
+                        quantity: 1000
+                        unit: "kg"
+                        facility:
+                          id: "FAC-A"
+                          name: "Factory A"
+                        timestamp: "2025-11-16T10:00:00Z"
+                  mode: "best-effort"
+      responses:
+        '201':
+          description: Batch processed (may include partial failures in best-effort mode)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResponse'
+        '400':
+          description: Invalid batch request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Atomic mode failure (all events rolled back)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/claims/{id}:
+    get:
+      summary: Resolve DKG claim and lineage
+      tags: [claims]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: Claim ID
+        - in: query
+          name: include_lineage
+          schema:
+            type: boolean
+            default: true
+          description: Include full lineage tree
+      responses:
+        '200':
+          description: Claim resolved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [claim, lineage]
+                properties:
+                  claim:
+                    $ref: '#/components/schemas/Claim'
+                  lineage:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Claim'
+                    description: Ancestor claims in chronological order
+        '404':
+          description: Claim not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /v1/batches/{batchId}/claims:
+    get:
+      summary: Get all claims for a specific batch
+      tags: [claims]
+      description: |
+        Retrieve all claims (events) associated with a batch ID.
+        Results are sorted by timestamp (newest first).
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+          description: Batch identifier
+          example: "BATCH-2025-001"
+      responses:
+        '200':
+          description: Batch claims retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchClaimsResponse'
+
+  /v1/lineage/{batchId}:
+    get:
+      summary: Get complete lineage graph for a batch
+      tags: [claims]
+      description: |
+        Retrieve full upstream (sources) and downstream (derivatives) lineage for a batch.
+        Traverses the entire supply chain graph to show all source materials and derived products.
+      parameters:
+        - in: path
+          name: batchId
+          required: true
+          schema:
+            type: string
+          description: Batch identifier
+          example: "BATCH-ASM-001"
+      responses:
+        '200':
+          description: Lineage graph retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineageResponse'
+
+  /v1/claims:
+    get:
+      summary: Search and filter claims
+      tags: [claims]
+      description: |
+        Search claims with multiple filter criteria and pagination.
+        Results are sorted by timestamp (newest first).
+      parameters:
+        - in: query
+          name: product_id
+          schema:
+            type: string
+          description: Filter by product ID
+        - in: query
+          name: batch_id
+          schema:
+            type: string
+          description: Filter by batch ID
+        - in: query
+          name: facility_id
+          schema:
+            type: string
+          description: Filter by facility ID
+        - in: query
+          name: event_type
+          schema:
+            type: string
+            enum: [PRODUCED, TRANSFORMED, SHIPPED, RECEIVED, CERTIFIED]
+          description: Filter by event type
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+          description: Start of date range (ISO 8601)
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+          description: End of date range (ISO 8601)
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 1000
+          description: Maximum results per page
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+          description: Number of results to skip
+      responses:
+        '200':
+          description: Claims retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+
+  /v1/verify:
+    post:
+      summary: Verify VC signature and lineage
+      tags: [verification]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vc_jwt]
+              properties:
+                vc_jwt:
+                  type: string
+                  description: The VC JWT to verify
+                expected_product_id:
+                  type: string
+                  description: Optional product ID to validate against
+                check_lineage:
+                  type: boolean
+                  default: true
+                  description: Also verify lineage integrity
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [valid, signature_valid]
+                properties:
+                  valid:
+                    type: boolean
+                    description: Overall validity
+                  signature_valid:
+                    type: boolean
+                    description: Signature check result
+                  lineage_valid:
+                    type: boolean
+                    description: Lineage integrity check
+                  issuer:
+                    type: string
+                    description: DID of issuer
+                  errors:
+                    type: array
+                    items:
+                      type: string
+                    description: Validation errors if any
+
+components:
+  schemas:
+    SupplyEvent:
+      type: object
+      required: ['@context', 'type', 'issuer', 'issuanceDate', 'credentialSubject']
+      properties:
+        '@context':
+          type: array
+          items:
+            type: string
+          example: ['https://www.w3.org/2018/credentials/v1']
+        type:
+          type: array
+          items:
+            type: string
+          example: ['VerifiableCredential', 'SupplyChainEvent']
+        issuer:
+          type: string
+          description: DID of the issuer
+          example: 'did:mycelix:org:acme-corp'
+        issuanceDate:
+          type: string
+          format: date-time
+        credentialSubject:
+          type: object
+          required: [eventType, productId, batchId, quantity, unit, facility]
+          properties:
+            eventType:
+              type: string
+              enum: [PRODUCED, TRANSFORMED, SHIPPED, RECEIVED, CERTIFIED]
+            productId:
+              type: string
+              example: 'SKU-12345'
+            batchId:
+              type: string
+              example: 'BATCH-2025-001'
+            prevBatchIds:
+              type: array
+              items:
+                type: string
+              description: Parent batches (for TRANSFORMED events)
+            quantity:
+              type: number
+              example: 1000
+            unit:
+              type: string
+              example: 'kg'
+            facility:
+              type: object
+              required: [id, name]
+              properties:
+                id:
+                  type: string
+                name:
+                  type: string
+                location:
+                  type: object
+                  properties:
+                    lat:
+                      type: number
+                    lon:
+                      type: number
+            timestamp:
+              type: string
+              format: date-time
+            metadata:
+              type: object
+              additionalProperties: true
+
+    Claim:
+      type: object
+      properties:
+        id:
+          type: string
+        vc_jwt:
+          type: string
+        lineage_hash:
+          type: string
+        previous_claims:
+          type: array
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+
+    BatchResponse:
+      type: object
+      required: [total, succeeded, failed, results, duration_ms]
+      properties:
+        total:
+          type: integer
+          description: Total number of events in batch
+          example: 10
+        succeeded:
+          type: integer
+          description: Number of successfully processed events
+          example: 8
+        failed:
+          type: integer
+          description: Number of failed events
+          example: 2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchResult'
+        duration_ms:
+          type: integer
+          description: Processing duration in milliseconds
+          example: 245
+
+    BatchResult:
+      type: object
+      required: [index, status]
+      properties:
+        index:
+          type: integer
+          description: Index of event in request array
+        status:
+          type: string
+          enum: [success, error]
+        claim_id:
+          type: string
+          description: Claim ID (present on success)
+        vc_jwt:
+          type: string
+          description: VC JWT (present on success)
+        lineage_hash:
+          type: string
+          description: Lineage hash (present on success)
+        error:
+          type: string
+          description: Error message (present on failure)
+
+    BatchClaimsResponse:
+      type: object
+      required: [batch_id, claims, total_claims]
+      properties:
+        batch_id:
+          type: string
+          description: Batch identifier
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+          description: All claims for this batch
+        total_claims:
+          type: integer
+          description: Total number of claims
+
+    LineageResponse:
+      type: object
+      required: [batch_id, claims, total_claims, depth]
+      properties:
+        batch_id:
+          type: string
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+          description: Claims for the queried batch
+        upstream:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineageBatch'
+          description: Source batches (raw materials)
+        downstream:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineageBatch'
+          description: Derived batches (transformed products)
+        total_claims:
+          type: integer
+        depth:
+          type: integer
+          description: Maximum lineage depth (transformation levels)
+
+    LineageBatch:
+      type: object
+      required: [batch_id, claim_count, depth]
+      properties:
+        batch_id:
+          type: string
+        claim_count:
+          type: integer
+          description: Number of claims in this batch
+        depth:
+          type: integer
+          description: Distance from queried batch
+
+    SearchResponse:
+      type: object
+      required: [claims, total, limit, offset, has_more]
+      properties:
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/Claim'
+        total:
+          type: integer
+          description: Total matching claims (all pages)
+        limit:
+          type: integer
+          description: Page size
+        offset:
+          type: integer
+          description: Starting index
+        has_more:
+          type: boolean
+          description: Whether more results exist
+
+    Error:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

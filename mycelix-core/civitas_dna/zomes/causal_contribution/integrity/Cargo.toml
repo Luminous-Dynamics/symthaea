@@ -1,0 +1,23 @@
+[package]
+name = "causal_contribution_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Integrity zome for Causal Contribution - Entry types and validation for ZK-verified contributions"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Holochain 0.6 - Integrity zomes use hdi
+hdi = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+holochain_serialized_bytes = "0.0.56"
+# Enable wasm support for getrandom (transitive dependencies)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'

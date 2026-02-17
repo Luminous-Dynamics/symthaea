@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                COUNT(DISTINCT product_id) as unique_products,\n                COALESCE(SUM(quantity_on_hand), 0) as total_quantity\n            FROM inv_stock_levels\n            WHERE tenant_id = $1 AND warehouse_id = $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "unique_products",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "total_quantity",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      null,
+      null
+    ]
+  },
+  "hash": "682369b8ae243d7836b2fc02f230c28d4f3bb3609f92bf9d453d014c7ef63279"
+}

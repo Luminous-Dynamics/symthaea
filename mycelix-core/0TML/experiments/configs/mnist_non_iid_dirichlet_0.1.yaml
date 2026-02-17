@@ -1,0 +1,51 @@
+# Non-IID Experiment: Dirichlet Distribution (Highly Non-IID)
+# Alpha = 0.1 means each client has very skewed label distribution
+# Expected: FedAvg struggles, SCAFFOLD excels
+
+experiment_name: "mnist_non_iid_dirichlet_0.1"
+output_dir: "results/non_iid"
+
+dataset:
+  name: "mnist"
+  data_dir: "datasets"
+
+model:
+  architecture: "simple_cnn"
+  params:
+    num_classes: 10
+
+data_split:
+  type: "dirichlet"
+  alpha: 0.1  # Highly non-IID (lower = more heterogeneous)
+  seed: 42
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 1
+  fraction_clients: 1.0  # Use all clients each round
+
+training:
+  num_rounds: 150  # Non-IID needs more rounds than IID
+  eval_every: 10
+  device: "cuda"  # GPU acceleration
+
+baselines:
+  - fedavg     # Baseline - expected to struggle
+  - fedprox    # Proximal term helps with heterogeneity
+  - scaffold   # Control variates - should excel here
+  - krum       # Byzantine-robust (for comparison)
+  - multikrum  # Multi-gradient averaging
+
+# Expected Results:
+# - FedAvg: Slower convergence, ~95% final accuracy
+# - FedProx: 5-10% better than FedAvg
+# - SCAFFOLD: 3-4x faster convergence, ~98% accuracy
+# - Krum/Multi-Krum: Stable but slower
+
+# Key Metrics to Track:
+# - Convergence speed (rounds to 95% accuracy)
+# - Final test accuracy
+# - Per-client accuracy variance (should be higher than IID)
+# - Communication cost

@@ -1,0 +1,29 @@
+[package]
+name = "mycelix-analysis"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Advanced ML-based music analysis for Mycelix Music Platform"
+
+[dependencies]
+mycelix-audio = { path = "../mycelix-audio" }
+
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+rayon.workspace = true
+num-traits.workspace = true
+
+uuid.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

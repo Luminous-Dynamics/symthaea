@@ -1,0 +1,200 @@
+{
+  "$id": "https://mycelix.org/schemas/vc.supplyEvent.v1.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Supply Chain Event Verifiable Credential",
+  "description": "Schema for supply chain event VCs (PRODUCED, TRANSFORMED, SHIPPED, RECEIVED, CERTIFIED)",
+  "type": "object",
+  "required": ["@context", "type", "issuer", "issuanceDate", "credentialSubject"],
+  "properties": {
+    "@context": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "description": "JSON-LD context URIs"
+    },
+    "type": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "contains": {
+        "const": "VerifiableCredential"
+      },
+      "description": "Must include VerifiableCredential"
+    },
+    "issuer": {
+      "type": "string",
+      "pattern": "^did:",
+      "description": "DID of the issuing organization"
+    },
+    "issuanceDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the credential was issued (ISO 8601)"
+    },
+    "expirationDate": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Optional expiration date"
+    },
+    "credentialSubject": {
+      "type": "object",
+      "required": ["eventType", "productId", "batchId", "quantity", "unit", "facility", "timestamp"],
+      "properties": {
+        "eventType": {
+          "type": "string",
+          "enum": ["PRODUCED", "TRANSFORMED", "SHIPPED", "RECEIVED", "CERTIFIED"],
+          "description": "Type of supply chain event"
+        },
+        "productId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "SKU or product identifier"
+        },
+        "batchId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique batch/lot identifier"
+        },
+        "prevBatchIds": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Parent batches (required for TRANSFORMED events)"
+        },
+        "quantity": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Quantity of product"
+        },
+        "unit": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unit of measurement (kg, pieces, liters, etc.)"
+        },
+        "facility": {
+          "type": "object",
+          "required": ["id", "name"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Unique facility identifier"
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable facility name"
+            },
+            "location": {
+              "type": "object",
+              "properties": {
+                "lat": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "lon": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                },
+                "address": {
+                  "type": "string"
+                },
+                "country": {
+                  "type": "string",
+                  "pattern": "^[A-Z]{2}$",
+                  "description": "ISO 3166-1 alpha-2 country code"
+                }
+              }
+            }
+          }
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the event occurred (ISO 8601)"
+        },
+        "shipment": {
+          "type": "object",
+          "description": "Additional fields for SHIPPED/RECEIVED events",
+          "properties": {
+            "shipmentId": {
+              "type": "string"
+            },
+            "carrier": {
+              "type": "string"
+            },
+            "trackingNumber": {
+              "type": "string"
+            },
+            "origin": {
+              "type": "string"
+            },
+            "destination": {
+              "type": "string"
+            }
+          }
+        },
+        "certification": {
+          "type": "object",
+          "description": "Additional fields for CERTIFIED events",
+          "properties": {
+            "certType": {
+              "type": "string",
+              "description": "Type of certification (Organic, FairTrade, ISO9001, etc.)"
+            },
+            "certBody": {
+              "type": "string",
+              "description": "Certifying body"
+            },
+            "certId": {
+              "type": "string",
+              "description": "Certificate identifier"
+            },
+            "validFrom": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "validUntil": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "description": "Additional custom fields",
+          "additionalProperties": true
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "description": "Cryptographic proof (added by signing process)",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "created": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "verificationMethod": {
+          "type": "string"
+        },
+        "proofPurpose": {
+          "type": "string"
+        },
+        "jws": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

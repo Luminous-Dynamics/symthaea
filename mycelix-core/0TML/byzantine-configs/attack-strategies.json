@@ -1,0 +1,116 @@
+{
+  "byzantine_configuration": {
+    "total_nodes": 20,
+    "honest_nodes": 12,
+    "byzantine_nodes": 8,
+    "byzantine_percentage": 40,
+    "exceeds_classical_bft": true,
+    "classical_bft_limit": 33
+  },
+  "node_assignments": {
+    "honest": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    "byzantine": [12, 13, 14, 15, 16, 17, 18, 19]
+  },
+  "attack_strategies": {
+    "label_flipping": {
+      "nodes": [12, 13],
+      "description": "Train on CIFAR-10 with flipped labels",
+      "implementation": "poisoned_labels = 9 - true_labels",
+      "severity": "medium",
+      "detectability": "high"
+    },
+    "gradient_reversal": {
+      "nodes": [14, 15],
+      "description": "Reverse gradient direction to prevent convergence",
+      "implementation": "poisoned_gradient = -1.0 * honest_gradient",
+      "severity": "high",
+      "detectability": "high"
+    },
+    "random_noise": {
+      "nodes": [16, 17],
+      "description": "Inject Gaussian noise with high variance",
+      "implementation": "poisoned_gradient = torch.randn_like(honest_gradient) * 100",
+      "severity": "medium",
+      "detectability": "medium"
+    },
+    "sybil_coordination": {
+      "nodes": [18, 19],
+      "description": "Coordinated Byzantine nodes submit identical bad gradients",
+      "implementation": "synchronized_attack = True",
+      "severity": "critical",
+      "detectability": "low"
+    }
+  },
+  "validation_rules": {
+    "1_dimension_validation": {
+      "enabled": true,
+      "threshold": "exact_match",
+      "targets": ["gradient_reversal", "random_noise"]
+    },
+    "2_magnitude_bounds": {
+      "enabled": true,
+      "threshold": "3_sigma",
+      "targets": ["gradient_reversal", "random_noise"]
+    },
+    "3_statistical_outlier": {
+      "enabled": true,
+      "method": "PoGQ",
+      "threshold": 0.35,
+      "targets": ["all"]
+    },
+    "4_temporal_consistency": {
+      "enabled": true,
+      "window_size": 3,
+      "targets": ["gradient_reversal", "sybil_coordination"]
+    },
+    "5_reputation_scoring": {
+      "enabled": true,
+      "method": "RB-BFT",
+      "decay_rate": 0.2,
+      "threshold": 0.3,
+      "targets": ["all"]
+    },
+    "6_cross_validation": {
+      "enabled": true,
+      "consensus_method": "median",
+      "threshold": "2_sigma",
+      "targets": ["label_flipping", "sybil_coordination"]
+    },
+    "7_gradient_noise": {
+      "enabled": true,
+      "entropy_threshold": 0.9,
+      "targets": ["random_noise"]
+    },
+    "8_pattern_anomaly": {
+      "enabled": true,
+      "method": "ml_based",
+      "targets": ["label_flipping", "sybil_coordination"]
+    }
+  },
+  "test_scenarios": {
+    "scenario_1_baseline_40pct": {
+      "byzantine_percentage": 40,
+      "rounds": 10,
+      "dataset": "CIFAR-10",
+      "metrics": ["detection_rate", "false_positive_rate", "convergence"]
+    },
+    "scenario_2_progressive": {
+      "byzantine_percentages": [0, 10, 20, 30, 40, 50],
+      "rounds_per_level": 5,
+      "dataset": "CIFAR-10",
+      "metrics": ["bft_threshold", "recovery_time"]
+    },
+    "scenario_3_sybil": {
+      "byzantine_percentage": 40,
+      "all_coordinated": true,
+      "rounds": 10,
+      "metrics": ["cluster_detection", "consensus_resilience"]
+    },
+    "scenario_4_adaptive": {
+      "byzantine_percentage": 40,
+      "strategy_evolution": true,
+      "rounds": 15,
+      "metrics": ["temporal_detection", "reputation_impact"]
+    }
+  }
+}

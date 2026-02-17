@@ -1,0 +1,32 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential"],
+  "issuer": "did:mycelix:org:artisan-coffee-roasters",
+  "issuanceDate": "2025-03-05T15:30:00Z",
+  "credentialSubject": {
+    "eventType": "RECEIVED",
+    "productId": "COFFEE-GREEN-BEANS-ETHIOPIAN-YIRGACHEFFE",
+    "batchId": "BATCH-2025-GREEN-001",
+    "quantity": 1000.0,
+    "unit": "kg",
+    "facility": {
+      "id": "ROAST-ARTISAN-OAKLAND",
+      "name": "Artisan Coffee Roasters",
+      "location": {
+        "country": "USA",
+        "region": "California",
+        "city": "Oakland",
+        "address": "1234 Coffee St, Oakland, CA 94607"
+      }
+    },
+    "timestamp": "2025-03-05T15:30:00Z",
+    "metadata": {
+      "conditionOnArrival": "Excellent",
+      "moistureContent": "11.2%",
+      "packagingIntact": true,
+      "inspector": "Jane Smith",
+      "qualityScore": "85/100 (Specialty Grade)",
+      "cupping Notes": "Floral, citrus, bergamot, clean finish"
+    }
+  }
+}

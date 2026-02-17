@@ -1,0 +1,44 @@
+# MNIST IID Experiment Configuration
+# Compare all 7 baselines on IID data
+
+experiment_name: "mnist_iid"
+output_dir: "results/iid"
+
+# Dataset configuration
+dataset:
+  name: "mnist"
+  data_dir: "datasets"
+
+# Model configuration
+model:
+  architecture: "simple_cnn"
+  params:
+    num_classes: 10
+
+# Data split configuration
+data_split:
+  type: "iid"  # IID split
+  seed: 42
+
+# Federated learning configuration
+federated:
+  num_clients: 10
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 1
+  fraction_clients: 1.0  # Use all clients each round
+
+# Training configuration
+training:
+  num_rounds: 100
+  eval_every: 10  # Evaluate on test set every N rounds
+
+# Baselines to compare
+baselines:
+  - fedavg
+  - fedprox
+  - scaffold
+  - krum
+  - multikrum
+  - bulyan
+  - median

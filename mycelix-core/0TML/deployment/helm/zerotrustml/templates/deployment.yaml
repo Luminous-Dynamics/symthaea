@@ -1,0 +1,108 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "zerotrustml.fullname" . }}
+  labels:
+    {{- include "zerotrustml.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "zerotrustml.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: {{ .Values.service.metricsPort | quote }}
+        prometheus.io/path: "/metrics"
+      labels:
+        {{- include "zerotrustml.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: {{ .Chart.Name }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: network
+          containerPort: {{ .Values.config.node.listenPort }}
+          protocol: TCP
+        - name: metrics
+          containerPort: {{ .Values.config.monitoring.prometheusPort }}
+          protocol: TCP
+        - name: gossip
+          containerPort: {{ add .Values.config.node.listenPort 1 }}
+          protocol: TCP
+        env:
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ENABLE_TLS
+          value: {{ .Values.config.node.enableTLS | quote }}
+        - name: ENABLE_COMPRESSION
+          value: {{ .Values.config.performance.enableCompression | quote }}
+        - name: ENABLE_PROMETHEUS
+          value: {{ .Values.config.monitoring.enablePrometheus | quote }}
+        - name: ENABLE_GOSSIP
+          value: {{ .Values.config.networking.enableGossip | quote }}
+        - name: ENABLE_SHARDING
+          value: {{ .Values.config.networking.enableSharding | quote }}
+        - name: COMPRESSION_ALGORITHM
+          value: {{ .Values.config.performance.compressionAlgorithm }}
+        - name: GOSSIP_FANOUT
+          value: {{ .Values.config.networking.gossipFanout | quote }}
+        - name: NUM_SHARDS
+          value: {{ .Values.config.networking.numShards | quote }}
+        {{- if .Values.redis.enabled }}
+        - name: REDIS_HOST
+          value: {{ include "zerotrustml.fullname" . }}-redis
+        - name: REDIS_PORT
+          value: "6379"
+        {{- end }}
+        - name: LOG_LEVEL
+          value: {{ .Values.config.logging.level }}
+        resources:
+          {{- toYaml .Values.resources | nindent 12 }}
+        livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+        readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 12 }}
+        volumeMounts:
+        - name: config
+          mountPath: /etc/zerotrustml
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/zerotrustml
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: {{ include "zerotrustml.fullname" . }}-config
+      - name: data
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

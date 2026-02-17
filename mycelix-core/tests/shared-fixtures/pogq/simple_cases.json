@@ -1,0 +1,19 @@
+[
+  {
+    "name": "high_quality_consistent",
+    "quality": 0.9,
+    "consistency": 0.8,
+    "entropy": 0.1,
+    "reputation": 0.85,
+    "expected_composite": 0.855
+  },
+  {
+    "name": "low_quality_noisy",
+    "quality": 0.2,
+    "consistency": 0.3,
+    "entropy": 0.9,
+    "reputation": 0.4,
+    "expected_composite": 0.29
+  }
+]
+

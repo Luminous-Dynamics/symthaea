@@ -1,0 +1,12 @@
+{
+  "final_acc": 0.669,
+  "robust_acc": 0.669,
+  "convergence_round": 5,
+  "auc": NaN,
+  "acc_at_round_10": 0.667,
+  "acc_at_round_20": 0.669,
+  "acc_at_round_30": 0.0,
+  "acc_at_round_40": 0.669,
+  "aggregator": "aegis",
+  "adversary_rate": 0.0
+}

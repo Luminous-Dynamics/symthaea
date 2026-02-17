@@ -1,0 +1,14 @@
+---
+data_root_path: /workspace/conductor-simple
+keystore:
+  type: lair_server_in_proc
+  lair_root: /workspace/conductor-simple/ks
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 9000
+network:
+  bootstrap_url: http://127.0.0.1:8000
+  signal_url: ws://127.0.0.1:8001
+request_timeout_s: 60
+db_sync_strategy: Fast

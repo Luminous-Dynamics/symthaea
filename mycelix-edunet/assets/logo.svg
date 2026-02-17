@@ -1,0 +1,65 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="95" fill="#3B82F6" opacity="0.1"/>
+
+  <!-- Neural network nodes -->
+  <g id="nodes">
+    <!-- Input layer -->
+    <circle cx="50" cy="70" r="8" fill="#3B82F6"/>
+    <circle cx="50" cy="100" r="8" fill="#3B82F6"/>
+    <circle cx="50" cy="130" r="8" fill="#3B82F6"/>
+
+    <!-- Hidden layer -->
+    <circle cx="100" cy="60" r="8" fill="#10B981"/>
+    <circle cx="100" cy="90" r="8" fill="#10B981"/>
+    <circle cx="100" cy="120" r="8" fill="#10B981"/>
+    <circle cx="100" cy="140" r="8" fill="#10B981"/>
+
+    <!-- Output layer -->
+    <circle cx="150" cy="80" r="8" fill="#F59E0B"/>
+    <circle cx="150" cy="110" r="8" fill="#F59E0B"/>
+  </g>
+
+  <!-- Connections (edges) -->
+  <g id="edges" stroke="#6B7280" stroke-width="1.5" opacity="0.3">
+    <!-- Input to hidden -->
+    <line x1="50" y1="70" x2="100" y2="60"/>
+    <line x1="50" y1="70" x2="100" y2="90"/>
+    <line x1="50" y1="70" x2="100" y2="120"/>
+
+    <line x1="50" y1="100" x2="100" y2="60"/>
+    <line x1="50" y1="100" x2="100" y2="90"/>
+    <line x1="50" y1="100" x2="100" y2="120"/>
+    <line x1="50" y1="100" x2="100" y2="140"/>
+
+    <line x1="50" y1="130" x2="100" y2="90"/>
+    <line x1="50" y1="130" x2="100" y2="120"/>
+    <line x1="50" y1="130" x2="100" y2="140"/>
+
+    <!-- Hidden to output -->
+    <line x1="100" y1="60" x2="150" y2="80"/>
+    <line x1="100" y1="60" x2="150" y2="110"/>
+
+    <line x1="100" y1="90" x2="150" y2="80"/>
+    <line x1="100" y1="90" x2="150" y2="110"/>
+
+    <line x1="100" y1="120" x2="150" y2="80"/>
+    <line x1="100" y1="120" x2="150" y2="110"/>
+
+    <line x1="100" y1="140" x2="150" y2="110"/>
+  </g>
+
+  <!-- Graduation cap -->
+  <g id="graduation-cap" transform="translate(85, 15)">
+    <!-- Cap board -->
+    <rect x="0" y="0" width="30" height="3" fill="#1F2937" rx="1"/>
+    <!-- Cap base -->
+    <rect x="5" y="3" width="20" height="8" fill="#1F2937" rx="1"/>
+    <!-- Tassel -->
+    <line x1="15" y1="0" x2="15" y2="-8" stroke="#F59E0B" stroke-width="1.5"/>
+    <circle cx="15" cy="-8" r="2" fill="#F59E0B"/>
+  </g>
+
+  <!-- Redraw nodes on top -->
+  <use href="#nodes"/>
+</svg>

@@ -1,0 +1,15 @@
+{
+  "seed": 101,
+  "byz_frac": 0.35,
+  "robust_acc_aegis": 0.662,
+  "robust_acc_median": 0.654,
+  "robust_acc_delta_pp": 0.8000000000000007,
+  "clean_acc_aegis": 0.662,
+  "clean_acc_median": 0.654,
+  "auc": 0.7485341307453877,
+  "fpr_at_tpr90": 0.6447638603696099,
+  "convergence_round_aegis": 5,
+  "convergence_round_median": 5,
+  "status": "both_fail",
+  "q_frac_mean": 0.2296
+}

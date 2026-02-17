@@ -1,0 +1,145 @@
+{
+  "name": "Mycelix Mail",
+  "short_name": "Mycelix",
+  "description": "Secure, decentralized email with Post-Quantum Encryption and trust-based identity",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#3b82f6",
+  "orientation": "any",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr",
+  "icons": [
+    {
+      "src": "/icons/icon-72.png",
+      "sizes": "72x72",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-96.png",
+      "sizes": "96x96",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-128.png",
+      "sizes": "128x128",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-144.png",
+      "sizes": "144x144",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-152.png",
+      "sizes": "152x152",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-384.png",
+      "sizes": "384x384",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "categories": ["productivity", "communication", "security"],
+  "screenshots": [
+    {
+      "src": "/screenshots/inbox.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Inbox with trust indicators"
+    },
+    {
+      "src": "/screenshots/trust-network.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Trust network visualization"
+    },
+    {
+      "src": "/screenshots/mobile-inbox.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Mobile inbox view"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Compose",
+      "short_name": "Compose",
+      "description": "Write a new email",
+      "url": "/compose",
+      "icons": [{ "src": "/icons/compose.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Trust Network",
+      "short_name": "Network",
+      "description": "View your trust network",
+      "url": "/trust",
+      "icons": [{ "src": "/icons/network.png", "sizes": "96x96" }]
+    },
+    {
+      "name": "Search",
+      "short_name": "Search",
+      "description": "Search emails",
+      "url": "/search",
+      "icons": [{ "src": "/icons/search.png", "sizes": "96x96" }]
+    }
+  ],
+  "protocol_handlers": [
+    {
+      "protocol": "mailto",
+      "url": "/compose?to=%s"
+    }
+  ],
+  "share_target": {
+    "action": "/compose",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "subject",
+      "text": "body",
+      "files": [
+        {
+          "name": "attachments",
+          "accept": ["*/*"]
+        }
+      ]
+    }
+  },
+  "file_handlers": [
+    {
+      "action": "/compose",
+      "accept": {
+        "message/rfc822": [".eml"],
+        "application/mbox": [".mbox"]
+      }
+    }
+  ],
+  "handle_links": "preferred",
+  "launch_handler": {
+    "client_mode": "focus-existing"
+  },
+  "prefer_related_applications": false
+}

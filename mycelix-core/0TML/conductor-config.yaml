@@ -1,0 +1,19 @@
+---
+# Holochain Conductor Configuration - Minimal for Local Testing
+# ZeroTrustML Credits System
+
+# Admin interface (WebSocket)
+admin_interfaces:
+  - allowed_origins: "*"
+    driver:
+      type: websocket
+      port: 8888
+
+# Database path
+db_dir: /tmp/holochain_db
+
+# Keystore path
+keystore_path: /tmp/holochain_keystore
+
+# Logging
+log_level: info

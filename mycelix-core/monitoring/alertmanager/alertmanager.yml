@@ -1,0 +1,277 @@
+# Alertmanager Configuration for Mycelix FL
+# Manages alert routing, grouping, silencing, and notification delivery
+
+global:
+  # The smarthost and SMTP sender used for mail notifications.
+  smtp_smarthost: 'smtp.example.com:587'
+  smtp_from: 'alertmanager@mycelix.io'
+  smtp_auth_username: 'alertmanager@mycelix.io'
+  smtp_auth_password_file: '/etc/alertmanager/secrets/smtp_password'
+  smtp_require_tls: true
+
+  # Slack API URL (using secrets)
+  slack_api_url_file: '/etc/alertmanager/secrets/slack_webhook_url'
+
+  # PagerDuty URL
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+  # Default timeout for resolving alerts
+  resolve_timeout: 5m
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree for alert routing
+route:
+  # Default receiver
+  receiver: 'default-receiver'
+
+  # Group alerts by these labels
+  group_by: ['alertname', 'severity', 'service']
+
+  # Wait time before sending first notification for a group
+  group_wait: 30s
+
+  # Wait time before sending notification for new alerts in same group
+  group_interval: 5m
+
+  # Wait time before resending notification for same alert
+  repeat_interval: 4h
+
+  # Child routes
+  routes:
+    # Critical security alerts - immediate PagerDuty escalation
+    - match:
+        severity: critical
+        category: security
+      receiver: 'security-critical'
+      group_wait: 10s
+      repeat_interval: 15m
+      continue: true
+
+    # Critical availability alerts - immediate PagerDuty
+    - match:
+        severity: critical
+        category: availability
+      receiver: 'pagerduty-critical'
+      group_wait: 10s
+      repeat_interval: 15m
+      continue: true
+
+    # Critical compliance alerts - immediate escalation
+    - match:
+        severity: critical
+        category: compliance
+      receiver: 'compliance-critical'
+      group_wait: 10s
+      repeat_interval: 15m
+
+    # All critical alerts also go to Slack
+    - match:
+        severity: critical
+      receiver: 'slack-critical'
+      continue: true
+
+    # Warning alerts - Slack notification
+    - match:
+        severity: warning
+      receiver: 'slack-warnings'
+      group_wait: 1m
+      repeat_interval: 2h
+
+    # Byzantine detection alerts - dedicated channel
+    - match_re:
+        alertname: '^(Byzantine|Sybil|Detection).*'
+      receiver: 'slack-byzantine'
+      group_wait: 15s
+
+    # Training alerts
+    - match:
+        category: training
+      receiver: 'slack-training'
+      group_wait: 2m
+
+    # Performance alerts
+    - match:
+        category: performance
+      receiver: 'slack-performance'
+      group_wait: 5m
+
+    # Capacity alerts
+    - match:
+        category: capacity
+      receiver: 'slack-capacity'
+      group_wait: 10m
+
+# Inhibition rules - suppress alerts when higher-priority alerts are firing
+inhibit_rules:
+  # If a critical alert is firing, suppress warning alerts for same service
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+
+  # If node is down, suppress other alerts for that node
+  - source_match:
+      alertname: 'NodeDown'
+    target_match_re:
+      alertname: '.+'
+    equal: ['instance']
+
+  # If Holochain is down, suppress hybrid bridge alerts
+  - source_match:
+      alertname: 'HolochainConductorDown'
+    target_match_re:
+      alertname: 'HybridBridge.*'
+    equal: ['cluster']
+
+  # If PostgreSQL is down, suppress storage-related alerts
+  - source_match:
+      alertname: 'PostgreSQLDown'
+    target_match_re:
+      alertname: '(Storage|Database).*'
+    equal: ['cluster']
+
+# Receivers define notification targets
+receivers:
+  # Default receiver - email to ops team
+  - name: 'default-receiver'
+    email_configs:
+      - to: 'ops@mycelix.io'
+        send_resolved: true
+        headers:
+          subject: '[Mycelix Alert] {{ .GroupLabels.alertname }}'
+
+  # Security critical - PagerDuty + Slack + Email
+  - name: 'security-critical'
+    pagerduty_configs:
+      - service_key_file: '/etc/alertmanager/secrets/pagerduty_security_key'
+        severity: critical
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          alertname: '{{ .GroupLabels.alertname }}'
+          description: '{{ .CommonAnnotations.description }}'
+          runbook: '{{ .CommonAnnotations.runbook_url }}'
+    slack_configs:
+      - channel: '#security-alerts'
+        username: 'Mycelix AlertBot'
+        icon_emoji: ':rotating_light:'
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+        actions:
+          - type: button
+            text: 'Runbook'
+            url: '{{ .CommonAnnotations.runbook_url }}'
+    email_configs:
+      - to: 'security@mycelix.io'
+        send_resolved: true
+
+  # PagerDuty for critical availability issues
+  - name: 'pagerduty-critical'
+    pagerduty_configs:
+      - service_key_file: '/etc/alertmanager/secrets/pagerduty_ops_key'
+        severity: critical
+        description: '{{ .GroupLabels.alertname }}: {{ .CommonAnnotations.summary }}'
+        details:
+          alertname: '{{ .GroupLabels.alertname }}'
+          description: '{{ .CommonAnnotations.description }}'
+          runbook: '{{ .CommonAnnotations.runbook_url }}'
+          action: '{{ .CommonAnnotations.action }}'
+
+  # Compliance critical alerts
+  - name: 'compliance-critical'
+    pagerduty_configs:
+      - service_key_file: '/etc/alertmanager/secrets/pagerduty_compliance_key'
+        severity: critical
+        description: 'COMPLIANCE: {{ .GroupLabels.alertname }}'
+    email_configs:
+      - to: 'compliance@mycelix.io, legal@mycelix.io'
+        send_resolved: true
+        headers:
+          subject: '[URGENT COMPLIANCE] {{ .GroupLabels.alertname }}'
+
+  # Slack critical alerts
+  - name: 'slack-critical'
+    slack_configs:
+      - channel: '#alerts-critical'
+        username: 'Mycelix AlertBot'
+        icon_emoji: ':fire:'
+        color: 'danger'
+        title: ':rotating_light: CRITICAL: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Severity:* {{ .GroupLabels.severity }}
+          *Service:* {{ .GroupLabels.service }}
+        actions:
+          - type: button
+            text: 'Runbook'
+            url: '{{ .CommonAnnotations.runbook_url }}'
+          - type: button
+            text: 'Dashboard'
+            url: 'http://grafana:3000/d/mycelix-{{ .GroupLabels.category }}'
+
+  # Slack warning alerts
+  - name: 'slack-warnings'
+    slack_configs:
+      - channel: '#alerts-warnings'
+        username: 'Mycelix AlertBot'
+        icon_emoji: ':warning:'
+        color: 'warning'
+        title: ':warning: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Resolution:* {{ .CommonAnnotations.resolution }}
+        send_resolved: true
+
+  # Byzantine detection channel
+  - name: 'slack-byzantine'
+    slack_configs:
+      - channel: '#byzantine-detection'
+        username: 'Byzantine Detector'
+        icon_emoji: ':shield:'
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+        title: ':shield: {{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Description:* {{ .CommonAnnotations.description }}
+          *Current Value:* {{ .CommonLabels.value }}
+        send_resolved: true
+
+  # Training alerts channel
+  - name: 'slack-training'
+    slack_configs:
+      - channel: '#fl-training'
+        username: 'FL Monitor'
+        icon_emoji: ':brain:'
+        color: 'warning'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+        send_resolved: true
+
+  # Performance alerts channel
+  - name: 'slack-performance'
+    slack_configs:
+      - channel: '#performance'
+        username: 'Performance Monitor'
+        icon_emoji: ':chart_with_upwards_trend:'
+        color: 'warning'
+        title: '{{ .GroupLabels.alertname }}'
+        text: |
+          *Summary:* {{ .CommonAnnotations.summary }}
+          *Resolution:* {{ .CommonAnnotations.resolution }}
+        send_resolved: true
+
+  # Capacity alerts channel
+  - name: 'slack-capacity'
+    slack_configs:
+      - channel: '#capacity-planning'
+        username: 'Capacity Monitor'
+        icon_emoji: ':package:'
+        color: 'warning'
+        title: '{{ .GroupLabels.alertname }}'
+        text: '{{ .CommonAnnotations.summary }}'
+        send_resolved: true

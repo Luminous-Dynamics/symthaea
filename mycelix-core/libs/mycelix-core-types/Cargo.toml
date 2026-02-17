@@ -1,0 +1,33 @@
+[package]
+name = "mycelix-core-types"
+version = "0.1.0"
+edition = "2021"
+description = "Core types for the Mycelix ecosystem - K-Vector, E/N/M Classification, GIS v4 types"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/luminous-dynamics/mycelix"
+
+[lib]
+name = "mycelix_core_types"
+crate-type = ["rlib", "cdylib"]
+
+[features]
+default = []
+holochain = ["hdi"]
+serde = ["dep:serde"]
+python = ["pyo3/extension-module"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"], optional = true }
+
+# Optional Holochain integration
+hdi = { version = "0.7.0", optional = true }
+
+# Optional Python bindings via PyO3
+pyo3 = { version = "0.22", features = ["auto-initialize"], optional = true }
+
+[dev-dependencies]
+serde_json = "1.0"
+
+[[example]]
+name = "epistemic_stress_test"
+path = "examples/epistemic_stress_test.rs"

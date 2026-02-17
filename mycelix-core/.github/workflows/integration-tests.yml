@@ -1,0 +1,417 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'tests/integration/**'
+      - 'src/**'
+      - '.github/workflows/integration-tests.yml'
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      run_slow_tests:
+        description: 'Run slow tests (100 rounds, stress tests)'
+        required: false
+        default: 'false'
+        type: boolean
+      byzantine_ratio:
+        description: 'Byzantine node ratio for tests'
+        required: false
+        default: '0.3'
+        type: string
+
+env:
+  PYTHON_VERSION: '3.11'
+  RUST_VERSION: '1.75'
+
+jobs:
+  # ============================================================================
+  # Quick Tests - Run on every push
+  # ============================================================================
+  quick-tests:
+    name: Quick Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-html pytest-cov numpy
+
+      - name: Run quick integration tests
+        run: |
+          pytest tests/integration/ \
+            -v \
+            --ignore=tests/integration/test_100_rounds.py \
+            -m "not slow and not stress" \
+            --html=reports/quick-tests.html \
+            --self-contained-html \
+            --cov=tests/integration \
+            --cov-report=xml:reports/coverage.xml \
+            --cov-report=html:reports/coverage-html \
+            --tb=short \
+            --durations=20
+        continue-on-error: false
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: quick-test-reports
+          path: reports/
+          retention-days: 30
+
+  # ============================================================================
+  # Byzantine Resilience Tests
+  # ============================================================================
+  byzantine-tests:
+    name: Byzantine Resilience Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quick-tests
+
+    strategy:
+      matrix:
+        byzantine_ratio: ['0.20', '0.33', '0.45']
+        aggregation_strategy: ['trimmed_mean', 'multi_krum', 'bulyan']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-html numpy
+
+      - name: Run Byzantine resilience tests
+        run: |
+          pytest tests/integration/test_byzantine_rejection.py \
+                 tests/integration/test_45_percent_byzantine.py \
+            -v \
+            --byzantine-ratio=${{ matrix.byzantine_ratio }} \
+            -m "byzantine" \
+            --html=reports/byzantine-${{ matrix.byzantine_ratio }}-${{ matrix.aggregation_strategy }}.html \
+            --self-contained-html \
+            --tb=short
+        env:
+          AGGREGATION_STRATEGY: ${{ matrix.aggregation_strategy }}
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: byzantine-reports-${{ matrix.byzantine_ratio }}-${{ matrix.aggregation_strategy }}
+          path: reports/
+          retention-days: 30
+
+  # ============================================================================
+  # Network Tests
+  # ============================================================================
+  network-tests:
+    name: Network Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quick-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-html numpy
+
+      - name: Run network integration tests
+        run: |
+          pytest tests/integration/test_full_fl_round.py \
+                 tests/integration/test_recovery.py \
+            -v \
+            -m "network" \
+            --html=reports/network-tests.html \
+            --self-contained-html \
+            --tb=short \
+            --durations=20
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: network-test-reports
+          path: reports/
+          retention-days: 30
+
+  # ============================================================================
+  # Healthcare Scenario Tests
+  # ============================================================================
+  healthcare-tests:
+    name: Healthcare Scenario Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: quick-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-html numpy
+
+      - name: Run healthcare scenario tests
+        run: |
+          pytest tests/integration/scenarios/healthcare.py \
+            -v \
+            -m "healthcare" \
+            --html=reports/healthcare-tests.html \
+            --self-contained-html \
+            --tb=short
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: healthcare-test-reports
+          path: reports/
+          retention-days: 30
+
+  # ============================================================================
+  # Adversarial Scenario Tests
+  # ============================================================================
+  adversarial-tests:
+    name: Adversarial Scenario Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: quick-tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-html numpy
+
+      - name: Run adversarial scenario tests
+        run: |
+          pytest tests/integration/scenarios/adversarial.py \
+            -v \
+            -m "byzantine" \
+            --html=reports/adversarial-tests.html \
+            --self-contained-html \
+            --tb=short
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: adversarial-test-reports
+          path: reports/
+          retention-days: 30
+
+  # ============================================================================
+  # Slow Tests - Run on schedule or manual trigger
+  # ============================================================================
+  slow-tests:
+    name: Long-Running Tests (100 Rounds)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch' && github.event.inputs.run_slow_tests == 'true'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-html numpy tracemalloc
+
+      - name: Run 100-round stability tests
+        run: |
+          pytest tests/integration/test_100_rounds.py \
+            -v \
+            -m "slow" \
+            --run-slow \
+            --fl-rounds=100 \
+            --html=reports/100-rounds-tests.html \
+            --self-contained-html \
+            --tb=short \
+            --durations=0
+        timeout-minutes: 90
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: slow-test-reports
+          path: reports/
+          retention-days: 90
+
+  # ============================================================================
+  # Stress Tests
+  # ============================================================================
+  stress-tests:
+    name: Stress Tests (45% Byzantine)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    if: |
+      github.event_name == 'schedule' ||
+      github.event_name == 'workflow_dispatch'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest pytest-asyncio pytest-html numpy
+
+      - name: Run stress tests
+        run: |
+          pytest tests/integration/test_45_percent_byzantine.py \
+            -v \
+            -m "stress" \
+            --run-slow \
+            --byzantine-ratio=0.45 \
+            --html=reports/stress-tests.html \
+            --self-contained-html \
+            --tb=short \
+            --durations=0
+
+      - name: Upload test reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stress-test-reports
+          path: reports/
+          retention-days: 90
+
+  # ============================================================================
+  # Comprehensive Report Generation
+  # ============================================================================
+  generate-report:
+    name: Generate Comprehensive Report
+    runs-on: ubuntu-latest
+    needs: [quick-tests, byzantine-tests, network-tests, healthcare-tests, adversarial-tests]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports/
+
+      - name: Generate summary report
+        run: |
+          echo "# Integration Test Summary" > summary.md
+          echo "" >> summary.md
+          echo "## Test Results" >> summary.md
+          echo "" >> summary.md
+
+          # Count test results
+          passed=0
+          failed=0
+          for report in all-reports/**/*.html; do
+            if [ -f "$report" ]; then
+              if grep -q "passed" "$report" 2>/dev/null; then
+                ((passed++))
+              else
+                ((failed++))
+              fi
+            fi
+          done
+
+          echo "- **Passed suites**: $passed" >> summary.md
+          echo "- **Failed suites**: $failed" >> summary.md
+          echo "" >> summary.md
+          echo "## Report Files" >> summary.md
+          echo "" >> summary.md
+
+          for report in all-reports/**/*.html; do
+            if [ -f "$report" ]; then
+              echo "- $(basename $report)" >> summary.md
+            fi
+          done
+
+          cat summary.md
+
+      - name: Upload summary
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-summary
+          path: summary.md
+          retention-days: 30
+
+  # ============================================================================
+  # Notify on Failure
+  # ============================================================================
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    needs: [quick-tests, byzantine-tests, network-tests]
+    if: failure()
+
+    steps:
+      - name: Create failure notification
+        run: |
+          echo "Integration tests failed!"
+          echo "Check the test reports for details."
+          # Add Slack/Discord/Email notification here if needed

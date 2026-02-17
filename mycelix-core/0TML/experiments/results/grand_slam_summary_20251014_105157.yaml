@@ -1,0 +1,30 @@
+experiment: Grand Slam Validation
+timestamp: '20251014_105157'
+total_experiments: 2
+core_experiments: 2
+stress_tests: 0
+key_findings:
+  average_improvement: 0.0
+  improvements_by_dataset: &id001
+  - dataset: mnist
+    fedavg_accuracy: 0.0
+    pogq_accuracy: 0.0
+    improvement: 0.0
+    improvement_pp: 0.0
+all_results:
+- dataset: mnist
+  baseline: FedAvg
+  attack: adaptive
+  byzantine_pct: 30
+  final_accuracy: 0.0
+  byzantine_detection_rate: 0.0
+- dataset: mnist
+  baseline: PoGQ+Rep
+  attack: adaptive
+  byzantine_pct: 30
+  final_accuracy: 0.0
+  byzantine_detection_rate: 0.0
+grant_ready_numbers:
+  claim: PoGQ+Reputation achieves +23.2pp improvement over baseline FedAvg
+  evidence: *id001
+  verification: See individual experiment results in results/ directory

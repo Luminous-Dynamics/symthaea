@@ -1,0 +1,12 @@
+# =============================================================================
+# Mycelix Music Platform - Kubernetes Namespace
+# =============================================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix
+  labels:
+    name: mycelix
+    environment: production
+    app.kubernetes.io/name: mycelix-music
+    app.kubernetes.io/managed-by: kubectl

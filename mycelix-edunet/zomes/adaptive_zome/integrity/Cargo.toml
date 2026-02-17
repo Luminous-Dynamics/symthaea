@@ -1,0 +1,23 @@
+[package]
+name = "adaptive_integrity"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Adaptive Learning Intelligence integrity zome - personalized learning through ML-like algorithms"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "adaptive_integrity"
+
+[dependencies]
+# Holochain Integrity (HDI) for entry definitions
+hdi.workspace = true
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true

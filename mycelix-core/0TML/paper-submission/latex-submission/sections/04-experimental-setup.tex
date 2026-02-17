@@ -1,0 +1,52 @@
+\section{Experimental Methodology}
+\label{sec:experiments}
+
+\subsection{Dataset and Model}
+
+\textbf{Dataset}: Synthetic MNIST-like data (28×28 grayscale images, 10 classes) with learnable but imperfect patterns (50\% noise). Enables precise control over Byzantine ratios and data distribution.
+
+\textbf{Model}: SimpleCNN with 2 convolutional layers (32 and 64 filters) + 2 fully connected layers (128 and 10 neurons). Pre-trained for 3 epochs to 89.2\% validation accuracy before Byzantine testing.
+
+\textbf{Data Heterogeneity}: Dirichlet($\alpha$=0.1) label skew~\cite{hsu2019measuring}. Each client receives unique local distribution: $p_i(y) \sim \text{Dir}(\alpha)$. This creates legitimate gradient diversity challenging for detection.
+
+\subsection{Byzantine Attack Models}
+
+\textbf{Sign Flip}: $\nabla_{\text{Byzantine}} = -\nabla_{\text{honest}}$ (gradient ascent vs. descent)
+
+\textbf{Gaussian Noise}: $\nabla_{\text{Byzantine}} = \nabla_{\text{honest}} + \mathcal{N}(0, \sigma^2)$ where $\sigma^2 = 10 \times \text{Var}(\nabla_{\text{honest}})$
+
+\textbf{Scaling}: $\nabla_{\text{Byzantine}} = \lambda \times \nabla_{\text{honest}}$ where $\lambda = 10$
+
+\textbf{Sleeper Agents}: Behave honestly for 5 rounds, then activate sign flip attack
+
+\subsection{Evaluation Metrics}
+
+\textbf{Detection Rate (Recall)}: Fraction of Byzantine nodes correctly flagged: $\text{DR} = \text{TP} / (\text{TP} + \text{FN})$
+
+\textbf{False Positive Rate}: Fraction of honest nodes incorrectly flagged: $\text{FPR} = \text{FP} / (\text{FP} + \text{TN})$
+
+\textbf{Precision}: Fraction of flagged nodes that are actually Byzantine: $\text{Prec} = \text{TP} / (\text{TP} + \text{FP})$
+
+\textbf{Target}: Detection Rate $\geq$ 80\%, False Positive Rate $\leq$ 10\%
+
+\subsection{Experimental Configuration}
+
+\textbf{Network}: 20 clients total, Byzantine ratios tested: 20\%, 25\%, 30\%, 35\%, 40\%, 45\%, 50\%
+
+\textbf{Training}: 10 federated rounds, learning rate $\eta = 0.01$, batch size 32
+
+\textbf{Validation Set}: 1000 samples (Byzantine-free, controlled by server)
+
+\textbf{Random Seeds}: Primary tests use seed 42 for reproducibility. Multi-seed validation uses seeds 42, 123, 456 for statistical robustness.
+
+\subsection{Test Suite}
+
+\textbf{Test 1: Mode 1 Boundary Testing} - Validate 100\% detection at 35--50\% BFT
+
+\textbf{Test 2: Mode 0 vs Mode 1 Comparison} - Direct A/B comparison on identical data
+
+\textbf{Test 3: Multi-Seed Validation} - Statistical robustness across seeds
+
+\textbf{Test 4: Adaptive Threshold Ablation} - Impact of threshold algorithm
+
+All tests implemented in Python 3.13 with PyTorch 2.8, NumPy 2.3. Hardware: CPU-only testing for reproducibility.

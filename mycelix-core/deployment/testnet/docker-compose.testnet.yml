@@ -1,0 +1,363 @@
+version: '3.8'
+
+# Mycelix Core - Public Testnet Configuration
+# This compose file sets up a complete testnet environment with:
+# - Bootstrap node for network coordination
+# - 5 seed FL (Federated Learning) nodes
+# - Monitoring stack (Prometheus + Grafana)
+# - PostgreSQL for persistent storage
+# - Redis for caching and pub/sub
+
+x-fl-node-common: &fl-node-common
+  image: mycelix/fl-node:testnet-latest
+  restart: unless-stopped
+  environment:
+    - MYCELIX_NETWORK=testnet
+    - MYCELIX_LOG_LEVEL=info
+    - REDIS_URL=redis://redis:6379
+    - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+    - BOOTSTRAP_NODES=bootstrap:9000
+    - METRICS_ENABLED=true
+    - METRICS_PORT=9090
+  depends_on:
+    - bootstrap
+    - postgres
+    - redis
+  networks:
+    - mycelix-testnet
+
+services:
+  # ============================================
+  # BOOTSTRAP NODE - Network Coordinator
+  # ============================================
+  bootstrap:
+    image: mycelix/bootstrap-node:testnet-latest
+    container_name: mycelix-bootstrap
+    hostname: bootstrap
+    restart: unless-stopped
+    ports:
+      - "9000:9000"   # P2P port
+      - "9001:9001"   # API port
+      - "9090:9090"   # Metrics port
+    environment:
+      - MYCELIX_NETWORK=testnet
+      - MYCELIX_NODE_TYPE=bootstrap
+      - MYCELIX_LOG_LEVEL=info
+      - MYCELIX_GENESIS_PATH=/config/genesis.json
+      - MYCELIX_PRIVATE_KEY_PATH=/secrets/bootstrap.key
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+      - REDIS_URL=redis://redis:6379
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_REQUESTS_PER_MINUTE=100
+      - RATE_LIMIT_BURST=20
+    volumes:
+      - ./config/genesis.json:/config/genesis.json:ro
+      - ./secrets/bootstrap.key:/secrets/bootstrap.key:ro
+      - bootstrap-data:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - mycelix-testnet
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # ============================================
+  # SEED FL NODES - Federated Learning Workers
+  # ============================================
+  fl-seed-1:
+    <<: *fl-node-common
+    container_name: mycelix-fl-seed-1
+    hostname: fl-seed-1
+    ports:
+      - "9100:9000"
+      - "9101:9001"
+    environment:
+      - MYCELIX_NETWORK=testnet
+      - MYCELIX_NODE_ID=fl-seed-1
+      - MYCELIX_NODE_TYPE=seed
+      - MYCELIX_LOG_LEVEL=info
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+      - BOOTSTRAP_NODES=bootstrap:9000
+      - METRICS_ENABLED=true
+      - METRICS_PORT=9090
+      - FL_MODEL_PATH=/models
+      - FL_GRADIENT_AGGREGATION=fedavg
+      - FL_MIN_PARTICIPANTS=3
+    volumes:
+      - fl-seed-1-data:/data
+      - fl-models:/models:ro
+
+  fl-seed-2:
+    <<: *fl-node-common
+    container_name: mycelix-fl-seed-2
+    hostname: fl-seed-2
+    ports:
+      - "9110:9000"
+      - "9111:9001"
+    environment:
+      - MYCELIX_NETWORK=testnet
+      - MYCELIX_NODE_ID=fl-seed-2
+      - MYCELIX_NODE_TYPE=seed
+      - MYCELIX_LOG_LEVEL=info
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+      - BOOTSTRAP_NODES=bootstrap:9000
+      - METRICS_ENABLED=true
+      - METRICS_PORT=9090
+      - FL_MODEL_PATH=/models
+      - FL_GRADIENT_AGGREGATION=fedavg
+      - FL_MIN_PARTICIPANTS=3
+    volumes:
+      - fl-seed-2-data:/data
+      - fl-models:/models:ro
+
+  fl-seed-3:
+    <<: *fl-node-common
+    container_name: mycelix-fl-seed-3
+    hostname: fl-seed-3
+    ports:
+      - "9120:9000"
+      - "9121:9001"
+    environment:
+      - MYCELIX_NETWORK=testnet
+      - MYCELIX_NODE_ID=fl-seed-3
+      - MYCELIX_NODE_TYPE=seed
+      - MYCELIX_LOG_LEVEL=info
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+      - BOOTSTRAP_NODES=bootstrap:9000
+      - METRICS_ENABLED=true
+      - METRICS_PORT=9090
+      - FL_MODEL_PATH=/models
+      - FL_GRADIENT_AGGREGATION=fedavg
+      - FL_MIN_PARTICIPANTS=3
+    volumes:
+      - fl-seed-3-data:/data
+      - fl-models:/models:ro
+
+  fl-seed-4:
+    <<: *fl-node-common
+    container_name: mycelix-fl-seed-4
+    hostname: fl-seed-4
+    ports:
+      - "9130:9000"
+      - "9131:9001"
+    environment:
+      - MYCELIX_NETWORK=testnet
+      - MYCELIX_NODE_ID=fl-seed-4
+      - MYCELIX_NODE_TYPE=seed
+      - MYCELIX_LOG_LEVEL=info
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+      - BOOTSTRAP_NODES=bootstrap:9000
+      - METRICS_ENABLED=true
+      - METRICS_PORT=9090
+      - FL_MODEL_PATH=/models
+      - FL_GRADIENT_AGGREGATION=fedavg
+      - FL_MIN_PARTICIPANTS=3
+    volumes:
+      - fl-seed-4-data:/data
+      - fl-models:/models:ro
+
+  fl-seed-5:
+    <<: *fl-node-common
+    container_name: mycelix-fl-seed-5
+    hostname: fl-seed-5
+    ports:
+      - "9140:9000"
+      - "9141:9001"
+    environment:
+      - MYCELIX_NETWORK=testnet
+      - MYCELIX_NODE_ID=fl-seed-5
+      - MYCELIX_NODE_TYPE=seed
+      - MYCELIX_LOG_LEVEL=info
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+      - BOOTSTRAP_NODES=bootstrap:9000
+      - METRICS_ENABLED=true
+      - METRICS_PORT=9090
+      - FL_MODEL_PATH=/models
+      - FL_GRADIENT_AGGREGATION=fedavg
+      - FL_MIN_PARTICIPANTS=3
+    volumes:
+      - fl-seed-5-data:/data
+      - fl-models:/models:ro
+
+  # ============================================
+  # FAUCET SERVICE - Test Token Distribution
+  # ============================================
+  faucet:
+    image: mycelix/faucet:testnet-latest
+    container_name: mycelix-faucet
+    hostname: faucet
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - MYCELIX_NETWORK=testnet
+      - FAUCET_AMOUNT=1000
+      - FAUCET_COOLDOWN_HOURS=24
+      - RATE_LIMIT_REQUESTS_PER_IP=5
+      - RATE_LIMIT_WINDOW_HOURS=24
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@postgres:5432/mycelix_testnet
+      - BOOTSTRAP_API=http://bootstrap:9001
+    depends_on:
+      - bootstrap
+      - redis
+      - postgres
+    networks:
+      - mycelix-testnet
+
+  # ============================================
+  # PERSISTENT STORAGE - PostgreSQL
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: mycelix-postgres
+    hostname: postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=mycelix
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - POSTGRES_DB=mycelix_testnet
+      - PGDATA=/var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./config/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - mycelix-testnet
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycelix -d mycelix_testnet"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================
+  # CACHING - Redis
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: mycelix-redis
+    hostname: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - mycelix-testnet
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ============================================
+  # MONITORING - Prometheus
+  # ============================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: mycelix-prometheus
+    hostname: prometheus
+    restart: unless-stopped
+    ports:
+      - "9091:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/alerting-rules.yml:/etc/prometheus/alerting-rules.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - mycelix-testnet
+    depends_on:
+      - bootstrap
+
+  # ============================================
+  # VISUALIZATION - Grafana
+  # ============================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: mycelix-grafana
+    hostname: grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - mycelix-testnet
+    depends_on:
+      - prometheus
+
+  # ============================================
+  # ALERTING - Alertmanager
+  # ============================================
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: mycelix-alertmanager
+    hostname: alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    volumes:
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks:
+      - mycelix-testnet
+
+# ============================================
+# NETWORKS
+# ============================================
+networks:
+  mycelix-testnet:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# ============================================
+# VOLUMES
+# ============================================
+volumes:
+  bootstrap-data:
+  fl-seed-1-data:
+  fl-seed-2-data:
+  fl-seed-3-data:
+  fl-seed-4-data:
+  fl-seed-5-data:
+  fl-models:
+  postgres-data:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:

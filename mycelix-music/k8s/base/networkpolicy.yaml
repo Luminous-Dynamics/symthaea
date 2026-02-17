@@ -1,0 +1,151 @@
+---
+# Default deny all ingress/egress for the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# Allow API pods to receive traffic from web and ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-ingress
+  labels:
+    app.kubernetes.io/name: mycelix-api
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycelix-api
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from web pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mycelix-web
+      ports:
+        - protocol: TCP
+          port: 3100
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3100
+
+---
+# Allow API pods to connect to databases and external services
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-egress
+  labels:
+    app.kubernetes.io/name: mycelix-api
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycelix-api
+  policyTypes:
+    - Egress
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # PostgreSQL (within namespace or external)
+    - ports:
+        - protocol: TCP
+          port: 5432
+    # Redis (within namespace or external)
+    - ports:
+        - protocol: TCP
+          port: 6379
+    # Ceramic/IPFS (internal or external)
+    - ports:
+        - protocol: TCP
+          port: 7007
+        - protocol: TCP
+          port: 5001
+        - protocol: TCP
+          port: 4001
+    # HTTPS for RPC and external APIs
+    - ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 8545
+
+---
+# Allow web pods to receive traffic from ingress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-ingress
+  labels:
+    app.kubernetes.io/name: mycelix-web
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycelix-web
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000
+
+---
+# Allow web pods to connect to API
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-egress
+  labels:
+    app.kubernetes.io/name: mycelix-web
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mycelix-web
+  policyTypes:
+    - Egress
+  egress:
+    # DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # API service
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mycelix-api
+      ports:
+        - protocol: TCP
+          port: 3100

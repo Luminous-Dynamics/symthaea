@@ -1,0 +1,25 @@
+[package]
+name = "pods_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Learning Pods coordinator zome - implements social learning business logic"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "pods_coordinator"
+
+[dependencies]
+# Holochain Development Kit (HDK) for zome functions
+hdk.workspace = true
+
+# Link to the integrity zome
+pods_integrity = { path = "../integrity" }
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true

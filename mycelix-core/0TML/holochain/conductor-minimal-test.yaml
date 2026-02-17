@@ -1,0 +1,21 @@
+---
+data_root_path: ./conductor-data-test
+keystore:
+  type: lair_server_in_proc
+  lair_root: ./conductor-data-test/ks
+
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 9000
+      allowed_origins: "*"
+
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      allowed_origins: "*"
+
+network:
+  bootstrap_url: https://dev-test-bootstrap2.holochain.org/
+  signal_url: wss://dev-test-bootstrap2.holochain.org/

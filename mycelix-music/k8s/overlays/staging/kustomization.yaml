@@ -1,0 +1,65 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mycelix-music-staging
+
+namePrefix: staging-
+
+resources:
+  - ../../base
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: api
+      spec:
+        replicas: 1
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: web
+      spec:
+        replicas: 1
+  - patch: |-
+      apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      metadata:
+        name: mycelix-ingress
+      spec:
+        tls:
+          - hosts:
+              - staging.mycelix.io
+              - api-staging.mycelix.io
+            secretName: mycelix-staging-tls
+        rules:
+          - host: staging.mycelix.io
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: web
+                      port:
+                        number: 3000
+          - host: api-staging.mycelix.io
+            http:
+              paths:
+                - path: /
+                  pathType: Prefix
+                  backend:
+                    service:
+                      name: api
+                      port:
+                        number: 3100
+
+images:
+  - name: mycelix-music/api
+    newName: ghcr.io/mycelix/api
+    newTag: staging
+  - name: mycelix-music/web
+    newName: ghcr.io/mycelix/web
+    newTag: staging

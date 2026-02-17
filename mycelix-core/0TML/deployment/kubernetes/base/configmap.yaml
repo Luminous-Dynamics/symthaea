@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zerotrustml-config
+  labels:
+    app: zerotrustml
+data:
+  config.yaml: |
+    # ZeroTrustML Node Configuration
+    node:
+      listen_port: 9000
+      enable_tls: true
+      enable_signing: true
+      enable_authentication: true
+
+    performance:
+      enable_compression: true
+      compression_algorithm: zstd
+      compression_level: 3
+      enable_batch_validation: true
+      batch_size: 32
+      enable_redis_cache: true
+      cache_ttl: 3600
+
+    monitoring:
+      enable_prometheus: true
+      prometheus_port: 9090
+      enable_topology_monitoring: true
+      enable_grafana: false
+
+    networking:
+      enable_gossip: true
+      gossip_fanout: 3
+      gossip_interval: 1.0
+      enable_sharding: true
+      num_shards: 10
+      shard_replication: 2
+
+    storage:
+      backend: memory
+      enable_checkpointing: false
+
+    logging:
+      level: INFO
+      format: json
+      output: stdout

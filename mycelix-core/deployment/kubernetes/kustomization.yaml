@@ -1,0 +1,58 @@
+# Mycelix Kubernetes Kustomization
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: mycelix-testnet
+
+namespace: mycelix
+
+labels:
+  - includeSelectors: true
+    pairs:
+      app.kubernetes.io/managed-by: kustomize
+      app.kubernetes.io/version: "1.0.0"
+
+resources:
+  # Namespaces
+  - namespaces.yaml
+
+  # RBAC (from testnet directory)
+  - testnet/kubernetes/rbac.yaml
+  - testnet/kubernetes/network-policies.yaml
+
+  # Core workloads
+  - validator-deployment.yaml
+  - fl-node-deployment.yaml
+
+  # Configuration
+  - configmaps.yaml
+  - external-secrets.yaml
+
+  # Networking
+  - ingress.yaml
+
+  # Autoscaling & Policies
+  - autoscaling.yaml
+
+images:
+  - name: ghcr.io/mycelix/validator
+    newTag: v1.0.0-testnet
+  - name: ghcr.io/mycelix/fl-aggregator
+    newTag: v1.0.0-testnet
+  - name: ghcr.io/mycelix/fl-coordinator
+    newTag: v1.0.0-testnet
+
+configMapGenerator:
+  - name: mycelix-version
+    literals:
+      - VERSION=1.0.0-testnet
+      - NETWORK=testnet
+      - BUILD_DATE=2026-01-16
+
+commonLabels:
+  environment: testnet
+  network: mycelix-testnet-1
+
+commonAnnotations:
+  meta.helm.sh/release-namespace: mycelix

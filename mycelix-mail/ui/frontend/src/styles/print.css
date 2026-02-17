@@ -1,0 +1,84 @@
+/* Print Styles for Email View */
+@media print {
+  /* Hide UI chrome and navigation */
+  .no-print,
+  header,
+  nav,
+  aside,
+  footer,
+  button,
+  .sidebar,
+  .toolbar {
+    display: none !important;
+  }
+
+  /* Email content optimizations */
+  .email-print-view {
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .email-metadata {
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #000;
+  }
+
+  .email-content {
+    font-size: 12pt;
+    line-height: 1.5;
+    color: #000;
+    font-family: Georgia, 'Times New Roman', serif;
+  }
+
+  /* Ensure links are visible */
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    color: #666;
+  }
+
+  /* Page breaks */
+  .email-content {
+    page-break-inside: avoid;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid;
+    color: #000;
+  }
+
+  /* Attachments list */
+  .attachments-list {
+    margin-top: 20px;
+    padding-top: 10px;
+    border-top: 1px solid #000;
+  }
+
+  /* Remove shadows and backgrounds */
+  * {
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  /* Black and white optimization */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid;
+  }
+
+  /* Headers on each page */
+  @page {
+    margin: 0.5in;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr, img {
+    page-break-inside: avoid;
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "summary": {
+    "total_files": 12,
+    "attacks_tested": ["sign_flip", "scaling_x100", "random_noise"],
+    "defenses_tested": ["boba", "rfa", "coord_median", "coord_median_safe", "fedavg"],
+    "defenses_missing": ["multi_krum", "trimmed_mean", "zeno"],
+    "dataset": "EMNIST",
+    "dirichlet_alpha": 0.3,
+    "byzantine_ratio": 0.33
+  },
+  "results": {
+    "sign_flip": {
+      "fedavg": 0.8322,
+      "boba": 0.8471,
+      "rfa": 0.8468,
+      "coord_median": 0.8404,
+      "coord_median_safe": 0.8364
+    },
+    "scaling_x100": {
+      "fedavg": 0.8469,
+      "boba": 0.8438,
+      "rfa": 0.8437,
+      "coord_median": 0.8386,
+      "coord_median_safe": 0.8399
+    },
+    "random_noise": {
+      "fedavg": 0.8434
+    }
+  },
+  "observations": [
+    "BOBA and RFA show nearly identical performance across attacks",
+    "FedAvg unexpectedly outperforms defenses on scaling_x100 (84.7% vs ~84.4%) - requires investigation",
+    "Coordinate Median variants perform slightly worse than BOBA/RFA",
+    "Random Noise attack only tested with FedAvg baseline",
+    "Still need Multi-Krum, Trimmed-Mean, and Zeno results for complete Table IX"
+  ],
+  "generated": "2025-11-09",
+  "status": "PARTIAL - 4/7 defenses complete"
+}

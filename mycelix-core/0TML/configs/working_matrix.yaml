@@ -1,0 +1,42 @@
+# Working Matrix Configuration - Fixed Label Mismatch
+# 2 datasets × 4 attacks × 4 defenses × 2 seeds = 64 experiments (~18-20 hours)
+
+experiment:
+  name: working_matrix
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    # Use MNIST (10 classes) - correct!
+    - name: mnist
+      non_iid: false
+    - name: mnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip        # Core attack
+    - scaling_x100     # Magnitude attack
+    - collusion        # Coordination attack
+    - sleeper_agent    # Adaptive attack
+
+defenses:
+  - fedavg           # Baseline
+  - fltrust          # Best comparison
+  - boba             # Strong baseline
+  - pogq_v4_1        # Our method
+
+training:
+  num_rounds: 100
+  eval_every: 10
+
+statistics:
+  alpha: 0.10
+  margin: 0.02
+  mondrian_profiles: ["label"]
+
+output:
+  base_dir: results
+  save_artifacts: true

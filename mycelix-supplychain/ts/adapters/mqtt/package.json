@@ -1,0 +1,30 @@
+{
+  "name": "mqtt-adapter",
+  "version": "0.1.0",
+  "description": "MQTT to Supply Chain Event adapter for IoT sensors",
+  "main": "dist/ingest.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/ingest.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "mycelix",
+    "supply-chain",
+    "mqtt",
+    "iot",
+    "adapter"
+  ],
+  "author": "Luminous Dynamics",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0"
+  },
+  "dependencies": {
+    "@mycelix/supplychain-sdk": "file:../../sdk",
+    "mqtt": "^5.3.0",
+    "commander": "^11.1.0"
+  }
+}

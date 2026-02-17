@@ -28,6 +28,13 @@ target/
 *.dylib
 *.exe
 *.dll
+*.wasm
+
+# === Compiled Binaries & Model Artifacts ===
+*.joblib
+*.pkl.gz
+mycelix-core/.archive/
+**/vsv-core/src/weights.rs
 
 # === Python ===
 __pycache__/
@@ -236,10 +243,6 @@ repos/
 phi-lab/
 services/
 mycelix.net/
-mycelix-edunet/
-mycelix-marketplace/
-mycelix-music/
-mycelix-supplychain/
 mycelix-workspace/mycelix-v6-living/
 symthaea-core.stale-v0.1/
 11-meta-consciousness/nsfw/

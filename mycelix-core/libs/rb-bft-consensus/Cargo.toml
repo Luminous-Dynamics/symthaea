@@ -1,0 +1,47 @@
+[package]
+name = "rb-bft-consensus"
+version = "0.1.0"
+edition = "2021"
+description = "Reputation-Based Byzantine Fault Tolerant consensus for Mycelix - 45% Byzantine tolerance"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/luminous-dynamics/mycelix"
+
+[features]
+default = ["std"]
+std = []
+async = ["tokio"]
+bls = ["blst"]
+vrf = []
+pq = ["pqcrypto-dilithium", "pqcrypto-traits"]
+threshold = ["frost-ed25519"]
+full-crypto = ["bls", "vrf", "pq", "threshold"]
+
+[dependencies]
+mycelix-core-types = { path = "../mycelix-core-types", features = ["serde"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Error handling (standardized to 2.0 across workspace)
+thiserror = "2.0"
+
+# Real cryptography - ed25519 signatures
+ed25519-dalek = { version = "2.1", features = ["serde", "rand_core", "batch"] }
+sha2 = "0.10"
+rand = "0.8"
+zeroize = { version = "1.7", features = ["derive"] }
+hex = "0.4"
+
+# BLS12-381 aggregate signatures (optional)
+blst = { version = "0.3", optional = true }
+
+# Post-quantum signatures (optional)
+pqcrypto-dilithium = { version = "0.5", optional = true }
+pqcrypto-traits = { version = "0.3", optional = true }
+
+# FROST threshold signatures (optional)
+frost-ed25519 = { version = "2.1", optional = true }
+
+# Optional async support
+tokio = { version = "1", features = ["sync", "time"], optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }

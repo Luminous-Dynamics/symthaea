@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "zomes/did_registry",
+    "zomes/identity_store",
+    "zomes/reputation_sync",
+    "zomes/guardian_graph",
+    "zomes/governance_record",
+]
+
+resolver = "2"
+
+[workspace.dependencies]
+hdk = "0.6.0-rc.0"
+serde = "1.0"

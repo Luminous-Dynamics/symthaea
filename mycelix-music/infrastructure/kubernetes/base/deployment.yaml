@@ -1,0 +1,339 @@
+---
+# Web Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app: mycelix
+    component: web
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: mycelix
+      component: web
+  template:
+    metadata:
+      labels:
+        app: mycelix
+        component: web
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "3000"
+        prometheus.io/path: "/api/metrics"
+    spec:
+      serviceAccountName: mycelix-web
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: web
+          image: ghcr.io/mycelix/web:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: NEXT_PUBLIC_API_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: api-url
+            - name: NEXT_PUBLIC_WS_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: ws-url
+          envFrom:
+            - secretRef:
+                name: mycelix-secrets
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: nextjs-cache
+              mountPath: /app/.next/cache
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: nextjs-cache
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: mycelix
+                    component: web
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: mycelix
+              component: web
+
+---
+# API Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: mycelix
+    component: api
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: mycelix
+      component: api
+  template:
+    metadata:
+      labels:
+        app: mycelix
+        component: api
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "4000"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mycelix-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+        - name: api
+          image: ghcr.io/mycelix/api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 4000
+              protocol: TCP
+            - name: ws
+              containerPort: 4001
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: PORT
+              value: "4000"
+            - name: WS_PORT
+              value: "4001"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mycelix-secrets
+                  key: database-url
+            - name: REDIS_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mycelix-secrets
+                  key: redis-url
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: mycelix-secrets
+                  key: jwt-secret
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: s3-bucket
+            - name: CDN_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: mycelix-config
+                  key: cdn-url
+          envFrom:
+            - secretRef:
+                name: mycelix-secrets
+            - configMapRef:
+                name: mycelix-config
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: mycelix
+                    component: api
+                topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: mycelix
+              component: api
+
+---
+# Processing Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-processing
+  labels:
+    app: mycelix
+    component: worker-processing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mycelix
+      component: worker-processing
+  template:
+    metadata:
+      labels:
+        app: mycelix
+        component: worker-processing
+    spec:
+      serviceAccountName: mycelix-worker
+      containers:
+        - name: worker
+          image: ghcr.io/mycelix/api:latest
+          command: ["node", "dist/workers/processing.js"]
+          env:
+            - name: WORKER_TYPE
+              value: "processing"
+            - name: WORKER_CONCURRENCY
+              value: "4"
+          envFrom:
+            - secretRef:
+                name: mycelix-secrets
+            - configMapRef:
+                name: mycelix-config
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+
+---
+# Streaming Worker Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker-streaming
+  labels:
+    app: mycelix
+    component: worker-streaming
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mycelix
+      component: worker-streaming
+  template:
+    metadata:
+      labels:
+        app: mycelix
+        component: worker-streaming
+    spec:
+      serviceAccountName: mycelix-worker
+      containers:
+        - name: worker
+          image: ghcr.io/mycelix/api:latest
+          command: ["node", "dist/workers/streaming.js"]
+          env:
+            - name: WORKER_TYPE
+              value: "streaming"
+          envFrom:
+            - secretRef:
+                name: mycelix-secrets
+            - configMapRef:
+                name: mycelix-config
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"

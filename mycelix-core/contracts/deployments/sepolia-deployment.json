@@ -1,0 +1,39 @@
+{
+  "network": "sepolia",
+  "chainId": 11155111,
+  "deployedAt": "2026-01-08T18:47:00Z",
+  "deployer": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c",
+  "rpcUrl": "https://ethereum-sepolia-rpc.publicnode.com",
+  "blockExplorer": "https://sepolia.etherscan.io",
+  "contracts": {
+    "MycelixRegistry": {
+      "address": "0x556b810371e3d8D9E5753117514F03cC6C93b835",
+      "etherscanUrl": "https://sepolia.etherscan.io/address/0x556b810371e3d8D9E5753117514F03cC6C93b835",
+      "sourcifyUrl": "https://sourcify.dev/#/lookup/0x556b810371e3d8D9E5753117514F03cC6C93b835",
+      "verified": true
+    },
+    "ReputationAnchor": {
+      "address": "0xf3B343888a9b82274cEfaa15921252DB6c5f48C9",
+      "etherscanUrl": "https://sepolia.etherscan.io/address/0xf3B343888a9b82274cEfaa15921252DB6c5f48C9",
+      "sourcifyUrl": "https://sourcify.dev/#/lookup/0xf3B343888a9b82274cEfaa15921252DB6c5f48C9",
+      "verified": true
+    },
+    "PaymentRouter": {
+      "address": "0x94417A3645824CeBDC0872c358cf810e4Ce4D1cB",
+      "etherscanUrl": "https://sepolia.etherscan.io/address/0x94417A3645824CeBDC0872c358cf810e4Ce4D1cB",
+      "sourcifyUrl": "https://sourcify.dev/#/lookup/0x94417A3645824CeBDC0872c358cf810e4Ce4D1cB",
+      "verified": true
+    }
+  },
+  "configuration": {
+    "owner": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c",
+    "anchorNode": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c",
+    "feeRecipient": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c"
+  },
+  "verificationMethod": "sourcify",
+  "stats": {
+    "totalDids": 1,
+    "registrationFee": "0"
+  },
+  "notes": "Second deployment to Sepolia. All contracts verified on Sourcify."
+}

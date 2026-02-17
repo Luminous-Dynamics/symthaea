@@ -1,0 +1,15 @@
+---
+manifest_version: "1"
+name: zerotrustml
+description: "ZeroTrustML - Byzantine-resistant federated learning with Holochain"
+roles:
+  - name: zerotrustml
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dna/zerotrustml.dna
+      properties: ~
+      uid: ~
+      version: ~
+      clone_limit: 0

@@ -1,0 +1,21 @@
+{{- if and .Values.prometheus.enabled .Values.prometheus.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "zerotrustml.fullname" . }}
+  labels:
+    {{- include "zerotrustml.labels" . | nindent 4 }}
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      {{- include "zerotrustml.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: metrics
+    interval: {{ .Values.prometheus.serviceMonitor.interval }}
+    {{- if .Values.prometheus.serviceMonitor.scrapeTimeout }}
+    scrapeTimeout: {{ .Values.prometheus.serviceMonitor.scrapeTimeout }}
+    {{- end }}
+    path: /metrics
+    scheme: http
+{{- end }}

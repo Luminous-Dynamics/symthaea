@@ -1,0 +1,127 @@
+{
+  "network": {
+    "name": "mycelix-testnet",
+    "chain_id": "mycelix-testnet-v1",
+    "version": "1.0.0",
+    "genesis_time": "2026-01-08T00:00:00Z"
+  },
+  "consensus": {
+    "algorithm": "federated_byzantine",
+    "min_validators": 3,
+    "max_validators": 100,
+    "block_time_ms": 5000,
+    "round_timeout_ms": 30000
+  },
+  "federated_learning": {
+    "aggregation_method": "fedavg",
+    "min_participants": 3,
+    "max_participants_per_round": 50,
+    "round_duration_seconds": 300,
+    "gradient_compression": true,
+    "differential_privacy": {
+      "enabled": true,
+      "epsilon": 1.0,
+      "delta": 1e-5,
+      "noise_multiplier": 1.1
+    },
+    "secure_aggregation": {
+      "enabled": true,
+      "threshold": 0.67
+    }
+  },
+  "tokenomics": {
+    "token_name": "MYCEL",
+    "token_symbol": "MYC",
+    "decimals": 18,
+    "initial_supply": "1000000000000000000000000000",
+    "rewards": {
+      "gradient_submission": "1000000000000000000",
+      "block_validation": "500000000000000000",
+      "model_improvement": "10000000000000000000"
+    }
+  },
+  "rate_limiting": {
+    "global": {
+      "requests_per_second": 1000,
+      "burst_size": 100
+    },
+    "per_node": {
+      "requests_per_minute": 100,
+      "burst_size": 20
+    },
+    "gradient_submission": {
+      "max_per_round": 1,
+      "cooldown_seconds": 60
+    }
+  },
+  "bootstrap_nodes": [
+    {
+      "id": "bootstrap-primary",
+      "public_key": "TO_BE_GENERATED",
+      "endpoints": [
+        "testnet.mycelix.network:9000",
+        "testnet-bootstrap-1.mycelix.network:9000"
+      ],
+      "role": "bootstrap",
+      "region": "us-east-1"
+    }
+  ],
+  "seed_nodes": [
+    {
+      "id": "fl-seed-1",
+      "public_key": "TO_BE_GENERATED",
+      "endpoints": ["testnet-seed-1.mycelix.network:9000"],
+      "role": "seed",
+      "region": "us-east-1"
+    },
+    {
+      "id": "fl-seed-2",
+      "public_key": "TO_BE_GENERATED",
+      "endpoints": ["testnet-seed-2.mycelix.network:9000"],
+      "role": "seed",
+      "region": "us-west-2"
+    },
+    {
+      "id": "fl-seed-3",
+      "public_key": "TO_BE_GENERATED",
+      "endpoints": ["testnet-seed-3.mycelix.network:9000"],
+      "role": "seed",
+      "region": "eu-west-1"
+    },
+    {
+      "id": "fl-seed-4",
+      "public_key": "TO_BE_GENERATED",
+      "endpoints": ["testnet-seed-4.mycelix.network:9000"],
+      "role": "seed",
+      "region": "ap-southeast-1"
+    },
+    {
+      "id": "fl-seed-5",
+      "public_key": "TO_BE_GENERATED",
+      "endpoints": ["testnet-seed-5.mycelix.network:9000"],
+      "role": "seed",
+      "region": "ap-northeast-1"
+    }
+  ],
+  "faucet": {
+    "enabled": true,
+    "amount_per_request": "1000000000000000000000",
+    "cooldown_hours": 24,
+    "max_requests_per_address": 10,
+    "captcha_required": false,
+    "whitelist_enabled": false
+  },
+  "governance": {
+    "proposal_threshold": "1000000000000000000000000",
+    "voting_period_blocks": 17280,
+    "quorum_percentage": 33,
+    "pass_threshold_percentage": 50
+  },
+  "network_parameters": {
+    "max_message_size_bytes": 10485760,
+    "heartbeat_interval_seconds": 30,
+    "peer_discovery_interval_seconds": 60,
+    "max_peers": 50,
+    "gossip_fanout": 6
+  }
+}

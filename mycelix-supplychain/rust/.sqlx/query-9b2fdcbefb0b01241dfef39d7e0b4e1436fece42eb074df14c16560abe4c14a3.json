@@ -1,0 +1,102 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id, tenant_id, product_id, warehouse_id, location_id,\n                quantity_on_hand, quantity_reserved, quantity_available, quantity_on_order,\n                unit_cost, total_value, last_counted_at,\n                created_at, updated_at\n            FROM inv_stock_levels\n            WHERE tenant_id = $1 AND product_id = $2 AND warehouse_id = $3\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "warehouse_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "location_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "quantity_on_hand",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "quantity_reserved",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "quantity_available",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "quantity_on_order",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "unit_cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "total_value",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "last_counted_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "9b2fdcbefb0b01241dfef39d7e0b4e1436fece42eb074df14c16560abe4c14a3"
+}

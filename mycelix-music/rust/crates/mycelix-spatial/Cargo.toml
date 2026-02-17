@@ -1,0 +1,28 @@
+[package]
+name = "mycelix-spatial"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Spatial audio engine with binaural rendering and ambisonics support"
+
+[dependencies]
+mycelix-audio = { path = "../mycelix-audio" }
+
+# Math and DSP
+nalgebra = { version = "0.32", features = ["serde-serialize"] }
+realfft.workspace = true
+ndarray.workspace = true
+num-complex = "0.4"
+
+# Core dependencies
+tokio.workspace = true
+async-trait.workspace = true
+
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+
+[dev-dependencies]
+tokio-test = "0.4"

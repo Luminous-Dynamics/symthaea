@@ -1,0 +1,13 @@
+[package]
+name = "monitoring"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+hdk = "0.6.0"
+serde = { version = "1.0", features = ["derive"] }
+
+[dev-dependencies]

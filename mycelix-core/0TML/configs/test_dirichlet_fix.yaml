@@ -1,0 +1,33 @@
+# Test config for the 3 failed experiments (254-256)
+experiment_name: "test_dirichlet_fix"
+
+dataset:
+  name: "emnist"
+  data_dir: "datasets"
+
+model:
+  type: "emnist_cnn"
+  params:
+    num_classes: 47
+
+data_split:
+  type: "dirichlet"
+  alpha: 0.3
+  seed: 1337
+
+federated:
+  num_clients: 100
+  batch_size: 10
+  learning_rate: 0.01
+  local_epochs: 1
+  fraction_clients: 0.1
+
+training:
+  num_rounds: 1  # Just 1 round to test split creation
+  eval_every: 1
+
+baselines:
+  - name: cbf  # Experiment 254 & 255
+  - name: pogq_v4_1  # Experiment 256
+
+output_dir: "results/dirichlet_fix_test"

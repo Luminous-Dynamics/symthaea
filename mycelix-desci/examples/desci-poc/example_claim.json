@@ -1,0 +1,65 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "epistemic_tier": "E3",
+  "content": {
+    "dataset_hash": "blake3:abc123def456...",
+    "description": "Reproducible study on NAD+ supplementation effects in aging mice",
+    "category": "longevity",
+    "keywords": [
+      "NAD+",
+      "aging",
+      "supplementation",
+      "mice",
+      "lifespan"
+    ],
+    "storage_ref": "ipfs://QmX8Y9Z...",
+    "reproducibility_score": 0.92,
+    "license": "CC-BY-4.0"
+  },
+  "provenance": [
+    {
+      "source": "Lab Notebook ID:2024-042",
+      "source_type": "laboratory_record",
+      "url": "https://lab.example.edu/notebook/2024-042",
+      "timestamp": "2025-10-15T14:30:00Z",
+      "metadata": {
+        "institution": "Example University",
+        "principal_investigator": "Dr. Jane Smith",
+        "funding": "NIH Grant R01AG123456"
+      }
+    },
+    {
+      "source": "PubChem ID:123456",
+      "source_type": "database",
+      "url": "https://pubchem.ncbi.nlm.nih.gov/compound/123456",
+      "timestamp": "2025-10-16T09:15:00Z",
+      "metadata": {
+        "compound_name": "Nicotinamide Adenine Dinucleotide",
+        "molecular_formula": "C21H27N7O14P2"
+      }
+    }
+  ],
+  "creator": "did:key:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK",
+  "created_at": "2025-10-15T14:30:00Z",
+  "updated_at": "2025-11-01T10:20:00Z",
+  "verifications": [
+    {
+      "verifier": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+      "timestamp": "2025-10-20T11:00:00Z",
+      "signature": "0x1234567890abcdef...",
+      "notes": "Verified experimental methodology and statistical analysis"
+    },
+    {
+      "verifier": "did:key:z6MknGc3ocHs3zdPiJbnaaqDi58NGb4pk1Sp9WxWufuXSdxf",
+      "timestamp": "2025-10-25T15:30:00Z",
+      "signature": "0xabcdef1234567890...",
+      "notes": "Reproduced results with 95% confidence interval"
+    },
+    {
+      "verifier": "did:key:z6MkrHKzgsahxBLyNAbLQyB1pcWNYC9GmywiWPgkrvntAZcj",
+      "timestamp": "2025-10-30T09:45:00Z",
+      "signature": "0xfedcba0987654321...",
+      "notes": "Independent replication successful, confirms findings"
+    }
+  ]
+}

@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mycelix Architecture Map</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2d3748;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #718096;
+            margin-bottom: 40px;
+            font-size: 1.2em;
+        }
+        
+        .architecture-stack {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .layer {
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+            transition: all 0.3s ease;
+        }
+        
+        .layer:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        
+        .layer-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        
+        .layer-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #2d3748;
+        }
+        
+        .layer-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .status-ready { background: #c6f6d5; color: #22543d; }
+        .status-dev { background: #feebc8; color: #7c2d12; }
+        .status-research { background: #e9d8fd; color: #44337a; }
+        .status-future { background: #bee3f8; color: #2c5282; }
+        
+        .layer-components {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-top: 15px;
+        }
+        
+        .component {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            font-size: 0.9em;
+        }
+        
+        .component-title {
+            font-weight: 600;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        
+        .component-desc {
+            color: #718096;
+            font-size: 0.85em;
+        }
+        
+        .legend {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin-top: 40px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 12px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+        
+        .flow-diagram {
+            margin-top: 40px;
+            padding: 30px;
+            background: #f7fafc;
+            border-radius: 12px;
+        }
+        
+        .flow-title {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        .flow-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .flow-step {
+            flex: 1;
+            min-width: 150px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .flow-arrow {
+            font-size: 2em;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🍄 Mycelix System Architecture</h1>
+        <p class="subtitle">From Verifiable Trust Foundation to Civilizational Protocol</p>
+        
+        <div class="architecture-stack">
+            <!-- Layer 10 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 10: Civilization</div>
+                    <div class="layer-status status-future">Phase 3+ (2027+)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">Cultural Memory</div>
+                        <div class="component-desc">Temporal knowledge graph, historical queries</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Ecological RWAs</div>
+                        <div class="component-desc">Carbon credits, biodiversity tracking</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Wisdom Library</div>
+                        <div class="component-desc">Constitutional commentary, rituals</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 9 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 9: Collective Intelligence</div>
+                    <div class="layer-status status-future">Phase 3+ (2027+)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">Scaled PoGQ</div>
+                        <div class="component-desc">Federated learning, gradient validation</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">zkML Oracles</div>
+                        <div class="component-desc">Verifiable ML predictions</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Epistemic Markets</div>
+                        <div class="component-desc">Prediction markets, confidence trading</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 8 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 8: Intent</div>
+                    <div class="layer-status status-dev">Phase 2 (2026)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">ISL (Intent Spec Language)</div>
+                        <div class="component-desc">Declarative goal expression</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Solver Network</div>
+                        <div class="component-desc">Competitive execution proposals</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Agent Communication</div>
+                        <div class="component-desc">P2P messaging, coordination</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 7 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 7: Governance</div>
+                    <div class="layer-status status-dev">Phase 1 (Bootstrap)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">RB-BFT Consensus</div>
+                        <div class="component-desc">45% Byzantine tolerance</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">MIP Framework</div>
+                        <div class="component-desc">Improvement proposals (T/E/G/S/C)</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Treasury</div>
+                        <div class="component-desc">Multi-sig, revenue distribution</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Voting (Reputation-Weighted)</div>
+                        <div class="component-desc">Quadratic voting, DP-protected</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 6 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 6: MATL (Adaptive Trust Layer)</div>
+                    <div class="layer-status status-research">Phase 1 (Research Preview)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">Composite Scoring</div>
+                        <div class="component-desc">PoGQ (0.4) + TCDM (0.3) + Entropy (0.3)</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Cartel Detection</div>
+                        <div class="component-desc">Graph clustering, risk scoring</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">zk-STARK Proofs (Optional)</div>
+                        <div class="component-desc">Verifiable computation (Risc0)</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Adaptive DP</div>
+                        <div class="component-desc">Vote privacy, governance protection</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 5 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 5: Identity</div>
+                    <div class="layer-status status-dev">Phase 1 (Minimal)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">W3C DIDs</div>
+                        <div class="component-desc">Self-sovereign identity</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Verifiable Credentials</div>
+                        <div class="component-desc">Phase 1: VerifiedHumanity only</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Gitcoin Passport</div>
+                        <div class="component-desc">Sybil filter (≥20 score)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 4 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 4: Bridge (Cross-Chain)</div>
+                    <div class="layer-status status-dev">Phase 1.5 (Q2 2026)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">Phase 1: Merkle Bridge</div>
+                        <div class="component-desc">RB-BFT validators, TVL caps</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Phase 2: ZK-STARK Bridge</div>
+                        <div class="component-desc">Trustless, proof-based</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Stablecoin Support</div>
+                        <div class="component-desc">USDC, DAI (Polygon PoS)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 3 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 3: Settlement (Verifiable Aggregation)</div>
+                    <div class="layer-status status-dev">Phase 2 (2026)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">ZK-Rollup / Validium</div>
+                        <div class="component-desc">Batch state transitions, validity proofs</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Sequencer Network</div>
+                        <div class="component-desc">Reputation-gated, Byzantine-resistant</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 2 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 2: DKG (Decentralized Knowledge Graph)</div>
+                    <div class="layer-status status-dev">Phase 2 (2026)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">RDF Triple Store</div>
+                        <div class="component-desc">Semantic data, SPARQL queries</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Epistemic Claims</div>
+                        <div class="component-desc">Tiered verifiability (0-4)</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Dispute Resolution</div>
+                        <div class="component-desc">4-tier system (A/B/C/D)</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 1 -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 1: DHT (Agent-Centric Execution)</div>
+                    <div class="layer-status status-ready">Phase 1 (Ready)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">Holochain RSM</div>
+                        <div class="component-desc">Source chains, gossip protocol</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Zero Fees</div>
+                        <div class="component-desc">Local operations, no gas</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Agent Sovereignty</div>
+                        <div class="component-desc">Immutable per-agent logs</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Layer 1B (NEW) -->
+            <div class="layer">
+                <div class="layer-header">
+                    <div class="layer-title">Layer 1B: Network Transport</div>
+                    <div class="layer-status status-dev">Phase 1.5 (Hybrid)</div>
+                </div>
+                <div class="layer-components">
+                    <div class="component">
+                        <div class="component-title">libp2p Mesh</div>
+                        <div class="component-desc">High-throughput messaging (50k+ msg/sec)</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">IPFS Storage</div>
+                        <div class="component-desc">Blob storage for gradients, models</div>
+                    </div>
+                    <div class="component">
+                        <div class="component-title">Hybrid Topology</div>
+                        <div class="component-desc">libp2p (transport) + Holochain (trust)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flow-diagram">
+            <div class="flow-title">Trust Verification Flow</div>
+            <div class="flow-steps">
+                <div class="flow-step">
+                    <div style="font-size: 2em; margin-bottom: 10px;">👤</div>
+                    <div style="font-weight: 600;">Member</div>
+                    <div style="font-size: 0.85em; color: #718096;">Submits action</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🔍</div>
+                    <div style="font-weight: 600;">MATL</div>
+                    <div style="font-size: 0.85em; color: #718096;">Calculates trust score</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div style="font-size: 2em; margin-bottom: 10px;">✅</div>
+                    <div style="font-weight: 600;">zk-STARK</div>
+                    <div style="font-size: 0.85em; color: #718096;">Generates proof</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🌐</div>
+                    <div style="font-weight: 600;">DHT</div>
+                    <div style="font-size: 0.85em; color: #718096;">Stores & validates</div>
+                </div>
+                <div class="flow-arrow">→</div>
+                <div class="flow-step">
+                    <div style="font-size: 2em; margin-bottom: 10px;">🏛️</div>
+                    <div style="font-weight: 600;">Governance</div>
+                    <div style="font-size: 0.85em; color: #718096;">Uses for decisions</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #c6f6d5;"></div>
+                <div>Ready (Q1 2026)</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #feebc8;"></div>
+                <div>In Development (2026)</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #e9d8fd;"></div>
+                <div>Research (Experimental)</div>
+            </div>
+            <div class="legend-item">
+                <div class="legend-dot" style="background: #bee3f8;"></div>
+                <div>Future (2027+)</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

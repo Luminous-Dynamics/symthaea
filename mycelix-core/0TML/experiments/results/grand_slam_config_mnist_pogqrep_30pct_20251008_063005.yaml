@@ -1,0 +1,53 @@
+baselines:
+- name: pogqrep
+  params:
+    quality_threshold: 0.3
+    reputation_decay: 0.95
+byzantine:
+  attack_types:
+  - adaptive
+  enable_peer_context: true
+  num_byzantine: 6
+  severity: 1.0
+data_split:
+  alpha: 0.1
+  num_clients: 10
+  seed: 42
+  type: dirichlet
+dataset:
+  name: mnist
+  num_test: 10000
+  num_train: 60000
+description: 'Quick validation: Does PoGQ beat Multi-Krum on hardest cases?'
+device: cuda
+experiment_name: grand_slam_mnist_pogqrep_30pct
+federated:
+  batch_size: 32
+  fraction_clients: 1.0
+  learning_rate: 0.01
+  local_epochs: 5
+  num_byzantine: 6
+  num_clients: 10
+  num_rounds: 50
+  quality_threshold: 0.3
+  reputation_decay: 0.95
+model:
+  params:
+    num_classes: 10
+  type: simple_cnn
+save:
+  attack_analysis: true
+  final_model: false
+  metrics:
+  - train_loss
+  - train_accuracy
+  - test_loss
+  - test_accuracy
+  - num_accepted
+  - avg_quality_score
+  per_round: true
+training:
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 5
+  num_rounds: 50

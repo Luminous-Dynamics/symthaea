@@ -1,0 +1,15 @@
+---
+manifest_version: "0"
+name: edunet-minimal
+
+integrity:
+  zomes:
+    - name: learning_integrity
+      path: ../target/wasm32-unknown-unknown/release/learning_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: learning_coordinator
+      path: ../target/wasm32-unknown-unknown/release/learning_coordinator.wasm
+      dependencies:
+        - name: learning_integrity

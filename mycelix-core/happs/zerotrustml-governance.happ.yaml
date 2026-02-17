@@ -1,0 +1,140 @@
+---
+# Holochain hApp Manifest
+# ZeroTrustML Governance - Decentralized Governance for ML Networks
+
+manifest_version: "1"
+name: zerotrustml-governance
+description: |
+  Decentralized governance system for managing ML network policies, model
+  validations, and collective decision-making within the Mycelix-Core ecosystem.
+  Implements futarchy-inspired prediction markets and conviction voting.
+
+roles:
+  - id: governance_core
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/zerotrustml-governance.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          # Proposal configuration
+          proposal_threshold: 100  # Min reputation to create proposals
+          voting_period_days: 7
+          quorum_percentage: 33
+          # Execution parameters
+          execution_delay_hours: 24
+          emergency_threshold: 75
+          # Voting mechanisms
+          voting_mechanism: conviction  # conviction | quadratic | weighted
+          conviction_decay: 0.9
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: policy_registry
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/policy-registry.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          policy_categories:
+            - model_safety
+            - privacy_requirements
+            - resource_limits
+            - access_control
+            - data_handling
+          version_history_depth: 50
+          require_impact_assessment: true
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: prediction_markets
+    provisioning:
+      strategy: create
+      deferred: true  # Optional component
+    dna:
+      bundled: ../dist/dnas/prediction-markets.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          market_creation_stake: 500
+          resolution_oracle: decentralized
+          fee_percentage: 1
+          max_market_duration_days: 90
+        origin_time: ~
+      version: ~
+      clone_limit: 20
+
+  - id: model_validation
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/model-validation.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          validation_types:
+            - safety_audit
+            - performance_benchmark
+            - bias_assessment
+            - privacy_audit
+          min_validators: 5
+          consensus_threshold: 0.8
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+membrane_proofs:
+  governance_core: null
+  policy_registry: null
+  prediction_markets: null
+  model_validation: null
+
+meta:
+  author: Mycelix Core Team
+  repository: https://github.com/Luminous-Dynamics/Mycelix-Core
+  license: Apache-2.0
+  version: "0.1.0"
+  holochain_version: "0.3.x"
+
+  dependencies:
+    - name: zerotrustml-identity
+      version: ">=0.1.0"
+      required: true
+    - name: zerotrustml-reputation
+      version: ">=0.1.0"
+      required: true
+
+  integrations:
+    - zerotrustml-identity
+    - zerotrustml-reputation
+    - mycelix-marketplace
+
+  entry_points:
+    create_proposal:
+      zome: governance_core
+      fn: create_proposal
+      description: Create a governance proposal
+    cast_vote:
+      zome: governance_core
+      fn: cast_vote
+      description: Cast a vote on an active proposal
+    register_policy:
+      zome: policy_registry
+      fn: register_policy
+      description: Register a new network policy
+    create_market:
+      zome: prediction_markets
+      fn: create_prediction_market
+      description: Create a futarchy prediction market
+    submit_validation:
+      zome: model_validation
+      fn: submit_model_validation
+      description: Submit a model validation result

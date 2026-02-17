@@ -1,0 +1,17 @@
+{
+  "h_calib": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "h_model": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "h_grad": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "beta_fp": 55705,
+  "w": 2,
+  "k": 3,
+  "m": 2,
+  "egregious_cap_fp": 65529,
+  "threshold_fp": 65536,
+  "ema_prev_fp": 49152,
+  "consec_viol_prev": 1,
+  "consec_clear_prev": 0,
+  "quarantined_prev": 0,
+  "current_round": 10,
+  "quarantine_out": 0
+}

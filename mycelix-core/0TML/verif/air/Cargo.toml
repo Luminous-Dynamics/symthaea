@@ -1,0 +1,19 @@
+[package]
+name = "vsv-stark-air"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+winterfell = "0.13"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+criterion = "0.5"
+
+# Benchmarks will be added in Day 3
+# [[bench]]
+# name = "proof_bench"
+# harness = false

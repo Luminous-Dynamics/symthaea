@@ -1,0 +1,278 @@
+# Alertmanager Escalation Policies for Mycelix FL
+# Defines escalation paths for different alert types and severities
+
+# =============================================================================
+# Escalation Tiers
+# =============================================================================
+
+tiers:
+  # Tier 1: On-call engineer (first response)
+  tier_1:
+    name: "On-Call Engineer"
+    response_time: "15 minutes"
+    channels:
+      - pagerduty_oncall
+      - slack_alerts_critical
+    responsibilities:
+      - Acknowledge alert
+      - Initial triage
+      - Apply immediate mitigation if possible
+      - Escalate if unable to resolve within 30 minutes
+
+  # Tier 2: Senior Engineer / Team Lead
+  tier_2:
+    name: "Senior Engineer"
+    response_time: "30 minutes"
+    escalation_after: "30 minutes from Tier 1"
+    channels:
+      - pagerduty_senior
+      - slack_alerts_critical
+      - email_engineering_leads
+    responsibilities:
+      - Deep technical investigation
+      - Coordinate with other teams if needed
+      - Decision on rollback or emergency fixes
+      - Escalate if customer impact exceeds 1 hour
+
+  # Tier 3: Engineering Manager + On-Call VP
+  tier_3:
+    name: "Engineering Leadership"
+    response_time: "1 hour"
+    escalation_after: "1 hour from Tier 2"
+    channels:
+      - pagerduty_management
+      - phone_call
+      - email_executive
+    responsibilities:
+      - Customer communication
+      - Resource allocation decisions
+      - External vendor coordination
+      - Post-incident review initiation
+
+  # Tier 4: Executive (major incidents only)
+  tier_4:
+    name: "Executive Response"
+    response_time: "2 hours"
+    escalation_after: "Major incident declared"
+    channels:
+      - phone_call
+      - email_c_level
+    responsibilities:
+      - Public communication decisions
+      - Legal/compliance coordination
+      - Customer escalation handling
+
+# =============================================================================
+# Alert-Specific Escalation Policies
+# =============================================================================
+
+policies:
+  # Security Incidents
+  security_critical:
+    description: "Active security threat or data breach"
+    severity: critical
+    category: security
+    initial_tier: tier_2  # Skip Tier 1, go directly to senior
+    automatic_escalation:
+      - to: tier_3
+        after: 30m
+      - to: tier_4
+        after: 1h
+    notifications:
+      - security_team_immediately
+      - legal_team_within_1h
+    sla:
+      acknowledge: 5m
+      mitigate: 30m
+      resolve: 4h
+
+  # Byzantine Attack
+  byzantine_attack:
+    description: "Active Byzantine or Sybil attack on FL network"
+    alerts:
+      - ByzantineAttackDetected
+      - SybilAttackSuspected
+      - HighByzantineRatio
+    initial_tier: tier_1
+    automatic_escalation:
+      - to: tier_2
+        after: 15m
+      - to: tier_3
+        after: 1h
+    special_actions:
+      - Enable strict validation mode
+      - Pause new node registrations
+      - Snapshot current state
+    sla:
+      acknowledge: 5m
+      mitigate: 30m
+      resolve: 2h
+
+  # Training Stalled
+  training_critical:
+    description: "FL training has stopped or is severely degraded"
+    alerts:
+      - TrainingStalled
+      - GradientAggregationFailure
+    initial_tier: tier_1
+    automatic_escalation:
+      - to: tier_2
+        after: 30m
+    sla:
+      acknowledge: 15m
+      mitigate: 1h
+      resolve: 4h
+
+  # Data Integrity
+  data_integrity:
+    description: "Potential data corruption or tampering"
+    alerts:
+      - HybridBridgeIntegrityError
+      - PrivacyViolationDetected
+    initial_tier: tier_2
+    automatic_escalation:
+      - to: tier_3
+        after: 15m
+      - to: tier_4
+        after: 1h
+    notifications:
+      - compliance_team_immediately
+    sla:
+      acknowledge: 5m
+      mitigate: 30m
+      resolve: 2h
+
+  # Service Down
+  service_availability:
+    description: "Critical service unavailable"
+    alerts:
+      - NodeDown
+      - PostgreSQLDown
+      - HolochainConductorDown
+    initial_tier: tier_1
+    automatic_escalation:
+      - to: tier_2
+        after: 15m
+      - to: tier_3
+        after: 45m
+    sla:
+      acknowledge: 5m
+      mitigate: 15m
+      resolve: 1h
+
+  # Performance Degradation
+  performance_warning:
+    description: "System performance below acceptable levels"
+    severity: warning
+    category: performance
+    initial_tier: tier_1
+    automatic_escalation:
+      - to: tier_2
+        after: 1h
+    sla:
+      acknowledge: 30m
+      investigate: 2h
+      resolve: 8h
+
+  # Capacity Issues
+  capacity_warning:
+    description: "Resource capacity approaching limits"
+    severity: warning
+    category: capacity
+    initial_tier: tier_1
+    automatic_escalation:
+      - to: tier_2
+        after: 2h
+        if: "utilization > 90%"
+    sla:
+      acknowledge: 1h
+      plan: 24h
+      resolve: 72h
+
+# =============================================================================
+# On-Call Schedule Integration
+# =============================================================================
+
+oncall_integration:
+  # PagerDuty schedule IDs
+  pagerduty:
+    primary_schedule: "PXXXXXX"
+    secondary_schedule: "PYYYYYY"
+    management_schedule: "PZZZZZZ"
+
+  # Slack user groups
+  slack_usergroups:
+    oncall_primary: "@oncall-primary"
+    oncall_secondary: "@oncall-secondary"
+    engineering_leads: "@eng-leads"
+
+# =============================================================================
+# Business Hours Configuration
+# =============================================================================
+
+business_hours:
+  timezone: "America/Los_Angeles"
+  weekdays:
+    start: "09:00"
+    end: "18:00"
+  weekends: false
+
+  # During business hours, faster escalation
+  business_hours_policy:
+    tier_1_to_tier_2: 15m
+    tier_2_to_tier_3: 30m
+
+  # After hours, slightly longer but still responsive
+  after_hours_policy:
+    tier_1_to_tier_2: 30m
+    tier_2_to_tier_3: 1h
+
+# =============================================================================
+# Major Incident Declaration
+# =============================================================================
+
+major_incident_criteria:
+  # Automatic major incident declaration
+  auto_declare:
+    - condition: "Multiple critical alerts firing simultaneously"
+      threshold: 3
+    - condition: "Customer-facing service down"
+      services: ["fl-coordinator", "holochain"]
+    - condition: "Data integrity violation"
+      any_of: ["HybridBridgeIntegrityError", "PrivacyViolationDetected"]
+    - condition: "Active security breach"
+      any_of: ["ByzantineAttackDetected", "SybilAttackSuspected"]
+
+  # Actions on major incident
+  actions:
+    - Create incident channel: "#inc-YYYYMMDD-HHMM"
+    - Page all tier_2 and tier_3
+    - Start incident timeline document
+    - Notify customer success team
+    - Begin status page updates
+
+# =============================================================================
+# Post-Incident Requirements
+# =============================================================================
+
+post_incident:
+  # Required for all severity: critical incidents
+  critical:
+    - Incident report within 24h
+    - Blameless post-mortem within 5 business days
+    - Action items tracked in JIRA
+    - Review with engineering leadership
+
+  # Required for all severity: warning incidents > 4h
+  extended_warning:
+    - Brief incident summary
+    - Root cause documented
+    - Prevention measures identified
+
+  # Customer communication
+  customer_notification:
+    required_for:
+      - Customer-facing service degradation > 30m
+      - Data integrity issues
+      - Security incidents
+    template: "templates/customer-incident-notification.md"

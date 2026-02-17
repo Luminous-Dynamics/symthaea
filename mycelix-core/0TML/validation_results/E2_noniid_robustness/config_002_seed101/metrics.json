@@ -1,0 +1,10 @@
+{
+  "clean_acc": 0.634,
+  "robust_acc": 0.634,
+  "auc": 0.8191473423115979,
+  "fpr_at_tpr90": 0.47357293868921774,
+  "alpha": 0.3,
+  "adversary_rate": 0.2,
+  "convergence_round": 7,
+  "flags_per_round": 7.45
+}

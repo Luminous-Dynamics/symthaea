@@ -1,0 +1,77 @@
+---
+manifest_version: "0"
+name: edunet
+
+integrity:
+  zomes:
+    # Core Education Features
+    - name: learning_integrity
+      path: ../target/wasm32-unknown-unknown/release/learning_integrity.wasm
+    - name: fl_integrity
+      path: ../target/wasm32-unknown-unknown/release/fl_integrity.wasm
+    - name: credential_integrity
+      path: ../target/wasm32-unknown-unknown/release/credential_integrity.wasm
+    - name: dao_integrity
+      path: ../target/wasm32-unknown-unknown/release/dao_integrity.wasm
+    # Differentiation Features
+    - name: srs_integrity
+      path: ../target/wasm32-unknown-unknown/release/srs_integrity.wasm
+    - name: gamification_integrity
+      path: ../target/wasm32-unknown-unknown/release/gamification_integrity.wasm
+    - name: adaptive_integrity
+      path: ../target/wasm32-unknown-unknown/release/adaptive_integrity.wasm
+    - name: integration_integrity
+      path: ../target/wasm32-unknown-unknown/release/integration_integrity.wasm
+    - name: pods_integrity
+      path: ../target/wasm32-unknown-unknown/release/pods_integrity.wasm
+    - name: knowledge_integrity
+      path: ../target/wasm32-unknown-unknown/release/knowledge_integrity.wasm
+
+coordinator:
+  zomes:
+    # Core Education Features
+    - name: learning_coordinator
+      path: ../target/wasm32-unknown-unknown/release/learning_coordinator.wasm
+      dependencies:
+        - name: learning_integrity
+    - name: fl_coordinator
+      path: ../target/wasm32-unknown-unknown/release/fl_coordinator.wasm
+      dependencies:
+        - name: fl_integrity
+    - name: credential_coordinator
+      path: ../target/wasm32-unknown-unknown/release/credential_coordinator.wasm
+      dependencies:
+        - name: credential_integrity
+    - name: dao_coordinator
+      path: ../target/wasm32-unknown-unknown/release/dao_coordinator.wasm
+      dependencies:
+        - name: dao_integrity
+    # Differentiation Features
+    - name: srs_coordinator
+      path: ../target/wasm32-unknown-unknown/release/srs_coordinator.wasm
+      dependencies:
+        - name: srs_integrity
+    - name: gamification_coordinator
+      path: ../target/wasm32-unknown-unknown/release/gamification_coordinator.wasm
+      dependencies:
+        - name: gamification_integrity
+    - name: adaptive_coordinator
+      path: ../target/wasm32-unknown-unknown/release/adaptive_coordinator.wasm
+      dependencies:
+        - name: adaptive_integrity
+    - name: integration_coordinator
+      path: ../target/wasm32-unknown-unknown/release/integration_coordinator.wasm
+      dependencies:
+        - name: integration_integrity
+        - name: learning_integrity
+        - name: srs_integrity
+        - name: gamification_integrity
+        - name: adaptive_integrity
+    - name: pods_coordinator
+      path: ../target/wasm32-unknown-unknown/release/pods_coordinator.wasm
+      dependencies:
+        - name: pods_integrity
+    - name: knowledge_coordinator
+      path: ../target/wasm32-unknown-unknown/release/knowledge_coordinator.wasm
+      dependencies:
+        - name: knowledge_integrity

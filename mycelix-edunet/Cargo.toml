@@ -1,0 +1,93 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/edunet-core",
+  "zomes/learning_zome/integrity",
+  "zomes/learning_zome/coordinator",
+  "zomes/fl_zome/integrity",
+  "zomes/fl_zome/coordinator",
+  "zomes/credential_zome/integrity",
+  "zomes/credential_zome/coordinator",
+  "zomes/dao_zome/integrity",
+  "zomes/dao_zome/coordinator",
+  # NEW: Differentiation features
+  "zomes/pods_zome/integrity",
+  "zomes/pods_zome/coordinator",
+  "zomes/knowledge_zome/integrity",
+  "zomes/knowledge_zome/coordinator",
+  # Spaced Repetition System (SM-2 algorithm)
+  "zomes/srs_zome/integrity",
+  "zomes/srs_zome/coordinator",
+  # Gamification Engine (XP, badges, streaks)
+  "zomes/gamification_zome/integrity",
+  "zomes/gamification_zome/coordinator",
+  # Adaptive Learning Intelligence (ML-inspired personalization)
+  "zomes/adaptive_zome/integrity",
+  "zomes/adaptive_zome/coordinator",
+  # Integration Layer (cross-zome orchestration)
+  "zomes/integration_zome/integrity",
+  "zomes/integration_zome/coordinator",
+]
+# Excluded from workspace: these pull in non-WASM-compatible deps.
+# - tests: full holochain conductor (tokio/mio)
+# - edunet-agg, mycelix-governance: statrs/nalgebra (rand -> getrandom 0.2)
+# Run tests with: cargo test --manifest-path tests/Cargo.toml
+exclude = ["tests", "crates/edunet-agg", "crates/mycelix-governance"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <info@mycelix.org>"]
+license = "Apache-2.0"
+repository = "https://github.com/Luminous-Dynamics/mycelix-edunet"
+
+[workspace.dependencies]
+# Holochain 0.6.0 compatible dependencies
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_integrity_types = "0.6.0"
+holochain_zome_types = "0.6.0"
+
+# Serialization (versions determined by HDI/HDK)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+holochain_serialized_bytes = "0.0.56"
+
+# Crypto
+blake3 = "1.5"
+ed25519-dalek = "2.1"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Utilities
+# Note: Use default-features = false to avoid wasm-bindgen for Holochain
+chrono = { version = "0.4", default-features = false, features = ["serde", "std"] }
+
+# Statistics (for aggregation)
+statrs = "0.17"
+
+# Random generation (for tests)
+rand = "0.8"
+rand_chacha = "0.3"
+rand_distr = "0.4"
+
+# Benchmarking
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# CRITICAL: Force getrandom to use custom backend for WASM builds
+# holochain_nonce enables "std" feature, but WASM needs "custom" as well
+# Features are additive in Cargo, so adding "custom" here enables both
+getrandom = { version = "0.3", default-features = false, features = ["custom"] }
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+overflow-checks = true
+
+# Pin mio to 1.0.x to avoid platform compatibility issues with 1.1.1
+# The mio 1.1.1 has UdpSocket method errors on some platforms
+[patch.crates-io]
+mio = { git = "https://github.com/tokio-rs/mio", tag = "v1.0.3" }

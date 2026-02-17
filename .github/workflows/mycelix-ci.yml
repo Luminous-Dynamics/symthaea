@@ -17,10 +17,9 @@ on:
       - 'mycelix-core/**'
       - 'mycelix-mail/**'
       - 'mycelix-personal/**'
-      # Uncomment once committed to git:
-      # - 'mycelix-edunet/**'
-      # - 'mycelix-marketplace/**'
-      # - 'mycelix-supplychain/**'
+      - 'mycelix-edunet/**'
+      - 'mycelix-marketplace/**'
+      - 'mycelix-supplychain/**'
       - 'mycelix-workspace/happs/lucid/ui/**'
       - '.github/workflows/mycelix-ci.yml'
   pull_request:
@@ -39,10 +38,9 @@ on:
       - 'mycelix-core/**'
       - 'mycelix-mail/**'
       - 'mycelix-personal/**'
-      # Uncomment once committed to git:
-      # - 'mycelix-edunet/**'
-      # - 'mycelix-marketplace/**'
-      # - 'mycelix-supplychain/**'
+      - 'mycelix-edunet/**'
+      - 'mycelix-marketplace/**'
+      - 'mycelix-supplychain/**'
 
 env:
   CARGO_TERM_COLOR: always
@@ -249,12 +247,11 @@ jobs:
           - { name: health, path: mycelix-health }          # submodule
           - { name: energy, path: mycelix-energy }
           - { name: climate, path: mycelix-climate }
-          - { name: mail, path: mycelix-mail/holochain }    # submodule
+          - { name: mail, path: mycelix-mail/holochain }
           - { name: personal, path: mycelix-personal }
-          # Uncomment these once their directories are committed to git:
-          # - { name: edunet, path: mycelix-edunet }
-          # - { name: marketplace, path: mycelix-marketplace/backend }
-          # - { name: supplychain, path: mycelix-supplychain/holochain }
+          - { name: edunet, path: mycelix-edunet }
+          - { name: marketplace, path: mycelix-marketplace/backend }
+          - { name: supplychain, path: mycelix-supplychain/holochain }
 
     steps:
       - uses: actions/checkout@v4

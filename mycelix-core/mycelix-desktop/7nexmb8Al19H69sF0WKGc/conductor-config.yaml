@@ -1,0 +1,26 @@
+tracing_override: null
+data_root_path: /srv/luminous-dynamics/Mycelix-Core/mycelix-desktop/7nexmb8Al19H69sF0WKGc
+device_seed_lair_tag: null
+danger_generate_throwaway_device_seed: false
+keystore:
+  type: lair_server_in_proc
+  lair_root: /srv/luminous-dynamics/Mycelix-Core/mycelix-desktop/7nexmb8Al19H69sF0WKGc/ks
+dpki:
+  dna_path: null
+  network_seed: ''
+  allow_throwaway_random_dpki_agent_key: false
+  no_dpki: true
+admin_interfaces:
+- driver:
+    type: websocket
+    port: 0
+    allowed_origins: '*'
+network:
+  bootstrap_url: https://dev-test-bootstrap2.holochain.org/
+  signal_url: wss://dev-test-bootstrap2.holochain.org/
+  webrtc_config: null
+  target_arc_factor: 1
+  advanced: null
+db_sync_strategy: Resilient
+tuning_params: null
+tracing_scope: null

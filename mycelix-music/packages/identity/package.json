@@ -1,0 +1,56 @@
+{
+  "name": "@mycelix/identity",
+  "version": "0.1.0",
+  "description": "Unified identity and wallet management for the Mycelix ecosystem",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react.mjs",
+      "require": "./dist/react.js",
+      "types": "./dist/react.d.ts"
+    },
+    "./contracts": {
+      "import": "./dist/contracts.mjs",
+      "require": "./dist/contracts.js",
+      "types": "./dist/contracts.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "@wagmi/core": "^2.6.0",
+    "viem": "^2.7.0",
+    "zustand": "^4.5.0",
+    "@tanstack/react-query": "^5.17.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0",
+    "react-dom": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  },
+  "keywords": [
+    "mycelix",
+    "identity",
+    "wallet",
+    "web3",
+    "soulbound"
+  ],
+  "license": "MIT"
+}

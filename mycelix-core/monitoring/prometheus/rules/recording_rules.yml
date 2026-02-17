@@ -1,0 +1,255 @@
+# Mycelix Recording Rules
+# Pre-computed aggregations for dashboard efficiency and complex alert queries
+
+groups:
+  # ============================================
+  # FL Training Metrics
+  # ============================================
+  - name: fl_training_recording
+    interval: 15s
+    rules:
+      # Rounds per minute
+      - record: mycelix_fl:rounds_per_minute
+        expr: rate(mycelix_fl_rounds_total[1m]) * 60
+
+      # Gradients processed per second
+      - record: mycelix_fl:gradients_per_second
+        expr: rate(mycelix_fl_gradients_received_total[1m])
+
+      # Byzantine detection rate (normalized)
+      - record: mycelix_fl:byzantine_detection_rate
+        expr: |
+          rate(mycelix_fl_byzantine_detected_total[5m]) /
+          (rate(mycelix_fl_gradients_received_total[5m]) + 0.001)
+
+      # Healing success rate
+      - record: mycelix_fl:healing_rate
+        expr: |
+          rate(mycelix_fl_gradients_healed_total[5m]) /
+          (rate(mycelix_fl_gradients_received_total[5m]) + 0.001)
+
+      # Round latency percentiles
+      - record: mycelix_fl:round_latency_p50_ms
+        expr: histogram_quantile(0.50, rate(mycelix_fl_round_latency_ms_bucket[5m]))
+
+      - record: mycelix_fl:round_latency_p95_ms
+        expr: histogram_quantile(0.95, rate(mycelix_fl_round_latency_ms_bucket[5m]))
+
+      - record: mycelix_fl:round_latency_p99_ms
+        expr: histogram_quantile(0.99, rate(mycelix_fl_round_latency_ms_bucket[5m]))
+
+      # Detection latency percentiles
+      - record: mycelix_fl:detection_latency_p50_ms
+        expr: histogram_quantile(0.50, rate(mycelix_fl_detection_latency_ms_bucket[5m]))
+
+      - record: mycelix_fl:detection_latency_p95_ms
+        expr: histogram_quantile(0.95, rate(mycelix_fl_detection_latency_ms_bucket[5m]))
+
+      - record: mycelix_fl:detection_latency_p99_ms
+        expr: histogram_quantile(0.99, rate(mycelix_fl_detection_latency_ms_bucket[5m]))
+
+  # ============================================
+  # Node Health Metrics
+  # ============================================
+  - name: node_health_recording
+    interval: 30s
+    rules:
+      # Active node count by status
+      - record: mycelix_fl:active_nodes_count
+        expr: count(up{job=~"mycelix-fl-nodes|mycelix-fl-coordinator"} == 1)
+
+      # Healthy node percentage
+      - record: mycelix_fl:healthy_node_percentage
+        expr: |
+          count(up{job="mycelix-fl-nodes"} == 1) /
+          count(up{job="mycelix-fl-nodes"})
+
+      # Average node reputation
+      - record: mycelix_fl:avg_node_reputation
+        expr: avg(mycelix_fl_node_reputation)
+
+      # Minimum node reputation
+      - record: mycelix_fl:min_node_reputation
+        expr: min(mycelix_fl_node_reputation)
+
+      # Node disconnection rate
+      - record: mycelix_fl:node_disconnection_rate
+        expr: rate(mycelix_fl_node_disconnections_total[5m])
+
+  # ============================================
+  # Byzantine Detection Metrics
+  # ============================================
+  - name: byzantine_recording
+    interval: 15s
+    rules:
+      # Total Byzantine detections (1h window)
+      - record: mycelix_fl:byzantine_detections_1h
+        expr: increase(mycelix_fl_byzantine_detected_total[1h])
+
+      # Byzantine ratio trend
+      - record: mycelix_fl:byzantine_ratio_trend
+        expr: deriv(mycelix_fl_byzantine_ratio[30m])
+
+      # Detector agreement score (lower is more agreement)
+      - record: mycelix_fl:detector_disagreement
+        expr: stddev(mycelix_fl_detector_score)
+
+      # Detection accuracy (if ground truth available)
+      - record: mycelix_fl:detection_precision
+        expr: |
+          sum(mycelix_fl_true_positive_total) /
+          (sum(mycelix_fl_true_positive_total) + sum(mycelix_fl_false_positive_total) + 0.001)
+
+      - record: mycelix_fl:detection_recall
+        expr: |
+          sum(mycelix_fl_true_positive_total) /
+          (sum(mycelix_fl_true_positive_total) + sum(mycelix_fl_false_negative_total) + 0.001)
+
+  # ============================================
+  # Storage Performance Metrics
+  # ============================================
+  - name: storage_recording
+    interval: 30s
+    rules:
+      # Storage operation latency by backend
+      - record: mycelix_storage:latency_p95_by_backend
+        expr: |
+          histogram_quantile(0.95,
+            sum by (backend, le) (rate(mycelix_storage_operation_duration_seconds_bucket[5m]))
+          )
+
+      # Storage throughput by backend
+      - record: mycelix_storage:ops_per_second_by_backend
+        expr: sum by (backend) (rate(mycelix_storage_operations_total[5m]))
+
+      # Storage error rate by backend
+      - record: mycelix_storage:error_rate_by_backend
+        expr: |
+          sum by (backend) (rate(mycelix_storage_errors_total[5m])) /
+          (sum by (backend) (rate(mycelix_storage_operations_total[5m])) + 0.001)
+
+      # Cache hit rate
+      - record: mycelix_storage:cache_hit_rate
+        expr: |
+          rate(mycelix_cache_hits_total[5m]) /
+          (rate(mycelix_cache_hits_total[5m]) + rate(mycelix_cache_misses_total[5m]) + 0.001)
+
+  # ============================================
+  # Holochain Metrics
+  # ============================================
+  - name: holochain_recording
+    interval: 30s
+    rules:
+      # DHT entry growth rate
+      - record: holochain:dht_growth_per_hour
+        expr: rate(holochain_dht_entries_total[1h]) * 3600
+
+      # Write latency percentiles
+      - record: holochain:write_latency_p95_ms
+        expr: histogram_quantile(0.95, rate(holochain_write_duration_ms_bucket[5m]))
+
+      # Sync pending ratio
+      - record: holochain:sync_pending_ratio
+        expr: |
+          hybrid_bridge_pending /
+          (hybrid_bridge_synced_total + 0.001)
+
+      # Bridge sync rate
+      - record: holochain:bridge_sync_rate
+        expr: rate(hybrid_bridge_synced_total[5m])
+
+  # ============================================
+  # Network Metrics
+  # ============================================
+  - name: network_recording
+    interval: 30s
+    rules:
+      # Network latency percentiles
+      - record: mycelix_network:latency_p50_ms
+        expr: histogram_quantile(0.50, rate(mycelix_network_latency_seconds_bucket[5m])) * 1000
+
+      - record: mycelix_network:latency_p95_ms
+        expr: histogram_quantile(0.95, rate(mycelix_network_latency_seconds_bucket[5m])) * 1000
+
+      - record: mycelix_network:latency_p99_ms
+        expr: histogram_quantile(0.99, rate(mycelix_network_latency_seconds_bucket[5m])) * 1000
+
+      # Message throughput
+      - record: mycelix_network:messages_per_second
+        expr: rate(mycelix_messages_sent_total[5m])
+
+      # Message queue wait time
+      - record: mycelix_network:queue_wait_p95_ms
+        expr: histogram_quantile(0.95, rate(mycelix_message_queue_wait_ms_bucket[5m]))
+
+  # ============================================
+  # Resource Utilization
+  # ============================================
+  - name: resource_recording
+    interval: 60s
+    rules:
+      # CPU utilization by service
+      - record: mycelix:cpu_usage_percent
+        expr: |
+          100 * rate(process_cpu_seconds_total{job=~"mycelix-fl-coordinator|zerotrustml|holochain"}[5m])
+
+      # Memory utilization by service
+      - record: mycelix:memory_usage_mb
+        expr: |
+          process_resident_memory_bytes{job=~"mycelix-fl-coordinator|zerotrustml|holochain"} / (1024 * 1024)
+
+      # Memory utilization percentage (assuming 16GB limit)
+      - record: mycelix:memory_usage_percent
+        expr: |
+          100 * process_resident_memory_bytes{job=~"mycelix-fl-coordinator|zerotrustml|holochain"} / (16 * 1024 * 1024 * 1024)
+
+      # Disk I/O rate
+      - record: mycelix:disk_io_read_mb_per_sec
+        expr: rate(node_disk_read_bytes_total[5m]) / (1024 * 1024)
+
+      - record: mycelix:disk_io_write_mb_per_sec
+        expr: rate(node_disk_written_bytes_total[5m]) / (1024 * 1024)
+
+  # ============================================
+  # SLA Compliance
+  # ============================================
+  - name: sla_recording
+    interval: 60s
+    rules:
+      # Service availability (over 5m window)
+      - record: mycelix:service_availability_5m
+        expr: avg_over_time(up{job=~"mycelix-fl-coordinator|zerotrustml|holochain"}[5m])
+
+      # Service availability (over 1h window)
+      - record: mycelix:service_availability_1h
+        expr: avg_over_time(up{job=~"mycelix-fl-coordinator|zerotrustml|holochain"}[1h])
+
+      # Detection SLA compliance (under 100ms target)
+      - record: mycelix_fl:detection_sla_compliance
+        expr: |
+          sum(rate(mycelix_fl_detection_latency_ms_bucket{le="100"}[5m])) /
+          sum(rate(mycelix_fl_detection_latency_ms_count[5m]))
+
+      # Error budget burn rate (assuming 0.1% error budget)
+      - record: mycelix:error_budget_burn_rate
+        expr: |
+          (1 - avg_over_time(up{job=~"mycelix-fl-coordinator|zerotrustml"}[1h])) /
+          0.001
+
+  # ============================================
+  # Phi (Integrated Information) Metrics
+  # ============================================
+  - name: phi_recording
+    interval: 30s
+    rules:
+      # System Phi average
+      - record: mycelix_fl:system_phi_avg
+        expr: avg(mycelix_fl_system_phi)
+
+      # Phi trend (increasing = more integration)
+      - record: mycelix_fl:system_phi_trend
+        expr: deriv(mycelix_fl_system_phi[30m])
+
+      # Phi by component
+      - record: mycelix_fl:component_phi_avg
+        expr: avg by (component) (mycelix_fl_component_phi)

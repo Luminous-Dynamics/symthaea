@@ -1,0 +1,13 @@
+Mycelix Mail DNA Hash
+=====================
+
+DNA Hash: uhC0kV_byY-EylKlDHg-AeGab0xNhFCIkEFAk2Nr9EDd7mV17oU_U
+
+Verified: November 11, 2025
+Holochain: 0.5.6
+File: dna/mycelix_mail.dna
+Size: 1.7MB (compressed) / 8.8MB (uncompressed)
+
+Network Seed: mycelix-mail-network-v1
+
+This hash uniquely identifies the Mycelix Mail DNA bundle.

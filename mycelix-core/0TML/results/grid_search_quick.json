@@ -1,0 +1,227 @@
+{
+  "timestamp": "2025-10-28T09:16:27.489532",
+  "total_tests": 16,
+  "best_result": {
+    "detection_rate": 1.0,
+    "fp_rate": 0.0,
+    "honest_rep": 1.0,
+    "params": {
+      "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+      "BEHAVIOR_RECOVERY_BONUS": 0.1,
+      "LABEL_SKEW_COS_MIN": -0.4,
+      "LABEL_SKEW_COS_MAX": 0.95
+    },
+    "success": true,
+    "score": -0.01
+  },
+  "all_results": [
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.0,
+      "honest_rep": 1.0,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": true,
+      "score": -0.01
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.214,
+      "honest_rep": 0.808,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.071,
+      "honest_rep": 0.876,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.14300000000000002,
+      "honest_rep": 0.859,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.28600000000000003,
+      "honest_rep": 0.6,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.28600000000000003,
+      "honest_rep": 0.69,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.14300000000000002,
+      "honest_rep": 0.765,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.214,
+      "honest_rep": 0.798,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 3,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.214,
+      "honest_rep": 0.805,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.35700000000000004,
+      "honest_rep": 0.711,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.071,
+      "honest_rep": 0.931,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.071,
+      "honest_rep": 0.936,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.1,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 0.833,
+      "fp_rate": 0.214,
+      "honest_rep": 0.788,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.28600000000000003,
+      "honest_rep": 0.673,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.3,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.071,
+      "honest_rep": 0.906,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.95
+      },
+      "success": false,
+      "score": 999.0
+    },
+    {
+      "detection_rate": 1.0,
+      "fp_rate": 0.071,
+      "honest_rep": 0.895,
+      "params": {
+        "BEHAVIOR_RECOVERY_THRESHOLD": 4,
+        "BEHAVIOR_RECOVERY_BONUS": 0.12,
+        "LABEL_SKEW_COS_MIN": -0.4,
+        "LABEL_SKEW_COS_MAX": 0.97
+      },
+      "success": false,
+      "score": 999.0
+    }
+  ]
+}

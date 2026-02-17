@@ -1,0 +1,39 @@
+[workspace]
+resolver = "2"
+
+members = [
+    "zomes/procurement/integrity",
+    "zomes/procurement/coordinator",
+    "zomes/inventory/integrity",
+    "zomes/inventory/coordinator",
+    "zomes/logistics/integrity",
+    "zomes/logistics/coordinator",
+    "zomes/payments/integrity",
+    "zomes/payments/coordinator",
+    "zomes/trust/integrity",
+    "zomes/trust/coordinator",
+    "zomes/claims/integrity",
+    "zomes/claims/coordinator",
+    "zomes/verification/integrity",
+    "zomes/verification/coordinator",
+    "zomes/bridge/integrity",
+    "zomes/bridge/coordinator",
+]
+
+[workspace.dependencies]
+# Holochain 0.6.0 dependencies
+hdk = "0.6.0"
+hdi = "0.7.0"
+holochain_serialized_bytes = "=0.0.56"
+serde = { version = "=1.0.219", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1"
+
+# WASM Compatibility - getrandom 0.3 with wasm_js feature for WASM
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

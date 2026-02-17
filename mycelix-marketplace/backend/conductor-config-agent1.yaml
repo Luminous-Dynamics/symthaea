@@ -1,0 +1,15 @@
+---
+environment_path: /workspace/conductor-data-1
+use_dangerous_test_keystore: true
+
+network:
+  bootstrap_service: https://bootstrap.holo.host
+  transport_pool:
+    - type: webrtc
+      signal_url: wss://signal.holo.host
+
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 9000
+

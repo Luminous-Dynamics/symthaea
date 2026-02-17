@@ -1,0 +1,72 @@
+groups:
+  - name: supplychain_alerts
+    interval: 30s
+    rules:
+      # Service availability
+      - alert: ServiceDown
+        expr: up{job="supplychain"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Supply Chain service is down"
+          description: "The Supply Chain service has been down for more than 1 minute."
+
+      # Error rate alerts
+      - alert: HighErrorRate
+        expr: rate(supplychain_api_request_duration_seconds_count{status=~"5.."}[5m]) > 0.01
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate (>1%)"
+          description: "The service is experiencing {{ $value | humanizePercentage }} error rate."
+
+      # Latency alerts
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, rate(supplychain_api_request_duration_seconds_bucket[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P95 latency >100ms"
+          description: "The P95 latency is {{ $value | humanizeDuration }}."
+
+      - alert: HighLatencyP99
+        expr: histogram_quantile(0.99, rate(supplychain_api_request_duration_seconds_bucket[5m])) > 0.2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "P99 latency >200ms"
+          description: "The P99 latency is {{ $value | humanizeDuration }}."
+
+      # Database alerts
+      - alert: DatabaseConnectionsHigh
+        expr: supplychain_db_connections_active > 40
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connections >40 (max 50)"
+          description: "Database connection count is {{ $value }}, approaching maximum."
+
+      # Validation errors
+      - alert: HighValidationErrorRate
+        expr: rate(supplychain_validation_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "High validation error rate"
+          description: "Validation errors are occurring at {{ $value }} per second."
+
+      # Batch processing
+      - alert: SlowBatchProcessing
+        expr: rate(supplychain_events_ingested_total{event_type="batch"}[5m]) == 0 and rate(supplychain_api_request_duration_seconds_count{endpoint="/v1/events/batch"}[5m]) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Batch processing is slow or failing"
+          description: "Batch endpoint is receiving requests but no events are being ingested."

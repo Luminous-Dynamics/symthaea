@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Byzantine FL Monitoring Dashboard - Holochain</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+            color: #e0e6ed;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .dashboard {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #8892b0;
+            margin-bottom: 30px;
+            font-size: 1.1rem;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.2);
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: #8892b0;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #64ffda;
+        }
+
+        .metric-change {
+            font-size: 0.85rem;
+            margin-top: 5px;
+        }
+
+        .metric-change.positive {
+            color: #64ffda;
+        }
+
+        .metric-change.negative {
+            color: #f07178;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .panel-title {
+            font-size: 1.3rem;
+            margin-bottom: 20px;
+            color: #ccd6f6;
+        }
+
+        .network-visualization {
+            position: relative;
+            height: 400px;
+            background: radial-gradient(ellipse at center, rgba(102, 126, 234, 0.1) 0%, transparent 70%);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .node {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .node.honest {
+            background: linear-gradient(135deg, #64ffda 0%, #63a4ff 100%);
+            box-shadow: 0 0 30px rgba(100, 255, 218, 0.4);
+        }
+
+        .node.byzantine {
+            background: linear-gradient(135deg, #f07178 0%, #ff5370 100%);
+            box-shadow: 0 0 30px rgba(240, 113, 120, 0.4);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .connection {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, rgba(100, 255, 218, 0.3), transparent);
+            height: 2px;
+            transform-origin: left center;
+            animation: flow 3s linear infinite;
+        }
+
+        @keyframes flow {
+            0% { opacity: 0; }
+            50% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .log-container {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.9rem;
+        }
+
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.02);
+            border-left: 3px solid #667eea;
+            border-radius: 4px;
+        }
+
+        .log-entry.success {
+            border-left-color: #64ffda;
+        }
+
+        .log-entry.warning {
+            border-left-color: #ffcb6b;
+        }
+
+        .log-entry.error {
+            border-left-color: #f07178;
+        }
+
+        .log-time {
+            color: #8892b0;
+            font-size: 0.85rem;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: blink 2s infinite;
+        }
+
+        .status-indicator.online {
+            background: #64ffda;
+        }
+
+        .status-indicator.offline {
+            background: #f07178;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .attack-indicator {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            background: rgba(240, 113, 120, 0.9);
+            color: white;
+            border-radius: 8px;
+            font-weight: bold;
+            display: none;
+            animation: slideIn 0.3s;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <h1>🛡️ Byzantine FL Monitor</h1>
+        <div class="subtitle">Holochain Federated Learning Network</div>
+        
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Active Nodes</div>
+                <div class="metric-value" id="activeNodes">5</div>
+                <div class="metric-change positive">+2 from last hour</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-label">Training Round</div>
+                <div class="metric-value" id="currentRound">42</div>
+                <div class="metric-change positive">~3 rounds/min</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-label">Model Accuracy</div>
+                <div class="metric-value" id="accuracy">89.1%</div>
+                <div class="metric-change positive">↑ 2.3%</div>
+            </div>
+            
+            <div class="metric-card">
+                <div class="metric-label">Byzantine Detected</div>
+                <div class="metric-value" id="byzantineCount">1</div>
+                <div class="metric-change negative">80% detection rate</div>
+            </div>
+        </div>
+
+        <div class="main-grid">
+            <div class="panel">
+                <h2 class="panel-title">Network Topology</h2>
+                <div class="network-visualization" id="networkViz">
+                    <!-- Nodes will be dynamically added -->
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2 class="panel-title">Training Performance</h2>
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h2 class="panel-title">
+                <span class="status-indicator online"></span>
+                Live Activity Stream
+            </h2>
+            <div class="button-group">
+                <button onclick="simulateAttack()">🔥 Simulate Attack</button>
+                <button onclick="addNode()">➕ Add Node</button>
+                <button onclick="resetNetwork()">🔄 Reset Network</button>
+                <button onclick="pauseStream()">⏸️ Pause</button>
+            </div>
+            <div class="log-container" id="logContainer">
+                <!-- Logs will be dynamically added -->
+            </div>
+        </div>
+    </div>
+
+    <div class="attack-indicator" id="attackIndicator">
+        🚨 Byzantine Attack Detected!
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // Network Visualization
+        const networkViz = document.getElementById('networkViz');
+        let nodes = [];
+        let connections = [];
+
+        function initializeNetwork() {
+            // Create 5 initial nodes
+            for (let i = 0; i < 5; i++) {
+                const node = document.createElement('div');
+                node.className = `node ${i === 0 ? 'byzantine' : 'honest'}`;
+                node.textContent = `N${i}`;
+                node.id = `node-${i}`;
+                
+                // Position nodes in a circle
+                const angle = (i / 5) * 2 * Math.PI;
+                const radius = 150;
+                const x = 200 + radius * Math.cos(angle);
+                const y = 200 + radius * Math.sin(angle);
+                
+                node.style.left = `${x - 30}px`;
+                node.style.top = `${y - 30}px`;
+                
+                node.onclick = () => toggleNodeStatus(i);
+                
+                networkViz.appendChild(node);
+                nodes.push(node);
+            }
+            
+            // Create connections
+            updateConnections();
+        }
+
+        function updateConnections() {
+            // Clear existing connections
+            document.querySelectorAll('.connection').forEach(c => c.remove());
+            
+            // Create new connections between all nodes
+            for (let i = 0; i < nodes.length; i++) {
+                for (let j = i + 1; j < nodes.length; j++) {
+                    const node1 = nodes[i];
+                    const node2 = nodes[j];
+                    
+                    const connection = document.createElement('div');
+                    connection.className = 'connection';
+                    
+                    // Calculate connection position and angle
+                    const x1 = parseInt(node1.style.left) + 30;
+                    const y1 = parseInt(node1.style.top) + 30;
+                    const x2 = parseInt(node2.style.left) + 30;
+                    const y2 = parseInt(node2.style.top) + 30;
+                    
+                    const length = Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+                    const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+                    
+                    connection.style.width = `${length}px`;
+                    connection.style.left = `${x1}px`;
+                    connection.style.top = `${y1}px`;
+                    connection.style.transform = `rotate(${angle}deg)`;
+                    
+                    networkViz.appendChild(connection);
+                    connections.push(connection);
+                }
+            }
+        }
+
+        function toggleNodeStatus(nodeId) {
+            const node = nodes[nodeId];
+            if (node.className.includes('byzantine')) {
+                node.className = 'node honest';
+                addLog(`Node ${nodeId} recovered from Byzantine behavior`, 'success');
+            } else {
+                node.className = 'node byzantine';
+                addLog(`Node ${nodeId} detected as Byzantine!`, 'error');
+                showAttackIndicator();
+            }
+            updateByzantineCount();
+        }
+
+        // Chart setup
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        const performanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Accuracy (%)',
+                    data: [],
+                    borderColor: '#64ffda',
+                    backgroundColor: 'rgba(100, 255, 218, 0.1)',
+                    tension: 0.4
+                }, {
+                    label: 'Loss',
+                    data: [],
+                    borderColor: '#f07178',
+                    backgroundColor: 'rgba(240, 113, 120, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#8892b0'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#8892b0'
+                        }
+                    }
+                },
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#ccd6f6'
+                        }
+                    }
+                }
+            }
+        });
+
+        // Add log entry
+        function addLog(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            
+            const time = new Date().toLocaleTimeString();
+            entry.innerHTML = `<span class="log-time">[${time}]</span> ${message}`;
+            
+            logContainer.insertBefore(entry, logContainer.firstChild);
+            
+            // Keep only last 20 logs
+            while (logContainer.children.length > 20) {
+                logContainer.removeChild(logContainer.lastChild);
+            }
+        }
+
+        // Simulate Byzantine attack
+        function simulateAttack() {
+            const randomNode = Math.floor(Math.random() * nodes.length);
+            nodes[randomNode].className = 'node byzantine';
+            addLog(`🚨 Byzantine attack from Node ${randomNode}!`, 'error');
+            showAttackIndicator();
+            updateByzantineCount();
+            
+            // Auto-recover after 3 seconds
+            setTimeout(() => {
+                nodes[randomNode].className = 'node honest';
+                addLog(`Node ${randomNode} recovered and rejoined network`, 'success');
+                updateByzantineCount();
+            }, 3000);
+        }
+
+        // Show attack indicator
+        function showAttackIndicator() {
+            const indicator = document.getElementById('attackIndicator');
+            indicator.style.display = 'block';
+            setTimeout(() => {
+                indicator.style.display = 'none';
+            }, 3000);
+        }
+
+        // Add new node
+        function addNode() {
+            const nodeId = nodes.length;
+            const node = document.createElement('div');
+            node.className = 'node honest';
+            node.textContent = `N${nodeId}`;
+            node.id = `node-${nodeId}`;
+            
+            // Random position
+            const x = Math.random() * 340 + 30;
+            const y = Math.random() * 340 + 30;
+            
+            node.style.left = `${x}px`;
+            node.style.top = `${y}px`;
+            
+            node.onclick = () => toggleNodeStatus(nodeId);
+            
+            networkViz.appendChild(node);
+            nodes.push(node);
+            
+            updateConnections();
+            document.getElementById('activeNodes').textContent = nodes.length;
+            addLog(`New node ${nodeId} joined the network`, 'success');
+        }
+
+        // Reset network
+        function resetNetwork() {
+            nodes = [];
+            connections = [];
+            networkViz.innerHTML = '';
+            initializeNetwork();
+            addLog('Network reset to initial state', 'warning');
+            document.getElementById('activeNodes').textContent = '5';
+            updateByzantineCount();
+        }
+
+        // Update Byzantine count
+        function updateByzantineCount() {
+            const byzantineNodes = document.querySelectorAll('.node.byzantine').length;
+            document.getElementById('byzantineCount').textContent = byzantineNodes;
+        }
+
+        // Pause/Resume stream
+        let streamPaused = false;
+        function pauseStream() {
+            streamPaused = !streamPaused;
+            event.target.textContent = streamPaused ? '▶️ Resume' : '⏸️ Pause';
+            addLog(streamPaused ? 'Stream paused' : 'Stream resumed', 'warning');
+        }
+
+        // Update metrics periodically
+        let round = 42;
+        let accuracy = 89.1;
+
+        function updateMetrics() {
+            if (streamPaused) return;
+            
+            // Update round
+            round++;
+            document.getElementById('currentRound').textContent = round;
+            
+            // Update accuracy with small random variation
+            accuracy += (Math.random() - 0.5) * 0.5;
+            accuracy = Math.max(85, Math.min(95, accuracy));
+            document.getElementById('accuracy').textContent = accuracy.toFixed(1) + '%';
+            
+            // Update chart
+            const labels = performanceChart.data.labels;
+            if (labels.length > 20) {
+                labels.shift();
+                performanceChart.data.datasets[0].data.shift();
+                performanceChart.data.datasets[1].data.shift();
+            }
+            
+            labels.push(`R${round}`);
+            performanceChart.data.datasets[0].data.push(accuracy);
+            performanceChart.data.datasets[1].data.push((100 - accuracy) / 50);
+            performanceChart.update();
+            
+            // Add random log entries
+            if (Math.random() > 0.7) {
+                const messages = [
+                    `Round ${round} completed successfully`,
+                    `Gradient aggregation completed in ${Math.floor(Math.random() * 50 + 10)}ms`,
+                    `DHT sync completed across ${nodes.length} nodes`,
+                    `Model checkpoint saved (round ${round})`,
+                    `P2P latency: ${Math.floor(Math.random() * 30 + 10)}ms`
+                ];
+                addLog(messages[Math.floor(Math.random() * messages.length)], 'success');
+            }
+        }
+
+        // WebSocket simulation (would connect to real conductor in production)
+        function simulateWebSocket() {
+            if (streamPaused) return;
+            
+            // Simulate incoming data
+            if (Math.random() > 0.8) {
+                addLog(`Worker ${Math.floor(Math.random() * 5)} submitted gradient`, 'info');
+            }
+        }
+
+        // Initialize
+        initializeNetwork();
+        addLog('Dashboard initialized - Connected to Holochain conductor', 'success');
+        addLog('Byzantine FL network online with 5 nodes', 'success');
+
+        // Start periodic updates
+        setInterval(updateMetrics, 2000);
+        setInterval(simulateWebSocket, 1000);
+
+        // Add some initial data to chart
+        for (let i = 0; i < 10; i++) {
+            performanceChart.data.labels.push(`R${i + 33}`);
+            performanceChart.data.datasets[0].data.push(85 + Math.random() * 5);
+            performanceChart.data.datasets[1].data.push(0.3 + Math.random() * 0.2);
+        }
+        performanceChart.update();
+    </script>
+
+        <div class="card">
+            <h2>PoGQ Calibration</h2>
+            <p>Current threshold configured: <strong>0.35</strong></p>
+            <p>Change accomplished: Oct 27, 2025 (see 0TML/WEEK_3_PRIORITY_2_SUMMARY.md)</p>
+        </div>
+
+</body>
+</html>

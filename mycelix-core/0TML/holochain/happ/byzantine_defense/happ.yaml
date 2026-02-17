@@ -1,0 +1,14 @@
+---
+manifest_version: "0"
+name: byzantine_defense
+description: Byzantine-robust federated learning with 45% fault tolerance
+roles:
+  - name: fl_node
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ../../dna/byzantine_defense/byzantine_defense.dna
+      modifiers:
+        network_seed: ~
+        properties: ~

@@ -1,0 +1,15 @@
+[package]
+name = "guardian_graph"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "guardian_graph"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0"
+holochain_serialized_bytes = "0.0.56"
+hex = "0.4"

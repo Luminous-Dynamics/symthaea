@@ -1,0 +1,206 @@
+version: '3.8'
+
+# ZeroTrustML Grant Demo - 5 Node Byzantine Detection
+# Configuration: 3 Honest + 2 Byzantine (Different Attack Types)
+# Demonstrates 40% Byzantine tolerance with multiple simultaneous attacks
+
+services:
+  # ============================================================
+  # PostgreSQL (Shared for demo - in prod each node has its own)
+  # ============================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: zerotrustml-postgres-demo
+    environment:
+      POSTGRES_DB: zerotrustml
+      POSTGRES_USER: zerotrustml
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - postgres_demo_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Use 5433 to avoid conflict with system PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zerotrustml"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - zerotrustml-demo
+
+  # ============================================================
+  # HONEST NODE 1: Boston Hospital
+  # ============================================================
+
+  holochain-node1-boston:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-boston-honest
+    hostname: node1-boston
+    ports:
+      - "8881:8888"  # Admin WebSocket
+      - "8891:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_boston_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-boston
+      - NODE_TYPE=HONEST
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-demo:
+        aliases:
+          - hospital-boston
+
+  # ============================================================
+  # HONEST NODE 2: London Hospital
+  # ============================================================
+
+  holochain-node2-london:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-london-honest
+    hostname: node2-london
+    ports:
+      - "8882:8888"  # Admin WebSocket
+      - "8892:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_london_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-london
+      - NODE_TYPE=HONEST
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-demo:
+        aliases:
+          - hospital-london
+
+  # ============================================================
+  # HONEST NODE 3: Tokyo Hospital
+  # ============================================================
+
+  holochain-node3-tokyo:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-tokyo-honest
+    hostname: node3-tokyo
+    ports:
+      - "8883:8888"  # Admin WebSocket
+      - "8893:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_tokyo_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-tokyo
+      - NODE_TYPE=HONEST
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-demo:
+        aliases:
+          - hospital-tokyo
+
+  # ============================================================
+  # MALICIOUS NODE 4: Rogue Hospital 1 (Gradient Inversion Attack)
+  # ============================================================
+
+  holochain-node4-rogue1:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-rogue1-malicious
+    hostname: node4-rogue1
+    ports:
+      - "8884:8888"  # Admin WebSocket
+      - "8894:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_rogue1_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-rogue1
+      - NODE_TYPE=MALICIOUS
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-demo:
+        aliases:
+          - hospital-rogue1
+
+  # ============================================================
+  # MALICIOUS NODE 5: Rogue Hospital 2 (Sign Flipping Attack)
+  # ============================================================
+
+  holochain-node5-rogue2:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-rogue2-malicious
+    hostname: node5-rogue2
+    ports:
+      - "8885:8888"  # Admin WebSocket
+      - "8895:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_rogue2_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-rogue2
+      - NODE_TYPE=MALICIOUS
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-demo:
+        aliases:
+          - hospital-rogue2
+
+networks:
+  zerotrustml-demo:
+    driver: bridge
+
+volumes:
+  postgres_demo_data:
+  holochain_boston_data:
+  holochain_london_data:
+  holochain_tokyo_data:
+  holochain_rogue1_data:
+  holochain_rogue2_data:

@@ -1,0 +1,36 @@
+{
+  "accuracies": [
+    10.0,
+    40.89,
+    44.74,
+    52.23,
+    45.11,
+    48.92,
+    45.69,
+    46.27,
+    41.51,
+    50.89,
+    49.49,
+    47.45,
+    48.18,
+    48.94,
+    52.11,
+    50.52,
+    48.83,
+    49.53,
+    48.12,
+    50.29
+  ],
+  "final_accuracy": 50.29,
+  "baseline": 51.68,
+  "improvement": -1.3900000000000006,
+  "gap_to_centralized": 23.449999999999996,
+  "improvements_applied": [
+    "Local epochs: 10",
+    "Data augmentation",
+    "Cosine annealing LR",
+    "GroupNorm",
+    "Weighted aggregation",
+    "Alpha=1.0 for less heterogeneity"
+  ]
+}

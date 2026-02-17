@@ -1,0 +1,142 @@
+---
+# Holochain hApp Manifest
+# Mycelix Mail - End-to-End Encrypted Agent Communication
+
+manifest_version: "1"
+name: mycelix-mail
+description: |
+  Decentralized, end-to-end encrypted messaging system for ML agents within
+  the Mycelix-Core network. Supports point-to-point messages, group channels,
+  and broadcast announcements with cryptographic delivery receipts.
+
+roles:
+  - id: mail_core
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/mycelix-mail.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          # Encryption settings
+          encryption_scheme: x25519-xsalsa20-poly1305
+          key_derivation: argon2id
+          forward_secrecy: true
+          # Message handling
+          max_message_size_kb: 1024
+          message_retention_days: 90
+          delivery_receipt_required: true
+          # Rate limiting
+          max_messages_per_minute: 60
+          max_recipients_per_message: 100
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: channels
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/mail-channels.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          max_channel_members: 1000
+          channel_types:
+            - private
+            - public
+            - announcement
+          moderation_enabled: true
+          archive_on_leave: true
+        origin_time: ~
+      version: ~
+      clone_limit: 50
+
+  - id: attachments
+    provisioning:
+      strategy: create
+      deferred: true
+    dna:
+      bundled: ../dist/dnas/mail-attachments.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          max_attachment_size_mb: 100
+          allowed_mime_types:
+            - application/json
+            - application/octet-stream
+            - text/plain
+            - application/x-tar
+            - application/gzip
+          content_addressing: blake3
+          deduplication_enabled: true
+        origin_time: ~
+      version: ~
+      clone_limit: 10
+
+  - id: notifications
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/mail-notifications.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          notification_types:
+            - new_message
+            - delivery_receipt
+            - channel_invite
+            - mention
+          aggregation_window_seconds: 30
+          priority_levels: 3
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+membrane_proofs:
+  mail_core: null
+  channels: null
+  attachments: null
+  notifications: null
+
+meta:
+  author: Mycelix Core Team
+  repository: https://github.com/Luminous-Dynamics/Mycelix-Core
+  license: Apache-2.0
+  version: "0.1.0"
+  holochain_version: "0.3.x"
+
+  dependencies:
+    - name: zerotrustml-identity
+      version: ">=0.1.0"
+      required: true
+
+  integrations:
+    - zerotrustml-identity
+    - zerotrustml-reputation
+    - mycelix-marketplace
+
+  entry_points:
+    send_message:
+      zome: mail_core
+      fn: send_message
+      description: Send an encrypted message to one or more agents
+    create_channel:
+      zome: channels
+      fn: create_channel
+      description: Create a new communication channel
+    upload_attachment:
+      zome: attachments
+      fn: upload_attachment
+      description: Upload an encrypted attachment
+    get_notifications:
+      zome: notifications
+      fn: get_pending_notifications
+      description: Retrieve pending notifications
+    read_inbox:
+      zome: mail_core
+      fn: get_inbox
+      description: Read messages from inbox

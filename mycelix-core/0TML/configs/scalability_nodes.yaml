@@ -1,0 +1,52 @@
+# Scalability Study: PoGQ Performance vs Number of Nodes
+# Tests how PoGQ scales with network size
+#
+# 3 node counts × 3 Byzantine ratios × 2 seeds = 18 experiments (~3-4 hours)
+
+experiment:
+  name: scalability_nodes
+  seeds: [42, 123]  # 2 seeds for efficiency
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+# Test different network sizes
+node_configurations:
+  - num_clients: 50
+    label: small
+  - num_clients: 100
+    label: medium
+  - num_clients: 200
+    label: large
+
+attack_matrix:
+  byzantine_ratios: [0.20, 0.35, 0.45]  # Test across BFT range
+  attacks:
+    - sign_flip
+
+defenses:
+  - pogq_v4_1  # Full PoGQ only (not ablations)
+
+training:
+  num_rounds: 50  # Reduced for scalability testing
+  eval_every: 10
+
+statistics:
+  alpha: 0.10
+  confidence_level: 0.95
+
+# Measure computational overhead
+profiling:
+  enabled: true
+  metrics:
+    - detection_time_per_round
+    - memory_usage
+    - throughput_decisions_per_second
+
+output:
+  base_dir: results/scalability_nodes
+  save_artifacts: true
+  generate_plots: true

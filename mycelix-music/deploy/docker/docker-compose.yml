@@ -1,0 +1,412 @@
+# =============================================================================
+# Mycelix Music Platform - Docker Compose
+#
+# Complete local development environment with all services
+# Usage: docker-compose up -d
+# =============================================================================
+
+version: '3.9'
+
+services:
+  # ===========================================================================
+  # Core Application
+  # ===========================================================================
+  api:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: development
+    container_name: mycelix-api
+    ports:
+      - "3000:3000"
+      - "9229:9229"  # Debug port
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=mycelix
+      - DATABASE_USERNAME=mycelix
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - SEARCH_HOSTS=http://elasticsearch:9200
+      - MESSAGING_BROKERS=kafka:9092
+      - JWT_SECRET=development-jwt-secret-change-in-production
+      - STORAGE_PROVIDER=minio
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set}
+      - STORAGE_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set}
+    volumes:
+      - ../../:/app
+      - /app/node_modules
+      - uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Worker Services
+  # ===========================================================================
+  worker:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+      target: development
+    container_name: mycelix-worker
+    command: npm run worker
+    environment:
+      - NODE_ENV=development
+      - DATABASE_HOST=postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=mycelix
+      - DATABASE_USERNAME=mycelix
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}
+      - REDIS_HOST=redis
+      - MESSAGING_BROKERS=kafka:9092
+    volumes:
+      - ../../:/app
+      - /app/node_modules
+    depends_on:
+      - api
+      - kafka
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # Transcoding worker for audio processing
+  transcoder:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile.transcoder
+    container_name: mycelix-transcoder
+    environment:
+      - REDIS_HOST=redis
+      - STORAGE_ENDPOINT=http://minio:9000
+      - STORAGE_ACCESS_KEY_ID=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set}
+      - STORAGE_SECRET_ACCESS_KEY=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set}
+    volumes:
+      - transcode-temp:/tmp/transcode
+    depends_on:
+      - redis
+      - minio
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+
+  # ===========================================================================
+  # Database
+  # ===========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: mycelix-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=mycelix
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD:?DATABASE_PASSWORD must be set}
+      - POSTGRES_DB=mycelix
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=en_US.utf8 --lc-ctype=en_US.utf8
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init-scripts/postgres:/docker-entrypoint-initdb.d
+    networks:
+      - mycelix-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycelix -d mycelix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Cache & Message Queue
+  # ===========================================================================
+  redis:
+    image: redis:7-alpine
+    container_name: mycelix-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - mycelix-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Kafka & Zookeeper
+  # ===========================================================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: mycelix-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    volumes:
+      - zookeeper-data:/var/lib/zookeeper/data
+      - zookeeper-logs:/var/lib/zookeeper/log
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: mycelix-kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    depends_on:
+      - zookeeper
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # Kafka UI for debugging
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: mycelix-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: mycelix
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Search
+  # ===========================================================================
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: mycelix-elasticsearch
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - cluster.name=mycelix-search
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    networks:
+      - mycelix-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  # Kibana for Elasticsearch management
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: mycelix-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Object Storage
+  # ===========================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: mycelix-minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"  # Console
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ACCESS_KEY:?MINIO_ACCESS_KEY must be set}
+      - MINIO_ROOT_PASSWORD=${MINIO_SECRET_KEY:?MINIO_SECRET_KEY must be set}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - mycelix-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # Create default buckets
+  minio-setup:
+    image: minio/mc:latest
+    container_name: mycelix-minio-setup
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set mycelix http://minio:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY;
+      mc mb --ignore-existing mycelix/audio;
+      mc mb --ignore-existing mycelix/images;
+      mc mb --ignore-existing mycelix/transcoded;
+      mc mb --ignore-existing mycelix/uploads;
+      mc anonymous set download mycelix/images;
+      exit 0;
+      "
+    networks:
+      - mycelix-network
+
+  # ===========================================================================
+  # Monitoring & Observability
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mycelix-prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mycelix-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: mycelix-jaeger
+    ports:
+      - "16686:16686"  # UI
+      - "14268:14268"  # HTTP collector
+      - "6831:6831/udp"  # Thrift compact
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Reverse Proxy
+  # ===========================================================================
+  nginx:
+    image: nginx:alpine
+    container_name: mycelix-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx-cache:/var/cache/nginx
+    depends_on:
+      - api
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  # ===========================================================================
+  # Development Tools
+  # ===========================================================================
+  adminer:
+    image: adminer:latest
+    container_name: mycelix-adminer
+    ports:
+      - "8081:8080"
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: mycelix-mailhog
+    ports:
+      - "1025:1025"  # SMTP
+      - "8025:8025"  # Web UI
+    networks:
+      - mycelix-network
+    restart: unless-stopped
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  mycelix-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  postgres-data:
+  redis-data:
+  elasticsearch-data:
+  kafka-data:
+  zookeeper-data:
+  zookeeper-logs:
+  minio-data:
+  prometheus-data:
+  grafana-data:
+  nginx-cache:
+  uploads:
+  transcode-temp:

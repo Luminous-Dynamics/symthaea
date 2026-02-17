@@ -1,0 +1,194 @@
+# ZeroTrustML Configuration
+# Choose configuration based on your use case
+
+# =============================================================================
+# RESEARCH CONFIGURATION - Lightweight, no persistence
+# =============================================================================
+research:
+  use_case: research
+  storage:
+    backend: memory
+    checkpoint_async: false
+
+  trust_layer:
+    reputation_threshold: 0.3
+    pogq_enabled: true
+    anomaly_detection: true
+
+  network:
+    protocol: local  # Direct Python calls
+    port: null
+
+# =============================================================================
+# WAREHOUSE ROBOTICS - Traditional database
+# =============================================================================
+warehouse:
+  use_case: warehouse
+  storage:
+    backend: postgresql
+    connection_string: ${POSTGRES_URL}  # From environment
+    checkpoint_async: true
+    checkpoint_interval_ms: 100
+
+  trust_layer:
+    reputation_threshold: 0.4  # More forgiving for sensors
+    pogq_enabled: true
+    anomaly_detection: true
+
+  network:
+    protocol: grpc
+    port: 50051
+    discovery: mdns  # Local network discovery
+
+# =============================================================================
+# AUTONOMOUS VEHICLES - Immutable audit trail
+# =============================================================================
+automotive:
+  use_case: automotive
+  storage:
+    backend: holochain
+    conductor_url: ${HOLOCHAIN_CONDUCTOR}
+    checkpoint_async: true
+    checkpoint_interval_ms: 1000  # 1 second
+    batch_size: 10  # Batch for efficiency
+
+  trust_layer:
+    reputation_threshold: 0.5  # Strict for safety
+    pogq_enabled: true
+    pogq_test_set_size: 1000
+    anomaly_detection: true
+    anomaly_threshold: 3.0  # Z-score
+
+  network:
+    protocol: libp2p
+    port: 9000
+    discovery: dht
+    encryption: required
+
+  compliance:
+    audit_trail: true
+    immutable_log: true
+    retention_years: 10
+    regulatory_body: NHTSA
+
+# =============================================================================
+# MEDICAL COLLABORATION - HIPAA compliant
+# =============================================================================
+medical:
+  use_case: medical
+  storage:
+    backend: holochain
+    conductor_url: ${HOLOCHAIN_CONDUCTOR}
+    checkpoint_async: true
+    checkpoint_interval_ms: 500
+    encryption: true  # Encrypt before DHT
+
+  trust_layer:
+    reputation_threshold: 0.6  # Very strict
+    pogq_enabled: true
+    pogq_test_set_size: 500
+    anomaly_detection: true
+    differential_privacy: true  # Add DP noise
+    epsilon: 0.1  # Privacy budget
+
+  network:
+    protocol: https  # Institutional networks
+    port: 8443
+    tls_required: true
+    mutual_auth: true
+
+  compliance:
+    audit_trail: true
+    immutable_log: true
+    hipaa_compliant: true
+    retention_years: 7
+    pii_protection: true
+
+# =============================================================================
+# FINANCIAL SERVICES - SEC/FinCEN compliant
+# =============================================================================
+finance:
+  use_case: finance
+  storage:
+    backend: holochain
+    conductor_url: ${HOLOCHAIN_CONDUCTOR}
+    checkpoint_async: true
+    checkpoint_interval_ms: 100
+    replication_factor: 5  # High availability
+
+  trust_layer:
+    reputation_threshold: 0.7  # Very strict
+    pogq_enabled: true
+    pogq_test_set_size: 1000
+    anomaly_detection: true
+    fraud_detection: true
+
+  network:
+    protocol: grpc
+    port: 50052
+    tls_required: true
+    mutual_auth: true
+    rate_limiting: true
+
+  compliance:
+    audit_trail: true
+    immutable_log: true
+    regulatory_bodies: [SEC, FinCEN]
+    retention_years: 7
+    tamper_evident: true
+
+# =============================================================================
+# DRONE SWARM - Lightweight checkpointing
+# =============================================================================
+drone_swarm:
+  use_case: drone_swarm
+  storage:
+    backend: holochain
+    conductor_url: ${HOLOCHAIN_CONDUCTOR}
+    checkpoint_async: true
+    checkpoint_interval_ms: 5000  # 5 seconds (slow for bandwidth)
+    checkpoint_strategy: important_only  # Only checkpoint critical states
+
+  trust_layer:
+    reputation_threshold: 0.5
+    pogq_enabled: true
+    pogq_test_set_size: 100  # Small for embedded
+    anomaly_detection: true
+
+  network:
+    protocol: lora  # Long-range, low-power
+    frequency: 915  # MHz
+    bandwidth_limited: true
+    latency_tolerant: true
+
+  optimization:
+    low_power_mode: true
+    compression: true
+    gradient_sparsification: 0.01  # 1% of gradients
+
+# =============================================================================
+# MANUFACTURING - Multi-vendor coordination
+# =============================================================================
+manufacturing:
+  use_case: manufacturing
+  storage:
+    backend: postgresql
+    connection_string: ${POSTGRES_URL}
+    checkpoint_async: true
+    checkpoint_interval_ms: 500
+
+  trust_layer:
+    reputation_threshold: 0.4
+    pogq_enabled: true
+    anomaly_detection: true
+    vendor_isolation: true  # Separate reputation per vendor
+
+  network:
+    protocol: mqtt
+    broker_url: ${MQTT_BROKER}
+    qos: 2  # Exactly once delivery
+
+  features:
+    multi_vendor: true
+    ip_protection: true  # Don't share raw gradients
+    secure_aggregation: true

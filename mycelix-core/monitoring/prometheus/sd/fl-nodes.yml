@@ -1,0 +1,24 @@
+# Mycelix FL Node Service Discovery
+# This file is automatically updated by the FL coordinator
+# or can be manually maintained for static deployments
+#
+# Format: Prometheus file-based service discovery
+# Refresh interval: 30s (configured in prometheus.yml)
+
+# Example static configuration:
+- targets:
+    - 'fl-node-01:9100'
+    - 'fl-node-02:9100'
+    - 'fl-node-03:9100'
+  labels:
+    cluster: mycelix-production
+    environment: production
+    region: us-west-2
+
+# Example for development/staging:
+# - targets:
+#     - 'fl-node-dev-01:9100'
+#   labels:
+#     cluster: mycelix-staging
+#     environment: staging
+#     region: us-west-2

@@ -1,0 +1,913 @@
+openapi: 3.1.0
+info:
+  title: Mycelix Music API
+  description: |
+    Decentralized music streaming platform API.
+
+    ## Authentication
+    All authenticated endpoints require a Bearer token in the Authorization header.
+    Tokens are obtained by signing a message with your Ethereum wallet.
+
+    ## Rate Limiting
+    - Anonymous: 100 requests/minute
+    - Authenticated: 500 requests/minute
+    - Premium: 1000 requests/minute
+
+    Rate limit headers are included in all responses.
+  version: 1.0.0
+  contact:
+    name: Mycelix Support
+    email: support@mycelix.io
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.mycelix.io/v1
+    description: Production
+  - url: https://api.staging.mycelix.io/v1
+    description: Staging
+  - url: http://localhost:3001/v1
+    description: Local development
+
+tags:
+  - name: Authentication
+    description: Wallet authentication and session management
+  - name: Songs
+    description: Song discovery, streaming, and metadata
+  - name: Artists
+    description: Artist profiles and content
+  - name: Playlists
+    description: Playlist creation and management
+  - name: Users
+    description: User profiles and social features
+  - name: Search
+    description: Full-text search across the platform
+  - name: Library
+    description: User's personal library
+  - name: Upload
+    description: Content upload for artists
+  - name: Analytics
+    description: Play statistics and analytics
+
+paths:
+  /auth/challenge:
+    post:
+      tags: [Authentication]
+      summary: Request authentication challenge
+      description: Get a message to sign with your Ethereum wallet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address]
+              properties:
+                address:
+                  type: string
+                  pattern: ^0x[a-fA-F0-9]{40}$
+                  example: "0x1234567890abcdef1234567890abcdef12345678"
+      responses:
+        '200':
+          description: Challenge created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: Message to sign
+                  nonce:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+
+  /auth/verify:
+    post:
+      tags: [Authentication]
+      summary: Verify wallet signature
+      description: Submit signed message to receive JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address, signature, message]
+              properties:
+                address:
+                  type: string
+                signature:
+                  type: string
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Authentication successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /songs:
+    get:
+      tags: [Songs]
+      summary: List songs
+      description: Get a paginated list of songs with optional filters
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: genre
+          in: query
+          schema:
+            type: string
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [plays, releaseDate, title]
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+      responses:
+        '200':
+          description: List of songs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongList'
+
+  /songs/{id}:
+    get:
+      tags: [Songs]
+      summary: Get song by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Song details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /songs/{id}/stream:
+    get:
+      tags: [Songs]
+      summary: Get streaming URL
+      description: Returns HLS manifest URL for adaptive streaming
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: quality
+          in: query
+          schema:
+            type: string
+            enum: [auto, low, medium, high, lossless]
+            default: auto
+      responses:
+        '200':
+          description: Streaming URLs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  hlsUrl:
+                    type: string
+                    format: uri
+                  dashUrl:
+                    type: string
+                    format: uri
+                  expiresAt:
+                    type: string
+                    format: date-time
+
+  /artists:
+    get:
+      tags: [Artists]
+      summary: List artists
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: verified
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of artists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistList'
+
+  /artists/{id}:
+    get:
+      tags: [Artists]
+      summary: Get artist profile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Artist profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Artist'
+
+  /artists/{id}/songs:
+    get:
+      tags: [Artists]
+      summary: Get artist's songs
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Artist's songs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongList'
+
+  /artists/{id}/follow:
+    post:
+      tags: [Artists]
+      summary: Follow an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully followed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      tags: [Artists]
+      summary: Unfollow an artist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Successfully unfollowed
+
+  /playlists:
+    get:
+      tags: [Playlists]
+      summary: List public playlists
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: featured
+          in: query
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: List of playlists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaylistList'
+
+    post:
+      tags: [Playlists]
+      summary: Create a playlist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlaylist'
+      responses:
+        '201':
+          description: Playlist created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Playlist'
+
+  /playlists/{id}:
+    get:
+      tags: [Playlists]
+      summary: Get playlist by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Playlist details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Playlist'
+
+    patch:
+      tags: [Playlists]
+      summary: Update playlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePlaylist'
+      responses:
+        '200':
+          description: Playlist updated
+
+    delete:
+      tags: [Playlists]
+      summary: Delete playlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Playlist deleted
+
+  /playlists/{id}/tracks:
+    post:
+      tags: [Playlists]
+      summary: Add track to playlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [songId]
+              properties:
+                songId:
+                  type: string
+                position:
+                  type: integer
+      responses:
+        '200':
+          description: Track added
+
+    delete:
+      tags: [Playlists]
+      summary: Remove track from playlist
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [songId]
+              properties:
+                songId:
+                  type: string
+      responses:
+        '200':
+          description: Track removed
+
+  /search:
+    get:
+      tags: [Search]
+      summary: Search content
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [all, songs, artists, playlists]
+            default: all
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResults'
+
+  /search/autocomplete:
+    get:
+      tags: [Search]
+      summary: Autocomplete suggestions
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 5
+            maximum: 10
+      responses:
+        '200':
+          description: Autocomplete suggestions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  suggestions:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        text:
+                          type: string
+                        type:
+                          type: string
+
+  /me:
+    get:
+      tags: [Users]
+      summary: Get current user profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+    patch:
+      tags: [Users]
+      summary: Update profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfile'
+      responses:
+        '200':
+          description: Profile updated
+
+  /me/library:
+    get:
+      tags: [Library]
+      summary: Get user's library
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User's library
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  likedSongs:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Song'
+                  playlists:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Playlist'
+                  following:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Artist'
+
+  /upload:
+    post:
+      tags: [Upload]
+      summary: Upload a song
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file, title, genre]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                title:
+                  type: string
+                genre:
+                  type: string
+                tags:
+                  type: array
+                  items:
+                    type: string
+                coverArt:
+                  type: string
+                  format: binary
+                explicit:
+                  type: boolean
+      responses:
+        '201':
+          description: Upload started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadId:
+                    type: string
+                  status:
+                    type: string
+                    enum: [processing, pending_review]
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Artist role required
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+  responses:
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    RateLimited:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+        Retry-After:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+        name:
+          type: string
+        avatar:
+          type: string
+          format: uri
+        role:
+          type: string
+          enum: [user, artist, admin]
+        subscription:
+          type: string
+          enum: [free, basic, premium, artist]
+        createdAt:
+          type: string
+          format: date-time
+
+    UpdateProfile:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        bio:
+          type: string
+          maxLength: 500
+        website:
+          type: string
+          format: uri
+        twitter:
+          type: string
+        instagram:
+          type: string
+
+    Song:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        artist:
+          $ref: '#/components/schemas/ArtistSummary'
+        coverArt:
+          type: string
+          format: uri
+        duration:
+          type: integer
+          description: Duration in seconds
+        genre:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        plays:
+          type: integer
+        likes:
+          type: integer
+        explicit:
+          type: boolean
+        releaseDate:
+          type: string
+          format: date
+
+    SongList:
+      type: object
+      properties:
+        songs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Song'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Artist:
+      type: object
+      properties:
+        id:
+          type: string
+        address:
+          type: string
+        name:
+          type: string
+        avatar:
+          type: string
+          format: uri
+        banner:
+          type: string
+          format: uri
+        bio:
+          type: string
+        verified:
+          type: boolean
+        followers:
+          type: integer
+        songCount:
+          type: integer
+        totalPlays:
+          type: integer
+        socialLinks:
+          type: object
+          properties:
+            twitter:
+              type: string
+            instagram:
+              type: string
+            website:
+              type: string
+
+    ArtistSummary:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        avatar:
+          type: string
+        verified:
+          type: boolean
+
+    ArtistList:
+      type: object
+      properties:
+        artists:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artist'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    Playlist:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        coverArt:
+          type: string
+          format: uri
+        creator:
+          $ref: '#/components/schemas/User'
+        trackCount:
+          type: integer
+        totalDuration:
+          type: integer
+        isPublic:
+          type: boolean
+        tracks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Song'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    PlaylistList:
+      type: object
+      properties:
+        playlists:
+          type: array
+          items:
+            $ref: '#/components/schemas/Playlist'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    CreatePlaylist:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        isPublic:
+          type: boolean
+          default: true
+
+    UpdatePlaylist:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        isPublic:
+          type: boolean
+
+    SearchResults:
+      type: object
+      properties:
+        songs:
+          type: array
+          items:
+            $ref: '#/components/schemas/Song'
+        artists:
+          type: array
+          items:
+            $ref: '#/components/schemas/Artist'
+        playlists:
+          type: array
+          items:
+            $ref: '#/components/schemas/Playlist'
+        total:
+          type: integer

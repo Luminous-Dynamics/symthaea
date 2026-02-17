@@ -1,0 +1,17 @@
+dataset: cifar10
+detector: meta
+description: >
+  CIFAR-10 Meta-detector validation. Requires ResNet-18 checkpoints and
+  Dirichlet α=0.1 client partitions. Run with experiments/cifar10_mode1_grid_search.py
+  or a dedicated meta harness using the same arguments.
+
+cli:
+  script: experiments/cifar10_mode1_grid_search.py
+  args:
+    --config: experiments/configs/cifar10_best_bet.yaml
+    --prefilter-fltrust: true
+    --conformal-fpr: 0.10
+notes:
+  - Use meta_detector.MetaDetector inside the runner when detector=meta
+  - Seeds: [42,123,456]
+  - BFT ratios: [0.35,0.45]

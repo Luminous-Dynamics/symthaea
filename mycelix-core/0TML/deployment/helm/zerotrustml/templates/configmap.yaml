@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "zerotrustml.fullname" . }}-config
+  labels:
+    {{- include "zerotrustml.labels" . | nindent 4 }}
+data:
+  config.yaml: |
+    node:
+      listen_port: {{ .Values.config.node.listenPort }}
+      enable_tls: {{ .Values.config.node.enableTLS }}
+      enable_signing: {{ .Values.config.node.enableSigning }}
+      enable_authentication: {{ .Values.config.node.enableAuthentication }}
+
+    performance:
+      enable_compression: {{ .Values.config.performance.enableCompression }}
+      compression_algorithm: {{ .Values.config.performance.compressionAlgorithm }}
+      compression_level: {{ .Values.config.performance.compressionLevel }}
+      enable_batch_validation: {{ .Values.config.performance.enableBatchValidation }}
+      batch_size: {{ .Values.config.performance.batchSize }}
+      enable_redis_cache: {{ .Values.config.performance.enableRedisCache }}
+      cache_ttl: {{ .Values.config.performance.cacheTTL }}
+
+    monitoring:
+      enable_prometheus: {{ .Values.config.monitoring.enablePrometheus }}
+      prometheus_port: {{ .Values.config.monitoring.prometheusPort }}
+      enable_topology_monitoring: {{ .Values.config.monitoring.enableTopologyMonitoring }}
+      enable_grafana: {{ .Values.config.monitoring.enableGrafana }}
+
+    networking:
+      enable_gossip: {{ .Values.config.networking.enableGossip }}
+      gossip_fanout: {{ .Values.config.networking.gossipFanout }}
+      gossip_interval: {{ .Values.config.networking.gossipInterval }}
+      enable_sharding: {{ .Values.config.networking.enableSharding }}
+      num_shards: {{ .Values.config.networking.numShards }}
+      shard_replication: {{ .Values.config.networking.shardReplication }}
+
+    storage:
+      backend: {{ .Values.config.storage.backend }}
+      enable_checkpointing: {{ .Values.config.storage.enableCheckpointing }}
+
+    logging:
+      level: {{ .Values.config.logging.level }}
+      format: {{ .Values.config.logging.format }}
+      output: {{ .Values.config.logging.output }}

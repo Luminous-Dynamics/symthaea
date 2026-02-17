@@ -1,0 +1,126 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mycelix-testnet-ingress
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    # Rate limiting
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-connections: "50"
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    # cert-manager for TLS
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+    - hosts:
+        - testnet.mycelix.network
+        - api.testnet.mycelix.network
+        - faucet.testnet.mycelix.network
+        - grafana.testnet.mycelix.network
+      secretName: mycelix-testnet-tls
+  rules:
+    - host: testnet.mycelix.network
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bootstrap
+                port:
+                  name: api
+    - host: api.testnet.mycelix.network
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: bootstrap
+                port:
+                  name: api
+    - host: faucet.testnet.mycelix.network
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: faucet
+                port:
+                  name: http
+    - host: grafana.testnet.mycelix.network
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  name: http
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mycelix-network-policy
+  namespace: mycelix-testnet
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+    # Allow internal traffic within namespace
+    - from:
+        - podSelector: {}
+    # Allow Prometheus scraping from monitoring namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9090
+          protocol: TCP
+  egress:
+    # Allow all egress (can be restricted further)
+    - {}
+---
+# Pod Disruption Budget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: fl-nodes-pdb
+  namespace: mycelix-testnet
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: fl-node
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bootstrap-pdb
+  namespace: mycelix-testnet
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: bootstrap

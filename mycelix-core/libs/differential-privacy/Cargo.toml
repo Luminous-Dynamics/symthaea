@@ -1,0 +1,45 @@
+[package]
+name = "mycelix-differential-privacy"
+version = "0.1.0"
+edition = "2021"
+description = "Differential Privacy primitives for Mycelix Federated Learning"
+license = "Apache-2.0"
+repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"
+keywords = ["differential-privacy", "federated-learning", "privacy", "machine-learning"]
+categories = ["cryptography", "science"]
+
+[lib]
+crate-type = ["rlib", "cdylib"]
+
+[dependencies]
+# Random number generation (standardized to 0.8 across workspace)
+rand = "0.8"
+rand_distr = "0.4"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# Numeric types
+num-traits = "0.2"
+
+# Logging
+tracing = "0.1"
+
+# PyO3 for Python bindings (optional)
+pyo3 = { version = "0.24", features = ["extension-module"], optional = true }
+
+[features]
+default = []
+python = ["pyo3"]
+
+[dev-dependencies]
+criterion = "0.6"
+approx = "0.5"
+
+[[bench]]
+name = "dp_benchmark"
+harness = false

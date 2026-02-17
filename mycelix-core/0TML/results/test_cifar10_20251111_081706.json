@@ -1,0 +1,156 @@
+{
+  "config": {
+    "attack": {
+      "byzantine_ratio": 0.2,
+      "type": "sign_flip"
+    },
+    "baselines": [
+      "fedavg"
+    ],
+    "data_split": {
+      "seed": 42,
+      "type": "iid"
+    },
+    "dataset": {
+      "data_dir": "datasets",
+      "name": "cifar10"
+    },
+    "experiment_name": "test_cifar10",
+    "federated": {
+      "batch_size": 32,
+      "fraction_clients": 1.0,
+      "learning_rate": 0.01,
+      "local_epochs": 1,
+      "num_clients": 5
+    },
+    "model": {
+      "params": {
+        "num_classes": 10
+      },
+      "type": "resnet9"
+    },
+    "output_dir": "results",
+    "seed": 42,
+    "training": {
+      "eval_every": 2,
+      "num_rounds": 2
+    }
+  },
+  "baselines": {
+    "fedavg": {
+      "rounds": [
+        0,
+        1
+      ],
+      "train_loss": [
+        1.8944348146438599,
+        1.6491980045318606
+      ],
+      "train_accuracy": [
+        0.29629999999999995,
+        0.38922
+      ],
+      "test_loss": [
+        2.2998276824951174,
+        2.2982624225616455
+      ],
+      "test_accuracy": [
+        0.1468,
+        0.1275
+      ],
+      "trust_scores": [
+        null,
+        null
+      ]
+    }
+  },
+  "metadata": {
+    "start_time": "2025-11-11T08:14:55.689912",
+    "device": "cuda",
+    "end_time": "2025-11-11T08:17:06.285505"
+  },
+  "split_stats": {
+    "num_clients": 5,
+    "samples_per_client": [
+      10000,
+      10000,
+      10000,
+      10000,
+      10000
+    ],
+    "total_samples": 50000,
+    "min_samples": 10000,
+    "max_samples": 10000,
+    "mean_samples": 10000.0,
+    "class_distribution": [
+      [
+        973,
+        979,
+        1030,
+        1023,
+        933,
+        1015,
+        996,
+        994,
+        1017,
+        1040
+      ],
+      [
+        1000,
+        1000,
+        979,
+        1018,
+        1011,
+        1018,
+        944,
+        999,
+        1028,
+        1003
+      ],
+      [
+        981,
+        1048,
+        1007,
+        991,
+        999,
+        998,
+        1026,
+        986,
+        968,
+        996
+      ],
+      [
+        1036,
+        984,
+        991,
+        1001,
+        1046,
+        965,
+        1001,
+        975,
+        983,
+        1018
+      ],
+      [
+        1010,
+        989,
+        993,
+        967,
+        1011,
+        1004,
+        1033,
+        1046,
+        1004,
+        943
+      ]
+    ],
+    "class_imbalance": [
+      0.030420387900222445,
+      0.022671568097509268,
+      0.021707141681944216,
+      0.024927896020322294,
+      0.028224103174414594
+    ],
+    "mean_class_imbalance": 0.02559021937488256
+  }
+}

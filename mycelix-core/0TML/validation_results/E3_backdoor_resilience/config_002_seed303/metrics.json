@@ -1,0 +1,11 @@
+{
+  "asr_aegis": 0.31,
+  "asr_median": 0.321,
+  "asr_ratio": 0.9657320872274143,
+  "clean_acc_aegis": 0.658,
+  "clean_acc_median": 0.654,
+  "robust_acc_aegis": 0.55601,
+  "robust_acc_median": 0.549033,
+  "auc": 0.6546765222482436,
+  "fpr_at_tpr90": 0.7848360655737705
+}

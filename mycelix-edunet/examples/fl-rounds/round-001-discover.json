@@ -1,0 +1,30 @@
+{
+  "round_id": "fl-round-001-2025-11-15",
+  "model_id": "spanish-learning-model-v1",
+  "state": "DISCOVER",
+  "base_model_hash": "blake3:a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+  "min_participants": 10,
+  "max_participants": 100,
+  "current_participants": 0,
+  "aggregation_method": "trimmed_mean",
+  "aggregation_config": {
+    "trim_percent": 0.1,
+    "min_updates": 10
+  },
+  "clip_norm": 1.0,
+  "privacy_params": {
+    "epsilon": null,
+    "delta": null,
+    "clip_norm": 1.0
+  },
+  "started_at": 1731683400,
+  "discovery_deadline": 1731769800,
+  "round_deadline": 1731856200,
+  "completed_at": null,
+  "aggregated_model_hash": null,
+  "metadata": {
+    "course_id": "spanish-beginner-2025",
+    "coordinator": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+    "description": "Federated learning round for Spanish language model, focusing on vocabulary and grammar exercises"
+  }
+}

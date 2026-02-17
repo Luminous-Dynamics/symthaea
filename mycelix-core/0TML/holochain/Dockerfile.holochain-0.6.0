@@ -1,0 +1,33 @@
+# Holochain 0.6.0 Conductor for ZeroTrustML
+# Upgrading from 0.5.6 to fix bind_address bug
+
+FROM debian:bookworm-slim
+
+# Install holochain 0.6.0 and dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Download and install Holochain 0.6.0-rc.1
+# Using the official Holochain releases
+RUN curl -L https://github.com/holochain/holochain/releases/download/holochain-0.6.0-rc.1/holochain-x86_64-unknown-linux-gnu -o /usr/local/bin/holochain \
+    && chmod +x /usr/local/bin/holochain
+
+# Create data directory
+RUN mkdir -p /data
+
+# Copy conductor configuration (without bind_address, matching old working config)
+COPY conductor-config-no-bind.yaml /conductor-config.yaml
+
+# Expose admin interface port
+EXPOSE 8888
+
+# Expose app interface port (if needed)
+EXPOSE 8889
+
+# Set working directory
+WORKDIR /data
+
+# Start conductor with passphrase piped from echo
+CMD ["sh", "-c", "echo 'zerotrustml-dev-passphrase' | holochain -p -c /conductor-config.yaml"]

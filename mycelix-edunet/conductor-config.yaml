@@ -1,0 +1,40 @@
+---
+# Development Conductor Configuration for Mycelix EduNet
+# Holochain 0.6 compatible
+
+# Data persistence directory
+environment_path: /tmp/mycelix-edunet-dev
+
+# DPKI (Distributed Public Key Infrastructure) configuration
+dpki:
+  # Use mock DPKI for development (not for production!)
+  instance_id: mycelix-dev
+  init_params: ~
+
+# Keystore configuration
+keystore:
+  type: lair_server_in_proc
+  lair_root: ~
+
+# Admin WebSocket interface for conductor management
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+
+# Network configuration for peer-to-peer connectivity
+network:
+  transport_pool:
+    - type: quic
+  bootstrap_service: https://bootstrap.holo.host
+  network_type: quic_bootstrap
+
+# Application interfaces for client connections
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 8889
+
+# Installed DNAs
+# Note: This will be populated when you install the DNA
+# using `hc app install` or through the admin interface

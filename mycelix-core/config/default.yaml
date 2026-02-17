@@ -1,0 +1,32 @@
+# Mycelix-Core Default Configuration
+
+coordinator:
+  host: "0.0.0.0"
+  port: 8080
+  workers: 4
+
+federated_learning:
+  min_nodes: 3
+  aggregation_timeout: 300
+  model_version: "1.0.0"
+
+byzantine:
+  threshold: 0.33
+  detection_enabled: true
+
+differential_privacy:
+  enabled: true
+  epsilon: 1.0
+  delta: 0.00001
+
+secure_aggregation:
+  enabled: true
+  secret_sharing_threshold: 3
+
+logging:
+  level: info
+  format: json
+
+metrics:
+  enabled: true
+  port: 9100

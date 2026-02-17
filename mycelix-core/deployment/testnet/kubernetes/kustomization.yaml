@@ -1,0 +1,37 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mycelix-testnet
+
+resources:
+  - namespace.yaml
+  - rbac.yaml
+  - network-policies.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - bootstrap-deployment.yaml
+  - fl-nodes-statefulset.yaml
+  - postgres-deployment.yaml
+  - redis-deployment.yaml
+  - monitoring-deployment.yaml
+  - services.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: mycelix
+  app.kubernetes.io/instance: testnet
+  app.kubernetes.io/version: "1.0.0"
+  app.kubernetes.io/managed-by: kustomize
+
+configMapGenerator:
+  - name: grafana-dashboards
+    files:
+      - mycelix-overview.json=../config/grafana/dashboards/mycelix-overview.json
+
+images:
+  - name: mycelix/bootstrap-node
+    newTag: testnet-latest
+  - name: mycelix/fl-node
+    newTag: testnet-latest
+  - name: mycelix/faucet
+    newTag: testnet-latest

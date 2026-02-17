@@ -1,0 +1,22 @@
+[package]
+name = "fl_zome"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Federated Learning zome for EduNet (library-only for v0.1)"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+edunet-core = { path = "../../crates/edunet-core" }
+
+# Holochain 0.6 dependencies for zome implementation
+hdk.workspace = true
+hdi.workspace = true
+holochain_integrity_types.workspace = true
+holochain_zome_types.workspace = true

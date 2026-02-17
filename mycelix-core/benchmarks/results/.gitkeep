@@ -1,0 +1,21 @@
+# This directory contains benchmark results
+# Results are organized by timestamp: results/{YYYYMMDD_HHMMSS}/
+#
+# Each run produces:
+#   - byzantine_detection.json
+#   - latency_distribution.json
+#   - scalability.json
+#   - compression.json
+#   - summary.json
+#   - environment.json
+#
+# Example output structure:
+#
+# results/
+#   20260112_143052/
+#     byzantine_detection.json
+#     latency_distribution.json
+#     scalability.json
+#     compression.json
+#     summary.json
+#     environment.json

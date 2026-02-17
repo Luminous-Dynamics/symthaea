@@ -1,0 +1,41 @@
+# Pre-commit hooks for VSV-STARK
+# Install: pre-commit install
+# Run manually: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+
+  - repo: local
+    hooks:
+      # Rust formatting
+      - id: rustfmt
+        name: rustfmt
+        entry: cargo fmt
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      # Rust linting
+      - id: clippy
+        name: clippy
+        entry: cargo clippy -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      # Rust tests (quick smoke test)
+      - id: cargo-test-lib
+        name: cargo test (lib only)
+        entry: cargo test --lib
+        language: system
+        types: [rust]
+        pass_filenames: false
+        stages: [pre-push]  # Only on push, not every commit

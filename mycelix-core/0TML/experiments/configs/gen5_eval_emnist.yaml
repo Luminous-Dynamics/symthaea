@@ -1,0 +1,89 @@
+# GEN5 EMNIST Evaluation (E2: Non-IID Robustness)
+#
+# Purpose: Validate AEGIS stability under realistic heterogeneity using real EMNIST data
+# Acceptance: AEGIS robust-acc ≥ +3-5pp vs Median at α=0.3, AUC ≥ 0.80
+
+dataset: emnist
+n_train: 6000
+n_test: 1000
+seed: 42
+
+model:
+  type: cnn_small  # 2-conv CNN
+  n_features: 784  # 28x28 grayscale
+  n_classes: 10    # Digits 0-9
+
+training:
+  n_rounds: 15  # Increased from 12 to help α=0.3 converge
+  local_epochs: 2
+  learning_rate: 0.05
+  lr_schedule: cosine_decay
+  batch_size: 32
+
+federation:
+  n_clients: 50
+  participation_rate: 0.6
+  byz_frac: 0.20  # 20% Byzantine clients
+  attack: model_replacement
+  attack_lambda: 10.0
+
+# Primary grid: α ∈ {1.0, 0.5, 0.3}
+experiments:
+  - name: E2_emnist_iid
+    noniid_alpha: 1.0
+    seed: 101
+
+  - name: E2_emnist_moderate
+    noniid_alpha: 0.5
+    seed: 101
+
+  - name: E2_emnist_highly_noniid
+    noniid_alpha: 0.3
+    seed: 101
+
+  # Stretch goal (not gating)
+  - name: E2_emnist_pathological_seed202
+    noniid_alpha: 0.1
+    seed: 202
+
+  - name: E2_emnist_pathological_seed303
+    noniid_alpha: 0.1
+    seed: 303
+
+aggregators:
+  - median  # Pure median (no filters)
+  - aegis   # Enhanced AEGIS with robust centroiding
+
+aegis_config:
+  burn_in_rounds: 3  # 5 for α≤0.1 (handled in code)
+  ema_beta: 0.8
+  use_robust_centroid: true
+  per_layer_clip: 1.5
+
+metrics:
+  - clean_acc
+  - robust_acc
+  - auc
+  - fpr_at_tpr90
+  - convergence_round
+  - flags_per_round
+  - time_s
+  - bytes_tx
+  - bytes_rx
+
+acceptance_criteria:
+  # Primary grid (α≥0.3)
+  aegis_advantage_pp: 3.0   # AEGIS robust-acc ≥ +3pp vs Median
+  aegis_advantage_target_pp: 5.0  # Stretch: +5pp
+  auc_min: 0.80
+  auc_target: 0.85  # Stretch
+  fpr_at_tpr90_max: 0.15
+  clean_acc_drop_max_pp: 1.0  # AEGIS vs Median at Byz=0
+
+notes: |
+  E2 EMNIST validation follows Phase A v5 conservative strategy:
+  - Primary grid: α∈{1.0, 0.5, 0.3} (realistic non-IID)
+  - Stretch: α=0.1 (not gating, for appendix)
+  - Uses "just-right" attack strength (model_replacement λ=10)
+  - Robust centroiding + adaptive quarantine ramp (burn-in=3, or 5 for α≤0.1)
+  - Relaxed hard gates for α≤0.1 (cosine < -0.3, mad_z > 3.5)

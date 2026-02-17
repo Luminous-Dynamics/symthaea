@@ -1,0 +1,35 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential"],
+  "issuer": "did:mycelix:org:downtown-specialty-cafe",
+  "issuanceDate": "2025-03-10T09:00:00Z",
+  "credentialSubject": {
+    "eventType": "RECEIVED",
+    "productId": "COFFEE-ROASTED-BEANS-ETHIOPIAN-YIRGACHEFFE",
+    "batchId": "BATCH-2025-ROASTED-001",
+    "quantity": 850.0,
+    "unit": "kg",
+    "facility": {
+      "id": "CAFE-DOWNTOWN-SF",
+      "name": "Downtown Specialty Cafe",
+      "location": {
+        "country": "USA",
+        "region": "California",
+        "city": "San Francisco",
+        "address": "456 Market St, San Francisco, CA 94102"
+      }
+    },
+    "timestamp": "2025-03-10T09:00:00Z",
+    "metadata": {
+      "orderNumber": "PO-2025-0234",
+      "deliveryMethod": "Local Truck",
+      "receivedBy": "Maria Garcia - Head Barista",
+      "conditionOnReceipt": "Perfect",
+      "aroma": "Fresh, vibrant",
+      "packagingType": "5lb bags with one-way valve",
+      "storageLocation": "Main storage, climate controlled",
+      "expectedUsage": "Next 2-3 weeks",
+      "pricePerLb": "$18.50"
+    }
+  }
+}

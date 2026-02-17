@@ -1,0 +1,107 @@
+# Stage 1 Set A: Primary Comparison - Extreme Non-IID
+#
+# Research Goal: Does PoGQ+Rep outperform baselines under extreme non-IID data?
+#
+# Configuration:
+# - Data: Extreme non-IID (Dirichlet alpha=0.1, ~90/10 label skew)
+# - Byzantine: 30% (3/10 clients) - high stress scenario
+# - Attacks: All 7 attack types
+# - Defenses: FedAvg (baseline), Multi-Krum (best classical), PoGQ (ours)
+#
+# Total: 7 attacks × 3 defenses = 21 experiments
+#
+# Expected Outcome: PoGQ shows superiority on hardest realistic scenario
+# Hypothesis: PoGQ shows largest improvement on sophisticated attacks (adaptive, sybil)
+
+experiment_name: "stage1_set_a_primary_comparison"
+description: "Primary comparison: PoGQ vs baselines on extreme non-IID data"
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+# CRITICAL: Extreme non-IID data distribution
+data_split:
+  type: "dirichlet"
+  alpha: 0.1  # Extreme heterogeneity (alpha → 0 = most non-IID)
+  num_clients: 10
+  seed: 42
+
+training:
+  num_rounds: 50  # Full convergence analysis
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+
+# Federated learning configuration
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 50
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 3  # 30% Byzantine (high stress)
+
+  # PoGQ-specific parameters
+  quality_threshold: 0.3  # Minimum quality score to accept
+  reputation_decay: 0.95  # Decay factor for historical reputation
+
+# Byzantine client configuration
+byzantine:
+  num_byzantine: 3  # 30% - challenging stress test
+
+  # All 7 attack types
+  attack_types:
+    - gaussian_noise      # Baseline: random noise
+    - sign_flip           # Gradient reversal
+    - label_flip          # Data poisoning
+    - targeted_poison     # Backdoor attack
+    - model_replacement   # Random weights
+    - adaptive            # Evade detection (hardest)
+    - sybil               # Coordinated attack (hardest)
+
+  severity: 1.0
+  enable_peer_context: true
+
+baselines:
+  # Baseline: No defense (should fail)
+  - name: "fedavg"
+
+  # Best classical defense (based on Oct 6 results: Multi-Krum 99.96%)
+  - name: "multikrum"
+    params:
+      num_byzantine: 3
+      k: 7  # Select top 7 of 10 clients
+
+  # PoGQ+Reputation (our method)
+  - name: "pogq"
+    params:
+      quality_threshold: 0.3
+      reputation_decay: 0.95
+
+# Model architecture
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+
+device: "cuda"
+
+# Results tracking
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - num_accepted  # PoGQ-specific: how many clients accepted
+    - avg_quality_score  # PoGQ-specific: average quality
+    - rejected_clients  # PoGQ-specific: which clients rejected
+  per_round: true
+  final_model: true
+  attack_analysis: true
+
+# Estimated time: 7 attacks × 3 defenses × 50 rounds × ~10 min/round = ~105 hours
+# With parallelization: ~35 hours wall time (run 3 defenses in parallel)

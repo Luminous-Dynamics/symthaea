@@ -1,0 +1,25 @@
+{
+  "name": "@mycelix/supplychain-examples",
+  "version": "0.1.0",
+  "description": "Comprehensive examples for the Mycelix Supply Chain SDK",
+  "private": true,
+  "scripts": {
+    "example:basic": "ts-node 01-basic-ingestion.ts",
+    "example:batch": "ts-node 02-batch-processing.ts",
+    "example:lineage": "ts-node 03-lineage-tracking.ts",
+    "example:search": "ts-node 04-search-filtering.ts",
+    "example:workflow": "ts-node 05-production-workflow.ts",
+    "example:all": "npm run example:basic && npm run example:batch && npm run example:lineage && npm run example:search && npm run example:workflow"
+  },
+  "dependencies": {
+    "@mycelix/supplychain-sdk": "file:../sdk"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

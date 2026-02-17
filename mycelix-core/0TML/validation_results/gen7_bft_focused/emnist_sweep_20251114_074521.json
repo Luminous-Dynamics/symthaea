@@ -1,0 +1,77 @@
+{
+  "results": [
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.746,
+      "auc": 0.4868827160493827,
+      "wall_time": 0.7856440544128418,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.867,
+      "auc": 1.0,
+      "wall_time": 3.5348622798919678,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis",
+      "clean_acc": 0.647,
+      "auc": 0.4256779139652643,
+      "wall_time": 0.7598822116851807,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.862,
+      "auc": 1.0,
+      "wall_time": 3.4632718563079834,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.556,
+      "auc": 0.4361306324927656,
+      "wall_time": 0.8332338333129883,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.865,
+      "auc": 1.0,
+      "wall_time": 3.4628355503082275,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.106,
+      "auc": 0.4422895622895623,
+      "wall_time": 1.2247931957244873,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.874,
+      "auc": 1.0,
+      "wall_time": 3.6820974349975586,
+      "status": "success"
+    }
+  ],
+  "dataset": "EMNIST"
+}

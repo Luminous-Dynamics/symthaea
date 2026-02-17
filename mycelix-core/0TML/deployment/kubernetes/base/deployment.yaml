@@ -1,0 +1,139 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zerotrustml-node
+  labels:
+    app: zerotrustml
+    component: node
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zerotrustml
+      component: node
+  template:
+    metadata:
+      labels:
+        app: zerotrustml
+        component: node
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+      - name: zerotrustml
+        image: zerotrustml/node:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: network
+          containerPort: 9000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        - name: gossip
+          containerPort: 9001
+          protocol: TCP
+        env:
+        - name: NODE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: ENABLE_TLS
+          value: "true"
+        - name: ENABLE_COMPRESSION
+          value: "true"
+        - name: ENABLE_PROMETHEUS
+          value: "true"
+        - name: ENABLE_GOSSIP
+          value: "true"
+        - name: ENABLE_SHARDING
+          value: "true"
+        - name: COMPRESSION_ALGORITHM
+          value: "zstd"
+        - name: GOSSIP_FANOUT
+          value: "3"
+        - name: NUM_SHARDS
+          value: "10"
+        - name: REDIS_HOST
+          value: "redis-service"
+        - name: REDIS_PORT
+          value: "6379"
+        - name: LOG_LEVEL
+          value: "INFO"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 9090
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        volumeMounts:
+        - name: config
+          mountPath: /etc/zerotrustml
+          readOnly: true
+        - name: data
+          mountPath: /var/lib/zerotrustml
+      volumes:
+      - name: config
+        configMap:
+          name: zerotrustml-config
+      - name: data
+        emptyDir: {}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: zerotrustml
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zerotrustml
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: zerotrustml
+        component: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - name: redis
+          containerPort: 6379
+          protocol: TCP
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        emptyDir: {}

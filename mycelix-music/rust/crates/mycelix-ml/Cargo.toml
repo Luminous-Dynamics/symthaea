@@ -1,0 +1,35 @@
+[package]
+name = "mycelix-ml"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "ML inference engine for audio analysis using ONNX models"
+
+[dependencies]
+mycelix-audio = { path = "../mycelix-audio" }
+
+tract-onnx.workspace = true
+tract-core.workspace = true
+ndarray.workspace = true
+
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+
+rayon.workspace = true
+parking_lot.workspace = true
+dirs = "5.0"
+
+# Model downloading
+ureq = "2.9"
+sha2 = "0.10"
+
+[dev-dependencies]
+tokio-test = "0.4"

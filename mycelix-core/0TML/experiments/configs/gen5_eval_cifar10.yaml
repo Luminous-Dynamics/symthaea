@@ -1,0 +1,99 @@
+# GEN5 CIFAR-10 Evaluation (E3: Backdoor Resilience)
+#
+# Purpose: Validate AEGIS backdoor defense on realistic image data
+# Acceptance: ASR(AEGIS) ≤ 30% and ≤ 0.5× ASR(Median), clean-acc within 1-2pp
+
+dataset: cifar10
+n_train: 2500
+n_test: 500
+seed: 42
+
+model:
+  type: cnn_small  # 2-conv CNN for CIFAR-10
+  n_features: 3072  # 32x32x3 RGB
+  n_classes: 10
+
+training:
+  n_rounds: 15
+  local_epochs: 2
+  learning_rate: 0.05
+  lr_schedule: cosine_decay
+  batch_size: 32
+
+federation:
+  n_clients: 50
+  participation_rate: 0.6
+  byz_frac: 0.20  # 20% Byzantine clients
+  attack: backdoor
+  noniid_alpha: 1.0  # IID for E3 backdoor test
+
+backdoor:
+  trigger_type: corner  # 4x4 corner patch (top-left), more detectable than diagonal
+  trigger_value: 2.0          # Bright patch (normalized)
+  trigger_width: 4            # 4x4 pixel patch
+  target_label: 0             # Target class
+  poison_frac: 0.3            # 30% of Byzantine training data (increased for detection signal)
+
+  # Corner patch trigger design (deep fix for detection):
+  # - Concentrated pattern in top-left corner (4x4)
+  # - More separable gradient signature than diffuse diagonal
+  # - Higher poison_frac (0.3) amplifies detection signal
+
+experiments:
+  - name: E3_cifar10_backdoor_seed101
+    seed: 101
+
+  - name: E3_cifar10_backdoor_seed202
+    seed: 202
+
+  - name: E3_cifar10_backdoor_seed303
+    seed: 303
+
+  - name: E3_cifar10_backdoor_seed404
+    seed: 404
+
+  - name: E3_cifar10_backdoor_seed505
+    seed: 505
+
+aggregators:
+  - median  # Pure median (no filters)
+  - aegis   # Enhanced AEGIS with robust centroiding
+
+aegis_config:
+  burn_in_rounds: 3
+  ema_beta: 0.8
+  use_robust_centroid: true
+  per_layer_clip: 1.5
+
+  # Threshold selection via cost-sensitive ROC
+  # Minimize: ASR + 0.5·FPR (don't over-quarantine)
+  threshold_strategy: cost_sensitive
+  asr_weight: 1.0
+  fpr_weight: 0.5
+
+metrics:
+  - clean_acc       # On clean test set
+  - robust_acc      # Clean acc accounting for Byzantine influence
+  - asr             # Attack Success Rate (on triggered test set)
+  - auc             # Detection AUC
+  - fpr_at_tpr90    # False positive rate at 90% TPR
+  - convergence_round
+  - detect_latency_rounds  # Temporal EMA + debounce delay
+  - time_s
+  - bytes_tx
+  - bytes_rx
+
+acceptance_criteria:
+  asr_aegis_max: 0.30      # ASR(AEGIS) ≤ 30%
+  asr_ratio_max: 0.50      # ASR(AEGIS) / ASR(Median) ≤ 0.5
+  clean_acc_drop_max_pp: 2.0  # AEGIS vs Median clean-acc within 2pp
+  fpr_at_tpr90_max: 0.15   # Keep FPR ≤ 15%
+
+notes: |
+  E3 CIFAR-10 validation follows Phase A v5 "just-right" regime:
+  - Diagonal stripe trigger (moderate strength, poison_frac=0.2)
+  - NOT the catastrophic v4 trigger (feature 42, value 10, frac 0.4)
+  - Uses v3-level parameters proven to show AEGIS advantage
+  - Pure Median baseline (no hidden filters/clipping)
+  - ASR measured only on triggered test set (non-target class samples with trigger)
+  - Threshold selected via cost-sensitive ROC (minimize ASR + 0.5·FPR)

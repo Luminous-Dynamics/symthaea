@@ -1,0 +1,27 @@
+[package]
+name = "mycelix-identity-client"
+version = "1.0.0"
+edition = "2021"
+description = "Shared identity client for Mycelix applications - DID resolution, credential verification, and assurance levels"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/Mycelix-Core"
+keywords = ["mycelix", "identity", "did", "holochain", "verifiable-credentials"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+async-trait = "0.1"
+tokio = { version = "1.0", features = ["sync", "time"] }
+tracing = "0.1"
+
+# Holochain dependencies (optional, for direct integration)
+holochain_client = { version = "0.5", optional = true }
+holochain_types = { version = "0.3", optional = true }
+
+[features]
+default = []
+holochain = ["holochain_client", "holochain_types"]
+
+[dev-dependencies]
+tokio = { version = "1.0", features = ["rt-multi-thread", "macros"] }

@@ -1,0 +1,40 @@
+# MNIST Test Configuration
+# Quick validation with minimal rounds
+
+experiment_name: "mnist_test"
+output_dir: "results/test"
+
+# Dataset configuration
+dataset:
+  name: "mnist"
+  data_dir: "datasets"
+
+# Model configuration
+model:
+  architecture: "simple_cnn"
+  params:
+    num_classes: 10
+
+# Data split configuration
+data_split:
+  type: "iid"
+  seed: 42
+
+# Federated learning configuration (reduced for testing)
+federated:
+  num_clients: 5  # Fewer clients for faster testing
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 1
+  fraction_clients: 1.0
+
+# Training configuration (minimal rounds)
+training:
+  num_rounds: 10  # Just 10 rounds for validation
+  eval_every: 2   # Evaluate more frequently
+
+# Test with 3 baselines (one from each category)
+baselines:
+  - fedavg      # Standard baseline
+  - fedprox     # Non-IID handling
+  - krum        # Byzantine-robust

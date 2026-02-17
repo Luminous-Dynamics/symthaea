@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # Web client (React + Vite)
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - "3000:80"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - edunet
+
+  # Holochain conductor (future use)
+  # Uncomment when Holochain integration is complete (v0.2.0+)
+  # conductor:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.conductor
+  #   ports:
+  #     - "4444:4444"  # Admin interface
+  #     - "8888:8888"  # App interface
+  #   volumes:
+  #     - conductor_data:/data
+  #     - ./config/conductor-config.yaml:/data/conductor-config.yaml:ro
+  #   environment:
+  #     - RUST_LOG=info
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "holochain", "--version"]
+  #     interval: 30s
+  #     timeout: 3s
+  #     retries: 3
+  #     start_period: 10s
+  #   networks:
+  #     - edunet
+
+  # Lair keystore (future use)
+  # Uncomment when Holochain integration is complete
+  # lair:
+  #   image: holochain/lair-keystore:latest-0.4.x
+  #   volumes:
+  #     - lair_data:/data
+  #   restart: unless-stopped
+  #   networks:
+  #     - edunet
+
+networks:
+  edunet:
+    driver: bridge
+
+volumes:
+  conductor_data:
+    driver: local
+  lair_data:
+    driver: local

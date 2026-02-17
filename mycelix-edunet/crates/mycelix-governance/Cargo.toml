@@ -1,0 +1,45 @@
+[package]
+name = "mycelix-governance"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["rlib"]  # Library crate for sharing across zomes
+
+[dependencies]
+# Holochain dependencies
+hdk.workspace = true
+hdi.workspace = true
+holochain_integrity_types.workspace = true
+holochain_zome_types.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+holochain_serialized_bytes.workspace = true
+
+# Error handling
+thiserror.workspace = true
+
+# Crypto
+blake3.workspace = true
+ed25519-dalek.workspace = true
+
+# Time
+chrono.workspace = true
+
+# Statistics (for reputation calculations)
+statrs = { version = "0.17", optional = true }
+
+[features]
+default = ["reputation"]
+reputation = ["statrs"]  # Reputation calculation algorithms
+hierarchical = []         # Hierarchical DAO support
+cross_happ = []          # Cross-hApp reputation sync
+
+[dev-dependencies]
+# Testing dependencies
+rand.workspace = true
+rand_chacha.workspace = true

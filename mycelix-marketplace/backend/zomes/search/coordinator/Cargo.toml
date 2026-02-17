@@ -1,0 +1,16 @@
+[package]
+name = "search_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "search"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+# Link to integrity zome
+search_integrity = { path = "../integrity" }

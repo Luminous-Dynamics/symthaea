@@ -1,0 +1,47 @@
+[package]
+name = "mycelix-audio"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "High-performance audio processing for Mycelix Music Platform"
+
+[dependencies]
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+# Audio
+symphonia.workspace = true
+rubato.workspace = true
+dasp.workspace = true
+hound.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror.workspace = true
+anyhow.workspace = true
+
+# Logging
+tracing.workspace = true
+
+# Concurrency
+crossbeam.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+
+# Utilities
+uuid.workspace = true
+num-traits.workspace = true
+derive_builder.workspace = true
+
+[dev-dependencies]
+criterion = "0.5"
+tempfile = "3.9"
+
+[[bench]]
+name = "audio_benchmarks"
+harness = false

@@ -1,0 +1,400 @@
+/**
+ * Mycelix Mail Browser Extension - Content Script Styles
+ */
+
+/* ============================================================================
+   Trust Badge
+   ============================================================================ */
+
+.mycelix-trust-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.mycelix-trust-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  color: white;
+  font-size: 11px;
+  font-weight: bold;
+  transition: transform 0.2s;
+}
+
+.mycelix-trust-badge:hover .mycelix-trust-icon {
+  transform: scale(1.1);
+}
+
+/* ============================================================================
+   Trust Tooltip
+   ============================================================================ */
+
+.mycelix-trust-tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+  z-index: 10000;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #333;
+}
+
+.mycelix-trust-badge:hover .mycelix-trust-tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mycelix-trust-tooltip strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.mycelix-trust-score-bar {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.mycelix-trust-score-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s;
+}
+
+.mycelix-trust-level,
+.mycelix-trust-attestations,
+.mycelix-trust-path {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.mycelix-trust-details {
+  display: inline-block;
+  margin-top: 8px;
+  color: #2196F3;
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.mycelix-trust-details:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================================
+   Modal
+   ============================================================================ */
+
+.mycelix-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+
+.mycelix-modal.open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.mycelix-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 400px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  transform: scale(0.95);
+  transition: transform 0.2s;
+}
+
+.mycelix-modal.open .mycelix-modal-content {
+  transform: scale(1);
+}
+
+.mycelix-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.mycelix-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.mycelix-modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.mycelix-modal-close:hover {
+  color: #333;
+}
+
+.mycelix-modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.mycelix-modal-footer {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+/* ============================================================================
+   Trust Detail View
+   ============================================================================ */
+
+.mycelix-trust-detail {
+  text-align: center;
+}
+
+.mycelix-trust-email {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 20px;
+  word-break: break-all;
+}
+
+.mycelix-trust-score-large {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.mycelix-score-circle {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: conic-gradient(
+    #4CAF50 0deg,
+    #4CAF50 calc(var(--score) * 3.6deg),
+    #e0e0e0 calc(var(--score) * 3.6deg),
+    #e0e0e0 360deg
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mycelix-score-circle::before {
+  content: '';
+  position: absolute;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: white;
+}
+
+.mycelix-score-circle span {
+  position: relative;
+  z-index: 1;
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
+.mycelix-trust-info {
+  text-align: left;
+  background: #f5f5f5;
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.mycelix-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.mycelix-info-row:last-child {
+  border-bottom: none;
+}
+
+.mycelix-info-row .label {
+  color: #666;
+}
+
+.mycelix-info-row .value {
+  font-weight: 500;
+  color: #333;
+}
+
+.mycelix-attestors {
+  text-align: left;
+}
+
+.mycelix-attestors h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.mycelix-attestors ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mycelix-attestors li {
+  padding: 6px 0;
+  font-size: 13px;
+  color: #333;
+}
+
+/* ============================================================================
+   Buttons
+   ============================================================================ */
+
+.mycelix-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  border: none;
+}
+
+.mycelix-btn-primary {
+  background: #2196F3;
+  color: white;
+}
+
+.mycelix-btn-primary:hover {
+  background: #1976D2;
+}
+
+.mycelix-btn-secondary {
+  background: #f5f5f5;
+  color: #333;
+}
+
+.mycelix-btn-secondary:hover {
+  background: #e0e0e0;
+}
+
+/* ============================================================================
+   Loading & Error States
+   ============================================================================ */
+
+.mycelix-loading {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+}
+
+.mycelix-error {
+  text-align: center;
+  padding: 20px;
+  color: #f44336;
+}
+
+.mycelix-error p {
+  margin: 8px 0;
+}
+
+/* ============================================================================
+   Dark Mode Support
+   ============================================================================ */
+
+@media (prefers-color-scheme: dark) {
+  .mycelix-trust-tooltip,
+  .mycelix-modal-content {
+    background: #2d2d2d;
+    color: #e0e0e0;
+  }
+
+  .mycelix-modal-header,
+  .mycelix-modal-footer {
+    border-color: #444;
+  }
+
+  .mycelix-modal-header h3,
+  .mycelix-trust-email,
+  .mycelix-info-row .value,
+  .mycelix-score-circle span {
+    color: #e0e0e0;
+  }
+
+  .mycelix-trust-info {
+    background: #1e1e1e;
+  }
+
+  .mycelix-info-row {
+    border-color: #444;
+  }
+
+  .mycelix-info-row .label,
+  .mycelix-trust-level,
+  .mycelix-trust-attestations,
+  .mycelix-trust-path,
+  .mycelix-attestors h4 {
+    color: #aaa;
+  }
+
+  .mycelix-score-circle::before {
+    background: #2d2d2d;
+  }
+
+  .mycelix-btn-secondary {
+    background: #444;
+    color: #e0e0e0;
+  }
+
+  .mycelix-btn-secondary:hover {
+    background: #555;
+  }
+}

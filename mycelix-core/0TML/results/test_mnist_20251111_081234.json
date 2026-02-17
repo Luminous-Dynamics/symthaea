@@ -1,0 +1,156 @@
+{
+  "config": {
+    "attack": {
+      "byzantine_ratio": 0.2,
+      "type": "sign_flip"
+    },
+    "baselines": [
+      "fedavg"
+    ],
+    "data_split": {
+      "seed": 42,
+      "type": "iid"
+    },
+    "dataset": {
+      "data_dir": "datasets",
+      "name": "mnist"
+    },
+    "experiment_name": "test_mnist",
+    "federated": {
+      "batch_size": 32,
+      "fraction_clients": 1.0,
+      "learning_rate": 0.01,
+      "local_epochs": 1,
+      "num_clients": 5
+    },
+    "model": {
+      "params": {
+        "num_classes": 10
+      },
+      "type": "simple_cnn"
+    },
+    "output_dir": "results",
+    "seed": 42,
+    "training": {
+      "eval_every": 2,
+      "num_rounds": 2
+    }
+  },
+  "baselines": {
+    "fedavg": {
+      "rounds": [
+        0,
+        1
+      ],
+      "train_loss": [
+        0.9171175428509711,
+        0.2802777137239774
+      ],
+      "train_accuracy": [
+        0.7261166666666666,
+        0.91585
+      ],
+      "test_loss": [
+        0.2666286155462265,
+        0.1606920209057629
+      ],
+      "test_accuracy": [
+        0.927,
+        0.9526
+      ],
+      "trust_scores": [
+        null,
+        null
+      ]
+    }
+  },
+  "metadata": {
+    "start_time": "2025-11-11T08:11:13.268849",
+    "device": "cuda",
+    "end_time": "2025-11-11T08:12:34.398250"
+  },
+  "split_stats": {
+    "num_clients": 5,
+    "samples_per_client": [
+      12000,
+      12000,
+      12000,
+      12000,
+      12000
+    ],
+    "total_samples": 60000,
+    "min_samples": 12000,
+    "max_samples": 12000,
+    "mean_samples": 12000.0,
+    "class_distribution": [
+      [
+        1175,
+        1322,
+        1174,
+        1219,
+        1176,
+        1104,
+        1177,
+        1299,
+        1160,
+        1194
+      ],
+      [
+        1189,
+        1350,
+        1148,
+        1265,
+        1158,
+        1111,
+        1239,
+        1217,
+        1145,
+        1178
+      ],
+      [
+        1192,
+        1328,
+        1223,
+        1189,
+        1149,
+        1096,
+        1188,
+        1265,
+        1181,
+        1189
+      ],
+      [
+        1195,
+        1355,
+        1197,
+        1293,
+        1220,
+        1044,
+        1107,
+        1226,
+        1161,
+        1202
+      ],
+      [
+        1172,
+        1387,
+        1216,
+        1165,
+        1139,
+        1066,
+        1207,
+        1258,
+        1204,
+        1186
+      ]
+    ],
+    "class_imbalance": [
+      0.051575187832910506,
+      0.05562398563369742,
+      0.049557766517693495,
+      0.06886681994174616,
+      0.06589975552138094
+    ],
+    "mean_class_imbalance": 0.05830470308948571
+  }
+}

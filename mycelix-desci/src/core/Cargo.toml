@@ -1,0 +1,49 @@
+[package]
+name = "mycelix-desci-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Core components for Mycelix-DeSci: MATL, PoGQ, and epistemic claims"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+sha2 = { workspace = true }
+blake3 = { workspace = true }
+ed25519-dalek = { workspace = true }
+rand = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+
+# Additional dependencies
+reqwest = { version = "0.11", features = ["json"] }
+url = "2.5"
+toml = "0.8"
+dirs = "5.0"
+hex = "0.4"
+regex = "1.10"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+[dev-dependencies]
+proptest = { workspace = true }
+tokio-test = "0.4"
+tempfile = "3.8"
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+[[bench]]
+name = "core_benchmarks"
+harness = false
+
+[features]
+default = []
+holochain = []

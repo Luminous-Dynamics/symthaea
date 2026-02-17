@@ -1,0 +1,30 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential"],
+  "issuer": "did:mycelix:org:fairtrade-international",
+  "issuanceDate": "2025-01-25T14:00:00Z",
+  "credentialSubject": {
+    "eventType": "CERTIFIED",
+    "productId": "COFFEE-GREEN-BEANS-ETHIOPIAN-YIRGACHEFFE",
+    "batchId": "BATCH-2025-GREEN-001",
+    "quantity": 1000.0,
+    "unit": "kg",
+    "facility": {
+      "id": "CERT-FAIRTRADE-INTL",
+      "name": "Fairtrade International Certification",
+      "location": {
+        "country": "Germany",
+        "region": "Bonn"
+      }
+    },
+    "timestamp": "2025-01-25T14:00:00Z",
+    "certification": {
+      "certType": "FAIR_TRADE",
+      "certBody": "Fairtrade International",
+      "certId": "FT-2025-ETH-007892",
+      "validUntil": "2026-01-25T00:00:00Z",
+      "standard": "Fairtrade Standard for Coffee",
+      "premiumPaid": "$0.20/lb"
+    }
+  }
+}

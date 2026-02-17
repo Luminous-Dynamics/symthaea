@@ -1,0 +1,178 @@
+# 🚀 Production Federated Learning Configuration
+# Optimized settings based on experiment results
+
+# System Configuration
+system:
+  seed: 42
+  device: "cuda" # or "cpu"
+  num_workers: 4
+  log_level: "INFO"
+  checkpoint_dir: "/tmp/fl_checkpoints"
+  
+# Dataset Configuration  
+dataset:
+  name: "CIFAR10"
+  data_dir: "./data"
+  batch_size: 32
+  
+# Data Augmentation
+augmentation:
+  enabled: true
+  transforms:
+    - name: "RandomCrop"
+      params:
+        size: 32
+        padding: 4
+    - name: "RandomHorizontalFlip"
+      params:
+        p: 0.5
+    - name: "ColorJitter"
+      params:
+        brightness: 0.2
+        contrast: 0.2
+        saturation: 0.2
+        hue: 0.1
+    - name: "RandomRotation"
+      params:
+        degrees: 15
+    - name: "RandomAffine"
+      params:
+        degrees: 0
+        translate: [0.1, 0.1]
+        
+# Federated Learning Configuration
+federated:
+  num_clients: 10
+  num_rounds: 20
+  clients_per_round: 5 # 50% participation
+  
+  # Non-IID data distribution
+  data_distribution:
+    type: "dirichlet"
+    alpha: 1.0 # Moderate heterogeneity
+    
+  # Aggregation strategy
+  aggregation:
+    strategy: "weighted" # weighted, average, or fedavg
+    weight_by:
+      - "data_size" # Weight by number of samples
+      - "performance" # Weight by accuracy
+      - "inverse_drift" # Prefer less drifted clients
+      
+# Model Configuration
+model:
+  architecture: "EnhancedCNN" # or "EfficientNet-B0"
+  normalization: "GroupNorm" # Better for FL than BatchNorm
+  dropout: 0.25
+  fc_dropout: 0.5
+  
+# Training Configuration  
+training:
+  local_epochs: 10 # Extended from 3
+  learning_rate: 0.05
+  momentum: 0.9
+  weight_decay: 1e-4
+  
+  # Learning rate scheduling
+  scheduler:
+    type: "cosine_annealing"
+    T_max: 200 # Total iterations
+    eta_min: 0.001
+    warm_restarts: true
+    restart_period: 50
+    
+  # Gradient clipping
+  gradient_clipping: 10.0
+  
+# FedProx Configuration
+fedprox:
+  enabled: true
+  mu: 0.01 # Proximal term weight
+  adaptive_mu: true # Adjust based on drift
+  drift_threshold: 0.5
+  mu_increase_factor: 1.5
+  mu_decrease_factor: 0.9
+  mu_max: 1.0
+  mu_min: 0.001
+  
+# Communication Efficiency
+communication:
+  # Quantization (4x reduction)
+  quantization:
+    enabled: true
+    bits: 8
+    dynamic: true # Dynamic range per layer
+    
+  # Sparsification (10x reduction)  
+  sparsification:
+    enabled: true
+    sparsity: 0.9 # Keep top 10%
+    strategy: "topk" # topk, random, or threshold
+    error_feedback: true # Accumulate dropped gradients
+    
+  # Hierarchical compression (40x total)
+  hierarchical_compression:
+    enabled: true
+    combine_methods: true # Sparsify then quantize
+    
+  # Expected compression ratios
+  expected_compression:
+    quantization_only: 4.0
+    sparsification_only: 10.0
+    combined: 40.0
+    
+# Byzantine Defense
+byzantine_defense:
+  enabled: true
+  detection_method: "median" # median, trimmed_mean, or krum
+  attack_simulation:
+    enabled: false # Set true for testing
+    num_byzantine: 2
+    attack_type: "sign_flip" # sign_flip, gaussian, or backdoor
+    attack_magnitude: 2
+    
+# Asynchronous Training (Optional)
+async_training:
+  enabled: false # Set true for 2x speed (experimental)
+  staleness_threshold: 5 # Max rounds a client can be behind
+  buffer_size: 3 # Number of updates to buffer
+  
+# Monitoring and Checkpointing
+monitoring:
+  log_every_n_batches: 50
+  evaluate_every_n_rounds: 1
+  save_checkpoint_every_n_rounds: 5
+  tensorboard: true
+  tensorboard_dir: "/tmp/tensorboard_fl"
+  
+  # Metrics to track
+  metrics:
+    - "accuracy"
+    - "loss"
+    - "client_drift"
+    - "compression_ratio"
+    - "communication_bytes"
+    - "training_time"
+    
+# Performance Targets
+targets:
+  accuracy: 70.0 # Target accuracy %
+  compression_ratio: 40.0 # Target compression
+  rounds_to_target: 15 # Expected convergence
+  
+# Hardware Optimization
+hardware:
+  cuda_enabled: true
+  mixed_precision: false # Set true for faster training (experimental)
+  num_data_workers: 4
+  pin_memory: true
+  
+# Deployment Settings
+deployment:
+  mode: "production" # production, development, or testing
+  api_endpoint: null # For remote deployment
+  secure_aggregation: false # Set true for privacy
+  differential_privacy:
+    enabled: false
+    epsilon: 1.0
+    delta: 1e-5

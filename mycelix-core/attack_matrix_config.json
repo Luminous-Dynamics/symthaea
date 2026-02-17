@@ -1,0 +1,19 @@
+{
+  "dataset": "cifar10",
+  "distribution": "iid",
+  "attacks": [
+    "noise",
+    "random",
+    "sign_flip",
+    "zero",
+    "backdoor",
+    "adaptive"
+  ],
+  "ratios": [
+    0.33,
+    0.4,
+    0.5
+  ],
+  "use_ml_detector": true,
+  "results_dir": "0TML/tests/results"
+}

@@ -1,0 +1,25 @@
+[package]
+name = "civitas_reputation"
+version = "0.1.0"
+edition = "2021"
+description = "Coordinator zome for Civitas Reputation - Agent reputation tracking"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Holochain 0.6 - Coordinator zomes use hdk
+hdk = "0.6.0"
+serde = { version = "1.0", features = ["derive"] }
+# Enable wasm support for getrandom (transitive dependencies)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+# Reference to integrity zome for types
+civitas_reputation_integrity = { path = "../integrity" }
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'

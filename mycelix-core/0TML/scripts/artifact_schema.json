@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Zero-TrustML Artifact Schema",
+  "description": "Schema for all 6 JSON artifacts generated per experiment",
+  "version": "1.0",
+
+  "definitions": {
+    "detection_metrics": {
+      "type": "object",
+      "required": ["auroc", "tpr_at_target_fpr", "fpr_at_target_tpr", "roc_curve", "time_to_detection"],
+      "properties": {
+        "auroc": {"type": "number", "minimum": 0, "maximum": 1},
+        "tpr_at_target_fpr": {"type": "number", "minimum": 0, "maximum": 1},
+        "fpr_at_target_tpr": {"type": "number", "minimum": 0, "maximum": 1},
+        "target_fpr": {"type": "number", "minimum": 0, "maximum": 1},
+        "target_tpr": {"type": "number", "minimum": 0, "maximum": 1},
+        "roc_curve": {
+          "type": "object",
+          "required": ["fpr", "tpr", "thresholds"],
+          "properties": {
+            "fpr": {"type": "array", "items": {"type": "number"}},
+            "tpr": {"type": "array", "items": {"type": "number"}},
+            "thresholds": {"type": "array", "items": {"type": "number"}}
+          }
+        },
+        "time_to_detection": {
+          "type": "array",
+          "items": {"type": "number"}
+        }
+      }
+    },
+
+    "per_bucket_fpr": {
+      "type": "object",
+      "required": ["buckets", "alpha", "margin"],
+      "properties": {
+        "buckets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["profile", "fpr", "n"],
+            "properties": {
+              "profile": {"type": "string"},
+              "fpr": {"type": "number", "minimum": 0, "maximum": 1},
+              "n": {"type": "integer", "minimum": 0}
+            }
+          }
+        },
+        "alpha": {"type": "number", "minimum": 0, "maximum": 1},
+        "margin": {"type": "number", "minimum": 0}
+      }
+    },
+
+    "ema_vs_raw": {
+      "type": "object",
+      "required": ["experiments"],
+      "properties": {
+        "experiments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["experiment_id", "flap_count"],
+            "properties": {
+              "experiment_id": {"type": "string"},
+              "flap_count": {"type": "integer", "minimum": 0},
+              "beta": {"type": "number", "minimum": 0, "maximum": 1},
+              "warmup_rounds": {"type": "integer", "minimum": 0}
+            }
+          }
+        }
+      }
+    },
+
+    "coord_median_diagnostics": {
+      "type": "object",
+      "required": ["experiments"],
+      "properties": {
+        "experiments": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["experiment_id", "guard_activations"],
+            "properties": {
+              "experiment_id": {"type": "string"},
+              "detector": {"type": "string"},
+              "guard_activations": {
+                "type": "object",
+                "properties": {
+                  "min_clients": {"type": "integer", "minimum": 0},
+                  "norm_clamp": {"type": "integer", "minimum": 0},
+                  "direction_check": {"type": "integer", "minimum": 0},
+                  "reject_all": {"type": "integer", "minimum": 0}
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+
+    "bootstrap_ci": {
+      "type": "object",
+      "required": ["metric", "mean", "ci_lower", "ci_upper", "n_samples"],
+      "properties": {
+        "metric": {"type": "string"},
+        "mean": {"type": "number"},
+        "ci_lower": {"type": "number"},
+        "ci_upper": {"type": "number"},
+        "confidence_level": {"type": "number", "minimum": 0, "maximum": 1},
+        "n_samples": {"type": "integer", "minimum": 0}
+      }
+    },
+
+    "model_metrics": {
+      "type": "object",
+      "required": ["test_accuracy", "test_loss", "rounds_to_convergence"],
+      "properties": {
+        "test_accuracy": {"type": "number", "minimum": 0, "maximum": 1},
+        "test_loss": {"type": "number", "minimum": 0},
+        "rounds_to_convergence": {"type": "integer", "minimum": 0},
+        "final_round": {"type": "integer", "minimum": 0}
+      }
+    }
+  }
+}

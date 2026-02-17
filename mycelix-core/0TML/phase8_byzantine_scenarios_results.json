@@ -1,0 +1,74 @@
+{
+  "timestamp": "2025-10-01T02:26:51.153221",
+  "phase": "Phase 8 Task 2 - Byzantine Scenario Validation",
+  "num_scenarios": 5,
+  "all_passed": true,
+  "scenarios": [
+    {
+      "scenario": "Adaptive Attack",
+      "stealth_level": "moderate",
+      "num_attackers": 5,
+      "num_rounds": 15,
+      "total_detected": 75,
+      "total_possible": 75,
+      "overall_detection_rate": 1.0,
+      "avg_detected_per_round": 5.0,
+      "final_round_detected": 5,
+      "duration_seconds": 2.152405023574829,
+      "success": true
+    },
+    {
+      "scenario": "Coordinated Attack",
+      "stealth_level": "moderate",
+      "num_attackers": 8,
+      "num_rounds": 15,
+      "total_detected": 120,
+      "total_possible": 120,
+      "overall_detection_rate": 1.0,
+      "avg_detected_per_round": 8.0,
+      "final_round_detected": 8,
+      "duration_seconds": 1.9994561672210693,
+      "success": true
+    },
+    {
+      "scenario": "Stealthy Attack",
+      "stealth_level": "stealthy",
+      "num_attackers": 3,
+      "num_rounds": 15,
+      "total_detected": 45,
+      "total_possible": 45,
+      "overall_detection_rate": 1.0,
+      "avg_detected_per_round": 3.0,
+      "final_round_detected": 3,
+      "duration_seconds": 1.970304250717163,
+      "success": true
+    },
+    {
+      "scenario": "Targeted Attack",
+      "stealth_level": "moderate",
+      "num_attackers": 4,
+      "num_rounds": 15,
+      "total_detected": 60,
+      "total_possible": 60,
+      "overall_detection_rate": 1.0,
+      "avg_detected_per_round": 4.0,
+      "final_round_detected": 4,
+      "duration_seconds": 1.9415640830993652,
+      "success": true
+    },
+    {
+      "scenario": "Obvious Attack (Baseline)",
+      "stealth_level": "obvious",
+      "num_attackers": 10,
+      "num_rounds": 15,
+      "total_detected": 150,
+      "total_possible": 150,
+      "overall_detection_rate": 1.0,
+      "avg_detected_per_round": 10.0,
+      "final_round_detected": 10,
+      "duration_seconds": 2.0279862880706787,
+      "success": true
+    }
+  ],
+  "test_duration_seconds": 10.12824010848999
+}

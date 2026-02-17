@@ -1,0 +1,180 @@
+---
+# Holochain hApp Manifest
+# Mycelix Marketplace - Decentralized ML Model & Service Exchange
+
+manifest_version: "1"
+name: mycelix-marketplace
+description: |
+  Decentralized marketplace for ML models, inference services, datasets, and
+  computational resources within the Mycelix-Core ecosystem. Supports trustless
+  exchange, escrow, and reputation-weighted discovery.
+
+roles:
+  - id: marketplace_core
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/mycelix-marketplace.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          # Listing configuration
+          listing_types:
+            - ml_model
+            - inference_service
+            - dataset
+            - compute_resource
+            - training_job
+          listing_fee_percentage: 0.5
+          min_listing_stake: 50
+          # Discovery settings
+          search_index_enabled: true
+          category_taxonomy_version: "1.0"
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: escrow
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/marketplace-escrow.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          escrow_timeout_hours: 168  # 7 days
+          dispute_resolution: decentralized
+          auto_release_on_confirmation: true
+          partial_release_enabled: true
+          arbitration_fee_percentage: 2
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: model_registry
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/model-registry.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          # Model metadata
+          supported_frameworks:
+            - pytorch
+            - tensorflow
+            - onnx
+            - safetensors
+            - gguf
+          version_control: semantic
+          license_types:
+            - open_source
+            - commercial
+            - research_only
+            - custom
+          # Verification
+          checksum_algorithm: blake3
+          signature_required: true
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: reviews
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/marketplace-reviews.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          review_dimensions:
+            - quality
+            - accuracy
+            - documentation
+            - support
+          rating_scale: 5
+          verified_purchase_required: true
+          edit_window_hours: 24
+          response_enabled: true
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: analytics
+    provisioning:
+      strategy: create
+      deferred: true
+    dna:
+      bundled: ../dist/dnas/marketplace-analytics.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          metrics:
+            - downloads
+            - active_users
+            - revenue
+            - dispute_rate
+          aggregation_interval_hours: 1
+          retention_days: 365
+          privacy_preserving: true
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+membrane_proofs:
+  marketplace_core: null
+  escrow: null
+  model_registry: null
+  reviews: null
+  analytics: null
+
+meta:
+  author: Mycelix Core Team
+  repository: https://github.com/Luminous-Dynamics/Mycelix-Core
+  license: Apache-2.0
+  version: "0.1.0"
+  holochain_version: "0.3.x"
+
+  dependencies:
+    - name: zerotrustml-identity
+      version: ">=0.1.0"
+      required: true
+    - name: zerotrustml-reputation
+      version: ">=0.1.0"
+      required: true
+
+  integrations:
+    - zerotrustml-identity
+    - zerotrustml-reputation
+    - zerotrustml-governance
+    - mycelix-mail
+
+  entry_points:
+    create_listing:
+      zome: marketplace_core
+      fn: create_listing
+      description: Create a new marketplace listing
+    initiate_purchase:
+      zome: escrow
+      fn: initiate_escrow
+      description: Initiate a purchase with escrow
+    register_model:
+      zome: model_registry
+      fn: register_model
+      description: Register an ML model in the registry
+    submit_review:
+      zome: reviews
+      fn: submit_review
+      description: Submit a verified review
+    search_listings:
+      zome: marketplace_core
+      fn: search_listings
+      description: Search marketplace listings
+    get_analytics:
+      zome: analytics
+      fn: get_listing_analytics
+      description: Get analytics for a listing

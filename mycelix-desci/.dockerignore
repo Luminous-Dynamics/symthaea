@@ -1,0 +1,41 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Target directories
+target/
+**/target/
+
+# Documentation
+*.md
+docs/
+examples/
+
+# CI/CD
+.github/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Benchmarks
+benches/
+criterion/
+
+# Test coverage
+tarpaulin-report.html
+cobertura.xml
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db

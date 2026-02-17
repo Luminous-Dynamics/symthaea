@@ -1,0 +1,47 @@
+{
+  "config": {
+    "nodes": 4,
+    "rounds": 5,
+    "network_type": "real_tcp_ip",
+    "cryptography": true,
+    "hc_cli": true
+  },
+  "results": [
+    {
+      "round": 1,
+      "selected_node": "node-3",
+      "byzantine_detected": true,
+      "participants": 4,
+      "timestamp": 1758867433.7570567
+    },
+    {
+      "round": 2,
+      "selected_node": "node-1",
+      "byzantine_detected": true,
+      "participants": 4,
+      "timestamp": 1758867434.2688935
+    },
+    {
+      "round": 3,
+      "selected_node": "node-1",
+      "byzantine_detected": true,
+      "participants": 4,
+      "timestamp": 1758867434.7766528
+    },
+    {
+      "round": 4,
+      "selected_node": "node-1",
+      "byzantine_detected": true,
+      "participants": 4,
+      "timestamp": 1758867435.3117304
+    },
+    {
+      "round": 5,
+      "selected_node": "node-3",
+      "byzantine_detected": true,
+      "participants": 4,
+      "timestamp": 1758867435.8233495
+    }
+  ],
+  "byzantine_detection_rate": 100.0
+}

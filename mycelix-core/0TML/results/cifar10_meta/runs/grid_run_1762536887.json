@@ -1,0 +1,64 @@
+[
+  {
+    "config": {
+      "val_batches": 8,
+      "ref_lr": 0.0001,
+      "mad_multiplier": 3.5,
+      "loss_fn": "mse_logits",
+      "val_size": 2000,
+      "dispersion": "biweight",
+      "winsorize": 0.05,
+      "threshold_mode": "mondrian",
+      "ema_alpha": 0.7,
+      "freeze_bn": true,
+      "relative_improvement": true,
+      "grad_clip": 1.0,
+      "hybrid_lambda": 0.5,
+      "detector": "meta",
+      "prefilter_fltrust": false,
+      "conformal_fpr": null,
+      "expected_bft_ratio": 0.35
+    },
+    "seed_metrics": [
+      {
+        "seed": 42,
+        "detection_rate": 0.14285714285714285,
+        "fpr": 0.07692307692307693,
+        "threshold": 0.0,
+        "mean_quality": 0.5092721514866813,
+        "auroc": 0.08791208791208792,
+        "auprc": 0.2380516241584353,
+        "cohen_d": 1.8093650071638725,
+        "class_counts": {
+          "0": 200,
+          "1": 200,
+          "2": 200,
+          "3": 200,
+          "4": 200,
+          "5": 200,
+          "6": 200,
+          "7": 200,
+          "8": 200,
+          "9": 200
+        },
+        "method": "meta",
+        "meta_summary": {
+          "threshold": 0.0,
+          "accept": 18,
+          "reject": 2,
+          "abstain": 0,
+          "reason_dirsim": 0,
+          "reason_outlier": 0,
+          "reason_density": 2,
+          "reason_utility": 0,
+          "reason_conflict": 0
+        }
+      }
+    ],
+    "mean_detection": 0.14285714285714285,
+    "std_detection": 0.0,
+    "mean_fpr": 0.07692307692307693,
+    "std_fpr": 0.0,
+    "aborted_by_rule": true
+  }
+]

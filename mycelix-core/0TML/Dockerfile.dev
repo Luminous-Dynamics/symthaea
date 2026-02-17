@@ -1,0 +1,48 @@
+# Zero-TrustML Holochain - Development Dockerfile
+# Includes development tools and optimized for rapid iteration
+
+FROM python:3.11-slim
+
+LABEL maintainer="Luminous Dynamics <dev@luminousdynamics.org>"
+LABEL description="Zero-TrustML Holochain - Development Environment"
+
+# Install system dependencies + dev tools
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    pkg-config \
+    libssl-dev \
+    git \
+    vim \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY setup.py README_PACKAGE.md ./
+COPY src/ ./src/
+
+# Install Python dependencies (dev mode)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
+    torch numpy \
+    pytest pytest-asyncio pytest-cov \
+    black ruff mypy \
+    ipython jupyter
+
+# Install package in editable mode
+RUN pip install --no-cache-dir -e .
+
+# Create data directory
+RUN mkdir -p /data /app/tests
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV ZEROTRUSTML_NODE_ID="dev-node"
+ENV ZEROTRUSTML_DATA_PATH="/data"
+ENV ZEROTRUSTML_HOLOCHAIN_URL="ws://holochain:8888"
+
+# Default to interactive shell for development
+CMD ["/bin/bash"]

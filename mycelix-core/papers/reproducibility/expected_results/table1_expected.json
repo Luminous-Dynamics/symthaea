@@ -1,0 +1,94 @@
+{
+  "description": "Expected results for Table 1: Byzantine Detection Rate (Sign-Flip Attack)",
+  "paper_reference": "Table 1, Section 5.2",
+  "tolerance_percent": 5.0,
+  "notes": "Detection rates may vary slightly (+/- 5%) due to random initialization and hardware differences",
+  "data": {
+    "10%": {
+      "fedavg": {
+        "detection_rate": 0.0,
+        "tolerance": 0.0
+      },
+      "krum": {
+        "detection_rate": 0.92,
+        "tolerance": 0.05
+      },
+      "fltrust": {
+        "detection_rate": 0.98,
+        "tolerance": 0.03
+      },
+      "pogq": {
+        "detection_rate": 0.99,
+        "tolerance": 0.02
+      }
+    },
+    "20%": {
+      "fedavg": {
+        "detection_rate": 0.0,
+        "tolerance": 0.0
+      },
+      "krum": {
+        "detection_rate": 0.85,
+        "tolerance": 0.05
+      },
+      "fltrust": {
+        "detection_rate": 0.95,
+        "tolerance": 0.04
+      },
+      "pogq": {
+        "detection_rate": 0.98,
+        "tolerance": 0.03
+      }
+    },
+    "33%": {
+      "fedavg": {
+        "detection_rate": 0.0,
+        "tolerance": 0.0
+      },
+      "krum": {
+        "detection_rate": 0.68,
+        "tolerance": 0.08
+      },
+      "fltrust": {
+        "detection_rate": 0.88,
+        "tolerance": 0.05
+      },
+      "pogq": {
+        "detection_rate": 0.95,
+        "tolerance": 0.04
+      }
+    },
+    "45%": {
+      "fedavg": {
+        "detection_rate": 0.0,
+        "tolerance": 0.0
+      },
+      "krum": {
+        "detection_rate": 0.45,
+        "tolerance": 0.10
+      },
+      "fltrust": {
+        "detection_rate": 0.72,
+        "tolerance": 0.08
+      },
+      "pogq": {
+        "detection_rate": 0.89,
+        "tolerance": 0.05
+      }
+    }
+  },
+  "key_claims": {
+    "pogq_beats_fltrust_at_45_percent": {
+      "description": "PoGQ detection rate > FLTrust at 45% Byzantine",
+      "expected_margin": 0.17
+    },
+    "pogq_beats_krum_at_45_percent": {
+      "description": "PoGQ detection rate > Krum at 45% Byzantine",
+      "expected_margin": 0.44
+    },
+    "pogq_99_at_10_percent": {
+      "description": "PoGQ achieves ~99% detection at 10% Byzantine",
+      "min_value": 0.97
+    }
+  }
+}

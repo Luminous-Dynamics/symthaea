@@ -1,0 +1,137 @@
+{
+  "config": {
+    "num_clients": 10,
+    "byzantine_fraction": 0.3,
+    "num_rounds": 10,
+    "local_epochs": 1
+  },
+  "final_metrics": {
+    "avg_detection_rate": 0.0,
+    "avg_accuracy": 0.7,
+    "avg_precision": 0.0,
+    "avg_recall": 0.0
+  },
+  "history": [
+    {
+      "round": 0,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.11197495460510254
+    },
+    {
+      "round": 1,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.09935188293457031
+    },
+    {
+      "round": 2,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.10024642944335938
+    },
+    {
+      "round": 3,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.09796905517578125
+    },
+    {
+      "round": 4,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.10074782371520996
+    },
+    {
+      "round": 5,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.09802722930908203
+    },
+    {
+      "round": 6,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.09883594512939453
+    },
+    {
+      "round": 7,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.09724187850952148
+    },
+    {
+      "round": 8,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.11704015731811523
+    },
+    {
+      "round": 9,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "precision": 0.0,
+      "recall": 0.0,
+      "tp": 0,
+      "fp": 0,
+      "fn": 3,
+      "tn": 7,
+      "time": 0.10354948043823242
+    }
+  ],
+  "implementation": "Real PyTorch with actual gradient computation"
+}

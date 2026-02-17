@@ -1,0 +1,55 @@
+# Mycelix-DeSci Configuration Example
+# Copy this file to .mycelix/config.toml and customize as needed
+
+[network]
+# DHT bootstrap nodes (comma-separated multiaddrs)
+bootstrap_nodes = []
+
+# Listen address for P2P connections
+listen_addr = "0.0.0.0"
+
+# Port for P2P connections
+port = 9000
+
+# Enable mDNS for local discovery
+enable_mdns = true
+
+[storage]
+# Storage backend: "memory", "ipfs", or "filecoin"
+backend = "memory"
+
+# IPFS API URL (required if backend = "ipfs")
+# ipfs_api_url = "http://localhost:5001"
+
+# Local storage path for claims and data
+local_path = ".mycelix/data"
+
+# Cache size in MB
+cache_size_mb = 100
+
+[pogq]
+# Byzantine fault tolerance threshold (0.0 - 1.0)
+# Default: 0.45 (45% adversary tolerance)
+bft_threshold = 0.45
+
+# Minimum quality score for gradient validity
+min_quality_score = 0.7
+
+# Number of validation rounds
+validation_rounds = 3
+
+# Enable adaptive threshold adjustment
+adaptive_threshold = true
+
+[logging]
+# Log level: "debug", "info", "warn", "error"
+level = "info"
+
+# Output format: "text" or "json"
+format = "text"
+
+# Optional: Log to file
+# file = ".mycelix/logs/mycelix-desci.log"
+
+# Enable performance metrics
+metrics = false

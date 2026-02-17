@@ -1,0 +1,64 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Key Implications}
+
+\textbf{Decentralization is Achievable}: Holochain DHT integration demonstrates that Byzantine-robust federated learning can be fully decentralized, achieving 10,127 TPS with 89ms median latency and zero transaction costs while eliminating centralized trust assumptions. This is our primary contribution.
+
+\textbf{Detector Inversion is Real}: The direct A/B comparison provides definitive empirical evidence that peer-comparison methods experience catastrophic failure (100\% FPR) at 35\% BFT with heterogeneous data. This validates theoretical concerns and demonstrates the necessity of external quality signals.
+
+\textbf{Server-Side Validation Works at Low-to-Moderate BFT}: Both PoGQ and FLTrust achieve perfect detection (100\% TPR, 0\% FPR) at 20--30\% Byzantine ratios, confirming that server-side validation is effective for realistic threat models.
+
+\subsection{Limitations of Loss-Based Quality Metrics (PoGQ)}
+
+While PoGQ achieves 100\% detection at 20--35\% BFT on MNIST and 20--30\% on FEMNIST, our evaluation reveals performance degradation at higher Byzantine ratios compared to direction-based methods like FLTrust.
+
+\textbf{FEMNIST High-BFT Performance}: Across three random seeds (42, 123, 456), PoGQ exhibits inconsistent performance above 30\% BFT. At 35\% BFT, detection rates range from 71--100\% (mean: 90.3\%, $\sigma$: 16.8\%), and at 45--50\% BFT, PoGQ fails completely (0\% TPR) on most seeds. In contrast, FLTrust maintains 100\% TPR across all tested ratios including 50\% BFT.
+
+\textbf{CIFAR-10 Failure}: Grid search across 193 hyperparameter configurations on CIFAR-10 with ResNet18 revealed systematic failure---all configurations achieved 0\% detection rate with AUROC < 0.5 (worse than random). We hypothesize this stems from increased gradient diversity in high-dimensional parameter spaces (ResNet18: 11M parameters vs. SimpleCNN: 50K), where honest gradients from heterogeneous clients produce highly varied loss improvements, causing distribution overlap with Byzantine quality scores.
+
+\textbf{Root Cause Hypothesis}: Loss-based metrics measure gradient \emph{utility} on validation data. In high-BFT regimes with heterogeneous client data, Byzantine nodes can produce gradients that improve loss on narrow validation subsets, creating overlap with honest quality score distributions. Direction-based metrics (like FLTrust's cosine similarity) appear more robust to this phenomenon, as gradient direction is less sensitive to data heterogeneity than absolute loss improvement.
+
+\textbf{Practical Implications}: For deployments requiring robustness at 40--50\% BFT, we recommend FLTrust over PoGQ. PoGQ remains competitive at 20--30\% BFT and may be preferable when direction-based trust scoring is insufficient (e.g., optimization-based poisoning attacks that preserve gradient direction).
+
+\subsection{General Limitations and Assumptions}
+
+\textbf{Server Trust}: Mode 1 assumes the server possesses a clean validation set. This is reasonable in many federated learning scenarios (e.g., healthcare institutions, enterprises) but limits applicability to fully trustless environments. \textit{Mitigation strategies}: (1) \textbf{Federated validation} via secret sharing~\cite{bonawitz2017practical} distributes validation across multiple nodes, (2) \textbf{Zero-knowledge proofs} (zk-SNARKs~\cite{bensasson2014succinct}) enable cryptographic verification without revealing validation data, (3) \textbf{Multi-party computation} allows collaborative quality assessment without central oracle.
+
+\textbf{Computational Overhead}: PoGQ requires $O(N)$ forward passes through the model per round (2--7\% overhead). For very large networks ($N > 1000$), sampling strategies may be necessary. \textit{Optimization}: Holochain's DHT naturally distributes validation across $\sqrt{N}$ validators per entry, reducing per-node overhead. For large gradient storage, IPFS content-addressing with Filecoin incentivized persistence can offload DHT storage costs while maintaining tamper-evidence via cryptographic hashes.
+
+\textbf{Data Heterogeneity}: Our experiments use Dirichlet($\alpha$=0.1) label skew. More extreme heterogeneity (e.g., $\alpha$=0.01) may increase quality score overlap, potentially raising FPR above 10\%.
+
+\textbf{Attack Models}: We evaluate sign flip, scaling, noise, and sleeper agents. More sophisticated attacks (e.g., gradient clipping evasion, optimization-based poisoning) require further study.
+
+\subsection{Practical Deployment Considerations}
+
+\textbf{Validation Set Size}: Our 1000-sample validation set provides stable quality scores. Smaller sets (100--500 samples) may increase variance.
+
+\textbf{Threshold Tuning}: The adaptive threshold algorithm requires no manual tuning but assumes bimodal quality score distribution (Byzantine vs. honest clusters). Pathological distributions may require domain-specific adjustments.
+
+\textbf{Network Dynamics}: Node churn, network partitions, and asynchronous communication require additional mechanisms beyond our current scope.
+
+\subsection{Future Work}
+
+\textbf{Improved Loss-Based Metrics}: Address CIFAR-10 failure through: (1) \textbf{Gradient decomposition}---assess quality per layer/module rather than aggregate loss improvement, (2) \textbf{Multi-metric fusion}---combine loss improvement with direction similarity and parameter magnitude, (3) \textbf{Adaptive validation}---dynamically select validation samples most sensitive to Byzantine attacks.
+
+\textbf{Zero-Knowledge Proofs}: Integrate zk-SNARKs for cryptographic gradient quality proofs, eliminating server trust assumption.
+
+\textbf{Federated Validation}: Distribute validation set across multiple honest nodes using secret sharing, reducing single-point-of-trust.
+
+\textbf{Adaptive Sampling}: For large networks ($N > 1000$), sample subset of gradients for validation using reputation-weighted strategies.
+
+\textbf{Advanced Attacks}: Evaluate against optimization-based poisoning~\cite{bagdasaryan2020backdoor} and gradient clipping evasion.
+
+\textbf{Additional Datasets}: Extend to (1) \textbf{Tabular data} (healthcare, finance) with feature heterogeneity, (2) \textbf{Non-image domains} (NLP sentiment analysis, time series forecasting) to validate decentralized architecture generality.
+
+\subsection{Security vs Performance Tradeoffs}
+
+We adopt RISC Zero zkVM (v3.0) as our primary proof backend, providing 127-bit conjectured security (S128 profile) with 30--60 second proving time on consumer hardware. While domain-specific AIRs like Winterfell theoretically offer 7--10$\times$ performance improvements, they require static trace length determination at compile-time. PoGQ's variable-length gradient vectors (dynamic based on model architecture) fundamentally conflict with this constraint. We explored selector columns and padding strategies but could not resolve this without sacrificing soundness or generality.
+
+RISC Zero's general-purpose RISC-V execution model eliminates this limitation, allowing identical PoGQ decision logic to handle arbitrary gradient dimensions without AIR recompilation. The 30--60 second proving cost is acceptable for federated learning audit scenarios where: (1) verification is instantaneous (<100ms), (2) proofs are generated asynchronously per-round (not blocking training), (3) cryptographic auditability justifies computational overhead. For higher security requirements, S192 profile provides 191-bit security at 2$\times$ proving cost. This architecture prioritizes correctness and flexibility over raw performance, aligning with our threat model where Byzantine detection accuracy matters more than proving throughput.
+
+\subsection{Broader Impact}
+
+Zero-TrustML demonstrates that decentralized Byzantine-robust federated learning is practical, enabling new deployment scenarios: IoT networks with compromised devices, open federated learning platforms, cross-institutional collaboration with partial trust. By eliminating centralized aggregation, we expand the applicability of privacy-preserving collaborative ML to scenarios where centralized trust is unacceptable. Our comparative evaluation provides guidance for practitioners selecting between loss-based (PoGQ) and direction-based (FLTrust) validation methods based on expected threat models.

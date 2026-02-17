@@ -1,0 +1,15 @@
+---
+manifest_version: "0"
+name: zerotrustml
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: gradient_storage
+      path: ../target/wasm32-unknown-unknown/release/gradient_storage.wasm
+    - name: reputation_tracker
+      path: ../target/wasm32-unknown-unknown/release/reputation_tracker.wasm
+    - name: zerotrustml_credits
+      path: ../target/wasm32-unknown-unknown/release/zerotrustml_credits.wasm
+coordinator:
+  zomes: []

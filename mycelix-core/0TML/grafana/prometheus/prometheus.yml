@@ -1,0 +1,38 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'matl-bft-monitor'
+
+scrape_configs:
+  # Scrape from static metrics files
+  - job_name: 'matl_bft_metrics'
+    honor_labels: true
+    metrics_path: '/artifacts/matl_metrics.prom'
+    file_sd_configs:
+      - files:
+          - '/etc/prometheus/artifacts/*.prom'
+        refresh_interval: 1m
+
+    # Also support direct file reading
+    static_configs:
+      - targets: []
+        labels:
+          source: 'ci_artifacts'
+
+  # Optional: Scrape from a Pushgateway if using one
+  - job_name: 'pushgateway'
+    honor_labels: true
+    static_configs:
+      - targets: ['pushgateway:9091']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+      scheme: http
+      timeout: 10s
+
+rule_files:
+  # Load alert rules if defined
+  - '/etc/prometheus/rules/*.yml'

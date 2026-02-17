@@ -1,0 +1,191 @@
+# Mycelix Paper Reproducibility Configuration
+# All hyperparameters used to generate paper results
+# Version: 1.0.0
+
+# Global settings
+global:
+  random_seed: 42                    # Ensures deterministic results
+  output_dir: "output"               # Output directory for results
+  num_trials: 10                     # Number of trials per configuration
+  confidence_level: 0.95             # For error bars (95% CI)
+
+# Experiment modes
+modes:
+  quick:
+    num_trials: 3
+    max_nodes: 100
+    max_rounds: 10
+    gradient_dim: 1000
+  full:
+    num_trials: 10
+    max_nodes: 1000
+    max_rounds: 50
+    gradient_dim: 10000
+
+# Byzantine detection experiments (Table 1, Figure 1)
+byzantine_detection:
+  byzantine_ratios:
+    - 0.10    # 10% Byzantine
+    - 0.20    # 20% Byzantine
+    - 0.33    # 33% Byzantine (classical BFT limit)
+    - 0.45    # 45% Byzantine (PoGQ extended tolerance)
+
+  attack_types:
+    sign_flip:
+      multiplier: -5.0              # g_attack = -5 * g_honest
+    scaling:
+      multiplier: 100.0             # g_attack = 100 * g_honest
+    label_flip:
+      flip_probability: 1.0         # 100% label inversion
+    backdoor:
+      trigger_pattern: "corner"     # Pixel pattern in corner
+      target_class: 0               # Misclassify as class 0
+
+  num_nodes: 100                    # Default number of nodes
+  num_rounds: 20                    # Training rounds per trial
+
+# PoGQ (Proof of Good Quality) parameters
+pogq:
+  # Statistical quality metrics
+  quality_metrics:
+    norm_weight: 0.4                # Weight for norm score
+    cosine_weight: 0.4              # Weight for cosine similarity
+    variance_weight: 0.2            # Weight for variance score
+
+  # Outlier detection
+  z_score_threshold: 2.0            # Z-score for outlier detection
+
+  # Reputation system
+  reputation:
+    initial_score: 0.5              # Starting reputation
+    decay_factor: 0.7               # alpha in R^{t+1} = alpha * R^t + (1-alpha) * Q
+    min_threshold: 0.2              # R_min for quarantine
+
+  # Adaptive thresholding
+  adaptive:
+    enabled: true
+    lambda: 2.0                     # Sensitivity parameter
+    min_threshold: 0.1              # tau_min
+
+# Aggregation methods (Table 2)
+aggregation:
+  methods:
+    - name: "pogq"
+      description: "Proof of Good Quality (ours)"
+    - name: "krum"
+      description: "Multi-Krum [Blanchard 2017]"
+    - name: "fltrust"
+      description: "FLTrust [Cao 2021]"
+    - name: "fedavg"
+      description: "FedAvg [McMahan 2017]"
+    - name: "trimmed_mean"
+      description: "Trimmed Mean [Yin 2018]"
+
+  # Krum-specific parameters
+  krum:
+    selection_mode: "multi"          # "single" or "multi"
+    num_selected: null               # null = auto (n - f - 2)
+
+  # Trimmed mean parameters
+  trimmed_mean:
+    trim_ratio: 0.2                  # Trim 20% from each end
+
+# Latency benchmarks (Table 2)
+latency:
+  warmup_iterations: 100             # Discard first N iterations
+  measurement_iterations: 1000       # Iterations for statistics
+  gradient_dimensions:
+    - 1000
+    - 5000
+    - 10000                          # Default for paper
+    - 50000
+  num_nodes: 100                     # Nodes for latency test
+
+# Throughput benchmarks
+throughput:
+  concurrent_clients:
+    - 1
+    - 10
+    - 50
+  operations_per_client: 10000
+  operation_types:
+    - "reputation_update"
+    - "gradient_submission"
+
+# Scalability experiments (Figure 3)
+scalability:
+  node_counts:
+    - 10
+    - 50
+    - 100
+    - 200
+    - 500
+    - 1000
+  gradient_dim: 10000
+  num_rounds: 10
+
+# Convergence experiments (Figure 2)
+convergence:
+  num_rounds: 50
+  num_nodes: 100
+  byzantine_ratio: 0.30              # 30% Byzantine
+  attack_type: "sign_flip"
+  initial_accuracy: 0.10             # Random guess baseline
+
+# Hierarchical aggregation
+hierarchical:
+  branching_factor: 10               # k in paper
+  enabled: true
+
+# Network topology
+network:
+  topology: "mesh"                   # "mesh", "ring", "star"
+  min_connections: 2
+  max_connections: 5
+
+# Gossip protocol
+gossip:
+  fanout: 3                          # Number of peers to gossip to
+  max_hops: 6                        # Maximum message propagation hops
+  ttl_seconds: 60                    # Time-to-live for messages
+
+# Model simulation
+model:
+  # Using synthetic gradients by default for reproducibility
+  use_synthetic: true
+  synthetic:
+    gradient_mean: 0.0
+    gradient_std: 0.1
+
+  # Real model training (optional)
+  real_training:
+    dataset: "mnist"                 # "mnist", "cifar10", "femnist"
+    batch_size: 32
+    learning_rate: 0.01
+    local_epochs: 1
+
+# Validation tolerances
+validation:
+  # Acceptable deviation from expected results (%)
+  detection_rate_tolerance: 5.0      # 5% tolerance
+  latency_tolerance: 20.0            # 20% tolerance (timing varies)
+  convergence_tolerance: 10.0        # 10% tolerance
+
+  # Statistical significance
+  min_p_value: 0.05                  # Reject if p < 0.05
+
+# Output formats
+output:
+  json:
+    enabled: true
+    pretty_print: true
+  csv:
+    enabled: true
+    include_metadata: true
+  latex:
+    enabled: true
+    table_format: "booktabs"
+  figures:
+    format: "png"
+    dpi: 300
+    style: "seaborn-v0_8-whitegrid"

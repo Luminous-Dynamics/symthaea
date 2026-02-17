@@ -1,0 +1,29 @@
+[38;5;87m🚀 Launching...[0m                         Finished `release` profile [optimized + debuginfo] target(s) in 0.28s
+     Running `/srv/luminous-dynamics/Mycelix-Core/0TML/vsv-stark/target/release/lean-benchmarks`
+🔬 Winterfell PoGQ LEAN Benchmarks (128-bit Security)
+================================================
+Security: 128-bit conjectured (90 queries, blowup 32)
+Range checks: 32-bit (rem_t 16-bit + x_t 16-bit)
+================================================
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+
+thread 'main' panicked at winterfell-pogq/src/bin/lean_benchmarks.rs:29:78:
+called `Result::unwrap()` on an `Err` value: "Verification failed: InsufficientConjecturedSecurity(128, 127)"
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+             at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/std/src/panicking.rs:697:5
+   1: core::panicking::panic_fmt
+             at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/core/src/panicking.rs:75:14
+   2: core::result::unwrap_failed
+             at /rustc/6b00bc3880198600130e1cf62b8f8a93494488cc/library/core/src/result.rs:1732:5
+   3: core::result::Result<T,E>::unwrap
+             at /nix/store/crlzd78gg6hbg543nhkn26j58i504k8g-rust-default-1.88.0/lib/rustlib/src/rust/library/core/src/result.rs:1137:23
+   4: lean_benchmarks::benchmark_scenario
+             at ./src/bin/lean_benchmarks.rs:29:21
+   5: lean_benchmarks::main
+             at ./src/bin/lean_benchmarks.rs:75:5
+   6: core::ops::function::FnOnce::call_once
+             at /nix/store/crlzd78gg6hbg543nhkn26j58i504k8g-rust-default-1.88.0/lib/rustlib/src/rust/library/core/src/ops/function.rs:250:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.

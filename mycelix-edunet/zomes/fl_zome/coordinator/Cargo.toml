@@ -1,0 +1,32 @@
+[package]
+name = "fl_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "FL coordinator zome - implements federated learning business logic"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "fl_coordinator"
+
+[dependencies]
+# Holochain Development (HDK) for business logic
+hdk.workspace = true
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+# Note: edunet-agg removed - aggregation happens client-side, not in WASM zome
+
+# Integrity zome (for entry types)
+fl_integrity = { path = "../integrity" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Cryptographic hashing
+blake3.workspace = true
+
+# Note: For randomness in Holochain zomes, use hdk::prelude::random_bytes()
+# Do NOT add getrandom - it requires wasm-bindgen which Holochain doesn't provide

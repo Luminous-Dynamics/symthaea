@@ -1,0 +1,269 @@
+{
+  "experiment": "Gen7 Comprehensive Byzantine Attack Suite",
+  "date": "2025-11-14T09:43:46.656680",
+  "seeds": [
+    101,
+    202,
+    303
+  ],
+  "byz_frac": 0.45,
+  "attack_types": [
+    "sign_flip",
+    "gaussian_noise",
+    "model_replacement",
+    "scaled_grad"
+  ],
+  "aggregators": [
+    "aegis",
+    "aegis_gen7"
+  ],
+  "dataset_config": {
+    "n_clients": 50,
+    "noniid_alpha": 1.0,
+    "n_train": 6000,
+    "n_test": 1000,
+    "seed": 42
+  },
+  "results": [
+    {
+      "seed": 101,
+      "attack_type": "sign_flip",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.106,
+      "auc": 0.4422895622895623,
+      "wall_time": 0.659247875213623,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "attack_type": "sign_flip",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.874,
+      "auc": 1.0,
+      "wall_time": 2.7837681770324707,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "attack_type": "gaussian_noise",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.489,
+      "auc": 0.7424466891133558,
+      "wall_time": 0.7103116512298584,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "attack_type": "gaussian_noise",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.874,
+      "auc": 1.0,
+      "wall_time": 2.9190731048583984,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "attack_type": "model_replacement",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.069,
+      "auc": 0.5143883277216611,
+      "wall_time": 0.6657657623291016,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "attack_type": "model_replacement",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.874,
+      "auc": 1.0,
+      "wall_time": 2.930699586868286,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "attack_type": "scaled_grad",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.803,
+      "auc": 0.7014141414141414,
+      "wall_time": 0.7503950595855713,
+      "status": "success"
+    },
+    {
+      "seed": 101,
+      "attack_type": "scaled_grad",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.874,
+      "auc": 1.0,
+      "wall_time": 3.3063132762908936,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "attack_type": "sign_flip",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.077,
+      "auc": 0.4492896960978242,
+      "wall_time": 0.89483642578125,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "attack_type": "sign_flip",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.87,
+      "auc": 1.0,
+      "wall_time": 3.7142231464385986,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "attack_type": "gaussian_noise",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.849,
+      "auc": 0.7444704189893904,
+      "wall_time": 0.7885711193084717,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "attack_type": "gaussian_noise",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.87,
+      "auc": 1.0,
+      "wall_time": 2.988062858581543,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "attack_type": "model_replacement",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.356,
+      "auc": 0.4743751123898579,
+      "wall_time": 0.7948153018951416,
+      "status": "failed"
+    },
+    {
+      "seed": 202,
+      "attack_type": "model_replacement",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.87,
+      "auc": 1.0,
+      "wall_time": 3.232156276702881,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "attack_type": "scaled_grad",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.853,
+      "auc": 0.7251843193670203,
+      "wall_time": 0.7461130619049072,
+      "status": "success"
+    },
+    {
+      "seed": 202,
+      "attack_type": "scaled_grad",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.87,
+      "auc": 1.0,
+      "wall_time": 2.7188363075256348,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "attack_type": "sign_flip",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.292,
+      "auc": 0.43056737271058165,
+      "wall_time": 0.7558116912841797,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "attack_type": "sign_flip",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 3.2955358028411865,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "attack_type": "gaussian_noise",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.336,
+      "auc": 0.7379875509381577,
+      "wall_time": 1.1618590354919434,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "attack_type": "gaussian_noise",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 3.344454526901245,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "attack_type": "model_replacement",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.357,
+      "auc": 0.6780708432224263,
+      "wall_time": 0.832094669342041,
+      "status": "failed"
+    },
+    {
+      "seed": 303,
+      "attack_type": "model_replacement",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 3.0067899227142334,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "attack_type": "scaled_grad",
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.862,
+      "auc": 0.730688280865165,
+      "wall_time": 0.6750807762145996,
+      "status": "success"
+    },
+    {
+      "seed": 303,
+      "attack_type": "scaled_grad",
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.866,
+      "auc": 1.0,
+      "wall_time": 2.5274925231933594,
+      "status": "success"
+    }
+  ]
+}

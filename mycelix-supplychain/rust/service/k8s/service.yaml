@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: provenance-service
+  namespace: mycelix
+  labels:
+    app: provenance-service
+  annotations:
+    # Prometheus scraping
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
+spec:
+  type: ClusterIP
+  selector:
+    app: provenance-service
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  sessionAffinity: None
+
+---
+# Headless service for StatefulSet (if needed in future)
+apiVersion: v1
+kind: Service
+metadata:
+  name: provenance-service-headless
+  namespace: mycelix
+  labels:
+    app: provenance-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: provenance-service
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP

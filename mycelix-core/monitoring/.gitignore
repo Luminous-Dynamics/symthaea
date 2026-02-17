@@ -1,0 +1,39 @@
+# Secrets - NEVER commit these
+alertmanager/secrets/*
+!alertmanager/secrets/.gitkeep
+
+# Data directories (created by Docker)
+prometheus-data/
+alertmanager-data/
+grafana-data/
+redis-data/
+
+# Environment files with secrets
+.env
+.env.local
+.env.production
+
+# Temporary files
+*.tmp
+*.log
+*.bak
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Backup files
+backups/*.tar.gz
+backups/*.json

@@ -1,0 +1,31 @@
+dataset: cifar10
+model: resnet18
+dirichlet_alpha: 0.1
+bft_ratio: 0.35
+num_clients: 20
+seeds: [42, 123, 456]
+
+search_space:
+  val_batches: [4, 8]
+  ref_lr: [0.0005, 0.0001]
+  mad_multiplier: [3.0, 3.5, 4.0]
+  loss_fn: ["mse_logits"]
+  val_size: [1000, 2000]
+  dispersion: ["mad", "biweight"]
+  winsorize: [0.05]
+  threshold_mode: ["robust"]
+  ema_alpha: [0.2]
+  freeze_bn: [true]
+  relative_improvement: [true]
+  grad_clip: [null, 1.0]
+  hybrid_lambda: [null, 0.7]
+
+early_gate:
+  metric: auroc
+  threshold: 0.8
+  min_val_batches: 4
+
+output:
+  csv: results/cifar10_grid_search_pruned.csv
+  best_json: results/cifar10_grid_search_best.json
+  logs_dir: results/cifar10_grid_runs

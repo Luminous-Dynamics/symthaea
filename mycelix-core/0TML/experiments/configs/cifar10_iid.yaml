@@ -1,0 +1,44 @@
+# CIFAR-10 IID Experiment Configuration
+# Compare all 7 baselines on IID data (more complex than MNIST)
+
+experiment_name: "cifar10_iid"
+output_dir: "results/iid"
+
+# Dataset configuration
+dataset:
+  name: "cifar10"
+  data_dir: "datasets"
+
+# Model configuration
+model:
+  architecture: "resnet9"
+  params:
+    num_classes: 10
+
+# Data split configuration
+data_split:
+  type: "iid"
+  seed: 42
+
+# Federated learning configuration
+federated:
+  num_clients: 10
+  batch_size: 32
+  learning_rate: 0.1  # Higher LR for CIFAR-10
+  local_epochs: 1
+  fraction_clients: 1.0
+
+# Training configuration
+training:
+  num_rounds: 200  # More rounds for CIFAR-10
+  eval_every: 10
+
+# Baselines to compare
+baselines:
+  - fedavg
+  - fedprox
+  - scaffold
+  - krum
+  - multikrum
+  - bulyan
+  - median

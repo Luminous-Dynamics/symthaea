@@ -1,0 +1,71 @@
+---
+# Mycelix Marketplace DNA
+# P2P commerce with MATL trust scoring and MRC arbitration
+
+manifest_version: "0"
+name: mycelix_marketplace
+integrity:
+  network_seed: ~
+  properties:
+    # MATL configuration
+    quality_weight: 0.4
+    consistency_weight: 0.3
+    reputation_weight: 0.3
+    min_trust_for_listing: 0.3
+
+    # Arbitration settings
+    arbitration_timeout_days: 14
+    max_arbitrators: 5
+
+  # Integrity zomes define data validation rules
+  zomes:
+    - name: listings_integrity
+      path: zomes/listings/integrity.wasm
+
+    - name: reputation_integrity
+      path: zomes/reputation/integrity.wasm
+
+    - name: transactions_integrity
+      path: zomes/transactions/integrity.wasm
+
+    - name: arbitration_integrity
+      path: zomes/arbitration/integrity.wasm
+
+    - name: messaging_integrity
+      path: zomes/messaging/integrity.wasm
+
+# Coordinator zomes implement business logic
+coordinator:
+  zomes:
+    - name: listings
+      path: zomes/listings/coordinator.wasm
+      dependencies:
+        - name: listings_integrity
+        - name: reputation_integrity
+
+    - name: reputation
+      path: zomes/reputation/coordinator.wasm
+      dependencies:
+        - name: reputation_integrity
+
+    - name: transactions
+      path: zomes/transactions/coordinator.wasm
+      dependencies:
+        - name: transactions_integrity
+        - name: listings_integrity
+        - name: reputation_integrity
+
+    - name: arbitration
+      path: zomes/arbitration/coordinator.wasm
+      dependencies:
+        - name: arbitration_integrity
+        - name: transactions_integrity
+        - name: reputation_integrity
+
+    - name: messaging
+      path: zomes/messaging/coordinator.wasm
+      dependencies:
+        - name: messaging_integrity
+        - name: reputation_integrity
+        - name: listings_integrity
+        - name: transactions_integrity

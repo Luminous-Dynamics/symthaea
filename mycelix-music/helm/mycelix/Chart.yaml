@@ -1,0 +1,27 @@
+apiVersion: v2
+name: mycelix
+description: Mycelix Music Platform - Decentralized music streaming with modular economics
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - music
+  - streaming
+  - web3
+  - blockchain
+  - decentralized
+home: https://github.com/luminous-dynamics/mycelix-music
+sources:
+  - https://github.com/luminous-dynamics/mycelix-music
+maintainers:
+  - name: Luminous Dynamics
+    email: team@luminous-dynamics.io
+dependencies:
+  - name: postgresql
+    version: "13.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

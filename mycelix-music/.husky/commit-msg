@@ -1,0 +1,25 @@
+#!/bin/sh
+# Enforce conventional commit format
+# Format: type(scope): description
+# Types: feat, fix, docs, style, refactor, test, chore, build, ci, perf
+
+commit_msg=$(cat "$1")
+
+# Pattern for conventional commits
+pattern="^(feat|fix|docs|style|refactor|test|chore|build|ci|perf)(\([a-z0-9-]+\))?: .{1,72}"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+    echo "Error: Commit message does not follow conventional commit format."
+    echo ""
+    echo "Format: <type>(<scope>): <description>"
+    echo ""
+    echo "Types: feat, fix, docs, style, refactor, test, chore, build, ci, perf"
+    echo ""
+    echo "Examples:"
+    echo "  feat(api): add user authentication"
+    echo "  fix(web): resolve login redirect issue"
+    echo "  docs: update API documentation"
+    echo ""
+    echo "Your message: $commit_msg"
+    exit 1
+fi

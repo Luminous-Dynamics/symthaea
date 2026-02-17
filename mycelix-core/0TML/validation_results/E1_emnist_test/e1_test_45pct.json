@@ -1,0 +1,16 @@
+{
+  "seed": 101,
+  "byz_frac": 0.45,
+  "robust_acc_aegis": 0.112,
+  "robust_acc_median": 0.054,
+  "robust_acc_delta_pp": 5.800000000000001,
+  "clean_acc_aegis": 0.112,
+  "clean_acc_median": 0.054,
+  "auc": 0.4888932022084196,
+  "fpr_at_tpr90": 0.8140096618357487,
+  "convergence_round_aegis": 25,
+  "convergence_round_median": 12,
+  "status": "both_fail",
+  "q_frac_mean": 0.2488,
+  "dataset": "emnist"
+}

@@ -1,0 +1,97 @@
+% IEEE S&P 2025 Submission Template
+% Zero-TrustML: Byzantine-Robust Federated Learning Beyond the 33% Barrier
+
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% Packages
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{balance}
+
+% Definitions
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% Color for highlighting (remove for final submission)
+\ifdefined\DRAFT
+\newcommand{\todo}[1]{\textcolor{red}{[TODO: #1]}}
+\else
+\newcommand{\todo}[1]{}
+\fi
+
+\input{../generated/stats.tex}
+
+\begin{document}
+
+% Title (anonymized for double-blind review)
+\title{Decentralized Byzantine-Robust Federated Learning:\\
+Eliminating Central Aggregation with Holochain DHT}
+
+% Authors (anonymized for review)
+\author{
+\IEEEauthorblockN{Anonymous Authors}
+\IEEEauthorblockA{Institution Withheld for Double-Blind Review}
+}
+
+\maketitle
+
+% Abstract
+\begin{abstract}
+Federated Learning (FL) systems traditionally rely on centralized
+aggregation servers, reintroducing trust assumptions that FL was
+designed to eliminate. We present a novel decentralized FL architecture
+based on Holochain's distributed hash table, enabling Byzantine-robust
+aggregation without central coordination. Our system achieves 10,127
+transactions per second with 89ms median latency---three orders of
+magnitude faster than blockchain alternatives---at zero transaction cost.
+
+To demonstrate Byzantine detection in this architecture, we implement
+two server-side validation approaches: (1) \textit{PoGQ}, a loss-based
+quality metric with adaptive thresholding, and (2) FLTrust
+\cite{cao2021fltrust}, a direction-based trust scoring method. Both
+detectors generate cryptographic provenance proofs via a dual-backend
+STARK architecture: Winterfell (1.5ms prove time, production) and RISC
+Zero zkVM (35.8s prove time, auditable cross-validation). Through
+evaluation on MNIST and FEMNIST across 20--50\% Byzantine ratios, we find
+that while both methods achieve perfect detection at 20--30\% BFT, FLTrust
+maintains superior performance at higher ratios (40--50\%). Our adaptive
+threshold algorithm (Gap+MAD) reduces false positive rates by 91\%
+compared to fixed thresholds.
+
+Our key contribution is demonstrating that Byzantine-robust FL can be
+fully decentralized using agent-centric architectures, eliminating the
+single point of failure inherent in traditional systems while maintaining
+competitive detection performance.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Byzantine Fault Tolerance, Federated Learning, Ground Truth Validation, Detector Inversion, Adaptive Thresholds, Holochain DHT, Decentralized Infrastructure
+\end{IEEEkeywords}
+
+% Sections
+\input{sections/01-introduction}
+\input{sections/02-related-work}
+\input{sections/03-design}
+\input{sections/04-experimental-setup}
+\input{sections/05-results}
+\input{sections/06-discussion}
+\input{sections/07-conclusion}
+
+% References
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+% Appendix
+\appendix
+\input{sections/08-appendix}
+
+\end{document}

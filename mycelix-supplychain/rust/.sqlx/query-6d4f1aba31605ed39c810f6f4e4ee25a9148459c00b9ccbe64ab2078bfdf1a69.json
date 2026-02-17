@@ -1,0 +1,46 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                w.id as warehouse_id,\n                w.name as warehouse_name,\n                COUNT(DISTINCT sl.product_id) as product_count,\n                COALESCE(SUM(sl.quantity_on_hand), 0) as quantity,\n                COALESCE(SUM(sl.total_value), 0) as value\n            FROM inv_warehouses w\n            LEFT JOIN inv_stock_levels sl ON w.id = sl.warehouse_id\n            WHERE w.tenant_id = $1 AND w.is_active = true\n            GROUP BY w.id, w.name\n            ORDER BY w.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "warehouse_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "warehouse_name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_count",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "quantity",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 4,
+        "name": "value",
+        "type_info": "Numeric"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "6d4f1aba31605ed39c810f6f4e4ee25a9148459c00b9ccbe64ab2078bfdf1a69"
+}

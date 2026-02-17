@@ -1,0 +1,40 @@
+{
+  "byzantine_configuration": {
+    "total_nodes": 20,
+    "honest_nodes": 14,
+    "byzantine_nodes": 6,
+    "byzantine_percentage": 33,
+    "exceeds_classical_bft": false
+  },
+  "node_assignments": {
+    "honest": [0,1,2,3,4,5,6,7,8,9,10,11,12,13],
+    "byzantine": [14,15,16,17,18,19]
+  },
+  "attack_strategies": {
+    "label_flipping": {
+      "nodes": [14, 15],
+      "severity": "medium",
+      "detectability": "high"
+    },
+    "gradient_reversal": {
+      "nodes": [16, 17],
+      "severity": "high",
+      "detectability": "high"
+    },
+    "random_noise": {
+      "nodes": [18, 19],
+      "severity": "medium",
+      "detectability": "medium"
+    },
+  },
+  "validation_rules": {
+    "1_dimension_validation": { "enabled": true },
+    "2_magnitude_bounds": { "enabled": true, "threshold": 3.0 },
+    "3_statistical_outlier_pogq": { "enabled": true, "threshold": 0.5 },
+    "4_temporal_consistency": { "enabled": true, "window": 3 },
+    "5_reputation_scoring": { "enabled": true, "threshold": 0.3, "decay_rate": 0.2 },
+    "6_cross_validation": { "enabled": true },
+    "7_gradient_noise": { "enabled": true },
+    "8_pattern_anomaly": { "enabled": false }
+  }
+}

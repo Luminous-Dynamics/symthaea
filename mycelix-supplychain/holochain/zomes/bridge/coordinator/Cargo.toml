@@ -1,0 +1,12 @@
+[package]
+name = "bridge_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+bridge_integrity = { path = "../integrity" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]

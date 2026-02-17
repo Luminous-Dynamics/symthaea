@@ -1,0 +1,30 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mycelix-music-prod
+
+namePrefix: prod-
+
+resources:
+  - ../../base
+
+patches:
+  - path: patches/api-deployment.yaml
+  - path: patches/web-deployment.yaml
+  - path: patches/ingress.yaml
+
+configMapGenerator:
+  - name: api-config
+    behavior: merge
+    literals:
+      - rpc-url=https://rpc.gnosischain.com
+      - ceramic-url=https://ceramic.mycelix.io
+      - ipfs-api-url=https://ipfs.mycelix.io
+
+images:
+  - name: mycelix-music/api
+    newName: ghcr.io/mycelix/api
+    newTag: production
+  - name: mycelix-music/web
+    newName: ghcr.io/mycelix/web
+    newTag: production

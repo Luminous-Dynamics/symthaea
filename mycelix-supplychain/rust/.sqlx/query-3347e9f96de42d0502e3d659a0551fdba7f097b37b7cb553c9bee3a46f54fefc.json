@@ -1,0 +1,18 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            UPDATE inv_stock_levels SET\n                quantity_on_hand = quantity_on_hand - $4,\n                quantity_available = quantity_available - $4,\n                total_value = (quantity_on_hand - $4) * COALESCE(unit_cost, 0),\n                updated_at = $5\n            WHERE tenant_id = $1 AND product_id = $2 AND warehouse_id = $3\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Numeric",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "3347e9f96de42d0502e3d659a0551fdba7f097b37b7cb553c9bee3a46f54fefc"
+}

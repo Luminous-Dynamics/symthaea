@@ -1,0 +1,76 @@
+{
+  "results": [
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.58,
+      "auc": 0.45900848765432095,
+      "wall_time": 0.13017868995666504,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.648,
+      "auc": 1.0,
+      "wall_time": 0.35575008392333984,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis",
+      "clean_acc": 0.53,
+      "auc": 0.44408688656476264,
+      "wall_time": 0.13747429847717285,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.637,
+      "auc": 1.0,
+      "wall_time": 0.32052087783813477,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.4,
+      "auc": 0.4547792935556474,
+      "wall_time": 0.13693022727966309,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.619,
+      "auc": 1.0,
+      "wall_time": 0.33341455459594727,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.229,
+      "auc": 0.45580246913580247,
+      "wall_time": 0.12700605392456055,
+      "status": "failed"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.615,
+      "auc": 1.0,
+      "wall_time": 0.29689717292785645,
+      "status": "failed"
+    }
+  ]
+}

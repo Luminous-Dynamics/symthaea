@@ -1,0 +1,132 @@
+{
+  "dashboard": {
+    "title": "Mycelix-DeSci Monitoring Dashboard",
+    "tags": ["mycelix", "desci", "prometheus"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "type": "graph",
+        "title": "HTTP Request Rate",
+        "targets": [
+          {
+            "expr": "rate(mycelix_http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}} - {{status}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "type": "graph",
+        "title": "HTTP Request Duration (p95)",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(mycelix_http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+        "type": "graph",
+        "title": "Claims Created",
+        "targets": [
+          {
+            "expr": "rate(mycelix_claims_created_total[5m])",
+            "legendFormat": "Tier {{tier}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "cps", "label": "Claims/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+        "type": "stat",
+        "title": "Active Claims",
+        "targets": [
+          {
+            "expr": "mycelix_active_claims"
+          }
+        ],
+        "options": {
+          "colorMode": "value",
+          "graphMode": "area",
+          "orientation": "auto"
+        }
+      },
+      {
+        "id": 5,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 16},
+        "type": "graph",
+        "title": "Query Performance",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.99, rate(mycelix_query_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{filter_type}} (p99)"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 6,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 16},
+        "type": "graph",
+        "title": "API Errors",
+        "targets": [
+          {
+            "expr": "rate(mycelix_api_errors_total[5m])",
+            "legendFormat": "{{endpoint}} - {{error_type}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "eps", "label": "Errors/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 7,
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 24},
+        "type": "graph",
+        "title": "Verifications Added",
+        "targets": [
+          {
+            "expr": "rate(mycelix_verifications_added_total[5m])",
+            "legendFormat": "Claim Tier {{claim_tier}}"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 24},
+        "type": "graph",
+        "title": "Storage Operations",
+        "targets": [
+          {
+            "expr": "rate(mycelix_storage_operations_total[5m])",
+            "legendFormat": "{{operation}} - {{status}}"
+          }
+        ]
+      }
+    ],
+    "refresh": "10s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

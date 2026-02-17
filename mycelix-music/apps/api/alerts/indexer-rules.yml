@@ -1,0 +1,19 @@
+groups:
+  - name: mycelix-indexer-alerts
+    rules:
+      - alert: IndexerPoisonSpike
+        expr: increase(indexer_poison_total[10m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Indexer poison events detected"
+          description: "Indexer recorded poison events in the last 10m."
+      - alert: IndexerLagHigh
+        expr: indexer_lag_blocks > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Indexer lag high"
+          description: "Indexer lag exceeds 10 blocks."

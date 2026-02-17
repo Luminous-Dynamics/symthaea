@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mycelix-config
+  namespace: mycelix
+data:
+  api-url: "https://api.mycelix.io"
+  cdn-url: "https://cdn.mycelix.io"
+  redis-host: "redis-master.mycelix.svc.cluster.local"
+  s3-bucket: "mycelix-audio"
+  s3-region: "us-east-1"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mycelix-secrets
+  namespace: mycelix
+type: Opaque
+stringData:
+  # These should be replaced with actual secrets in production
+  # Use external secrets manager like AWS Secrets Manager, HashiCorp Vault, etc.
+  database-url: "postgresql://user:password@postgres:5432/mycelix"
+  jwt-secret: "CHANGE_ME_IN_PRODUCTION"
+  aws-access-key: "CHANGE_ME"
+  aws-secret-key: "CHANGE_ME"
+  privy-app-secret: "CHANGE_ME"

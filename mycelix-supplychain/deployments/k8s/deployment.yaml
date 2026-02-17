@@ -1,0 +1,173 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix-supplychain
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: provenance-config
+  namespace: mycelix-supplychain
+data:
+  RUST_LOG: "info"
+  DATABASE_URL: "sqlite://data/claims.db"
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: provenance-service
+  namespace: mycelix-supplychain
+  labels:
+    app: provenance-service
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: provenance-service
+  template:
+    metadata:
+      labels:
+        app: provenance-service
+    spec:
+      containers:
+      - name: service
+        image: mycelix/provenance-service:0.1.0
+        ports:
+        - containerPort: 8080
+          name: http
+        envFrom:
+        - configMapRef:
+            name: provenance-config
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: data
+          mountPath: /app/data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: provenance-data-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: provenance-service
+  namespace: mycelix-supplychain
+spec:
+  selector:
+    app: provenance-service
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 8080
+  type: ClusterIP
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: provenance-data-pvc
+  namespace: mycelix-supplychain
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: provenance-ingress
+  namespace: mycelix-supplychain
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.supplychain.example.com
+    secretName: provenance-tls
+  rules:
+  - host: api.supplychain.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: provenance-service
+            port:
+              number: 80
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dashboard
+  namespace: mycelix-supplychain
+  labels:
+    app: dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+      - name: dashboard
+        image: mycelix/supplychain-dashboard:0.1.0
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NEXT_PUBLIC_API_URL
+          value: "http://provenance-service"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: mycelix-supplychain
+spec:
+  selector:
+    app: dashboard
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 3000
+  type: ClusterIP

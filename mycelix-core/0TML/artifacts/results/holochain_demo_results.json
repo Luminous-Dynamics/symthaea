@@ -1,0 +1,48 @@
+{
+  "demo_type": "Holochain FL Integration",
+  "timestamp": "2025-09-25T23:01:55.414580",
+  "configuration": {
+    "num_agents": 5,
+    "byzantine_agents": 1,
+    "defense": "Krum",
+    "rounds": 5
+  },
+  "results": [
+    {
+      "round": 1,
+      "avg_accuracy": 23.874922987414998,
+      "byzantine_detected": true,
+      "model_hash": "2a5e95281e59b9e2",
+      "num_participants": 5
+    },
+    {
+      "round": 2,
+      "avg_accuracy": 33.50086615300275,
+      "byzantine_detected": true,
+      "model_hash": "6ea8f6b06543b6e6",
+      "num_participants": 5
+    },
+    {
+      "round": 3,
+      "avg_accuracy": 42.2865953346669,
+      "byzantine_detected": true,
+      "model_hash": "38821d5fb9393e87",
+      "num_participants": 5
+    },
+    {
+      "round": 4,
+      "avg_accuracy": 52.21971896077402,
+      "byzantine_detected": true,
+      "model_hash": "fb6dedb62719e5ba",
+      "num_participants": 5
+    },
+    {
+      "round": 5,
+      "avg_accuracy": 62.724520062287,
+      "byzantine_detected": true,
+      "model_hash": "b17923a10b5ec845",
+      "num_participants": 5
+    }
+  ],
+  "success_rate": 1.0
+}

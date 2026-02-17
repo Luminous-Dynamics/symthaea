@@ -1,0 +1,13 @@
+[package]
+name = "verification_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+verification_integrity = { path = "../integrity" }
+claims_integrity = { path = "../../claims/integrity" }
+
+[lib]
+crate-type = ["cdylib", "rlib"]

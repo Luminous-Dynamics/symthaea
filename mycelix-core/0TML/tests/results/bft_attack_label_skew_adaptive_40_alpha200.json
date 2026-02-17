@@ -1,0 +1,142 @@
+{
+  "success": false,
+  "dataset": "cifar10",
+  "distribution": "label_skew",
+  "attack_suite": [
+    "adaptive"
+  ],
+  "bft_ratio": 0.4,
+  "num_byzantine": 8,
+  "final_detection_rate": 25.0,
+  "final_false_positive_rate": 66.66666666666667,
+  "final_detection_count": 2,
+  "final_false_positive_count": 8,
+  "avg_honest_rep": 0.333604157457845,
+  "avg_byzantine_rep": 0.71184375,
+  "round_stats": [
+    {
+      "round": 1,
+      "avg_honest_rep": 0.7083333333333334,
+      "avg_byzantine_rep": 0.875,
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "byzantine_detected": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 2,
+      "avg_honest_rep": 0.5249999999999999,
+      "avg_byzantine_rep": 0.803125,
+      "detection_rate": 12.5,
+      "false_positive_rate": 50.0,
+      "byzantine_detected": 1,
+      "false_positives": 6
+    },
+    {
+      "round": 3,
+      "avg_honest_rep": 0.4972916666666667,
+      "avg_byzantine_rep": 0.69828125,
+      "detection_rate": 25.0,
+      "false_positive_rate": 50.0,
+      "byzantine_detected": 2,
+      "false_positives": 6
+    },
+    {
+      "round": 4,
+      "avg_honest_rep": 0.4503020833333333,
+      "avg_byzantine_rep": 0.7525312500000001,
+      "detection_rate": 12.5,
+      "false_positive_rate": 50.0,
+      "byzantine_detected": 1,
+      "false_positives": 6
+    },
+    {
+      "round": 5,
+      "avg_honest_rep": 0.3848973958333333,
+      "avg_byzantine_rep": 0.778125,
+      "detection_rate": 12.5,
+      "false_positive_rate": 58.333333333333336,
+      "byzantine_detected": 1,
+      "false_positives": 7
+    },
+    {
+      "round": 6,
+      "avg_honest_rep": 0.3513807552083333,
+      "avg_byzantine_rep": 0.7105,
+      "detection_rate": 12.5,
+      "false_positive_rate": 66.66666666666667,
+      "byzantine_detected": 1,
+      "false_positives": 8
+    },
+    {
+      "round": 7,
+      "avg_honest_rep": 0.33964993098958335,
+      "avg_byzantine_rep": 0.669875,
+      "detection_rate": 25.0,
+      "false_positive_rate": 66.66666666666667,
+      "byzantine_detected": 2,
+      "false_positives": 8
+    },
+    {
+      "round": 8,
+      "avg_honest_rep": 0.3355441425130208,
+      "avg_byzantine_rep": 0.801125,
+      "detection_rate": 0.0,
+      "false_positive_rate": 66.66666666666667,
+      "byzantine_detected": 0,
+      "false_positives": 8
+    },
+    {
+      "round": 9,
+      "avg_honest_rep": 0.3341071165462239,
+      "avg_byzantine_rep": 0.7835000000000001,
+      "detection_rate": 25.0,
+      "false_positive_rate": 66.66666666666667,
+      "byzantine_detected": 2,
+      "false_positives": 8
+    },
+    {
+      "round": 10,
+      "avg_honest_rep": 0.333604157457845,
+      "avg_byzantine_rep": 0.71184375,
+      "detection_rate": 25.0,
+      "false_positive_rate": 66.66666666666667,
+      "byzantine_detected": 2,
+      "false_positives": 8
+    }
+  ],
+  "criteria": [
+    {
+      "name": "Average Honest Reputation",
+      "value": 0.333604157457845,
+      "threshold": "> 0.8",
+      "passed": false
+    },
+    {
+      "name": "Average Byzantine Reputation",
+      "value": 0.71184375,
+      "threshold": "< 0.4",
+      "passed": false
+    },
+    {
+      "name": "Reputation Gap",
+      "value": -0.378239592542155,
+      "threshold": "> 0.4",
+      "passed": false
+    },
+    {
+      "name": "Byzantine Detection Rate",
+      "value": 25.0,
+      "threshold": ">= 68%",
+      "passed": false
+    },
+    {
+      "name": "False Positive Rate",
+      "value": 66.66666666666667,
+      "threshold": "< 5%",
+      "passed": false
+    }
+  ],
+  "label_skew_alpha": 0.2,
+  "attack_type": "adaptive"
+}

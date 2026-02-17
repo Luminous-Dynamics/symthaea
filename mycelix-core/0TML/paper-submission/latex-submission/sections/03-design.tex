@@ -1,0 +1,182 @@
+\section{System Design}
+\label{sec:design}
+
+\subsection{System Model and Threat Model}
+
+\textbf{Network}: $N$ total clients, $f$ Byzantine clients, Byzantine ratio $\rho = f/N$. Global model $\theta \in \mathbb{R}^d$, client $i$ computes local gradient $\nabla_i \in \mathbb{R}^d$.
+
+\textbf{Data Distribution}: Non-IID with label skew modeled by Dirichlet($\alpha$=0.1)~\cite{hsu2019measuring}, creating legitimate gradient diversity.
+
+\textbf{Threat Model}: Byzantine clients submit arbitrary gradients. Attack types: sign flip, scaling, noise injection, sleeper agents. Server possesses clean validation set $V$ for quality measurement.
+
+\textbf{Byzantine Ratios}: Mode 0 designed for $\rho < 0.33$, Mode 1 validated at $\rho \in [0.35, 0.50]$.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.48\textwidth]{figures/simplified_architecture.png}
+\caption{Zero-TrustML System Architecture. Mode 1 uses server validation set for PoGQ quality scoring, enabling detection beyond 33\% Byzantine threshold. Holochain DHT provides decentralized gradient storage with three-layer validation.}
+\label{fig:architecture}
+\end{figure}
+
+\subsection{Ground Truth Detection (Mode 1): Proof of Gradient Quality}
+
+\textbf{Core Insight}: Traditional peer-comparison fails because it has no external reference when Byzantine nodes dominate. Ground truth uses the server's validation set as an independent quality oracle.
+
+\textbf{Proof of Gradient Quality (PoGQ)}: Measures ``If we apply this gradient to the current model, does validation accuracy improve?''
+
+\begin{algorithm}[h]
+\caption{Proof of Gradient Quality (PoGQ)}
+\begin{algorithmic}[1]
+\REQUIRE Global model $\theta_t$, validation set $V$, gradient $\nabla_i$, learning rate $\eta$
+\ENSURE Quality score $q_i \in [0, 1]$
+\STATE $L_{\text{before}} \gets \text{Loss}(\theta_t, V)$
+\STATE $\theta_{\text{temp}} \gets \theta_t - \eta \times \nabla_i$
+\STATE $L_{\text{after}} \gets \text{Loss}(\theta_{\text{temp}}, V)$
+\STATE $\Delta \gets L_{\text{before}} - L_{\text{after}}$
+\STATE $q_i \gets \text{sigmoid}(10 \times \Delta) = 1 / (1 + \exp(-10 \times \Delta))$
+\RETURN $q_i$
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{Score Interpretation}: $q_i \approx 1.0$ indicates large validation loss reduction (high quality), $q_i \approx 0.0$ indicates loss increase (low quality).
+
+\textbf{Why PoGQ Works Beyond 33\%}: (1) Independent of peer gradients, (2) External ground truth (validation set), (3) Direct quality measurement.
+
+\subsubsection{Adaptive Threshold Selection}
+
+Challenge: Heterogeneous data causes legitimate quality score diversity. Fixed thresholds produce high false positive rates (84.6\% FPR observed).
+
+\textbf{Solution: Gap-Based Adaptive Threshold with MAD}
+
+\begin{algorithm}[h]
+\caption{Adaptive Threshold Selection}
+\begin{algorithmic}[1]
+\REQUIRE Quality scores $Q = \{q_1, \ldots, q_N\}$
+\ENSURE Adaptive threshold $\tau_{\text{adaptive}}$
+\STATE $Q_{\text{sorted}} \gets \text{sort}(Q)$
+\STATE $\text{gaps} \gets [Q_{\text{sorted}}[i+1] - Q_{\text{sorted}}[i] \text{ for } i \in [0, N-2]]$
+\STATE $\text{idx} \gets \arg\max(\text{gaps})$
+\STATE $\tau_{\text{gap}} \gets (Q_{\text{sorted}}[\text{idx}] + Q_{\text{sorted}}[\text{idx}+1]) / 2$
+\STATE $\text{median}_q \gets \text{median}(Q)$
+\STATE $\text{MAD} \gets \text{median}(|Q - \text{median}_q|)$
+\STATE $\tau_{\text{outlier}} \gets \text{median}_q - 3.0 \times \text{MAD}$
+\STATE $\tau_{\text{adaptive}} \gets \max(\tau_{\text{gap}}, \tau_{\text{outlier}})$
+\RETURN $\tau_{\text{adaptive}}$
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{Design Rationale}: Gap-based identifies clusters, MAD robust to 50\% outliers~\cite{rousseeuw1993alternatives}, conservative choice reduces false positives.
+
+\textbf{Impact}: Static threshold yielded 84.6\% FPR, adaptive yielded 7.7\% FPR (91\% improvement).
+
+\subsubsection{Detection Decision}
+
+For each client $i$:
+\begin{equation}
+\text{Flag}_i = \begin{cases}
+\text{Byzantine} & \text{if } q_i < \tau_{\text{adaptive}} \\
+\text{Honest} & \text{otherwise}
+\end{cases}
+\end{equation}
+
+Accepted gradients aggregated via FedAvg: $\theta_{t+1} = \theta_t - (\eta / |A|) \sum_{i \in A} \nabla_i$ where $A = \{i : q_i \geq \tau_{\text{adaptive}}\}$.
+
+\subsection{Mode 0 (Peer-Comparison): Baseline}
+
+Simplified peer-comparison detector for empirical validation:
+
+\textbf{Cosine Similarity}: $\cos\_\text{sim}_i = (\nabla_i \cdot \nabla_{\text{median}}) / (||\nabla_i|| \times ||\nabla_{\text{median}}||)$
+
+\textbf{Magnitude Z-Score}: $z_i = (||\nabla_i|| - \mu) / \sigma$
+
+\textbf{Detection}: Flag if $\cos\_\text{sim}_i < 0.5$ OR $|z_i| > 3.0$
+
+\textbf{Limitation}: When $\rho \geq 0.33$, Byzantine gradients dominate statistics, causing detector inversion.
+
+\subsection{Holochain DHT Integration}
+
+Traditional FL relies on centralized aggregation servers, creating single points of failure, trust requirements, and scalability bottlenecks.
+
+\textbf{Holochain Architecture}: Agent-centric DHT with no global consensus, custom validation logic, gossip protocol for peer-to-peer propagation.
+
+\textbf{Zome Implementation}: Three WebAssembly modules for gradient storage, reputation tracking, and validation rules. Full implementation details in Appendix.
+
+\textbf{Performance}: $\sim$10,000 TPS throughput, <1ms cached queries, zero transaction costs.
+
+\subsection{Cryptographic Provenance: Dual-Backend STARK Architecture}
+
+To provide auditable, tamper-evident proof of Byzantine detection decisions, we implement cryptographic provenance using zero-knowledge Scalable Transparent ARguments of Knowledge (STARKs)~\cite{bensasson2018scalable}. Our system employs a dual-backend architecture balancing auditability with performance.
+
+\subsubsection{Design Rationale: The Variable-Length Challenge}
+
+PoGQ detection decisions operate on gradients of arbitrary dimension (determined by model architecture). This creates a fundamental tension:
+
+\textbf{Domain-Specific STARKs} (e.g., Winterfell AIR~\cite{winterfell}) achieve exceptional performance (1--2ms proving) but require \textit{static trace length} determined at compile-time. Gradient vectors vary in length: SimpleCNN gradients ($\sim$50K parameters) differ from ResNet18 ($\sim$11M parameters). While padding strategies exist, they sacrifice proving efficiency or introduce soundness concerns.
+
+\textbf{General-Purpose zkVMs} (e.g., RISC Zero~\cite{risczero}) execute arbitrary RISC-V programs with dynamic memory allocation, naturally handling variable-length inputs without AIR recompilation. The tradeoff: 3--4 orders of magnitude slower proving.
+
+\subsubsection{RISC Zero zkVM Backend (Primary)}
+
+The primary implementation uses RISC Zero zkVM (v3.0) as the proof backend for PoGQ decision verification:
+
+\textbf{Architecture}: RISC-V execution model compiling guest programs (written in Rust) to zkVM bytecode. The prover generates execution traces for arbitrary computations, including:
+\begin{itemize}
+    \item Loading gradient vectors (arbitrary dimensions)
+    \item Forward pass through model for loss computation
+    \item PoGQ quality score calculation (sigmoid transformation)
+    \item Adaptive threshold computation (Gap+MAD algorithm)
+    \item Byzantine/honest classification decision
+\end{itemize}
+
+\textbf{Security}: S128 profile provides 127-bit conjectured security (comparable to 256-bit ECDSA). S192 profile available for 191-bit security at 2$\times$ proving cost.
+
+\textbf{Proof Structure}: Guest program outputs public commitment to:
+\begin{equation}
+\text{Commitment} = \text{Hash}(\text{gradient}_i, q_i, \tau_{\text{adaptive}}, \text{decision}_i)
+\end{equation}
+
+Verifiers check: (1) proof validity (cryptographic), (2) decision correctness (logic), (3) commitment integrity (hash).
+
+\textbf{Performance}: Approximately 30--60 seconds per decision on consumer hardware (Intel Core i9-8950HK, 2.9 GHz, 6-core mobile CPU), generating 216 KB proofs (S128) with <100ms verification time. Detailed performance comparison in Section~\ref{sec:results}.
+
+\subsubsection{Winterfell AIR Backend (Cross-Validation)}
+
+We implement a secondary backend using Winterfell~\cite{winterfell}, Facebook's STARK prover, with custom Algebraic Intermediate Representation (AIR) for PoGQ:
+
+\textbf{AIR Design}: Domain-specific constraint system encoding PoGQ decision logic as polynomial constraints over finite field $\mathbb{F}_{p}$ where $p = 2^{64} - 2^{32} + 1$. Trace columns represent:
+\begin{itemize}
+    \item Gradient vector elements (padded to fixed length)
+    \item Model parameters (current and updated)
+    \item Loss computation intermediates
+    \item Quality score calculation steps
+    \item Threshold selection state
+\end{itemize}
+
+\textbf{Constraints}: 127 boundary constraints (initial state) and 89 transition constraints (step validity) ensuring computational integrity. Custom composition polynomial combines constraints with random weights.
+
+\textbf{Performance}: 1.0--1.6ms proving time with $\sim$8 KB proofs, 30,000$\times$ faster than RISC Zero. However, AIR recompilation required for different model architectures due to fixed trace length.
+
+\textbf{Security}: 96-bit conjectured security (comparable to 192-bit ECDSA) with default parameters. Configurable via extension field degree and FRI folding factor.
+
+\subsubsection{Dual-Backend Strategy}
+
+The dual-backend architecture serves complementary purposes:
+
+\textbf{RISC Zero (Primary Production Use)}:
+\begin{itemize}
+    \item \textbf{Flexibility}: Handles arbitrary gradient dimensions without AIR recompilation
+    \item \textbf{Auditability}: Guest code in Rust is human-readable and formally verifiable
+    \item \textbf{Correctness}: Identical decision logic to Python implementation enables direct testing
+    \item \textbf{Acceptable Latency}: 30--60s proving acceptable for federated learning audit scenarios (non-blocking, asynchronous)
+\end{itemize}
+
+\textbf{Winterfell (Cross-Validation)}:
+\begin{itemize}
+    \item \textbf{Performance Validation}: Demonstrates STARK proving \textit{can} be fast for specialized use cases
+    \item \textbf{Semantic Correctness}: Identical decisions across both backends validates AIR constraint correctness
+    \item \textbf{Future Optimization}: Provides path to production deployment if trace length limitations resolved
+\end{itemize}
+
+\textbf{Verification Priority}: For Byzantine detection in federated learning, \textit{verification speed} matters more than proving speed. Clients verify proofs (<100ms) synchronously during training; servers generate proofs (30--60s) asynchronously per-round. This latency is negligible compared to federated round duration (minutes to hours).
+
+\textbf{Cross-Validation Protocol}: For critical decisions (e.g., permanent node banning), both backends generate proofs. Agreement between RISC Zero (general) and Winterfell (domain-specific) provides high confidence in decision correctness, mitigating implementation bugs in either prover.

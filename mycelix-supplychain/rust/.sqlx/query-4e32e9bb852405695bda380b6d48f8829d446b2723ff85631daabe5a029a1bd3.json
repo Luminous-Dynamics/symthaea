@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                id, tenant_id, warehouse_id, code, name, location_type,\n                zone, aisle, rack, shelf, bin,\n                max_weight, max_volume,\n                is_active, created_at, updated_at\n            FROM inv_locations\n            WHERE tenant_id = $1 AND warehouse_id = $2 AND is_active = true\n            ORDER BY zone, aisle, rack, shelf, bin\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "warehouse_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "code",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 5,
+        "name": "location_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 6,
+        "name": "zone",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "aisle",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "rack",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "shelf",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 10,
+        "name": "bin",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 11,
+        "name": "max_weight",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 12,
+        "name": "max_volume",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 13,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 14,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 15,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "4e32e9bb852405695bda380b6d48f8829d446b2723ff85631daabe5a029a1bd3"
+}

@@ -1,0 +1,44 @@
+{
+  "timestamp": "2025-09-25T12:49:59.949614",
+  "results": [
+    {
+      "success": false,
+      "byzantine_fraction": 0.1,
+      "detection_rate": 0,
+      "aggregation_quality": 0,
+      "clean_clients": 0
+    },
+    {
+      "success": false,
+      "byzantine_fraction": 0.2,
+      "detection_rate": 0,
+      "aggregation_quality": 0,
+      "clean_clients": 0
+    },
+    {
+      "success": false,
+      "byzantine_fraction": 0.3,
+      "detection_rate": 0,
+      "aggregation_quality": 0,
+      "clean_clients": 0
+    },
+    {
+      "success": false,
+      "byzantine_fraction": 0.4,
+      "detection_rate": 0,
+      "aggregation_quality": 0,
+      "clean_clients": 0
+    },
+    {
+      "success": false,
+      "byzantine_fraction": 0.5,
+      "detection_rate": 0,
+      "aggregation_quality": 0,
+      "clean_clients": 0
+    }
+  ],
+  "practical_limit": 0,
+  "theoretical_limit": 0.33,
+  "claim_50_percent": false,
+  "claim_exceeds_theoretical": false
+}

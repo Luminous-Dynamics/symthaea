@@ -1,0 +1,102 @@
+[package]
+name = "edunet-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+edunet-core = { path = "../crates/edunet-core" }
+edunet-agg = { path = "../crates/edunet-agg" }
+
+# Learning zome dependencies (for integration tests)
+learning_integrity = { path = "../zomes/learning_zome/integrity" }
+learning_coordinator = { path = "../zomes/learning_zome/coordinator" }
+
+# FL zome dependencies (for integration tests)
+fl_integrity = { path = "../zomes/fl_zome/integrity" }
+fl_coordinator = { path = "../zomes/fl_zome/coordinator" }
+
+# Credential zome dependencies (for integration tests)
+credential_integrity = { path = "../zomes/credential_zome/integrity" }
+credential_coordinator = { path = "../zomes/credential_zome/coordinator" }
+
+# DAO zome dependencies (for integration tests)
+dao_integrity = { path = "../zomes/dao_zome/integrity" }
+dao_coordinator = { path = "../zomes/dao_zome/coordinator" }
+
+# Learning Pods zome dependencies (for integration tests)
+pods_integrity = { path = "../zomes/pods_zome/integrity" }
+pods_coordinator = { path = "../zomes/pods_zome/coordinator" }
+
+# Knowledge Roots zome dependencies (for integration tests)
+knowledge_integrity = { path = "../zomes/knowledge_zome/integrity" }
+knowledge_coordinator = { path = "../zomes/knowledge_zome/coordinator" }
+
+# SRS zome dependencies (for differentiation tests)
+srs_integrity = { path = "../zomes/srs_zome/integrity" }
+srs_coordinator = { path = "../zomes/srs_zome/coordinator" }
+
+# Gamification zome dependencies (for differentiation tests)
+gamification_integrity = { path = "../zomes/gamification_zome/integrity" }
+gamification_coordinator = { path = "../zomes/gamification_zome/coordinator" }
+
+# Adaptive Learning zome dependencies (for differentiation tests)
+adaptive_integrity = { path = "../zomes/adaptive_zome/integrity" }
+adaptive_coordinator = { path = "../zomes/adaptive_zome/coordinator" }
+
+# Integration Layer zome dependencies (for differentiation tests)
+integration_integrity = { path = "../zomes/integration_zome/integrity" }
+integration_coordinator = { path = "../zomes/integration_zome/coordinator" }
+
+# Holochain dependencies (for integration testing)
+hdk.workspace = true
+hdi.workspace = true
+
+# Holochain testing dependencies
+holochain = { version = "0.6", features = ["test_utils", "sweettest"] }
+holochain_types = "0.6"
+
+# Async runtime for tests
+tokio = { version = "1.35", features = ["full", "test-util"] }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+chrono.workspace = true
+uuid = { version = "1.6", features = ["v4"] }
+
+# Random generation
+rand.workspace = true
+rand_chacha.workspace = true
+rand_distr.workspace = true
+
+# WASM compatibility: Force getrandom 0.2.x to enable "js" feature
+# This ensures that the transitive dependency (via rand_core) has WASM support
+getrandom = { version = "0.2", features = ["js"] }
+
+[lib]
+name = "fixtures"
+path = "fixtures/mod.rs"
+
+# End-to-End Integration Tests
+[[test]]
+name = "e2e_test"
+path = "e2e_test.rs"
+
+# Learning Pods Integration Tests
+[[test]]
+name = "pods_integration"
+path = "pods_integration_tests.rs"
+
+# Knowledge Roots Integration Tests
+[[test]]
+name = "knowledge_integration"
+path = "knowledge_integration_tests.rs"
+
+# Differentiation Features Integration Tests (SRS, Gamification, Adaptive, Integration)
+[[test]]
+name = "differentiation_integration"
+path = "differentiation_integration_tests.rs"

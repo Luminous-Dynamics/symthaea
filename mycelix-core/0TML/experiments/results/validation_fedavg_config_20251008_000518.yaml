@@ -1,0 +1,19 @@
+attack_type: AdaptivePoisoning
+baseline: FedAvg
+baseline_config: {}
+byzantine_fraction: 0.3
+dataset:
+  data_dir: datasets
+  name: mnist
+experiment_name: validation_FedAvg
+heterogeneity:
+  alpha: 0.1
+  type: dirichlet
+num_clients: 10
+samples_per_client: 300
+training:
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 3
+  num_rounds: 20
+validation_split: 0.2

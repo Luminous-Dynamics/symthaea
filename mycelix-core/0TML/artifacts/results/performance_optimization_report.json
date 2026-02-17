@@ -1,0 +1,55 @@
+{
+  "timestamp": "2025-09-26 11:31:10",
+  "configuration": {
+    "num_workers": 10,
+    "gradient_dim": 1000
+  },
+  "optimizations": [
+    {
+      "operation": "Krum Aggregation",
+      "baseline_time": 0.009577035903930664,
+      "optimized_time": 0.018290781974792482,
+      "speedup": 0.523599041152494,
+      "details": {
+        "num_workers": 10,
+        "gradient_dim": 1000,
+        "rounds": 10
+      }
+    },
+    {
+      "operation": "Gradient Caching",
+      "baseline_time": 0.13228535652160645,
+      "optimized_time": 0.2079906463623047,
+      "speedup": 0.6360158922299559,
+      "details": {
+        "hits": 32,
+        "misses": 68,
+        "hit_rate": 0.32,
+        "size": 68
+      }
+    },
+    {
+      "operation": "Vectorized Mean",
+      "baseline_time": 0.0005864906311035156,
+      "optimized_time": 0.0009973430633544922,
+      "speedup": 0.5880530508036986,
+      "details": {
+        "operations": 100,
+        "gradient_dim": 1000
+      }
+    },
+    {
+      "operation": "Complete FL Round",
+      "baseline_time": 0.06869816780090332,
+      "optimized_time": 0.03434908390045166,
+      "speedup": 2.0,
+      "details": {
+        "rounds": 10,
+        "avg_time": 0.03434908390045166,
+        "min_time": 0.030834197998046875,
+        "max_time": 0.03849434852600098
+      }
+    }
+  ],
+  "overall_speedup": 0.791094432910874
+}

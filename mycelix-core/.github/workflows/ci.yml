@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "develop"]
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: cargo test
+        run: cargo test --workspace -- --nocapture
+
+  fl-aggregator:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: libs/fl-aggregator
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: libs/fl-aggregator
+      - name: Run Byzantine algorithm tests
+        run: cargo test --test byzantine_tests -- --nocapture
+      - name: Run Aggregator tests
+        run: cargo test --test aggregator_tests -- --nocapture
+      - name: Run all fl-aggregator tests
+        run: cargo test --all-features -- --nocapture
+      - name: Clippy
+        run: cargo clippy --all-features -- -D warnings
+
+  fl-zomes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: zomes/federated_learning
+      - name: Coordinator tests
+        run: cd zomes/federated_learning/coordinator && cargo test --target x86_64-unknown-linux-gnu -- --nocapture
+      - name: Integrity tests
+        run: cd zomes/federated_learning/integrity && cargo test --target x86_64-unknown-linux-gnu -- --nocapture
+      - name: Check WASM compilation (coordinator)
+        run: cd zomes/federated_learning/coordinator && cargo check
+      - name: Check WASM compilation (integrity)
+        run: cd zomes/federated_learning/integrity && cargo check
+      - name: Clippy coordinator
+        run: cd zomes/federated_learning/coordinator && cargo clippy --target x86_64-unknown-linux-gnu -- -D warnings
+      - name: Clippy integrity
+        run: cd zomes/federated_learning/integrity && cargo clippy --target x86_64-unknown-linux-gnu -- -D warnings
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Install dependencies
+        run: poetry install --with dev --extras cpu
+      - name: pytest smoke suite with coverage
+        run: |
+          poetry run pytest -q 0TML/tests/test_smoke.py \
+            --cov=0TML/src \
+            --cov-report=xml \
+            --cov-report=term-missing
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          files: coverage.xml
+          flags: smoke-tests
+          fail_ci_if_error: false
+
+  paper:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Generate paper stats and assets
+        run: |
+          python 0TML/paper-submission/scripts/build_results.py
+      - uses: xu-cheng/latex-action@v3
+        with:
+          root_file: 0TML/paper-submission/latex-submission/main.tex
+      - name: Upload paper PDF
+        uses: actions/upload-artifact@v4
+        with:
+          name: zerotrustml-paper
+          path: 0TML/paper-submission/latex-submission/main.pdf
+
+  benches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Poetry
+        run: pip install poetry
+      - name: Run loss benchmark
+        shell: bash
+        run: |
+          if [ ! -f 0TML/models/canary_cnn.pt ]; then
+            echo "Skipping bench run (0TML/models/canary_cnn.pt missing)."
+            exit 0
+          fi
+          poetry install --with dev --extras cpu
+          poetry run python 0TML/vsv-stark/scripts/export_weights.py \
+            --model 0TML/models/canary_cnn.pt \
+            --output 0TML/vsv-stark/vsv-core/src/weights.rs \
+            --samples 8 \
+            --calibration-output 0TML/vsv-stark/vsv-core/src/calibration.rs
+          cargo bench -p vsv-core --features bench-fixtures --bench loss -- --noplot --warm-up-time 1
+      - name: Benchmark summary
+        if: success() && hashFiles('target/criterion/loss/new/estimates.json') != ''
+        run: |
+          jq '{mean: .mean.point_estimate, stddev: .std_dev.point_estimate}' \
+            target/criterion/loss/new/estimates.json || \
+          echo '{"mean":0,"stddev":0}'
+      - name: Upload Criterion reports
+        if: success() && hashFiles('target/criterion/loss/new/estimates.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-loss
+          path: target/criterion/loss/new/estimates.json
+      - name: Trust layer benchmark
+        run: cargo bench --bench trust_layer_bench -- --sample-size=20 --warm-up-time 1 --measurement-time 5
+      - name: Check trust-layer regressions
+        run: python tools/check_bench_regressions.py --baseline docs/performance/baseline_trust_layer.json --criterion target/criterion --threshold 0.2
+      - name: Upload trust-layer Criterion reports
+        if: success() && hashFiles('target/criterion/trust_layer_bench/new/estimates.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-trust-layer
+          path: target/criterion

@@ -1,0 +1,24 @@
+name: Nightly Trust Bench
+
+on:
+  schedule:
+    - cron: "0 5 * * *"
+
+jobs:
+  nightly-bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run trust-layer benchmark
+        run: cargo bench --bench trust_layer_bench -- --sample-size=20 --warm-up-time=1 --measurement-time=5
+      - name: Check regressions
+        run: python tools/check_bench_regressions.py --baseline docs/performance/baseline_trust_layer.json --criterion target/criterion --threshold 0.2
+      - name: Upload Criterion artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-criterion
+          path: target/criterion

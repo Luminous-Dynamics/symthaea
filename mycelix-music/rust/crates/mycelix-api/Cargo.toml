@@ -1,0 +1,45 @@
+[package]
+name = "mycelix-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "REST and GraphQL API service for Mycelix"
+
+[dependencies]
+# Core engine
+mycelix-core = { path = "../mycelix-core" }
+
+# Web framework
+axum = { version = "0.7", features = ["macros", "multipart", "ws"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
+
+# GraphQL
+async-graphql = { version = "7.0", features = ["uuid", "chrono"] }
+async-graphql-axum = "7.0"
+
+# Async runtime
+tokio.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Utilities
+thiserror.workspace = true
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid.workspace = true
+bytes.workspace = true
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.22"
+
+# WebSocket
+tokio-tungstenite = "0.21"
+
+[dev-dependencies]
+tokio-test = "0.4"
+reqwest = { version = "0.11", features = ["json"] }

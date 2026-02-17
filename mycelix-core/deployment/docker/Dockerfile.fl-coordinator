@@ -1,0 +1,92 @@
+# Mycelix FL Coordinator Dockerfile
+#
+# Multi-stage build for optimized production image
+#
+# Build: docker build -f deployment/docker/Dockerfile.fl-coordinator -t mycelix/fl-coordinator .
+# Run:   docker run -d --name fl-coordinator mycelix/fl-coordinator
+
+# ====================
+# Build Stage
+# ====================
+FROM rust:1.75-bookworm AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    cmake \
+    protobuf-compiler \
+    libssl-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cache dependencies
+COPY libs/Cargo.toml libs/Cargo.lock ./libs/
+COPY libs/fl-aggregator/Cargo.toml ./libs/fl-aggregator/
+COPY libs/mycelix-core-types/Cargo.toml ./libs/mycelix-core-types/
+
+# Create dummy files
+RUN mkdir -p libs/fl-aggregator/src libs/mycelix-core-types/src \
+    && echo "fn main() {}" > libs/fl-aggregator/src/main.rs \
+    && echo "" > libs/mycelix-core-types/src/lib.rs
+
+WORKDIR /build/libs
+RUN cargo build --release --package fl-aggregator 2>/dev/null || true
+
+# Copy actual source
+WORKDIR /build
+COPY libs/ ./libs/
+
+# Build coordinator binary
+WORKDIR /build/libs
+RUN cargo build --release --package fl-aggregator --bin fl-coordinator
+
+# ====================
+# Runtime Stage
+# ====================
+FROM debian:bookworm-slim AS runtime
+
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd -r mycelix && useradd -r -g mycelix mycelix
+
+RUN mkdir -p /app /config \
+    && chown -R mycelix:mycelix /app /config
+
+WORKDIR /app
+
+COPY --from=builder /build/libs/target/release/fl-coordinator /app/fl-coordinator
+COPY deployment/config/fl-coordinator.toml /config/fl-coordinator.toml
+
+RUN chown -R mycelix:mycelix /app /config
+
+USER mycelix
+
+ENV RUST_LOG=info,fl_coordinator=debug
+ENV CONFIG_PATH=/config/fl-coordinator.toml
+
+EXPOSE 8083/tcp
+EXPOSE 9092/tcp
+EXPOSE 8084/tcp
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8084/health/live || exit 1
+
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG VCS_REF
+
+LABEL org.opencontainers.image.title="Mycelix FL Coordinator" \
+      org.opencontainers.image.description="Mycelix federated learning coordinator" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="Luminous Dynamics" \
+      org.opencontainers.image.source="https://github.com/mycelix/core"
+
+ENTRYPOINT ["/app/fl-coordinator"]
+CMD ["--config", "/config/fl-coordinator.toml"]

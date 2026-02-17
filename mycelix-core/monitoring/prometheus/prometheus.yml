@@ -1,0 +1,190 @@
+# Prometheus Configuration for Mycelix Federated Learning System
+# Comprehensive monitoring for all services including FL coordinator,
+# Byzantine detection, Holochain conductor, and storage backends.
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'mycelix-production'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+      timeout: 10s
+
+# Load alert rules from files
+rule_files:
+  - '/etc/prometheus/rules/*.yml'
+
+# Scrape configurations for all Mycelix services
+scrape_configs:
+  # ============================================
+  # Prometheus Self-Monitoring
+  # ============================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # ============================================
+  # MycelixFL Core Services
+  # ============================================
+  - job_name: 'mycelix-fl-coordinator'
+    static_configs:
+      - targets:
+          - 'fl-coordinator:9100'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'fl-coordinator'
+    metrics_path: /metrics
+    scrape_interval: 10s
+    scrape_timeout: 8s
+
+  - job_name: 'mycelix-fl-nodes'
+    # Discovery via file-based service discovery or DNS
+    file_sd_configs:
+      - files:
+          - '/etc/prometheus/sd/fl-nodes.yml'
+        refresh_interval: 30s
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'fl-node'
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # ============================================
+  # ZeroTrustML Byzantine Detection
+  # ============================================
+  - job_name: 'zerotrustml'
+    static_configs:
+      - targets:
+          - 'zerotrustml-node:9090'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'zerotrustml'
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # ============================================
+  # Holochain Conductor
+  # ============================================
+  - job_name: 'holochain'
+    static_configs:
+      - targets:
+          - 'holochain-conductor:9200'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'holochain'
+    metrics_path: /metrics
+    scrape_interval: 15s
+    scrape_timeout: 10s
+
+  # ============================================
+  # Hybrid Bridge (PostgreSQL to Holochain)
+  # ============================================
+  - job_name: 'hybrid-bridge'
+    static_configs:
+      - targets:
+          - 'hybrid-bridge:9300'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'hybrid-bridge'
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # ============================================
+  # Storage Backends
+  # ============================================
+  - job_name: 'postgresql'
+    static_configs:
+      - targets:
+          - 'postgres-exporter:9187'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'postgresql'
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  - job_name: 'redis'
+    static_configs:
+      - targets:
+          - 'redis-exporter:9121'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'redis'
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # ============================================
+  # Infrastructure Monitoring
+  # ============================================
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+          - 'node-exporter:9100'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'node'
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets:
+          - 'cadvisor:8080'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'docker'
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # ============================================
+  # NGINX/API Gateway (if present)
+  # ============================================
+  - job_name: 'nginx'
+    static_configs:
+      - targets:
+          - 'nginx-exporter:9113'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+      - target_label: service
+        replacement: 'nginx'
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+# Remote write for long-term storage (optional)
+# remote_write:
+#   - url: "https://prometheus-remote.example.com/api/v1/write"
+#     basic_auth:
+#       username: mycelix
+#       password_file: /etc/prometheus/remote_password
+
+# Remote read for federated queries (optional)
+# remote_read:
+#   - url: "https://prometheus-remote.example.com/api/v1/read"
+#     read_recent: true

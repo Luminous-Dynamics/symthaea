@@ -1,0 +1,44 @@
+{
+  "network": "polygon-amoy",
+  "chainId": 80002,
+  "status": "pending_funding",
+  "deployer": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c",
+  "rpcUrl": "https://rpc-amoy.polygon.technology",
+  "blockExplorer": "https://amoy.polygonscan.com",
+  "faucet": "https://faucet.polygon.technology/",
+  "expectedContracts": {
+    "ReputationAnchor": "0xf3B343888a9b82274cEfaa15921252DB6c5f48C9",
+    "PaymentRouter": "0x94417A3645824CeBDC0872c358cf810e4Ce4D1cB",
+    "MycelixRegistry": "0x556b810371e3d8D9E5753117514F03cC6C93b835"
+  },
+  "deploymentCommand": "cd contracts && nix-shell -p foundry --run \"source .env && forge script script/Deploy.s.sol:DeployAmoy --rpc-url https://rpc-amoy.polygon.technology --broadcast --verify\"",
+  "estimatedGas": {
+    "ReputationAnchor": "1161664",
+    "PaymentRouter": "1818646",
+    "MycelixRegistry": "1771039",
+    "totalGasUnits": "4751349",
+    "estimatedCostPOL": "~0.5 POL"
+  },
+  "verificationUrls": {
+    "ReputationAnchor": "https://amoy.polygonscan.com/address/0xf3B343888a9b82274cEfaa15921252DB6c5f48C9",
+    "PaymentRouter": "https://amoy.polygonscan.com/address/0x94417A3645824CeBDC0872c358cf810e4Ce4D1cB",
+    "MycelixRegistry": "https://amoy.polygonscan.com/address/0x556b810371e3d8D9E5753117514F03cC6C93b835"
+  },
+  "configuration": {
+    "owner": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c",
+    "anchorNode": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c",
+    "feeRecipient": "0x8aDfb26E4596cd6ba8dC31943cEEF4AC77261C1c"
+  },
+  "notes": [
+    "Contracts compiled and dry-run simulation successful",
+    "Wallet needs POL from Amoy faucet before deployment",
+    "Addresses are deterministic (CREATE2) - will match Sepolia deployment",
+    "EIP-3855 warning can be ignored for testnet"
+  ],
+  "sepoliaEquivalent": {
+    "ReputationAnchor": "0xf3B343888a9b82274cEfaa15921252DB6c5f48C9",
+    "PaymentRouter": "0x94417A3645824CeBDC0872c358cf810e4Ce4D1cB",
+    "MycelixRegistry": "0x556b810371e3d8D9E5753117514F03cC6C93b835"
+  },
+  "preparedAt": "2026-01-09T10:30:00Z"
+}

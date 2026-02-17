@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mycelix: Re-architecting the Scientific Enterprise</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 300px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 350px;
+            }
+        }
+        .flow-arrow {
+            font-size: 2rem;
+            line-height: 1;
+            color: #328CC1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-[#1D2731]">
+
+    <main class="container mx-auto p-4 md:p-8">
+
+        <header class="text-center mb-12 md:mb-16">
+            <h1 class="text-4xl md:text-6xl font-black text-[#0B3C5D] mb-4">Re-architecting the Scientific Enterprise</h1>
+            <p class="text-lg md:text-xl text-gray-600 max-w-4xl mx-auto">The Mycelix Framework is a new operating system for science, designed to solve the systemic failures of the current research funding and publication model through decentralization and verifiable reputation.</p>
+        </header>
+
+        <section id="crisis" class="mb-12 md:mb-20">
+            <h2 class="text-3xl md:text-4xl font-bold text-center text-[#0B3C5D] mb-8">The Crisis in Modern Science</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4 text-center">The Reproducibility Crisis</h3>
+                    <p class="text-gray-600 mb-6 text-center">A fundamental breakdown in scientific rigor and transparency plagues the current system. The results from a shocking number of studies cannot be independently verified, undermining the foundation of scientific truth.</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div>
+                            <div class="chart-container h-64">
+                                <canvas id="reproducibilityChart1"></canvas>
+                            </div>
+                            <p class="text-center font-semibold text-[#0B3C5D] mt-2">Failure to Reproduce Others' Work</p>
+                        </div>
+                        <div>
+                            <div class="chart-container h-64">
+                                <canvas id="reproducibilityChart2"></canvas>
+                            </div>
+                            <p class="text-center font-semibold text-[#0B3C5D] mt-2">Failure to Reproduce Own Work</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4 text-center">The Broken Funding Model</h3>
+                    <p class="text-gray-600 mb-6">Funding is slow, bureaucratic, and controlled by a handful of gatekeepers who favor incremental research from established institutions, stifling high-risk, high-reward innovation.</p>
+                    <div class="space-y-4">
+                        <div class="flex items-center p-4 bg-gray-50 rounded-lg">
+                            <div class="text-2xl mr-4">🔬</div>
+                            <div>
+                                <h4 class="font-bold text-[#0B3C5D]">Scientist with Idea</h4>
+                                <p class="text-sm text-gray-500">Submits proposal</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-center"><div class="flow-arrow">▼</div></div>
+                        <div class="flex items-center p-4 bg-red-50 rounded-lg border border-red-200">
+                             <div class="text-2xl mr-4">🏛️</div>
+                            <div>
+                                <h4 class="font-bold text-red-800">Centralized Granting Body</h4>
+                                <p class="text-sm text-gray-500">Slow, conservative review panel</p>
+                            </div>
+                        </div>
+                        <div class="flex justify-center"><div class="flow-arrow">▼</div></div>
+                        <div class="flex items-center p-4 bg-red-50 rounded-lg border border-red-200">
+                            <div class="text-2xl mr-4">📚</div>
+                            <div>
+                                <h4 class="font-bold text-red-800">For-Profit Publishers</h4>
+                                <p class="text-sm text-gray-500">Research locked behind paywalls</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="solution" class="mb-12 md:mb-20">
+            <h2 class="text-3xl md:text-4xl font-bold text-center text-[#0B3C5D] mb-2">The Mycelix Solution</h2>
+            <p class="text-lg text-gray-600 text-center max-w-3xl mx-auto mb-8">A "Decentralized Science" (DeSci) operating system built on a hybrid architecture that ensures scalability, user sovereignty, and finality.</p>
+             <div class="bg-white rounded-lg shadow-md p-6">
+                <h3 class="text-xl font-bold text-[#1D2731] mb-6 text-center">System Architecture Layers</h3>
+                <div class="flex flex-col space-y-2 text-center">
+                    <div class="p-4 bg-[#0B3C5D] text-white rounded-t-lg">
+                        <h4 class="font-bold">Industry Adapters</h4>
+                        <p class="text-sm opacity-80">Federated Learning, Healthcare, Energy</p>
+                    </div>
+                    <div class="flex justify-center"><div class="flow-arrow -my-2">▼</div></div>
+                    <div class="p-4 bg-[#328CC1] text-white">
+                        <h4 class="font-bold">Meta-Core Services</h4>
+                        <p class="text-sm opacity-80">Reputation, Identity, Currency Exchange</p>
+                    </div>
+                    <div class="flex justify-center"><div class="flow-arrow -my-2">▼</div></div>
+                    <div class="grid grid-cols-2 gap-2">
+                         <div class="p-4 bg-gray-200 text-[#1D2731]">
+                            <h4 class="font-bold">Holochain P2P Layer</h4>
+                            <p class="text-sm">Scalability & Sovereignty</p>
+                        </div>
+                        <div class="p-4 bg-gray-200 text-[#1D2731]">
+                            <h4 class="font-bold">Layer-2 Settlement</h4>
+                            <p class="text-sm">Finality & Interoperability</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-center"><div class="flow-arrow -my-2">▼</div></div>
+                    <div class="p-4 bg-[#D9B310] text-[#1D2731] rounded-b-lg">
+                        <h4 class="font-bold">Cross-Chain Bridge</h4>
+                        <p class="text-sm">Secure Inter-Layer Communication</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="how" class="mb-12 md:mb-20">
+            <h2 class="text-3xl md:text-4xl font-bold text-center text-[#0B3C5D] mb-8">A Paradigm Shift for Science</h2>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4">From Panels to Quadratic Funding</h3>
+                    <p class="text-gray-600 mb-6">Mycelix replaces closed review panels with a community-driven model. Small donations from many scientists are quadratically matched by a larger fund, amplifying the collective intelligence of the community and funding a wider range of innovative ideas.</p>
+                    <div class="chart-container">
+                        <canvas id="fundingChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4">From Prestige to Verifiable Reputation</h3>
+                    <p class="text-gray-600 mb-6">Reputation is no longer based on institutional prestige. Instead, it's a dynamic, multi-dimensional score based on verifiable on-chain contributions, creating a true meritocracy.</p>
+                    <div class="chart-container">
+                        <canvas id="reputationChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4">From Static PDFs to "Living Papers"</h3>
+                    <p class="text-gray-600 mb-6">Scientific papers become living, executable objects. They contain the text, raw data, analysis code, and a cryptographic hash of the results, making science transparent and reproducible by default.</p>
+                    <div class="flex flex-col items-center space-y-2 p-4">
+                        <div class="text-center p-3 border-2 border-dashed border-[#0B3C5D] rounded-lg w-full">
+                            <h4 class="font-bold">📄 Living Paper</h4>
+                            <p class="text-sm">Text + Data + Code + Hash</p>
+                        </div>
+                        <div class="flow-arrow">▼</div>
+                        <div class="font-bold text-center p-3 bg-gray-100 rounded-lg w-full">One-Click Reproduction</div>
+                        <div class="flow-arrow">▼</div>
+                         <div class="text-center p-3 border-2 border-dashed border-[#328CC1] rounded-lg w-full">
+                            <h4 class="font-bold">🍴 Fork Paper</h4>
+                            <p class="text-sm">Apply new analysis or data</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4">From Paywalls to a Knowledge Commons</h3>
+                    <p class="text-gray-600 mb-6">The multi-billion dollar academic publishing industry is disintermediated. All research is published openly, and the value is returned to the scientists and the public who funded the work.</p>
+                     <div class="flex items-center justify-around p-4">
+                        <div class="text-center">
+                            <div class="text-5xl mb-2">🔒</div>
+                            <h4 class="font-bold text-red-600">Old Way</h4>
+                            <p>Publisher Paywalls</p>
+                        </div>
+                        <div class="text-4xl text-[#D9B310] font-bold">→</div>
+                        <div class="text-center">
+                            <div class="text-5xl mb-2">🌍</div>
+                            <h4 class="font-bold text-green-600">Mycelix Way</h4>
+                            <p>Knowledge Commons</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+        <section id="tech" class="mb-12 md:mb-20">
+            <h2 class="text-3xl md:text-4xl font-bold text-center text-[#0B3C5D] mb-8">Technology Powering the Revolution</h2>
+             <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4">Hybrid Architecture Benefits</h3>
+                     <p class="text-gray-600 mb-6">By combining a P2P layer for scalability with a Layer-2 blockchain for settlement, Mycelix achieves massive performance gains over traditional blockchains, enabling high-frequency scientific data and transactions.</p>
+                    <div class="chart-container">
+                        <canvas id="l2BenefitsChart"></canvas>
+                    </div>
+                </div>
+                 <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-xl font-bold text-[#1D2731] mb-4">Future-Proof Bridge Scalability</h3>
+                    <p class="text-gray-600 mb-6">The system is designed to evolve. The initial bridge architecture already enables significant throughput, with a clear upgrade path to a ZK-Bridge that offers a 100x improvement, ensuring long-term viability.</p>
+                    <div class="chart-container">
+                         <canvas id="bridgeScalabilityChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="text-center text-gray-500 text-sm mt-16">
+            <p>Mycelix: Building a transparent, verifiable, and hyper-collaborative future for science.</p>
+        </footer>
+
+    </main>
+
+    <script>
+        const tooltipTitleCallback = {
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const item = tooltipItems[0];
+                            let label = item.chart.data.labels[item.dataIndex];
+                            if (Array.isArray(label)) {
+                              return label.join(' ');
+                            } else {
+                              return label;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        const chartColors = {
+            darkBlue: '#0B3C5D',
+            mediumBlue: '#328CC1',
+            gold: '#D9B310',
+            charcoal: '#1D2731',
+            lightGray: '#F8F9FA'
+        };
+
+        const processLabel = (label) => {
+            const maxLength = 16;
+            if (label.length <= maxLength) {
+                return label;
+            }
+            const words = label.split(' ');
+            const lines = [];
+            let currentLine = '';
+            for (const word of words) {
+                if ((currentLine + ' ' + word).trim().length > maxLength) {
+                    lines.push(currentLine.trim());
+                    currentLine = word;
+                } else {
+                    currentLine = (currentLine + ' ' + word).trim();
+                }
+            }
+            if (currentLine) {
+                lines.push(currentLine.trim());
+            }
+            return lines;
+        };
+
+        new Chart(document.getElementById('reproducibilityChart1'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Failed to Reproduce', 'Succeeded'],
+                datasets: [{
+                    data: [70, 30],
+                    backgroundColor: [chartColors.mediumBlue, chartColors.lightGray],
+                    borderColor: '#ffffff',
+                    borderWidth: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: tooltipTitleCallback.plugins.tooltip
+                }
+            }
+        });
+
+        new Chart(document.getElementById('reproducibilityChart2'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Failed to Reproduce', 'Succeeded'],
+                datasets: [{
+                    data: [55, 45],
+                    backgroundColor: [chartColors.darkBlue, chartColors.lightGray],
+                    borderColor: '#ffffff',
+                    borderWidth: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: tooltipTitleCallback.plugins.tooltip
+                }
+            }
+        });
+
+        new Chart(document.getElementById('fundingChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Project A', 'Project B (High Community Support)', 'Project C'],
+                datasets: [{
+                    label: 'Community Donations',
+                    data: [10, 50, 15],
+                    backgroundColor: chartColors.mediumBlue,
+                }, {
+                    label: 'Quadratic Matching Funds',
+                    data: [40, 250, 60],
+                    backgroundColor: chartColors.gold,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true, title: { display: true, text: 'Total Funding' } }
+                },
+                ...tooltipTitleCallback
+            }
+        });
+
+        new Chart(document.getElementById('reputationChart'), {
+            type: 'radar',
+            data: {
+                labels: ['Reproducibility', 'Peer Review Score', 'Data Contribution', 'Publication VCs', 'Collaboration'],
+                datasets: [{
+                    label: 'Verifiable Reputation',
+                    data: [4.5, 4, 5, 3.5, 4.2],
+                    backgroundColor: 'rgba(50, 140, 193, 0.2)',
+                    borderColor: chartColors.mediumBlue,
+                    pointBackgroundColor: chartColors.mediumBlue,
+                    pointBorderColor: '#fff',
+                    pointHoverBackgroundColor: '#fff',
+                    pointHoverBorderColor: chartColors.mediumBlue
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    r: {
+                        angleLines: { color: 'rgba(0, 0, 0, 0.1)' },
+                        grid: { color: 'rgba(0, 0, 0, 0.1)' },
+                        pointLabels: { font: { size: 12 } },
+                        suggestedMin: 0,
+                        suggestedMax: 5
+                    }
+                },
+                ...tooltipTitleCallback
+            }
+        });
+
+        const l2BenefitLabels = ['Transaction Fees', 'Transaction Throughput'].map(processLabel);
+        new Chart(document.getElementById('l2BenefitsChart'), {
+            type: 'bar',
+            data: {
+                labels: l2BenefitLabels,
+                datasets: [
+                    {
+                        label: 'Layer-1 Baseline',
+                        data: [100, 1],
+                        backgroundColor: chartColors.lightGray,
+                        borderColor: chartColors.darkBlue,
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Mycelix L2',
+                        data: [1, 1000],
+                        backgroundColor: chartColors.mediumBlue
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        type: 'logarithmic',
+                        title: { display: true, text: 'Factor of Improvement (Log Scale)' }
+                    }
+                },
+                ...tooltipTitleCallback
+            }
+        });
+
+        new Chart(document.getElementById('bridgeScalabilityChart'), {
+            type: 'bar',
+            data: {
+                labels: ['Phase 1 (Verifiable)', 'Phase 2 (ZK-Bridge)'],
+                datasets: [{
+                    label: 'Transactions per Day',
+                    data: [1000, 100000],
+                    backgroundColor: [chartColors.darkBlue, chartColors.gold],
+                    barPercentage: 0.6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'logarithmic',
+                        title: { display: true, text: 'Swaps per Day (Log Scale)' }
+                    }
+                },
+                plugins: {
+                    legend: { display: false }
+                },
+                ...tooltipTitleCallback
+            }
+        });
+    </script>
+</body>
+</html>

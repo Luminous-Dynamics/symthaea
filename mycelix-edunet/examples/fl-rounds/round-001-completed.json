@@ -1,0 +1,46 @@
+{
+  "round_id": "fl-round-001-2025-11-15",
+  "model_id": "spanish-learning-model-v1",
+  "state": "COMPLETED",
+  "base_model_hash": "blake3:a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+  "min_participants": 10,
+  "max_participants": 100,
+  "current_participants": 37,
+  "aggregation_method": "trimmed_mean",
+  "aggregation_config": {
+    "trim_percent": 0.1,
+    "min_updates": 10
+  },
+  "clip_norm": 1.0,
+  "privacy_params": {
+    "epsilon": null,
+    "delta": null,
+    "clip_norm": 1.0
+  },
+  "started_at": 1731683400,
+  "discovery_deadline": 1731769800,
+  "round_deadline": 1731856200,
+  "completed_at": 1731855600,
+  "aggregated_model_hash": "blake3:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "provenance": {
+    "parent_hash": "blake3:a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+    "contributor_count": 37,
+    "aggregation_method": "trimmed_mean",
+    "update_quality_metrics": {
+      "median_val_loss": 0.42,
+      "mean_val_loss": 0.45,
+      "min_val_loss": 0.31,
+      "max_val_loss": 2.15
+    }
+  },
+  "metadata": {
+    "course_id": "spanish-beginner-2025",
+    "coordinator": "did:key:z6MkpTHR8VNsBxYAAWHut2Geadd9jSwuBV8xRoAnwWsdvktH",
+    "description": "Federated learning round for Spanish language model, focusing on vocabulary and grammar exercises",
+    "performance_improvement": {
+      "base_model_accuracy": 0.78,
+      "new_model_accuracy": 0.82,
+      "improvement": 0.04
+    }
+  }
+}

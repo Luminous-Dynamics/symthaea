@@ -1,0 +1,29 @@
+{
+  "name": "csv-adapter",
+  "version": "0.1.0",
+  "description": "CSV to Supply Chain Event adapter",
+  "main": "dist/ingest.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/ingest.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "mycelix",
+    "supply-chain",
+    "csv",
+    "adapter"
+  ],
+  "author": "Luminous Dynamics",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@types/node": "^20.10.5",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0"
+  },
+  "dependencies": {
+    "@mycelix/supplychain-sdk": "file:../../sdk",
+    "csv-parse": "^5.5.3",
+    "commander": "^11.1.0"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "ratios_tested": [
+    0.35,
+    0.36,
+    0.37,
+    0.38,
+    0.39,
+    0.4
+  ],
+  "results": [
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "robust_acc_aegis": 0.873,
+      "robust_acc_median": 0.847,
+      "robust_acc_delta_pp": 2.6000000000000023,
+      "clean_acc_aegis": 0.873,
+      "clean_acc_median": 0.847,
+      "auc": 0.7881574940857738,
+      "fpr_at_tpr90": 0.5995893223819302,
+      "convergence_round_aegis": 10,
+      "convergence_round_median": 8,
+      "status": "both_work",
+      "q_frac_mean": 0.192,
+      "dataset": "emnist"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "robust_acc_aegis": 0.007,
+      "robust_acc_median": 0.011,
+      "robust_acc_delta_pp": -0.3999999999999999,
+      "clean_acc_aegis": 0.007,
+      "clean_acc_median": 0.011,
+      "auc": 0.7666565349544073,
+      "fpr_at_tpr90": 0.6234042553191489,
+      "convergence_round_aegis": 10,
+      "convergence_round_median": 8,
+      "status": "both_fail",
+      "q_frac_mean": 0.1936,
+      "dataset": "emnist"
+    }
+  ],
+  "exact_limit": 0.35
+}

@@ -1,0 +1,69 @@
+---
+# Holochain Conductor Configuration for ZeroTrustML Phase 2.5
+#
+# This configures a local Holochain conductor for development and testing
+# of the pogq_zome_dilithium DHT-backed client registry.
+
+# Data directory for conductor state
+data_root_path: /tmp/holochain-zerotrustml
+
+# Keystore configuration
+keystore:
+  type: lair_server_in_proc
+  lair_root: /tmp/holochain-zerotrustml/keystore
+
+# Admin interface (for installing apps)
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 9000
+      allowed_origins: "*"
+
+# App interfaces (for zome calls from Python clients)
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      # Allow all apps to use this interface
+      allowed_origins: "*"
+
+# Network configuration (IPv4-only to avoid ENXIO error)
+network:
+  # Explicit IPv4 binding (fixes "No such device or address" error)
+  bind_to: "127.0.0.1:0"
+
+  # Kitsune2 bootstrap server for WAN discovery
+  bootstrap_url: "https://dev-test-bootstrap2.holochain.org/"
+
+  # Kitsune2 sbd server for webrtc signalling
+  signal_url: "wss://dev-test-bootstrap2.holochain.org/"
+
+  # Target arc factor (1 = normal operation, 0 = leacher, >1 = extra burden)
+  target_arc_factor: 1
+
+  # WebRTC config (null for default)
+  webrtc_config: ~
+
+# Signal encoding (for notifications)
+signal_encoding: json
+
+# Database configuration
+db_sync_strategy: Fast
+
+# Logging
+tracing:
+  type: file
+  file: /tmp/holochain-zerotrustml/conductor.log
+  level: info
+
+# DPKI configuration (disabled for local development)
+dpki:
+  dna_path: ~
+  network_seed: ""
+  allow_throwaway_random_dpki_agent_key: false
+  no_dpki: true
+
+# Passphrase service (for keystore encryption)
+passphrase_service:
+  type: cmd
+  cmd: "echo 'zerotrustml-dev-passphrase'"

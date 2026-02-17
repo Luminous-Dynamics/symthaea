@@ -1,0 +1,25 @@
+[package]
+name = "learning_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Learning coordinator zome - implements business logic for courses"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "learning_coordinator"
+
+[dependencies]
+# Holochain Development Kit (HDK) for zome functions
+hdk.workspace = true
+
+# Link to the integrity zome
+learning_integrity = { path = "../integrity" }
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true

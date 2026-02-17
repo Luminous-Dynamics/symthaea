@@ -1,0 +1,9 @@
+---
+manifest_version: "0"
+name: pogq_dna
+integrity:
+  zomes:
+    - name: pogq_zome
+      path: ../../zomes/pogq_zome.wasm
+coordinator:
+  zomes: []

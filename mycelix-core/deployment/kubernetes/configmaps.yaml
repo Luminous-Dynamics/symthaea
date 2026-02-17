@@ -1,0 +1,156 @@
+# Mycelix ConfigMaps
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: validator-config
+  namespace: mycelix-validators
+  labels:
+    app.kubernetes.io/name: validator
+    app.kubernetes.io/part-of: mycelix
+data:
+  region: "us-east-1"
+  network: "testnet"
+  consensus_algorithm: "rb-bft"
+  byzantine_threshold: "0.45"
+  min_validators: "5"
+  block_time_ms: "5000"
+  max_block_size_mb: "4"
+  p2p_port: "9000"
+  metrics_port: "9090"
+  health_port: "8080"
+  grpc_port: "50051"
+  log_level: "info"
+  log_format: "json"
+  enable_metrics: "true"
+  enable_tracing: "false"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fl-config
+  namespace: mycelix-fl
+  labels:
+    app.kubernetes.io/name: fl
+    app.kubernetes.io/part-of: mycelix
+data:
+  network: "testnet"
+  models_bucket: "mycelix-testnet-models"
+  round_duration_secs: "300"
+  min_participants: "3"
+  max_participants: "100"
+  aggregation_algorithm: "weighted_median"
+  byzantine_detection: "enabled"
+  dp_enabled: "true"
+  dp_epsilon: "1.0"
+  dp_delta: "0.00001"
+  zk_proof_mode: "fast"
+  trust_threshold: "0.5"
+  http_port: "8081"
+  metrics_port: "9091"
+  health_port: "8082"
+  log_level: "info"
+  log_format: "json"
+  enable_metrics: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: common-config
+  namespace: mycelix
+  labels:
+    app.kubernetes.io/part-of: mycelix
+data:
+  environment: "testnet"
+  network_id: "mycelix-testnet-1"
+  chain_id: "42161"
+  holochain_conductor_url: "ws://holochain-conductor:8888"
+  ethereum_rpc_url: "https://arbitrum-sepolia.infura.io/v3/${INFURA_PROJECT_ID}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: mycelix-monitoring
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/part-of: mycelix
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+                - alertmanager:9093
+
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'validators'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - mycelix-validators
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: (.+)
+            replacement: $1
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+      - job_name: 'fl-nodes'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - mycelix-fl
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: (.+)
+            replacement: $1
+          - source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+
+      - job_name: 'kubernetes-nodes'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            regex: ([^:]+)(?::\d+)?;(\d+)
+            replacement: $1:$2
+            target_label: __address__

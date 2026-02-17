@@ -1,0 +1,216 @@
+elapsed_hours: 8.875703706410196
+experiments:
+- alpha: 100.0
+  attack: adaptive
+  baseline: fedavg
+  description: "Set A: FEDAVG vs PoGQ (iid \u03B1=100.0, adaptive attack)"
+  experiment: fedavg_iid_adaptive
+  results:
+    fedavg:
+      test_accuracy: 0.99
+      test_loss: 0.026651841361984924
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - &id001 !!python/object/apply:numpy.dtype
+        args:
+        - f8
+        - false
+        - true
+        state: !!python/tuple
+        - 3
+        - <
+        - null
+        - null
+        - null
+        - -1
+        - -1
+        - 0
+      - !!binary |
+        i5S3Tbud7z8=
+    pogq:
+      test_accuracy: 0.9906
+      test_loss: 0.026013270279083615
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        c2T/3VmY7z8=
+  set: A
+  status: success
+- alpha: 1.0
+  attack: adaptive
+  baseline: fedavg
+  description: "Set A: FEDAVG vs PoGQ (moderate \u03B1=1.0, adaptive attack)"
+  experiment: fedavg_moderate_adaptive
+  results:
+    fedavg:
+      test_accuracy: 0.9893
+      test_loss: 0.03072651400919693
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        hV//rQmm7z8=
+    pogq:
+      test_accuracy: 0.9886
+      test_loss: 0.03015348955319821
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        g4WybQ+j7z8=
+  set: A
+  status: success
+- alpha: 0.1
+  attack: adaptive
+  baseline: fedavg
+  description: "Set A: FEDAVG vs PoGQ (extreme \u03B1=0.1, adaptive attack)"
+  experiment: fedavg_extreme_adaptive
+  results:
+    fedavg:
+      test_accuracy: 0.9821
+      test_loss: 0.05169596504775239
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        pv8mUjqu7z8=
+    pogq:
+      test_accuracy: 0.9796
+      test_loss: 0.06094380350729165
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        DUVXP7u97z8=
+  set: A
+  status: success
+- alpha: 100.0
+  attack: adaptive
+  baseline: fedprox
+  description: "Set A: FEDPROX vs PoGQ (iid \u03B1=100.0, adaptive attack)"
+  experiment: fedprox_iid_adaptive
+  results:
+    fedprox:
+      test_accuracy: 0.9898
+      test_loss: 0.0289712765700587
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        FmyHoMWX7z8=
+    pogq:
+      test_accuracy: 0.9897
+      test_loss: 0.029069136305849407
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        JpvZX2mc7z8=
+  set: A
+  status: success
+- alpha: 1.0
+  attack: adaptive
+  baseline: fedprox
+  description: "Set A: FEDPROX vs PoGQ (moderate \u03B1=1.0, adaptive attack)"
+  experiment: fedprox_moderate_adaptive
+  results:
+    fedprox:
+      test_accuracy: 0.9899
+      test_loss: 0.02917628676356999
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        5SDz3jqn7z8=
+    pogq:
+      test_accuracy: 0.9893
+      test_loss: 0.030264462609816276
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        3Q3gLNej7z8=
+  set: A
+  status: success
+- alpha: 0.1
+  attack: adaptive
+  baseline: fedprox
+  description: "Set A: FEDPROX vs PoGQ (extreme \u03B1=0.1, adaptive attack)"
+  experiment: fedprox_extreme_adaptive
+  results:
+    fedprox:
+      test_accuracy: 0.9803
+      test_loss: 0.05808896165757333
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        ctJvBRGw7z8=
+    pogq:
+      test_accuracy: 0.9799
+      test_loss: 0.05892159532552537
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        xStBFx667z8=
+  set: A
+  status: success
+- alpha: 100.0
+  attack: adaptive
+  baseline: scaffold
+  description: "Set A: SCAFFOLD vs PoGQ (iid \u03B1=100.0, adaptive attack)"
+  experiment: scaffold_iid_adaptive
+  results:
+    pogq:
+      test_accuracy: 0.9898
+      test_loss: 0.028457414047173654
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        nr6VLt2a7z8=
+    scaffold:
+      test_accuracy: 0.9902
+      test_loss: 0.02818152804994692
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        nQgzKnyR7z8=
+  set: A
+  status: success
+- alpha: 1.0
+  attack: adaptive
+  baseline: scaffold
+  description: "Set A: SCAFFOLD vs PoGQ (moderate \u03B1=1.0, adaptive attack)"
+  experiment: scaffold_moderate_adaptive
+  results:
+    pogq:
+      test_accuracy: 0.9887
+      test_loss: 0.03028850404617448
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        siCOr8+n7z8=
+    scaffold:
+      test_accuracy: 0.9902
+      test_loss: 0.02914437850964073
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        Gr1xNjWW7z8=
+  set: A
+  status: success
+- alpha: 0.1
+  attack: adaptive
+  baseline: scaffold
+  description: "Set A: SCAFFOLD vs PoGQ (extreme \u03B1=0.1, adaptive attack)"
+  experiment: scaffold_extreme_adaptive
+  results:
+    pogq:
+      test_accuracy: 0.9796
+      test_loss: 0.06183088276559076
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        4yNCZjKx7z8=
+    scaffold:
+      test_accuracy: 0.9875
+      test_loss: 0.03927142626890272
+      train_accuracy: !!python/object/apply:numpy._core.multiarray.scalar
+      - *id001
+      - !!binary |
+        Urbt38607z8=
+  set: A
+  status: success
+stage: stage1_comprehensive
+timestamp: '2025-10-07T18:10:22.227516'
+total_experiments: 9

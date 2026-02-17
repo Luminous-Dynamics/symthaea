@@ -1,0 +1,121 @@
+# Alertmanager Silence Rules for Mycelix FL
+# These are example silence configurations that can be applied via the API
+#
+# To apply a silence:
+# curl -X POST http://alertmanager:9093/api/v2/silences -H "Content-Type: application/json" -d @silence.json
+
+# =============================================================================
+# Maintenance Window Silences
+# =============================================================================
+
+# Example: Silence all alerts during scheduled maintenance
+maintenance_window:
+  comment: "Scheduled maintenance window"
+  createdBy: "ops-automation"
+  startsAt: "2026-01-15T02:00:00Z"
+  endsAt: "2026-01-15T06:00:00Z"
+  matchers:
+    - name: cluster
+      value: mycelix-production
+      isRegex: false
+      isEqual: true
+
+# Example: Silence specific node during upgrade
+node_upgrade:
+  comment: "Node upgrade in progress"
+  createdBy: "ops-team"
+  startsAt: "2026-01-10T10:00:00Z"
+  endsAt: "2026-01-10T12:00:00Z"
+  matchers:
+    - name: instance
+      value: "fl-node-05"
+      isRegex: false
+      isEqual: true
+
+# =============================================================================
+# Known Issue Silences
+# =============================================================================
+
+# Example: Silence known flaky alert while investigating
+known_issue_investigation:
+  comment: "Investigating flaky alert - JIRA-1234"
+  createdBy: "engineer@mycelix.io"
+  startsAt: "2026-01-08T00:00:00Z"
+  endsAt: "2026-01-15T00:00:00Z"
+  matchers:
+    - name: alertname
+      value: "NetworkLatencyHigh"
+      isRegex: false
+      isEqual: true
+    - name: instance
+      value: "edge-.*"
+      isRegex: true
+      isEqual: true
+
+# =============================================================================
+# Deployment Silences
+# =============================================================================
+
+# Example: Silence during blue-green deployment
+deployment_silence:
+  comment: "Blue-green deployment in progress"
+  createdBy: "deploy-automation"
+  matchers:
+    - name: severity
+      value: "warning"
+      isRegex: false
+      isEqual: true
+    - name: category
+      value: "availability"
+      isRegex: false
+      isEqual: true
+
+# =============================================================================
+# Silence Templates (apply via script)
+# =============================================================================
+
+# Quick silence template for on-call use
+oncall_silence_template:
+  comment: "On-call silence: <TICKET_ID> - <REASON>"
+  createdBy: "<ONCALL_EMAIL>"
+  duration: "4h"  # Default 4 hours
+  matchers:
+    - name: alertname
+      value: "<ALERT_NAME>"
+      isRegex: false
+      isEqual: true
+
+# =============================================================================
+# Scripts for Managing Silences
+# =============================================================================
+
+# Create a silence (save as create-silence.sh):
+# #!/bin/bash
+# ALERTMANAGER_URL="http://alertmanager:9093"
+# ALERT_NAME="$1"
+# DURATION="${2:-4h}"
+# REASON="${3:-On-call silence}"
+#
+# END_TIME=$(date -d "+${DURATION}" --iso-8601=seconds)
+# START_TIME=$(date --iso-8601=seconds)
+#
+# curl -X POST "${ALERTMANAGER_URL}/api/v2/silences" \
+#   -H "Content-Type: application/json" \
+#   -d "{
+#     \"matchers\": [{
+#       \"name\": \"alertname\",
+#       \"value\": \"${ALERT_NAME}\",
+#       \"isRegex\": false,
+#       \"isEqual\": true
+#     }],
+#     \"startsAt\": \"${START_TIME}\",
+#     \"endsAt\": \"${END_TIME}\",
+#     \"createdBy\": \"oncall\",
+#     \"comment\": \"${REASON}\"
+#   }"
+
+# List active silences:
+# curl -s http://alertmanager:9093/api/v2/silences | jq '.[] | select(.status.state == "active")'
+
+# Delete a silence:
+# curl -X DELETE http://alertmanager:9093/api/v2/silence/<SILENCE_ID>

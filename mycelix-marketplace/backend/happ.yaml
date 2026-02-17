@@ -1,0 +1,35 @@
+---
+# Mycelix Marketplace hApp Bundle
+# Decentralized P2P commerce with 45% Byzantine fault tolerance
+
+manifest_version: "0"
+name: mycelix_marketplace
+description: |
+  Decentralized P2P marketplace with 45% Byzantine fault tolerance
+  via MATL (Mycelix Adaptive Trust Layer). Features trust-gated listings,
+  escrow transactions, and MRC arbitration.
+
+roles:
+  # Main Marketplace DNA
+  - name: marketplace
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./mycelix_marketplace.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  # Identity DNA - Optional dependency for DID resolution and credential verification
+  - name: identity
+    provisioning:
+      strategy: create
+      deferred: true
+    dna:
+      path: ../../mycelix-identity/dna/mycelix_identity_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

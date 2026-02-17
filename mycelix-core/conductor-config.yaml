@@ -1,0 +1,57 @@
+---
+# Mycelix Conductor Configuration
+# ================================
+#
+# IMPORTANT: This file uses hierarchical bootstrap for resilience.
+# The single bootstrap_url below is the PRIMARY server, but fallback
+# servers are configured in: libs/bootstrap/bootstrap_config.yaml
+#
+# When using the Mycelix Python client, bootstrap failures automatically
+# fall back to secondary servers and local peer cache.
+#
+# See: docs/BOOTSTRAP_OPERATOR_GUIDE.md for running your own bootstrap node.
+
+environment_path: .hc
+use_dangerous_test_keystore: true
+
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 39329
+      allowed_origins: "*"
+
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 9998
+      allowed_origins: "*"
+
+network:
+  transport_pool:
+    - type: webrtc
+      signal_url: wss://signal.holo.host
+
+  default_network_type: quic_bootstrap
+
+  # Primary bootstrap URL
+  # Fallback servers are defined in libs/bootstrap/bootstrap_config.yaml:
+  #   - https://bootstrap.mycelix.net (primary)
+  #   - https://bootstrap-staging.holo.host (primary)
+  #   - https://bootstrap-community1.mycelix.net (secondary)
+  #   - Local peer cache: ~/.mycelix/peer_cache.json (fallback)
+  bootstrap_url: https://bootstrap.mycelix.net
+
+  tuning_params:
+    gossip_loop_iteration_delay_ms: 1000
+    default_notify_remote_agent_count: 5
+    default_notify_timeout_ms: 10000
+    default_rpc_single_timeout_ms: 10000
+    default_rpc_multi_remote_agent_count: 5
+    default_rpc_multi_timeout_ms: 10000
+    agent_info_expires_after_ms: 1200000
+    tls_in_mem_session_storage: 512
+    proxy_keepalive_ms: 120000
+    proxy_to_expire_ms: 300000
+
+dpki:
+  no_dpki: true

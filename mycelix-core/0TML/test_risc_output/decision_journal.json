@@ -1,0 +1,16 @@
+{
+  "mode": "RISC0_RECEIPT",
+  "current_round": 3,
+  "ema_t_fp": 49278,
+  "consec_viol_t": 2,
+  "consec_clear_t": 0,
+  "quarantine_out": 1,
+  "prov_hash": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "profile_id": 0,
+  "air_rev": 1
+}

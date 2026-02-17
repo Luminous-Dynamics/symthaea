@@ -1,0 +1,41 @@
+[
+  {
+    "seed": 42,
+    "bft_ratio": 0.2,
+    "tp": 0,
+    "fp": 1,
+    "tn": 7,
+    "fn": 2,
+    "tpr": 0.0,
+    "fpr": 0.125,
+    "threshold": 0.5,
+    "detector": "meta",
+    "meta_summary": {
+      "threshold": 0.0,
+      "accept": 9,
+      "reject": 1,
+      "abstain": 0,
+      "reason_dirsim": 0,
+      "reason_outlier": 0,
+      "reason_density": 1,
+      "reason_utility": 0,
+      "reason_conflict": 0
+    },
+    "method": "meta",
+    "meta": {
+      "tpr": 0.0,
+      "fpr": 0.125,
+      "summary": {
+        "threshold": 0.0,
+        "accept": 9,
+        "reject": 1,
+        "abstain": 0,
+        "reason_dirsim": 0,
+        "reason_outlier": 0,
+        "reason_density": 1,
+        "reason_utility": 0,
+        "reason_conflict": 0
+      }
+    }
+  }
+]

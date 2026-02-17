@@ -1,0 +1,89 @@
+{
+  "timestamp": "2025-09-26 11:27:59",
+  "configuration": {
+    "num_workers": 5,
+    "gradient_dimension": 100,
+    "detection_threshold": 2.0
+  },
+  "overall_stats": {
+    "total_tests": 5,
+    "successful_detections": 0,
+    "detection_rate": 0.0
+  },
+  "detailed_results": [
+    {
+      "attack_type": "gradient_inversion",
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "time_to_detect": 0.0008587837219238281,
+      "accuracy_impact": 0.3,
+      "attack_successful": true,
+      "details": {
+        "inversion_success": true,
+        "detected": false
+      }
+    },
+    {
+      "attack_type": "backdoor_poisoning",
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "time_to_detect": 0.0007853507995605469,
+      "accuracy_impact": 0.5,
+      "attack_successful": true,
+      "details": {
+        "detected": false,
+        "attack_type": "unknown"
+      }
+    },
+    {
+      "attack_type": "adaptive_attack",
+      "detection_rate": 0.3,
+      "false_positive_rate": 0.0,
+      "time_to_detect": 0.01,
+      "accuracy_impact": 0.4,
+      "attack_successful": true,
+      "details": {
+        "round_detections": [
+          true,
+          false,
+          false,
+          false,
+          true,
+          false,
+          true,
+          false,
+          false,
+          false
+        ]
+      }
+    },
+    {
+      "attack_type": "coordinated_attack",
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "time_to_detect": 0.0008561611175537109,
+      "accuracy_impact": 0.6,
+      "attack_successful": true,
+      "details": {
+        "byzantine_nodes": [
+          3,
+          4
+        ],
+        "detected_nodes": [],
+        "attack_type": "unknown"
+      }
+    },
+    {
+      "attack_type": "delayed_attack",
+      "detection_rate": 0.0,
+      "false_positive_rate": 0.0,
+      "time_to_detect": 0.01,
+      "accuracy_impact": 0.3,
+      "attack_successful": true,
+      "details": {
+        "false_positives_before": 0,
+        "true_positives_after": 0
+      }
+    }
+  ]
+}

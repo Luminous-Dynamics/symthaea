@@ -1,0 +1,13 @@
+[package]
+name = "vsv-stark-python"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "vsv_stark"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.20", features = ["extension-module"] }
+vsv-stark-air = { path = "../air" }
+serde_json = "1.0"

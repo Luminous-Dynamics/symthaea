@@ -1,0 +1,56 @@
+---
+# Mycelix Desktop - Holochain Conductor Configuration
+# Updated for Holochain 0.5.6 format
+
+# Tracing and logging
+tracing_override: null
+
+# Data directory
+data_root_path: .holochain
+
+# Device seed (optional, for development)
+device_seed_lair_tag: null
+danger_generate_throwaway_device_seed: false
+
+# Keystore configuration
+keystore:
+  type: lair_server_in_proc
+  lair_root: .holochain/ks
+
+# DPKI configuration
+dpki:
+  dna_path: null
+  network_seed: ''
+  allow_throwaway_random_dpki_agent_key: false
+  no_dpki: true
+
+# Admin interfaces
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      allowed_origins: '*'
+
+# App interfaces (for zome calls)
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 8889
+      allowed_origins: '*'
+
+# Network configuration
+network:
+  bootstrap_url: https://dev-test-bootstrap2.holochain.org/
+  signal_url: wss://dev-test-bootstrap2.holochain.org/
+  webrtc_config: null
+  target_arc_factor: 1
+  advanced: null
+
+# Database sync strategy
+db_sync_strategy: Fast
+
+# Tuning params (optional)
+tuning_params: null
+
+# Tracing scope
+tracing_scope: null

@@ -1,0 +1,99 @@
+# Mini-Validation Suite: Quick PoGQ Smoke Test
+#
+# Purpose: Validate PoGQ beats Multi-Krum BEFORE committing to 100+ GPU hours
+#
+# Strategy: Test 5 critical scenarios that cover:
+# 1. Hardest single attack (adaptive)
+# 2. Hardest coordinated attack (sybil)
+# 3. Control scenario (IID data)
+# 4. Moderate difficulty (moderate non-IID)
+# 5. Best case (no attack baseline)
+#
+# Decision Gate:
+# - ✅ PoGQ wins clearly (>3% improvement) → Run full Stage 1
+# - ⚠️ Marginal (1-2% improvement) → Debug and tune
+# - ❌ PoGQ loses → Stop and analyze why
+#
+# Total: 5 experiments × 10 rounds × ~30 min = ~2.5 GPU hours
+
+experiment_name: "mini_validation_pogq_vs_multikrum"
+description: "Quick validation: Does PoGQ beat Multi-Krum on hardest cases?"
+
+# This config will be used as base, then modified for each experiment
+# See run_mini_validation.py for experiment-specific overrides
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+# Default: Extreme non-IID (will be overridden for some experiments)
+data_split:
+  type: "dirichlet"
+  alpha: 0.1  # Extreme heterogeneity
+  num_clients: 10
+  seed: 42
+
+# Quick validation: 10 rounds only
+training:
+  num_rounds: 10  # Fast validation (vs 50 for full experiments)
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 10
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 3  # 30% Byzantine (will be 0 for no-attack baseline)
+
+  # PoGQ parameters
+  quality_threshold: 0.3
+  reputation_decay: 0.95
+
+byzantine:
+  num_byzantine: 3  # 30% Byzantine
+  attack_types: ["adaptive"]  # Will be overridden per experiment
+  severity: 1.0
+  enable_peer_context: true
+
+# Only test Multi-Krum vs PoGQ (best baseline vs ours)
+baselines:
+  - name: "multikrum"
+    params:
+      num_byzantine: 3
+      k: 7
+
+  - name: "pogq"
+    params:
+      quality_threshold: 0.3
+      reputation_decay: 0.95
+
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+
+device: "cuda"
+
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - num_accepted
+    - avg_quality_score
+  per_round: true
+  final_model: false  # Don't save models for mini-validation
+  attack_analysis: true
+
+# Experiment scenarios (defined in runner):
+# 1. Extreme non-IID (α=0.1) + Adaptive attack
+# 2. Extreme non-IID (α=0.1) + Sybil attack
+# 3. IID (α=100) + Adaptive attack
+# 4. Moderate non-IID (α=1.0) + Gaussian noise
+# 5. Extreme non-IID (α=0.1) + No attack (baseline)

@@ -1,0 +1,13 @@
+[package]
+name = "mycelix_common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+hdk = { workspace = true }
+hdi = { workspace = true }
+serde = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+
+[lib]
+crate-type = ["lib"]

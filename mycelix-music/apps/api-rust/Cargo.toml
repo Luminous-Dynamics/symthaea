@@ -1,0 +1,57 @@
+[package]
+name = "mycelix-music-api"
+version = "0.1.0"
+edition = "2021"
+authors = ["Tristan Stoltz <tristan.stoltz@luminousdynamics.com>"]
+description = "Rust API for Mycelix Music - Decentralized Music Platform"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/Mycelix-Music"
+
+[dependencies]
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tokio = { version = "1", features = ["full"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-gzip"] }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Database
+sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono"] }
+
+# Caching
+redis = { version = "0.24", features = ["tokio-comp"] }
+
+# Blockchain/Web3
+ethers = { version = "2", features = ["rustls"] }
+alloy-primitives = "0.6"
+
+# IPFS
+ipfs-api-backend-hyper = "0.6"
+
+# Crypto
+ed25519-dalek = "2"
+sha2 = "0.10"
+hex = "0.4"
+
+# Utilities
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dotenvy = "0.15"
+
+# Mycelix Core integration (shared crates)
+# zerotrustml = { path = "../../../mycelix-core/0TML" }
+
+[dev-dependencies]
+tokio-test = "0.4"
+httptest = "0.15"
+
+[[bin]]
+name = "mycelix-music-api"
+path = "src/main.rs"

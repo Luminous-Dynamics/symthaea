@@ -1,0 +1,17 @@
+
+\begin{table}[t]
+\centering
+\caption{VSV-STARK Performance: REAL Integrated Measurements}
+\label{tab:vsv_stark_performance}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Method} & \textbf{Prove} & \textbf{Verify} & \textbf{Size} & \textbf{ZK+Byz} \\
+\midrule
+VSV-STARK & 46.6s & 92ms & 221KB & Yes \\
+ECDSA & 0.5ms & 1.0ms & 64B & No \\
+RSA-2048 & 2.0ms & 0.1ms & 256B & No \\
+\bottomrule
+\end{tabular}
+\\[0.5em]
+\footnotesize VSV-STARK: Real RISC Zero measurements with PoGQ Byzantine detection
+\end{table}

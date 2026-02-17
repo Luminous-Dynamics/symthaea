@@ -1,0 +1,45 @@
+# Non-IID Robustness Study: α=0.1 (Extreme Heterogeneity)
+# ========================================================
+# Test PoGQ v4.1 conformal prediction under extreme label skew
+# α=0.1 → clients have very different label distributions
+# Hypothesis: Mondrian conformal should maintain FPR ≤ α despite heterogeneity
+
+experiment:
+  name: robustness_alpha_0_1
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.1  # ⚡ EXTREME heterogeneity
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: 0.10
+  mondrian_enabled: true
+  mondrian_profiles: ["label", "norm", "direction"]
+  adaptive_hybrid: true
+  ema_beta: 0.85
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02
+
+# Expected behavior:
+# - Per-bucket FPR should remain ≤ 0.12 (α + 2% margin)
+# - Adaptive hybrid should switch to global more often (small buckets)
+# - Mondrian should handle extreme skew gracefully

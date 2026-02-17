@@ -1,0 +1,39 @@
+# Ablation Study: PoGQ v4.1 WITHOUT PCA
+# =======================================
+# Test impact of removing PCA dimensionality reduction
+# Baseline: v4.1 uses top-10 PCA components (90% variance)
+# Ablation: Use raw gradient space instead
+
+experiment:
+  name: ablation_no_pca
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1_no_pca   # Disable PCA, use raw gradients
+
+pogq_config:
+  pca_enabled: false          # ❌ DISABLED
+  pca_components: 0           # No dimensionality reduction
+  conformal_alpha: 0.10
+  mondrian_enabled: true
+  adaptive_hybrid: true
+  ema_beta: 0.85
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02

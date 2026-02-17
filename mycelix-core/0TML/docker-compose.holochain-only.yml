@@ -1,0 +1,150 @@
+version: '3.8'
+
+# Simplified Holochain-only setup for hybrid demo
+# 3 independent Holochain conductors forming a P2P network
+
+services:
+  # ================================================
+  # Holochain Conductor - Node 1 (Hospital A - Boston)
+  # ================================================
+
+  holochain-node1:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-node1-boston
+    hostname: node1-boston
+    ports:
+      - "8881:8888"  # Admin WebSocket
+      - "8891:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_node1_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-boston
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-p2p:
+        aliases:
+          - hospital-boston
+
+  # ================================================
+  # Holochain Conductor - Node 2 (Hospital B - London)
+  # ================================================
+
+  holochain-node2:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-node2-london
+    hostname: node2-london
+    ports:
+      - "8882:8888"  # Admin WebSocket
+      - "8892:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_node2_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-london
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-p2p:
+        aliases:
+          - hospital-london
+
+  # ================================================
+  # Holochain Conductor - Node 3 (Hospital C - Tokyo)
+  # ================================================
+
+  holochain-node3:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-node3-tokyo
+    hostname: node3-tokyo
+    ports:
+      - "8883:8888"  # Admin WebSocket
+      - "8893:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_node3_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-tokyo
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-p2p:
+        aliases:
+          - hospital-tokyo
+
+  # ================================================
+  # Malicious Node (Byzantine Actor)
+  # ================================================
+
+  holochain-malicious:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-malicious
+    hostname: malicious-node
+    ports:
+      - "8884:8888"  # Admin WebSocket
+      - "8894:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_malicious_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=malicious-node
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-p2p:
+        aliases:
+          - malicious-node
+
+volumes:
+  holochain_node1_data:
+    driver: local
+  holochain_node2_data:
+    driver: local
+  holochain_node3_data:
+    driver: local
+  holochain_malicious_data:
+    driver: local
+
+networks:
+  zerotrustml-p2p:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

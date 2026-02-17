@@ -1,0 +1,367 @@
+{
+  "config": {
+    "baselines": [
+      {
+        "name": "multikrum",
+        "params": {
+          "k": 7,
+          "num_byzantine": 3
+        }
+      },
+      {
+        "name": "pogq",
+        "params": {
+          "quality_threshold": 0.3,
+          "reputation_decay": 0.95
+        }
+      }
+    ],
+    "byzantine": {
+      "attack_types": [],
+      "enable_peer_context": true,
+      "num_byzantine": 0,
+      "severity": 1.0
+    },
+    "data_split": {
+      "alpha": 0.1,
+      "num_clients": 10,
+      "seed": 42,
+      "type": "dirichlet"
+    },
+    "dataset": {
+      "name": "mnist",
+      "num_test": 10000,
+      "num_train": 60000
+    },
+    "description": "Quick validation: Does PoGQ beat Multi-Krum on hardest cases?",
+    "device": "cuda",
+    "experiment_name": "mini_validation_extreme_noattack",
+    "federated": {
+      "batch_size": 32,
+      "fraction_clients": 1.0,
+      "learning_rate": 0.01,
+      "local_epochs": 1,
+      "num_byzantine": 0,
+      "num_clients": 10,
+      "num_rounds": 10,
+      "quality_threshold": 0.3,
+      "reputation_decay": 0.95
+    },
+    "mini_validation": {
+      "alpha": 0.1,
+      "attack": null,
+      "description": "Extreme non-IID + No attack (baseline)",
+      "scenario": "extreme_noattack"
+    },
+    "model": {
+      "params": {
+        "num_classes": 10
+      },
+      "type": "simple_cnn"
+    },
+    "save": {
+      "attack_analysis": true,
+      "final_model": false,
+      "metrics": [
+        "train_loss",
+        "train_accuracy",
+        "test_loss",
+        "test_accuracy",
+        "num_accepted",
+        "avg_quality_score"
+      ],
+      "per_round": true
+    },
+    "training": {
+      "batch_size": 32,
+      "learning_rate": 0.01,
+      "local_epochs": 1,
+      "num_rounds": 10
+    }
+  },
+  "baselines": {
+    "multikrum": {
+      "rounds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "train_loss": [
+        1.1398446582544273,
+        0.8588977850129951,
+        0.7337266735397062,
+        0.6386222036651602,
+        0.5351096819149208,
+        0.49619734869706617,
+        0.4054356029082536,
+        0.35624346232931875,
+        0.3293607465430686,
+        0.276471117670038
+      ],
+      "train_accuracy": [
+        0.6775195038003067,
+        0.7149127950254414,
+        0.7530960117329693,
+        0.7757380166865031,
+        0.831232789575591,
+        0.8423247139973362,
+        0.8778779970935651,
+        0.8935785552647335,
+        0.8944151242027031,
+        0.9188894566883583
+      ],
+      "test_loss": [
+        2.363400930794664,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        1.7811465091979541
+      ],
+      "test_accuracy": [
+        0.1864,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.537
+      ]
+    },
+    "pogq": {
+      "rounds": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "train_loss": [
+        0.822029245719303,
+        0.4275896586058499,
+        0.28567291460560545,
+        0.1919519541400084,
+        0.15828523907859882,
+        0.13676924341870406,
+        0.11844034926210814,
+        0.10751861867700749,
+        0.09701934298783696,
+        0.09451185350970656
+      ],
+      "train_accuracy": [
+        0.762540122466657,
+        0.8716767416676952,
+        0.9150449391067503,
+        0.9440678276961828,
+        0.9512673251400144,
+        0.9586048499253682,
+        0.9640169072825072,
+        0.9681969403470904,
+        0.9704906260555644,
+        0.97017067982591
+      ],
+      "test_loss": [
+        1.7565578858311566,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.20864440734608294
+      ],
+      "test_accuracy": [
+        0.5051,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        0.9366
+      ]
+    }
+  },
+  "metadata": {
+    "start_time": "2025-10-07T01:36:14.392485",
+    "device": "cuda",
+    "end_time": "2025-10-07T01:46:43.400516"
+  },
+  "split_stats": {
+    "num_clients": 10,
+    "samples_per_client": [
+      9216,
+      408,
+      5870,
+      529,
+      13678,
+      4402,
+      4983,
+      12043,
+      301,
+      8570
+    ],
+    "total_samples": 60000,
+    "min_samples": 301,
+    "max_samples": 13678,
+    "mean_samples": 6000.0,
+    "class_distribution": [
+      [
+        0,
+        0,
+        1114,
+        0,
+        3663,
+        87,
+        18,
+        344,
+        3985,
+        5
+      ],
+      [
+        0,
+        0,
+        8,
+        27,
+        0,
+        0,
+        60,
+        294,
+        3,
+        16
+      ],
+      [
+        6,
+        379,
+        250,
+        1705,
+        0,
+        0,
+        11,
+        3,
+        0,
+        3516
+      ],
+      [
+        1,
+        0,
+        0,
+        15,
+        151,
+        45,
+        0,
+        243,
+        0,
+        74
+      ],
+      [
+        138,
+        3208,
+        929,
+        0,
+        897,
+        0,
+        4805,
+        3193,
+        0,
+        508
+      ],
+      [
+        2,
+        56,
+        0,
+        4314,
+        0,
+        2,
+        24,
+        0,
+        0,
+        4
+      ],
+      [
+        7,
+        13,
+        0,
+        6,
+        0,
+        3130,
+        2,
+        20,
+        0,
+        1805
+      ],
+      [
+        3187,
+        3083,
+        0,
+        1,
+        1082,
+        1934,
+        893,
+        0,
+        1862,
+        1
+      ],
+      [
+        113,
+        0,
+        3,
+        63,
+        1,
+        0,
+        105,
+        0,
+        0,
+        16
+      ],
+      [
+        2469,
+        3,
+        3654,
+        0,
+        48,
+        223,
+        0,
+        2168,
+        1,
+        4
+      ]
+    ],
+    "class_imbalance": [
+      1.6156818258107803,
+      2.1147799672497407,
+      1.868499006495348,
+      1.48357550533515,
+      1.1970990353594122,
+      2.9336165565101373,
+      2.063474331638175,
+      0.9941450224114888,
+      1.446953510916738,
+      1.5149196942887404
+    ],
+    "mean_class_imbalance": 1.723274445601571
+  }
+}

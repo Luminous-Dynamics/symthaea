@@ -1,0 +1,56 @@
+# FINAL Working Configuration - Three Datasets Properly Configured
+# 3 datasets × 4 attacks × 4 defenses × 2 seeds = 96 experiments (~20-24 hours)
+
+experiment:
+  name: final_3datasets
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    # Dataset 1: MNIST (10 classes, grayscale)
+    - name: mnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+      model_type: simple_cnn
+      num_classes: 10
+
+    # Dataset 2: EMNIST (62 classes, grayscale) - This is FEMNIST!
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+      model_type: simple_cnn
+      num_classes: 62
+
+    # Dataset 3: CIFAR-10 (10 classes, RGB)
+    - name: cifar10
+      non_iid: true
+      dirichlet_alpha: 0.3
+      model_type: resnet9
+      num_classes: 10
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip        # Core attack type
+    - scaling_x100     # Magnitude-based
+    - collusion        # Coordination
+    - sleeper_agent    # Adaptive
+
+defenses:
+  - fedavg           # Baseline
+  - fltrust          # Best comparison
+  - boba             # Strong baseline
+  - pogq_v4_1        # Our method
+
+training:
+  num_rounds: 100
+  eval_every: 10
+
+statistics:
+  alpha: 0.10
+  margin: 0.02
+  mondrian_profiles: ["label"]
+
+output:
+  base_dir: results
+  save_artifacts: true

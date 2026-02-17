@@ -1,0 +1,171 @@
+# Prometheus Configuration for Mycelix Music Platform
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'mycelix-production'
+    env: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Rule files
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # API Gateway
+  - job_name: 'api-gateway'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['mycelix']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: api-gateway
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+
+  # Streaming Service
+  - job_name: 'streaming-service'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['mycelix']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: streaming-service
+        action: keep
+
+  # Discovery Engine
+  - job_name: 'discovery-engine'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['mycelix']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: discovery-engine
+        action: keep
+
+  # AI Audio Service
+  - job_name: 'ai-audio'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['mycelix']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: ai-audio
+        action: keep
+
+  # Live Performance Service
+  - job_name: 'live-performance'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['mycelix']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: live-performance
+        action: keep
+
+  # Social Service
+  - job_name: 'social-service'
+    kubernetes_sd_configs:
+      - role: endpoints
+        namespaces:
+          names: ['mycelix']
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_service_name]
+        regex: social-service
+        action: keep
+
+  # PostgreSQL
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    metrics_path: /metrics
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # Elasticsearch
+  - job_name: 'elasticsearch'
+    static_configs:
+      - targets: ['elasticsearch-exporter:9114']
+
+  # ClickHouse
+  - job_name: 'clickhouse'
+    static_configs:
+      - targets: ['clickhouse:9116']
+
+  # RabbitMQ
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+
+  # IPFS
+  - job_name: 'ipfs'
+    static_configs:
+      - targets: ['ipfs:5001']
+    metrics_path: /debug/metrics/prometheus
+
+  # Kubernetes nodes
+  - job_name: 'kubernetes-nodes'
+    kubernetes_sd_configs:
+      - role: node
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+
+  # Kubernetes pods
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+        action: replace
+        target_label: __metrics_path__
+        regex: (.+)
+      - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+        action: replace
+        regex: ([^:]+)(?::\d+)?;(\d+)
+        replacement: $1:$2
+        target_label: __address__
+
+  # cAdvisor (container metrics)
+  - job_name: 'cadvisor'
+    kubernetes_sd_configs:
+      - role: node
+    scheme: https
+    tls_config:
+      ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+    relabel_configs:
+      - action: labelmap
+        regex: __meta_kubernetes_node_label_(.+)
+      - target_label: __address__
+        replacement: kubernetes.default.svc:443
+      - source_labels: [__meta_kubernetes_node_name]
+        regex: (.+)
+        target_label: __metrics_path__
+        replacement: /api/v1/nodes/${1}/proxy/metrics/cadvisor

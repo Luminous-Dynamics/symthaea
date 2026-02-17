@@ -1,0 +1,52 @@
+================================================================================
+MYCELIX FEDERATED LEARNING - 100-ROUND VALIDATION REPORT
+================================================================================
+Timestamp: 2026-01-08T11:52:35.955892
+
+EXECUTIVE SUMMARY
+----------------------------------------
+Total Rounds: 20
+Successful: 20 (100.0%)
+Failed: 0
+All Targets Met: YES
+
+BYZANTINE DETECTION METRICS
+----------------------------------------
+Total Byzantine Appearances: 60
+Total Detections: 60
+Overall Detection Rate: 100.00%
+Target (100%): MET
+False Positives: 0 (0.00%)
+False Negatives: 0 (0.00%)
+
+PERFORMANCE METRICS
+----------------------------------------
+Avg Detection Latency: 7.0668ms
+Max Detection Latency: 18.9704ms
+P99 Detection Latency: 17.7046ms
+Sub-millisecond Target (<1ms): MET
+Avg Round Time: 1106.51ms
+
+MEMORY METRICS
+----------------------------------------
+Initial Memory: 0.00MB
+Final Memory: 0.00MB
+Peak Memory: 9.59MB
+Memory Growth: 0.00MB
+Memory Target (<100.0MB): MET
+
+MODEL CONVERGENCE
+----------------------------------------
+Initial Loss: 2.3164
+Final Loss: 1.6676
+Loss Reduction: 28.0%
+Convergence: YES
+
+DETAILED ROUND STATISTICS
+----------------------------------------
+Rounds   1- 10: Detection=100.0%, Latency=5.3449ms, Model Acc=77.9%
+Rounds  11- 20: Detection=100.0%, Latency=8.7888ms, Model Acc=100.0%
+
+================================================================================
+VALIDATION RESULT: PASSED
+================================================================================

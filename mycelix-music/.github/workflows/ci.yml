@@ -1,0 +1,233 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  release:
+    types: [created]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  NODE_VERSION: '20'
+  PNPM_VERSION: '8'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  # Fast checks that don't need services
+  lint-and-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (monorepo)
+        run: npm run lint
+
+      - name: Build SDK
+        run: npm run build --workspace=packages/sdk
+
+      - name: Type-check Web
+        run: npm run type-check --workspace=@mycelix/web
+
+      - name: Build API
+        run: npm run build --workspace=@mycelix/api
+
+  # Build web app
+  build-web:
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build SDK (dependency)
+        run: npm run build --workspace=packages/sdk
+
+      - name: Build Web App
+        run: npm run build --workspace=@mycelix/web
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:3100
+          NEXT_PUBLIC_CHAIN_ID: '31337'
+
+  # Rust API build and test
+  rust-api:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/api-rust
+
+      - name: Check formatting
+        run: cargo fmt --check
+        working-directory: apps/api-rust
+
+      - name: Clippy lints
+        run: cargo clippy -- -D warnings
+        working-directory: apps/api-rust
+
+      - name: Build Rust API
+        run: cargo build --release
+        working-directory: apps/api-rust
+
+      - name: Test Rust API
+        run: cargo test
+        working-directory: apps/api-rust
+
+  # Smart contract tests
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: stable
+
+      - name: Contracts build
+        run: npm run contracts:build
+
+      - name: Contracts tests (fuzzed)
+        run: |
+          cd contracts
+          forge test --fuzz-runs 256
+
+      - name: Contracts test (free stream via router)
+        run: |
+          cd contracts
+          forge test -m testGiftEconomyFreeListeningViaRouter -vvv
+
+  # SDK tests
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build SDK
+        run: npm run build --workspace=packages/sdk
+
+      - name: Test SDK with Coverage
+        run: npm run test --workspace=packages/sdk
+
+      - name: Upload SDK Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: packages/sdk/coverage/lcov.info
+          flags: sdk
+          fail_ci_if_error: false
+
+  # Node.js API tests (requires services)
+  api-integration:
+    runs-on: ubuntu-latest
+    needs: [lint-and-typecheck, contracts]
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: mycelix
+          POSTGRES_PASSWORD: mycelix_dev_pass
+          POSTGRES_DB: mycelix_music
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build API
+        run: npm run build --workspace=apps/api
+
+      - name: API tests with Coverage
+        env:
+          DATABASE_URL: postgresql://mycelix:mycelix_dev_pass@localhost:5432/mycelix_music
+          REDIS_URL: redis://localhost:6379
+          ENABLE_CORS: "true"
+        run: npm run test --workspace=@mycelix/api
+
+      - name: Upload API Coverage
+        uses: codecov/codecov-action@v3
+        with:
+          files: apps/api/coverage/lcov.info
+          flags: api
+          fail_ci_if_error: false
+
+      - name: Integration checks
+        env:
+          DATABASE_URL: postgresql://mycelix:mycelix_dev_pass@localhost:5432/mycelix_music
+          REDIS_URL: redis://localhost:6379
+          NEXT_PUBLIC_API_URL: http://localhost:3100
+          CHECK_WEB: 'false'
+        run: |
+          node apps/api/dist/index.js &
+          sleep 5
+          npx tsx scripts/test-integration.ts

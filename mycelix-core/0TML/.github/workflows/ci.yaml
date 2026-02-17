@@ -1,0 +1,27 @@
+name: ZeroTrustML (0TML) CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+
+      - name: Run 0TML tests
+        run: |
+          nix develop --command bash -lc '
+            cd 0TML && \
+            poetry install --with dev && \
+            poetry run python -m pytest \
+              tests/test_committee_votes.py \
+              tests/test_edge_validation_flow.py \
+              tests/test_holochain_backend_edge_proof.py
+          '

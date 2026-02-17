@@ -1,0 +1,43 @@
+# AP Southeast Region Configuration
+replicaCount: 3
+
+config:
+  networking:
+    numShards: 15
+    shardReplication: 2
+
+resources:
+  requests:
+    memory: "1Gi"
+    cpu: "1000m"
+  limits:
+    memory: "4Gi"
+    cpu: "4000m"
+
+autoscaling:
+  minReplicas: 3
+  maxReplicas: 100
+
+nodeSelector:
+  topology.kubernetes.io/region: ap-southeast-1
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - ap-southeast-1a
+          - ap-southeast-1b
+          - ap-southeast-1c
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchExpressions:
+        - key: app
+          operator: In
+          values:
+          - zerotrustml
+      topologyKey: kubernetes.io/hostname

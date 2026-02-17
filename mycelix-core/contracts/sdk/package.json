@@ -1,0 +1,35 @@
+{
+  "name": "@mycelix/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for Mycelix smart contracts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "bin": {
+    "mycelix": "./src/cli.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "cli": "npx tsx src/cli.ts",
+    "demo": "npx tsx src/demo.ts",
+    "demo:register": "npx tsx src/demo.ts register",
+    "demo:reputation": "npx tsx src/demo.ts reputation"
+  },
+  "dependencies": {
+    "ethers": "^6.9.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^5.3.0"
+  },
+  "keywords": [
+    "mycelix",
+    "ethereum",
+    "holochain",
+    "federated-learning",
+    "web3"
+  ],
+  "license": "MIT"
+}

@@ -1,0 +1,249 @@
+# ZeroTrustML Phase 9 - Node Configuration
+# Production-ready Byzantine-resistant Federated Learning
+
+# ============================================
+# Node Identity
+# ============================================
+node:
+  id: "fl-node-001"
+  region: "us-west-2"
+  description: "Production FL coordinator"
+
+# ============================================
+# Network Configuration
+# ============================================
+network:
+  listen_address: "0.0.0.0"
+  listen_port: 8765
+  
+  # Connection settings
+  max_connections: 100
+  connection_timeout: 30  # seconds
+  heartbeat_interval: 10  # seconds
+  
+  # TLS/SSL (production only)
+  tls_enabled: false
+  # tls_cert_path: "/app/certs/server.crt"
+  # tls_key_path: "/app/certs/server.key"
+
+# ============================================
+# Byzantine Resistance Configuration
+# ============================================
+byzantine_detection:
+  enabled: true
+  
+  # Proof of Gradient Quality thresholds
+  pogq_threshold: 0.7  # Reject gradients with quality < 0.7
+  pogq_test_size: 0.1  # Use 10% of data for validation
+  
+  # Reputation system
+  reputation_decay: 0.95  # Decay factor per round
+  reputation_min: 0.0
+  reputation_max: 1.0
+  reputation_initial: 0.5
+  
+  # Anomaly detection
+  anomaly_sensitivity: 2.5  # Standard deviations
+  anomaly_window_size: 10  # Rounds to analyze
+  
+  # Penalties
+  byzantine_penalty: -0.2  # Reputation penalty for Byzantine behavior
+  false_positive_threshold: 0.01  # Tolerate 1% false positives
+
+# ============================================
+# Credits System Configuration
+# ============================================
+credits:
+  backend: "postgresql"  # Phase 9: PostgreSQL only
+  
+  # PostgreSQL connection
+  postgresql:
+    enabled: true
+    host: "${ZEROTRUSTML_DB_HOST:-postgres}"
+    port: 5432
+    database: "${ZEROTRUSTML_DB_NAME:-zerotrustml}"
+    user: "${ZEROTRUSTML_DB_USER:-zerotrustml}"
+    password: "${ZEROTRUSTML_DB_PASSWORD}"
+    
+    # Connection pooling
+    min_connections: 5
+    max_connections: 20
+    connection_timeout: 30
+  
+  # Holochain (Phase 10)
+  holochain:
+    enabled: false  # Set to true for Phase 10 hybrid mode
+    conductor_url: "ws://localhost:8888"
+    admin_port: 8888
+    app_port: 8889
+
+    # DNA configuration
+    dna_path: "./holochain/dna/zerotrustml.dna"
+    happ_path: "./holochain/happ/zerotrustml.happ"
+
+    # Hybrid bridge settings
+    sync_enabled: true
+    sync_priority: "critical_only"  # Options: all, critical_only, none
+    sync_retry_max: 3
+    sync_retry_delay: 5  # seconds
+  
+  # Credit issuance rates
+  rewards:
+    quality_credit_base: 10
+    quality_credit_multiplier: 1.5  # Bonus for PoGQ > 0.9
+    
+    security_credit_detection: 50  # For detecting Byzantine node
+    security_credit_report: 25     # For reporting suspicious behavior
+    
+    validation_credit: 5  # Per peer validation
+    contribution_credit: 1  # Per gradient submission
+  
+  # Transaction settings
+  transaction_timeout: 5  # seconds
+  batch_size: 100  # Credits to issue per batch
+
+# ============================================
+# Federated Learning Configuration
+# ============================================
+federated_learning:
+  # Aggregation method
+  aggregation: "krum"  # Options: krum, median, trimmed_mean, fedavg
+  
+  # Training parameters
+  rounds: 100
+  clients_per_round: 10
+  min_clients: 5
+  
+  # Gradient settings
+  max_gradient_norm: 10.0
+  gradient_clipping: true
+  gradient_compression: false  # Enable for large models
+  
+  # Model checkpointing
+  checkpoint_interval: 10  # Save model every 10 rounds
+  checkpoint_path: "/app/models"
+
+# ============================================
+# Security Configuration
+# ============================================
+security:
+  # Rate limiting
+  max_requests_per_minute: 60
+  max_requests_per_hour: 1000
+  
+  # Signature verification
+  require_signatures: true
+  signature_algorithm: "ed25519"
+  
+  # Encryption
+  encrypt_gradients: true
+  encryption_algorithm: "chacha20-poly1305"
+  
+  # Authentication
+  require_authentication: false
+  # jwt_secret: "${JWT_SECRET}"
+  # jwt_expiry: 3600  # seconds
+
+# ============================================
+# Performance Configuration
+# ============================================
+performance:
+  # Compression
+  compression_enabled: false
+  compression_algorithm: "zstd"  # Options: zstd, lz4, gzip
+  compression_level: 3
+  
+  # Caching
+  cache_enabled: true
+  cache_size_mb: 512
+  cache_ttl: 3600  # seconds
+  
+  # Batch processing
+  batch_validation: true
+  batch_size: 32
+  
+  # Parallelization
+  num_workers: 4
+  async_checkpointing: true
+
+# ============================================
+# Monitoring Configuration
+# ============================================
+monitoring:
+  # Prometheus metrics
+  prometheus_enabled: true
+  prometheus_port: 9090
+  prometheus_path: "/metrics"
+  
+  # Health checks
+  health_check_interval: 30  # seconds
+  health_check_timeout: 5
+  
+  # Logging
+  log_level: "${ZEROTRUSTML_LOG_LEVEL:-INFO}"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  log_format: "json"  # json or text
+  log_file: "/app/logs/zerotrustml.log"
+  log_rotation: "daily"
+  log_retention_days: 30
+  
+  # Metrics to track
+  metrics:
+    - node_health
+    - byzantine_detection
+    - gradient_quality
+    - transaction_volume
+    - database_performance
+    - network_latency
+
+# ============================================
+# Storage Configuration
+# ============================================
+storage:
+  data_path: "${ZEROTRUSTML_DATA_PATH:-/app/data}"
+  models_path: "/app/models"
+  logs_path: "/app/logs"
+  
+  # Retention policies
+  model_retention_days: 90
+  log_retention_days: 30
+  metrics_retention_days: 365
+
+# ============================================
+# Advanced Configuration
+# ============================================
+advanced:
+  # Development mode
+  dev_mode: false
+  
+  # Debug options
+  debug_gradients: false
+  debug_transactions: false
+  
+  # Experimental features (Phase 10+)
+  enable_zk_proofs: false  # Set to true for ZK-PoC privacy
+  enable_holochain_dht: false  # Set to true for immutable audit
+
+# ============================================
+# Phase 10: Zero-Knowledge Proof of Contribution
+# ============================================
+zkpoc:
+  enabled: false  # Set to true for privacy-preserving validation
+
+  # Bulletproofs configuration
+  pogq_threshold: 0.7  # Minimum PoGQ score to prove
+  proof_verification_timeout: 100  # milliseconds
+
+  # Privacy settings
+  store_pogq_scores: false  # If true, stores exact scores (less private)
+  require_gradient_encryption: true  # Gradients must be encrypted
+
+  # Proof generation
+  proof_generator: "bulletproofs"  # Future: zk-SNARKs, zk-STARKs
+
+  # Compliance
+  hipaa_mode: false  # Extra privacy guarantees for medical data
+  gdpr_mode: false   # Extra privacy guarantees for EU data
+  
+  # Graceful shutdown
+  shutdown_timeout: 30  # seconds
+  shutdown_save_state: true

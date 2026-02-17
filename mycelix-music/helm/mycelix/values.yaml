@@ -1,0 +1,200 @@
+# Default values for Mycelix Music Platform
+
+# Global settings
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# API configuration
+api:
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/mycelix/api
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3100
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  env:
+    NODE_ENV: production
+    PORT: "3100"
+    ENABLE_CORS: "true"
+    LOG_REQUESTS: "true"
+    ENABLE_API_DOCS: "true"
+    ENABLE_SWAGGER_UI: "true"
+
+  # Sensitive values - use secrets in production
+  secrets:
+    databaseUrl: ""  # Set via --set or secrets
+    redisUrl: ""
+    apiAdminKey: ""
+    ceramicAdminSeed: ""
+
+  probes:
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 10
+      periodSeconds: 15
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    startup:
+      path: /health/startup
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      failureThreshold: 30
+
+# Web application configuration
+web:
+  replicaCount: 2
+
+  image:
+    repository: ghcr.io/mycelix/web
+    tag: "latest"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3000
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+
+  env:
+    NODE_ENV: production
+    PORT: "3000"
+
+  # Build-time environment variables (must be set when building the image)
+  buildArgs:
+    NEXT_PUBLIC_API_URL: ""
+    NEXT_PUBLIC_PRIVY_APP_ID: ""
+    NEXT_PUBLIC_ROUTER_ADDRESS: ""
+    NEXT_PUBLIC_FLOW_TOKEN_ADDRESS: ""
+    NEXT_PUBLIC_CHAIN_ID: "100"
+    NEXT_PUBLIC_RPC_URL: "https://rpc.gnosischain.com"
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+  hosts:
+    - host: mycelix.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: web
+    - host: api.mycelix.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: api
+  tls:
+    - secretName: mycelix-tls
+      hosts:
+        - mycelix.example.com
+        - api.mycelix.example.com
+
+# PostgreSQL subchart configuration
+postgresql:
+  enabled: true
+  auth:
+    username: mycelix
+    password: ""  # Set via --set
+    database: mycelix_music
+  primary:
+    persistence:
+      enabled: true
+      size: 10Gi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+# Redis subchart configuration
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 1Gi
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  replica:
+    replicaCount: 0
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Network policies
+networkPolicy:
+  enabled: true
+
+# Monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+  prometheusRule:
+    enabled: true
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity: {}

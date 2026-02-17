@@ -1,0 +1,241 @@
+groups:
+  - name: phase10_alerts
+    interval: 30s
+    rules:
+      # ============================================
+      # Holochain Conductor Alerts
+      # ============================================
+
+      - alert: HolochainConductorDown
+        expr: up{job="holochain"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          phase: 10
+        annotations:
+          summary: "Holochain conductor is down"
+          description: "The Holochain conductor has been down for more than 1 minute. Immutable audit trail unavailable."
+
+      - alert: HolochainHighLatency
+        expr: holochain_write_duration_ms > 1000
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Holochain write latency high"
+          description: "Holochain writes taking >1000ms. DHT operations may be slow. Current: {{ $value }}ms"
+
+      - alert: HolochainDHTSizeExcessive
+        expr: holochain_dht_entries_total > 1000000
+        for: 10m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Holochain DHT size growing large"
+          description: "DHT has {{ $value }} entries. Consider archiving or sharding."
+
+      # ============================================
+      # Hybrid Bridge Alerts
+      # ============================================
+
+      - alert: HybridBridgeSyncBacklog
+        expr: hybrid_bridge_pending > 100
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Hybrid bridge sync backlog building"
+          description: "{{ $value }} records pending Holochain sync. Bridge may be overloaded or Holochain slow."
+
+      - alert: HybridBridgeIntegrityError
+        expr: rate(hybrid_bridge_integrity_errors[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          phase: 10
+        annotations:
+          summary: "Hybrid bridge integrity violation detected"
+          description: "PostgreSQL and Holochain data mismatch detected. Potential data corruption or tampering."
+
+      - alert: HybridBridgeSyncFailing
+        expr: rate(hybrid_bridge_failed[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Hybrid bridge sync failures increasing"
+          description: "Sync failure rate: {{ $value }}/sec. Check Holochain conductor and network."
+
+      - alert: HybridBridgeSyncLag
+        expr: hybrid_bridge_pending / (hybrid_bridge_synced_total + 1) > 0.2
+        for: 10m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Hybrid bridge sync lag excessive"
+          description: "{{ $value }}% of records unsynced. Bridge falling behind write rate."
+
+      # ============================================
+      # Zero-Knowledge Proof Alerts
+      # ============================================
+
+      - alert: ZKPoCVerificationFailing
+        expr: rate(zkpoc_proofs_failed_total[5m]) / rate(zkpoc_proofs_verified_total[5m]) > 0.3
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "High ZK-PoC verification failure rate"
+          description: "{{ $value }}% of ZK proofs failing. Possible Byzantine attack or misconfiguration."
+
+      - alert: ZKPoCVerificationSlow
+        expr: histogram_quantile(0.95, zkpoc_verification_duration_ms) > 500
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "ZK-PoC verification latency high"
+          description: "95th percentile verification time: {{ $value }}ms. Should be <100ms."
+
+      - alert: ZKPoCProofsNotGenerated
+        expr: rate(zkpoc_proofs_generated_total[5m]) < rate(trustml_gradients_submitted_total[5m]) * 0.9
+        for: 10m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "ZK-PoC proofs not being generated"
+          description: "Only {{ $value }}% of gradients have ZK proofs. Check ZK-PoC enablement."
+
+      # ============================================
+      # Privacy Compliance Alerts
+      # ============================================
+
+      - alert: PrivacyViolationDetected
+        expr: zkpoc_privacy_violations_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          phase: 10
+        annotations:
+          summary: "Privacy violation detected"
+          description: "{{ $value }} privacy violations detected. HIPAA/GDPR compliance at risk."
+
+      - alert: UnencryptedGradientSubmitted
+        expr: rate(trustml_gradients_unencrypted_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          phase: 10
+        annotations:
+          summary: "Unencrypted gradient submitted"
+          description: "Gradient submitted without encryption. Privacy requirement violated."
+
+      - alert: PoGQScoreExposed
+        expr: zkpoc_score_exposure_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          phase: 10
+        annotations:
+          summary: "PoGQ score exposed without ZK-PoC"
+          description: "{{ $value }} PoGQ scores exposed. Privacy breach."
+
+      # ============================================
+      # Phase 10 System Health
+      # ============================================
+
+      - alert: Phase10ServicesIncomplete
+        expr: count(up{job=~"trustml|holochain"} == 1) < 2
+        for: 2m
+        labels:
+          severity: critical
+          phase: 10
+        annotations:
+          summary: "Phase 10 services incomplete"
+          description: "Not all Phase 10 services running. Need both TrustML node and Holochain conductor."
+
+      - alert: Phase10MemoryPressure
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Phase 10 memory pressure high"
+          description: "System memory usage: {{ $value }}%. Phase 10 requires more memory than Phase 9."
+
+      - alert: Phase10DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Phase 10 disk space low"
+          description: "Only {{ $value }}% disk space available. Holochain DHT requires significant storage."
+
+      # ============================================
+      # Compliance Monitoring
+      # ============================================
+
+      - alert: HIPAAModeNotEnabled
+        expr: zkpoc_hipaa_mode_enabled == 0 AND trustml_medical_nodes_total > 0
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "HIPAA mode not enabled for medical nodes"
+          description: "Medical nodes detected but HIPAA mode disabled. Compliance violation."
+
+      - alert: GDPRModeNotEnabled
+        expr: zkpoc_gdpr_mode_enabled == 0 AND trustml_eu_nodes_total > 0
+        for: 5m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "GDPR mode not enabled for EU nodes"
+          description: "EU nodes detected but GDPR mode disabled. Compliance violation."
+
+      - alert: AuditTrailIncomplete
+        expr: rate(hybrid_bridge_integrity_errors[1h]) > 0.001
+        for: 1h
+        labels:
+          severity: critical
+          phase: 10
+        annotations:
+          summary: "Audit trail integrity compromised"
+          description: "Audit trail has integrity errors. Regulatory compliance at risk."
+
+      # ============================================
+      # Performance Degradation
+      # ============================================
+
+      - alert: Phase10PerformanceDegradation
+        expr: histogram_quantile(0.95, trustml_response_time_seconds) > 5
+        for: 10m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Phase 10 performance degrading"
+          description: "95th percentile response time: {{ $value }}s. Phase 10 overhead may be excessive."
+
+      - alert: HybridBridgeBottleneck
+        expr: rate(hybrid_bridge_synced_total[5m]) < rate(trustml_gradients_submitted_total[5m]) * 0.8
+        for: 10m
+        labels:
+          severity: warning
+          phase: 10
+        annotations:
+          summary: "Hybrid bridge becoming bottleneck"
+          description: "Bridge sync rate {{ $value }}% of gradient submission rate. May need optimization."

@@ -1,0 +1,31 @@
+[package]
+name = "pogq_validation_integrity"
+version = "0.1.0"
+edition = "2021"
+description = "Integrity zome for PoGQ (Proof of Gradient Quality) validation"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Holochain 0.7 - Integrity zomes use hdi
+hdi = "0.7"
+serde = { version = "1.0", features = ["derive"] }
+holochain_serialized_bytes = "0.0.56"
+
+# Enable wasm support for getrandom (transitive dependencies)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+# Pin rmp and rmp-serde to compatible versions
+rmp = "=0.8.14"
+rmp-serde = "=1.3.0"
+
+# Pin indexmap to version compatible with Rust 1.81
+indexmap = "=2.2.6"
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'

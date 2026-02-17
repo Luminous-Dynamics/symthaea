@@ -1,0 +1,21 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO inv_stock_levels (\n                id, tenant_id, product_id, warehouse_id, location_id,\n                quantity_on_hand, quantity_reserved, quantity_available, quantity_on_order,\n                unit_cost, created_at, updated_at\n            ) VALUES (\n                $1, $2, $3, $4, $5,\n                $6, 0, $6, 0,\n                $7, $8, $8\n            )\n            ON CONFLICT (tenant_id, product_id, warehouse_id, COALESCE(location_id, '00000000-0000-0000-0000-000000000000'::uuid))\n            DO UPDATE SET\n                quantity_on_hand = inv_stock_levels.quantity_on_hand + $6,\n                quantity_available = inv_stock_levels.quantity_available + $6,\n                unit_cost = COALESCE($7, inv_stock_levels.unit_cost),\n                total_value = (inv_stock_levels.quantity_on_hand + $6) * COALESCE($7, inv_stock_levels.unit_cost),\n                updated_at = $8\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Uuid",
+        "Numeric",
+        "Numeric",
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7c9891b2883ceaf0b5242112b2c67e392bddb2759a7a9bf3599bbed4b58235c8"
+}

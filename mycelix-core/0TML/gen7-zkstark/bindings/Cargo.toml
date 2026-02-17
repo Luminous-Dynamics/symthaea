@@ -1,0 +1,30 @@
+[package]
+name = "gen7-zkstark"
+version = "0.1.0"
+edition = "2021"
+
+[workspace]
+# Empty workspace to exclude from parent workspace
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# PyO3 for Python bindings (0.22+ supports Python 3.13)
+pyo3 = { version = "0.22", features = ["extension-module"] }
+
+# RISC Zero zkVM (same version as host)
+risc0-zkvm = { version = "^3.0.3" }
+methods = { path = "../methods" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
+
+# Hashing
+sha2 = "0.10"
+
+# Post-Quantum Cryptography (CRYSTALS-Dilithium)
+pqcrypto-dilithium = "0.5"
+pqcrypto-traits = "0.3"
+rand = "0.8"

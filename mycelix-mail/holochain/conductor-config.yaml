@@ -1,0 +1,163 @@
+# Mycelix Mail Holochain Conductor Configuration
+#
+# Configures the Holochain conductor for running Mycelix Mail DNA
+
+---
+# Data storage
+data_root_path: /var/lib/holochain/mycelix
+
+# Environment configuration
+environment_path: /var/lib/holochain/mycelix/databases
+
+# Admin interface for conductor management
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      allowed_origins:
+        - "localhost"
+        - "127.0.0.1"
+
+# App interfaces for client connections
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 8889
+      allowed_origins:
+        - "*"  # In production, restrict to app domain
+
+# Network configuration
+network:
+  # Bootstrap service for peer discovery
+  bootstrap_service: https://bootstrap.holo.host
+
+  # Transport configuration
+  transport_pool:
+    - type: webrtc
+      signal_url: wss://signal.holo.host
+    - type: mem  # For testing
+
+  # Network tuning
+  tuning_params:
+    # Gossip configuration
+    gossip_loop_iteration_delay_ms: 1000
+    gossip_peer_on_success_next_gossip_delay_ms: 60000
+    gossip_peer_on_error_next_gossip_delay_ms: 300000
+    gossip_agent_info_update_interval_ms: 300000
+
+    # DHT configuration
+    default_rpc_single_timeout_ms: 30000
+    default_rpc_multi_remote_agent_count: 3
+    default_rpc_multi_timeout_ms: 30000
+
+    # Connection limits
+    tx5_min_ephemeral_udp_port: 40000
+    tx5_max_ephemeral_udp_port: 50000
+
+    # Memory limits
+    danger_gossip_recent_threshold_secs: 900
+
+# DPKI configuration (Decentralized PKI)
+dpki:
+  instance_id: dpki
+  init_params: ~
+
+# Keystore configuration
+keystore:
+  type: lair_server
+  connection_url: "unix:///var/lib/holochain/mycelix/keystore/socket"
+
+# Installed apps
+installed_apps:
+  - installed_app_id: mycelix-mail
+    agent_key: ~  # Generated at install time
+    dna_hash: ~   # Computed from DNA bundle
+    role_name: main
+
+    # Cell configuration
+    cell_id:
+      - ~  # DNA hash
+      - ~  # Agent key
+
+    # DNA modifiers
+    modifiers:
+      network_seed: "mycelix-mail-production"
+      properties:
+        environment: production
+
+    # Clone limit for DNA variants
+    clone_limit: 0
+
+# Resource limits
+resource_limits:
+  # Maximum concurrent connections
+  max_connections: 1000
+
+  # Memory limits (bytes)
+  max_memory: 2147483648  # 2 GB
+
+  # Storage limits (bytes)
+  max_storage: 10737418240  # 10 GB
+
+  # Rate limits
+  max_ops_per_second: 1000
+
+# Tracing and logging
+tracing:
+  type: opentelemetry
+  service_name: mycelix-mail-holochain
+
+  # Log levels by component
+  filter:
+    default: info
+    holochain_conductor: info
+    holochain_state: warn
+    holochain_p2p: info
+    kitsune_p2p: warn
+
+# Metrics export
+metrics:
+  type: prometheus
+  port: 9090
+  path: /metrics
+
+# Health check
+health_check:
+  enabled: true
+  port: 8890
+  path: /health
+
+# Conductor persistence
+conductor_state_dir: /var/lib/holochain/mycelix/conductor
+
+# Signal configuration for real-time updates
+signals:
+  # Emit signals on app interface
+  consistency_level: latest
+
+  # Signal batching
+  batch_interval_ms: 100
+  max_batch_size: 50
+
+---
+# Development/Testing override
+# Use: holochain -c conductor-config.yaml -c conductor-config-dev.yaml
+
+# For development, uncomment and save as conductor-config-dev.yaml:
+# data_root_path: ./holochain-data
+# environment_path: ./holochain-data/databases
+#
+# admin_interfaces:
+#   - driver:
+#       type: websocket
+#       port: 8888
+#       allowed_origins: "*"
+#
+# network:
+#   transport_pool:
+#     - type: mem
+#
+# tracing:
+#   filter:
+#     default: debug
+#     holochain_conductor: debug

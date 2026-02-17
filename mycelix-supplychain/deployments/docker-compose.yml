@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  provenance-service:
+    build:
+      context: ../rust/service
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - RUST_LOG=info
+      - DATABASE_URL=sqlite://data/claims.db
+    volumes:
+      - provenance-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  dashboard:
+    build:
+      context: ../ts/dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://provenance-service:8080
+    depends_on:
+      - provenance-service
+    restart: unless-stopped
+
+  # Optional: PostgreSQL for production use
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=supplychain
+      - POSTGRES_USER=mycelix
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    profiles:
+      - production
+
+  # Optional: MQTT broker for IoT adapters
+  mqtt:
+    image: eclipse-mosquitto:2
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - mqtt-data:/mosquitto/data
+      - mqtt-logs:/mosquitto/log
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    restart: unless-stopped
+    profiles:
+      - iot
+
+volumes:
+  provenance-data:
+  postgres-data:
+  mqtt-data:
+  mqtt-logs:
+
+networks:
+  default:
+    name: mycelix-supplychain

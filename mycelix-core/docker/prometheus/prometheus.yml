@@ -1,0 +1,63 @@
+# =============================================================================
+# Prometheus Configuration for Mycelix-Core
+# =============================================================================
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'mycelix-monitor'
+
+# Alerting configuration (optional)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Rule files (optional)
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+
+  # FL Coordinator
+  - job_name: 'mycelix-coordinator'
+    static_configs:
+      - targets: ['coordinator:8080']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # FL Nodes
+  - job_name: 'mycelix-nodes'
+    static_configs:
+      - targets:
+          - 'node-1:9100'
+          - 'node-2:9100'
+          - 'node-3:9100'
+          - 'node-4:9100'
+          - 'node-5:9100'
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # Redis (if redis_exporter is available)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    metrics_path: /metrics
+
+  # PostgreSQL (if postgres_exporter is available)
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    metrics_path: /metrics
+
+# Remote write/read (optional, for long-term storage)
+# remote_write:
+#   - url: "http://remote-storage:9201/write"
+# remote_read:
+#   - url: "http://remote-storage:9201/read"

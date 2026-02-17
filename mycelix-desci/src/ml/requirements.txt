@@ -1,0 +1,32 @@
+# Core ML and Federated Learning
+torch>=2.10.0
+numpy>=2.4.2
+flower>=1.6.0  # Federated learning framework
+
+# Bioinformatics
+biopython>=1.81
+pubchempy>=1.0.4
+
+# Data Science
+pandas>=2.1.0
+scikit-learn>=1.8.0
+
+# Cryptography and Privacy
+pycryptodome>=3.19.0
+
+# Utilities
+pyyaml>=6.0
+requests>=2.31.0
+tqdm>=4.66.0
+
+# Development
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+black>=23.11.0
+flake8>=6.1.0
+mypy>=1.7.0
+
+# Jupyter for research notebooks
+jupyter>=1.0.0
+matplotlib>=3.8.0
+seaborn>=0.13.0

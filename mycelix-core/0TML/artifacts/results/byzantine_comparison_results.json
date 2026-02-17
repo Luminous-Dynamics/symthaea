@@ -1,0 +1,33 @@
+{
+  "timestamp": "2025-09-25T03:44:06.891607",
+  "algorithms": {
+    "Krum": {
+      "No Attack": 99.66762725929199,
+      "Sign Flip": 99.5897916032582,
+      "Random Noise": 99.57923302648967,
+      "Zero Gradient": 99.60253366880764,
+      "Scaling": 99.53941124842083
+    },
+    "Multi-Krum": {
+      "No Attack": 99.96419123646007,
+      "Sign Flip": 99.96541196116581,
+      "Random Noise": 99.96227175574406,
+      "Zero Gradient": 99.97198173645398,
+      "Scaling": 99.96259561845538
+    },
+    "Median": {
+      "No Attack": 99.9612157729645,
+      "Sign Flip": 99.89198441240697,
+      "Random Noise": 99.92998039970786,
+      "Zero Gradient": 99.87942407283973,
+      "Scaling": 99.9211216452329
+    },
+    "Trimmed Mean": {
+      "No Attack": 99.96872968243812,
+      "Sign Flip": 99.89261367949312,
+      "Random Noise": 99.93256265610981,
+      "Zero Gradient": 99.89898098383205,
+      "Scaling": 99.90632100380637
+    }
+  }
+}

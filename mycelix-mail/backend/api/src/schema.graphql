@@ -1,0 +1,871 @@
+# Mycelix Mail GraphQL Schema
+#
+# This schema defines the complete API for Mycelix Mail, including:
+# - Email operations (CRUD, search, organize)
+# - Trust network queries and mutations
+# - User and settings management
+# - Real-time subscriptions
+
+# =============================================================================
+# Scalars
+# =============================================================================
+
+scalar DateTime
+scalar EmailAddress
+scalar JSON
+scalar Upload
+
+# =============================================================================
+# Enums
+# =============================================================================
+
+enum TrustType {
+  PERSONAL
+  PROFESSIONAL
+  ORGANIZATIONAL
+  TRANSACTIONAL
+  REFERRAL
+}
+
+enum EmailStatus {
+  UNREAD
+  READ
+  ARCHIVED
+  DELETED
+  SPAM
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum SortOrder {
+  ASC
+  DESC
+}
+
+enum EmailSortField {
+  DATE
+  SUBJECT
+  FROM
+  TRUST_SCORE
+  PRIORITY
+}
+
+enum AttachmentType {
+  IMAGE
+  DOCUMENT
+  VIDEO
+  AUDIO
+  ARCHIVE
+  OTHER
+}
+
+enum FolderType {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+  SPAM
+  ARCHIVE
+  CUSTOM
+}
+
+enum WorkflowTriggerType {
+  EMAIL_RECEIVED
+  EMAIL_SENT
+  SCHEDULE
+  TRUST_CHANGED
+  WEBHOOK
+  MANUAL
+}
+
+enum FocusModeType {
+  WORK
+  DEEP_WORK
+  PERSONAL
+  SLEEP
+  CUSTOM
+}
+
+# =============================================================================
+# Input Types
+# =============================================================================
+
+input EmailFilter {
+  folders: [ID!]
+  labels: [ID!]
+  status: [EmailStatus!]
+  hasAttachment: Boolean
+  from: [EmailAddress!]
+  to: [EmailAddress!]
+  dateRange: DateRangeInput
+  searchQuery: String
+  trustScoreMin: Int
+  trustScoreMax: Int
+}
+
+input DateRangeInput {
+  start: DateTime!
+  end: DateTime!
+}
+
+input EmailSort {
+  field: EmailSortField!
+  order: SortOrder!
+}
+
+input PaginationInput {
+  limit: Int = 50
+  offset: Int = 0
+  cursor: String
+}
+
+input CreateEmailInput {
+  to: [EmailAddressInput!]!
+  cc: [EmailAddressInput!]
+  bcc: [EmailAddressInput!]
+  subject: String!
+  body: String!
+  bodyHtml: String
+  attachments: [Upload!]
+  inReplyTo: ID
+  scheduledAt: DateTime
+  encrypt: Boolean
+  sign: Boolean
+}
+
+input EmailAddressInput {
+  email: EmailAddress!
+  name: String
+}
+
+input UpdateEmailInput {
+  id: ID!
+  status: EmailStatus
+  labels: [ID!]
+  folderId: ID
+  isStarred: Boolean
+  priority: Priority
+}
+
+input CreateFolderInput {
+  name: String!
+  parentId: ID
+  color: String
+  icon: String
+}
+
+input CreateLabelInput {
+  name: String!
+  color: String!
+}
+
+input TrustAttestationInput {
+  subjectEmail: EmailAddress!
+  score: Int!
+  trustType: TrustType!
+  context: String
+  claims: [String!]
+  expiresAt: DateTime
+}
+
+input ProfileInput {
+  name: String!
+  emails: [EmailAddress!]!
+  avatar: String
+  bio: String
+  encryptionKey: String
+}
+
+input CreateWorkflowInput {
+  name: String!
+  description: String
+  trigger: WorkflowTriggerInput!
+  conditions: [WorkflowConditionInput!]
+  actions: [WorkflowActionInput!]!
+  isActive: Boolean
+}
+
+input WorkflowTriggerInput {
+  type: WorkflowTriggerType!
+  filters: JSON
+  schedule: String
+}
+
+input WorkflowConditionInput {
+  field: String!
+  operator: String!
+  value: JSON!
+  logic: String
+}
+
+input WorkflowActionInput {
+  type: String!
+  config: JSON!
+  delay: Int
+  order: Int!
+}
+
+input CalendarEventInput {
+  title: String!
+  description: String
+  start: DateTime!
+  end: DateTime!
+  allDay: Boolean
+  location: String
+  meetingLink: String
+  attendees: [EmailAddress!]
+  reminders: [ReminderInput!]
+  recurrence: RecurrenceInput
+}
+
+input ReminderInput {
+  type: String!
+  minutes: Int!
+}
+
+input RecurrenceInput {
+  frequency: String!
+  interval: Int!
+  until: DateTime
+  count: Int
+  byDay: [String!]
+}
+
+input TaskInput {
+  title: String!
+  description: String
+  dueDate: DateTime
+  priority: Priority
+  labels: [String!]
+  sourceEmailId: ID
+}
+
+# =============================================================================
+# Types - Email
+# =============================================================================
+
+type Email {
+  id: ID!
+  threadId: ID!
+  messageId: String!
+  from: Contact!
+  to: [Contact!]!
+  cc: [Contact!]
+  bcc: [Contact!]
+  replyTo: Contact
+  subject: String!
+  body: String!
+  bodyHtml: String
+  snippet: String!
+  date: DateTime!
+  receivedAt: DateTime!
+  status: EmailStatus!
+  isStarred: Boolean!
+  priority: Priority!
+  labels: [Label!]!
+  folder: Folder!
+  attachments: [Attachment!]!
+  trustScore: Int
+  trustAnalysis: TrustAnalysis
+  aiAnalysis: AIAnalysis
+  inReplyTo: Email
+  replies: [Email!]!
+  isEncrypted: Boolean!
+  isSigned: Boolean!
+  signatureValid: Boolean
+  headers: JSON
+}
+
+type Thread {
+  id: ID!
+  subject: String!
+  emails: [Email!]!
+  participants: [Contact!]!
+  lastEmail: Email!
+  emailCount: Int!
+  unreadCount: Int!
+  hasAttachments: Boolean!
+  labels: [Label!]!
+  averageTrustScore: Int
+}
+
+type Attachment {
+  id: ID!
+  filename: String!
+  mimeType: String!
+  size: Int!
+  type: AttachmentType!
+  url: String!
+  thumbnailUrl: String
+  isInline: Boolean!
+}
+
+type Folder {
+  id: ID!
+  name: String!
+  type: FolderType!
+  parentId: ID
+  color: String
+  icon: String
+  emailCount: Int!
+  unreadCount: Int!
+  children: [Folder!]!
+}
+
+type Label {
+  id: ID!
+  name: String!
+  color: String!
+  emailCount: Int!
+}
+
+# =============================================================================
+# Types - Contacts & Trust
+# =============================================================================
+
+type Contact {
+  id: ID!
+  email: EmailAddress!
+  name: String
+  avatar: String
+  trustScore: Int!
+  trustLevel: String!
+  attestations: [TrustAttestation!]!
+  lastContact: DateTime
+  emailCount: Int!
+  isBlocked: Boolean!
+  publicKey: String
+  profile: Profile
+}
+
+type TrustAttestation {
+  id: ID!
+  attestor: Contact!
+  subject: Contact!
+  score: Int!
+  trustType: TrustType!
+  context: String
+  claims: [String!]!
+  createdAt: DateTime!
+  expiresAt: DateTime
+  isActive: Boolean!
+  isVerified: Boolean!
+}
+
+type TrustPath {
+  nodes: [Contact!]!
+  totalScore: Int!
+  pathLength: Int!
+}
+
+type TrustAnalysis {
+  score: Int!
+  level: String!
+  factors: [TrustFactor!]!
+  attestationCount: Int!
+  pathsToKnown: Int!
+  riskIndicators: [RiskIndicator!]!
+}
+
+type TrustFactor {
+  name: String!
+  weight: Float!
+  score: Int!
+  description: String!
+}
+
+type RiskIndicator {
+  type: String!
+  severity: String!
+  description: String!
+}
+
+type Profile {
+  id: ID!
+  agentPubKey: String!
+  name: String!
+  emails: [EmailAddress!]!
+  avatar: String
+  bio: String
+  encryptionKey: String
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# =============================================================================
+# Types - AI Analysis
+# =============================================================================
+
+type AIAnalysis {
+  sentiment: SentimentAnalysis!
+  intent: IntentAnalysis!
+  entities: [Entity!]!
+  claims: [Claim!]!
+  suggestedReplies: [SuggestedReply!]!
+  summary: String
+  actionItems: [ActionItem!]!
+  meetingInfo: MeetingInfo
+}
+
+type SentimentAnalysis {
+  score: Float!
+  label: String!
+  confidence: Float!
+}
+
+type IntentAnalysis {
+  primary: String!
+  secondary: [String!]!
+  confidence: Float!
+}
+
+type Entity {
+  type: String!
+  value: String!
+  confidence: Float!
+}
+
+type Claim {
+  text: String!
+  type: String!
+  verifiable: Boolean!
+  verified: Boolean
+}
+
+type SuggestedReply {
+  tone: String!
+  content: String!
+  confidence: Float!
+}
+
+type ActionItem {
+  text: String!
+  priority: Priority!
+  dueDate: DateTime
+}
+
+type MeetingInfo {
+  detected: Boolean!
+  title: String
+  dateTime: DateTime
+  duration: Int
+  location: String
+  attendees: [String!]
+  confidence: Float!
+}
+
+# =============================================================================
+# Types - Workflow
+# =============================================================================
+
+type Workflow {
+  id: ID!
+  name: String!
+  description: String
+  trigger: WorkflowTrigger!
+  conditions: [WorkflowCondition!]!
+  actions: [WorkflowAction!]!
+  isActive: Boolean!
+  stats: WorkflowStats!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+  lastTriggeredAt: DateTime
+}
+
+type WorkflowTrigger {
+  type: WorkflowTriggerType!
+  filters: JSON
+  schedule: String
+}
+
+type WorkflowCondition {
+  id: ID!
+  field: String!
+  operator: String!
+  value: JSON!
+  logic: String
+}
+
+type WorkflowAction {
+  id: ID!
+  type: String!
+  config: JSON!
+  delay: Int
+  order: Int!
+}
+
+type WorkflowStats {
+  totalRuns: Int!
+  successfulRuns: Int!
+  failedRuns: Int!
+  avgExecutionTime: Float!
+}
+
+type WorkflowExecution {
+  id: ID!
+  workflowId: ID!
+  status: String!
+  triggeredAt: DateTime!
+  completedAt: DateTime
+  executedActions: [ExecutedAction!]!
+}
+
+type ExecutedAction {
+  actionId: ID!
+  status: String!
+  result: JSON
+  error: String
+  duration: Int!
+}
+
+# =============================================================================
+# Types - Calendar & Tasks
+# =============================================================================
+
+type CalendarEvent {
+  id: ID!
+  title: String!
+  description: String
+  start: DateTime!
+  end: DateTime!
+  allDay: Boolean!
+  location: String
+  meetingLink: String
+  attendees: [EventAttendee!]!
+  organizer: Contact
+  status: String!
+  visibility: String!
+  reminders: [EventReminder!]!
+  recurrence: RecurrenceRule
+  sourceEmail: Email
+  calendar: Calendar!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type EventAttendee {
+  email: EmailAddress!
+  name: String
+  status: String!
+  optional: Boolean!
+}
+
+type EventReminder {
+  type: String!
+  minutes: Int!
+}
+
+type RecurrenceRule {
+  frequency: String!
+  interval: Int!
+  until: DateTime
+  count: Int
+  byDay: [String!]
+}
+
+type Calendar {
+  id: ID!
+  name: String!
+  color: String!
+  isVisible: Boolean!
+  isDefault: Boolean!
+  canEdit: Boolean!
+  source: String!
+}
+
+type Task {
+  id: ID!
+  title: String!
+  description: String
+  dueDate: DateTime
+  priority: Priority!
+  status: String!
+  labels: [String!]!
+  sourceEmail: Email
+  assignee: String
+  estimatedMinutes: Int
+  completedAt: DateTime
+  createdAt: DateTime!
+}
+
+# =============================================================================
+# Types - Settings & Notifications
+# =============================================================================
+
+type UserSettings {
+  id: ID!
+  theme: String!
+  language: String!
+  timezone: String!
+  emailSignature: String
+  notificationPreferences: NotificationPreferences!
+  accessibilitySettings: AccessibilitySettings!
+  focusMode: FocusMode
+  availabilityPreferences: AvailabilityPreferences!
+}
+
+type NotificationPreferences {
+  emailNotifications: Boolean!
+  pushNotifications: Boolean!
+  desktopNotifications: Boolean!
+  soundEnabled: Boolean!
+  quietHoursEnabled: Boolean!
+  quietHoursStart: String
+  quietHoursEnd: String
+}
+
+type AccessibilitySettings {
+  highContrastMode: Boolean!
+  dyslexiaFont: Boolean!
+  fontSize: String!
+  reduceMotion: Boolean!
+  colorBlindMode: String!
+  screenReaderOptimized: Boolean!
+}
+
+type FocusMode {
+  id: ID!
+  name: String!
+  icon: String!
+  isActive: Boolean!
+  settings: FocusModeSettings!
+}
+
+type FocusModeSettings {
+  muteNotifications: Boolean!
+  allowedSenders: [EmailAddress!]!
+  urgentKeywords: [String!]!
+  autoReplyEnabled: Boolean!
+  autoReplyMessage: String
+}
+
+type AvailabilityPreferences {
+  workingHoursStart: String!
+  workingHoursEnd: String!
+  workingDays: [Int!]!
+  timezone: String!
+  bufferBetweenMeetings: Int!
+}
+
+type Notification {
+  id: ID!
+  type: String!
+  title: String!
+  body: String!
+  priority: String!
+  timestamp: DateTime!
+  read: Boolean!
+  actionUrl: String
+  sourceId: String
+}
+
+# =============================================================================
+# Connection Types (Pagination)
+# =============================================================================
+
+type EmailConnection {
+  edges: [EmailEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EmailEdge {
+  node: Email!
+  cursor: String!
+}
+
+type ThreadConnection {
+  edges: [ThreadEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ThreadEdge {
+  node: Thread!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# =============================================================================
+# Query Root
+# =============================================================================
+
+type Query {
+  # Email queries
+  email(id: ID!): Email
+  emails(filter: EmailFilter, sort: EmailSort, pagination: PaginationInput): EmailConnection!
+  thread(id: ID!): Thread
+  threads(filter: EmailFilter, pagination: PaginationInput): ThreadConnection!
+  searchEmails(query: String!, filter: EmailFilter, pagination: PaginationInput): EmailConnection!
+
+  # Folder & Label queries
+  folders: [Folder!]!
+  folder(id: ID!): Folder
+  labels: [Label!]!
+
+  # Contact & Trust queries
+  contact(email: EmailAddress!): Contact
+  contacts(search: String, pagination: PaginationInput): [Contact!]!
+  trustScore(email: EmailAddress!): Int!
+  trustPaths(from: EmailAddress!, to: EmailAddress!, maxDepth: Int): [TrustPath!]!
+  myAttestations: [TrustAttestation!]!
+  attestationsAbout(email: EmailAddress!): [TrustAttestation!]!
+
+  # Profile queries
+  myProfile: Profile
+  profile(agentPubKey: String!): Profile
+
+  # Workflow queries
+  workflows: [Workflow!]!
+  workflow(id: ID!): Workflow
+  workflowExecutions(workflowId: ID!, pagination: PaginationInput): [WorkflowExecution!]!
+  workflowTemplates: [Workflow!]!
+
+  # Calendar queries
+  calendars: [Calendar!]!
+  events(calendarIds: [ID!], dateRange: DateRangeInput!): [CalendarEvent!]!
+  event(id: ID!): CalendarEvent
+  availableSlots(attendees: [EmailAddress!]!, duration: Int!, dateRange: DateRangeInput!): [DateRangeInput!]!
+
+  # Task queries
+  tasks(status: [String!], priority: [Priority!], dateRange: DateRangeInput): [Task!]!
+  task(id: ID!): Task
+
+  # Settings queries
+  settings: UserSettings!
+  notifications(unreadOnly: Boolean, pagination: PaginationInput): [Notification!]!
+  unreadNotificationCount: Int!
+}
+
+# =============================================================================
+# Mutation Root
+# =============================================================================
+
+type Mutation {
+  # Email mutations
+  sendEmail(input: CreateEmailInput!): Email!
+  saveDraft(input: CreateEmailInput!): Email!
+  updateEmail(input: UpdateEmailInput!): Email!
+  deleteEmails(ids: [ID!]!): Boolean!
+  moveEmails(ids: [ID!]!, folderId: ID!): [Email!]!
+  archiveEmails(ids: [ID!]!): [Email!]!
+  markAsRead(ids: [ID!]!): [Email!]!
+  markAsUnread(ids: [ID!]!): [Email!]!
+  starEmails(ids: [ID!]!): [Email!]!
+  unstarEmails(ids: [ID!]!): [Email!]!
+  addLabels(emailIds: [ID!]!, labelIds: [ID!]!): [Email!]!
+  removeLabels(emailIds: [ID!]!, labelIds: [ID!]!): [Email!]!
+  reportSpam(ids: [ID!]!): Boolean!
+  blockSender(email: EmailAddress!): Boolean!
+  unblockSender(email: EmailAddress!): Boolean!
+
+  # Folder & Label mutations
+  createFolder(input: CreateFolderInput!): Folder!
+  updateFolder(id: ID!, input: CreateFolderInput!): Folder!
+  deleteFolder(id: ID!): Boolean!
+  createLabel(input: CreateLabelInput!): Label!
+  updateLabel(id: ID!, input: CreateLabelInput!): Label!
+  deleteLabel(id: ID!): Boolean!
+
+  # Trust mutations
+  createAttestation(input: TrustAttestationInput!): TrustAttestation!
+  revokeAttestation(id: ID!): Boolean!
+  requestIntroduction(targetEmail: EmailAddress!, introducerEmail: EmailAddress!, message: String): Boolean!
+  respondToIntroduction(requestId: ID!, accept: Boolean!): Boolean!
+
+  # Profile mutations
+  updateProfile(input: ProfileInput!): Profile!
+
+  # Workflow mutations
+  createWorkflow(input: CreateWorkflowInput!): Workflow!
+  updateWorkflow(id: ID!, input: CreateWorkflowInput!): Workflow!
+  deleteWorkflow(id: ID!): Boolean!
+  toggleWorkflow(id: ID!): Workflow!
+  executeWorkflow(id: ID!, context: JSON): WorkflowExecution!
+
+  # Calendar mutations
+  createEvent(input: CalendarEventInput!): CalendarEvent!
+  updateEvent(id: ID!, input: CalendarEventInput!): CalendarEvent!
+  deleteEvent(id: ID!): Boolean!
+  respondToEvent(id: ID!, status: String!): CalendarEvent!
+  createEventFromEmail(emailId: ID!): CalendarEvent
+
+  # Task mutations
+  createTask(input: TaskInput!): Task!
+  updateTask(id: ID!, input: TaskInput!): Task!
+  deleteTask(id: ID!): Boolean!
+  completeTask(id: ID!): Task!
+  extractTasksFromEmail(emailId: ID!): [Task!]!
+
+  # Settings mutations
+  updateSettings(settings: JSON!): UserSettings!
+  activateFocusMode(modeId: ID!): FocusMode!
+  deactivateFocusMode: Boolean!
+  markNotificationRead(id: ID!): Notification!
+  markAllNotificationsRead: Boolean!
+  clearNotifications: Boolean!
+
+  # Encryption mutations
+  generateKeyPair(passphrase: String!): KeyPair!
+  importPublicKey(email: EmailAddress!, publicKey: String!): Boolean!
+}
+
+type KeyPair {
+  publicKey: String!
+  privateKeyEncrypted: String!
+  fingerprint: String!
+}
+
+# =============================================================================
+# Subscription Root
+# =============================================================================
+
+type Subscription {
+  # Real-time email updates
+  emailReceived: Email!
+  emailUpdated: Email!
+  emailDeleted: ID!
+
+  # Trust updates
+  trustScoreChanged(email: EmailAddress!): Int!
+  newAttestation: TrustAttestation!
+
+  # Workflow updates
+  workflowExecuted(workflowId: ID): WorkflowExecution!
+
+  # Calendar updates
+  eventCreated: CalendarEvent!
+  eventUpdated: CalendarEvent!
+  eventReminder: CalendarEvent!
+
+  # Notification updates
+  notificationReceived: Notification!
+
+  # Presence updates
+  userPresenceChanged: UserPresence!
+  typingIndicator(emailId: ID!): TypingIndicator!
+}
+
+type UserPresence {
+  userId: ID!
+  status: String!
+  lastSeen: DateTime!
+  currentView: String
+}
+
+type TypingIndicator {
+  userId: ID!
+  userName: String!
+  isTyping: Boolean!
+}

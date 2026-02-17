@@ -1,0 +1,31 @@
+[package]
+name = "reputation_tracker_v2"
+version = "0.1.0"
+edition = "2021"
+description = "Enhanced Multi-Round Reputation Tracker with EMA, sudden change detection, and sleeper agent catching"
+authors = ["Luminous Dynamics Research Team <tristan.stoltz@evolvingresonantcocreationism.com>"]
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "reputation_tracker_v2"
+
+# Empty workspace to prevent parent workspace detection (standard Holochain pattern)
+[workspace]
+
+[dependencies]
+# Holochain SDK
+hdk = "0.6.0"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+
+# Note: Uses Q16.16 fixed-point arithmetic for deterministic DHT computation
+# Same pattern as cbd_zome
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1

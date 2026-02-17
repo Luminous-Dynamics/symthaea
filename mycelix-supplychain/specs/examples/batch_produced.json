@@ -1,0 +1,39 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://mycelix.org/contexts/supply-chain/v1"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "SupplyChainEvent"
+  ],
+  "issuer": "did:mycelix:org:acme-manufacturing",
+  "issuanceDate": "2025-11-15T08:30:00Z",
+  "credentialSubject": {
+    "eventType": "PRODUCED",
+    "productId": "SKU-WIDGET-42",
+    "batchId": "BATCH-2025-1115-001",
+    "quantity": 5000,
+    "unit": "pieces",
+    "facility": {
+      "id": "FAC-PLANT-A",
+      "name": "ACME Manufacturing Plant A",
+      "location": {
+        "lat": 37.7749,
+        "lon": -122.4194,
+        "address": "123 Industrial Blvd, San Francisco, CA 94110",
+        "country": "US"
+      }
+    },
+    "timestamp": "2025-11-15T08:00:00Z",
+    "metadata": {
+      "productionLine": "LINE-3",
+      "shift": "MORNING",
+      "qualityInspector": "EMP-12345",
+      "rawMaterialBatches": [
+        "RM-STEEL-2025-1114-01",
+        "RM-PLASTIC-2025-1113-05"
+      ]
+    }
+  }
+}

@@ -1,0 +1,70 @@
+[package]
+name = "mycelix-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Core dependencies
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Cryptography
+sha2 = "0.10"
+hex = "0.4"
+
+# WASM compatibility
+# WASM compatibility - getrandom 0.3 with custom backend (HDK provides __getrandom_v03_custom)
+getrandom_03 = { package = "getrandom", version = "0.3" }
+
+# Platform-specific dependencies (not for WASM)
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+tokio-tungstenite = "0.20"
+futures-util = "0.3"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+
+# Holochain integration (migrated to HDK 0.6.0)
+[dependencies.hdk]
+version = "0.6.0"
+
+[dependencies.hdi]
+version = "0.7.0"
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+httpmock = "0.7"
+blake3 = "1.5"
+tokio-test = "0.4"
+tempfile = "3"
+
+# NOTE: The e2e tests below are ASPIRATIONAL - they test features that are not yet implemented.
+# They are excluded from the default test run. To run them once implemented:
+#   cargo test --features unimplemented_e2e --test e2e_agent_detector_exchange
+# See HONEST_HAPP_INVENTORY.md for current status.
+
+[[test]]
+name = "e2e_agent_detector_exchange"
+path = "tests/e2e_agent_detector_exchange.rs"
+required-features = ["unimplemented_e2e"]
+
+[[test]]
+name = "e2e_provenance_validation"
+path = "tests/e2e_provenance_validation.rs"
+required-features = ["unimplemented_e2e"]
+
+[[test]]
+name = "parity_loss_delta"
+path = "tests/parity_loss_delta.rs"
+required-features = ["unimplemented_e2e"]
+
+[features]
+default = []
+unimplemented_e2e = []  # Enable to compile aspirational e2e tests

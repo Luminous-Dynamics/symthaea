@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  # Main FL network node
+  fl-main:
+    build: .
+    container_name: fl-main
+    environment:
+      - FL_NODES=10
+      - FL_ROUNDS=100
+      - FL_BASE_PORT=9000
+    ports:
+      - "9000-9010:9000-9010"
+      - "8080:8080"  # Dashboard
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - fl-network
+    restart: unless-stopped
+
+  # Dashboard service
+  fl-dashboard:
+    build: .
+    container_name: fl-dashboard
+    command: ["python3", "live_dashboard.py"]
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    networks:
+      - fl-network
+    depends_on:
+      - fl-main
+    restart: unless-stopped
+
+networks:
+  fl-network:
+    driver: bridge
+
+volumes:
+  fl-data:
+  fl-logs:

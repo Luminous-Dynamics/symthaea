@@ -1,0 +1,8 @@
+admin_interfaces:
+  - allowed_origins: "*"
+    driver:
+      type: websocket
+      port: 8888
+db_dir: /tmp/holochain_db
+keystore_path: /tmp/holochain_keystore
+log_level: info

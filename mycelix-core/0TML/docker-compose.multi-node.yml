@@ -1,0 +1,292 @@
+version: '3.8'
+
+# ZeroTrustML Multi-Node P2P Testing
+# Simulates 3 hospitals with independent Holochain conductors
+
+services:
+  # ================================================
+  # PostgreSQL (shared for demo - in prod each node has its own)
+  # ================================================
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: zerotrustml-postgres
+    environment:
+      POSTGRES_DB: zerotrustml
+      POSTGRES_USER: zerotrustml
+      POSTGRES_PASSWORD: dev_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Use 5433 to avoid conflict with system PostgreSQL
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zerotrustml"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - zerotrustml-p2p
+
+  # ================================================
+  # Holochain Conductor - Node 1 (Hospital A - Boston)
+  # ================================================
+
+  holochain-node1:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-node1-boston
+    hostname: node1-boston
+    ports:
+      - "8881:8888"  # Admin WebSocket
+      - "8891:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_node1_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-boston
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-p2p:
+        aliases:
+          - hospital-boston
+
+  # ================================================
+  # Holochain Conductor - Node 2 (Hospital B - London)
+  # ================================================
+
+  holochain-node2:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-node2-london
+    hostname: node2-london
+    ports:
+      - "8882:8888"  # Admin WebSocket
+      - "8892:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_node2_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-london
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-p2p:
+        aliases:
+          - hospital-london
+
+  # ================================================
+  # Holochain Conductor - Node 3 (Hospital C - Tokyo)
+  # ================================================
+
+  holochain-node3:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-node3-tokyo
+    hostname: node3-tokyo
+    ports:
+      - "8883:8888"  # Admin WebSocket
+      - "8893:8889"  # App WebSocket
+    volumes:
+      - ./holochain/conductor-config-minimal.yaml:/conductor-config.yaml:ro
+      - holochain_node3_data:/data
+    command: sh -c "echo 'test-passphrase' | holochain -p -c /conductor-config.yaml"
+    environment:
+      - RUST_LOG=warn,holochain=info
+      - HOLOCHAIN_NODE_NAME=hospital-tokyo
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=0
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "8888"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      zerotrustml-p2p:
+        aliases:
+          - hospital-tokyo
+
+  # ================================================
+  # ZeroTrustML Node 1 (Boston - connects to holochain-node1)
+  # ================================================
+
+  zerotrustml-node1:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zerotrustml-node1-boston
+    depends_on:
+      postgres:
+        condition: service_healthy
+      holochain-node1:
+        condition: service_healthy
+    ports:
+      - "8761:8765"  # WebSocket for FL clients
+    environment:
+      - ZEROTRUSTML_NODE_ID=hospital-boston-node1
+      - ZEROTRUSTML_NODE_NAME=Boston Medical Center
+
+      # PostgreSQL (internal Docker network uses standard port)
+      - ZEROTRUSTML_DB_HOST=postgres
+      - ZEROTRUSTML_DB_PORT=5432
+      - ZEROTRUSTML_DB_NAME=zerotrustml
+      - ZEROTRUSTML_DB_USER=zerotrustml
+      - ZEROTRUSTML_DB_PASSWORD=dev_password
+
+      # Holochain (points to node1)
+      - HOLOCHAIN_ENABLED=true
+      - HOLOCHAIN_ADMIN_URL=ws://holochain-node1:8888
+      - HOLOCHAIN_APP_URL=ws://holochain-node1:8889
+
+      # Byzantine resistance
+      - ZEROTRUSTML_BYZANTINE_ENABLED=true
+      - ZEROTRUSTML_POGQ_THRESHOLD=0.35
+
+      - ZEROTRUSTML_LOG_LEVEL=INFO
+    networks:
+      - zerotrustml-p2p
+
+  # ================================================
+  # ZeroTrustML Node 2 (London - connects to holochain-node2)
+  # ================================================
+
+  zerotrustml-node2:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zerotrustml-node2-london
+    depends_on:
+      postgres:
+        condition: service_healthy
+      holochain-node2:
+        condition: service_healthy
+    ports:
+      - "8762:8765"  # WebSocket for FL clients
+    environment:
+      - ZEROTRUSTML_NODE_ID=hospital-london-node2
+      - ZEROTRUSTML_NODE_NAME=London General Hospital
+
+      # PostgreSQL (internal Docker network uses standard port)
+      - ZEROTRUSTML_DB_HOST=postgres
+      - ZEROTRUSTML_DB_PORT=5432
+      - ZEROTRUSTML_DB_NAME=zerotrustml
+      - ZEROTRUSTML_DB_USER=zerotrustml
+      - ZEROTRUSTML_DB_PASSWORD=dev_password
+
+      # Holochain (points to node2)
+      - HOLOCHAIN_ENABLED=true
+      - HOLOCHAIN_ADMIN_URL=ws://holochain-node2:8888
+      - HOLOCHAIN_APP_URL=ws://holochain-node2:8889
+
+      # Byzantine resistance
+      - ZEROTRUSTML_BYZANTINE_ENABLED=true
+      - ZEROTRUSTML_POGQ_THRESHOLD=0.35
+
+      - ZEROTRUSTML_LOG_LEVEL=INFO
+    networks:
+      - zerotrustml-p2p
+
+  # ================================================
+  # ZeroTrustML Node 3 (Tokyo - connects to holochain-node3)
+  # ================================================
+
+  zerotrustml-node3:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zerotrustml-node3-tokyo
+    depends_on:
+      postgres:
+        condition: service_healthy
+      holochain-node3:
+        condition: service_healthy
+    ports:
+      - "8763:8765"  # WebSocket for FL clients
+    environment:
+      - ZEROTRUSTML_NODE_ID=hospital-tokyo-node3
+      - ZEROTRUSTML_NODE_NAME=Tokyo Research Hospital
+
+      # PostgreSQL (internal Docker network uses standard port)
+      - ZEROTRUSTML_DB_HOST=postgres
+      - ZEROTRUSTML_DB_PORT=5432
+      - ZEROTRUSTML_DB_NAME=zerotrustml
+      - ZEROTRUSTML_DB_USER=zerotrustml
+      - ZEROTRUSTML_DB_PASSWORD=dev_password
+
+      # Holochain (points to node3)
+      - HOLOCHAIN_ENABLED=true
+      - HOLOCHAIN_ADMIN_URL=ws://holochain-node3:8888
+      - HOLOCHAIN_APP_URL=ws://holochain-node3:8889
+
+      # Byzantine resistance
+      - ZEROTRUSTML_BYZANTINE_ENABLED=true
+      - ZEROTRUSTML_POGQ_THRESHOLD=0.35
+
+      - ZEROTRUSTML_LOG_LEVEL=INFO
+    networks:
+      - zerotrustml-p2p
+
+  # ================================================
+  # Test Orchestrator (runs FL training across all nodes)
+  # ================================================
+
+  test-orchestrator:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zerotrustml-test-orchestrator
+    depends_on:
+      - zerotrustml-node1
+      - zerotrustml-node2
+      - zerotrustml-node3
+    volumes:
+      - ./tests:/app/tests:ro
+      - ./test_results:/app/test_results
+    environment:
+      - TEST_MODE=multi_node
+      - NODE1_URL=ws://zerotrustml-node1:8765
+      - NODE2_URL=ws://zerotrustml-node2:8765
+      - NODE3_URL=ws://zerotrustml-node3:8765
+    command: >
+      sh -c "
+        echo 'Waiting for all nodes to be ready...';
+        sleep 15;
+        echo 'Running multi-node federated learning test...';
+        python tests/test_multi_node_p2p.py;
+      "
+    networks:
+      - zerotrustml-p2p
+
+volumes:
+  postgres_data:
+    driver: local
+  holochain_node1_data:
+    driver: local
+  holochain_node2_data:
+    driver: local
+  holochain_node3_data:
+    driver: local
+
+networks:
+  zerotrustml-p2p:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16

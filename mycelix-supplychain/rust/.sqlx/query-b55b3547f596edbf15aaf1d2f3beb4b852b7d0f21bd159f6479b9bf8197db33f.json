@@ -1,0 +1,113 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                sl.id, sl.tenant_id, sl.product_id, sl.warehouse_id, sl.location_id,\n                sl.quantity_on_hand, sl.quantity_reserved, sl.quantity_available, sl.quantity_on_order,\n                sl.unit_cost, sl.total_value, sl.last_counted_at,\n                sl.created_at, sl.updated_at,\n                p.sku as product_sku, p.name as product_name\n            FROM inv_stock_levels sl\n            JOIN inv_products p ON sl.product_id = p.id\n            WHERE sl.tenant_id = $1 AND sl.warehouse_id = $2\n            ORDER BY p.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "product_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 3,
+        "name": "warehouse_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 4,
+        "name": "location_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 5,
+        "name": "quantity_on_hand",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 6,
+        "name": "quantity_reserved",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 7,
+        "name": "quantity_available",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 8,
+        "name": "quantity_on_order",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 9,
+        "name": "unit_cost",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "total_value",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "last_counted_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 12,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 13,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 14,
+        "name": "product_sku",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 15,
+        "name": "product_name",
+        "type_info": "Varchar"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "b55b3547f596edbf15aaf1d2f3beb4b852b7d0f21bd159f6479b9bf8197db33f"
+}

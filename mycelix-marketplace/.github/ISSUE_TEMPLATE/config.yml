@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/Luminous-Dynamics/Mycelix-Marketplace/discussions
+    about: Ask questions, share ideas, or discuss the project with the community
+  - name: 📚 Documentation
+    url: https://github.com/Luminous-Dynamics/Mycelix-Marketplace#readme
+    about: Read the project documentation and guides
+  - name: 🌐 Holochain Community
+    url: https://forum.holochain.org/
+    about: Connect with the broader Holochain developer community

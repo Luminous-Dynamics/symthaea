@@ -1,0 +1,41 @@
+# Ablation Study: PoGQ v4.1 WITHOUT Adaptive Hybrid
+# ====================================================
+# Test impact of removing adaptive switching
+# Baseline: v4.1 switches between Mondrian and global based on bucket size
+# Ablation: Use Mondrian-only (no fallback to global)
+
+experiment:
+  name: ablation_no_hybrid
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1_no_hybrid   # Mondrian-only, no global fallback
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: 0.10
+  mondrian_enabled: true
+  mondrian_profiles: ["label", "norm", "direction"]
+  adaptive_hybrid: false         # ❌ DISABLED
+  min_bucket_size: 0             # No switching threshold
+  ema_beta: 0.85
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02

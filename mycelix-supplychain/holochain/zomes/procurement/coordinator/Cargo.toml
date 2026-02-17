@@ -1,0 +1,14 @@
+[package]
+name = "procurement_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "procurement_coordinator"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+holochain_serialized_bytes.workspace = true
+procurement_integrity = { path = "../integrity" }

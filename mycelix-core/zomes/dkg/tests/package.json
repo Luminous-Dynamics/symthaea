@@ -1,0 +1,17 @@
+{
+  "name": "dkg-tests",
+  "version": "0.1.0",
+  "description": "DKG Zome Integration Tests - Synapse Simulation",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:simulation": "vitest run epistemic_simulation.test.ts"
+  },
+  "devDependencies": {
+    "@holochain/client": "^0.20.0",
+    "@holochain/tryorama": "^0.19.0",
+    "typescript": "^5.0.0",
+    "vitest": "^4.0.18"
+  }
+}

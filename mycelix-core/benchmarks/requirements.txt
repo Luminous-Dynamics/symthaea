@@ -1,0 +1,26 @@
+# Mycelix Benchmark Suite Requirements
+# Install with: pip install -r benchmarks/requirements.txt
+
+# Core dependencies
+numpy>=1.21.0
+
+# Optional: GPU acceleration
+# torch>=2.0.0
+
+# Optional: Progress bars
+# tqdm>=4.65.0
+
+# Optional: Visualization
+# matplotlib>=3.7.0
+# seaborn>=0.12.0
+
+# The benchmark suite works with just numpy, but will utilize
+# the full mycelix_fl library if available in the parent 0TML directory.
+#
+# For full functionality, ensure mycelix_fl is installed:
+#   cd /path/to/Mycelix-Core/0TML
+#   pip install -e .
+#
+# For Rust acceleration (100-1000x speedup), build fl-aggregator:
+#   cd /path/to/Mycelix-Core/libs/fl-aggregator
+#   cargo build --release --features python

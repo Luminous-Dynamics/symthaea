@@ -1,0 +1,6 @@
+{
+  "x_t_fp": 50000,
+  "in_warmup": 0,
+  "violation_t": 1,
+  "release_t": 0
+}

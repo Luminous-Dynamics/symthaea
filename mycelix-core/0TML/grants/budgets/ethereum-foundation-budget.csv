@@ -1,0 +1,61 @@
+Category,Item,Description,Amount (USD),Percentage,Months,Monthly Rate,Notes
+Personnel,Lead Architect/Developer,Tristan Stoltz - Full-time development,"$90,000",60%,6,"$15,000","40+ hours/week: Smart contracts, SDK, documentation, community support"
+,,,,,,,
+Infrastructure,Ethereum Testnet Deployment,Sepolia/Goerli contracts + gas fees,"$5,000",3.3%,6,"$833",Contract deployment and ongoing testing transactions
+Infrastructure,Holochain Infrastructure,DHT hosting + cross-chain bridge,"$15,000",10%,6,"$2,500",DID resolution servers and WebSocket infrastructure
+Infrastructure,CI/CD & Testing,GitHub Actions + automated testing,"$7,500",5%,6,"$1,250",Continuous integration and deployment pipelines
+Infrastructure,Developer Tooling,SDK development + GraphQL API hosting,"$10,000",6.7%,6,"$1,667",TypeScript libraries and developer portal
+,,,,,,,
+Security,Smart Contract Audit,Professional 3rd-party security audit,"$20,000",13.3%,1,"$20,000","Trail of Bits, ConsenSys Diligence, or similar"
+Security,Penetration Testing,Key management + API security review,"$2,500",1.7%,1,"$2,500",Security validation for identity infrastructure
+,,,,,,,
+TOTAL,,,$ 150000,100%,,,
+,,,,,,,
+Budget Summary by Category,,,,,,,
+Personnel,,,$ 90000,60%,,,
+Infrastructure,,,$ 37500,25%,,,
+Security,,,$ 22500,15%,,,
+,,,,,,,
+Budget Summary by Month,,,,,,,
+Month 1 (Jan 2026),Development + Infrastructure,"$15,000 personnel + $4,167 infrastructure","$19,167",,,,
+Month 2 (Feb 2026),Development + Infrastructure,"$15,000 personnel + $4,167 infrastructure","$19,167",,,,
+Month 3 (Mar 2026),Development + Infrastructure,"$15,000 personnel + $4,167 infrastructure","$19,167",,,,
+Month 4 (Apr 2026),Development + Infrastructure,"$15,000 personnel + $4,167 infrastructure","$19,167",,,,
+Month 5 (May 2026),"Development + Infrastructure + Audit Start","$15,000 personnel + $4,167 infrastructure + $10,000 audit","$29,167",,,,
+Month 6 (Jun 2026),"Development + Infrastructure + Audit Complete + Pen Test","$15,000 personnel + $4,167 infrastructure + $10,000 audit + $2,500 pen test","$31,667",,,,
+,,,,,,,
+Deliverables by Budget Period,,,,,,,
+Months 1-2,Foundation Layer,"DID method implementation, VC smart contracts, ENS integration",,,,,
+Months 3-4,Reputation Layer,"On-chain reputation commitments, PoGQ aggregation, PoP integration",,,,,
+Month 5,DAO Integration,"Hybrid governance contracts, quadratic funding, Snapshot strategy",,,,,
+Month 6,Production Hardening,"Security audit, documentation, pilot integration, testnet launch",,,,,
+,,,,,,,
+Success Metrics,,,,,,,
+Technical,DID resolution latency,< 500ms,,,,,
+Technical,VC verification time,< 200ms,,,,,
+Technical,Gas cost per reputation update,< $5 (Layer-2),,,,,
+Technical,System uptime,> 99.9%,,,,,
+Adoption,Testnet users,"1,000+ by Month 6",,,,,
+Adoption,DAOs testing governance,10+ DAOs,,,,,
+Adoption,Developers using SDK,100+ developers,,,,,
+Adoption,Major platform integration,"1+ (Gitcoin, Snapshot, or Aragon)",,,,,
+Impact,Sybil detection rate,> 95%,,,,,
+Impact,User retention,> 60% active after 30 days,,,,,
+Impact,Cross-platform portability,Credentials work on 3+ dApps,,,,,
+,,,,,,,
+Risk Mitigation Budget Allocation,,,,,,,
+PoP dependency risk,Multiple PoP providers,"Gitcoin Passport, Worldcoin, BrightID support",Included in infrastructure,,,,"Diversification built into architecture"
+Gas cost risk,Layer-2 deployment,Primary deployment on Optimism/Arbitrum,Included in infrastructure,,,,"Batch updates, off-chain aggregation"
+Security risk,Professional audit + pen test,Defense-in-depth validation,"$22,500 (15% of budget)",,,,"Non-negotiable security allocation"
+Adoption risk,Documentation + pilot integration,Developer experience focus,Built into personnel + infrastructure,,,,"Extensive docs, tutorials, pilot with major platform"
+,,,,,,,
+Fiscal Sponsorship,,,,,,,
+Fiscal Sponsor,Holochain Foundation (pending),"501(c)(3) fiscal sponsorship - 5% overhead",Paid from grant funds if applicable,,,,Standard fiscal sponsorship arrangement
+,,,,,,,
+Notes and Assumptions,,,,,,,
+1,Personnel,"Lead architect (Tristan Stoltz) will dedicate full-time (40+ hours/week) to this project for 6 months, forgoing other income opportunities",,,,,
+2,Infrastructure,"All infrastructure costs are based on conservative estimates; actual costs may be lower due to efficiency optimizations",,,,,
+3,Security,"Security audit is non-negotiable 15% allocation, ensuring battle-tested contracts before mainnet consideration",,,,,
+4,Timeline,"6-month timeline is realistic based on mini-validation completion (Oct 2025) and Stage 1 experiments in progress",,,,,
+5,Open Source,"All deliverables will be MIT/Apache-2.0 licensed, ensuring permissionless use by Ethereum ecosystem",,,,,
+6,Sustainability,"Post-grant sustainability via ecosystem grants, DAO treasury allocations, and Swiss Foundation model (no extraction from users)",,,,,

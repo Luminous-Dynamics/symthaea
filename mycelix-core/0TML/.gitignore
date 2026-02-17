@@ -1,0 +1,68 @@
+# Local development artifacts
+.postgres/
+*.log
+conductor-data*/
+.cargo/
+target/
+*.wasm
+*.dna
+cosmos/wallet.txt
+
+# Temporary test files
+/tmp/*.log
+*.jsonl
+results/*trace*.jsonl
+
+# Grid search temporary results
+results/grid_search_temp/
+
+# Background job logs
+nohup.out
+
+# Large data directories (should not be in git)
+data/
+datasets/
+rust-bridge/
+cosmos/
+holochain-dht-setup/
+zerotrustml-dna/
+
+# Holochain generated artifacts (but track source files!)
+holochain/conductor_data/
+holochain/.hc*
+holochain/zomes/*/target/
+holochain/*/target/
+
+# hApp bundles - only track canonical locations to prevent duplicates
+# Canonical locations (DO NOT ignore):
+#   - holochain/happ/zerotrustml.happ (main hApp)
+#   - holochain/dist/byzantine_defense.happ (build output)
+#   - holochain/deployment-package/bundles/zerotrustml.happ (deployment copy)
+# Ignore all other hApp locations:
+holochain/conductor/*.happ
+holochain/happ/byzantine_defense/*.happ
+holochain/.archive*
+
+# Test outputs and results
+tests/*.log
+tests/*.jsonl
+results/*.jsonl
+results/*trace*.jsonl
+
+# Model checkpoints
+*.pt
+*.pth
+*.ckpt
+
+# Build artifacts
+*.pyc
+__pycache__/
+.pytest_cache/
+*.so
+*.o
+target/
+
+# Environment
+.venv/
+.env
+.postgres/

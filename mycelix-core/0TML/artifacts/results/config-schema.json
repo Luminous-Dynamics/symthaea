@@ -1,0 +1,25 @@
+warning: Git tree '/srv/luminous-dynamics' is dirty
+🍄 Holochain Mycelix Development Environment
+✅ Holochain holochain 0.6.0-dev.23
+✅ hc holochain_cli 0.6.0-dev.23
+
+Commands:
+  holochain -c conductor-config.yaml  - Start conductor
+  hc app pack ./happ                  - Build hApp
+  hc app install                      - Install hApp
+
+thread 'main' panicked at crates/holochain_conductor_api/src/config/conductor.rs:606:43:
+Missing schema field
+stack backtrace:
+   0: __rustc::rust_begin_unwind
+   1: core::panicking::panic_fmt
+   2: core::option::expect_failed
+   3: core::option::Option<T>::expect
+   4: holochain_conductor_api::config::conductor::_::<impl schemars::JsonSchema for holochain_conductor_api::config::conductor::NetworkConfig>::json_schema
+   5: schemars::generate::SchemaGenerator::json_schema_internal
+   6: holochain_conductor_api::config::conductor::_::<impl schemars::JsonSchema for holochain_conductor_api::config::conductor::ConductorConfig>::json_schema
+   7: schemars::generate::SchemaGenerator::into_root_schema_for
+   8: tokio::runtime::runtime::Runtime::block_on
+   9: holochain_util::tokio_helper::block_on_given::{{closure}}
+  10: holochain::main
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.

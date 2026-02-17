@@ -1,0 +1,18 @@
+{
+  "round_id": "fl-round-001-2025-11-15",
+  "model_id": "spanish-learning-model-v1",
+  "participant": "did:key:z6MkrJVnaZkeFzdQyMZu1cgjg7k1pZZ6pvBQ7XJPt4swbTQ2",
+  "parent_model_hash": "blake3:a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a",
+  "grad_commitment": "blake3:5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03",
+  "clipped_l2_norm": 0.87,
+  "local_val_loss": 0.38,
+  "sample_count": 156,
+  "timestamp": 1731770400,
+  "metadata": {
+    "training_time_secs": 45,
+    "epochs": 3,
+    "batch_size": 32,
+    "device": "cpu"
+  },
+  "_note": "The actual gradient is NOT published here. Only the commitment (hash) is on-chain. Gradient is shared P2P with coordinator during aggregation."
+}

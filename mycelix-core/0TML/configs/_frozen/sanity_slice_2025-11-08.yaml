@@ -1,0 +1,48 @@
+# Sanity Slice Configuration
+# ===========================
+# Small-scale experiment run for first-pass validation
+#
+# Total: 2 datasets × 8 attacks × 8 defenses × 2 seeds = 256 experiments
+#
+# Purpose: Generate first draft of Table II with all artifacts
+# Timeline: Day 11-12 (November 9-10, 2025)
+# Target: USENIX Security 2025 (February 8, 2025)
+
+experiment:
+  name: sanity_slice
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: false
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - random_noise
+    - noise_masked
+    - targeted_neuron
+    - collusion
+    - sybil_flip
+    - sleeper_agent
+
+defenses:
+  - fedavg
+  - coord_median
+  - coord_median_safe     # Phase 5 preset
+  - rfa
+  - fltrust
+  - boba
+  - cbf                   # baseline filter (formerly fedguard_strict)
+  - pogq_v4_1             # Phase 2 (EMA+warmup+hysteresis enabled)
+
+statistics:
+  alpha: 0.10
+  margin: 0.02
+  mondrian_profiles: ["label"]

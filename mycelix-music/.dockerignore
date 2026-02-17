@@ -1,0 +1,62 @@
+# Dependencies
+node_modules
+**/node_modules
+
+# Build outputs (will be built in container)
+**/dist
+**/.next
+**/out
+
+# Development files
+.git
+.gitignore
+.env*
+!.env.example
+
+# IDE and editor files
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test files
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+**/coverage
+**/.nyc_output
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Contract artifacts (large)
+contracts/out
+contracts/cache
+contracts/broadcast
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Debug files
+.npm
+.eslintcache
+.turbo
+
+# CI artifacts
+.github/

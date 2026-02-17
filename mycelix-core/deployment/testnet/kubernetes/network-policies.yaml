@@ -1,0 +1,386 @@
+# =============================================================================
+# Mycelix Testnet Network Policies
+# =============================================================================
+# Restricts network traffic using Kubernetes NetworkPolicies.
+# Requires a CNI that supports NetworkPolicy (Calico, Cilium, etc.)
+# =============================================================================
+
+---
+# Default deny all ingress and egress for the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: network-policy
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+
+---
+# FL Nodes Network Policy
+# - Can communicate with other FL nodes (peer-to-peer)
+# - Can reach Bootstrap server for peer discovery
+# - Can reach Redis for caching
+# - Can reach PostgreSQL for state persistence
+# - Egress to external networks for WebRTC (STUN/TURN)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: fl-node-policy
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: fl-node
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: fl-node
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from other FL nodes
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: fl-node
+      ports:
+        - protocol: TCP
+          port: 9998  # HC App port
+        - protocol: TCP
+          port: 39329 # HC Admin port
+        - protocol: UDP
+          port: 10000 # WebRTC data
+          endPort: 10100
+    # Allow traffic from Bootstrap for health checks
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: bootstrap
+      ports:
+        - protocol: TCP
+          port: 8080  # Health check
+        - protocol: TCP
+          port: 9090  # Metrics
+    # Allow traffic from monitoring
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090  # Prometheus metrics
+  egress:
+    # Allow traffic to other FL nodes
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: fl-node
+      ports:
+        - protocol: TCP
+          port: 9998
+        - protocol: TCP
+          port: 39329
+        - protocol: UDP
+          port: 10000
+          endPort: 10100
+    # Allow traffic to Bootstrap
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: bootstrap
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 443
+    # Allow traffic to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow traffic to PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow external WebRTC (STUN/TURN)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: UDP
+          port: 3478  # STUN
+        - protocol: TCP
+          port: 443   # TURN over TLS
+
+---
+# Bootstrap Server Network Policy
+# - Receives connections from FL nodes
+# - Can query Kubernetes API for peer discovery
+# - Exposes HTTP/HTTPS for external access
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: bootstrap-policy
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: bootstrap
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: bootstrap
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from FL nodes
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: fl-node
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 443
+    # Allow from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 443
+    # Allow from monitoring
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: monitoring
+      ports:
+        - protocol: TCP
+          port: 9090
+  egress:
+    # Allow to FL nodes for health checks
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: fl-node
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+    # Allow to Redis
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    # Allow DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Allow Kubernetes API access
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+
+---
+# PostgreSQL Network Policy
+# - Only accepts connections from FL nodes and Bootstrap
+# - No egress except DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-policy
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: postgres
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: postgres
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: fl-node
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: bootstrap
+      ports:
+        - protocol: TCP
+          port: 5432
+  egress:
+    # DNS only
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+---
+# Redis Network Policy
+# - Only accepts connections from FL nodes and Bootstrap
+# - No egress except DNS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: redis-policy
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: redis
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: redis
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: fl-node
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/component: bootstrap
+      ports:
+        - protocol: TCP
+          port: 6379
+  egress:
+    # DNS only
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+
+---
+# Monitoring Network Policy
+# - Can scrape metrics from all pods
+# - Exposes Grafana/Prometheus dashboards
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: monitoring-policy
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: monitoring
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/component: monitoring
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow from ingress for dashboards
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 3000  # Grafana
+        - protocol: TCP
+          port: 9090  # Prometheus
+        - protocol: TCP
+          port: 9093  # Alertmanager
+  egress:
+    # Can scrape all pods in namespace
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 8080
+    # DNS
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Alertmanager external notifications (email, Slack, PagerDuty)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 587  # SMTP

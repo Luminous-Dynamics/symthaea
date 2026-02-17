@@ -1,0 +1,91 @@
+# fl-aggregator Proof Service Configuration
+# Environment variables override these settings with prefix PROOF_
+
+[server]
+# gRPC server host
+host = "0.0.0.0"
+# gRPC server port
+port = 50051
+# Request timeout in seconds
+request_timeout_secs = 300
+# Maximum concurrent proof generations
+max_concurrent = 100
+# Maximum batch size for streaming
+max_batch_size = 1000
+
+[metrics]
+# Prometheus metrics port
+port = 9090
+# Enable detailed metrics
+detailed = true
+
+[proofs]
+# Default security level: Standard96, Standard128, High256
+default_security_level = "Standard128"
+# Enable parallel proof generation
+parallel = true
+# Maximum proof size in bytes (0 = unlimited)
+max_proof_size = 0
+
+[rayon]
+# Number of threads for parallel operations
+# 0 = auto-detect based on CPU cores
+# Recommended: 0 for general use, specific value for containers
+num_threads = 0
+# Thread stack size in bytes (0 = default)
+stack_size = 0
+
+[cache]
+# Maximum cached proofs
+max_entries = 1000
+# TTL in seconds (0 = no expiration)
+ttl_seconds = 3600
+# Enable statistics tracking
+track_stats = true
+
+[rate_limit]
+# Global requests per second
+requests_per_second = 100.0
+# Burst size (token bucket)
+burst_size = 50
+# Enable per-user limits
+per_user_limits = true
+
+[rate_limit.default_quota]
+# Maximum proofs per hour per user
+proofs_per_hour = 1000
+# Maximum proofs per day per user
+proofs_per_day = 10000
+# Maximum bytes per day per user
+bytes_per_day = 104857600  # 100 MB
+# Maximum concurrent requests per user
+max_concurrent = 10
+
+[gpu]
+# Minimum data size to use GPU (elements)
+min_gpu_size = 1024
+# Maximum batch size for GPU operations
+max_batch_size = 1048576  # 1M
+# Enable async GPU operations
+async_enabled = false
+# Fallback to CPU on GPU errors
+cpu_fallback = true
+# Collect GPU statistics
+collect_stats = true
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+# JSON format for structured logging
+json = false
+# Include timestamps
+timestamps = true
+
+[security]
+# Enable request authentication
+auth_enabled = false
+# API key header name
+api_key_header = "X-API-Key"
+# TLS configuration (optional)
+# tls_cert_path = "/path/to/cert.pem"
+# tls_key_path = "/path/to/key.pem"

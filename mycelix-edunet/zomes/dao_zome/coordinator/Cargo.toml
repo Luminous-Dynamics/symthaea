@@ -1,0 +1,31 @@
+[package]
+name = "dao_coordinator"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "DAO coordinator zome - implements governance business logic"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "dao_coordinator"
+
+[dependencies]
+# Holochain Development (HDK) for business logic
+hdk.workspace = true
+
+# Core types
+edunet-core = { path = "../../../crates/edunet-core" }
+
+# Integrity zome (for entry types)
+dao_integrity = { path = "../integrity" }
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Time handling
+chrono.workspace = true
+
+# Crypto
+blake3.workspace = true

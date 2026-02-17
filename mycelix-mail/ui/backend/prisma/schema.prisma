@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String?
+  lastName  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emailAccounts EmailAccount[]
+  folders       Folder[]
+  emails        Email[]
+
+  @@map("users")
+}
+
+model EmailAccount {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  email        String
+  provider     String // gmail, outlook, custom
+  imapHost     String
+  imapPort     Int
+  imapSecure   Boolean  @default(true)
+  imapUser     String
+  imapPassword String // encrypted
+
+  smtpHost     String
+  smtpPort     Int
+  smtpSecure   Boolean  @default(true)
+  smtpUser     String
+  smtpPassword String // encrypted
+
+  isDefault    Boolean  @default(false)
+  lastSyncedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  folders Folder[]
+  emails  Email[]
+
+  @@map("email_accounts")
+}
+
+model Folder {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailAccountId String
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+
+  name       String
+  path       String // IMAP path like "INBOX" or "INBOX/Archive"
+  type       FolderType @default(CUSTOM)
+  unreadCount Int        @default(0)
+  totalCount  Int        @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  emails Email[]
+
+  @@unique([emailAccountId, path])
+  @@map("folders")
+}
+
+enum FolderType {
+  INBOX
+  SENT
+  DRAFTS
+  TRASH
+  SPAM
+  ARCHIVE
+  CUSTOM
+}
+
+model Email {
+  id             String       @id @default(uuid())
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailAccountId String
+  emailAccount   EmailAccount @relation(fields: [emailAccountId], references: [id], onDelete: Cascade)
+  folderId       String
+  folder         Folder       @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  messageId  String  @unique
+  subject    String
+  from       Json // {name: string, address: string}
+  to         Json // [{name: string, address: string}]
+  cc         Json?   // [{name: string, address: string}]
+  bcc        Json?   // [{name: string, address: string}]
+  replyTo    Json?   // [{name: string, address: string}]
+
+  bodyText   String?
+  bodyHtml   String?
+
+  isRead     Boolean  @default(false)
+  isStarred  Boolean  @default(false)
+  isDraft    Boolean  @default(false)
+
+  date       DateTime
+  size       Int      @default(0)
+
+  attachments Attachment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, folderId])
+  @@index([emailAccountId])
+  @@index([date])
+  @@map("emails")
+}
+
+model Attachment {
+  id      String @id @default(uuid())
+  emailId String
+  email   Email  @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  filename    String
+  contentType String
+  size        Int
+  contentId   String?
+  data        Bytes? // Store small attachments, use external storage for large ones
+
+  createdAt DateTime @default(now())
+
+  @@map("attachments")
+}

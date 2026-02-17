@@ -1,0 +1,31 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mycelix-ingress
+spec:
+  tls:
+    - hosts:
+        - mycelix.io
+        - api.mycelix.io
+      secretName: mycelix-prod-tls
+  rules:
+    - host: mycelix.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 3000
+    - host: api.mycelix.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3100

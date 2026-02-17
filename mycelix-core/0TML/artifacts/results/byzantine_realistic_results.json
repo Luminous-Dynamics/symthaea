@@ -1,0 +1,9 @@
+{
+  "timestamp": "2025-09-25T12:51:06.622542",
+  "results": [
+    {
+      "byzantine_fraction": 0.0,
+      "cosine_similarity": 0.9997626573097568,
+      "mse": 0.0004776441869724338,
+      "detection_rate": 1.0,
+      "success": 

@@ -1,0 +1,37 @@
+[package]
+name = "mycelix-holochain-tests"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Holochain conductor integration tests for Mycelix zomes"
+
+[dependencies]
+# Holochain testing framework (SweetTest)
+# Note: sweetest requires matching Holochain version
+# For production: holochain = { version = "0.6", features = ["test_utils"] }
+
+# Async runtime
+tokio = { version = "1.0", features = ["full", "test-util"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Random data generation for tests
+rand = "0.8"
+
+# Test utilities
+pretty_assertions = "1.4"
+
+# Futures for async testing
+futures = "0.3"
+
+[dev-dependencies]
+# When sweetest is available:
+# sweetest = "0.6"
+
+[features]
+# Enable when Holochain conductor is available
+conductor = []
+# Enable for network simulation tests
+network-sim = []

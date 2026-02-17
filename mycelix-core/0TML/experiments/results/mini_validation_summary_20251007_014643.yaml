@@ -1,0 +1,49 @@
+avg_improvement: 0.23247999999999996
+decision: STOP
+elapsed_hours: 0.8528389677736494
+max_improvement: 0.39959999999999996
+min_improvement: 0.0007000000000000339
+results:
+- alpha: 0.1
+  attack: adaptive
+  description: Extreme non-IID + Adaptive attack (hardest single)
+  improvement: 0.37859999999999994
+  multikrum_accuracy: 0.5602
+  pogq_accuracy: 0.9388
+  scenario: extreme_adaptive
+  status: success
+- alpha: 0.1
+  attack: sybil
+  description: Extreme non-IID + Sybil attack (hardest coordinated)
+  improvement: 0.3741000000000001
+  multikrum_accuracy: 0.5629
+  pogq_accuracy: 0.937
+  scenario: extreme_sybil
+  status: success
+- alpha: 100
+  attack: adaptive
+  description: IID + Adaptive attack (control scenario)
+  improvement: 0.0007000000000000339
+  multikrum_accuracy: 0.9763
+  pogq_accuracy: 0.977
+  scenario: iid_adaptive
+  status: success
+- alpha: 1.0
+  attack: gaussian_noise
+  description: Moderate non-IID + Gaussian noise (moderate difficulty)
+  improvement: 0.009399999999999964
+  multikrum_accuracy: 0.9637
+  pogq_accuracy: 0.9731
+  scenario: moderate_gaussian
+  status: success
+- alpha: 0.1
+  attack: null
+  description: Extreme non-IID + No attack (baseline)
+  improvement: 0.39959999999999996
+  multikrum_accuracy: 0.537
+  pogq_accuracy: 0.9366
+  scenario: extreme_noattack
+  status: success
+suite: mini_validation
+timestamp: '2025-10-07T01:46:43.407173'
+total_experiments: 5

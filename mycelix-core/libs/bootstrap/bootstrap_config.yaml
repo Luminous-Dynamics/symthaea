@@ -1,0 +1,151 @@
+# Mycelix Hierarchical Bootstrap Configuration
+# =============================================
+#
+# This configuration removes the single point of failure (SPOF) in bootstrap
+# by defining multiple bootstrap sources with fallback strategies.
+#
+# Architecture:
+#   1. Primary servers: Official Holo + Mycelix-operated (highest trust)
+#   2. Secondary servers: Community-operated (medium trust)
+#   3. Local peer cache: Previously discovered peers (fallback)
+#   4. DHT-based discovery: Gossip-based peer discovery (last resort)
+
+version: "1.0"
+
+bootstrap:
+  # Primary bootstrap servers (official, highly available)
+  # These are tried first in order of priority
+  primary:
+    - url: https://bootstrap.mycelix.net
+      weight: 100
+      region: global
+      timeout_ms: 5000
+
+    - url: https://bootstrap-staging.holo.host
+      weight: 90
+      region: global
+      timeout_ms: 5000
+
+    - url: https://bootstrap.holo.host
+      weight: 85
+      region: global
+      timeout_ms: 5000
+
+  # Secondary bootstrap servers (community-operated)
+  # Used when all primary servers fail
+  secondary:
+    - url: https://bootstrap-community1.mycelix.net
+      weight: 70
+      region: na
+      timeout_ms: 7000
+      operator: community
+
+    - url: https://bootstrap-community2.mycelix.net
+      weight: 65
+      region: eu
+      timeout_ms: 7000
+      operator: community
+
+    - url: https://bootstrap-community3.mycelix.net
+      weight: 60
+      region: asia
+      timeout_ms: 7000
+      operator: community
+
+  # Tertiary bootstrap servers (experimental/dev)
+  # Only used when primary and secondary fail
+  tertiary:
+    - url: https://bootstrap-dev.mycelix.net
+      weight: 40
+      region: global
+      timeout_ms: 10000
+      operator: mycelix-dev
+
+  # Local peer cache configuration
+  # Stores previously discovered peers for offline/fallback use
+  local_peer_cache:
+    enabled: true
+    path: ~/.mycelix/peer_cache.json
+    max_peers: 500
+    max_age_hours: 168  # 7 days
+    min_peers_for_offline: 5
+    refresh_interval_hours: 1
+
+  # DHT-based peer discovery (last resort)
+  # Uses Holochain's DHT gossip to discover peers
+  dht_discovery:
+    enabled: true
+    max_discovery_time_ms: 30000
+    min_peers_before_ready: 3
+    gossip_bootstrap_peers: 5
+
+  # Retry strategy configuration
+  retry_strategy:
+    max_attempts_per_server: 3
+    initial_backoff_ms: 1000
+    max_backoff_ms: 30000
+    backoff_multiplier: 2.0
+    jitter_factor: 0.1
+
+    # Tier-level retries
+    max_tier_retries: 2
+    tier_backoff_ms: 5000
+
+  # Health check configuration
+  health_check:
+    enabled: true
+    interval_seconds: 60
+    timeout_ms: 3000
+    failure_threshold: 3
+    recovery_threshold: 2
+
+  # Circuit breaker settings
+  circuit_breaker:
+    enabled: true
+    failure_threshold: 5
+    reset_timeout_seconds: 300
+    half_open_requests: 3
+
+  # Parallel discovery settings
+  parallel:
+    enabled: true
+    max_concurrent: 3
+    early_success_threshold: 1
+
+# Signal server configuration (for WebRTC)
+signal:
+  primary:
+    - url: wss://signal.holo.host
+      weight: 100
+
+    - url: wss://signal.mycelix.net
+      weight: 90
+
+  secondary:
+    - url: wss://signal-community1.mycelix.net
+      weight: 70
+
+  retry_strategy:
+    max_attempts: 3
+    backoff_ms: 2000
+
+# Network tuning parameters
+network_tuning:
+  gossip_loop_iteration_delay_ms: 1000
+  default_notify_remote_agent_count: 5
+  default_notify_timeout_ms: 10000
+  default_rpc_single_timeout_ms: 10000
+  default_rpc_multi_remote_agent_count: 5
+  default_rpc_multi_timeout_ms: 10000
+  agent_info_expires_after_ms: 1200000
+  tls_in_mem_session_storage: 512
+  proxy_keepalive_ms: 120000
+  proxy_to_expire_ms: 300000
+
+# Metrics and observability
+metrics:
+  enabled: true
+  bootstrap_latency_histogram: true
+  peer_discovery_counter: true
+  cache_hit_rate: true
+  circuit_breaker_state: true

@@ -1,0 +1,29 @@
+# Mycelix Music Platform - Code Owners
+# These owners will be requested for review on PRs that modify these paths
+
+# Default owners for everything
+* @luminous-dynamics/core-team
+
+# Smart contracts require additional review
+/contracts/ @luminous-dynamics/smart-contracts @luminous-dynamics/security
+
+# Infrastructure changes require ops review
+/k8s/ @luminous-dynamics/devops
+/docker-compose*.yml @luminous-dynamics/devops
+/**/Dockerfile @luminous-dynamics/devops
+
+# Security-sensitive files
+/SECURITY.md @luminous-dynamics/security
+/.github/workflows/ @luminous-dynamics/devops @luminous-dynamics/security
+
+# API changes
+/apps/api/ @luminous-dynamics/backend
+
+# Web app changes
+/apps/web/ @luminous-dynamics/frontend
+
+# SDK changes affect both web and external consumers
+/packages/sdk/ @luminous-dynamics/core-team
+
+# CI/CD configuration
+/.github/ @luminous-dynamics/devops

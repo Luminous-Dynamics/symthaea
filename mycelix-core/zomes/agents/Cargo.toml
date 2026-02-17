@@ -1,0 +1,16 @@
+[package]
+name = "mycelix_agents"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+hdk = "0.6.0-dev.17"
+serde = { version = "1.0", features = ["derive"] }
+getrandom = { version = "0.2", features = ["wasm-bindgen"] }
+
+[profile.release]
+opt-level = "z"
+lto = true

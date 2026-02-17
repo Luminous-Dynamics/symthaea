@@ -1,0 +1,166 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: mycelix-testnet
+  labels:
+    app: postgres
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: database
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        app.kubernetes.io/name: mycelix
+        app.kubernetes.io/instance: testnet
+        app.kubernetes.io/component: database
+    spec:
+      securityContext:
+        fsGroup: 999
+        runAsNonRoot: true
+        runAsUser: 999
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: postgres-secrets
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init-scripts
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - mycelix
+                - -d
+                - mycelix_testnet
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - mycelix
+                - -d
+                - mycelix_testnet
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: init-scripts
+          configMap:
+            name: postgres-init-scripts
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          app: postgres
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: standard
+        resources:
+          requests:
+            storage: 50Gi
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-scripts
+  namespace: mycelix-testnet
+data:
+  init.sql: |
+    -- Extensions
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+    -- Nodes table
+    CREATE TABLE IF NOT EXISTS nodes (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        node_id VARCHAR(255) UNIQUE NOT NULL,
+        public_key TEXT NOT NULL,
+        node_type VARCHAR(50) NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        endpoints JSONB NOT NULL DEFAULT '[]',
+        metadata JSONB DEFAULT '{}',
+        reputation_score DECIMAL(10, 4) DEFAULT 100.0000,
+        first_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Blocks table
+    CREATE TABLE IF NOT EXISTS blocks (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        block_number BIGINT UNIQUE NOT NULL,
+        block_hash VARCHAR(66) UNIQUE NOT NULL,
+        parent_hash VARCHAR(66) NOT NULL,
+        proposer_id VARCHAR(255) NOT NULL,
+        timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- FL Rounds table
+    CREATE TABLE IF NOT EXISTS fl_rounds (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        round_number BIGINT UNIQUE NOT NULL,
+        status VARCHAR(50) NOT NULL DEFAULT 'pending',
+        model_version VARCHAR(100) NOT NULL,
+        participants_count INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Faucet requests table
+    CREATE TABLE IF NOT EXISTS faucet_requests (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        address VARCHAR(255) NOT NULL,
+        ip_address INET NOT NULL,
+        amount NUMERIC(78, 0) NOT NULL,
+        status VARCHAR(50) DEFAULT 'pending',
+        requested_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    );
+
+    -- Indexes
+    CREATE INDEX IF NOT EXISTS idx_nodes_node_id ON nodes(node_id);
+    CREATE INDEX IF NOT EXISTS idx_nodes_status ON nodes(status);
+    CREATE INDEX IF NOT EXISTS idx_blocks_number ON blocks(block_number DESC);
+    CREATE INDEX IF NOT EXISTS idx_fl_rounds_number ON fl_rounds(round_number DESC);
+    CREATE INDEX IF NOT EXISTS idx_faucet_requests_address ON faucet_requests(address);
+
+    -- Initial faucet account
+    INSERT INTO nodes (node_id, public_key, node_type, status)
+    VALUES ('faucet', 'FAUCET_PUBLIC_KEY', 'faucet', 'active')
+    ON CONFLICT (node_id) DO NOTHING;

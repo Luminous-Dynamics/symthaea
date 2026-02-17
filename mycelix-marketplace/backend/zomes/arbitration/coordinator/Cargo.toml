@@ -1,0 +1,23 @@
+[package]
+name = "arbitration_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "arbitration_coordinator"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+# Shared utilities
+mycelix_common = { path = "../../../crates/mycelix_common" }
+
+arbitration_integrity = { path = "../integrity" }
+transactions_integrity = { path = "../../transactions/integrity" }
+reputation_integrity = { path = "../../reputation/integrity" }
+
+# Monitoring and metrics
+monitoring = { path = "../../monitoring" }

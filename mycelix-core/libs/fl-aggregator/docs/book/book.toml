@@ -1,0 +1,49 @@
+[book]
+title = "fl-aggregator Proof System"
+authors = ["Luminous Dynamics"]
+language = "en"
+multilingual = false
+src = "src"
+description = "zkSTARK proofs for verifiable federated learning"
+
+[build]
+build-dir = "../build"
+create-missing = true
+
+[output.html]
+default-theme = "rust"
+preferred-dark-theme = "ayu"
+git-repository-url = "https://github.com/luminous-dynamics/mycelix-core"
+edit-url-template = "https://github.com/luminous-dynamics/mycelix-core/edit/main/libs/fl-aggregator/docs/book/{path}"
+additional-css = ["theme/custom.css"]
+additional-js = ["theme/mermaid.min.js", "theme/mermaid-init.js"]
+no-section-label = false
+
+[output.html.fold]
+enable = true
+level = 1
+
+[output.html.playground]
+editable = true
+copyable = true
+copy-js = true
+line-numbers = true
+runnable = false
+
+[output.html.search]
+enable = true
+limit-results = 30
+teaser-word-count = 30
+use-hierarchical-tree = true
+boost-title = 2
+boost-hierarchy = 1
+boost-paragraph = 1
+expand = true
+heading-split-level = 3
+
+[preprocessor.mermaid]
+command = "mdbook-mermaid"
+
+[preprocessor.toc]
+command = "mdbook-toc"
+renderer = ["html"]

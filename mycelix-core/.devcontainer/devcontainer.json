@@ -1,0 +1,106 @@
+{
+  "name": "Mycelix-Core Development",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "stable"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "rust-lang.rust-analyzer",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "tamasfe.even-better-toml",
+        "serayuzgur.crates",
+        "vadimcn.vscode-lldb",
+        "JuanBlanco.solidity",
+        "streetsidesoftware.code-spell-checker",
+        "eamodio.gitlens",
+        "usernamehw.errorlens",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "redhat.vscode-yaml",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "rust-analyzer.checkOnSave.command": "clippy",
+        "rust-analyzer.cargo.features": "all",
+        "editor.formatOnSave": true,
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.analysis.typeCheckingMode": "basic",
+        "[rust]": {
+          "editor.defaultFormatter": "rust-lang.rust-analyzer"
+        },
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.python"
+        },
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "files.watcherExclude": {
+          "**/target/**": true,
+          "**/.hc/**": true,
+          "**/node_modules/**": true
+        }
+      }
+    },
+    "codespaces": {
+      "openFiles": [
+        "docs/GETTING_STARTED.md"
+      ]
+    }
+  },
+  "forwardPorts": [
+    3000,
+    8888,
+    9090,
+    3001,
+    8545
+  ],
+  "portsAttributes": {
+    "3000": {
+      "label": "FL Coordinator API",
+      "onAutoForward": "notify"
+    },
+    "8888": {
+      "label": "Holochain Conductor",
+      "onAutoForward": "silent"
+    },
+    "9090": {
+      "label": "Prometheus Metrics",
+      "onAutoForward": "silent"
+    },
+    "3001": {
+      "label": "Grafana Dashboard",
+      "onAutoForward": "notify"
+    },
+    "8545": {
+      "label": "Local Ethereum (Anvil)",
+      "onAutoForward": "silent"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+  "remoteUser": "vscode",
+  "containerEnv": {
+    "MYCELIX_ENV": "development",
+    "RUST_BACKTRACE": "1",
+    "RUST_LOG": "info,fl_aggregator=debug"
+  },
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+  },
+  "waitFor": "postCreateCommand"
+}

@@ -1,0 +1,17 @@
+---
+manifest_version: "1"
+name: zerotrustml_identity
+integrity:
+  zomes:
+    - name: did_registry
+      bundled: ./target/wasm32-unknown-unknown/release/did_registry.wasm
+    - name: identity_store
+      bundled: ./target/wasm32-unknown-unknown/release/identity_store.wasm
+    - name: reputation_sync
+      bundled: ./target/wasm32-unknown-unknown/release/reputation_sync.wasm
+    - name: guardian_graph
+      bundled: ./target/wasm32-unknown-unknown/release/guardian_graph.wasm
+    - name: governance_record
+      bundled: ./target/wasm32-unknown-unknown/release/governance_record.wasm
+coordinator:
+  zomes: []

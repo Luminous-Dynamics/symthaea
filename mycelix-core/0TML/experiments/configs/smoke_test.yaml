@@ -1,0 +1,66 @@
+# Smoke Test: Verify Grand Slam Fixes Work
+#
+# Purpose: Quick 5-round test to verify:
+# 1. MNIST loads correctly
+# 2. Training produces non-zero accuracy
+# 3. No import errors or path issues
+#
+# Expected: >10% accuracy after 5 rounds on MNIST
+# Time: ~2-3 minutes per baseline
+
+experiment_name: "smoke_test_grand_slam_fixes"
+description: "Quick validation that all Grand Slam fixes work correctly"
+
+dataset:
+  name: "mnist"  # Test MNIST first (fastest)
+  num_train: 60000
+  num_test: 10000
+  # data_dir will use default: /srv/luminous-dynamics/Mycelix-Core/0TML/datasets
+
+data_split:
+  type: "iid"  # Simple IID split for smoke test
+  num_clients: 10
+  seed: 42
+
+training:
+  num_rounds: 5  # Very quick test
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 5
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 0  # No Byzantine for smoke test
+
+byzantine:
+  num_byzantine: 0  # No Byzantine attacks - just test training works
+  attack_types: []
+  severity: 0.0
+  enable_peer_context: false
+
+# Test only FedAvg (simplest baseline)
+baselines:
+  - name: "fedavg"
+    params: {}
+
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+
+device: "cuda"
+
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+  per_round: true
+  final_model: false
+  attack_analysis: false

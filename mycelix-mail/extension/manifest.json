@@ -1,0 +1,65 @@
+{
+  "manifest_version": 3,
+  "name": "Mycelix Mail",
+  "version": "1.0.0",
+  "description": "Mycelix Mail browser extension for trust-verified email",
+  "permissions": [
+    "storage",
+    "notifications",
+    "contextMenus",
+    "activeTab",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://mail.mycelix.com/*",
+    "https://api.mycelix.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Mycelix Mail"
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://mail.google.com/*", "https://outlook.live.com/*"],
+      "js": ["src/content.js"],
+      "css": ["src/content.css"]
+    }
+  ],
+  "options_page": "options.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "commands": {
+    "compose": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+C",
+        "mac": "Command+Shift+C"
+      },
+      "description": "Compose new email"
+    },
+    "quick-trust-check": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+T",
+        "mac": "Command+Shift+T"
+      },
+      "description": "Quick trust check"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*", "src/inject.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

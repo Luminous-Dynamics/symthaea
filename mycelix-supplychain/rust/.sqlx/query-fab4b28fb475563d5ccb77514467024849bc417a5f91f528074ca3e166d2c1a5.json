@@ -1,0 +1,178 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                p.id, p.tenant_id, p.sku, p.name, p.description, p.category_id,\n                p.product_type, p.status, p.unit_of_measure,\n                p.cost_price, p.sale_price, p.currency, p.barcode,\n                p.weight, p.weight_unit,\n                p.dimensions_length, p.dimensions_width, p.dimensions_height, p.dimensions_unit,\n                p.min_stock_level, p.max_stock_level, p.reorder_point, p.reorder_quantity, p.lead_time_days,\n                p.is_active, p.created_at, p.updated_at\n            FROM inv_products p\n            LEFT JOIN inv_stock_levels sl ON p.id = sl.product_id\n            WHERE p.tenant_id = $1\n              AND p.is_active = true\n              AND p.reorder_point IS NOT NULL\n              AND (sl.quantity_on_hand IS NULL OR sl.quantity_on_hand <= p.reorder_point)\n            ORDER BY p.name\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 1,
+        "name": "tenant_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 2,
+        "name": "sku",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 3,
+        "name": "name",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 4,
+        "name": "description",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 5,
+        "name": "category_id",
+        "type_info": "Uuid"
+      },
+      {
+        "ordinal": 6,
+        "name": "product_type",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 7,
+        "name": "status",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 8,
+        "name": "unit_of_measure",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 9,
+        "name": "cost_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 10,
+        "name": "sale_price",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 11,
+        "name": "currency",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 12,
+        "name": "barcode",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 13,
+        "name": "weight",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 14,
+        "name": "weight_unit",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 15,
+        "name": "dimensions_length",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 16,
+        "name": "dimensions_width",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 17,
+        "name": "dimensions_height",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 18,
+        "name": "dimensions_unit",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 19,
+        "name": "min_stock_level",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 20,
+        "name": "max_stock_level",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 21,
+        "name": "reorder_point",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 22,
+        "name": "reorder_quantity",
+        "type_info": "Numeric"
+      },
+      {
+        "ordinal": 23,
+        "name": "lead_time_days",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 24,
+        "name": "is_active",
+        "type_info": "Bool"
+      },
+      {
+        "ordinal": 25,
+        "name": "created_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 26,
+        "name": "updated_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "fab4b28fb475563d5ccb77514467024849bc417a5f91f528074ca3e166d2c1a5"
+}

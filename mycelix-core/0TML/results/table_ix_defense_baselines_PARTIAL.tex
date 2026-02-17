@@ -1,0 +1,33 @@
+% Table IX: Defense Baseline Performance (PARTIAL - awaiting Multi-Krum, Trimmed-Mean, Zeno)
+% Generated from 12 sanity_slice experiments
+% Date: 2025-11-09
+% NOTE: Only 4/7 defenses tested so far
+
+\begin{table}[t]
+\centering
+\caption{Defense Baseline Performance on EMNIST (Non-IID $\alpha=0.3$, 33\% Byzantine)}
+\label{tab:defense_baselines}
+\begin{tabular}{l c c c}
+\toprule
+\textbf{Defense} & \textbf{Sign Flip} & \textbf{Scaling $\times$100} & \textbf{Random Noise} \\
+\midrule
+FedAvg (no defense)       &  83.2 &  84.7 &  84.3 \\
+BOBA                      &  84.7 &  84.4 &    -- \\
+RFA                       &  84.7 &  84.4 &    -- \\
+Coordinate Median         &  84.0 &  83.9 &    -- \\
+Coord. Median (safe)      &  83.6 &  84.0 &    -- \\
+\midrule
+\textit{Multi-Krum}       & \textit{TBD} & \textit{TBD} & \textit{TBD} \\
+\textit{Trimmed-Mean}     & \textit{TBD} & \textit{TBD} & \textit{TBD} \\
+\textit{Zeno}             & \textit{TBD} & \textit{TBD} & \textit{TBD} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% NOTES:
+% - BOBA and RFA show identical performance (84.7% sign_flip, 84.4% scaling)
+% - FedAvg unexpectedly outperforms defenses on scaling_x100 (84.7% vs 84.4%)
+%   → Needs investigation: possible calibration issue?
+% - Coordinate Median variants perform slightly worse (~84.0%)
+% - Random Noise only tested with FedAvg baseline
+% - Still need: Multi-Krum, Trimmed-Mean, Zeno results

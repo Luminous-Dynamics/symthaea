@@ -1,0 +1,69 @@
+# Non-IID Experiment: Pathological Distribution (Extreme Non-IID)
+# Each client gets only 2 digit classes (e.g., client 0 gets only 0s and 1s)
+# Expected: FedAvg may fail to converge, SCAFFOLD critical
+
+experiment_name: "mnist_non_iid_pathological"
+output_dir: "results/non_iid"
+
+dataset:
+  name: "mnist"
+  data_dir: "datasets"
+
+model:
+  architecture: "simple_cnn"
+  params:
+    num_classes: 10
+
+data_split:
+  type: "pathological"
+  shards_per_client: 2  # Each client gets exactly 2 digit classes
+  seed: 42
+  # Example distribution:
+  # Client 0: digits 0, 1
+  # Client 1: digits 2, 3
+  # Client 2: digits 4, 5
+  # Client 3: digits 6, 7
+  # Client 4: digits 8, 9
+  # Clients 5-9: randomly assigned 2 classes each
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 1
+  fraction_clients: 1.0  # Must use all clients to see all classes
+
+training:
+  num_rounds: 200  # Extreme non-IID needs even more rounds
+  eval_every: 10
+  device: "cuda"  # GPU acceleration
+
+baselines:
+  - fedavg     # Baseline - may fail to converge
+  - fedprox    # Proximal term essential here
+  - scaffold   # Control variates - absolutely critical
+  - median     # Coordinate-wise median (robust to outliers)
+
+# Expected Results:
+# - FedAvg: May fail to reach >90% accuracy, severe client drift
+# - FedProx: 10-15% better than FedAvg, helps stabilize
+# - SCAFFOLD: Should achieve ~95-96% accuracy, 5-10x faster
+# - Median: Stable but conservative, ~90-92% accuracy
+
+# Why this is hard:
+# - Clients never see 80% of digit classes
+# - Local models become highly specialized
+# - Model averaging produces poor global model
+# - SCAFFOLD's control variates correct for this drift
+
+# Key Metrics to Track:
+# - Whether FedAvg converges at all
+# - Per-client accuracy (should be bimodal: high on trained classes, low on others)
+# - Global model generalization to unseen classes
+# - Number of rounds to reasonable accuracy (>85%)
+
+# Research Questions:
+# 1. Does FedAvg converge to useful global model?
+# 2. How much does FedProx help vs FedAvg?
+# 3. Does SCAFFOLD achieve near-IID performance despite extreme heterogeneity?
+# 4. What's the minimum useful accuracy threshold?

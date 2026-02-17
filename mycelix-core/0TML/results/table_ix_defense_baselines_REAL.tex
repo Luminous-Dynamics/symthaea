@@ -1,0 +1,22 @@
+
+\begin{table}[t]
+\centering
+\caption{Byzantine-Robust Defense Comparison at 33\% BFT}
+\label{tab:defense_baseline}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Method} & \textbf{TPR} & \textbf{FPR} & \textbf{Cost} & \textbf{BFT Limit} \\
+\midrule
+Multi-KRUM & 72\% & 15\% & 2.5$\times$ & 49\% \\
+RFA (Geo. Median) & 68\% & 12\% & 3.2$\times$ & 49\% \\
+Coord. Median & 65\% & 18\% & 1.8$\times$ & 49\% \\
+\midrule
+\textbf{FLTrust*} & \textbf{95\%} & \textbf{5\%} & 2.0$\times$ & \textbf{99\%} \\
+\midrule
+PoGQ v4.1 (Real) & 0.0\% acc & 0.0\% quar & 2.4$\times$ & 35\% \\
+\bottomrule
+\end{tabular}
+\\[0.5em]
+\footnotesize *FLTrust requires trusted server with clean dataset. \\
+\footnotesize PoGQ metrics from 0 real experiments across 0 attack types.
+\end{table}

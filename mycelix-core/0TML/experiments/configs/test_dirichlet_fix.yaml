@@ -1,0 +1,57 @@
+# Dirichlet Fix Verification Test
+# Tests the specific configuration that caused 192 experiment failures
+# 100 clients + EMNIST (47 classes) + Dirichlet α=0.3
+
+experiment_name: "dirichlet_fix_verification"
+description: "Verify Dirichlet split bug is fixed for 100 clients with EMNIST"
+
+dataset:
+  name: "emnist"
+  num_train: 60000
+  num_test: 10000
+
+data_split:
+  type: "dirichlet"
+  num_clients: 100  # THIS is what triggered the bug
+  alpha: 0.3        # Concentration parameter
+  seed: 42
+
+training:
+  num_rounds: 2  # Just 2 rounds to verify it doesn't crash
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+
+federated:
+  num_clients: 100
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 2
+  learning_rate: 0.01
+  fraction_clients: 0.1  # Only use 10 clients per round for speed
+  num_byzantine: 0
+
+byzantine:
+  num_byzantine: 0
+  attack_types: []
+  severity: 0.0
+  enable_peer_context: false
+
+# Test only FedAvg
+baselines:
+  - name: "fedavg"
+    params: {}
+
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 47  # EMNIST balanced
+
+device: "cuda"
+
+save:
+  metrics:
+    - test_accuracy
+  per_round: false
+  final_model: false
+  attack_analysis: false

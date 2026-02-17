@@ -1,0 +1,50 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: provenance-service
+  namespace: mycelix
+  labels:
+    app: provenance-service
+  annotations:
+    # Nginx ingress controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+
+    # Rate limiting (nginx ingress)
+    nginx.ingress.kubernetes.io/limit-rps: "100"
+    nginx.ingress.kubernetes.io/limit-burst-multiplier: "2"
+
+    # CORS (optional, service handles CORS internally)
+    # nginx.ingress.kubernetes.io/enable-cors: "true"
+    # nginx.ingress.kubernetes.io/cors-allow-origin: "https://app.example.com"
+
+    # Body size limit
+    nginx.ingress.kubernetes.io/proxy-body-size: "5m"
+
+    # Timeouts
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "30"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "30"
+
+    # TLS/SSL
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # If using cert-manager
+
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.mycelix.example.com
+    secretName: provenance-service-tls
+
+  rules:
+  - host: api.mycelix.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: provenance-service
+            port:
+              number: 80

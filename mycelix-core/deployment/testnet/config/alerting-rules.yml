@@ -1,0 +1,202 @@
+# Mycelix Testnet - Alerting Rules
+groups:
+  - name: mycelix_node_alerts
+    interval: 30s
+    rules:
+      # Node availability
+      - alert: NodeDown
+        expr: up{job=~"mycelix-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mycelix node {{ $labels.instance }} is down"
+          description: "Node {{ $labels.instance }} has been unreachable for more than 2 minutes."
+
+      - alert: BootstrapNodeDown
+        expr: up{job="mycelix-bootstrap"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Bootstrap node is down"
+          description: "The bootstrap node is unreachable. New nodes cannot join the network."
+
+      # Peer connectivity
+      - alert: LowPeerCount
+        expr: mycelix_peers_connected < 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Node {{ $labels.node_id }} has low peer count"
+          description: "Node has only {{ $value }} peers connected. Minimum recommended is 3."
+
+      - alert: NoPeers
+        expr: mycelix_peers_connected == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node {{ $labels.node_id }} has no peers"
+          description: "Node is completely isolated with no peer connections."
+
+  - name: mycelix_fl_alerts
+    interval: 30s
+    rules:
+      # Federated Learning metrics
+      - alert: FLRoundStalled
+        expr: increase(mycelix_fl_rounds_completed_total[30m]) == 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "FL rounds have stalled"
+          description: "No federated learning rounds have completed in the last 30 minutes."
+
+      - alert: InsufficientFLParticipants
+        expr: mycelix_fl_active_participants < 3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Insufficient FL participants"
+          description: "Only {{ $value }} participants active. Minimum 3 required for aggregation."
+
+      - alert: HighGradientRejectionRate
+        expr: rate(mycelix_fl_gradients_rejected_total[5m]) / rate(mycelix_fl_gradients_submitted_total[5m]) > 0.3
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High gradient rejection rate"
+          description: "More than 30% of submitted gradients are being rejected."
+
+      - alert: GradientAggregationFailure
+        expr: increase(mycelix_fl_aggregation_failures_total[5m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: "Gradient aggregation failure"
+          description: "Gradient aggregation has failed. Check node logs for details."
+
+  - name: mycelix_consensus_alerts
+    interval: 30s
+    rules:
+      # Consensus metrics
+      - alert: ConsensusStalled
+        expr: increase(mycelix_blocks_produced_total[10m]) == 0
+        for: 15m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Consensus has stalled"
+          description: "No new blocks have been produced in the last 15 minutes."
+
+      - alert: HighBlockTime
+        expr: mycelix_block_time_seconds > 30
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Block time is high"
+          description: "Average block time is {{ $value }}s, expected ~5s."
+
+      - alert: ValidatorSetTooSmall
+        expr: mycelix_active_validators < 3
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Validator set too small"
+          description: "Only {{ $value }} active validators. Minimum 3 required for BFT consensus."
+
+  - name: mycelix_resource_alerts
+    interval: 30s
+    rules:
+      # Resource utilization
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.container_name }}"
+          description: "Container is using {{ $value | humanizePercentage }} of its memory limit."
+
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.9
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.container_name }}"
+          description: "Container CPU usage is above 90% for 10 minutes."
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space"
+          description: "Less than 10% disk space remaining."
+
+  - name: mycelix_faucet_alerts
+    interval: 60s
+    rules:
+      - alert: FaucetDepleted
+        expr: mycelix_faucet_balance < 1000000000000000000000
+        labels:
+          severity: warning
+        annotations:
+          summary: "Faucet balance is low"
+          description: "Faucet balance is below 1000 tokens. Consider refilling."
+
+      - alert: FaucetHighRequestRate
+        expr: rate(mycelix_faucet_requests_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High faucet request rate"
+          description: "Faucet is receiving unusually high request rate. Possible abuse."
+
+  - name: mycelix_database_alerts
+    interval: 30s
+    rules:
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PostgreSQL is down"
+          description: "PostgreSQL database is unreachable."
+
+      - alert: PostgresHighConnections
+        expr: pg_stat_activity_count > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High PostgreSQL connection count"
+          description: "PostgreSQL has {{ $value }} active connections."
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis cache is unreachable."
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis memory usage high"
+          description: "Redis is using {{ $value | humanizePercentage }} of its max memory."

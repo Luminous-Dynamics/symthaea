@@ -1,0 +1,121 @@
+{
+  "dashboard": {
+    "title": "ZeroTrustML Performance Metrics",
+    "tags": ["zerotrustml", "performance", "optimization"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Validation Time (p50, p95, p99)",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 0, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(zerotrustml_validation_time_seconds_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(zerotrustml_validation_time_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(zerotrustml_validation_time_seconds_bucket[5m]))",
+            "legendFormat": "p99"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Time"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Compression Ratio",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 6, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(zerotrustml_compression_ratio_bucket[5m]))",
+            "legendFormat": "Median Compression"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Ratio"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Gradient Size Distribution",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 12, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(zerotrustml_gradient_size_bytes_bucket[5m]))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(zerotrustml_gradient_size_bytes_bucket[5m]))",
+            "legendFormat": "p95"
+          }
+        ],
+        "yaxes": [
+          {"format": "bytes", "label": "Size"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Cache Hit Rate",
+        "type": "gauge",
+        "gridPos": {"x": 12, "y": 0, "w": 6, "h": 8},
+        "targets": [
+          {
+            "expr": "sum(rate(zerotrustml_cache_operations_total{result=\"hit\"}[5m])) / sum(rate(zerotrustml_cache_operations_total[5m]))",
+            "legendFormat": "Hit Rate"
+          }
+        ],
+        "options": {
+          "min": 0,
+          "max": 1,
+          "thresholds": [
+            {"value": 0, "color": "red"},
+            {"value": 0.5, "color": "yellow"},
+            {"value": 0.8, "color": "green"}
+          ]
+        }
+      },
+      {
+        "id": 5,
+        "title": "Storage Operations",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 18, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "sum by (backend, operation) (rate(zerotrustml_storage_operations_total{result=\"success\"}[5m]))",
+            "legendFormat": "{{backend}}: {{operation}}"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Storage Latency",
+        "type": "graph",
+        "gridPos": {"x": 0, "y": 24, "w": 12, "h": 6},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, sum by (backend, operation, le) (rate(zerotrustml_storage_latency_seconds_bucket[5m])))",
+            "legendFormat": "{{backend}}: {{operation}}"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Latency"},
+          {"format": "short"}
+        ]
+      }
+    ],
+    "refresh": "5s",
+    "schemaVersion": 27,
+    "version": 1
+  }
+}

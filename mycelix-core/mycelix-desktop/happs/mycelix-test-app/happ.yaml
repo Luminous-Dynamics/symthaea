@@ -1,0 +1,11 @@
+---
+manifest_version: "1"
+name: mycelix-test-app
+description: Test hApp for Mycelix Desktop
+roles:
+  - name: mycelix-test-role
+    dna:
+      bundled: "../../dnas/mycelix-test/mycelix-test.dna"
+    provisioning:
+      strategy: create
+      deferred: false

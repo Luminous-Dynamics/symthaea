@@ -1,0 +1,17 @@
+{
+  "validation_id": "AEGIS-GEN5-20251112-093604",
+  "git_commit": "a26775d3380f51f0929e8967f4a13ba6c2960cb9",
+  "state_hash": "17782d23cfec0d01",
+  "timestamp": "2025-11-12T09:36:04.664346",
+  "python_version": "3.13.8",
+  "numpy_version": "2.3.3",
+  "seeds": [
+    101,
+    202,
+    303,
+    404,
+    505
+  ],
+  "mode": "phase-a",
+  "total_runs": 14
+}

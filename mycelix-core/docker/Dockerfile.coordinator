@@ -1,0 +1,606 @@
+# =============================================================================
+# Mycelix-Core FL Coordinator Dockerfile
+# =============================================================================
+# Multi-stage build for Python + Rust federated learning coordinator
+
+# -----------------------------------------------------------------------------
+# Stage 1: Rust Builder
+# -----------------------------------------------------------------------------
+FROM rust:1.75-bookworm AS rust-builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    cmake \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy Rust source files
+COPY rust/ ./rust/
+COPY Cargo.toml Cargo.lock* ./
+
+# Build Rust components in release mode
+RUN cd rust && \
+    if [ -f Cargo.toml ]; then \
+        cargo build --release; \
+    else \
+        echo "No Rust Cargo.toml found, creating stub library"; \
+        mkdir -p src && \
+        echo 'pub fn init() { println!("Mycelix Rust core initialized"); }' > src/lib.rs && \
+        echo '[package]\nname = "mycelix-core"\nversion = "0.1.0"\nedition = "2021"\n\n[lib]\ncrate-type = ["cdylib"]' > Cargo.toml && \
+        cargo build --release; \
+    fi
+
+# -----------------------------------------------------------------------------
+# Stage 2: Python Builder
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS python-builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create virtual environment
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy requirements and install dependencies
+COPY requirements*.txt ./
+RUN pip install --upgrade pip && \
+    if [ -f requirements.txt ]; then \
+        pip install --no-cache-dir -r requirements.txt; \
+    else \
+        pip install --no-cache-dir \
+            fastapi[all]==0.109.0 \
+            uvicorn[standard]==0.27.0 \
+            numpy==1.26.3 \
+            scipy==1.12.0 \
+            torch==2.1.2 \
+            cryptography==42.0.0 \
+            pydantic==2.5.3 \
+            redis==5.0.1 \
+            asyncpg==0.29.0 \
+            sqlalchemy[asyncio]==2.0.25 \
+            prometheus-client==0.19.0 \
+            python-jose[cryptography]==3.3.0 \
+            httpx==0.26.0 \
+            structlog==24.1.0; \
+    fi
+
+# -----------------------------------------------------------------------------
+# Stage 3: Runtime
+# -----------------------------------------------------------------------------
+FROM python:3.11-slim-bookworm AS runtime
+
+LABEL maintainer="Mycelix Team"
+LABEL description="Mycelix-Core Federated Learning Coordinator"
+LABEL version="0.1.0"
+
+WORKDIR /app
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd -m -u 1000 mycelix
+
+# Copy virtual environment from builder
+COPY --from=python-builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Copy Rust libraries
+COPY --from=rust-builder /build/rust/target/release/*.so /usr/local/lib/ 2>/dev/null || true
+ENV LD_LIBRARY_PATH="/usr/local/lib:$LD_LIBRARY_PATH"
+
+# Copy application code
+COPY --chown=mycelix:mycelix src/ ./src/
+COPY --chown=mycelix:mycelix coordinator/ ./coordinator/
+COPY --chown=mycelix:mycelix config/ ./config/
+
+# Create coordinator module if it doesn't exist
+RUN mkdir -p coordinator && \
+    if [ ! -f coordinator/__init__.py ]; then \
+        echo '"""Mycelix FL Coordinator"""' > coordinator/__init__.py; \
+    fi
+
+# Create the main coordinator application
+RUN cat > coordinator/main.py << 'COORDINATOR_CODE'
+"""
+Mycelix-Core Federated Learning Coordinator
+Main entry point for the FL coordination server
+"""
+
+import asyncio
+import os
+import json
+import time
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+from typing import Dict, List, Optional, Any
+from contextlib import asynccontextmanager
+
+import structlog
+from fastapi import FastAPI, HTTPException, Depends, BackgroundTasks, Query
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from starlette.responses import Response
+import redis.asyncio as redis
+import numpy as np
+
+# Configure structured logging
+structlog.configure(
+    processors=[
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.JSONRenderer()
+    ]
+)
+logger = structlog.get_logger()
+
+# =============================================================================
+# Prometheus Metrics
+# =============================================================================
+REQUESTS_TOTAL = Counter('mycelix_requests_total', 'Total requests', ['method', 'endpoint', 'status'])
+REQUEST_LATENCY = Histogram('mycelix_request_latency_seconds', 'Request latency', ['endpoint'])
+ACTIVE_NODES = Gauge('mycelix_active_nodes', 'Number of active FL nodes')
+AGGREGATION_ROUNDS = Counter('mycelix_aggregation_rounds_total', 'Total aggregation rounds')
+BYZANTINE_DETECTIONS = Counter('mycelix_byzantine_detections_total', 'Byzantine node detections')
+MODEL_UPDATES = Counter('mycelix_model_updates_total', 'Total model updates received')
+CONVERGENCE_SCORE = Gauge('mycelix_convergence_score', 'Current model convergence score')
+NODE_HEALTH = Gauge('mycelix_node_health', 'Node health status', ['node_id'])
+
+# =============================================================================
+# Data Models
+# =============================================================================
+class NodeRegistration(BaseModel):
+    node_id: str
+    capabilities: Dict[str, Any] = Field(default_factory=dict)
+    public_key: Optional[str] = None
+
+class ModelUpdate(BaseModel):
+    node_id: str
+    round_id: int
+    gradients: List[float]
+    metrics: Dict[str, float] = Field(default_factory=dict)
+    timestamp: float = Field(default_factory=time.time)
+    signature: Optional[str] = None
+
+class AggregationResult(BaseModel):
+    round_id: int
+    aggregated_weights: List[float]
+    participating_nodes: List[str]
+    byzantine_detected: List[str]
+    convergence_score: float
+    timestamp: float
+
+class NodeStatus(BaseModel):
+    node_id: str
+    status: str
+    last_seen: float
+    rounds_participated: int
+    trust_score: float
+
+class SystemStatus(BaseModel):
+    status: str
+    version: str
+    uptime_seconds: float
+    coordinator_id: str
+    current_round: int
+    active_nodes: int
+    total_aggregations: int
+    byzantine_detections: int
+    model_version: str
+    convergence_score: float
+    services: Dict[str, Dict[str, Any]]
+
+# =============================================================================
+# Byzantine Detection
+# =============================================================================
+class ByzantineDetector:
+    """Detects malicious or faulty nodes in federated learning"""
+
+    def __init__(self, threshold: float = 0.33):
+        self.threshold = threshold
+        self.node_history: Dict[str, List[float]] = {}
+        self.trust_scores: Dict[str, float] = {}
+
+    def analyze_update(self, node_id: str, gradients: List[float], all_updates: List[ModelUpdate]) -> tuple[bool, float]:
+        """Analyze if an update is potentially byzantine"""
+        if len(all_updates) < 3:
+            return False, 1.0
+
+        # Calculate median gradient
+        all_grads = np.array([u.gradients for u in all_updates])
+        median_grad = np.median(all_grads, axis=0)
+
+        # Calculate node's deviation from median
+        node_grad = np.array(gradients)
+        deviation = np.linalg.norm(node_grad - median_grad) / (np.linalg.norm(median_grad) + 1e-8)
+
+        # Update trust score
+        current_trust = self.trust_scores.get(node_id, 1.0)
+        if deviation > 2.0:  # Significant deviation
+            new_trust = max(0.0, current_trust - 0.1)
+            is_byzantine = new_trust < self.threshold
+        else:
+            new_trust = min(1.0, current_trust + 0.01)
+            is_byzantine = False
+
+        self.trust_scores[node_id] = new_trust
+
+        # Track history
+        if node_id not in self.node_history:
+            self.node_history[node_id] = []
+        self.node_history[node_id].append(deviation)
+
+        return is_byzantine, new_trust
+
+    def get_trust_score(self, node_id: str) -> float:
+        return self.trust_scores.get(node_id, 1.0)
+
+# =============================================================================
+# Secure Aggregation
+# =============================================================================
+class SecureAggregator:
+    """Implements secure aggregation with differential privacy"""
+
+    def __init__(self, epsilon: float = 1.0, delta: float = 1e-5):
+        self.epsilon = epsilon
+        self.delta = delta
+
+    def aggregate(self, updates: List[ModelUpdate], trust_scores: Dict[str, float]) -> tuple[List[float], float]:
+        """Aggregate model updates with trust-weighted averaging and DP noise"""
+        if not updates:
+            return [], 0.0
+
+        # Filter out untrusted nodes
+        trusted_updates = [u for u in updates if trust_scores.get(u.node_id, 1.0) > 0.3]
+
+        if not trusted_updates:
+            trusted_updates = updates[:3]  # Fallback to first 3
+
+        # Trust-weighted aggregation
+        weights = np.array([trust_scores.get(u.node_id, 1.0) for u in trusted_updates])
+        weights = weights / weights.sum()
+
+        gradients = np.array([u.gradients for u in trusted_updates])
+        aggregated = np.average(gradients, axis=0, weights=weights)
+
+        # Add differential privacy noise
+        sensitivity = np.max(np.abs(aggregated)) * 0.1
+        noise_scale = sensitivity * np.sqrt(2 * np.log(1.25 / self.delta)) / self.epsilon
+        noise = np.random.laplace(0, noise_scale, aggregated.shape)
+        aggregated_with_dp = aggregated + noise
+
+        # Calculate convergence score (gradient magnitude reduction)
+        convergence = 1.0 / (1.0 + np.linalg.norm(aggregated))
+
+        return aggregated_with_dp.tolist(), float(convergence)
+
+# =============================================================================
+# Coordinator State
+# =============================================================================
+class CoordinatorState:
+    def __init__(self):
+        self.start_time = time.time()
+        self.coordinator_id = hashlib.sha256(secrets.token_bytes(32)).hexdigest()[:16]
+        self.current_round = 0
+        self.total_aggregations = 0
+        self.byzantine_detections = 0
+        self.model_version = os.getenv("MODEL_VERSION", "1.0.0")
+        self.convergence_score = 0.0
+
+        self.nodes: Dict[str, NodeStatus] = {}
+        self.pending_updates: Dict[int, List[ModelUpdate]] = {}
+
+        self.byzantine_detector = ByzantineDetector(
+            threshold=float(os.getenv("BFT_THRESHOLD", "0.33"))
+        )
+        self.secure_aggregator = SecureAggregator(
+            epsilon=float(os.getenv("DIFFERENTIAL_PRIVACY_EPSILON", "1.0")),
+            delta=float(os.getenv("DIFFERENTIAL_PRIVACY_DELTA", "0.00001"))
+        )
+
+        self.redis_client: Optional[redis.Redis] = None
+        self.services_status: Dict[str, Dict[str, Any]] = {}
+
+state = CoordinatorState()
+
+# =============================================================================
+# Lifespan Management
+# =============================================================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Manage application lifespan"""
+    logger.info("Starting Mycelix FL Coordinator")
+
+    # Initialize Redis connection
+    redis_host = os.getenv("REDIS_HOST", "redis")
+    redis_port = int(os.getenv("REDIS_PORT", "6379"))
+    redis_password = os.getenv("REDIS_PASSWORD")
+
+    try:
+        state.redis_client = redis.Redis(
+            host=redis_host,
+            port=redis_port,
+            password=redis_password,
+            decode_responses=True
+        )
+        await state.redis_client.ping()
+        state.services_status["redis"] = {"status": "healthy", "connected": True}
+        logger.info("Redis connection established")
+    except Exception as e:
+        logger.warning(f"Redis connection failed: {e}")
+        state.services_status["redis"] = {"status": "unavailable", "error": str(e)}
+
+    # Check PostgreSQL
+    postgres_host = os.getenv("POSTGRES_HOST", "postgres")
+    state.services_status["postgres"] = {"status": "configured", "host": postgres_host}
+
+    # Check Prometheus
+    state.services_status["prometheus"] = {"status": "configured", "port": 9090}
+
+    # Update metrics
+    ACTIVE_NODES.set(0)
+    CONVERGENCE_SCORE.set(0.0)
+
+    yield
+
+    # Cleanup
+    if state.redis_client:
+        await state.redis_client.close()
+    logger.info("Mycelix FL Coordinator shutdown complete")
+
+# =============================================================================
+# FastAPI Application
+# =============================================================================
+app = FastAPI(
+    title="Mycelix-Core FL Coordinator",
+    description="Federated Learning Coordinator with Byzantine Fault Tolerance",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# =============================================================================
+# Health & Status Endpoints
+# =============================================================================
+@app.get("/health")
+async def health_check():
+    """Simple health check endpoint"""
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+
+@app.get("/status", response_model=SystemStatus)
+async def detailed_status():
+    """Detailed system status"""
+    uptime = time.time() - state.start_time
+
+    return SystemStatus(
+        status="operational",
+        version="0.1.0",
+        uptime_seconds=uptime,
+        coordinator_id=state.coordinator_id,
+        current_round=state.current_round,
+        active_nodes=len([n for n in state.nodes.values() if n.status == "active"]),
+        total_aggregations=state.total_aggregations,
+        byzantine_detections=state.byzantine_detections,
+        model_version=state.model_version,
+        convergence_score=state.convergence_score,
+        services=state.services_status
+    )
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus metrics endpoint"""
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
+
+# =============================================================================
+# Node Management Endpoints
+# =============================================================================
+@app.post("/nodes/register")
+async def register_node(registration: NodeRegistration):
+    """Register a new FL node"""
+    node_id = registration.node_id
+
+    state.nodes[node_id] = NodeStatus(
+        node_id=node_id,
+        status="active",
+        last_seen=time.time(),
+        rounds_participated=0,
+        trust_score=1.0
+    )
+
+    ACTIVE_NODES.set(len([n for n in state.nodes.values() if n.status == "active"]))
+    NODE_HEALTH.labels(node_id=node_id).set(1.0)
+
+    logger.info("Node registered", node_id=node_id)
+
+    return {
+        "status": "registered",
+        "node_id": node_id,
+        "current_round": state.current_round,
+        "coordinator_id": state.coordinator_id
+    }
+
+@app.get("/nodes")
+async def list_nodes():
+    """List all registered nodes"""
+    return {"nodes": list(state.nodes.values())}
+
+@app.get("/nodes/{node_id}")
+async def get_node(node_id: str):
+    """Get specific node status"""
+    if node_id not in state.nodes:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return state.nodes[node_id]
+
+# =============================================================================
+# Federated Learning Endpoints
+# =============================================================================
+@app.post("/rounds/{round_id}/submit")
+async def submit_update(round_id: int, update: ModelUpdate, background_tasks: BackgroundTasks):
+    """Submit model update for a round"""
+    if update.node_id not in state.nodes:
+        raise HTTPException(status_code=400, detail="Node not registered")
+
+    # Update node status
+    state.nodes[update.node_id].last_seen = time.time()
+    state.nodes[update.node_id].rounds_participated += 1
+
+    # Store update
+    if round_id not in state.pending_updates:
+        state.pending_updates[round_id] = []
+    state.pending_updates[round_id].append(update)
+
+    MODEL_UPDATES.inc()
+
+    # Check if we should trigger aggregation
+    min_nodes = int(os.getenv("MIN_NODES_FOR_AGGREGATION", "3"))
+    if len(state.pending_updates[round_id]) >= min_nodes:
+        background_tasks.add_task(perform_aggregation, round_id)
+
+    logger.info("Update submitted", node_id=update.node_id, round_id=round_id)
+
+    return {"status": "accepted", "round_id": round_id}
+
+@app.get("/rounds/{round_id}/status")
+async def round_status(round_id: int):
+    """Get round status"""
+    updates = state.pending_updates.get(round_id, [])
+    return {
+        "round_id": round_id,
+        "updates_received": len(updates),
+        "participating_nodes": [u.node_id for u in updates]
+    }
+
+@app.post("/rounds/new")
+async def start_new_round():
+    """Start a new aggregation round"""
+    state.current_round += 1
+    state.pending_updates[state.current_round] = []
+
+    logger.info("New round started", round_id=state.current_round)
+
+    return {
+        "round_id": state.current_round,
+        "status": "started",
+        "timestamp": time.time()
+    }
+
+async def perform_aggregation(round_id: int):
+    """Perform secure aggregation for a round"""
+    updates = state.pending_updates.get(round_id, [])
+    if not updates:
+        return
+
+    # Detect byzantine nodes
+    byzantine_nodes = []
+    for update in updates:
+        is_byzantine, trust = state.byzantine_detector.analyze_update(
+            update.node_id, update.gradients, updates
+        )
+        if is_byzantine:
+            byzantine_nodes.append(update.node_id)
+            state.byzantine_detections += 1
+            BYZANTINE_DETECTIONS.inc()
+            logger.warning("Byzantine node detected", node_id=update.node_id)
+
+    # Perform aggregation
+    trust_scores = {n: state.byzantine_detector.get_trust_score(n) for n in state.nodes}
+    aggregated, convergence = state.secure_aggregator.aggregate(updates, trust_scores)
+
+    state.convergence_score = convergence
+    state.total_aggregations += 1
+    AGGREGATION_ROUNDS.inc()
+    CONVERGENCE_SCORE.set(convergence)
+
+    # Update node health metrics
+    for node_id in state.nodes:
+        trust = state.byzantine_detector.get_trust_score(node_id)
+        NODE_HEALTH.labels(node_id=node_id).set(trust)
+        state.nodes[node_id].trust_score = trust
+
+    logger.info(
+        "Aggregation complete",
+        round_id=round_id,
+        participants=len(updates),
+        byzantine_detected=len(byzantine_nodes),
+        convergence=convergence
+    )
+
+# =============================================================================
+# Analytics Endpoints
+# =============================================================================
+@app.get("/analytics/convergence")
+async def convergence_history(limit: int = Query(default=100, le=1000)):
+    """Get convergence history"""
+    return {
+        "current_score": state.convergence_score,
+        "total_rounds": state.total_aggregations,
+        "model_version": state.model_version
+    }
+
+@app.get("/analytics/byzantine")
+async def byzantine_stats():
+    """Get Byzantine detection statistics"""
+    trust_scores = {
+        node_id: state.byzantine_detector.get_trust_score(node_id)
+        for node_id in state.nodes
+    }
+
+    return {
+        "total_detections": state.byzantine_detections,
+        "trust_scores": trust_scores,
+        "threshold": state.byzantine_detector.threshold
+    }
+
+# =============================================================================
+# Entry Point
+# =============================================================================
+if __name__ == "__main__":
+    import uvicorn
+
+    host = os.getenv("COORDINATOR_HOST", "0.0.0.0")
+    port = int(os.getenv("COORDINATOR_PORT", "8080"))
+    workers = int(os.getenv("COORDINATOR_WORKERS", "1"))
+
+    uvicorn.run(
+        "coordinator.main:app",
+        host=host,
+        port=port,
+        workers=workers,
+        log_level=os.getenv("LOG_LEVEL", "info").lower()
+    )
+COORDINATOR_CODE
+
+# Set permissions
+RUN chown -R mycelix:mycelix /app
+
+USER mycelix
+
+# Expose ports
+EXPOSE 8080 9100
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Default command
+CMD ["python", "-m", "uvicorn", "coordinator.main:app", "--host", "0.0.0.0", "--port", "8080"]

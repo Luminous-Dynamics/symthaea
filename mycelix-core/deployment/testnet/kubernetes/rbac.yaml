@@ -1,0 +1,189 @@
+# =============================================================================
+# Mycelix Testnet RBAC Configuration
+# =============================================================================
+# Role-Based Access Control for secure Kubernetes deployment.
+# Follows principle of least privilege.
+# =============================================================================
+
+---
+# Service Account for FL Nodes
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fl-node-sa
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: fl-node
+
+---
+# Service Account for Bootstrap Server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bootstrap-sa
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: bootstrap
+
+---
+# Service Account for Monitoring
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: monitoring-sa
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: monitoring
+
+---
+# Role for FL Nodes - minimal permissions
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: fl-node-role
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: fl-node
+rules:
+  # Can read config maps for configuration
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+    resourceNames: ["mycelix-config", "fl-config"]
+  # Can read secrets they need
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["fl-node-secrets", "conductor-passphrase"]
+  # Can update own pod status for health checks
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+  # Can create events for logging
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+
+---
+# Role for Bootstrap Server - can discover FL nodes
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: bootstrap-role
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: bootstrap
+rules:
+  # Can read and list pods for peer discovery
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  # Can read services for endpoint discovery
+  - apiGroups: [""]
+    resources: ["services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  # Can read config maps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
+  # Can read required secrets
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["bootstrap-secrets", "tls-certs"]
+  # Can create events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+
+---
+# Role for Monitoring - read-only access to metrics
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: monitoring-role
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: monitoring
+rules:
+  # Can read all pods for metrics collection
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  # Can read config maps
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list"]
+  # Can read monitoring secrets (Grafana, etc.)
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+    resourceNames: ["grafana-secrets", "prometheus-secrets"]
+
+---
+# Bind FL Node Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: fl-node-binding
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: fl-node
+subjects:
+  - kind: ServiceAccount
+    name: fl-node-sa
+    namespace: mycelix-testnet
+roleRef:
+  kind: Role
+  name: fl-node-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Bind Bootstrap Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: bootstrap-binding
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: bootstrap-sa
+    namespace: mycelix-testnet
+roleRef:
+  kind: Role
+  name: bootstrap-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Bind Monitoring Role
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: monitoring-binding
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/component: monitoring
+subjects:
+  - kind: ServiceAccount
+    name: monitoring-sa
+    namespace: mycelix-testnet
+roleRef:
+  kind: Role
+  name: monitoring-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# Pod Security Policy (deprecated but still used in some clusters)
+# Use Pod Security Standards labels on namespace instead for K8s 1.25+
+# See: https://kubernetes.io/docs/concepts/security/pod-security-standards/

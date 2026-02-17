@@ -1,0 +1,77 @@
+{
+  "experiment": "H-FL Multi-Dataset Testing (Pure Python)",
+  "timestamp": "2025-09-25 02:32:31",
+  "configuration": {
+    "n_agents": 5,
+    "byzantine_ratio": 0.2,
+    "defense_method": "Krum"
+  },
+  "datasets": [
+    {
+      "name": "CIFAR-10",
+      "type": "image",
+      "samples": 1000,
+      "features": 100,
+      "classes": 10,
+      "final_accuracy": 0.695466483964735,
+      "convergence_round": 7,
+      "training_time_seconds": 1.1424760818481445
+    },
+    {
+      "name": "Fashion-MNIST",
+      "type": "image",
+      "samples": 1000,
+      "features": 100,
+      "classes": 10,
+      "final_accuracy": 0.8115309649062974,
+      "convergence_round": 10,
+      "training_time_seconds": 1.166083812713623
+    },
+    {
+      "name": "Text Classification",
+      "type": "text",
+      "samples": 1000,
+      "features": 50,
+      "classes": 4,
+      "final_accuracy": 0.705073043190443,
+      "convergence_round": 13,
+      "training_time_seconds": 0.44463014602661133
+    },
+    {
+      "name": "Tabular Medical",
+      "type": "tabular",
+      "samples": 999,
+      "features": 20,
+      "classes": 3,
+      "final_accuracy": 0.8295642936922396,
+      "convergence_round": 15,
+      "training_time_seconds": 0.2172555923461914
+    }
+  ],
+  "paper_validation": {
+    "CIFAR-10": {
+      "paper_target": 0.723,
+      "achieved": 0.695466483964735,
+      "difference": 0.027533516035264993,
+      "within_5_percent": true
+    },
+    "Fashion-MNIST": {
+      "paper_target": 0.815,
+      "achieved": 0.8115309649062974,
+      "difference": 0.003469035093702555,
+      "within_5_percent": true
+    },
+    "Text Classification": {
+      "paper_target": 0.689,
+      "achieved": 0.705073043190443,
+      "difference": 0.016073043190443004,
+      "within_5_percent": true
+    },
+    "Tabular Medical": {
+      "paper_target": 0.852,
+      "achieved": 0.8295642936922396,
+      "difference": 0.022435706307760372,
+      "within_5_percent": true
+    }
+  }
+}

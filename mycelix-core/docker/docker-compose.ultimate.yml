@@ -1,0 +1,391 @@
+# =============================================================================
+# Mycelix-Core Ultimate Docker Compose
+# =============================================================================
+# Complete federated learning stack with Byzantine fault tolerance
+#
+# Services:
+#   - coordinator: FL Coordinator (Python + Rust)
+#   - node-1 to node-5: Simulated FL clients
+#   - postgres: State storage
+#   - redis: Caching and rate limiting
+#   - prometheus: Metrics collection
+#   - grafana: Dashboards and visualization
+#   - holochain (optional): Decentralized coordination
+#
+# Usage:
+#   docker compose -f docker-compose.ultimate.yml up --build
+#
+# =============================================================================
+
+name: mycelix-core
+
+services:
+  # ===========================================================================
+  # Core Infrastructure
+  # ===========================================================================
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mycelix-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mycelix}
+      POSTGRES_USER: ${POSTGRES_USER:-mycelix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mycelix_secure_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mycelix} -d ${POSTGRES_DB:-mycelix}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${POSTGRES_MEMORY_LIMIT:-1g}
+
+  redis:
+    image: redis:7-alpine
+    container_name: mycelix-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${REDIS_MEMORY_LIMIT:-512m}
+
+  # ===========================================================================
+  # FL Coordinator
+  # ===========================================================================
+
+  coordinator:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.coordinator
+    container_name: mycelix-coordinator
+    restart: unless-stopped
+    environment:
+      # Core settings
+      ENVIRONMENT: ${ENVIRONMENT:-development}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+
+      # Server settings
+      COORDINATOR_HOST: "0.0.0.0"
+      COORDINATOR_PORT: "8080"
+      COORDINATOR_WORKERS: ${COORDINATOR_WORKERS:-4}
+
+      # Byzantine Fault Tolerance
+      BFT_THRESHOLD: ${BFT_THRESHOLD:-0.33}
+      MIN_NODES_FOR_AGGREGATION: ${MIN_NODES_FOR_AGGREGATION:-3}
+      AGGREGATION_TIMEOUT_SECONDS: ${AGGREGATION_TIMEOUT_SECONDS:-300}
+
+      # Model settings
+      MODEL_VERSION: ${MODEL_VERSION:-1.0.0}
+      DIFFERENTIAL_PRIVACY_EPSILON: ${DIFFERENTIAL_PRIVACY_EPSILON:-1.0}
+      DIFFERENTIAL_PRIVACY_DELTA: ${DIFFERENTIAL_PRIVACY_DELTA:-0.00001}
+
+      # Database
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: "5432"
+      POSTGRES_DB: ${POSTGRES_DB:-mycelix}
+      POSTGRES_USER: ${POSTGRES_USER:-mycelix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mycelix_secure_password}
+
+      # Redis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_secure_password}
+
+      # Metrics
+      METRICS_ENABLED: "true"
+      METRICS_PORT: "9100"
+    ports:
+      - "8080:8080"
+      - "9100:9100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${COORDINATOR_MEMORY_LIMIT:-2g}
+          cpus: "${COORDINATOR_CPU_LIMIT:-2}"
+
+  # ===========================================================================
+  # FL Nodes (Simulated Clients)
+  # ===========================================================================
+
+  node-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: mycelix-node-1
+    restart: unless-stopped
+    environment:
+      NODE_ID: node-1
+      COORDINATOR_URL: http://coordinator:8080
+      MODEL_SIZE: ${MODEL_SIZE:-1000}
+      TRAINING_INTERVAL: ${TRAINING_INTERVAL:-15}
+      BYZANTINE_MODE: "false"
+      METRICS_PORT: "9100"
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${NODE_MEMORY_LIMIT:-512m}
+          cpus: "${NODE_CPU_LIMIT:-0.5}"
+
+  node-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: mycelix-node-2
+    restart: unless-stopped
+    environment:
+      NODE_ID: node-2
+      COORDINATOR_URL: http://coordinator:8080
+      MODEL_SIZE: ${MODEL_SIZE:-1000}
+      TRAINING_INTERVAL: ${TRAINING_INTERVAL:-15}
+      BYZANTINE_MODE: "false"
+      METRICS_PORT: "9100"
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${NODE_MEMORY_LIMIT:-512m}
+          cpus: "${NODE_CPU_LIMIT:-0.5}"
+
+  node-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: mycelix-node-3
+    restart: unless-stopped
+    environment:
+      NODE_ID: node-3
+      COORDINATOR_URL: http://coordinator:8080
+      MODEL_SIZE: ${MODEL_SIZE:-1000}
+      TRAINING_INTERVAL: ${TRAINING_INTERVAL:-15}
+      BYZANTINE_MODE: "false"
+      METRICS_PORT: "9100"
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${NODE_MEMORY_LIMIT:-512m}
+          cpus: "${NODE_CPU_LIMIT:-0.5}"
+
+  node-4:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: mycelix-node-4
+    restart: unless-stopped
+    environment:
+      NODE_ID: node-4
+      COORDINATOR_URL: http://coordinator:8080
+      MODEL_SIZE: ${MODEL_SIZE:-1000}
+      TRAINING_INTERVAL: ${TRAINING_INTERVAL:-15}
+      BYZANTINE_MODE: "false"
+      METRICS_PORT: "9100"
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${NODE_MEMORY_LIMIT:-512m}
+          cpus: "${NODE_CPU_LIMIT:-0.5}"
+
+  node-5:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.node
+    container_name: mycelix-node-5
+    restart: unless-stopped
+    environment:
+      NODE_ID: node-5
+      COORDINATOR_URL: http://coordinator:8080
+      MODEL_SIZE: ${MODEL_SIZE:-1000}
+      TRAINING_INTERVAL: ${TRAINING_INTERVAL:-15}
+      # This node can optionally be byzantine for testing
+      BYZANTINE_MODE: ${BYZANTINE_NODE_5:-false}
+      METRICS_PORT: "9100"
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: ${NODE_MEMORY_LIMIT:-512m}
+          cpus: "${NODE_CPU_LIMIT:-0.5}"
+
+  # ===========================================================================
+  # Monitoring & Observability
+  # ===========================================================================
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: mycelix-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_DAYS:-15}d'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    depends_on:
+      - coordinator
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: mycelix-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_SERVER_ROOT_URL: "http://localhost:${GRAFANA_PORT:-3000}"
+      GF_AUTH_ANONYMOUS_ENABLED: ${GRAFANA_ALLOW_ANONYMOUS:-false}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-simple-json-datasource
+      # Postgres password for datasource
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mycelix_secure_password}
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - mycelix-network
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  # ===========================================================================
+  # CLI Tools (optional, for debugging)
+  # ===========================================================================
+
+  cli:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.cli
+    container_name: mycelix-cli
+    environment:
+      COORDINATOR_URL: http://coordinator:8080
+    depends_on:
+      - coordinator
+    networks:
+      - mycelix-network
+    profiles:
+      - tools
+    stdin_open: true
+    tty: true
+
+  # ===========================================================================
+  # Holochain Conductor (Optional - for full decentralization)
+  # ===========================================================================
+
+  holochain:
+    image: holochain/holochain:0.3
+    container_name: mycelix-holochain
+    restart: unless-stopped
+    environment:
+      RUST_LOG: info
+    volumes:
+      - holochain_data:/data
+    ports:
+      - "${HOLOCHAIN_CONDUCTOR_PORT:-8888}:8888"
+      - "${HOLOCHAIN_ADMIN_PORT:-8889}:8889"
+    networks:
+      - mycelix-network
+    profiles:
+      - holochain
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+
+# =============================================================================
+# Networks
+# =============================================================================
+
+networks:
+  mycelix-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# Volumes
+# =============================================================================
+
+volumes:
+  postgres_data:
+    name: mycelix_postgres_data
+  redis_data:
+    name: mycelix_redis_data
+  prometheus_data:
+    name: mycelix_prometheus_data
+  grafana_data:
+    name: mycelix_grafana_data
+  holochain_data:
+    name: mycelix_holochain_data

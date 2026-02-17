@@ -1,0 +1,161 @@
+# Mycelix FL Coordinator Configuration
+#
+# The coordinator manages FL rounds, participant registration,
+# and result distribution.
+
+[node]
+# Coordinator identifier
+id = "primary"
+
+# Human-readable name
+name = "Mycelix FL Coordinator"
+
+# Network identifier
+network = "testnet"
+
+# Log level
+log_level = "info"
+
+# Log format
+log_format = "json"
+
+[server]
+# HTTP API listen address
+listen_addr = "0.0.0.0:8083"
+
+# Maximum request body size
+max_body_size = 10485760
+
+# Request timeout in seconds
+request_timeout_secs = 60
+
+[rounds]
+# Round duration in seconds
+duration_secs = 300
+
+# Minimum participants to start a round
+min_participants = 3
+
+# Maximum participants per round
+max_participants = 100
+
+# Grace period after round ends (seconds)
+grace_period_secs = 30
+
+# Automatic round progression
+auto_progress = true
+
+# Time between rounds (seconds)
+inter_round_delay_secs = 10
+
+[registration]
+# Allow new participant registration
+enabled = true
+
+# Registration validation
+validate_trust_score = true
+min_trust_score = 0.3
+
+# Maximum registered participants
+max_participants = 500
+
+# Registration expiry (seconds)
+expiry_secs = 3600
+
+[aggregators]
+# Registered aggregators (populated dynamically)
+# Minimum aggregators required
+min_required = 1
+
+# Aggregator health check interval (seconds)
+health_check_interval_secs = 30
+
+# Aggregator timeout (seconds)
+timeout_secs = 60
+
+[model]
+# Current model identifier
+# model_id = "mycelix-v1"
+
+# Model version tracking
+track_versions = true
+
+# Maximum model versions to retain
+max_versions = 10
+
+# Model distribution method: pull, push
+distribution_method = "pull"
+
+[consensus]
+# Require consensus on aggregated results
+enabled = true
+
+# Minimum aggregators agreeing
+min_agreement = 1
+
+# Agreement threshold (0.0 - 1.0)
+agreement_threshold = 0.66
+
+[scheduling]
+# Round scheduling strategy: fixed, adaptive
+strategy = "fixed"
+
+# Adaptive scheduling parameters
+adaptive_min_duration_secs = 60
+adaptive_max_duration_secs = 600
+adaptive_target_participants = 50
+
+[database]
+pool_size = 10
+connect_timeout_secs = 30
+query_timeout_secs = 60
+
+[redis]
+pool_size = 5
+key_prefix = "mycelix:coordinator:"
+
+# Pub/sub channels
+round_channel = "fl:rounds"
+result_channel = "fl:results"
+
+[metrics]
+enabled = true
+listen_addr = "0.0.0.0:9092"
+path = "/metrics"
+
+# Coordinator-specific metrics
+track_round_statistics = true
+track_participant_statistics = true
+track_aggregator_health = true
+
+[health]
+listen_addr = "0.0.0.0:8084"
+liveness_path = "/health/live"
+readiness_path = "/health/ready"
+
+[notifications]
+# Enable notifications for round events
+enabled = true
+
+# Notification methods: webhook, redis_pubsub
+methods = ["redis_pubsub"]
+
+# Webhook URL (if method includes webhook)
+# webhook_url = "https://hooks.example.com/fl"
+
+[leader_election]
+# Enable leader election for HA
+enabled = false
+
+# Election backend: redis, etcd
+backend = "redis"
+
+# Leader lease duration (seconds)
+lease_duration_secs = 30
+
+# Leader renewal interval (seconds)
+renewal_interval_secs = 10
+
+[tracing]
+enabled = false
+sampling_rate = 0.1

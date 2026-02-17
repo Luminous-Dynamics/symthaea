@@ -1,0 +1,13 @@
+[package]
+name = "governance_record"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "governance_record"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+holochain_serialized_bytes = "0.0.56"

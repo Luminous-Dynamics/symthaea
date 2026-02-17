@@ -1,0 +1,1175 @@
+openapi: 3.1.0
+info:
+  title: Mycelix Music API
+  description: |
+    The Mycelix Music Platform API provides access to music streaming, artist management,
+    blockchain-based royalty distribution, and AI-powered music tools.
+
+    ## Authentication
+    Most endpoints require authentication via JWT tokens or Web3 wallet signatures.
+
+    ## Rate Limiting
+    - Standard tier: 100 requests/minute
+    - Premium tier: 1000 requests/minute
+
+    ## Pagination
+    List endpoints support cursor-based pagination using `cursor` and `limit` parameters.
+  version: 1.0.0
+  contact:
+    name: Mycelix Support
+    email: support@mycelix.music
+    url: https://docs.mycelix.music
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.mycelix.music/v1
+    description: Production server
+  - url: https://staging-api.mycelix.music/v1
+    description: Staging server
+  - url: http://localhost:3001/v1
+    description: Development server
+
+tags:
+  - name: Songs
+    description: Song management and playback
+  - name: Artists
+    description: Artist profiles and management
+  - name: Playlists
+    description: Playlist creation and management
+  - name: Analytics
+    description: Streaming analytics and insights
+  - name: Royalties
+    description: Blockchain royalty distribution
+  - name: AI
+    description: AI-powered music tools
+  - name: Auth
+    description: Authentication and authorization
+  - name: Health
+    description: Service health checks
+
+paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Basic health check
+      description: Returns basic service health status
+      operationId: getHealth
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Kubernetes readiness probe checking all dependencies
+      operationId: getHealthReady
+      responses:
+        '200':
+          description: Service is ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+        '503':
+          description: Service not ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadinessResponse'
+
+  /health/metrics:
+    get:
+      tags: [Health]
+      summary: Prometheus metrics
+      description: Returns metrics in Prometheus format
+      operationId: getMetrics
+      responses:
+        '200':
+          description: Metrics in Prometheus format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /songs:
+    get:
+      tags: [Songs]
+      summary: List songs
+      description: Get a paginated list of songs with optional filters
+      operationId: listSongs
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+        - name: genre
+          in: query
+          schema:
+            type: string
+          description: Filter by genre
+        - name: artistId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by artist ID
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [createdAt, playCount, title, duration]
+          description: Sort field
+        - name: sortOrder
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+          description: Sort order
+      responses:
+        '200':
+          description: Paginated list of songs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongListResponse'
+
+    post:
+      tags: [Songs]
+      summary: Upload a new song
+      description: Upload a new song with metadata
+      operationId: createSong
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/CreateSongRequest'
+      responses:
+        '201':
+          description: Song created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /songs/{songId}:
+    get:
+      tags: [Songs]
+      summary: Get song details
+      description: Get detailed information about a specific song
+      operationId: getSong
+      parameters:
+        - $ref: '#/components/parameters/SongIdParam'
+      responses:
+        '200':
+          description: Song details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SongDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      tags: [Songs]
+      summary: Update song
+      description: Update song metadata
+      operationId: updateSong
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SongIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSongRequest'
+      responses:
+        '200':
+          description: Song updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Song'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Songs]
+      summary: Delete song
+      description: Delete a song (artist only)
+      operationId: deleteSong
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SongIdParam'
+      responses:
+        '204':
+          description: Song deleted
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /songs/{songId}/stream:
+    get:
+      tags: [Songs]
+      summary: Stream song
+      description: Get streaming URL for a song
+      operationId: streamSong
+      parameters:
+        - $ref: '#/components/parameters/SongIdParam'
+        - name: quality
+          in: query
+          schema:
+            type: string
+            enum: [low, medium, high, lossless]
+            default: high
+          description: Audio quality
+      responses:
+        '200':
+          description: Streaming URL
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StreamResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /songs/{songId}/play:
+    post:
+      tags: [Songs]
+      summary: Record play
+      description: Record a song play for analytics
+      operationId: recordPlay
+      parameters:
+        - $ref: '#/components/parameters/SongIdParam'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                duration:
+                  type: integer
+                  description: Play duration in seconds
+                source:
+                  type: string
+                  enum: [web, mobile, api, embed]
+      responses:
+        '200':
+          description: Play recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  playCount:
+                    type: integer
+
+  /songs/{songId}/like:
+    post:
+      tags: [Songs]
+      summary: Toggle like
+      description: Like or unlike a song
+      operationId: toggleLike
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/SongIdParam'
+      responses:
+        '200':
+          description: Like status updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  liked:
+                    type: boolean
+                  likes:
+                    type: integer
+
+  /songs/{songId}/similar:
+    get:
+      tags: [Songs]
+      summary: Get similar songs
+      description: Get songs similar to the specified song
+      operationId: getSimilarSongs
+      parameters:
+        - $ref: '#/components/parameters/SongIdParam'
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Similar songs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Song'
+
+  /artists:
+    get:
+      tags: [Artists]
+      summary: List artists
+      description: Get a paginated list of artists
+      operationId: listArtists
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - $ref: '#/components/parameters/SearchParam'
+      responses:
+        '200':
+          description: Paginated list of artists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistListResponse'
+
+  /artists/{artistId}:
+    get:
+      tags: [Artists]
+      summary: Get artist profile
+      description: Get detailed artist profile
+      operationId: getArtist
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Artist profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistProfile'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /artists/{artistId}/analytics:
+    get:
+      tags: [Analytics]
+      summary: Get artist analytics
+      description: Get streaming analytics for an artist
+      operationId: getArtistAnalytics
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: artistId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, year, all]
+            default: month
+        - name: startDate
+          in: query
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Artist analytics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ArtistAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /playlists:
+    get:
+      tags: [Playlists]
+      summary: List playlists
+      description: Get public playlists or user's playlists
+      operationId: listPlaylists
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: userId
+          in: query
+          schema:
+            type: string
+            format: uuid
+          description: Filter by user ID
+      responses:
+        '200':
+          description: Paginated list of playlists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlaylistListResponse'
+
+    post:
+      tags: [Playlists]
+      summary: Create playlist
+      description: Create a new playlist
+      operationId: createPlaylist
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePlaylistRequest'
+      responses:
+        '201':
+          description: Playlist created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Playlist'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /royalties/earnings:
+    get:
+      tags: [Royalties]
+      summary: Get earnings
+      description: Get artist earnings from royalties
+      operationId: getEarnings
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: period
+          in: query
+          schema:
+            type: string
+            enum: [day, week, month, year, all]
+      responses:
+        '200':
+          description: Earnings data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EarningsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /royalties/withdraw:
+    post:
+      tags: [Royalties]
+      summary: Withdraw earnings
+      description: Initiate withdrawal of earnings to wallet
+      operationId: withdrawEarnings
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount, walletAddress]
+              properties:
+                amount:
+                  type: string
+                  description: Amount to withdraw in wei
+                walletAddress:
+                  type: string
+                  pattern: ^0x[a-fA-F0-9]{40}$
+      responses:
+        '200':
+          description: Withdrawal initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WithdrawalResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /ai/stem-separation:
+    post:
+      tags: [AI]
+      summary: Separate stems
+      description: AI-powered stem separation for a track
+      operationId: separateStems
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [songId]
+              properties:
+                songId:
+                  type: string
+                  format: uuid
+                stems:
+                  type: array
+                  items:
+                    type: string
+                    enum: [vocals, drums, bass, other, piano, guitar]
+      responses:
+        '202':
+          description: Processing started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIJobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /ai/mastering:
+    post:
+      tags: [AI]
+      summary: AI mastering
+      description: AI-powered audio mastering
+      operationId: masterTrack
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [songId]
+              properties:
+                songId:
+                  type: string
+                  format: uuid
+                preset:
+                  type: string
+                  enum: [balanced, warm, bright, punchy, vintage]
+                  default: balanced
+                targetLoudness:
+                  type: number
+                  description: Target LUFS value
+                  default: -14
+      responses:
+        '202':
+          description: Processing started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AIJobResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      description: Authenticate with email/password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  minLength: 8
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/wallet:
+    post:
+      tags: [Auth]
+      summary: Wallet login
+      description: Authenticate with Web3 wallet signature
+      operationId: walletLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [address, signature, message]
+              properties:
+                address:
+                  type: string
+                  pattern: ^0x[a-fA-F0-9]{40}$
+                signature:
+                  type: string
+                message:
+                  type: string
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    walletSignature:
+      type: apiKey
+      in: header
+      name: X-Wallet-Signature
+
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SearchParam:
+      name: search
+      in: query
+      schema:
+        type: string
+    SongIdParam:
+      name: songId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Song:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        artist:
+          type: string
+        artistId:
+          type: string
+          format: uuid
+        album:
+          type: string
+        duration:
+          type: integer
+          description: Duration in seconds
+        genre:
+          type: string
+        bpm:
+          type: integer
+        key:
+          type: string
+        audioUrl:
+          type: string
+          format: uri
+        coverArt:
+          type: string
+          format: uri
+        playCount:
+          type: integer
+        likes:
+          type: integer
+        isPublic:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    SongDetail:
+      allOf:
+        - $ref: '#/components/schemas/Song'
+        - type: object
+          properties:
+            waveformData:
+              type: array
+              items:
+                type: number
+            collaborators:
+              type: array
+              items:
+                $ref: '#/components/schemas/Collaborator'
+            royaltySplits:
+              type: array
+              items:
+                $ref: '#/components/schemas/RoyaltySplit'
+
+    CreateSongRequest:
+      type: object
+      required: [title, audio]
+      properties:
+        title:
+          type: string
+          maxLength: 200
+        album:
+          type: string
+        genre:
+          type: string
+        description:
+          type: string
+        bpm:
+          type: integer
+          minimum: 20
+          maximum: 300
+        key:
+          type: string
+        audio:
+          type: string
+          format: binary
+        coverArt:
+          type: string
+          format: binary
+        isPublic:
+          type: boolean
+          default: true
+
+    UpdateSongRequest:
+      type: object
+      properties:
+        title:
+          type: string
+        album:
+          type: string
+        genre:
+          type: string
+        description:
+          type: string
+        isPublic:
+          type: boolean
+
+    SongListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Song'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    ArtistProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        bio:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        coverUrl:
+          type: string
+          format: uri
+        walletAddress:
+          type: string
+        followerCount:
+          type: integer
+        songCount:
+          type: integer
+        totalPlays:
+          type: integer
+        verified:
+          type: boolean
+        socialLinks:
+          type: object
+          additionalProperties:
+            type: string
+
+    ArtistListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ArtistProfile'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    ArtistAnalytics:
+      type: object
+      properties:
+        totalPlays:
+          type: integer
+        uniqueListeners:
+          type: integer
+        totalEarnings:
+          type: string
+        playsByDay:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              plays:
+                type: integer
+        topSongs:
+          type: array
+          items:
+            type: object
+            properties:
+              songId:
+                type: string
+              title:
+                type: string
+              plays:
+                type: integer
+        demographics:
+          type: object
+          properties:
+            byCountry:
+              type: object
+              additionalProperties:
+                type: integer
+            byAge:
+              type: object
+              additionalProperties:
+                type: integer
+
+    Playlist:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        coverArt:
+          type: string
+          format: uri
+        ownerId:
+          type: string
+          format: uuid
+        ownerName:
+          type: string
+        isPublic:
+          type: boolean
+        isCollaborative:
+          type: boolean
+        songCount:
+          type: integer
+        totalDuration:
+          type: integer
+        followerCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    PlaylistListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Playlist'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    CreatePlaylistRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 100
+        description:
+          type: string
+        isPublic:
+          type: boolean
+          default: true
+        songIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+
+    Collaborator:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        role:
+          type: string
+        splitPercent:
+          type: number
+
+    RoyaltySplit:
+      type: object
+      properties:
+        recipientId:
+          type: string
+          format: uuid
+        recipientName:
+          type: string
+        percentage:
+          type: number
+        walletAddress:
+          type: string
+
+    EarningsResponse:
+      type: object
+      properties:
+        totalEarnings:
+          type: string
+        availableBalance:
+          type: string
+        pendingBalance:
+          type: string
+        earningsByPeriod:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+              amount:
+                type: string
+        earningsBySong:
+          type: array
+          items:
+            type: object
+            properties:
+              songId:
+                type: string
+              title:
+                type: string
+              amount:
+                type: string
+
+    WithdrawalResponse:
+      type: object
+      properties:
+        transactionHash:
+          type: string
+        amount:
+          type: string
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        estimatedCompletion:
+          type: string
+          format: date-time
+
+    StreamResponse:
+      type: object
+      properties:
+        url:
+          type: string
+          format: uri
+        expiresAt:
+          type: string
+          format: date-time
+        quality:
+          type: string
+        format:
+          type: string
+
+    AIJobResponse:
+      type: object
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [queued, processing, completed, failed]
+        estimatedDuration:
+          type: integer
+          description: Estimated processing time in seconds
+        webhookUrl:
+          type: string
+          format: uri
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        user:
+          $ref: '#/components/schemas/User'
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        avatarUrl:
+          type: string
+          format: uri
+        role:
+          type: string
+          enum: [user, artist, admin]
+        walletAddress:
+          type: string
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+
+    ReadinessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ready, not_ready]
+        timestamp:
+          type: string
+          format: date-time
+        checks:
+          type: object
+          properties:
+            database:
+              $ref: '#/components/schemas/HealthCheck'
+            cache:
+              $ref: '#/components/schemas/HealthCheck'
+            storage:
+              $ref: '#/components/schemas/HealthCheck'
+
+    HealthCheck:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, unhealthy]
+        latency:
+          type: number
+        message:
+          type: string
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type: object
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

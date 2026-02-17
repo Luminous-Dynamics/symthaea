@@ -1,0 +1,45 @@
+[package]
+name = "fl-aggregator-fuzz"
+version = "0.0.0"
+authors = ["Automatically generated"]
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+
+[dependencies.fl-aggregator]
+path = ".."
+features = ["proofs"]
+
+# Prevent this from interfering with workspaces
+[workspace]
+members = ["."]
+
+[profile.release]
+debug = 1
+
+[[bin]]
+name = "fuzz_range_proof"
+path = "fuzz_targets/fuzz_range_proof.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_gradient_proof"
+path = "fuzz_targets/fuzz_gradient_proof.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_proof_deserialization"
+path = "fuzz_targets/fuzz_proof_deserialization.rs"
+test = false
+doc = false
+bench = false

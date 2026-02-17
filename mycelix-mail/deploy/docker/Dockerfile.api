@@ -1,0 +1,73 @@
+# Mycelix Mail API - Multi-stage Dockerfile
+# Optimized for minimal image size and security
+
+# =============================================================================
+# Stage 1: Build
+# =============================================================================
+FROM rust:1.75-bookworm AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    pkg-config \
+    libssl-dev \
+    libpq-dev \
+    protobuf-compiler \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Cache dependencies
+COPY Cargo.toml Cargo.lock ./
+COPY api/Cargo.toml api/
+RUN mkdir -p api/src && echo "fn main() {}" > api/src/main.rs
+RUN cargo build --release --package mycelix-api && rm -rf api/src
+
+# Build actual application
+COPY api/src api/src
+RUN touch api/src/main.rs && cargo build --release --package mycelix-api
+
+# Build worker binary
+COPY worker/Cargo.toml worker/
+COPY worker/src worker/src
+RUN cargo build --release --package mycelix-worker
+
+# =============================================================================
+# Stage 2: Runtime
+# =============================================================================
+FROM debian:bookworm-slim AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r mycelix && useradd -r -g mycelix mycelix
+
+WORKDIR /app
+
+# Copy binaries
+COPY --from=builder /app/target/release/mycelix-api .
+COPY --from=builder /app/target/release/mycelix-worker .
+
+# Copy migrations and config
+COPY migrations ./migrations
+COPY config ./config
+
+# Set permissions
+RUN chown -R mycelix:mycelix /app
+
+USER mycelix
+
+# Expose ports
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health/liveness || exit 1
+
+# Default command
+CMD ["./mycelix-api"]

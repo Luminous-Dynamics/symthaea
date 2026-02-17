@@ -1,0 +1,40 @@
+# Ablation Study: PoGQ v4.1 WITHOUT EMA Smoothing
+# =================================================
+# Test impact of removing exponential moving average
+# Baseline: v4.1 uses β=0.85 smoothing
+# Ablation: Use raw scores (β=0.0, no smoothing)
+
+experiment:
+  name: ablation_no_ema
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1_no_ema   # Raw scores, no smoothing
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: 0.10
+  mondrian_enabled: true
+  mondrian_profiles: ["label", "norm", "direction"]
+  adaptive_hybrid: true
+  ema_beta: 0.0                 # ❌ DISABLED (no smoothing)
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02

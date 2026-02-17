@@ -1,0 +1,8 @@
+{
+  "normal_grad_norm": 0.789543304592371,
+  "byzantine_flip_norm": 7.895433008670807,
+  "byzantine_noise_norm": 10522.401092529297,
+  "ratio_flip": 9.99999995281715,
+  "ratio_noise": 13327.199447232157,
+  "recommended_threshold": 3.947716522961855
+}

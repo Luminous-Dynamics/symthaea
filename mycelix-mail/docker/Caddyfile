@@ -1,0 +1,59 @@
+# Mycelix Mail - Caddy Configuration
+# ===================================
+# Automatic HTTPS with Let's Encrypt
+
+{
+    email admin@mycelix.mail
+    acme_ca https://acme-v02.api.letsencrypt.org/directory
+}
+
+# Production domain
+mycelix.mail {
+    # Security headers
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    }
+
+    # Frontend
+    handle {
+        reverse_proxy frontend:80
+    }
+
+    # API
+    handle /api/* {
+        reverse_proxy backend:3001
+    }
+
+    # WebSocket for Holochain
+    handle /ws/* {
+        reverse_proxy holochain:8888
+    }
+
+    # Compression
+    encode gzip
+
+    # Logging
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
+
+# Development / local access
+:80 {
+    handle {
+        reverse_proxy frontend:80
+    }
+
+    handle /api/* {
+        reverse_proxy backend:3001
+    }
+
+    handle /ws/* {
+        reverse_proxy holochain:8888
+    }
+}

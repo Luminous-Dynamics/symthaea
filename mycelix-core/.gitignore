@@ -1,0 +1,106 @@
+# =============================================================================
+# Secrets and Credentials - NEVER COMMIT
+# =============================================================================
+.env
+.env.*
+.env.local
+.env.development
+.env.production
+!.env.example
+!.env.template
+*.pem
+*.key
+*.p12
+*.pfx
+.age-identity
+*.age-identity
+secrets/
+credentials/
+**/secrets.yaml
+**/secrets.yml
+
+# =============================================================================
+# Python artifacts
+# =============================================================================
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+venv/
+
+# Rust build
+/target/
+
+# Holochain conductor data dumps
+conductor-data*/
+conductor-node-*/
+
+# Logs and checkpoints
+*.log
+checkpoints/
+
+# Large data files (should not be in git)
+data/
+datasets/
+real_data/
+*.tar.gz
+
+# Build artifacts
+federated-learning/target/
+
+# Holochain binaries
+holochain-bin/
+federated-learning-happ/holochain-*
+target/
+
+# Embedded git repositories (should be submodules if needed)
+holochain-src/
+holonix/
+mycelix-fl-pure-p2p/
+mycelix-mail/
+_websites/mycelix.net-pogq/
+
+# Build and cache directories
+.npm/
+site/
+test-happ/
+
+# More build artifacts
+*.map
+.venv*/
+.postgres/
+.pytest_cache/
+
+# Large binaries (download separately)
+holochain-binary*
+hc
+*.rlib
+
+# Cargo cache
+.cargo/
+
+# Node modules
+node_modules/
+
+# All target directories (Rust build artifacts - regenerable)
+**/target/
+
+# All venv directories
+**/venv/
+**/.venv/
+**/.venv.*/
+
+# Nix result symlinks
+result
+result-*
+
+# Archive directory (consolidated, optional - uncomment to track)
+# .archive/
+
+# Holochain caches
+.holochain*/
+*/.holochain*/
+
+# Model checkpoints (large)
+models/*/classifier/*.pkl

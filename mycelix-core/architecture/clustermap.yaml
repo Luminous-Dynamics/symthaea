@@ -1,0 +1,122 @@
+# Mycelix Fractal CivOS — Canonical Cluster Map
+#
+# The 3-tier agent-centric architecture for the Mycelix ecosystem.
+# Each tier maps to a Holochain DNA cluster with distinct trust semantics.
+#
+# This file governs all cluster decisions. Changes here require review.
+# See: THE_SUBSTRATE_ROADMAP.md § Fractal CivOS
+
+version: "1.0"
+model: "fractal-civos"
+
+tiers:
+  # ─────────────────────────────────────────────────────────────────────
+  # Tier 1 — Sovereign (ME): Private agent data
+  # ─────────────────────────────────────────────────────────────────────
+  sovereign:
+    cluster: mycelix-personal
+    path: mycelix-personal/
+    dna: mycelix_personal
+    trust_model: source-chain-only
+    description: |
+      Private agent data vault. Entries stored on the source chain only
+      (no DHT gossip). Cross-cluster disclosure is always opt-in via
+      the personal_bridge zome.
+    zomes:
+      - name: identity_vault
+        role: "Store profile, avatar, master keys"
+        visibility: private
+      - name: health_vault
+        role: "Store medical records, biometrics"
+        visibility: private
+      - name: credential_wallet
+        role: "Store VCs from any issuer"
+        visibility: private
+      - name: personal_bridge
+        role: "Selective disclosure to other clusters"
+        visibility: public-facing
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Tier 2 — Civic (WE): Permissioned governance and infrastructure
+  # ─────────────────────────────────────────────────────────────────────
+  civic:
+    cluster: mycelix-civic
+    path: mycelix-civic/
+    dna: mycelix_civic
+    trust_model: permissioned-dht
+    description: |
+      Civic operations platform. Membrane-proof access, governance-gated
+      actions. Justice, emergency response, and media verification.
+    domains:
+      - justice:    [cases, evidence, arbitration, restorative, enforcement]
+      - emergency:  [incidents, triage, resources, coordination, shelters, comms]
+      - media:      [publication, attribution, factcheck, curation]
+    bridge: civic_bridge
+    cross_cluster:
+      - target: commons
+        via: CallTargetCell::OtherRole("commons")
+      - target: personal
+        via: CallTargetCell::OtherRole("personal")
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Tier 3 — Commons (ALL): Public DHT, markets, social spaces
+  # ─────────────────────────────────────────────────────────────────────
+  commons:
+    cluster: mycelix-commons
+    path: mycelix-commons/
+    dna: mycelix_commons
+    trust_model: public-dht
+    description: |
+      Universal resource coordination. Public DHT for markets, social
+      spaces, FL aggregation, and membrane factory for private groups.
+    domains:
+      - property:   [registry, transfer, disputes, commons]
+      - housing:    [units, membership, finances, maintenance, clt, governance]
+      - care:       [timebank, circles, matching, plans, credentials]
+      - mutualaid:  [needs, circles, governance, pools, requests, resources, timebank]
+      - water:      [flow, purity, capture, steward, wisdom]
+      - food:       [production, distribution, preservation, knowledge]
+      - transport:  [routes, sharing, impact]
+    bridge: commons_bridge
+    cross_cluster:
+      - target: civic
+        via: CallTargetCell::OtherRole("civic")
+      - target: personal
+        via: CallTargetCell::OtherRole("personal")
+
+# ─────────────────────────────────────────────────────────────────────
+# Cross-cluster communication rules
+# ─────────────────────────────────────────────────────────────────────
+cross_cluster:
+  unified_happ: mycelix-workspace/happs/mycelix-unified-happ.yaml
+  roles: [personal, civic, commons]
+  rules:
+    - from: civic
+      to: personal
+      pattern: "credential presentation (Phi, identity, K-vector)"
+    - from: civic
+      to: commons
+      pattern: "resource queries (property, housing, care, water, food)"
+    - from: commons
+      to: civic
+      pattern: "governance queries, emergency alerts"
+    - from: commons
+      to: personal
+      pattern: "membership verification, credential checks"
+    - from: personal
+      to: civic
+      pattern: "governance participation, emergency reporting"
+    - from: personal
+      to: commons
+      pattern: "market participation, resource requests"
+
+# ─────────────────────────────────────────────────────────────────────
+# Future clusters (planned, not yet scaffolded)
+# ─────────────────────────────────────────────────────────────────────
+planned:
+  - name: mycelix-knowledge
+    tier: commons
+    description: "Knowledge graphs, DeSci, educational resources"
+  - name: mycelix-finance
+    tier: civic
+    description: "Treasury, staking, mutual credit"

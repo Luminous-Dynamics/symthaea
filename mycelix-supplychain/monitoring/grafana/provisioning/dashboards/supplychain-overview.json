@@ -1,0 +1,268 @@
+{
+  "dashboard": {
+    "title": "Supply Chain Provenance - Overview",
+    "tags": ["supplychain", "provenance"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "10s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Request Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+        "targets": [{
+          "expr": "rate(supplychain_api_request_duration_seconds_count[5m])",
+          "legendFormat": "{{method}} {{endpoint}}",
+          "refId": "A"
+        }],
+        "yaxes": [
+          {"format": "reqps", "label": "Requests/sec"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Error Rate",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+        "targets": [{
+          "expr": "rate(supplychain_api_request_duration_seconds_count{status=~\"5..\"}[5m])",
+          "legendFormat": "{{endpoint}} - {{status}}",
+          "refId": "A"
+        }],
+        "alert": {
+          "conditions": [{
+            "evaluator": {"type": "gt", "params": [0.01]},
+            "query": {"params": ["A", "5m", "now"]}
+          }],
+          "name": "High Error Rate"
+        },
+        "yaxes": [
+          {"format": "percentunit", "label": "Error Rate"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Latency Percentiles",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, rate(supplychain_api_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, rate(supplychain_api_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, rate(supplychain_api_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ],
+        "thresholds": [
+          {"value": 0.1, "color": "yellow", "fill": false},
+          {"value": 0.2, "color": "red", "fill": false}
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Events Ingested",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 0, "y": 16},
+        "targets": [{
+          "expr": "sum(increase(supplychain_events_ingested_total[1h]))",
+          "refId": "A"
+        }],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"},
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "blue"},
+                {"value": 100, "color": "green"},
+                {"value": 1000, "color": "yellow"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Claims Stored",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 6, "y": 16},
+        "targets": [{
+          "expr": "supplychain_claims_stored_total",
+          "refId": "A"
+        }],
+        "options": {
+          "graphMode": "area",
+          "colorMode": "value"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "color": {"mode": "thresholds"}
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Database Connections",
+        "type": "gauge",
+        "gridPos": {"h": 4, "w": 6, "x": 12, "y": 16},
+        "targets": [{
+          "expr": "supplychain_db_connections_active",
+          "refId": "A"
+        }],
+        "options": {
+          "showThresholdLabels": true,
+          "showThresholdMarkers": true
+        },
+        "fieldConfig": {
+          "defaults": {
+            "min": 0,
+            "max": 50,
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "green"},
+                {"value": 30, "color": "yellow"},
+                {"value": 40, "color": "red"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Service Health",
+        "type": "stat",
+        "gridPos": {"h": 4, "w": 6, "x": 18, "y": 16},
+        "targets": [{
+          "expr": "up{job=\"supplychain\"}",
+          "refId": "A"
+        }],
+        "options": {
+          "graphMode": "none",
+          "colorMode": "background"
+        },
+        "fieldConfig": {
+          "defaults": {
+            "mappings": [
+              {"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}}},
+              {"type": "value", "options": {"1": {"text": "UP", "color": "green"}}}
+            ],
+            "thresholds": {
+              "steps": [
+                {"value": 0, "color": "red"},
+                {"value": 1, "color": "green"}
+              ]
+            }
+          }
+        }
+      },
+      {
+        "id": 8,
+        "title": "Database Query Duration",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 20},
+        "targets": [{
+          "expr": "rate(supplychain_db_query_duration_seconds_sum[5m]) / rate(supplychain_db_query_duration_seconds_count[5m])",
+          "legendFormat": "{{operation}}",
+          "refId": "A"
+        }],
+        "yaxes": [
+          {"format": "s", "label": "Duration"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 9,
+        "title": "Lineage Depth Distribution",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 20},
+        "targets": [{
+          "expr": "rate(supplychain_lineage_depth_sum[5m]) / rate(supplychain_lineage_depth_count[5m])",
+          "legendFormat": "Average Depth",
+          "refId": "A"
+        }],
+        "yaxes": [
+          {"format": "short", "label": "Depth"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Events by Type",
+        "type": "piechart",
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 28},
+        "targets": [{
+          "expr": "sum by (event_type) (increase(supplychain_events_ingested_total[1h]))",
+          "legendFormat": "{{event_type}}",
+          "refId": "A"
+        }],
+        "options": {
+          "legend": {"displayMode": "list", "placement": "right"}
+        }
+      },
+      {
+        "id": 11,
+        "title": "Batch Processing Stats",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 28},
+        "targets": [
+          {
+            "expr": "rate(supplychain_events_ingested_total{event_type=\"batch\"}[5m])",
+            "legendFormat": "Batch Events/sec",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(supplychain_api_request_duration_seconds_count{endpoint=\"/v1/events/batch\"}[5m])",
+            "legendFormat": "Batch Requests/sec",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {"format": "short", "label": "Rate"},
+          {"format": "short"}
+        ]
+      },
+      {
+        "id": 12,
+        "title": "Validation Errors",
+        "type": "graph",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 36},
+        "targets": [{
+          "expr": "rate(supplychain_validation_errors_total[5m])",
+          "legendFormat": "{{error_type}}",
+          "refId": "A"
+        }],
+        "yaxes": [
+          {"format": "short", "label": "Errors/sec"},
+          {"format": "short"}
+        ]
+      }
+    ]
+  },
+  "overwrite": true
+}

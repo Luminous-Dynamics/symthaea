@@ -1,0 +1,55 @@
+# Prometheus alert rules for Mycelix-DeSci
+
+groups:
+  - name: mycelix_api_alerts
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: HighAPIErrorRate
+        expr: rate(mycelix_api_errors_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High API error rate detected"
+          description: "API error rate is {{ $value | humanize }} errors/sec for {{ $labels.endpoint }}"
+
+      # High request latency
+      - alert: HighRequestLatency
+        expr: histogram_quantile(0.95, rate(mycelix_http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High request latency detected"
+          description: "95th percentile latency is {{ $value | humanize }}s for {{ $labels.endpoint }}"
+
+      # API down
+      - alert: APIDown
+        expr: up{job="mycelix-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Mycelix API is down"
+          description: "The Mycelix API has been down for more than 1 minute"
+
+      # Low storage success rate
+      - alert: LowStorageSuccessRate
+        expr: rate(mycelix_storage_operations_total{status="failure"}[5m]) / rate(mycelix_storage_operations_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low storage operation success rate"
+          description: "Storage failure rate is {{ $value | humanizePercentage }} for operation {{ $labels.operation }}"
+
+      # Slow queries
+      - alert: SlowQueryPerformance
+        expr: histogram_quantile(0.99, rate(mycelix_query_duration_seconds_bucket[5m])) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow query performance detected"
+          description: "99th percentile query duration is {{ $value | humanize }}s for {{ $labels.filter_type }}"

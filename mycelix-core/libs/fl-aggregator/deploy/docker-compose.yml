@@ -1,0 +1,89 @@
+# Docker Compose for fl-aggregator proof service stack
+# Includes: proof service, Prometheus, Grafana
+
+services:
+  # zkSTARK Proof Service
+  proof-service:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: fl-aggregator/proof-service:latest
+    container_name: proof-service
+    ports:
+      - "50051:50051"  # gRPC
+      - "9090:9090"    # Prometheus metrics
+    environment:
+      - RUST_LOG=info,fl_aggregator=debug
+      - PROOF_SERVICE_HOST=0.0.0.0
+      - PROOF_SERVICE_PORT=50051
+      - METRICS_PORT=9090
+      - RAYON_NUM_THREADS=0  # Auto-detect
+      - SECURITY_LEVEL=Standard128
+      - MAX_CONCURRENT_PROOFS=100
+      - CACHE_SIZE=1000
+      - CACHE_TTL_SECONDS=3600
+    volumes:
+      - proof-cache:/app/cache
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/app/proof_server", "health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - proof-network
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - proof-network
+
+  # Grafana for dashboards
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana-data:/var/lib/grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    networks:
+      - proof-network
+
+volumes:
+  proof-cache:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  proof-network:
+    driver: bridge

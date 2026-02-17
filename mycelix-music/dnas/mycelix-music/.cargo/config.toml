@@ -1,0 +1,10 @@
+# Cargo configuration for Holochain zome development
+
+[target.wasm32-unknown-unknown]
+rustflags = [
+    # Enable getrandom 0.3.x wasm_js backend
+    "--cfg", "getrandom_backend=\"wasm_js\"",
+]
+
+[build]
+target = "wasm32-unknown-unknown"

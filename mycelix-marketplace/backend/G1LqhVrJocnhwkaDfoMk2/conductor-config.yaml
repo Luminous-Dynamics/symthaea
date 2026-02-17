@@ -1,0 +1,23 @@
+tracing_override: null
+data_root_path: /workspace/G1LqhVrJocnhwkaDfoMk2
+keystore:
+  type: lair_server_in_proc
+  lair_root: /workspace/G1LqhVrJocnhwkaDfoMk2/ks
+admin_interfaces:
+- driver:
+    type: websocket
+    port: 0
+    danger_bind_addr: null
+    allowed_origins: '*'
+network:
+  base64_auth_material: null
+  bootstrap_url: https://dev-test-bootstrap2.holochain.org/
+  signal_url: wss://dev-test-bootstrap2.holochain.org/
+  webrtc_config: null
+  target_arc_factor: 1
+  report: none
+  advanced: null
+request_timeout_s: 60
+db_sync_strategy: Resilient
+tuning_params: null
+tracing_scope: null

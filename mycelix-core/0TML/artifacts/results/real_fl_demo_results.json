@@ -1,0 +1,154 @@
+{
+  "config": {
+    "num_clients": 10,
+    "byzantine_fraction": 0.3,
+    "num_rounds": 20,
+    "local_epochs": 5,
+    "learning_rate": 0.01
+  },
+  "pytorch_available": true,
+  "avg_detection_rate": 0.0,
+  "avg_accuracy": 0.6999999999999998,
+  "history": [
+    {
+      "round": 0,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 1,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 2,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 3,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 4,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 5,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 6,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 7,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 8,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 9,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 10,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 11,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 12,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 13,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 14,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 15,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 16,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 17,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 18,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    },
+    {
+      "round": 19,
+      "detection_rate": 0.0,
+      "accuracy": 0.7,
+      "true_positives": 0,
+      "false_positives": 0
+    }
+  ]
+}

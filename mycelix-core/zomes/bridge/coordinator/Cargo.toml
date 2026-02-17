@@ -1,0 +1,43 @@
+[package]
+name = "bridge_coordinator"
+version = "0.1.0"
+edition = "2021"
+description = "Bridge coordinator zome - inter-hApp communication, reputation aggregation, and event broadcasting"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "bridge_coordinator"
+
+[dependencies]
+# Holochain Development (HDK) for business logic
+hdk = "0.6"
+# Enable wasm support for getrandom (transitive dependencies)
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
+# Integrity zome (for entry types)
+bridge_integrity = { path = "../integrity" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Cryptography for hashing
+sha2 = "0.10"
+
+# Pin rmp and rmp-serde to compatible versions
+rmp = "=0.8.14"
+rmp-serde = "=1.3.0"
+
+# Pin indexmap to version compatible with Rust 1.81
+indexmap = "=2.2.6"
+
+# Mycelix SDK for Bridge types
+mycelix-sdk = { path = "/srv/luminous-dynamics/mycelix-workspace/sdk" }
+
+[profile.release]
+opt-level = 'z'
+lto = true
+codegen-units = 1
+panic = 'abort'

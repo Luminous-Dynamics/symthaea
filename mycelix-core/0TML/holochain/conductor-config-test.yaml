@@ -1,0 +1,28 @@
+---
+# ZeroTrustML Holochain Conductor Configuration
+# Phase 10 Multi-Backend Integration - Testing Format
+
+# Environment configuration
+environment_path: /tmp/holochain-zerotrustml
+
+# Network configuration (Kitsune2 for Holochain 0.5.6)
+network:
+  bootstrap_url: https://bootstrap.holo.host
+  signal_url: wss://signal.holo.host
+  target_arc_factor: 1
+
+# Admin interface for conductor management
+admin_interfaces:
+  -
+    driver:
+      type: websocket
+      port: 8888
+    allowed_origins: '*'
+
+# Keystore configuration
+keystore:
+  type: lair_server_in_proc
+  lair_root: /tmp/holochain-zerotrustml/lair
+
+# Database path
+db_sync_strategy: Fast

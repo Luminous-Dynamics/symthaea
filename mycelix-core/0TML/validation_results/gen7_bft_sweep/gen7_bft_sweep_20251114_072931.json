@@ -1,0 +1,245 @@
+{
+  "byz_fracs": [
+    0.35,
+    0.36,
+    0.37,
+    0.38,
+    0.39,
+    0.4,
+    0.41,
+    0.42,
+    0.43,
+    0.44,
+    0.45
+  ],
+  "aggregators": [
+    "aegis",
+    "aegis_gen7"
+  ],
+  "seeds": [
+    101
+  ],
+  "n_rounds": 10,
+  "results": [
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (20,) (17,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (19,) (16,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.37,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.37,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (19,) (16,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.38,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.38,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (19,) (15,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.39,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.39,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (19,) (15,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (19,) (14,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.41,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.41,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (19,) (14,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.42,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.42,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (18,) (13,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.43,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.43,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (18,) (13,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.44,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.44,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (17,) (13,) "
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "'wall_time'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "operands could not be broadcast together with shapes (17,) (13,) "
+    }
+  ]
+}

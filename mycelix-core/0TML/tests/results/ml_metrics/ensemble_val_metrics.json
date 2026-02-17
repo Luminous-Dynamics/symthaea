@@ -1,0 +1,16 @@
+{
+  "detection_rate": 0.9890682811974436,
+  "false_positive_rate": 0.054549962806843544,
+  "accuracy": 0.9639594633171568,
+  "precision": 0.930390760955545,
+  "f1_score": 0.9588326404173799,
+  "auc_roc": 0.995891123675356,
+  "auc_pr": 0.994454778862163,
+  "true_positives": 5881,
+  "false_positives": 440,
+  "true_negatives": 7626,
+  "false_negatives": 65,
+  "num_samples": 14012,
+  "num_byzantine": 5946,
+  "num_honest": 8066
+}

@@ -1,0 +1,30 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential"],
+  "issuer": "did:mycelix:org:yirgacheffe-processing",
+  "issuanceDate": "2025-01-20T14:00:00Z",
+  "credentialSubject": {
+    "eventType": "TRANSFORMED",
+    "productId": "COFFEE-GREEN-BEANS-ETHIOPIAN-YIRGACHEFFE",
+    "batchId": "BATCH-2025-GREEN-001",
+    "prevBatchIds": ["BATCH-2025-HARVEST-001"],
+    "quantity": 1000.0,
+    "unit": "kg",
+    "facility": {
+      "id": "PROC-YIRGACHEFFE-MILL",
+      "name": "Yirgacheffe Processing Mill",
+      "location": {
+        "country": "Ethiopia",
+        "region": "Yirgacheffe"
+      }
+    },
+    "timestamp": "2025-01-20T14:00:00Z",
+    "metadata": {
+      "processType": "Washed (Wet Processing)",
+      "fermentationTime": "48 hours",
+      "dryingMethod": "Sun-dried on raised beds",
+      "moistureContent": "11%",
+      "screenSize": "15/16"
+    }
+  }
+}

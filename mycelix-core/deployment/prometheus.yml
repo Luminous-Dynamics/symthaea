@@ -1,0 +1,134 @@
+# =============================================================================
+# PROMETHEUS CONFIGURATION - MYCELIX TESTNET VALIDATOR
+# =============================================================================
+#
+# This configuration scrapes metrics from:
+#   - Mycelix validator node (FL Coordinator + 0TML)
+#   - Node exporter (host metrics)
+#   - Prometheus itself (meta-monitoring)
+#
+# Documentation: https://prometheus.io/docs/prometheus/latest/configuration/
+# =============================================================================
+
+global:
+  # How frequently to scrape targets
+  scrape_interval: 15s
+
+  # How frequently to evaluate alerting rules
+  evaluation_interval: 15s
+
+  # Attach these labels to all metrics
+  external_labels:
+    monitor: 'mycelix-validator'
+    environment: 'testnet'
+
+# =============================================================================
+# ALERTING CONFIGURATION
+# =============================================================================
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+# =============================================================================
+# ALERTING RULES
+# =============================================================================
+# Alert rules are loaded from the rules directory. Available rule files:
+#
+#   - fl-alerts.yml: Comprehensive FL system alerts including:
+#       * Byzantine detection (HighByzantineRate, ByzantineSpike)
+#       * FL round health (RoundTimeout, RoundFailure, LowParticipation)
+#       * Node health (NodeDisconnected, NodeHighLatency, NodeResourceExhaustion)
+#       * Aggregation quality (AggregationQualityDrop, PhiCoherenceLow)
+#       * System health (DatabaseConnectionFailed, HighErrorRate, ReplayAttackDetected)
+#       * Model integrity (ModelCheckpointFailed, ModelDivergence)
+#
+# Mount the rules directory in Docker:
+#   volumes:
+#     - ./prometheus/rules:/etc/prometheus/rules:ro
+# =============================================================================
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+# =============================================================================
+# SCRAPE CONFIGURATIONS
+# =============================================================================
+
+scrape_configs:
+  # ---------------------------------------------------------------------------
+  # PROMETHEUS SELF-MONITORING
+  # ---------------------------------------------------------------------------
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  # ---------------------------------------------------------------------------
+  # MYCELIX VALIDATOR NODE
+  # ---------------------------------------------------------------------------
+  - job_name: 'mycelix-validator'
+    static_configs:
+      - targets: ['validator:9090']
+        labels:
+          node_type: 'validator'
+          network: 'testnet'
+
+    # Relabel to add node_id from metric labels
+    metric_relabel_configs:
+      - source_labels: [node_id]
+        target_label: instance
+        regex: '(.+)'
+        replacement: '${1}'
+
+    # Scrape more frequently for real-time monitoring
+    scrape_interval: 10s
+    scrape_timeout: 5s
+
+  # ---------------------------------------------------------------------------
+  # NODE EXPORTER (HOST METRICS)
+  # ---------------------------------------------------------------------------
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+
+    # Only keep relevant metrics to reduce storage
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'node_(cpu|memory|disk|network|filesystem).*'
+        action: keep
+
+  # ---------------------------------------------------------------------------
+  # DOCKER CONTAINERS (OPTIONAL)
+  # ---------------------------------------------------------------------------
+  # Uncomment if using cAdvisor for container metrics
+  # - job_name: 'cadvisor'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']
+
+# =============================================================================
+# RECORDING RULES (Computed Metrics)
+# =============================================================================
+# These are defined in separate rule files for organization
+#
+# Example rules that could be added to /etc/prometheus/rules/mycelix.yml:
+#
+# groups:
+#   - name: mycelix_aggregations
+#     rules:
+#       # Average detection latency over 5 minutes
+#       - record: mycelix:detection_latency_avg_5m
+#         expr: avg_over_time(mycelix_detection_latency_ms[5m])
+#
+#       # Byzantine detection rate
+#       - record: mycelix:byzantine_detection_rate
+#         expr: |
+#           rate(mycelix_byzantine_detected_total[5m]) /
+#           rate(mycelix_rounds_completed_total[5m])
+#
+#       # Rounds per minute
+#       - record: mycelix:rounds_per_minute
+#         expr: rate(mycelix_rounds_completed_total[1m]) * 60

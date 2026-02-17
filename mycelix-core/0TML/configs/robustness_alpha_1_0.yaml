@@ -1,0 +1,46 @@
+# Non-IID Robustness Study: α=1.0 (Minimal Heterogeneity)
+# ========================================================
+# Test PoGQ v4.1 conformal prediction under near-IID conditions
+# α=1.0 → clients have similar label distributions (approaching IID)
+# This is the "easy" scenario - conformal should work perfectly
+
+experiment:
+  name: robustness_alpha_1_0
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 1.0  # ⚡ MINIMAL heterogeneity (near-IID)
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: 0.10
+  mondrian_enabled: true
+  mondrian_profiles: ["label", "norm", "direction"]
+  adaptive_hybrid: true
+  ema_beta: 0.85
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02
+
+# Expected behavior:
+# - Per-bucket FPR should be well below 0.10 (easy calibration)
+# - Large, balanced buckets for Mondrian conformal
+# - Rare adaptive hybrid switching to global
+# - This is the "control" for demonstrating Mondrian's value

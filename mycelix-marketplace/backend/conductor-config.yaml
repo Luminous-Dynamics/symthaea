@@ -1,0 +1,65 @@
+---
+# Mycelix Marketplace Conductor Configuration
+# For local development and testing
+#
+# This configuration runs a single Holochain conductor with the Mycelix Marketplace hApp installed.
+#
+# Usage:
+#   holochain -c conductor-config.yaml
+#
+# Prerequisites:
+#   - mycelix_marketplace.happ must exist (run ./build-happ.sh first)
+#   - Ports 8888 and 8889 must be available
+
+environment_path: .holochain_env
+
+use_dangerous_test_keystore: true
+
+keystore:
+  type: danger_test_keystore
+
+# Network configuration
+network:
+  transport_pool:
+    - type: quic
+  bootstrap_service: https://bootstrap.holo.host
+  network_type: quic_bootstrap
+
+# Admin interface for conductor management
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+
+# App interface for client connections
+app_interfaces:
+  - driver:
+      type: websocket
+      port: 8889
+
+# Database path
+db_dir: .database
+
+# Logging configuration
+logger:
+  type: debug
+  rules:
+    # Log levels: trace, debug, info, warn, error
+    - pattern: '.*'
+      level: debug
+    # More verbose logging for specific modules
+    - pattern: 'holochain::core'
+      level: trace
+    - pattern: 'holochain_websocket'
+      level: info
+
+# No hApps are installed by default - you need to install them via admin interface
+# To install the hApp:
+#   1. Start conductor: holochain -c conductor-config.yaml
+#   2. Connect to admin interface on ws://localhost:8888
+#   3. Install hApp: mycelix_marketplace.happ
+#   4. Generate agent key
+#   5. Enable app
+
+# Example using hc CLI:
+#   hc app install ./mycelix_marketplace.happ

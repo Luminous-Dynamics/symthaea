@@ -1,0 +1,38 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential"],
+  "issuer": "did:mycelix:org:artisan-coffee-roasters",
+  "issuanceDate": "2025-03-08T10:00:00Z",
+  "credentialSubject": {
+    "eventType": "TRANSFORMED",
+    "productId": "COFFEE-ROASTED-BEANS-ETHIOPIAN-YIRGACHEFFE",
+    "batchId": "BATCH-2025-ROASTED-001",
+    "prevBatchIds": ["BATCH-2025-GREEN-001"],
+    "quantity": 850.0,
+    "unit": "kg",
+    "facility": {
+      "id": "ROAST-ARTISAN-OAKLAND",
+      "name": "Artisan Coffee Roasters",
+      "location": {
+        "country": "USA",
+        "region": "California",
+        "city": "Oakland"
+      }
+    },
+    "timestamp": "2025-03-08T10:00:00Z",
+    "metadata": {
+      "roastLevel": "Medium (City+)",
+      "roastTemperature": "220°C",
+      "roastDuration": "12 minutes",
+      "roastProfile": "Ethiopian Yirgacheffe Light-Medium",
+      "developmentTime": "2:30 minutes",
+      "firstCrack": "9:30 minutes",
+      "endTemperature": "216°C",
+      "weightLoss": "15%",
+      "roastDate": "2025-03-08",
+      "roastMaster": "Carlos Rodriguez",
+      "batchNumber": "R-2025-001",
+      "flavorNotes": "Blueberry, jasmine, lemon zest, chocolate"
+    }
+  }
+}

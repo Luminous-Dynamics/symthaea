@@ -1,0 +1,21 @@
+---
+manifest_version: "1"
+name: zerotrustml
+uid: 00000000-0000-0000-0000-000000000001
+properties: ~
+origin_time: 2025-01-01T00:00:00.000000Z
+
+integrity:
+  network_seed: ~
+  properties: ~
+  zomes:
+    - name: pogq_zome_dilithium_integrity
+      bundled: ../zomes/pogq_zome_dilithium/target/wasm32-unknown-unknown/release/pogq_zome_dilithium.wasm
+      dependencies: []
+
+coordinator:
+  zomes:
+    - name: pogq_zome_dilithium
+      bundled: ../zomes/pogq_zome_dilithium/target/wasm32-unknown-unknown/release/pogq_zome_dilithium.wasm
+      dependencies:
+        - name: pogq_zome_dilithium_integrity

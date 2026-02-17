@@ -1,0 +1,46 @@
+{
+  "@context": [
+    "https://www.w3.org/2018/credentials/v1",
+    "https://mycelix.org/contexts/supply-chain/v1"
+  ],
+  "type": [
+    "VerifiableCredential",
+    "SupplyChainEvent"
+  ],
+  "issuer": "did:mycelix:org:global-logistics",
+  "issuanceDate": "2025-11-15T14:20:00Z",
+  "credentialSubject": {
+    "eventType": "SHIPPED",
+    "productId": "SKU-WIDGET-42",
+    "batchId": "BATCH-2025-1115-001",
+    "quantity": 5000,
+    "unit": "pieces",
+    "facility": {
+      "id": "FAC-PLANT-A",
+      "name": "ACME Manufacturing Plant A",
+      "location": {
+        "lat": 37.7749,
+        "lon": -122.4194,
+        "country": "US"
+      }
+    },
+    "timestamp": "2025-11-15T14:00:00Z",
+    "shipment": {
+      "shipmentId": "SHIP-2025-GL-98765",
+      "carrier": "Global Logistics Corp",
+      "trackingNumber": "GL1234567890",
+      "origin": "FAC-PLANT-A",
+      "destination": "WH-EAST-01",
+      "expectedDelivery": "2025-11-18T10:00:00Z"
+    },
+    "metadata": {
+      "containerType": "40ft-refrigerated",
+      "sealNumber": "SEAL-XYZ-12345",
+      "temperatureRange": {
+        "min": 2,
+        "max": 8,
+        "unit": "celsius"
+      }
+    }
+  }
+}

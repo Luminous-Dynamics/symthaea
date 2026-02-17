@@ -1,0 +1,40 @@
+# Ablation Study: PoGQ v4.1 WITHOUT Conformal Prediction
+# =========================================================
+# Test impact of removing conformal thresholding
+# Baseline: v4.1 uses α=0.10 with 2% margin
+# Ablation: Use fixed threshold instead
+
+experiment:
+  name: ablation_no_conformal
+  seeds: [42, 1337]
+
+data:
+  datasets:
+    - name: emnist
+      non_iid: true
+      dirichlet_alpha: 0.3
+
+attack_matrix:
+  byzantine_ratio: 0.33
+  attacks:
+    - sign_flip
+    - scaling_x100
+    - sleeper_agent
+
+defenses:
+  - pogq_v4_1_no_conformal   # Use fixed threshold
+
+pogq_config:
+  pca_enabled: true
+  pca_components: 10
+  conformal_alpha: null       # ❌ DISABLED
+  fixed_threshold: 3.0        # Use 3-sigma rule instead
+  mondrian_enabled: false     # Requires conformal
+  adaptive_hybrid: false      # Requires conformal
+  ema_beta: 0.85
+  hysteresis_k: 2
+  hysteresis_m: 3
+
+statistics:
+  alpha: 0.10
+  margin: 0.02

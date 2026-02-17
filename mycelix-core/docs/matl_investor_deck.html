@@ -1,0 +1,829 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MATL - Investor Deck</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+            background: #0f172a;
+            color: white;
+            overflow-x: hidden;
+        }
+        
+        .slide-container {
+            width: 100vw;
+            height: 100vh;
+            overflow-y: scroll;
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+        
+        .slide {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 60px;
+            scroll-snap-align: start;
+            position: relative;
+        }
+        
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.1), transparent 70%);
+            pointer-events: none;
+        }
+        
+        .slide-number {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            font-size: 0.9em;
+            opacity: 0.5;
+        }
+        
+        h1 {
+            font-size: 4em;
+            font-weight: 800;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-align: center;
+        }
+        
+        h2 {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        h3 {
+            font-size: 1.8em;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #818cf8;
+        }
+        
+        .subtitle {
+            font-size: 1.5em;
+            color: #94a3b8;
+            margin-bottom: 40px;
+            text-align: center;
+        }
+        
+        .tagline {
+            font-size: 1.3em;
+            color: #cbd5e1;
+            text-align: center;
+            max-width: 800px;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            width: 100%;
+            max-width: 1200px;
+            margin-top: 40px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .card-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+        }
+        
+        .card-title {
+            font-size: 1.4em;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #c7d2fe;
+        }
+        
+        .card-text {
+            font-size: 1.1em;
+            line-height: 1.6;
+            color: #94a3b8;
+        }
+        
+        .metric {
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .metric-value {
+            font-size: 3.5em;
+            font-weight: 800;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+        
+        .metric-label {
+            font-size: 1.2em;
+            color: #94a3b8;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 40px;
+            border-collapse: collapse;
+        }
+        
+        .comparison-table th,
+        .comparison-table td {
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .comparison-table th {
+            background: rgba(99, 102, 241, 0.2);
+            font-weight: 600;
+            font-size: 1.2em;
+        }
+        
+        .comparison-table td {
+            font-size: 1.1em;
+        }
+        
+        .highlight {
+            background: rgba(34, 197, 94, 0.2);
+            font-weight: 700;
+            color: #4ade80;
+        }
+        
+        .timeline {
+            width: 100%;
+            max-width: 1000px;
+            margin-top: 40px;
+        }
+        
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .timeline-quarter {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #818cf8;
+            min-width: 120px;
+        }
+        
+        .timeline-content {
+            flex: 1;
+        }
+        
+        .timeline-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .timeline-desc {
+            font-size: 1.1em;
+            color: #94a3b8;
+        }
+        
+        .cta-button {
+            margin-top: 50px;
+            padding: 20px 50px;
+            font-size: 1.3em;
+            font-weight: 600;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+        }
+        
+        .cta-button:hover {
+            transform: scale(1.05);
+        }
+        
+        .bullet-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 30px;
+            width: 100%;
+            max-width: 800px;
+        }
+        
+        .bullet-list li {
+            font-size: 1.2em;
+            padding: 15px 15px 15px 50px;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            position: relative;
+        }
+        
+        .bullet-list li::before {
+            content: '✓';
+            position: absolute;
+            left: 20px;
+            color: #4ade80;
+            font-weight: 700;
+            font-size: 1.3em;
+        }
+        
+        .architecture-diagram {
+            width: 100%;
+            max-width: 900px;
+            margin-top: 40px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .layer-box {
+            padding: 20px;
+            margin-bottom: 15px;
+            background: rgba(99, 102, 241, 0.2);
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .layer-title {
+            font-weight: 700;
+            font-size: 1.2em;
+            margin-bottom: 8px;
+            color: #c7d2fe;
+        }
+        
+        .layer-desc {
+            font-size: 1em;
+            color: #94a3b8;
+        }
+        
+        .navigation {
+            position: fixed;
+            bottom: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 1000;
+        }
+        
+        .nav-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-dot.active {
+            background: #667eea;
+            transform: scale(1.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container" id="slideContainer">
+        <!-- Slide 1: Title -->
+        <div class="slide">
+            <h1>MATL</h1>
+            <div class="subtitle">Mycelix Adaptive Trust Layer</div>
+            <p class="tagline">Breaking the 33% Byzantine Barrier in Federated Learning</p>
+            <div class="slide-number">1 / 15</div>
+        </div>
+
+        <!-- Slide 2: The Problem -->
+        <div class="slide">
+            <h2>The $2B Problem</h2>
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-icon">🏥</div>
+                    <div class="card-title">Healthcare</div>
+                    <div class="card-text">Hospitals can't share patient data, but need collaborative AI models</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🏦</div>
+                    <div class="card-title">Finance</div>
+                    <div class="card-text">Banks need fraud detection without exposing transaction data</div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🛡️</div>
+                    <div class="card-title">Defense</div>
+                    <div class="card-text">Military needs edge intelligence without centralizing sensitive data</div>
+                </div>
+            </div>
+            <div class="slide-number">2 / 15</div>
+        </div>
+
+        <!-- Slide 3: Current Solutions Fail -->
+        <div class="slide">
+            <h2>Current Solutions Fail at Scale</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Approach</th>
+                        <th>Byzantine Tolerance</th>
+                        <th>Decentralized</th>
+                        <th>Hardware Cost</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>FedAvg / Krum</strong></td>
+                        <td>≤33%</td>
+                        <td>✅</td>
+                        <td>Low</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Central Validator</strong></td>
+                        <td>High</td>
+                        <td>❌</td>
+                        <td>Low</td>
+                    </tr>
+                    <tr>
+                        <td><strong>TEE-Based</strong></td>
+                        <td>High</td>
+                        <td>⚠️</td>
+                        <td>High</td>
+                    </tr>
+                    <tr class="highlight">
+                        <td><strong>MATL</strong></td>
+                        <td><strong>≤45%</strong></td>
+                        <td><strong>✅</strong></td>
+                        <td><strong>Low</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+            <div class="slide-number">3 / 15</div>
+        </div>
+
+        <!-- Slide 4: MATL Solution -->
+        <div class="slide">
+            <h2>MATL: The Solution</h2>
+            <div class="architecture-diagram">
+                <div class="layer-box">
+                    <div class="layer-title">FL Client (PyTorch/TensorFlow)</div>
+                    <div class="layer-desc">Training happens locally, no data leaves device</div>
+                </div>
+                <div style="text-align: center; margin: 10px 0; font-size: 1.5em;">↓</div>
+                <div class="layer-box">
+                    <div class="layer-title">MATL Middleware (2-line integration)</div>
+                    <div class="layer-desc">Validates gradients, calculates trust scores</div>
+                </div>
+                <div style="text-align: center; margin: 10px 0; font-size: 1.5em;">↓</div>
+                <div class="layer-box">
+                    <div class="layer-title">Network (Holochain + libp2p)</div>
+                    <div class="layer-desc">Decentralized storage and verification</div>
+                </div>
+            </div>
+            <div class="slide-number">4 / 15</div>
+        </div>
+
+        <!-- Slide 5: How It Works -->
+        <div class="slide">
+            <h2>How MATL Achieves 45% BFT</h2>
+            <ul class="bullet-list">
+                <li><strong>Reputation-Weighted Validation:</strong> New attackers start with low reputation</li>
+                <li><strong>Composite Trust Scoring:</strong> PoGQ (40%) + TCDM (30%) + Entropy (30%)</li>
+                <li><strong>Cartel Detection:</strong> Graph clustering identifies coordinated attacks</li>
+                <li><strong>Verifiable Computation:</strong> Optional zk-STARK proofs for transparency</li>
+            </ul>
+            <div style="margin-top: 50px; padding: 30px; background: rgba(99, 102, 241, 0.2); border-radius: 12px; max-width: 800px;">
+                <div style="font-size: 1.3em; margin-bottom: 15px; color: #c7d2fe;"><strong>Key Insight:</strong></div>
+                <div style="font-size: 1.1em; color: #94a3b8;">Even if 50% of nodes are malicious, system remains safe because their <em>aggregate reputation²</em> is lower than honest nodes</div>
+            </div>
+            <div class="slide-number">5 / 15</div>
+        </div>
+
+        <!-- Slide 6: Traction -->
+        <div class="slide">
+            <h2>Traction & Validation</h2>
+            <div class="content-grid">
+                <div class="metric">
+                    <div class="metric-value">45%</div>
+                    <div class="metric-label">Byzantine Tolerance<br/>(vs. 33% classical limit)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">100%</div>
+                    <div class="metric-label">Detection Rate<br/>(sign-flip attacks)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">25%</div>
+                    <div class="metric-label">Overhead<br/>(vs. centralized FL)</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-value">1000+</div>
+                    <div class="metric-label">Nodes Tested<br/>(production-ready)</div>
+                </div>
+            </div>
+            <div style="margin-top: 50px; font-size: 1.2em; text-align: center; color: #94a3b8;">
+                📄 Paper submitted to IEEE S&P / USENIX Security<br/>
+                🔬 Reproducible results via open-source 0TML framework
+            </div>
+            <div class="slide-number">6 / 15</div>
+        </div>
+
+        <!-- Slide 7: Market Size -->
+        <div class="slide">
+            <h2>Market Opportunity</h2>
+            <div class="content-grid" style="grid-template-columns: 1fr;">
+                <div class="card">
+                    <h3 style="text-align: center; margin-bottom: 30px;">Federated Learning Market</h3>
+                    <div style="display: flex; justify-content: space-around; margin-bottom: 30px;">
+                        <div class="metric">
+                            <div class="metric-value">$2B</div>
+                            <div class="metric-label">Market Size (2027)</div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-value">47%</div>
+                            <div class="metric-label">CAGR (2024-2030)</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 1.1em; color: #94a3b8; line-height: 1.6;">
+                        <strong>Key Drivers:</strong><br/>
+                        • Privacy regulations (GDPR, HIPAA)<br/>
+                        • Edge computing growth<br/>
+                        • Military/defense requirements<br/>
+                        • Cross-organization AI collaboration
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">7 / 15</div>
+        </div>
+
+        <!-- Slide 8: Business Model -->
+        <div class="slide">
+            <h2>Business Model</h2>
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-title">🎓 Research License</div>
+                    <div class="card-text" style="font-size: 1.3em; margin: 20px 0;"><strong>FREE</strong></div>
+                    <div class="card-text">
+                        • Academic use only<br/>
+                        • Public datasets<br/>
+                        • Community support<br/>
+                        • Citation required
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🏛️ Non-Profit License</div>
+                    <div class="card-text" style="font-size: 1.3em; margin: 20px 0;"><strong>$25K/year</strong></div>
+                    <div class="card-text">
+                        • NGOs, foundations<br/>
+                        • Private datasets OK<br/>
+                        • Email support<br/>
+                        • No commercial use
+                    </div>
+                </div>
+                <div class="card" style="border: 2px solid #667eea;">
+                    <div class="card-title">🏢 Enterprise License</div>
+                    <div class="card-text" style="font-size: 1.3em; margin: 20px 0;"><strong>$100K+/year</strong></div>
+                    <div class="card-text">
+                        • Unlimited production<br/>
+                        • Custom SLAs<br/>
+                        • Priority support<br/>
+                        • On-premise option
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">8 / 15</div>
+        </div>
+
+        <!-- Slide 9: Go-to-Market -->
+        <div class="slide">
+            <h2>Go-to-Market Strategy</h2>
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-icon">1️⃣</div>
+                    <div class="card-title">Open Source Adoption</div>
+                    <div class="card-text">
+                        Release Python SDK, documentation, tutorials<br/><br/>
+                        <strong>Target: 1000+ GitHub stars in 6 months</strong>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">2️⃣</div>
+                    <div class="card-title">Academic Validation</div>
+                    <div class="card-text">
+                        Publish at top-tier venues (IEEE S&P, USENIX)<br/><br/>
+                        <strong>Target: 10+ citations in first year</strong>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">3️⃣</div>
+                    <div class="card-title">Enterprise Sales</div>
+                    <div class="card-text">
+                        Direct outreach to healthcare, finance, defense<br/><br/>
+                        <strong>Target: 3-5 enterprise customers by EOY 2026</strong>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">9 / 15</div>
+        </div>
+
+        <!-- Slide 10: Competition -->
+        <div class="slide">
+            <h2>Competitive Landscape</h2>
+            <table class="comparison-table">
+                <thead>
+                    <tr>
+                        <th>Feature</th>
+                        <th>FedAvg</th>
+                        <th>Krum</th>
+                        <th>FLTrust</th>
+                        <th class="highlight">MATL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>BFT Tolerance</strong></td>
+                        <td>≤33%</td>
+                        <td>≤33%</td>
+                        <td>≤33%</td>
+                        <td class="highlight">≤45%</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Decentralized</strong></td>
+                        <td>✅</td>
+                        <td>✅</td>
+                        <td>❌</td>
+                        <td class="highlight">✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Verifiable</strong></td>
+                        <td>❌</td>
+                        <td>❌</td>
+                        <td>⚠️</td>
+                        <td class="highlight">✅</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Production Ready</strong></td>
+                        <td>✅</td>
+                        <td>⚠️</td>
+                        <td>❌</td>
+                        <td class="highlight">✅</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="margin-top: 40px; font-size: 1.2em; text-align: center; color: #94a3b8;">
+                <strong>MATL is the only solution that achieves all four:</strong><br/>
+                High BFT • Decentralized • Verifiable • Production-Ready
+            </div>
+            <div class="slide-number">10 / 15</div>
+        </div>
+
+        <!-- Slide 11: Use Cases -->
+        <div class="slide">
+            <h2>Target Use Cases</h2>
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-icon">🏥</div>
+                    <div class="card-title">Healthcare</div>
+                    <div class="card-text">
+                        <strong>Problem:</strong> Hospitals can't share patient data (HIPAA)<br/>
+                        <strong>Solution:</strong> Train diagnostic models collaboratively without data leaving hospitals<br/>
+                        <strong>Customers:</strong> Epic, Cerner, Philips Healthcare
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🏦</div>
+                    <div class="card-title">Finance</div>
+                    <div class="card-text">
+                        <strong>Problem:</strong> Banks need fraud detection without sharing transaction data<br/>
+                        <strong>Solution:</strong> Collaborative fraud models across institutions<br/>
+                        <strong>Customers:</strong> JPMorgan, Goldman Sachs, Stripe
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-icon">🛡️</div>
+                    <div class="card-title">Defense</div>
+                    <div class="card-text">
+                        <strong>Problem:</strong> Military needs edge AI without centralization<br/>
+                        <strong>Solution:</strong> Distributed intelligence for autonomous systems<br/>
+                        <strong>Customers:</strong> Palantir, Booz Allen, MITRE
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">11 / 15</div>
+        </div>
+
+        <!-- Slide 12: Roadmap -->
+        <div class="slide">
+            <h2>12-Month Roadmap</h2>
+            <div class="timeline">
+                <div class="timeline-item">
+                    <div class="timeline-quarter">Q4 2025</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Research Validation</div>
+                        <div class="timeline-desc">Submit paper to IEEE S&P, finalize experimental results</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-quarter">Q1 2026</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Open Source Release</div>
+                        <div class="timeline-desc">Python SDK v0.1, documentation, tutorials</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-quarter">Q2 2026</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Whitepaper & Partnerships</div>
+                        <div class="timeline-desc">Technical whitepaper, partnership outreach</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-quarter">Q3 2026</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Testnet Deployment</div>
+                        <div class="timeline-desc">1000-node production testnet, public demo</div>
+                    </div>
+                </div>
+                <div class="timeline-item">
+                    <div class="timeline-quarter">Q4 2026</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">Commercialization</div>
+                        <div class="timeline-desc">First enterprise customers, $100K ARR</div>
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">12 / 15</div>
+        </div>
+
+        <!-- Slide 13: Team -->
+        <div class="slide">
+            <h2>Team & Advisors</h2>
+            <div class="content-grid">
+                <div class="card">
+                    <div class="card-title">👤 Technical Team</div>
+                    <div class="card-text">
+                        • <strong>Research Lead:</strong> Published in federated learning, Byzantine fault tolerance<br/>
+                        • <strong>Backend Engineer:</strong> Holochain expert, distributed systems<br/>
+                        • <strong>DevOps:</strong> K8s, cloud infrastructure, 1000+ node deployments
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">🎓 Academic Advisors</div>
+                    <div class="card-text">
+                        • <strong>Prof. [Name]:</strong> Stanford, FL security<br/>
+                        • <strong>Prof. [Name]:</strong> MIT, cryptography<br/>
+                        • <strong>Prof. [Name]:</strong> Berkeley, distributed systems
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">💼 Industry Advisors</div>
+                    <div class="card-text">
+                        • <strong>[Name]:</strong> Former Google FL lead<br/>
+                        • <strong>[Name]:</strong> Healthcare AI, Epic Systems<br/>
+                        • <strong>[Name]:</strong> Defense tech, Palantir
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">13 / 15</div>
+        </div>
+
+        <!-- Slide 14: The Ask -->
+        <div class="slide">
+            <h2>The Ask</h2>
+            <div style="max-width: 900px; margin: 0 auto;">
+                <div style="text-align: center; margin-bottom: 50px;">
+                    <div class="metric-value" style="font-size: 5em;">$500K</div>
+                    <div class="metric-label" style="font-size: 1.5em;">Seed Round</div>
+                </div>
+                
+                <div class="content-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="card">
+                        <div class="card-title">Use of Funds</div>
+                        <div class="card-text">
+                            • <strong>$300K:</strong> Team (3 engineers)<br/>
+                            • <strong>$120K:</strong> Infrastructure (testnet)<br/>
+                            • <strong>$50K:</strong> Marketing & sales<br/>
+                            • <strong>$30K:</strong> Legal & ops
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">18-Month Milestones</div>
+                        <div class="card-text">
+                            • Paper published (Q1 2026)<br/>
+                            • SDK released (Q2 2026)<br/>
+                            • Testnet live (Q3 2026)<br/>
+                            • $100K ARR (Q4 2026)<br/>
+                            • Series A ready (Q2 2027)
+                        </div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 50px; padding: 30px; background: rgba(99, 102, 241, 0.2); border-radius: 12px;">
+                    <div style="font-size: 1.3em; color: #c7d2fe; text-align: center;">
+                        <strong>Exit Strategy:</strong> Acquisition by Google, Meta, Microsoft, or AWS (FL infrastructure play)<br/>
+                        OR Series B+ and continue as independent middleware company
+                    </div>
+                </div>
+            </div>
+            <div class="slide-number">14 / 15</div>
+        </div>
+
+        <!-- Slide 15: Contact -->
+        <div class="slide">
+            <h1>Let's Build the Future of<br/>Federated Learning</h1>
+            <div style="margin-top: 50px; font-size: 1.5em; color: #94a3b8; text-align: center; line-height: 2;">
+                📧 contact@matl.network<br/>
+                🌐 matl.network<br/>
+                📄 Read the whitepaper<br/>
+                💻 Try the SDK (launching Q1 2026)
+            </div>
+            <button class="cta-button">Schedule a Demo</button>
+            <div style="margin-top: 60px; font-size: 1.2em; color: #64748b; text-align: center;">
+                "Breaking the 33% barrier isn't just an academic achievement—<br/>
+                it's the key to unlocking trillion-dollar collaborative AI markets."
+            </div>
+            <div class="slide-number">15 / 15</div>
+        </div>
+    </div>
+
+    <div class="navigation" id="navigation"></div>
+
+    <script>
+        // Create navigation dots
+        const nav = document.getElementById('navigation');
+        const slides = document.querySelectorAll('.slide');
+        
+        slides.forEach((slide, index) => {
+            const dot = document.createElement('div');
+            dot.className = 'nav-dot';
+            if (index === 0) dot.classList.add('active');
+            dot.addEventListener('click', () => {
+                slides[index].scrollIntoView({ behavior: 'smooth' });
+            });
+            nav.appendChild(dot);
+        });
+
+        // Update active dot on scroll
+        const container = document.getElementById('slideContainer');
+        container.addEventListener('scroll', () => {
+            const scrollPosition = container.scrollTop;
+            const slideHeight = window.innerHeight;
+            const currentSlide = Math.round(scrollPosition / slideHeight);
+            
+            document.querySelectorAll('.nav-dot').forEach((dot, index) => {
+                if (index === currentSlide) {
+                    dot.classList.add('active');
+                } else {
+                    dot.classList.remove('active');
+                }
+            });
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            const container = document.getElementById('slideContainer');
+            const currentScroll = container.scrollTop;
+            const slideHeight = window.innerHeight;
+            const currentSlide = Math.round(currentScroll / slideHeight);
+            
+            if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+                if (currentSlide < slides.length - 1) {
+                    slides[currentSlide + 1].scrollIntoView({ behavior: 'smooth' });
+                }
+            } else if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+                if (currentSlide > 0) {
+                    slides[currentSlide - 1].scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    </script>
+</body>
+</html>

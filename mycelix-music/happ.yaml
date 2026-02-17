@@ -1,0 +1,21 @@
+---
+# Mycelix Music hApp Bundle
+# Zero-cost streaming through agent-centric architecture
+
+manifest_version: "0"
+name: mycelix-music
+description: |
+  Decentralized music streaming platform for the Mycelix ecosystem.
+  Artist-first royalty distribution with P2P plays tracking.
+
+roles:
+  - name: music
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dnas/mycelix-music/mycelix_music.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

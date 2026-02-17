@@ -1,0 +1,23 @@
+[workspace]
+resolver = "2"
+members = [
+    "zomes/catalog/integrity",
+    "zomes/catalog/coordinator",
+    "zomes/plays/integrity",
+    "zomes/plays/coordinator",
+    "zomes/balances/integrity",
+    "zomes/balances/coordinator",
+    "zomes/trust/integrity",
+    "zomes/trust/coordinator",
+]
+
+[workspace.dependencies]
+hdi = "0.4"
+hdk = "0.3"
+serde = "1"
+
+[profile.dev]
+opt-level = "z"
+
+[profile.release]
+opt-level = "z"

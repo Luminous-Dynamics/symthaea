@@ -1,0 +1,14 @@
+data_root_path: /tmp/holochain_zerotrustml
+keystore:
+  type: lair_server_in_proc
+  lair_root: /tmp/holochain_zerotrustml/ks
+dpki:
+  network_seed: ''
+  no_dpki: true
+admin_interfaces:
+- driver:
+    type: websocket
+    port: 8888
+    allowed_origins: '*'
+network: null
+db_sync_strategy: Resilient

@@ -1,0 +1,25 @@
+# Foundry
+/out/
+/cache/
+/broadcast/
+
+# Environment
+.env
+.env.local
+
+# Dependencies (managed by forge install)
+/lib/
+
+# Coverage
+lcov.info
+
+# Node (if using any JS tools)
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

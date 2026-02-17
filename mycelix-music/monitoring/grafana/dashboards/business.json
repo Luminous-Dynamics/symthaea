@@ -1,0 +1,228 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "mycelix-business",
+    "title": "Mycelix Business Metrics",
+    "tags": ["mycelix", "business"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "1m",
+    "panels": [
+      {
+        "id": 1,
+        "title": "Plays (Last Hour)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(increase(mycelix_plays_total[1h]))",
+            "legendFormat": "plays"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [{ "color": "green", "value": null }]
+            }
+          }
+        }
+      },
+      {
+        "id": 2,
+        "title": "Signups (Today)",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+        "targets": [
+          {
+            "expr": "sum(increase(mycelix_signups_total[24h]))",
+            "legendFormat": "signups"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [{ "color": "blue", "value": null }]
+            }
+          }
+        }
+      },
+      {
+        "id": 3,
+        "title": "Total Users",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+        "targets": [
+          {
+            "expr": "mycelix_users_total",
+            "legendFormat": "users"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 4,
+        "title": "Total Songs",
+        "type": "stat",
+        "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+        "targets": [
+          {
+            "expr": "mycelix_songs_total",
+            "legendFormat": "songs"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        }
+      },
+      {
+        "id": 5,
+        "title": "Plays Over Time",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+        "targets": [
+          {
+            "expr": "sum(rate(mycelix_plays_total[5m])) by (genre)",
+            "legendFormat": "{{ genre }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "plays/s"
+          }
+        }
+      },
+      {
+        "id": 6,
+        "title": "Engagement Rate",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+        "targets": [
+          {
+            "expr": "sum(rate(mycelix_likes_total[5m]))",
+            "legendFormat": "Likes"
+          },
+          {
+            "expr": "sum(rate(mycelix_follows_total{action=\"follow\"}[5m]))",
+            "legendFormat": "Follows"
+          },
+          {
+            "expr": "sum(rate(mycelix_shares_total[5m]))",
+            "legendFormat": "Shares"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "events/s"
+          }
+        }
+      },
+      {
+        "id": 7,
+        "title": "Plays by Source",
+        "type": "piechart",
+        "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
+        "targets": [
+          {
+            "expr": "sum(increase(mycelix_plays_total[24h])) by (source)",
+            "legendFormat": "{{ source }}"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Uploads",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
+        "targets": [
+          {
+            "expr": "sum(rate(mycelix_uploads_total{status=\"success\"}[5m]))",
+            "legendFormat": "Successful"
+          },
+          {
+            "expr": "sum(rate(mycelix_uploads_total{status=\"failed\"}[5m]))",
+            "legendFormat": "Failed"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "uploads/s"
+          }
+        }
+      },
+      {
+        "id": 9,
+        "title": "Search Latency",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, sum(rate(mycelix_search_latency_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p50"
+          },
+          {
+            "expr": "histogram_quantile(0.95, sum(rate(mycelix_search_latency_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p95"
+          },
+          {
+            "expr": "histogram_quantile(0.99, sum(rate(mycelix_search_latency_seconds_bucket[5m])) by (le))",
+            "legendFormat": "p99"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "s"
+          }
+        }
+      },
+      {
+        "id": 10,
+        "title": "Transactions",
+        "type": "timeseries",
+        "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+        "targets": [
+          {
+            "expr": "sum(rate(mycelix_transactions_total{status=\"success\"}[5m])) by (type)",
+            "legendFormat": "{{ type }}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "tx/s"
+          }
+        }
+      },
+      {
+        "id": 11,
+        "title": "Royalties Distributed (ETH)",
+        "type": "stat",
+        "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+        "targets": [
+          {
+            "expr": "sum(mycelix_royalties_distributed_total{currency=\"ETH\"}) / 1e18",
+            "legendFormat": "ETH"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ETH",
+            "thresholds": {
+              "mode": "absolute",
+              "steps": [{ "color": "purple", "value": null }]
+            }
+          }
+        }
+      }
+    ]
+  }
+}

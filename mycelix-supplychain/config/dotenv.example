@@ -1,0 +1,35 @@
+# Mycelix Supply Chain Configuration
+# Copy to .env and customize for your environment
+
+# Service Configuration
+SERVICE_PORT=8080
+SERVICE_HOST=0.0.0.0
+RUST_LOG=info
+
+# Database (optional - defaults to in-memory)
+# DATABASE_URL=sqlite://data/claims.db
+# DATABASE_URL=postgres://user:password@localhost:5432/supplychain
+
+# DKG Integration (when available)
+# DKG_API_URL=http://localhost:9000
+# DKG_NODE_DID=did:mycelix:node:example
+
+# Signing Key (in production, use secure key management)
+# SIGNING_KEY_SEED=<64-character-hex-string>
+
+# API Keys (if using authentication)
+# API_KEY=your-api-key-here
+
+# CORS Settings
+# CORS_ALLOWED_ORIGINS=http://localhost:3000,https://dashboard.example.com
+
+# Dashboard
+NEXT_PUBLIC_API_URL=http://localhost:8080
+
+# MQTT (for IoT adapters)
+# MQTT_BROKER=mqtt://localhost:1883
+# MQTT_TOPIC=supplychain/events/#
+
+# Monitoring
+# SENTRY_DSN=https://...
+# METRICS_PORT=9090

@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zerotrustml-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    networks:
+      - zerotrustml-monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zerotrustml-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-dashboard-byzantine.json:/etc/grafana/provisioning/dashboards/byzantine.json
+      - ./grafana-dashboard-network.json:/etc/grafana/provisioning/dashboards/network.json
+      - ./grafana-dashboard-performance.json:/etc/grafana/provisioning/dashboards/performance.json
+      - ./grafana-datasource.yml:/etc/grafana/provisioning/datasources/prometheus.yml
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - zerotrustml-monitoring
+
+  redis:
+    image: redis:7-alpine
+    container_name: zerotrustml-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+    networks:
+      - zerotrustml-monitoring
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: zerotrustml-redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - zerotrustml-monitoring
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  redis-data:
+
+networks:
+  zerotrustml-monitoring:
+    driver: bridge

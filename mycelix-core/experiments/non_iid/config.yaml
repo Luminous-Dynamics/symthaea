@@ -1,0 +1,294 @@
+# Non-IID Validation Experiment Configuration
+# Mycelix Federated Learning System
+# Author: Luminous Dynamics
+# Date: January 2026
+
+# =============================================================================
+# Global Settings
+# =============================================================================
+
+experiment:
+  name: "non_iid_validation"
+  description: "Validate Byzantine detection under Non-IID data distributions"
+  version: "1.0.0"
+  seed: 42
+  output_dir: "results/non_iid"
+
+# =============================================================================
+# Network Configuration
+# =============================================================================
+
+network:
+  # Total number of federated learning nodes
+  num_nodes: 20
+
+  # Fraction of Byzantine (malicious) nodes
+  byzantine_ratio: 0.30
+
+  # Byzantine attack types to use
+  attack_types:
+    - "gradient_scaling"
+    - "sign_flip"
+    - "gaussian_noise"
+    - "label_flip"
+
+  # Attack strategy: random, coordinated, adaptive
+  attack_strategy: "random"
+
+# =============================================================================
+# Training Configuration
+# =============================================================================
+
+training:
+  # Number of federated learning rounds
+  num_rounds: 100
+
+  # Local epochs per round (each client trains this many epochs locally)
+  local_epochs: 5
+
+  # Batch size for local training
+  batch_size: 32
+
+  # Learning rate
+  learning_rate: 0.01
+
+  # Learning rate scheduler: none, step, cosine
+  lr_scheduler: "step"
+  lr_decay_step: 30
+  lr_decay_gamma: 0.5
+
+  # Warmup rounds before measuring metrics
+  warmup_rounds: 5
+
+  # Checkpoint interval (save model every N rounds)
+  checkpoint_interval: 10
+
+# =============================================================================
+# Dataset Configuration
+# =============================================================================
+
+dataset:
+  # Dataset name: mnist, cifar10
+  name: "cifar10"
+
+  # Data directory (auto-downloads if not present)
+  data_dir: "./data"
+
+  # Validation split ratio
+  val_split: 0.1
+
+  # Test batch size
+  test_batch_size: 100
+
+# =============================================================================
+# Model Configuration
+# =============================================================================
+
+model:
+  # Model architecture: simple_cnn, resnet18, vit_tiny
+  architecture: "simple_cnn"
+
+  # Number of classes
+  num_classes: 10
+
+  # Input channels (1 for MNIST, 3 for CIFAR-10)
+  input_channels: 3
+
+# =============================================================================
+# Label Skew Configuration
+# =============================================================================
+
+label_skew:
+  # Enable label skew experiments
+  enabled: true
+
+  # Dirichlet concentration parameters to test
+  # Lower alpha = more heterogeneous distribution
+  alphas:
+    - 0.1   # Extreme: 1-2 classes per node
+    - 0.5   # Moderate: 3-5 classes per node
+    - 1.0   # Mild: roughly uniform
+
+  # Minimum samples per client (resamples if less)
+  min_samples_per_client: 100
+
+# =============================================================================
+# Feature Skew Configuration
+# =============================================================================
+
+feature_skew:
+  # Enable feature skew experiments
+  enabled: true
+
+  # Types of feature transformations
+  transformations:
+    - type: "brightness"
+      range: [0.5, 1.5]  # Multiplier range
+    - type: "rotation"
+      range: [-30, 30]   # Degrees
+    - type: "noise"
+      range: [0.0, 0.3]  # Gaussian noise std
+    - type: "blur"
+      range: [0, 3]      # Kernel size
+
+  # Fraction of nodes with transformed features
+  transformation_ratio: 0.5
+
+# =============================================================================
+# Quantity Skew Configuration
+# =============================================================================
+
+quantity_skew:
+  # Enable quantity skew experiments
+  enabled: true
+
+  # Data distribution across nodes
+  distribution:
+    # Number of "large" nodes with maximum data
+    large_nodes: 2
+    large_samples: 10000
+
+    # Number of "medium" nodes
+    medium_nodes: 8
+    medium_samples: 1000
+
+    # Number of "small" nodes with minimum data
+    small_nodes: 10
+    small_samples: 100
+
+  # Maximum imbalance ratio (largest / smallest)
+  max_imbalance_ratio: 100
+
+# =============================================================================
+# Combined Skew Configuration
+# =============================================================================
+
+combined_skew:
+  # Enable combined skew experiments
+  enabled: true
+
+  # Combine all skew types
+  label_alpha: 0.5      # Moderate label skew
+  feature_ratio: 0.3    # 30% nodes with feature shift
+  quantity_imbalance: true  # Enable quantity imbalance
+
+# =============================================================================
+# Byzantine Detection Configuration
+# =============================================================================
+
+detection:
+  # Detection layers to enable
+  enable_pogq: true
+  enable_shapley: true
+  enable_hypervector: true
+  enable_self_healing: true
+  enable_zkstark: false  # Not yet implemented
+
+  # Detection thresholds
+  cosine_threshold_min: -0.5  # Optimized for label skew
+  cosine_threshold_max: 0.95
+
+  # Behavior recovery parameters (from .env.optimal)
+  recovery_threshold: 2
+  recovery_bonus: 0.12
+
+# =============================================================================
+# Aggregation Configuration
+# =============================================================================
+
+aggregation:
+  # Aggregation strategy: fedavg, krum, median, trimmed_mean, coordinate_median
+  strategy: "coordinate_median"
+
+  # Krum parameters
+  krum_f: null  # Auto-calculate based on byzantine_ratio
+
+  # Trimmed mean parameters
+  trim_ratio: 0.2
+
+  # FedProx parameters (for Non-IID stability)
+  fedprox_mu: 0.01
+  fedprox_enabled: false
+
+# =============================================================================
+# Metrics Configuration
+# =============================================================================
+
+metrics:
+  # Metrics to collect
+  collect:
+    - "detection_accuracy"
+    - "model_accuracy"
+    - "convergence_speed"
+    - "fairness"
+    - "gradient_variance"
+    - "client_drift"
+
+  # Per-class metrics
+  per_class_metrics: true
+
+  # Latency percentiles to record
+  latency_percentiles: [50, 95, 99]
+
+# =============================================================================
+# Plotting Configuration
+# =============================================================================
+
+plotting:
+  # Enable publication-ready plots
+  enabled: true
+
+  # Plot style: seaborn, matplotlib, publication
+  style: "publication"
+
+  # Figure DPI for saving
+  dpi: 300
+
+  # Figure format: png, pdf, svg
+  format: "png"
+
+  # Plot types to generate
+  plots:
+    - "detection_accuracy_by_alpha"
+    - "convergence_curves"
+    - "fairness_distribution"
+    - "per_class_accuracy"
+    - "gradient_variance"
+    - "latency_distribution"
+    - "confusion_matrix"
+    - "roc_curve"
+
+# =============================================================================
+# Logging Configuration
+# =============================================================================
+
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR
+  level: "INFO"
+
+  # Log to file
+  file_logging: true
+  log_file: "experiment.log"
+
+  # Progress bar
+  progress_bar: true
+
+  # Verbose mode (print per-round metrics)
+  verbose: false
+
+# =============================================================================
+# Reproducibility
+# =============================================================================
+
+reproducibility:
+  # Master random seed
+  seed: 42
+
+  # Make PyTorch deterministic
+  deterministic: true
+
+  # CUDA benchmark mode
+  cudnn_benchmark: false
+
+  # Save config with results
+  save_config: true

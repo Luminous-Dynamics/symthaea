@@ -1,0 +1,222 @@
+#!/usr/bin/env node
+/**
+ * WebRTC Signaling Server for Holochain P2P Network
+ * Enables real peer-to-peer connections between Holochain nodes
+ */
+
+const WebSocket = require('ws');
+const http = require('http');
+
+const PORT = process.env.SIGNAL_PORT || 9002;
+
+// Create HTTP server for health checks
+const server = http.createServer((req, res) => {
+    if (req.url === '/health') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+            status: 'healthy',
+            connections: wss.clients.size,
+            timestamp: new Date().toISOString()
+        }));
+    } else {
+        res.writeHead(404);
+        res.end('Not Found');
+    }
+});
+
+// Create WebSocket server for signaling
+const wss = new WebSocket.Server({ server });
+
+// Store peer connections
+const peers = new Map();
+
+wss.on('connection', (ws, req) => {
+    const peerId = generatePeerId();
+    
+    console.log(`🟢 New peer connected: ${peerId}`);
+    console.log(`   From: ${req.connection.remoteAddress}`);
+    
+    // Store peer
+    peers.set(peerId, {
+        ws,
+        info: {
+            id: peerId,
+            connected: new Date().toISOString(),
+            address: req.connection.remoteAddress
+        }
+    });
+    
+    // Send welcome message
+    ws.send(JSON.stringify({
+        type: 'welcome',
+        peerId,
+        peers: Array.from(peers.keys()).filter(id => id !== peerId)
+    }));
+    
+    // Notify other peers of new connection
+    broadcast({
+        type: 'peer-joined',
+        peerId,
+        totalPeers: peers.size
+    }, peerId);
+    
+    // Handle messages
+    ws.on('message', (data) => {
+        try {
+            const msg = JSON.parse(data.toString());
+            handleMessage(peerId, msg);
+        } catch (err) {
+            console.error(`❌ Invalid message from ${peerId}:`, err);
+        }
+    });
+    
+    // Handle disconnection
+    ws.on('close', () => {
+        console.log(`🔴 Peer disconnected: ${peerId}`);
+        peers.delete(peerId);
+        
+        // Notify others
+        broadcast({
+            type: 'peer-left',
+            peerId,
+            totalPeers: peers.size
+        });
+    });
+    
+    // Handle errors
+    ws.on('error', (err) => {
+        console.error(`❌ WebSocket error for ${peerId}:`, err);
+    });
+});
+
+/**
+ * Handle signaling messages
+ */
+function handleMessage(fromPeerId, msg) {
+    console.log(`📨 Message from ${fromPeerId}:`, msg.type);
+    
+    switch (msg.type) {
+        case 'offer':
+        case 'answer':
+        case 'ice-candidate':
+            // Forward WebRTC signaling to target peer
+            if (msg.targetPeerId && peers.has(msg.targetPeerId)) {
+                const targetPeer = peers.get(msg.targetPeerId);
+                targetPeer.ws.send(JSON.stringify({
+                    ...msg,
+                    fromPeerId
+                }));
+                console.log(`   ➡️ Forwarded to ${msg.targetPeerId}`);
+            } else {
+                console.log(`   ⚠️ Target peer not found: ${msg.targetPeerId}`);
+            }
+            break;
+            
+        case 'broadcast':
+            // Broadcast message to all peers
+            broadcast({
+                type: 'broadcast',
+                fromPeerId,
+                data: msg.data,
+                timestamp: new Date().toISOString()
+            }, fromPeerId);
+            console.log(`   📢 Broadcasted to ${peers.size - 1} peers`);
+            break;
+            
+        case 'ping':
+            // Respond to ping
+            const pingPeer = peers.get(fromPeerId);
+            if (pingPeer) {
+                pingPeer.ws.send(JSON.stringify({
+                    type: 'pong',
+                    timestamp: new Date().toISOString()
+                }));
+            }
+            break;
+            
+        case 'get-peers':
+            // Send list of connected peers
+            const getPeer = peers.get(fromPeerId);
+            if (getPeer) {
+                getPeer.ws.send(JSON.stringify({
+                    type: 'peers-list',
+                    peers: Array.from(peers.entries()).map(([id, p]) => ({
+                        id,
+                        ...p.info
+                    })).filter(p => p.id !== fromPeerId)
+                }));
+            }
+            break;
+            
+        default:
+            console.log(`   ❓ Unknown message type: ${msg.type}`);
+    }
+}
+
+/**
+ * Broadcast message to all peers except sender
+ */
+function broadcast(msg, excludePeerId = null) {
+    const message = JSON.stringify(msg);
+    
+    peers.forEach((peer, peerId) => {
+        if (peerId !== excludePeerId && peer.ws.readyState === WebSocket.OPEN) {
+            peer.ws.send(message);
+        }
+    });
+}
+
+/**
+ * Generate unique peer ID
+ */
+function generatePeerId() {
+    return 'peer-' + Math.random().toString(36).substr(2, 9);
+}
+
+// Start server
+server.listen(PORT, () => {
+    console.log(`
+╔════════════════════════════════════════════════╗
+║       🧬 MYCELIX SIGNALING SERVER              ║
+╠════════════════════════════════════════════════╣
+║  WebRTC Signaling for Holochain P2P Network   ║
+║                                                ║
+║  🌐 WebSocket: ws://localhost:${PORT}           ║
+║  📊 Health:    http://localhost:${PORT}/health  ║
+║                                                ║
+║  Status: READY FOR P2P CONNECTIONS            ║
+╚════════════════════════════════════════════════╝
+    `);
+    
+    // Log stats every 30 seconds
+    setInterval(() => {
+        if (peers.size > 0) {
+            console.log(`\n📊 Network Stats:`);
+            console.log(`   • Connected peers: ${peers.size}`);
+            console.log(`   • Memory usage: ${(process.memoryUsage().heapUsed / 1024 / 1024).toFixed(2)} MB`);
+            console.log(`   • Uptime: ${(process.uptime() / 60).toFixed(1)} minutes`);
+        }
+    }, 30000);
+});
+
+// Handle graceful shutdown
+process.on('SIGINT', () => {
+    console.log('\n🛑 Shutting down signaling server...');
+    
+    // Notify all peers
+    broadcast({
+        type: 'server-shutdown',
+        message: 'Signaling server is shutting down'
+    });
+    
+    // Close all connections
+    peers.forEach((peer) => {
+        peer.ws.close();
+    });
+    
+    // Close server
+    server.close(() => {
+        console.log('✅ Server shut down gracefully');
+        process.exit(0);
+    });
+});

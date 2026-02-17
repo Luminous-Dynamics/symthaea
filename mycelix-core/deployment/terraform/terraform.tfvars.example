@@ -1,0 +1,52 @@
+# Mycelix Testnet Infrastructure Configuration
+#
+# Copy this file to terraform.tfvars and fill in the values.
+# DO NOT commit terraform.tfvars to version control.
+
+# General Configuration
+environment    = "testnet"
+primary_region = "us-east-1"
+secondary_region = "us-west-2"
+
+# VPC Configuration
+vpc_cidr        = "10.0.0.0/16"
+private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+# Kubernetes Configuration
+kubernetes_version = "1.29"
+
+# Validator Node Configuration
+validator_instance_types = ["m6i.xlarge"]
+validator_min_nodes      = 3
+validator_max_nodes      = 10
+validator_desired_nodes  = 5
+
+# FL Node Configuration
+fl_instance_types  = ["c6i.2xlarge"]
+fl_min_nodes       = 2
+fl_max_nodes       = 20
+fl_desired_nodes   = 5
+
+# Database Configuration
+db_instance_class        = "db.t3.medium"
+db_allocated_storage     = 50
+db_max_allocated_storage = 200
+
+# Redis Configuration
+redis_node_type = "cache.t3.medium"
+
+# Monitoring (REQUIRED - set these values)
+grafana_admin_password = ""  # Generate: openssl rand -base64 32
+letsencrypt_email      = "ops@luminous-dynamics.org"
+
+# Domain
+domain_name = "testnet.mycelix.io"
+
+# Alerting (optional but recommended)
+pagerduty_integration_key = ""  # Get from PagerDuty integration settings
+slack_webhook_url         = ""  # Get from Slack incoming webhooks
+
+# Cost Management
+enable_spot_instances = true
+monthly_budget_limit  = 5000

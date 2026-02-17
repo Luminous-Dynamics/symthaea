@@ -1,0 +1,39 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "mycelix-wisdom"
+version = "0.1.0"
+description = "Mycelix WisdomEngine - Pattern intelligence for AI systems"
+license = {text = "MIT OR Apache-2.0"}
+requires-python = ">=3.9"
+keywords = ["ai", "wisdom", "patterns", "hdc", "mycelix"]
+authors = [
+    {name = "Luminous Dynamics", email = "dev@luminousdynamics.org"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Rust",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+[project.urls]
+Homepage = "https://github.com/luminous-dynamics/mycelix"
+Documentation = "https://mycelix.net/docs"
+Repository = "https://github.com/luminous-dynamics/mycelix"
+
+[tool.maturin]
+# Build with Python bindings feature
+features = ["python"]
+
+# Module name must match the #[pymodule] function name
+module-name = "mycelix_wisdom"

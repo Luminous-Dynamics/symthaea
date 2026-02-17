@@ -1,0 +1,71 @@
+{
+  "description": "Expected results for Table 2: Aggregation Latency",
+  "paper_reference": "Table 3, Section 5.3",
+  "tolerance_percent": 20.0,
+  "notes": "Latency measurements can vary significantly based on hardware. A 20% tolerance is used.",
+  "hardware_baseline": {
+    "cpu": "AMD EPYC 7763 (64 cores)",
+    "ram": "256GB",
+    "description": "Paper results were generated on this hardware. Lower-end hardware will be slower."
+  },
+  "data": {
+    "pogq": {
+      "median_ms": 0.452,
+      "p95_ms": 0.812,
+      "p99_ms": 1.124,
+      "mean_ms": 0.498,
+      "tolerance_factor": 0.20
+    },
+    "fltrust": {
+      "median_ms": 0.385,
+      "p95_ms": 0.702,
+      "p99_ms": 0.958,
+      "mean_ms": 0.421,
+      "tolerance_factor": 0.20
+    },
+    "krum": {
+      "median_ms": 2.845,
+      "p95_ms": 4.521,
+      "p99_ms": 5.823,
+      "mean_ms": 3.012,
+      "tolerance_factor": 0.25
+    },
+    "fedavg": {
+      "median_ms": 0.124,
+      "p95_ms": 0.215,
+      "p99_ms": 0.298,
+      "mean_ms": 0.138,
+      "tolerance_factor": 0.20
+    }
+  },
+  "key_claims": {
+    "pogq_sub_millisecond": {
+      "description": "PoGQ achieves sub-millisecond median latency",
+      "max_value_ms": 1.0
+    },
+    "pogq_faster_than_krum": {
+      "description": "PoGQ is at least 5x faster than Krum",
+      "min_speedup": 5.0
+    },
+    "pogq_6_3x_faster_than_krum": {
+      "description": "Paper claims 6.3x speedup over Krum",
+      "expected_speedup": 6.3,
+      "tolerance": 1.0
+    }
+  },
+  "scaling_expectations": {
+    "description": "How latency scales with parameters",
+    "gradient_dim": {
+      "relationship": "linear",
+      "notes": "Latency scales approximately linearly with gradient dimension"
+    },
+    "num_nodes_pogq": {
+      "relationship": "linear",
+      "complexity": "O(n)"
+    },
+    "num_nodes_krum": {
+      "relationship": "quadratic",
+      "complexity": "O(n^2)"
+    }
+  }
+}

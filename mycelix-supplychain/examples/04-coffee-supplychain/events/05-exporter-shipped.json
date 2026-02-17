@@ -1,0 +1,41 @@
+{
+  "@context": ["https://www.w3.org/2018/credentials/v1"],
+  "type": ["VerifiableCredential"],
+  "issuer": "did:mycelix:org:ethiopian-coffee-exporters",
+  "issuanceDate": "2025-02-01T08:00:00Z",
+  "credentialSubject": {
+    "eventType": "SHIPPED",
+    "productId": "COFFEE-GREEN-BEANS-ETHIOPIAN-YIRGACHEFFE",
+    "batchId": "BATCH-2025-GREEN-001",
+    "quantity": 1000.0,
+    "unit": "kg",
+    "facility": {
+      "id": "EXPORT-ETHIOPIAN-COFFEE",
+      "name": "Ethiopian Coffee Exporters",
+      "location": {
+        "country": "Ethiopia",
+        "region": "Addis Ababa",
+        "city": "Addis Ababa"
+      }
+    },
+    "timestamp": "2025-02-01T08:00:00Z",
+    "shipment": {
+      "shipmentId": "SHIP-ETH-USA-2025-001",
+      "carrier": "Maersk Line",
+      "trackingNumber": "MAEU123456789",
+      "origin": "Addis Ababa, Ethiopia",
+      "destination": "Oakland, CA, USA",
+      "containerNumber": "MAEU1234567",
+      "vesselName": "Maersk Sealand",
+      "departureDate": "2025-02-01",
+      "estimatedArrival": "2025-03-05"
+    },
+    "metadata": {
+      "incoterms": "FOB",
+      "packageType": "60kg jute bags",
+      "totalPackages": 17,
+      "containerType": "20ft Dry Container",
+      "temperature": "Ambient"
+    }
+  }
+}

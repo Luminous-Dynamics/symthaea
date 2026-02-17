@@ -1,0 +1,22 @@
+[package]
+name = "reputation_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "reputation"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+# Shared utilities
+mycelix_common = { path = "../../../crates/mycelix_common" }
+
+# Link to integrity zome
+reputation_integrity = { path = "../integrity" }
+
+# Monitoring and metrics
+monitoring = { path = "../../monitoring" }

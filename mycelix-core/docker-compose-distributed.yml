@@ -1,0 +1,219 @@
+version: '3.8'
+
+# This creates a REAL distributed test environment with:
+# - 1 Holochain conductor
+# - 1 FL Coordinator 
+# - 10 FL Worker nodes (2 Byzantine)
+# - Each in separate containers with network delays
+
+services:
+  # Holochain Conductor (DHT Backend)
+  holochain-conductor:
+    build:
+      context: .
+      dockerfile: Dockerfile.holochain
+    container_name: holochain-conductor
+    ports:
+      - "8888:8888"  # WebSocket API
+      - "9000:9000"  # Admin API
+    environment:
+      - RUST_LOG=info
+    volumes:
+      - ./conductor-config:/config
+      - holochain-data:/data
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.10
+    healthcheck:
+      test: ["CMD", "hc", "conductor", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # FL Coordinator Node
+  fl-coordinator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-coordinator
+    environment:
+      - NODE_TYPE=coordinator
+      - NODE_ID=coordinator
+      - HOLOCHAIN_WS=ws://holochain-conductor:8888
+      - USE_HOLOCHAIN=true
+      - FL_PORT=7000
+    ports:
+      - "7000:7000"
+      - "8080:8080"  # Dashboard
+    depends_on:
+      holochain-conductor:
+        condition: service_healthy
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.20
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+
+  # Honest FL Worker Nodes (8 total)
+  fl-worker-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-worker-1
+    environment:
+      - NODE_TYPE=worker
+      - NODE_ID=worker-1
+      - IS_BYZANTINE=false
+      - COORDINATOR_HOST=fl-coordinator
+      - COORDINATOR_PORT=7000
+      - HOLOCHAIN_WS=ws://holochain-conductor:8888
+      - USE_HOLOCHAIN=true
+    depends_on:
+      - fl-coordinator
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.31
+    # Add network delay to simulate real conditions
+    cap_add:
+      - NET_ADMIN
+    command: >
+      sh -c "tc qdisc add dev eth0 root netem delay 10ms 2ms && 
+             python run_fl_worker.py"
+
+  fl-worker-2:
+    extends: fl-worker-1
+    container_name: fl-worker-2
+    environment:
+      - NODE_ID=worker-2
+      - IS_BYZANTINE=false
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.32
+
+  fl-worker-3:
+    extends: fl-worker-1
+    container_name: fl-worker-3
+    environment:
+      - NODE_ID=worker-3
+      - IS_BYZANTINE=false
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.33
+
+  fl-worker-4:
+    extends: fl-worker-1
+    container_name: fl-worker-4
+    environment:
+      - NODE_ID=worker-4
+      - IS_BYZANTINE=false
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.34
+
+  fl-worker-5:
+    extends: fl-worker-1
+    container_name: fl-worker-5
+    environment:
+      - NODE_ID=worker-5
+      - IS_BYZANTINE=false
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.35
+
+  fl-worker-6:
+    extends: fl-worker-1
+    container_name: fl-worker-6
+    environment:
+      - NODE_ID=worker-6
+      - IS_BYZANTINE=false
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.36
+
+  fl-worker-7:
+    extends: fl-worker-1
+    container_name: fl-worker-7
+    environment:
+      - NODE_ID=worker-7
+      - IS_BYZANTINE=false
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.37
+
+  fl-worker-8:
+    extends: fl-worker-1
+    container_name: fl-worker-8
+    environment:
+      - NODE_ID=worker-8
+      - IS_BYZANTINE=false
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.38
+
+  # Byzantine FL Worker Nodes (2 total = 20%)
+  fl-byzantine-1:
+    extends: fl-worker-1
+    container_name: fl-byzantine-1
+    environment:
+      - NODE_ID=byzantine-1
+      - IS_BYZANTINE=true
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.41
+    # Byzantine nodes have unstable network
+    command: >
+      sh -c "tc qdisc add dev eth0 root netem delay 50ms 20ms loss 5% && 
+             python run_fl_worker.py"
+
+  fl-byzantine-2:
+    extends: fl-worker-1
+    container_name: fl-byzantine-2
+    environment:
+      - NODE_ID=byzantine-2
+      - IS_BYZANTINE=true
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.42
+    command: >
+      sh -c "tc qdisc add dev eth0 root netem delay 50ms 20ms loss 5% && 
+             python run_fl_worker.py"
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: fl-prometheus
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    ports:
+      - "9090:9090"
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.100
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: fl-grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+    volumes:
+      - ./monitoring/grafana:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    networks:
+      fl-network:
+        ipv4_address: 172.20.0.101
+
+networks:
+  fl-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  holochain-data:
+  prometheus-data:
+  grafana-data:

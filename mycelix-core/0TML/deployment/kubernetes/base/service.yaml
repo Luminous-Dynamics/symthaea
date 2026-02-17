@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zerotrustml-service
+  labels:
+    app: zerotrustml
+    component: node
+spec:
+  type: ClusterIP
+  selector:
+    app: zerotrustml
+    component: node
+  ports:
+  - name: network
+    port: 9000
+    targetPort: 9000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  - name: gossip
+    port: 9001
+    targetPort: 9001
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zerotrustml-headless
+  labels:
+    app: zerotrustml
+    component: node
+spec:
+  clusterIP: None
+  selector:
+    app: zerotrustml
+    component: node
+  ports:
+  - name: network
+    port: 9000
+    targetPort: 9000
+    protocol: TCP
+  - name: gossip
+    port: 9001
+    targetPort: 9001
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  labels:
+    app: zerotrustml
+    component: redis
+spec:
+  type: ClusterIP
+  selector:
+    app: zerotrustml
+    component: redis
+  ports:
+  - name: redis
+    port: 6379
+    targetPort: 6379
+    protocol: TCP

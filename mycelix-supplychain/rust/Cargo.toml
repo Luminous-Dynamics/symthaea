@@ -1,0 +1,68 @@
+[workspace]
+members = [
+    "service",
+    "claim-model",
+    "crypto",
+    "cli",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0"
+authors = ["Luminous Dynamics <dev@luminous-dynamics.dev>"]
+repository = "https://github.com/Luminous-Dynamics/mycelix-erp"
+
+[workspace.dependencies]
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+
+# Web framework
+axum = { version = "0.7", features = ["ws"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Cryptography
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+rand = "0.8"
+sha2 = "0.10"
+
+# Database (optional)
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "sqlite", "postgres", "uuid", "chrono", "rust_decimal"] }
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# HTTP client
+reqwest = { version = "0.11", features = ["json"] }
+
+# Config
+config = "0.14"
+
+# JSON Schema
+jsonschema = "0.18"
+
+# UUID
+uuid = { version = "1.6", features = ["v4", "serde"] }
+
+# Financial precision
+rust_decimal = { version = "1.33", features = ["serde"] }
+
+# Authentication
+jsonwebtoken = "9.2"
+argon2 = "0.5"
+axum-extra = { version = "0.9", features = ["typed-header"] }

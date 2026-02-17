@@ -1,0 +1,16 @@
+[workspace]
+resolver = "2"
+members = [
+    "zomes/gradient_storage",
+    "zomes/reputation_tracker",
+    "zomes/zerotrustml_credits",
+    "zomes/pogq_zome",
+]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+
+[profile.dev]
+opt-level = 0

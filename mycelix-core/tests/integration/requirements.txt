@@ -1,0 +1,27 @@
+# Mycelix FL Integration Test Requirements
+
+# Core testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-html>=4.1.0
+pytest-cov>=4.1.0
+pytest-timeout>=2.2.0
+pytest-xdist>=3.5.0  # For parallel test execution
+
+# Numerical computing
+numpy>=1.24.0
+
+# Optional: Memory profiling for resource tests
+# tracemalloc is built-in to Python 3.4+
+
+# Optional: For Rust integration (when fl-aggregator is available)
+# maturin>=1.4.0
+# pyo3>=0.20.0
+
+# Development utilities
+black>=23.0.0
+isort>=5.12.0
+mypy>=1.7.0
+
+# Type stubs
+types-dataclasses>=0.6.6

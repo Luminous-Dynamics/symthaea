@@ -1,0 +1,125 @@
+# Stage 1: Comprehensive PoGQ Validation (43 Experiments)
+#
+# Mini-validation showed PoGQ beats Multi-Krum by 23.2 points average
+# Stage 1 comprehensively validates this across all baselines and scenarios
+#
+# Structure:
+# - Set A: Core Baselines (FedAvg, FedProx, SCAFFOLD) - 9 experiments
+# - Set B: Byzantine-Resilient (Krum, Multi-Krum) - 14 experiments
+# - Set D: Comprehensive Attack Evaluation - 20 experiments
+# Total: 43 experiments × 50 rounds × ~6 min = ~100 GPU hours
+#
+# Decision to drop Bulyan: Cannot test realistic 30% Byzantine (requires f < n/3)
+
+experiment_name: "stage1_comprehensive_pogq_validation"
+description: "Comprehensive validation of PoGQ superiority across all baselines and attack scenarios"
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+# Default: Extreme non-IID (will be overridden for specific experiments)
+data_split:
+  type: "dirichlet"
+  alpha: 0.1  # Extreme heterogeneity
+  num_clients: 10
+  seed: 42
+
+# Production experiments: 50 rounds (vs 10 for mini-validation)
+training:
+  num_rounds: 50
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+  eval_every: 5  # Evaluate every 5 rounds
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 50
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 3  # 30% Byzantine
+
+  # PoGQ parameters (from mini-validation)
+  quality_threshold: 0.3
+  reputation_decay: 0.95
+
+  # Multi-Krum parameters
+  multi_k: 7  # n - f - 2 = 10 - 3 - 2 = 5, but use 7 for better aggregation
+
+byzantine:
+  num_byzantine: 3  # 30% Byzantine
+  attack_types: ["adaptive"]  # Will be overridden per experiment
+  severity: 1.0
+  enable_peer_context: true
+
+# Baselines to test (Bulyan excluded per user decision)
+baselines:
+  # Standard FL baselines
+  - name: "fedavg"
+
+  - name: "fedprox"
+    params:
+      mu: 0.01
+
+  - name: "scaffold"
+
+  # Byzantine-resilient baselines
+  - name: "krum"
+    params:
+      num_byzantine: 3
+
+  - name: "multikrum"
+    params:
+      num_byzantine: 3
+      multi_k: 7
+
+  - name: "median"
+
+  # Our approach
+  - name: "pogq"
+    params:
+      quality_threshold: 0.3
+      reputation_decay: 0.95
+
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+
+device: "cuda"
+
+save:
+  output_dir: "results/stage1"
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - num_accepted  # PoGQ-specific
+    - avg_quality_score  # PoGQ-specific
+  per_round: true
+  final_model: true  # Save final models for analysis
+  attack_analysis: true
+
+# Experiment sets will be defined in runner script:
+#
+# Set A: Core Baselines vs PoGQ (9 experiments)
+#   - Heterogeneity: IID (α=100), Moderate (α=1.0), Extreme (α=0.1)
+#   - Baselines: FedAvg, FedProx, SCAFFOLD
+#   - Attack: Adaptive (hardest for standard baselines)
+#
+# Set B: Byzantine-Resilient vs PoGQ (14 experiments)
+#   - Heterogeneity: Extreme (α=0.1)
+#   - Baselines: Krum, Multi-Krum
+#   - Attacks: All 7 types (gaussian_noise, sign_flip, label_flip,
+#             targeted_poison, model_replacement, adaptive, sybil)
+#
+# Set D: Comprehensive Attack Evaluation (20 experiments)
+#   - Heterogeneity: IID, Moderate, Extreme
+#   - Baseline: PoGQ only (deep dive)
+#   - Attacks: All 7 types
+#   - NOTE: Excludes duplicate from mini-validation (extreme+adaptive)

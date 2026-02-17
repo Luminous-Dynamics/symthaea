@@ -1,0 +1,273 @@
+[38;5;87m🚀 Launching...[0m                         Finished `release` profile [optimized + debuginfo] target(s) in 0.42s
+     Running `/srv/luminous-dynamics/Mycelix-Core/0TML/vsv-stark/target/release/lean-benchmarks`
+🔬 Winterfell PoGQ LEAN Benchmarks (127-bit Security)
+================================================
+Security: 127-bit conjectured (80 queries, blowup 16)
+Range checks: 32-bit (rem_t 16-bit + x_t 16-bit)
+================================================
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+
+=== Normal Operation (no violation) ===
+  Prove:  12.52 ms (avg over 20 rounds)
+  Verify: 1.72 ms
+  Size:   61264 bytes (59.8 KB)
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+
+=== Enter Quarantine ===
+  Prove:  9.90 ms (avg over 20 rounds)
+  Verify: 1.06 ms
+  Size:   64654 bytes (63.1 KB)
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG TraceBuilder: matrix.num_cols()=44, num_rows()=32
+DEBUG: trace_width=44, trace_length=32
+DEBUG Air::new(): trace_info.length()=32, width()=44
+DEBUG Air::new(): trace_info.length()=32, width()=44
+
+=== Release from Quarantine ===
+  Prove:  6.99 ms (avg over 20 rounds)
+  Verify: 0.99 ms
+  Size:   64332 bytes (62.8 KB)
+
+================================================
+✅ LEAN benchmarks complete (127-bit security)!
+
+📊 Comparisons:
+   96-bit LEAN:  1.0-1.6 ms prove, 0.45-0.60 ms verify, ~30 KB
+   127-bit LEAN: Will be measured in this benchmark run
+   zkVM baseline: 46.6 s prove, 92 ms verify, 221 KB
+
+   → Still ~30,000× faster than zkVM!
+   → 127-bit security provides cryptographically strong guarantees

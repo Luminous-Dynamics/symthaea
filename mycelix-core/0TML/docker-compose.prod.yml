@@ -1,0 +1,171 @@
+# ZeroTrustML Phase 9 - Production Docker Compose
+# PostgreSQL-based Byzantine-resistant Federated Learning
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: zerotrustml-postgres
+    environment:
+      POSTGRES_DB: zerotrustml
+      POSTGRES_USER: zerotrustml
+      POSTGRES_PASSWORD: ${ZEROTRUSTML_DB_PASSWORD:?ZEROTRUSTML_DB_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - zerotrustml-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U zerotrustml"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ZeroTrustML Node (Coordinator)
+  zerotrustml-node:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zerotrustml-node
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      # Node configuration
+      - ZEROTRUSTML_NODE_ID=${ZEROTRUSTML_NODE_ID:-fl-node-001}
+      - ZEROTRUSTML_DATA_PATH=/app/data
+
+      # Database configuration
+      - ZEROTRUSTML_DB_HOST=postgres
+      - ZEROTRUSTML_DB_PORT=5432
+      - ZEROTRUSTML_DB_NAME=zerotrustml
+      - ZEROTRUSTML_DB_USER=zerotrustml
+      - ZEROTRUSTML_DB_PASSWORD=${ZEROTRUSTML_DB_PASSWORD:?ZEROTRUSTML_DB_PASSWORD must be set}
+
+      # Byzantine resistance
+      - ZEROTRUSTML_POGQ_THRESHOLD=0.35
+      - ZEROTRUSTML_REPUTATION_DECAY=0.95
+      - ZEROTRUSTML_ANOMALY_SENSITIVITY=2.5
+
+      # Network
+      - ZEROTRUSTML_LISTEN_ADDRESS=0.0.0.0
+      - ZEROTRUSTML_LISTEN_PORT=8765
+
+      # Monitoring
+      - ZEROTRUSTML_LOG_LEVEL=${ZEROTRUSTML_LOG_LEVEL:-INFO}
+      - ZEROTRUSTML_PROMETHEUS_PORT=9090
+    volumes:
+      - ./config:/app/config:ro
+      - ./data:/app/data
+      - ./models:/app/models
+      - node_logs:/app/logs
+    ports:
+      - "8765:8765"  # FL coordination
+      - "9090:9090"  # Prometheus metrics
+    networks:
+      - zerotrustml-network
+    command: zerotrustml-node --config /app/config/node.yaml
+    healthcheck:
+      test: ["CMD", "zerotrustml", "health-check"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+          cpus: '4'
+        reservations:
+          memory: 4G
+          cpus: '2'
+
+  # Prometheus - Metrics Collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: zerotrustml-prometheus
+    depends_on:
+      - zerotrustml-node
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./monitoring/alerts:/etc/prometheus/alerts:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9091:9090"
+    networks:
+      - zerotrustml-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    restart: unless-stopped
+
+  # Grafana - Visualization Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: zerotrustml-grafana
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./monitoring/grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "3000:3000"
+    networks:
+      - zerotrustml-network
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_SERVER_ROOT_URL=http://localhost:3000
+      - GF_USERS_ALLOW_SIGN_UP=false
+    restart: unless-stopped
+
+  # PostgreSQL Backup (Daily)
+  postgres-backup:
+    image: prodrigestivill/postgres-backup-local
+    container_name: zerotrustml-backup
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./backups:/backups
+    networks:
+      - zerotrustml-network
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_DB=zerotrustml
+      - POSTGRES_USER=zerotrustml
+      - POSTGRES_PASSWORD=${ZEROTRUSTML_DB_PASSWORD:?ZEROTRUSTML_DB_PASSWORD must be set}
+      - SCHEDULE=@daily
+      - BACKUP_KEEP_DAYS=30
+      - BACKUP_KEEP_WEEKS=8
+      - BACKUP_KEEP_MONTHS=6
+      - HEALTHCHECK_PORT=8080
+    restart: unless-stopped
+
+networks:
+  zerotrustml-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  node_logs:
+    driver: local

@@ -1,0 +1,49 @@
+# MNIST Byzantine Attack Experiment Configuration
+# Test Byzantine-robust methods against malicious clients
+
+experiment_name: "mnist_byzantine_2_attackers"
+output_dir: "results/byzantine"
+
+# Dataset configuration
+dataset:
+  name: "mnist"
+  data_dir: "datasets"
+
+# Model configuration
+model:
+  architecture: "simple_cnn"
+  params:
+    num_classes: 10
+
+# Data split configuration
+data_split:
+  type: "iid"  # Use IID to isolate Byzantine effect
+  seed: 42
+
+# Federated learning configuration
+federated:
+  num_clients: 10
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 1
+  fraction_clients: 1.0
+
+  # Byzantine attack configuration
+  num_byzantine: 2  # Number of Byzantine clients
+  byzantine_clients: [5, 7]  # Specific client IDs to make Byzantine
+
+  # Parameters for robust methods
+  multi_k: 5  # Multi-Krum: number of gradients to average
+
+# Training configuration
+training:
+  num_rounds: 100
+  eval_every: 10
+
+# Baselines to compare (focus on Byzantine-robust methods)
+baselines:
+  - fedavg  # Should fail with Byzantine clients
+  - krum
+  - multikrum
+  - bulyan  # Strongest defense
+  - median

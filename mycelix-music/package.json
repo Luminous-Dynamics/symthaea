@@ -1,0 +1,75 @@
+{
+  "name": "@mycelix/music-platform",
+  "version": "0.1.0",
+  "description": "Decentralized music streaming platform with modular economics",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*",
+    "contracts"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+
+    "contracts:build": "cd contracts && forge build",
+    "contracts:test": "cd contracts && forge test",
+    "contracts:deploy:local": "cd contracts && forge script script/DeployLocal.s.sol --rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast",
+    "contracts:deploy:testnet": "cd contracts && forge script script/DeployTestnet.s.sol --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast --verify",
+
+    "seed:local": "tsx scripts/seed-local.ts",
+    "seed:testnet": "tsx scripts/seed-testnet.ts",
+
+    "services:up": "docker-compose up -d",
+    "services:down": "docker-compose down",
+    "services:logs": "docker-compose logs -f",
+    "services:ps": "docker-compose ps",
+
+    "test:integration": "tsx scripts/test-integration.ts",
+    "test:e2e": "playwright test",
+
+    "setup:local": "npm run services:up && sleep 10 && npm run contracts:deploy:local && npm run seed:local",
+    "prepare": "husky",
+    "type-check": "turbo run type-check"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.2.0",
+    "tsx": "^4.7.0",
+    "turbo": "^1.11.0",
+    "typescript": "^5.3.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.sol": [
+      "forge fmt"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  },
+  "keywords": [
+    "decentralized",
+    "music",
+    "streaming",
+    "web3",
+    "blockchain",
+    "modular-economics"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/luminous-dynamics/mycelix-music"
+  }
+}

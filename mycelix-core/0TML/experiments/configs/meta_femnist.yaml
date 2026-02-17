@@ -1,0 +1,23 @@
+dataset: femnist
+detector: meta
+description: >
+  FEMNIST Meta-detector validation run (PoGQ backbone + FLTrust + density +
+  conformal calibration). Executed via experiments/femnist_mode1_validation.py.
+
+cli:
+  script: experiments/femnist_mode1_validation.py
+  args:
+    --detector: meta
+    --seeds: "42,123,456,789,1011"
+    --bft-ratios: "0.20,0.35,0.45,0.50"
+    --val-users: 200
+    --val-batch-size: 256
+    --samples-per-client: 128
+    --client-batch-size: 32
+    --meta-alpha: 0.10
+    --meta-temporal-alpha: 0.6
+    --meta-dir-floor: 0.0
+    --meta-dir-warning: 0.05
+    --meta-density-min: 0.15
+    --meta-density-warning: 0.25
+    --meta-density-k: 3

@@ -1,0 +1,59 @@
+[package]
+name = "kvector-zkp"
+version = "0.1.0"
+edition = "2021"
+authors = ["Luminous Dynamics <contact@luminous-dynamics.org>"]
+description = "Zero-knowledge STARK proofs for K-Vector validation in Mycelix"
+license = "Apache-2.0"
+
+[features]
+default = ["parallel"]
+parallel = ["rayon", "winterfell/concurrent"]
+simd = []  # Enable SIMD optimizations when available
+gpu = ["dep:wgpu", "dep:pollster"]  # GPU acceleration (experimental)
+
+[dependencies]
+# Winterfell STARK library
+winterfell = "0.13"
+
+# Core types
+mycelix-core-types = { path = "../mycelix-core-types" }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+
+# Hashing
+sha3 = "0.10"
+
+# Error handling
+thiserror = "2.0"
+
+# Parallel processing (optional)
+rayon = { version = "1.10", optional = true }
+
+# LRU cache for proof caching
+lru = "0.12"
+
+# Parking lot for faster synchronization
+parking_lot = "0.12"
+
+# GPU acceleration (optional)
+wgpu = { version = "23.0", optional = true }
+pollster = { version = "0.4", optional = true }
+
+[dev-dependencies]
+rand = "0.8"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "prover_benchmark"
+harness = false
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3
+
+[profile.bench]
+lto = true
+codegen-units = 1

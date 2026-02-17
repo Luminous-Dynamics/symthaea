@@ -1,0 +1,45 @@
+# Mycelix Kubernetes Namespaces
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/part-of: mycelix
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix-validators
+  labels:
+    app.kubernetes.io/name: mycelix-validators
+    app.kubernetes.io/part-of: mycelix
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix-fl
+  labels:
+    app.kubernetes.io/name: mycelix-fl
+    app.kubernetes.io/part-of: mycelix
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mycelix-monitoring
+  labels:
+    app.kubernetes.io/name: mycelix-monitoring
+    app.kubernetes.io/part-of: mycelix
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

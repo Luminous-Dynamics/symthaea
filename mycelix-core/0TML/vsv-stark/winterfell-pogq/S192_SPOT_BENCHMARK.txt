@@ -1,0 +1,39 @@
+🔬 VSV-STARK S192 Spot Benchmark Results
+================================================
+Date: 2025-01-XX (continuation session)
+Profile: S192 (120 queries, ≥192-bit security)
+Scenario: Normal operation (T=32)
+Rounds: 10
+================================================
+
+S192 Performance (120 queries):
+  Prove:  4.91 ms (avg)
+  Verify: 1.26 ms (avg)
+  Size:   91384 bytes (89.2 KB)
+
+S128 Performance (80 queries, from LEAN_BENCHMARKS_127BIT_FINAL.txt):
+  Prove:  12.52 ms (avg, normal operation)
+  Verify: 1.72 ms (avg)
+  Size:   61264 bytes (59.8 KB)
+
+Overhead Analysis:
+  Prove time:  S192/S128 = 0.39× (FASTER - likely system variance/cache effects)
+  Verify time: S192/S128 = 0.73× (FASTER - unexpected)
+  Proof size:  S192/S128 = 1.49× (LARGER - expected for 50% more queries)
+
+Notes:
+- Proof size increase (1.5×) is consistent with 50% more queries (120 vs 80)
+- Unexpected faster prove/verify times may be due to:
+  * System cache warming
+  * CPU frequency scaling
+  * Background process interference on S128 measurements
+  * Natural variance in Winterfell execution
+- Should run controlled side-by-side benchmarks for fair comparison
+- For conservative estimates, use projected S192 = ~2× S128 prove time
+
+Security Profile System Status: ✅ WORKING
+- Environment variable switching works (VSV_SECURITY_PROFILE)
+- Banner displays correct profile and parameters
+- Prover successfully generates proofs with both profiles
+- Proof sizes scale appropriately with query count
+================================================

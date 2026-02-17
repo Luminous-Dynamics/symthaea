@@ -1,0 +1,333 @@
+# Mycelix Testnet Validator Deployment
+# =====================================
+# Production-ready configuration for running a Mycelix validator node.
+#
+# Usage:
+#   cp .env.example .env
+#   # Edit .env with your configuration
+#   docker-compose up -d
+#
+# Services:
+#   - validator: FL Coordinator + Holochain Conductor
+#   - prometheus: Metrics collection
+#   - grafana: Monitoring dashboards
+
+version: '3.8'
+
+services:
+  # ==========================================================================
+  # MYCELIX VALIDATOR NODE
+  # ==========================================================================
+  validator:
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: mycelix-validator
+    hostname: ${VALIDATOR_HOSTNAME:-mycelix-validator}
+    restart: unless-stopped
+
+    environment:
+      # Node Identity
+      - VALIDATOR_NODE_ID=${VALIDATOR_NODE_ID:-validator-001}
+      - VALIDATOR_REGION=${VALIDATOR_REGION:-global}
+      - VALIDATOR_OPERATOR=${VALIDATOR_OPERATOR:-community}
+
+      # Network Configuration
+      - BOOTSTRAP_URL=${BOOTSTRAP_URL:-https://bootstrap.mycelix.net}
+      - SIGNAL_URL=${SIGNAL_URL:-wss://signal.holo.host}
+      - NETWORK_TYPE=${NETWORK_TYPE:-testnet}
+
+      # Ethereum/Sepolia Contract Configuration
+      - ETH_NETWORK=${ETH_NETWORK:-sepolia}
+      - ETH_CHAIN_ID=${ETH_CHAIN_ID:-11155111}
+      - ETH_RPC_URL=${ETH_RPC_URL:-https://sepolia.drpc.org}
+      - MYCELIX_REGISTRY_ADDRESS=${MYCELIX_REGISTRY_ADDRESS:-0x69411e4c9D99814952EBA9a35028c12c2bbD03cd}
+      - REPUTATION_ANCHOR_ADDRESS=${REPUTATION_ANCHOR_ADDRESS:-0x042ee96Ce1CaFFF1e84d6da0585CD440d73DAF99}
+      - PAYMENT_ROUTER_ADDRESS=${PAYMENT_ROUTER_ADDRESS:-0x3BD80003d27f9786bd4ffeaA5ffA7CC83365da1b}
+      - ETH_PRIVATE_KEY=${ETH_PRIVATE_KEY:-}
+
+      # FL Coordinator Settings
+      - FL_MIN_NODES=${FL_MIN_NODES:-3}
+      - FL_MAX_NODES=${FL_MAX_NODES:-100}
+      - FL_ROUND_TIMEOUT_SECONDS=${FL_ROUND_TIMEOUT_SECONDS:-120}
+      - FL_BYZANTINE_THRESHOLD=${FL_BYZANTINE_THRESHOLD:-0.45}
+
+      # 0TML Detection Settings
+      - MYCELIX_HV_DIMENSION=${MYCELIX_HV_DIMENSION:-2048}
+      - MYCELIX_BYZANTINE_THRESHOLD=${MYCELIX_BYZANTINE_THRESHOLD:-0.45}
+      - MYCELIX_USE_RUST=${MYCELIX_USE_RUST:-true}
+      - MYCELIX_DEBUG=${MYCELIX_DEBUG:-false}
+
+      # Holochain Conductor
+      - HC_ADMIN_PORT=${HC_ADMIN_PORT:-39329}
+      - HC_APP_PORT=${HC_APP_PORT:-9998}
+      - HC_DATA_PATH=/data/holochain
+
+      # Metrics & Monitoring
+      - METRICS_ENABLED=${METRICS_ENABLED:-true}
+      - METRICS_PORT=${METRICS_PORT:-9090}
+      - HEALTH_CHECK_PORT=${HEALTH_CHECK_PORT:-8080}
+
+      # Logging
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - RUST_LOG=${RUST_LOG:-info}
+
+      # Resource Limits
+      - MAX_MEMORY_MB=${MAX_MEMORY_MB:-4096}
+      - MAX_WORKERS=${MAX_WORKERS:-4}
+
+    ports:
+      # Holochain Admin Interface
+      - "${HC_ADMIN_PORT:-39329}:39329"
+      # Holochain App Interface
+      - "${HC_APP_PORT:-9998}:9998"
+      # Metrics endpoint (Prometheus scraping)
+      - "${METRICS_PORT:-9090}:9090"
+      # Health check endpoint
+      - "${HEALTH_CHECK_PORT:-8080}:8080"
+      # FL Coordinator gRPC (if enabled)
+      - "${FL_GRPC_PORT:-50051}:50051"
+
+    volumes:
+      # Persistent data storage
+      - validator-data:/data
+      # Holochain keystore
+      - validator-keystore:/keystore
+      # Logs
+      - validator-logs:/logs
+      # Peer cache
+      - validator-cache:/cache
+      # Custom configuration (optional)
+      - ./config:/config:ro
+
+    networks:
+      - mycelix-network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+    deploy:
+      resources:
+        limits:
+          cpus: '${CPU_LIMIT:-4}'
+          memory: ${MEMORY_LIMIT:-4G}
+        reservations:
+          cpus: '${CPU_RESERVATION:-1}'
+          memory: ${MEMORY_RESERVATION:-1G}
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "5"
+
+  # ==========================================================================
+  # PROMETHEUS - METRICS COLLECTION
+  # ==========================================================================
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: mycelix-prometheus
+    restart: unless-stopped
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+    networks:
+      - mycelix-network
+
+    depends_on:
+      - validator
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # ==========================================================================
+  # GRAFANA - MONITORING DASHBOARDS
+  # ==========================================================================
+  grafana:
+    image: grafana/grafana:10.2.2
+    container_name: mycelix-grafana
+    restart: unless-stopped
+
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-http://localhost:3000}
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+    networks:
+      - mycelix-network
+
+    depends_on:
+      - prometheus
+
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+
+  # ==========================================================================
+  # ALERTMANAGER - ALERT ROUTING (OPTIONAL)
+  # ==========================================================================
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: mycelix-alertmanager
+    restart: unless-stopped
+    profiles:
+      - alerting
+
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+
+    ports:
+      - "${ALERTMANAGER_PORT:-9093}:9093"
+
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+
+    networks:
+      - mycelix-network
+
+    depends_on:
+      - prometheus
+
+  # ==========================================================================
+  # NODE EXPORTER - HOST METRICS (OPTIONAL)
+  # ==========================================================================
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: mycelix-node-exporter
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+
+    ports:
+      - "${NODE_EXPORTER_PORT:-9100}:9100"
+
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+
+    networks:
+      - mycelix-network
+
+# =============================================================================
+# NETWORKS
+# =============================================================================
+networks:
+  mycelix-network:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+
+# =============================================================================
+# VOLUMES
+# =============================================================================
+volumes:
+  # Validator persistent storage
+  validator-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/validator
+
+  validator-keystore:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/keystore
+
+  validator-logs:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/logs
+
+  validator-cache:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/cache
+
+  # Prometheus data
+  prometheus-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/prometheus
+
+  # Grafana data
+  grafana-data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${DATA_PATH:-./data}/grafana
+
+  # Alertmanager data
+  alertmanager-data:
+    driver: local

@@ -1,0 +1,216 @@
+version: '3.8'
+
+# Distributed FL Network Simulation
+# 3 Holochain nodes + 3 ML clients in isolated network segments
+
+services:
+  # === Holochain Conductors ===
+  
+  conductor-1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-conductor-1
+    hostname: conductor1
+    ports:
+      - "38889:8888"
+    environment:
+      - NODE_ID=1
+      - NODE_TYPE=conductor
+      - RUST_LOG=info
+    volumes:
+      - ./conductor-data/node1:/app/conductor-data
+      - ./federated-learning:/app/federated-learning
+    networks:
+      fl-net-1:
+        ipv4_address: 172.20.1.10
+      fl-backbone:
+        ipv4_address: 172.21.0.10
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  conductor-2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-conductor-2
+    hostname: conductor2
+    ports:
+      - "38890:8888"
+    environment:
+      - NODE_ID=2
+      - NODE_TYPE=conductor
+      - RUST_LOG=info
+    volumes:
+      - ./conductor-data/node2:/app/conductor-data
+      - ./federated-learning:/app/federated-learning
+    networks:
+      fl-net-2:
+        ipv4_address: 172.20.2.10
+      fl-backbone:
+        ipv4_address: 172.21.0.20
+    depends_on:
+      - conductor-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  conductor-3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fl-conductor-3
+    hostname: conductor3
+    ports:
+      - "38891:8888"
+    environment:
+      - NODE_ID=3
+      - NODE_TYPE=conductor
+      - RUST_LOG=info
+    volumes:
+      - ./conductor-data/node3:/app/conductor-data
+      - ./federated-learning:/app/federated-learning
+    networks:
+      fl-net-3:
+        ipv4_address: 172.20.3.10
+      fl-backbone:
+        ipv4_address: 172.21.0.30
+    depends_on:
+      - conductor-1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # === ML Training Clients ===
+  
+  ml-client-1:
+    image: python:3.11-slim
+    container_name: fl-ml-client-1
+    hostname: mlclient1
+    working_dir: /app
+    command: |
+      bash -c "
+        pip install torch torchvision websockets numpy --quiet
+        echo '🧠 ML Client 1 ready - Hospital A (2000 samples)'
+        python mnist_fl_bridge.py --client-id 1 --samples 2000 --conductor conductor1:8888
+      "
+    environment:
+      - CLIENT_ID=1
+      - DATA_SAMPLES=2000
+      - CONDUCTOR_HOST=conductor1
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./federated-learning:/app
+      - ./ml-data/client1:/app/data
+    networks:
+      fl-net-1:
+        ipv4_address: 172.20.1.20
+    depends_on:
+      - conductor-1
+
+  ml-client-2:
+    image: python:3.11-slim
+    container_name: fl-ml-client-2
+    hostname: mlclient2
+    working_dir: /app
+    command: |
+      bash -c "
+        pip install torch torchvision websockets numpy --quiet
+        echo '🧠 ML Client 2 ready - Hospital B (3000 samples)'
+        python mnist_fl_bridge.py --client-id 2 --samples 3000 --conductor conductor2:8888
+      "
+    environment:
+      - CLIENT_ID=2
+      - DATA_SAMPLES=3000
+      - CONDUCTOR_HOST=conductor2
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./federated-learning:/app
+      - ./ml-data/client2:/app/data
+    networks:
+      fl-net-2:
+        ipv4_address: 172.20.2.20
+    depends_on:
+      - conductor-2
+
+  ml-client-3:
+    image: python:3.11-slim
+    container_name: fl-ml-client-3
+    hostname: mlclient3
+    working_dir: /app
+    command: |
+      bash -c "
+        pip install torch torchvision websockets numpy --quiet
+        echo '🧠 ML Client 3 ready - Hospital C (5000 samples)'
+        python mnist_fl_bridge.py --client-id 3 --samples 5000 --conductor conductor3:8888
+      "
+    environment:
+      - CLIENT_ID=3
+      - DATA_SAMPLES=5000
+      - CONDUCTOR_HOST=conductor3
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./federated-learning:/app
+      - ./ml-data/client3:/app/data
+    networks:
+      fl-net-3:
+        ipv4_address: 172.20.3.20
+    depends_on:
+      - conductor-3
+
+  # === Monitoring Dashboard ===
+  
+  dashboard:
+    image: python:3.11-slim
+    container_name: fl-dashboard
+    hostname: dashboard
+    working_dir: /app
+    ports:
+      - "8080:8080"
+    command: |
+      bash -c "
+        pip install flask plotly pandas numpy --quiet
+        python dashboard.py
+      "
+    environment:
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./federated-learning:/app
+      - ./dashboard-data:/app/dashboard-data
+    networks:
+      fl-backbone:
+        ipv4_address: 172.21.0.100
+
+networks:
+  # Isolated networks for each client (simulating different locations)
+  fl-net-1:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.1.0/24
+  
+  fl-net-2:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.2.0/24
+  
+  fl-net-3:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.3.0/24
+  
+  # Backbone network for conductor communication
+  fl-backbone:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/24

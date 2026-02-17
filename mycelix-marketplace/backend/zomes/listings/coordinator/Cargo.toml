@@ -1,0 +1,25 @@
+[package]
+name = "listings_coordinator"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "listings"
+
+[dependencies]
+hdk.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+# Shared utilities
+mycelix_common = { path = "../../../crates/mycelix_common" }
+
+# Link to integrity zome
+listings_integrity = { path = "../integrity" }
+
+# Security utilities
+security = { path = "../../security" }
+
+# Monitoring and metrics
+monitoring = { path = "../../monitoring" }

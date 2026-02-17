@@ -1,0 +1,115 @@
+# Mycelix FL Aggregator Dockerfile
+#
+# Multi-stage build for optimized production image
+#
+# Build: docker build -f deployment/docker/Dockerfile.fl-aggregator -t mycelix/fl-aggregator .
+# Run:   docker run -d --name fl-aggregator mycelix/fl-aggregator
+
+# ====================
+# Build Stage
+# ====================
+FROM rust:1.75-bookworm AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    cmake \
+    protobuf-compiler \
+    libssl-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+# Cache dependencies first
+COPY libs/Cargo.toml libs/Cargo.lock ./libs/
+COPY libs/fl-aggregator/Cargo.toml ./libs/fl-aggregator/
+COPY libs/kvector-zkp/Cargo.toml ./libs/kvector-zkp/
+COPY libs/matl-bridge/Cargo.toml ./libs/matl-bridge/
+COPY libs/differential-privacy/Cargo.toml ./libs/differential-privacy/
+COPY libs/homomorphic-encryption/Cargo.toml ./libs/homomorphic-encryption/
+COPY libs/mycelix-core-types/Cargo.toml ./libs/mycelix-core-types/
+
+# Create dummy files for caching
+RUN mkdir -p libs/fl-aggregator/src libs/kvector-zkp/src libs/matl-bridge/src \
+    libs/differential-privacy/src libs/homomorphic-encryption/src libs/mycelix-core-types/src \
+    && echo "fn main() {}" > libs/fl-aggregator/src/main.rs \
+    && echo "" > libs/kvector-zkp/src/lib.rs \
+    && echo "" > libs/matl-bridge/src/lib.rs \
+    && echo "" > libs/differential-privacy/src/lib.rs \
+    && echo "" > libs/homomorphic-encryption/src/lib.rs \
+    && echo "" > libs/mycelix-core-types/src/lib.rs
+
+WORKDIR /build/libs
+RUN cargo build --release --package fl-aggregator 2>/dev/null || true
+
+# Copy actual source code
+WORKDIR /build
+COPY libs/ ./libs/
+
+# Build FL aggregator binary
+WORKDIR /build/libs
+RUN cargo build --release --package fl-aggregator --bin fl-aggregator
+
+# ====================
+# Runtime Stage
+# ====================
+FROM debian:bookworm-slim AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    libssl3 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN groupadd -r mycelix && useradd -r -g mycelix mycelix
+
+# Create directories
+RUN mkdir -p /app /cache /config \
+    && chown -R mycelix:mycelix /app /cache /config
+
+WORKDIR /app
+
+# Copy binary from builder
+COPY --from=builder /build/libs/target/release/fl-aggregator /app/fl-aggregator
+
+# Copy configuration
+COPY deployment/config/fl-aggregator.toml /config/fl-aggregator.toml
+
+# Set ownership
+RUN chown -R mycelix:mycelix /app /config
+
+# Switch to non-root user
+USER mycelix
+
+# Environment variables
+ENV RUST_LOG=info,fl_aggregator=debug
+ENV CONFIG_PATH=/config/fl-aggregator.toml
+ENV CACHE_DIR=/cache
+
+# Expose ports
+EXPOSE 8081/tcp
+EXPOSE 9091/tcp
+EXPOSE 8082/tcp
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8082/health/live || exit 1
+
+# Labels
+ARG VERSION=dev
+ARG BUILD_DATE
+ARG VCS_REF
+
+LABEL org.opencontainers.image.title="Mycelix FL Aggregator" \
+      org.opencontainers.image.description="Mycelix federated learning aggregator node" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      org.opencontainers.image.vendor="Luminous Dynamics" \
+      org.opencontainers.image.source="https://github.com/mycelix/core"
+
+# Entrypoint
+ENTRYPOINT ["/app/fl-aggregator"]
+CMD ["--config", "/config/fl-aggregator.toml"]

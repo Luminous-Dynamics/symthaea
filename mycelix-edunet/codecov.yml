@@ -1,0 +1,35 @@
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: yes
+
+coverage:
+  status:
+    project:
+      default:
+        target: 70%
+        threshold: 5%
+        if_ci_failed: error
+
+    patch:
+      default:
+        target: 60%
+        threshold: 10%
+
+  precision: 2
+  round: down
+  range: "50...100"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+
+ignore:
+  - "target/**/*"
+  - "**/*.md"
+  - "**/tests/**"
+  - "examples/**"
+  - "benches/**"

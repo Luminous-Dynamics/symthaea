@@ -1,0 +1,12 @@
+[package]
+name = "zerotrustml_credits"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "zerotrustml_credits"
+
+[dependencies]
+hdk = "0.4"
+serde = "1"

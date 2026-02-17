@@ -1,0 +1,309 @@
+{
+  "lastUpdated": "2025-12-30T19:04:00.410424",
+  "summary": {
+    "best_accuracy": 70.88170618838514,
+    "best_defense": "multi_krum",
+    "worst_no_defense": 19.810197848265037,
+    "max_improvement": 51.071508340120104,
+    "45_percent_bft_achieved": true
+  },
+  "bftCurve": {
+    "labels": [
+      "10%",
+      "30%",
+      "45%"
+    ],
+    "noDefense": [
+      31.8155513353168,
+      31.700543252566373,
+      27.971993341048055,
+      25.337104339663046,
+      22.683792922140007,
+      19.810197848265037
+    ],
+    "multiKrum": [
+      68.25855809924913,
+      52.89435690253289,
+      39.958973239398404
+    ],
+    "trimmedMean": [
+      62.91054941277196,
+      66.94237656853781,
+      49.04887602167173,
+      49.79430486946538,
+      33.970127281945416,
+      38.55891193931117
+    ]
+  },
+  "defenseComparison": {
+    "none": 26.654548840355552,
+    "multi_krum": 52.89435690253289,
+    "trimmed_mean": 49.421590445568555
+  },
+  "attackComparison": {
+    "sign_flip": 27.49044586616829,
+    "scaling": 25.615948480164818
+  },
+  "recentExperiments": [
+    {
+      "attack_type": "sign_flip",
+      "defense_type": "trimmed_mean",
+      "byzantine_ratio": 0.3,
+      "num_nodes": 10,
+      "num_byzantine": 3,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 49.04887602167173,
+      "accuracy_per_round": [
+        15.795340193322378,
+        24.885174230842853,
+        32.558187259465434,
+        40.182182840855454,
+        49.04887602167173
+      ],
+      "time_per_round": [
+        24.959851138121852,
+        23.613239390541136,
+        22.278910997814794,
+        21.186451383221343,
+        22.086268773820507
+      ],
+      "total_time": 114.12472168351962,
+      "improvement_over_baseline": 23.04887602167173,
+      "detection_rate": 0.0
+    },
+    {
+      "attack_type": "scaling",
+      "defense_type": "none",
+      "byzantine_ratio": 0.3,
+      "num_nodes": 10,
+      "num_byzantine": 3,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 25.337104339663046,
+      "accuracy_per_round": [
+        10.354805981981105,
+        16.21284967708863,
+        19.658052651456757,
+        22.418986935393317,
+        25.337104339663046
+      ],
+      "time_per_round": [
+        14.99232445978952,
+        17.71172472038244,
+        15.737888897172539,
+        24.231403846412363,
+        24.44318542457288
+      ],
+      "total_time": 97.11652734832973,
+      "improvement_over_baseline": 0.0,
+      "detection_rate": 1.0
+    },
+    {
+      "attack_type": "scaling",
+      "defense_type": "multi_krum",
+      "byzantine_ratio": 0.3,
+      "num_nodes": 10,
+      "num_byzantine": 3,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 54.54103660620969,
+      "accuracy_per_round": [
+        21.838926832414145,
+        29.098598754613878,
+        40.201546026537336,
+        46.8852872120953,
+        54.54103660620969
+      ],
+      "time_per_round": [
+        14.353188588564862,
+        19.54480366037786,
+        12.343312501582588,
+        23.59062710901776,
+        15.012033414399207
+      ],
+      "total_time": 84.84396527394227,
+      "improvement_over_baseline": 29.541036606209687,
+      "detection_rate": 1.0
+    },
+    {
+      "attack_type": "scaling",
+      "defense_type": "trimmed_mean",
+      "byzantine_ratio": 0.3,
+      "num_nodes": 10,
+      "num_byzantine": 3,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 49.79430486946538,
+      "accuracy_per_round": [
+        19.56463894284359,
+        23.28666629315547,
+        35.5989166208605,
+        44.182123371019195,
+        49.79430486946538
+      ],
+      "time_per_round": [
+        13.313883793631181,
+        11.507076691901737,
+        22.06426523117376,
+        21.49659374867378,
+        21.654682458540876
+      ],
+      "total_time": 90.03650192392134,
+      "improvement_over_baseline": 24.79430486946538,
+      "detection_rate": 1.0
+    },
+    {
+      "attack_type": "sign_flip",
+      "defense_type": "none",
+      "byzantine_ratio": 0.45,
+      "num_nodes": 10,
+      "num_byzantine": 4,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 22.683792922140007,
+      "accuracy_per_round": [
+        13.34365589049645,
+        10,
+        11.28914091090042,
+        18.007054693853604,
+        22.683792922140007
+      ],
+      "time_per_round": [
+        15.396639259575778,
+        22.519834561969894,
+        24.54273014536181,
+        16.65381775247678,
+        21.56432747963772
+      ],
+      "total_time": 100.67734919902199,
+      "improvement_over_baseline": 0.0,
+      "detection_rate": 0.0
+    },
+    {
+      "attack_type": "sign_flip",
+      "defense_type": "multi_krum",
+      "byzantine_ratio": 0.45,
+      "num_nodes": 10,
+      "num_byzantine": 4,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 38.308462080976724,
+      "accuracy_per_round": [
+        16.585800691386652,
+        20.156322771770693,
+        27.272669334256424,
+        35.82976889361405,
+        38.308462080976724
+      ],
+      "time_per_round": [
+        14.59767929487931,
+        17.010937620851895,
+        24.337638504023246,
+        23.55786887130796,
+        17.83195897407382
+      ],
+      "total_time": 97.33608326513624,
+      "improvement_over_baseline": 18.808462080976724,
+      "detection_rate": 0.0
+    },
+    {
+      "attack_type": "sign_flip",
+      "defense_type": "trimmed_mean",
+      "byzantine_ratio": 0.45,
+      "num_nodes": 10,
+      "num_byzantine": 4,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 33.970127281945416,
+      "accuracy_per_round": [
+        12.540170145742467,
+        18.887377352600176,
+        30.290247438377,
+        30.85644374161449,
+        33.970127281945416
+      ],
+      "time_per_round": [
+        17.56265012741802,
+        20.30231869729009,
+        15.241586221783567,
+        12.41076763838602,
+        18.993475834047544
+      ],
+      "total_time": 84.51079851892524,
+      "improvement_over_baseline": 14.470127281945416,
+      "detection_rate": 0.25
+    },
+    {
+      "attack_type": "scaling",
+      "defense_type": "none",
+      "byzantine_ratio": 0.45,
+      "num_nodes": 10,
+      "num_byzantine": 4,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 19.810197848265037,
+      "accuracy_per_round": [
+        10,
+        10.276277293533703,
+        13.629239085649871,
+        16.514685439006655,
+        19.810197848265037
+      ],
+      "time_per_round": [
+        24.129902725449952,
+        14.947523404394058,
+        21.626848752115443,
+        22.82736064455004,
+        22.980436742509305
+      ],
+      "total_time": 106.5120722690188,
+      "improvement_over_baseline": 0.0,
+      "detection_rate": 1.0
+    },
+    {
+      "attack_type": "scaling",
+      "defense_type": "multi_krum",
+      "byzantine_ratio": 0.45,
+      "num_nodes": 10,
+      "num_byzantine": 4,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 41.609484397820076,
+      "accuracy_per_round": [
+        14.584080917802389,
+        25.858102186338197,
+        30.84700966178635,
+        38.72556957590907,
+        41.609484397820076
+      ],
+      "time_per_round": [
+        11.44500302363353,
+        21.12804300811593,
+        19.864715946951037,
+        14.836354280907791,
+        16.119696298318527
+      ],
+      "total_time": 83.39381255792682,
+      "improvement_over_baseline": 22.859484397820076,
+      "detection_rate": 1.0
+    },
+    {
+      "attack_type": "scaling",
+      "defense_type": "trimmed_mean",
+      "byzantine_ratio": 0.45,
+      "num_nodes": 10,
+      "num_byzantine": 4,
+      "initial_accuracy": 12.0,
+      "final_accuracy": 38.55891193931117,
+      "accuracy_per_round": [
+        10.941161631762366,
+        19.288130746300403,
+        25.35881750778194,
+        31.707725788952878,
+        38.55891193931117
+      ],
+      "time_per_round": [
+        23.52719061842646,
+        24.016108731002348,
+        13.461227867266649,
+        23.423297550807284,
+        19.831973042161746
+      ],
+      "total_time": 104.25979780966449,
+      "improvement_over_baseline": 19.808911939311173,
+      "detection_rate": 1.0
+    }
+  ]
+}

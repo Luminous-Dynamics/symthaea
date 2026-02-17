@@ -1,0 +1,120 @@
+# Stage 1 Set D: PoGQ Deep Dive - Worst-Case Scenarios
+#
+# Research Goal: Understand PoGQ behavior under extreme stress
+#
+# Configuration:
+# - Data: Extreme non-IID (hardest case)
+# - Byzantine: 30% (3/10 clients)
+# - Scenarios: 4 worst-case scenarios
+# - Defense: PoGQ only (characterize limits)
+#
+# Total: 4 scenarios × 1 defense = 4 experiments
+#
+# Expected Outcome: Characterize PoGQ limits and failure modes
+
+experiment_name: "stage1_set_d_pogq_deep_dive"
+description: "Deep dive into PoGQ behavior under worst-case scenarios"
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+# Extreme non-IID
+data_split:
+  type: "dirichlet"
+  alpha: 0.1
+  num_clients: 10
+  seed: 42
+
+training:
+  num_rounds: 50
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 50
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 3  # 30% Byzantine
+
+  quality_threshold: 0.3
+  reputation_decay: 0.95
+
+byzantine:
+  num_byzantine: 3  # 30% Byzantine
+
+  # Four worst-case scenarios
+  attack_scenarios:
+    # Scenario 1: Baseline (no attack)
+    # Purpose: Establish PoGQ baseline accuracy without attacks
+    - name: "no_attack"
+      attack_type: null
+      description: "Clean run - no Byzantine clients active"
+
+    # Scenario 2: Hardest single attack
+    # Purpose: Test PoGQ against most sophisticated evasion
+    - name: "adaptive_attack"
+      attack_type: "adaptive"
+      description: "Adaptive attack designed to evade quality metrics"
+
+    # Scenario 3: Hardest coordinated attack
+    # Purpose: Test PoGQ against multiple colluding clients
+    - name: "sybil_attack"
+      attack_type: "sybil"
+      description: "Coordinated attack by multiple Byzantine clients"
+
+    # Scenario 4: Combined worst case
+    # Purpose: Absolute worst case - both sophisticated AND coordinated
+    - name: "combined_adaptive_sybil"
+      attack_type: "adaptive+sybil"
+      description: "Combined adaptive evasion + coordination"
+
+  severity: 1.0
+  enable_peer_context: true
+
+baselines:
+  # PoGQ only (deep dive)
+  - name: "pogq"
+    params:
+      quality_threshold: 0.3
+      reputation_decay: 0.95
+
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+
+device: "cuda"
+
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - num_accepted
+    - avg_quality_score
+    - rejected_clients
+    - reputation_history  # Track reputation evolution
+    - quality_distribution  # Distribution of quality scores
+    - false_positive_rate  # Honest clients rejected
+    - false_negative_rate  # Byzantine clients accepted
+  per_round: true
+  final_model: true  # Save final model for analysis
+  attack_analysis: true
+  detailed_stats: true  # Extra detailed statistics for deep dive
+
+# Analysis focus:
+# 1. Baseline accuracy (no attack)
+# 2. Degradation under adaptive attack
+# 3. Degradation under sybil attack
+# 4. Failure mode under combined attack
+# 5. Reputation evolution patterns
+# 6. Quality metric effectiveness
+#
+# Estimated time: 4 scenarios × 50 rounds × ~10 min = ~20 hours

@@ -1,0 +1,185 @@
+{
+  "timestamp": "2025-10-22T08:06:06.773453",
+  "runs": [
+    {
+      "dataset": "cifar10",
+      "distribution": "iid",
+      "attack_type": "noise",
+      "success": true
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "label_skew",
+      "attack_type": "noise",
+      "success": false
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "iid",
+      "attack_type": "sign_flip",
+      "success": true
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "label_skew",
+      "attack_type": "sign_flip",
+      "success": false
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "iid",
+      "attack_type": "zero",
+      "success": true
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "label_skew",
+      "attack_type": "zero",
+      "success": false
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "iid",
+      "attack_type": "random",
+      "success": true
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "label_skew",
+      "attack_type": "random",
+      "success": false
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "iid",
+      "attack_type": "backdoor",
+      "success": true
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "label_skew",
+      "attack_type": "backdoor",
+      "success": true
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "iid",
+      "attack_type": "adaptive",
+      "success": true
+    },
+    {
+      "dataset": "cifar10",
+      "distribution": "label_skew",
+      "attack_type": "adaptive",
+      "success": false
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "iid",
+      "attack_type": "noise",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "label_skew",
+      "attack_type": "noise",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "iid",
+      "attack_type": "sign_flip",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "label_skew",
+      "attack_type": "sign_flip",
+      "success": false
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "iid",
+      "attack_type": "zero",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "label_skew",
+      "attack_type": "zero",
+      "success": false
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "iid",
+      "attack_type": "random",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "label_skew",
+      "attack_type": "random",
+      "success": false
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "iid",
+      "attack_type": "backdoor",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "label_skew",
+      "attack_type": "backdoor",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "iid",
+      "attack_type": "adaptive",
+      "success": true
+    },
+    {
+      "dataset": "emnist_balanced",
+      "distribution": "label_skew",
+      "attack_type": "adaptive",
+      "success": false
+    },
+    {
+      "dataset": "breast_cancer",
+      "distribution": "iid",
+      "attack_type": "noise",
+      "success": true
+    },
+    {
+      "dataset": "breast_cancer",
+      "distribution": "iid",
+      "attack_type": "sign_flip",
+      "success": true
+    },
+    {
+      "dataset": "breast_cancer",
+      "distribution": "iid",
+      "attack_type": "zero",
+      "success": true
+    },
+    {
+      "dataset": "breast_cancer",
+      "distribution": "iid",
+      "attack_type": "random",
+      "success": true
+    },
+    {
+      "dataset": "breast_cancer",
+      "distribution": "iid",
+      "attack_type": "backdoor",
+      "success": true
+    },
+    {
+      "dataset": "breast_cancer",
+      "distribution": "iid",
+      "attack_type": "adaptive",
+      "success": true
+    }
+  ]
+}

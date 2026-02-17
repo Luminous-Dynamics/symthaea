@@ -1,0 +1,19 @@
+{
+  "name": "h-fl",
+  "integrity": {
+    "network_seed": "h-fl-2025",
+    "properties": {
+      "model_type": "CNN",
+      "dataset": "CIFAR-10"
+    }
+  },
+  "coordinator": {
+    "zomes": [
+      {
+        "name": "federated_learning",
+        "dependencies": [],
+        "bundled": "federated_learning.wasm"
+      }
+    ]
+  }
+}

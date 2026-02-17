@@ -1,0 +1,157 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mycelix-bootstrap
+  namespace: mycelix-testnet
+  labels:
+    app: bootstrap
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+    app.kubernetes.io/component: bootstrap
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bootstrap
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app: bootstrap
+        app.kubernetes.io/name: mycelix
+        app.kubernetes.io/instance: testnet
+        app.kubernetes.io/component: bootstrap
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: mycelix-bootstrap
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: bootstrap
+          image: mycelix/bootstrap-node:testnet-latest
+          imagePullPolicy: Always
+          ports:
+            - name: p2p
+              containerPort: 9000
+              protocol: TCP
+            - name: api
+              containerPort: 9001
+              protocol: TCP
+            - name: metrics
+              containerPort: 9090
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: mycelix-config
+          env:
+            - name: MYCELIX_NODE_TYPE
+              value: "bootstrap"
+            - name: MYCELIX_GENESIS_PATH
+              value: "/config/genesis.json"
+            - name: MYCELIX_PRIVATE_KEY_PATH
+              value: "/secrets/bootstrap.key"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: mycelix-secrets
+                  key: DATABASE_URL
+                  optional: true
+            - name: REDIS_URL
+              value: "redis://redis-master:6379"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: genesis-config
+              mountPath: /config
+              readOnly: true
+            - name: secrets
+              mountPath: /secrets
+              readOnly: true
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: api
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: genesis-config
+          configMap:
+            name: mycelix-genesis
+        - name: secrets
+          secret:
+            secretName: mycelix-secrets
+        - name: data
+          persistentVolumeClaim:
+            claimName: bootstrap-data-pvc
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: bootstrap
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mycelix-bootstrap
+  namespace: mycelix-testnet
+  labels:
+    app.kubernetes.io/name: mycelix
+    app.kubernetes.io/instance: testnet
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: bootstrap-data-pvc
+  namespace: mycelix-testnet
+  labels:
+    app: bootstrap
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: standard
+  resources:
+    requests:
+      storage: 50Gi

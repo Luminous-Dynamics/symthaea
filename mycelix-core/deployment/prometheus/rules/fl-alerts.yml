@@ -1,0 +1,684 @@
+# =============================================================================
+# PROMETHEUS ALERT RULES - MYCELIX FEDERATED LEARNING SYSTEM
+# =============================================================================
+#
+# Comprehensive alerting rules for monitoring the Mycelix FL system including:
+#   - Byzantine detection and fault tolerance
+#   - FL round health and participation
+#   - Node health and resource monitoring
+#   - Aggregation quality and phi coherence
+#   - System health and security
+#
+# Documentation: https://prometheus.io/docs/prometheus/latest/configuration/alerting_rules/
+# =============================================================================
+
+groups:
+  # ===========================================================================
+  # BYZANTINE DETECTION ALERTS
+  # ===========================================================================
+  - name: mycelix_byzantine_detection
+    interval: 15s
+    rules:
+      # -----------------------------------------------------------------------
+      # HighByzantineRate - Critical alert when byzantine detection rate exceeds 30%
+      # This indicates a significant portion of nodes may be compromised or malicious
+      # -----------------------------------------------------------------------
+      - alert: HighByzantineRate
+        expr: |
+          (
+            sum(rate(mycelix_byzantine_detected_total[5m])) /
+            sum(rate(mycelix_updates_received_total[5m]))
+          ) > 0.30
+        for: 2m
+        labels:
+          severity: critical
+          component: byzantine_detection
+          team: security
+        annotations:
+          summary: "High Byzantine detection rate exceeds 30%"
+          description: |
+            Byzantine detection rate is {{ $value | humanizePercentage }} over the last 5 minutes.
+            This exceeds the 30% threshold indicating potential coordinated attack or widespread node compromise.
+            Immediate investigation required.
+          runbook_url: "https://docs.mycelix.io/runbooks/high-byzantine-rate"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-security/byzantine-detection"
+
+      # -----------------------------------------------------------------------
+      # ByzantineSpike - Warning alert for sudden increase in byzantine detections
+      # Detects rapid changes that may indicate emerging attack
+      # -----------------------------------------------------------------------
+      - alert: ByzantineSpike
+        expr: |
+          (
+            sum(rate(mycelix_byzantine_detected_total[5m])) /
+            sum(rate(mycelix_byzantine_detected_total[30m]))
+          ) > 3
+        for: 1m
+        labels:
+          severity: warning
+          component: byzantine_detection
+          team: security
+        annotations:
+          summary: "Sudden spike in Byzantine detections"
+          description: |
+            Byzantine detection rate has increased {{ $value | humanize }}x compared to the 30-minute baseline.
+            This sudden spike may indicate the beginning of an attack or a new wave of malicious nodes.
+          runbook_url: "https://docs.mycelix.io/runbooks/byzantine-spike"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-security/byzantine-detection"
+
+      # -----------------------------------------------------------------------
+      # ByzantineDetectionDisabled - Critical if detection system is not running
+      # -----------------------------------------------------------------------
+      - alert: ByzantineDetectionDisabled
+        expr: |
+          absent(mycelix_byzantine_detected_total) or
+          sum(rate(mycelix_byzantine_checks_total[5m])) == 0
+        for: 5m
+        labels:
+          severity: critical
+          component: byzantine_detection
+          team: security
+        annotations:
+          summary: "Byzantine detection system is not operational"
+          description: |
+            No byzantine detection checks have been performed in the last 5 minutes.
+            The FL system is vulnerable to malicious updates without this protection.
+          runbook_url: "https://docs.mycelix.io/runbooks/byzantine-detection-disabled"
+
+  # ===========================================================================
+  # FL ROUND HEALTH ALERTS
+  # ===========================================================================
+  - name: mycelix_fl_round_health
+    interval: 15s
+    rules:
+      # -----------------------------------------------------------------------
+      # RoundTimeout - Critical when FL round exceeds 5 minute duration
+      # -----------------------------------------------------------------------
+      - alert: RoundTimeout
+        expr: |
+          (time() - mycelix_round_start_timestamp_seconds) > 300
+          and mycelix_round_in_progress == 1
+        for: 30s
+        labels:
+          severity: critical
+          component: fl_coordinator
+          team: platform
+        annotations:
+          summary: "FL round has exceeded 5 minute timeout"
+          description: |
+            FL round {{ $labels.round_id }} has been running for {{ $value | humanizeDuration }}.
+            This exceeds the 5-minute threshold. The round may be stuck or experiencing severe delays.
+            Consider manual intervention to abort and restart.
+          runbook_url: "https://docs.mycelix.io/runbooks/round-timeout"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-rounds/round-health"
+
+      # -----------------------------------------------------------------------
+      # RoundFailure - Critical alert when FL rounds are consistently failing
+      # -----------------------------------------------------------------------
+      - alert: RoundFailure
+        expr: |
+          (
+            sum(rate(mycelix_rounds_failed_total[10m])) /
+            sum(rate(mycelix_rounds_total[10m]))
+          ) > 0.20
+        for: 5m
+        labels:
+          severity: critical
+          component: fl_coordinator
+          team: platform
+        annotations:
+          summary: "High FL round failure rate detected"
+          description: |
+            {{ $value | humanizePercentage }} of FL rounds have failed in the last 10 minutes.
+            This indicates systemic issues with the federated learning process.
+            Check aggregator logs and node connectivity.
+          runbook_url: "https://docs.mycelix.io/runbooks/round-failure"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-rounds/round-health"
+
+      # -----------------------------------------------------------------------
+      # LowParticipation - Warning when fewer than 50% of expected nodes participate
+      # -----------------------------------------------------------------------
+      - alert: LowParticipation
+        expr: |
+          (
+            mycelix_round_participants_count /
+            mycelix_registered_nodes_total
+          ) < 0.50
+        for: 3m
+        labels:
+          severity: warning
+          component: fl_coordinator
+          team: platform
+        annotations:
+          summary: "Low node participation in FL rounds"
+          description: |
+            Only {{ $value | humanizePercentage }} of registered nodes are participating in FL rounds.
+            Current participants: {{ with query "mycelix_round_participants_count" }}{{ . | first | value }}{{ end }}
+            Expected minimum: 50% of registered nodes.
+            Check for network issues or node health problems.
+          runbook_url: "https://docs.mycelix.io/runbooks/low-participation"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-rounds/participation"
+
+      # -----------------------------------------------------------------------
+      # CriticallyLowParticipation - Critical when participation drops below 25%
+      # -----------------------------------------------------------------------
+      - alert: CriticallyLowParticipation
+        expr: |
+          (
+            mycelix_round_participants_count /
+            mycelix_registered_nodes_total
+          ) < 0.25
+        for: 2m
+        labels:
+          severity: critical
+          component: fl_coordinator
+          team: platform
+        annotations:
+          summary: "Critically low node participation in FL rounds"
+          description: |
+            Only {{ $value | humanizePercentage }} of registered nodes are participating.
+            This is below the critical threshold of 25% and may compromise model quality.
+            Immediate investigation required.
+          runbook_url: "https://docs.mycelix.io/runbooks/critical-low-participation"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-rounds/participation"
+
+      # -----------------------------------------------------------------------
+      # NoActiveRounds - Warning when no FL rounds are running
+      # -----------------------------------------------------------------------
+      - alert: NoActiveRounds
+        expr: |
+          sum(rate(mycelix_rounds_total[10m])) == 0
+        for: 10m
+        labels:
+          severity: warning
+          component: fl_coordinator
+          team: platform
+        annotations:
+          summary: "No FL rounds have been initiated"
+          description: |
+            No FL rounds have been started in the last 10 minutes.
+            The federated learning process may be stalled or the coordinator may be down.
+          runbook_url: "https://docs.mycelix.io/runbooks/no-active-rounds"
+
+  # ===========================================================================
+  # NODE HEALTH ALERTS
+  # ===========================================================================
+  - name: mycelix_node_health
+    interval: 15s
+    rules:
+      # -----------------------------------------------------------------------
+      # NodeDisconnected - Warning when a node loses connection
+      # -----------------------------------------------------------------------
+      - alert: NodeDisconnected
+        expr: |
+          (time() - mycelix_node_last_heartbeat_timestamp_seconds) > 60
+        for: 1m
+        labels:
+          severity: warning
+          component: node
+          team: platform
+        annotations:
+          summary: "FL node has disconnected"
+          description: |
+            Node {{ $labels.node_id }} has not sent a heartbeat in {{ $value | humanizeDuration }}.
+            The node may have crashed, lost network connectivity, or been shut down.
+          runbook_url: "https://docs.mycelix.io/runbooks/node-disconnected"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-nodes/node-health?var-node={{ $labels.node_id }}"
+
+      # -----------------------------------------------------------------------
+      # MultipleNodesDisconnected - Critical when multiple nodes disconnect
+      # -----------------------------------------------------------------------
+      - alert: MultipleNodesDisconnected
+        expr: |
+          count(
+            (time() - mycelix_node_last_heartbeat_timestamp_seconds) > 60
+          ) > 5
+        for: 2m
+        labels:
+          severity: critical
+          component: node
+          team: platform
+        annotations:
+          summary: "Multiple FL nodes have disconnected"
+          description: |
+            {{ $value }} nodes have disconnected simultaneously.
+            This may indicate a network partition, infrastructure issue, or coordinated attack.
+          runbook_url: "https://docs.mycelix.io/runbooks/multiple-nodes-disconnected"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-nodes/node-overview"
+
+      # -----------------------------------------------------------------------
+      # NodeHighLatency - Warning when node response time exceeds 1 second
+      # -----------------------------------------------------------------------
+      - alert: NodeHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(mycelix_node_response_latency_seconds_bucket[5m])) by (le, node_id)
+          ) > 1.0
+        for: 3m
+        labels:
+          severity: warning
+          component: node
+          team: platform
+        annotations:
+          summary: "High latency detected for FL node"
+          description: |
+            Node {{ $labels.node_id }} has P95 response latency of {{ $value | humanizeDuration }}.
+            This exceeds the 1-second threshold and may impact FL round completion times.
+          runbook_url: "https://docs.mycelix.io/runbooks/node-high-latency"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-nodes/node-health?var-node={{ $labels.node_id }}"
+
+      # -----------------------------------------------------------------------
+      # NodeCPUExhaustion - Warning when node CPU usage is critically high
+      # -----------------------------------------------------------------------
+      - alert: NodeCPUExhaustion
+        expr: |
+          mycelix_node_cpu_usage_percent > 90
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+          team: platform
+        annotations:
+          summary: "FL node CPU usage is critically high"
+          description: |
+            Node {{ $labels.node_id }} CPU usage is at {{ $value | humanizePercentage }}.
+            High CPU usage may cause missed round deadlines and degraded model training.
+          runbook_url: "https://docs.mycelix.io/runbooks/node-cpu-exhaustion"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-nodes/node-resources?var-node={{ $labels.node_id }}"
+
+      # -----------------------------------------------------------------------
+      # NodeMemoryExhaustion - Warning when node memory usage is critically high
+      # -----------------------------------------------------------------------
+      - alert: NodeMemoryExhaustion
+        expr: |
+          mycelix_node_memory_usage_percent > 85
+        for: 5m
+        labels:
+          severity: warning
+          component: node
+          team: platform
+        annotations:
+          summary: "FL node memory usage is critically high"
+          description: |
+            Node {{ $labels.node_id }} memory usage is at {{ $value | humanizePercentage }}.
+            High memory usage may cause OOM kills and node disconnections.
+          runbook_url: "https://docs.mycelix.io/runbooks/node-memory-exhaustion"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-nodes/node-resources?var-node={{ $labels.node_id }}"
+
+      # -----------------------------------------------------------------------
+      # NodeResourceExhaustion - Critical combined resource alert
+      # -----------------------------------------------------------------------
+      - alert: NodeResourceExhaustion
+        expr: |
+          (mycelix_node_cpu_usage_percent > 95) or
+          (mycelix_node_memory_usage_percent > 95)
+        for: 2m
+        labels:
+          severity: critical
+          component: node
+          team: platform
+        annotations:
+          summary: "FL node resources critically exhausted"
+          description: |
+            Node {{ $labels.node_id }} is experiencing critical resource exhaustion.
+            CPU: {{ with query "mycelix_node_cpu_usage_percent{node_id='$labels.node_id'}" }}{{ . | first | value | humanizePercentage }}{{ end }}
+            Memory: {{ with query "mycelix_node_memory_usage_percent{node_id='$labels.node_id'}" }}{{ . | first | value | humanizePercentage }}{{ end }}
+            Immediate action required to prevent node failure.
+          runbook_url: "https://docs.mycelix.io/runbooks/node-resource-exhaustion"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-nodes/node-resources?var-node={{ $labels.node_id }}"
+
+  # ===========================================================================
+  # AGGREGATION QUALITY ALERTS
+  # ===========================================================================
+  - name: mycelix_aggregation_quality
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # AggregationQualityDrop - Warning when aggregation quality drops below 90%
+      # -----------------------------------------------------------------------
+      - alert: AggregationQualityDrop
+        expr: |
+          mycelix_aggregation_quality_score < 0.90
+        for: 5m
+        labels:
+          severity: warning
+          component: aggregator
+          team: ml
+        annotations:
+          summary: "FL aggregation quality has dropped below 90%"
+          description: |
+            Aggregation quality score is {{ $value | humanizePercentage }}.
+            This may indicate:
+            - Too many low-quality model updates
+            - Byzantine nodes bypassing detection
+            - Data distribution shift across nodes
+          runbook_url: "https://docs.mycelix.io/runbooks/aggregation-quality-drop"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-aggregation/quality"
+
+      # -----------------------------------------------------------------------
+      # AggregationQualityCritical - Critical when quality drops below 70%
+      # -----------------------------------------------------------------------
+      - alert: AggregationQualityCritical
+        expr: |
+          mycelix_aggregation_quality_score < 0.70
+        for: 3m
+        labels:
+          severity: critical
+          component: aggregator
+          team: ml
+        annotations:
+          summary: "FL aggregation quality critically low"
+          description: |
+            Aggregation quality score is {{ $value | humanizePercentage }}.
+            Model updates should be paused until quality issues are resolved.
+          runbook_url: "https://docs.mycelix.io/runbooks/aggregation-quality-critical"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-aggregation/quality"
+
+      # -----------------------------------------------------------------------
+      # PhiCoherenceLow - Warning when phi coherence drops below 0.3
+      # -----------------------------------------------------------------------
+      - alert: PhiCoherenceLow
+        expr: |
+          mycelix_phi_coherence_score < 0.3
+        for: 5m
+        labels:
+          severity: warning
+          component: aggregator
+          team: ml
+        annotations:
+          summary: "Phi coherence score is below threshold"
+          description: |
+            Phi coherence score is {{ $value }}, below the 0.3 threshold.
+            Low coherence indicates model updates are diverging significantly.
+            This may impact model convergence and final quality.
+          runbook_url: "https://docs.mycelix.io/runbooks/phi-coherence-low"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-aggregation/phi-metrics"
+
+      # -----------------------------------------------------------------------
+      # PhiCoherenceCritical - Critical when phi coherence drops below 0.1
+      # -----------------------------------------------------------------------
+      - alert: PhiCoherenceCritical
+        expr: |
+          mycelix_phi_coherence_score < 0.1
+        for: 3m
+        labels:
+          severity: critical
+          component: aggregator
+          team: ml
+        annotations:
+          summary: "Phi coherence critically low - model divergence detected"
+          description: |
+            Phi coherence score is {{ $value }}, critically below threshold.
+            Model updates are highly divergent. Consider:
+            - Pausing aggregation
+            - Reviewing node contributions
+            - Checking for adversarial updates
+          runbook_url: "https://docs.mycelix.io/runbooks/phi-coherence-critical"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-aggregation/phi-metrics"
+
+      # -----------------------------------------------------------------------
+      # GradientNormAnomaly - Warning for unusual gradient norms
+      # -----------------------------------------------------------------------
+      - alert: GradientNormAnomaly
+        expr: |
+          abs(mycelix_gradient_norm_current - mycelix_gradient_norm_avg) /
+          mycelix_gradient_norm_stddev > 3
+        for: 5m
+        labels:
+          severity: warning
+          component: aggregator
+          team: ml
+        annotations:
+          summary: "Anomalous gradient norms detected in aggregation"
+          description: |
+            Gradient norms are {{ $value }} standard deviations from the mean.
+            This may indicate poisoning attacks or data quality issues.
+          runbook_url: "https://docs.mycelix.io/runbooks/gradient-norm-anomaly"
+
+  # ===========================================================================
+  # SYSTEM HEALTH ALERTS
+  # ===========================================================================
+  - name: mycelix_system_health
+    interval: 15s
+    rules:
+      # -----------------------------------------------------------------------
+      # DatabaseConnectionFailed - Critical when database is unreachable
+      # -----------------------------------------------------------------------
+      - alert: DatabaseConnectionFailed
+        expr: |
+          mycelix_database_connection_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: database
+          team: platform
+        annotations:
+          summary: "Database connection has failed"
+          description: |
+            The Mycelix FL system cannot connect to the database.
+            Database: {{ $labels.database }}
+            This will prevent model storage, round persistence, and state management.
+          runbook_url: "https://docs.mycelix.io/runbooks/database-connection-failed"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-system/database"
+
+      # -----------------------------------------------------------------------
+      # DatabaseHighLatency - Warning for slow database queries
+      # -----------------------------------------------------------------------
+      - alert: DatabaseHighLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(mycelix_database_query_duration_seconds_bucket[5m])) by (le)
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          component: database
+          team: platform
+        annotations:
+          summary: "Database query latency is high"
+          description: |
+            P95 database query latency is {{ $value | humanizeDuration }}.
+            This may slow down FL round processing and model storage.
+          runbook_url: "https://docs.mycelix.io/runbooks/database-high-latency"
+
+      # -----------------------------------------------------------------------
+      # HighErrorRate - Warning when error rate exceeds 5%
+      # -----------------------------------------------------------------------
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(mycelix_errors_total[5m])) /
+            sum(rate(mycelix_requests_total[5m]))
+          ) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          component: system
+          team: platform
+        annotations:
+          summary: "High error rate detected in Mycelix FL system"
+          description: |
+            Error rate is {{ $value | humanizePercentage }} over the last 5 minutes.
+            This exceeds the 5% threshold. Check application logs for details.
+          runbook_url: "https://docs.mycelix.io/runbooks/high-error-rate"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-system/errors"
+
+      # -----------------------------------------------------------------------
+      # CriticalErrorRate - Critical when error rate exceeds 15%
+      # -----------------------------------------------------------------------
+      - alert: CriticalErrorRate
+        expr: |
+          (
+            sum(rate(mycelix_errors_total[5m])) /
+            sum(rate(mycelix_requests_total[5m]))
+          ) > 0.15
+        for: 2m
+        labels:
+          severity: critical
+          component: system
+          team: platform
+        annotations:
+          summary: "Critical error rate in Mycelix FL system"
+          description: |
+            Error rate is {{ $value | humanizePercentage }}, exceeding the 15% critical threshold.
+            System stability is compromised. Immediate investigation required.
+          runbook_url: "https://docs.mycelix.io/runbooks/critical-error-rate"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-system/errors"
+
+      # -----------------------------------------------------------------------
+      # ReplayAttackDetected - Critical security alert for replay attacks
+      # -----------------------------------------------------------------------
+      - alert: ReplayAttackDetected
+        expr: |
+          increase(mycelix_replay_attacks_detected_total[5m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          component: security
+          team: security
+        annotations:
+          summary: "Replay attack detected in FL system"
+          description: |
+            {{ $value }} replay attack(s) detected in the last 5 minutes.
+            Attacker may be attempting to resubmit old model updates.
+            Source: {{ $labels.source_ip }}
+            Node: {{ $labels.node_id }}
+          runbook_url: "https://docs.mycelix.io/runbooks/replay-attack-detected"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-security/attacks"
+
+      # -----------------------------------------------------------------------
+      # SybilAttackSuspected - Warning for potential Sybil attacks
+      # -----------------------------------------------------------------------
+      - alert: SybilAttackSuspected
+        expr: |
+          increase(mycelix_sybil_attack_indicators_total[10m]) > 3
+        for: 1m
+        labels:
+          severity: warning
+          component: security
+          team: security
+        annotations:
+          summary: "Potential Sybil attack detected"
+          description: |
+            Multiple Sybil attack indicators detected in the last 10 minutes.
+            An attacker may be attempting to register multiple fake identities.
+          runbook_url: "https://docs.mycelix.io/runbooks/sybil-attack-suspected"
+
+      # -----------------------------------------------------------------------
+      # CoordinatorDown - Critical when FL coordinator is unreachable
+      # -----------------------------------------------------------------------
+      - alert: CoordinatorDown
+        expr: |
+          up{job="mycelix-coordinator"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: coordinator
+          team: platform
+        annotations:
+          summary: "FL Coordinator is down"
+          description: |
+            The FL Coordinator service is unreachable.
+            No FL rounds can be initiated or completed without the coordinator.
+          runbook_url: "https://docs.mycelix.io/runbooks/coordinator-down"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-system/coordinator"
+
+      # -----------------------------------------------------------------------
+      # CertificateExpiringSoon - Warning for expiring TLS certificates
+      # -----------------------------------------------------------------------
+      - alert: CertificateExpiringSoon
+        expr: |
+          (mycelix_tls_certificate_expiry_timestamp_seconds - time()) < 604800
+        for: 1h
+        labels:
+          severity: warning
+          component: security
+          team: platform
+        annotations:
+          summary: "TLS certificate expiring soon"
+          description: |
+            TLS certificate for {{ $labels.domain }} expires in {{ $value | humanizeDuration }}.
+            Certificate should be renewed before expiration to prevent service disruption.
+          runbook_url: "https://docs.mycelix.io/runbooks/certificate-expiring"
+
+      # -----------------------------------------------------------------------
+      # DiskSpaceLow - Warning when disk space is running low
+      # -----------------------------------------------------------------------
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/var/lib/mycelix"} /
+            node_filesystem_size_bytes{mountpoint="/var/lib/mycelix"}
+          ) < 0.15
+        for: 10m
+        labels:
+          severity: warning
+          component: infrastructure
+          team: platform
+        annotations:
+          summary: "Disk space running low on Mycelix data volume"
+          description: |
+            Only {{ $value | humanizePercentage }} disk space remaining on /var/lib/mycelix.
+            Consider cleaning up old model checkpoints or expanding storage.
+          runbook_url: "https://docs.mycelix.io/runbooks/disk-space-low"
+
+  # ===========================================================================
+  # MODEL INTEGRITY ALERTS
+  # ===========================================================================
+  - name: mycelix_model_integrity
+    interval: 30s
+    rules:
+      # -----------------------------------------------------------------------
+      # ModelCheckpointFailed - Warning when model checkpoint fails
+      # -----------------------------------------------------------------------
+      - alert: ModelCheckpointFailed
+        expr: |
+          increase(mycelix_model_checkpoint_failures_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+          component: model
+          team: ml
+        annotations:
+          summary: "Model checkpoint save failed"
+          description: |
+            {{ $value }} model checkpoint(s) failed to save in the last 10 minutes.
+            Model state may be at risk if the system crashes.
+          runbook_url: "https://docs.mycelix.io/runbooks/model-checkpoint-failed"
+
+      # -----------------------------------------------------------------------
+      # ModelDivergence - Warning when model metrics indicate divergence
+      # -----------------------------------------------------------------------
+      - alert: ModelDivergence
+        expr: |
+          mycelix_model_loss_current > (mycelix_model_loss_baseline * 1.5)
+        for: 10m
+        labels:
+          severity: warning
+          component: model
+          team: ml
+        annotations:
+          summary: "Model performance has diverged from baseline"
+          description: |
+            Current model loss ({{ $value }}) is 50% higher than baseline.
+            The model may be experiencing catastrophic forgetting or poisoning.
+          runbook_url: "https://docs.mycelix.io/runbooks/model-divergence"
+          dashboard_url: "https://grafana.mycelix.io/d/fl-model/performance"
+
+      # -----------------------------------------------------------------------
+      # ModelVersionMismatch - Warning for version inconsistencies
+      # -----------------------------------------------------------------------
+      - alert: ModelVersionMismatch
+        expr: |
+          count(count by (model_version) (mycelix_node_model_version)) > 1
+        for: 15m
+        labels:
+          severity: warning
+          component: model
+          team: ml
+        annotations:
+          summary: "Multiple model versions detected across nodes"
+          description: |
+            {{ $value }} different model versions are active across participating nodes.
+            This may cause aggregation issues and should be resolved.
+          runbook_url: "https://docs.mycelix.io/runbooks/model-version-mismatch"

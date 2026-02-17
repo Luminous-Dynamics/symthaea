@@ -1,0 +1,1051 @@
+openapi: 3.1.0
+info:
+  title: Mycelix Mail API
+  description: |
+    RESTful API for Mycelix Mail - the epistemic email platform with
+    decentralized trust networks and post-quantum encryption.
+
+    ## Authentication
+    All endpoints require Bearer token authentication unless marked as public.
+    Obtain tokens via the OAuth2 flow at `/auth/authorize`.
+
+    ## Trust System
+    Mycelix Mail uses a unique trust network where users attest to each other's
+    trustworthiness. Trust scores are calculated from the weighted graph of
+    attestations stored on Holochain.
+
+    ## Post-Quantum Encryption
+    All sensitive data is encrypted using CRYSTALS-Kyber (KEM) and
+    CRYSTALS-Dilithium (signatures) for quantum-resistant security.
+  version: 1.0.0
+  contact:
+    name: Mycelix Team
+    url: https://mycelix.mail
+    email: api@mycelix.mail
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.mycelix.mail/v1
+    description: Production server
+  - url: https://staging-api.mycelix.mail/v1
+    description: Staging server
+  - url: http://localhost:3001/v1
+    description: Local development
+
+tags:
+  - name: Auth
+    description: Authentication and authorization
+  - name: Emails
+    description: Email operations
+  - name: Trust
+    description: Trust network and attestations
+  - name: Contacts
+    description: Contact management
+  - name: Workflows
+    description: Email automation workflows
+  - name: Calendar
+    description: Calendar and scheduling
+  - name: Settings
+    description: User settings and preferences
+  - name: Federation
+    description: ActivityPub federation
+
+paths:
+  # ============================================================================
+  # Authentication
+  # ============================================================================
+  /auth/authorize:
+    get:
+      tags: [Auth]
+      summary: Initiate OAuth2 authorization
+      description: Redirects to OAuth provider for authentication
+      parameters:
+        - name: provider
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [google, microsoft, github]
+        - name: redirect_uri
+          in: query
+          schema:
+            type: string
+            format: uri
+        - name: state
+          in: query
+          schema:
+            type: string
+        - name: code_challenge
+          in: query
+          description: PKCE code challenge
+          schema:
+            type: string
+        - name: code_challenge_method
+          in: query
+          schema:
+            type: string
+            enum: [S256]
+      responses:
+        '302':
+          description: Redirect to OAuth provider
+
+  /auth/token:
+    post:
+      tags: [Auth]
+      summary: Exchange code for tokens
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [grant_type]
+              properties:
+                grant_type:
+                  type: string
+                  enum: [authorization_code, refresh_token]
+                code:
+                  type: string
+                refresh_token:
+                  type: string
+                code_verifier:
+                  type: string
+      responses:
+        '200':
+          description: Token response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # Emails
+  # ============================================================================
+  /emails:
+    get:
+      tags: [Emails]
+      summary: List emails
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: folder
+          in: query
+          schema:
+            type: string
+            default: inbox
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 100
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: q
+          in: query
+          description: Search query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: unread
+          in: query
+          schema:
+            type: boolean
+        - name: starred
+          in: query
+          schema:
+            type: boolean
+        - name: has_attachment
+          in: query
+          schema:
+            type: boolean
+        - name: trust_min
+          in: query
+          description: Minimum trust score (0-1)
+          schema:
+            type: number
+            minimum: 0
+            maximum: 1
+      responses:
+        '200':
+          description: Email list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailListResponse'
+
+    post:
+      tags: [Emails]
+      summary: Send email
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendEmailRequest'
+      responses:
+        '201':
+          description: Email sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Email'
+
+  /emails/{id}:
+    get:
+      tags: [Emails]
+      summary: Get email by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Email details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailFull'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Emails]
+      summary: Update email
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmailRequest'
+      responses:
+        '200':
+          description: Email updated
+
+    delete:
+      tags: [Emails]
+      summary: Delete email
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Email deleted
+
+  /emails/batch:
+    post:
+      tags: [Emails]
+      summary: Batch email operations
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchEmailRequest'
+      responses:
+        '200':
+          description: Batch operation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchResult'
+
+  # ============================================================================
+  # Trust
+  # ============================================================================
+  /trust/score:
+    get:
+      tags: [Trust]
+      summary: Get trust score for email
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema:
+            type: string
+            format: email
+      responses:
+        '200':
+          description: Trust score
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustScore'
+
+  /trust/attestations:
+    get:
+      tags: [Trust]
+      summary: List attestations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: about
+          in: query
+          description: Get attestations about this email
+          schema:
+            type: string
+        - name: by
+          in: query
+          description: Get attestations made by this email
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Attestation list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Attestation'
+
+    post:
+      tags: [Trust]
+      summary: Create attestation
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAttestationRequest'
+      responses:
+        '201':
+          description: Attestation created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attestation'
+
+  /trust/path:
+    get:
+      tags: [Trust]
+      summary: Find trust path
+      description: Find the shortest trust path between two users
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trust path
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrustPath'
+
+  # ============================================================================
+  # Contacts
+  # ============================================================================
+  /contacts:
+    get:
+      tags: [Contacts]
+      summary: List contacts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Contact list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contact'
+
+    post:
+      tags: [Contacts]
+      summary: Create contact
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContactRequest'
+      responses:
+        '201':
+          description: Contact created
+
+  # ============================================================================
+  # Workflows
+  # ============================================================================
+  /workflows:
+    get:
+      tags: [Workflows]
+      summary: List workflows
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Workflow list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Workflow'
+
+    post:
+      tags: [Workflows]
+      summary: Create workflow
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkflowRequest'
+      responses:
+        '201':
+          description: Workflow created
+
+  /workflows/{id}/test:
+    post:
+      tags: [Workflows]
+      summary: Test workflow
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TestWorkflowRequest'
+      responses:
+        '200':
+          description: Test result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowTestResult'
+
+  # ============================================================================
+  # ML / AI
+  # ============================================================================
+  /ml/analyze:
+    post:
+      tags: [Emails]
+      summary: Analyze email with ML
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalyzeEmailRequest'
+      responses:
+        '200':
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmailAnalysis'
+
+  /ml/draft:
+    post:
+      tags: [Emails]
+      summary: Generate email draft
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DraftRequest'
+      responses:
+        '200':
+          description: Generated draft
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DraftResponse'
+
+  /ml/summarize:
+    post:
+      tags: [Emails]
+      summary: Summarize email thread
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SummarizeRequest'
+      responses:
+        '200':
+          description: Summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SummaryResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+          example: Bearer
+        expires_in:
+          type: integer
+        refresh_token:
+          type: string
+        scope:
+          type: string
+
+    Email:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        threadId:
+          type: string
+        from:
+          $ref: '#/components/schemas/EmailAddress'
+        to:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailAddress'
+        subject:
+          type: string
+        preview:
+          type: string
+        isRead:
+          type: boolean
+        isStarred:
+          type: boolean
+        hasAttachments:
+          type: boolean
+        receivedAt:
+          type: string
+          format: date-time
+        trustScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        labels:
+          type: array
+          items:
+            type: string
+
+    EmailFull:
+      allOf:
+        - $ref: '#/components/schemas/Email'
+        - type: object
+          properties:
+            cc:
+              type: array
+              items:
+                $ref: '#/components/schemas/EmailAddress'
+            bcc:
+              type: array
+              items:
+                $ref: '#/components/schemas/EmailAddress'
+            bodyHtml:
+              type: string
+            bodyText:
+              type: string
+            attachments:
+              type: array
+              items:
+                $ref: '#/components/schemas/Attachment'
+            headers:
+              type: object
+              additionalProperties:
+                type: string
+
+    EmailAddress:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+        filename:
+          type: string
+        contentType:
+          type: string
+        size:
+          type: integer
+        url:
+          type: string
+          format: uri
+
+    EmailListResponse:
+      type: object
+      properties:
+        emails:
+          type: array
+          items:
+            $ref: '#/components/schemas/Email'
+        cursor:
+          type: string
+        hasMore:
+          type: boolean
+
+    SendEmailRequest:
+      type: object
+      required: [to, subject]
+      properties:
+        to:
+          type: array
+          items:
+            type: string
+            format: email
+        cc:
+          type: array
+          items:
+            type: string
+            format: email
+        bcc:
+          type: array
+          items:
+            type: string
+            format: email
+        subject:
+          type: string
+        bodyHtml:
+          type: string
+        bodyText:
+          type: string
+        replyTo:
+          type: string
+        attachments:
+          type: array
+          items:
+            type: string
+            format: uuid
+        encrypt:
+          type: boolean
+          default: true
+          description: Use PQE encryption
+
+    UpdateEmailRequest:
+      type: object
+      properties:
+        isRead:
+          type: boolean
+        isStarred:
+          type: boolean
+        labels:
+          type: array
+          items:
+            type: string
+        folder:
+          type: string
+
+    BatchEmailRequest:
+      type: object
+      required: [ids, action]
+      properties:
+        ids:
+          type: array
+          items:
+            type: string
+        action:
+          type: string
+          enum: [markRead, markUnread, star, unstar, archive, delete, move]
+        folder:
+          type: string
+
+    BatchResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        count:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: string
+
+    TrustScore:
+      type: object
+      properties:
+        email:
+          type: string
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        attestations:
+          type: integer
+        pathLength:
+          type: integer
+        breakdown:
+          type: object
+          properties:
+            direct:
+              type: number
+            network:
+              type: number
+            behavior:
+              type: number
+        lastUpdated:
+          type: string
+          format: date-time
+
+    Attestation:
+      type: object
+      properties:
+        id:
+          type: string
+        attester:
+          type: string
+        subject:
+          type: string
+        type:
+          type: string
+          enum: [professional, personal, verified, vouched]
+        score:
+          type: number
+        comment:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+
+    CreateAttestationRequest:
+      type: object
+      required: [subject, type, score]
+      properties:
+        subject:
+          type: string
+          format: email
+        type:
+          type: string
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        comment:
+          type: string
+        expiresIn:
+          type: integer
+          description: Expiration in days
+
+    TrustPath:
+      type: object
+      properties:
+        found:
+          type: boolean
+        length:
+          type: integer
+        path:
+          type: array
+          items:
+            type: object
+            properties:
+              email:
+                type: string
+              trustScore:
+                type: number
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        name:
+          type: string
+        avatarUrl:
+          type: string
+        trustScore:
+          type: number
+        lastInteraction:
+          type: string
+          format: date-time
+        tags:
+          type: array
+          items:
+            type: string
+
+    CreateContactRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+
+    Workflow:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        trigger:
+          type: object
+        conditions:
+          type: array
+          items:
+            type: object
+        actions:
+          type: array
+          items:
+            type: object
+        enabled:
+          type: boolean
+        lastRun:
+          type: string
+          format: date-time
+
+    CreateWorkflowRequest:
+      type: object
+      required: [name, trigger, actions]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        trigger:
+          type: object
+        conditions:
+          type: array
+          items:
+            type: object
+        actions:
+          type: array
+          items:
+            type: object
+
+    TestWorkflowRequest:
+      type: object
+      properties:
+        sampleEmail:
+          $ref: '#/components/schemas/Email'
+
+    WorkflowTestResult:
+      type: object
+      properties:
+        matched:
+          type: boolean
+        conditionResults:
+          type: array
+          items:
+            type: object
+        actionsToExecute:
+          type: array
+          items:
+            type: string
+
+    AnalyzeEmailRequest:
+      type: object
+      required: [email]
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+
+    EmailAnalysis:
+      type: object
+      properties:
+        spam:
+          type: object
+          properties:
+            isSpam:
+              type: boolean
+            confidence:
+              type: number
+            reasons:
+              type: array
+              items:
+                type: string
+        phishing:
+          type: object
+          properties:
+            isPhishing:
+              type: boolean
+            riskLevel:
+              type: string
+            indicators:
+              type: array
+              items:
+                type: object
+        category:
+          type: object
+          properties:
+            primary:
+              type: string
+            suggestions:
+              type: array
+              items:
+                type: string
+        meeting:
+          type: object
+          properties:
+            detected:
+              type: boolean
+            title:
+              type: string
+            datetime:
+              type: string
+            location:
+              type: string
+
+    DraftRequest:
+      type: object
+      required: [intent]
+      properties:
+        context:
+          type: string
+        intent:
+          type: string
+        tone:
+          type: string
+          enum: [professional, casual, formal, friendly]
+        recipientInfo:
+          type: string
+
+    DraftResponse:
+      type: object
+      properties:
+        subject:
+          type: string
+        body:
+          type: string
+        suggestions:
+          type: array
+          items:
+            type: string
+        confidence:
+          type: number
+
+    SummarizeRequest:
+      type: object
+      required: [threadId]
+      properties:
+        threadId:
+          type: string
+        maxLength:
+          type: integer
+
+    SummaryResponse:
+      type: object
+      properties:
+        summary:
+          type: string
+        keyPoints:
+          type: array
+          items:
+            type: string
+        actionItems:
+          type: array
+          items:
+            type: string
+
+  responses:
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              message:
+                type: string
+
+security:
+  - bearerAuth: []

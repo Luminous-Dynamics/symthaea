@@ -1,0 +1,80 @@
+---
+# Holochain hApp Manifest
+# ZeroTrustML Identity - Decentralized Identity Management for ML Agents
+
+manifest_version: "1"
+name: zerotrustml-identity
+description: |
+  Decentralized identity management for AI/ML agents operating within the
+  Mycelix-Core ecosystem. Provides cryptographic identity binding, capability
+  delegation, and agent lifecycle management on Holochain.
+
+roles:
+  - id: identity_core
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/zerotrustml-identity.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          # Identity configuration
+          identity_expiry_days: 365
+          max_delegation_depth: 3
+          require_attestation: true
+          # Cryptographic settings
+          signature_scheme: ed25519
+          hash_algorithm: blake3
+        origin_time: ~
+      version: ~
+      clone_limit: 0
+
+  - id: capability_tokens
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      bundled: ../dist/dnas/capability-tokens.dna
+      modifiers:
+        network_seed: ~
+        properties:
+          token_ttl_hours: 24
+          revocation_enabled: true
+          capability_inheritance: true
+        origin_time: ~
+      version: ~
+      clone_limit: 10
+
+# Membrane proofs for network access control
+membrane_proofs:
+  identity_core: null  # Open membership for identity creation
+  capability_tokens: null
+
+# hApp-level metadata
+meta:
+  author: Mycelix Core Team
+  repository: https://github.com/Luminous-Dynamics/Mycelix-Core
+  license: Apache-2.0
+  version: "0.1.0"
+  holochain_version: "0.3.x"
+
+  # Integration points
+  integrations:
+    - zerotrustml-reputation
+    - zerotrustml-governance
+
+  # Zome entry points
+  entry_points:
+    create_identity:
+      zome: identity_core
+      fn: create_agent_identity
+      description: Create a new ML agent identity
+    delegate_capability:
+      zome: capability_tokens
+      fn: delegate_capability
+      description: Delegate a capability to another agent
+    verify_identity:
+      zome: identity_core
+      fn: verify_agent_identity
+      description: Cryptographically verify an agent identity

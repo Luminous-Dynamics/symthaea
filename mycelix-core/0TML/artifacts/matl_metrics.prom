@@ -1,0 +1,2 @@
+# HELP matl_detection_rate_percent Final detection rate per attack scenario.
+# TYPE matl_detection_rate_percent gauge

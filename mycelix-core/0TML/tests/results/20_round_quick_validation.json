@@ -1,0 +1,12 @@
+{
+  "summary": {
+    "total_rounds": 20,
+    "successful_rounds": 20,
+    "detection_rate": 1.0,
+    "avg_latency_ms": 7.066837279126048,
+    "memory_growth_mb": 0.0,
+    "convergence": true,
+    "all_targets_met": true
+  },
+  "timestamp": "2026-01-08T11:52:35.955892"
+}

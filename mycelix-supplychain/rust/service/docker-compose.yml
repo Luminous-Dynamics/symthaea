@@ -1,0 +1,113 @@
+version: '3.8'
+
+services:
+  # Provenance service
+  provenance-service:
+    build:
+      context: ..
+      dockerfile: service/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      # Server configuration
+      - BIND_ADDRESS=0.0.0.0:8080
+
+      # Database configuration (using PostgreSQL for production-like setup)
+      - DATABASE_URL=postgresql://mycelix:${POSTGRES_PASSWORD}@postgres:5432/provenance
+      - DB_MAX_CONNECTIONS=10
+      - DB_CONNECT_TIMEOUT=30
+
+      # Security configuration
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
+      - PERMISSIVE_CORS=false
+
+      # Rate limiting
+      - RATE_LIMIT_RPS=100
+      - RATE_LIMIT_BURST=20
+
+      # Observability
+      - RUST_LOG=info
+      - JSON_LOGS=false
+      - REQUEST_TRACING=true
+
+      # Environment
+      - RUST_ENV=development
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health/live"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # PostgreSQL database (production-like setup)
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=provenance
+      - POSTGRES_USER=mycelix
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mycelix"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    depends_on:
+      - provenance-service
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for visualization
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - mycelix-network
+    profiles:
+      - monitoring
+
+volumes:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  mycelix-network:
+    driver: bridge

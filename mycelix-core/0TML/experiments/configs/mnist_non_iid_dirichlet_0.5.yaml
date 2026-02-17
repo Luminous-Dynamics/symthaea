@@ -1,0 +1,56 @@
+# Non-IID Experiment: Dirichlet Distribution (Moderately Non-IID)
+# Alpha = 0.5 provides a balanced non-IID scenario
+# Expected: FedAvg works reasonably, SCAFFOLD still better
+
+experiment_name: "mnist_non_iid_dirichlet_0.5"
+output_dir: "results/non_iid"
+
+dataset:
+  name: "mnist"
+  data_dir: "datasets"
+
+model:
+  architecture: "simple_cnn"
+  params:
+    num_classes: 10
+
+data_split:
+  type: "dirichlet"
+  alpha: 0.5  # Moderately non-IID (balanced heterogeneity)
+  seed: 42
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  learning_rate: 0.01
+  local_epochs: 1
+  fraction_clients: 1.0  # Use all clients each round
+
+training:
+  num_rounds: 150  # Non-IID needs more rounds than IID
+  eval_every: 10
+  device: "cuda"  # GPU acceleration
+
+baselines:
+  - fedavg     # Baseline - should work reasonably
+  - fedprox    # Proximal term helps with heterogeneity
+  - scaffold   # Control variates - should still excel
+  - krum       # Byzantine-robust (for comparison)
+  - multikrum  # Multi-gradient averaging
+
+# Expected Results:
+# - FedAvg: Reasonable convergence, ~96-97% final accuracy
+# - FedProx: 3-5% better than FedAvg
+# - SCAFFOLD: 2-3x faster convergence, ~98% accuracy
+# - Krum/Multi-Krum: Competitive with FedAvg
+
+# Comparison with alpha=0.1:
+# - Faster convergence across all methods
+# - Smaller accuracy gap between baselines
+# - Less client variance
+
+# Key Metrics to Track:
+# - Convergence speed vs alpha=0.1 and IID
+# - Final test accuracy
+# - Per-client accuracy variance (medium)
+# - Communication cost

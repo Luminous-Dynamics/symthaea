@@ -1,0 +1,196 @@
+{
+  "timestamp": "2025-09-26T11:53:55.256202",
+  "configuration": {
+    "num_workers": 5,
+    "gradient_dim": 100,
+    "holochain_state": "error"
+  },
+  "summary": {
+    "total_rounds": 10,
+    "detection_rate": 0.5,
+    "avg_round_time": 0.03338987827301025,
+    "dht_operations": 0
+  },
+  "rounds": [
+    {
+      "round": 1,
+      "time": 0.009675264358520508,
+      "byzantine_nodes": [
+        4
+      ],
+      "detected_nodes": [],
+      "detection_success": false,
+      "attack_type": "unknown",
+      "global_model_hash": "7121a971caae64a6",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 1,
+        "hit_rate": 0.0,
+        "size": 1
+      }
+    },
+    {
+      "round": 2,
+      "time": 0.0358424186706543,
+      "byzantine_nodes": [
+        4
+      ],
+      "detected_nodes": [
+        4
+      ],
+      "detection_success": true,
+      "attack_type": "unknown",
+      "global_model_hash": "e9e0fdb52c547313",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 2,
+        "hit_rate": 0.0,
+        "size": 2
+      }
+    },
+    {
+      "round": 3,
+      "time": 0.03753304481506348,
+      "byzantine_nodes": [
+        2
+      ],
+      "detected_nodes": [],
+      "detection_success": false,
+      "attack_type": "unknown",
+      "global_model_hash": "a6e3bca7aa0f6102",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 3,
+        "hit_rate": 0.0,
+        "size": 3
+      }
+    },
+    {
+      "round": 4,
+      "time": 0.038543701171875,
+      "byzantine_nodes": [
+        2
+      ],
+      "detected_nodes": [
+        2
+      ],
+      "detection_success": true,
+      "attack_type": "unknown",
+      "global_model_hash": "155fa12ed3bc5525",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 4,
+        "hit_rate": 0.0,
+        "size": 4
+      }
+    },
+    {
+      "round": 5,
+      "time": 0.03631114959716797,
+      "byzantine_nodes": [
+        4
+      ],
+      "detected_nodes": [
+        4
+      ],
+      "detection_success": true,
+      "attack_type": "unknown",
+      "global_model_hash": "0786445aff860cdc",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 5,
+        "hit_rate": 0.0,
+        "size": 5
+      }
+    },
+    {
+      "round": 6,
+      "time": 0.03426313400268555,
+      "byzantine_nodes": [
+        2
+      ],
+      "detected_nodes": [],
+      "detection_success": false,
+      "attack_type": "unknown",
+      "global_model_hash": "603839198cb01a4a",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 6,
+        "hit_rate": 0.0,
+        "size": 6
+      }
+    },
+    {
+      "round": 7,
+      "time": 0.03279447555541992,
+      "byzantine_nodes": [
+        0
+      ],
+      "detected_nodes": [
+        0
+      ],
+      "detection_success": true,
+      "attack_type": "unknown",
+      "global_model_hash": "a2c49587152f4c0b",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 7,
+        "hit_rate": 0.0,
+        "size": 7
+      }
+    },
+    {
+      "round": 8,
+      "time": 0.03517889976501465,
+      "byzantine_nodes": [
+        1
+      ],
+      "detected_nodes": [],
+      "detection_success": false,
+      "attack_type": "unknown",
+      "global_model_hash": "52e36af5ad321583",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 8,
+        "hit_rate": 0.0,
+        "size": 8
+      }
+    },
+    {
+      "round": 9,
+      "time": 0.037358999252319336,
+      "byzantine_nodes": [
+        4
+      ],
+      "detected_nodes": [],
+      "detection_success": false,
+      "attack_type": "unknown",
+      "global_model_hash": "24381ae719a44276",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 9,
+        "hit_rate": 0.0,
+        "size": 9
+      }
+    },
+    {
+      "round": 10,
+      "time": 0.036397695541381836,
+      "byzantine_nodes": [
+        0
+      ],
+      "detected_nodes": [
+        0
+      ],
+      "detection_success": true,
+      "attack_type": "unknown",
+      "global_model_hash": "01f0fc46148cc3f4",
+      "cache_stats": {
+        "hits": 0,
+        "misses": 10,
+        "hit_rate": 0.0,
+        "size": 10
+      }
+    }
+  ]
+}

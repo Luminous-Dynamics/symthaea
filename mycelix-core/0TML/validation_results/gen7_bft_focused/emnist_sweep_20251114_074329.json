@@ -1,0 +1,85 @@
+{
+  "results": [
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.35,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.36,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.4,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    },
+    {
+      "seed": 101,
+      "byz_frac": 0.45,
+      "aggregator": "aegis_gen7",
+      "clean_acc": 0.0,
+      "auc": 0.0,
+      "wall_time": 0.0,
+      "status": "error",
+      "error": "run_fl() got an unexpected keyword argument 'fl_data'"
+    }
+  ],
+  "dataset": "EMNIST"
+}

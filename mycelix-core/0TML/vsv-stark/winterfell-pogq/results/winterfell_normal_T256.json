@@ -1,0 +1,49 @@
+{
+  "backend": "Winterfell",
+  "scenario": "normal",
+  "trace_length": 256,
+  "rounds": 10,
+  "prove_times_ms": [
+    21,
+    19,
+    19,
+    17,
+    15,
+    17,
+    20,
+    17,
+    16,
+    18
+  ],
+  "verify_times_ms": [
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1,
+    1
+  ],
+  "proof_sizes_bytes": [
+    34484,
+    34484,
+    34484,
+    34484,
+    34484,
+    34484,
+    34484,
+    34484,
+    34484,
+    34484
+  ],
+  "mean_prove_ms": 17.9,
+  "std_prove_ms": 1.7578395831246947,
+  "p95_prove_ms": 21,
+  "mean_verify_ms": 1.0,
+  "std_verify_ms": 0.0,
+  "p95_verify_ms": 1,
+  "mean_proof_size_kb": 33.67578125
+}

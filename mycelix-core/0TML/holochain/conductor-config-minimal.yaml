@@ -1,0 +1,25 @@
+---
+# ZeroTrustML Holochain Conductor - Minimal Working Config
+# Based on holochain --create-config output
+
+data_root_path: /data/holochain-zerotrustml
+
+network:
+  bootstrap_url: https://dev-test-bootstrap2.holochain.org/
+  signal_url: wss://dev-test-bootstrap2.holochain.org/
+  target_arc_factor: 1
+
+# Admin interface - BIND TO 0.0.0.0 for external access
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      bind_address: "0.0.0.0"  # Allow external connections
+      allowed_origins: '*'
+
+# Keystore
+keystore:
+  type: lair_server_in_proc
+  lair_root: /data/holochain-zerotrustml/lair
+
+db_sync_strategy: Fast

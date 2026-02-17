@@ -1,0 +1,237 @@
+name: Production Validation
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: '0 2 * * *'  # Nightly at 2 AM UTC
+  workflow_dispatch:
+
+concurrency:
+  group: production-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-tests:
+    runs-on: ubuntu-latest
+    name: Security & Input Validation
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Poetry
+        run: pip install poetry
+      
+      - name: Install dependencies
+        run: poetry install --with dev --extras cpu
+        working-directory: 0TML
+      
+      - name: Run security tests
+        run: poetry run pytest tests/unit/security/ -v --tb=short
+        working-directory: 0TML
+
+  unit-tests-with-coverage:
+    runs-on: ubuntu-latest
+    name: Unit Tests with Coverage
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Poetry
+        run: pip install poetry
+      
+      - name: Install dependencies
+        run: poetry install --with dev --extras cpu
+        working-directory: 0TML
+      
+      - name: Run unit tests with coverage
+        run: |
+          poetry run pytest tests/unit/ -v \
+            --cov=zerotrustml \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            --cov-fail-under=60
+        working-directory: 0TML
+      
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: 0TML/coverage.xml
+          flags: unit-tests
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+  integration-tests:
+    runs-on: ubuntu-latest
+    name: Integration Tests
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: mycelix
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: mycelix_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Poetry
+        run: pip install poetry
+      
+      - name: Install dependencies
+        run: poetry install --with dev --extras cpu
+        working-directory: 0TML
+      
+      - name: Run integration tests
+        run: poetry run pytest tests/integration/ -v -m "not holochain and not ethereum" --tb=short
+        working-directory: 0TML
+        env:
+          REDIS_URL: redis://localhost:6379
+          DATABASE_URL: postgresql://mycelix:testpass@localhost:5432/mycelix_test
+
+  byzantine-tolerance:
+    runs-on: ubuntu-latest
+    name: Byzantine Tolerance Validation
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Poetry
+        run: pip install poetry
+      
+      - name: Install dependencies
+        run: poetry install --with dev --extras cpu
+        working-directory: 0TML
+      
+      - name: Run Byzantine detection tests
+        run: poetry run pytest tests/security/byzantine/ -v --tb=short
+        working-directory: ..
+      
+      - name: Run 40% Byzantine tolerance test
+        run: poetry run pytest tests/scenarios/ -v -k "byzantine" --tb=short
+        working-directory: 0TML
+
+  contract-tests:
+    runs-on: ubuntu-latest
+    name: Smart Contract Tests
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+      
+      - name: Run Forge tests
+        run: forge test -vvv
+        working-directory: contracts
+      
+      - name: Check gas snapshots
+        run: forge snapshot --check
+        working-directory: contracts
+        continue-on-error: true
+
+  nightly-validation:
+    runs-on: ubuntu-latest
+    name: 100-Round Validation
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    needs: [security-tests, unit-tests-with-coverage, byzantine-tolerance]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      
+      - name: Install Poetry
+        run: pip install poetry
+      
+      - name: Install dependencies
+        run: poetry install --with dev --extras cpu
+        working-directory: 0TML
+      
+      - name: Run 100-round validation
+        run: poetry run pytest tests/ -v -m "validation" --tb=short
+        working-directory: 0TML
+        timeout-minutes: 30
+        env:
+          RUN_100_ROUND_VALIDATION: "1"
+      
+      - name: Upload validation artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: validation-results
+          path: |
+            0TML/validation_results.json
+            0TML/convergence_plots/
+          retention-days: 30
+
+  homomorphic-encryption-tests:
+    runs-on: ubuntu-latest
+    name: Homomorphic Encryption Tests
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: dtolnay/rust-toolchain@stable
+      
+      - name: Run HE library tests
+        run: cargo test --release
+        working-directory: libs/homomorphic-encryption
+      
+      - name: Run HE benchmarks (quick)
+        run: cargo bench -- --sample-size 10 --warm-up-time 1
+        working-directory: libs/homomorphic-encryption
+        continue-on-error: true
+
+  all-checks-passed:
+    runs-on: ubuntu-latest
+    name: All Checks Passed
+    needs: [security-tests, unit-tests-with-coverage, integration-tests, byzantine-tolerance, contract-tests]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          if [ "${{ needs.security-tests.result }}" != "success" ] || \
+             [ "${{ needs.unit-tests-with-coverage.result }}" != "success" ] || \
+             [ "${{ needs.integration-tests.result }}" != "success" ] || \
+             [ "${{ needs.byzantine-tolerance.result }}" != "success" ] || \
+             [ "${{ needs.contract-tests.result }}" != "success" ]; then
+            echo "One or more required checks failed"
+            exit 1
+          fi
+          echo "All production validation checks passed!"

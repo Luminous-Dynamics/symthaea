@@ -1,0 +1,16 @@
+# Cargo configuration for Holochain WASM builds
+#
+# This file configures the build for wasm32-unknown-unknown target,
+# which is required for Holochain zomes.
+#
+# IMPORTANT: Use "custom" backend, NOT "wasm_js". The wasm_js backend
+# pulls in wasm-bindgen which is incompatible with Holochain's WASM runtime.
+# HDK 0.6 provides __getrandom_v03_custom.
+
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="custom"']
+
+[build]
+# Set the default target for this workspace
+# Uncomment if you want WASM to be the default build target
+# target = "wasm32-unknown-unknown"

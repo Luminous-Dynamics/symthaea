@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: provenance-service-config
+  namespace: mycelix
+  labels:
+    app: provenance-service
+    component: config
+data:
+  # Server configuration
+  BIND_ADDRESS: "0.0.0.0:8080"
+  MAX_BODY_SIZE: "5242880"  # 5MB
+
+  # Security configuration
+  ALLOWED_ORIGINS: "https://app.example.com,https://dashboard.example.com"
+  PERMISSIVE_CORS: "false"
+
+  # Rate limiting
+  RATE_LIMIT_RPS: "100"
+  RATE_LIMIT_BURST: "20"
+
+  # Observability
+  RUST_LOG: "info"
+  JSON_LOGS: "true"
+  REQUEST_TRACING: "true"
+  RUST_ENV: "production"
+
+  # Database configuration
+  DB_MAX_CONNECTIONS: "20"
+  DB_CONNECT_TIMEOUT: "30"

@@ -1,0 +1,25 @@
+---
+# ZeroTrustML Holochain Conductor - Config with bind_address to accept external connections
+# This version binds to 0.0.0.0 to allow Docker port mapping to work
+
+data_root_path: /data/holochain-zerotrustml
+
+network:
+  bootstrap_url: https://dev-test-bootstrap2.holochain.org/
+  signal_url: wss://dev-test-bootstrap2.holochain.org/
+  target_arc_factor: 1
+
+# Admin interface - WITH bind_address set to 0.0.0.0 for Docker compatibility
+admin_interfaces:
+  - driver:
+      type: websocket
+      port: 8888
+      bind_address: "0.0.0.0"
+      allowed_origins: '*'
+
+# Keystore
+keystore:
+  type: lair_server_in_proc
+  lair_root: /data/holochain-zerotrustml/lair
+
+db_sync_strategy: Fast

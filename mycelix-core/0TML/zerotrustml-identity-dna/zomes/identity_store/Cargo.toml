@@ -1,0 +1,18 @@
+[package]
+name = "identity_store"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "identity_store"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1.0"
+holochain_serialized_bytes = "0.0.56"
+
+# Ed25519 signature verification
+ed25519-dalek = { version = "2.1", default-features = false, features = ["alloc"] }
+bs58 = "0.5"  # For multibase (base58btc) decoding

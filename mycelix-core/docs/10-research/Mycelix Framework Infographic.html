@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mycelix: An OS Framework for Realities</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #F0F4F8;
+            color: #102A43;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 500px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 350px;
+            max-height: 400px;
+        }
+        @media (min-width: 768px) {
+            .chart-container {
+                height: 400px;
+            }
+        }
+        .connector-line {
+            width: 2px;
+            background-color: #9FB3C8;
+            margin: 0 auto;
+        }
+        .connector-arrow {
+            width: 0;
+            height: 0;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: 12px solid #9FB3C8;
+            margin: 0 auto;
+        }
+        .card {
+            background-color: #FFFFFF;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        }
+         .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.1);
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8">
+
+        <section id="hero" class="text-center py-20 sm:py-24">
+            <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-[#102A43]">
+                Mycelix
+            </h1>
+            <p class="mt-4 text-xl sm:text-2xl font-semibold text-[#3E6280]">An OS Framework for Realities</p>
+            <p class="mt-6 max-w-3xl mx-auto text-lg text-[#486581]">
+                A roadmap-aware, hybrid DLT meta-framework designed for sovereignty, security, and scalability. Mycelix provides the tools to build humane, meritocratic, and resilient decentralized applications across any industry.
+            </p>
+
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+                <div class="card">
+                    <p class="text-5xl font-bold text-[#24A19C]">10x</p>
+                    <p class="mt-2 text-lg font-semibold text-[#102A43]">Throughput Scalability</p>
+                    <p class="mt-1 text-sm text-[#486581]">Enhanced via adaptive DHT sharding and ZK-Rollups.</p>
+                </div>
+                <div class="card">
+                    <p class="text-5xl font-bold text-[#24A19C]">45%</p>
+                    <p class="mt-2 text-lg font-semibold text-[#102A43]">Byzantine Fault Tolerance</p>
+                    <p class="mt-1 text-sm text-[#486581]">Exceeding industry standards with PoGQ + Reputation weighting.</p>
+                </div>
+                <div class="card">
+                    <p class="text-5xl font-bold text-[#24A19C]">5x</p>
+                    <p class="mt-2 text-lg font-semibold text-[#102A43]">Developer Onboarding</p>
+                    <p class="mt-1 text-sm text-[#486581]">Accelerated with modular SDKs and standardized interfaces.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="architecture" class="py-16 sm:py-20">
+            <h2 class="text-3xl font-bold text-center text-[#102A43]">Roadmap-Aware Architecture</h2>
+            <p class="mt-4 max-w-3xl mx-auto text-center text-lg text-[#486581]">
+                Mycelix is built in layers, allowing for pragmatic deployment today while paving a clear path to advanced, privacy-preserving infrastructure for tomorrow. Each layer is modular and evolvable.
+            </p>
+
+            <div class="mt-12 flex flex-col items-center space-y-2">
+                <div class="w-full max-w-2xl text-center border-2 border-[#9FB3C8] rounded-lg p-4 bg-white shadow-md">
+                    <h3 class="font-bold text-lg text-[#102A43]">Industry Adapters Layer</h3>
+                    <p class="text-sm text-[#486581]">Federated Learning, Healthcare, Energy Grid...</p>
+                    <p class="text-xs mt-1 font-mono text-[#829AB1]">Phase 2+: Intent-centric via IBC</p>
+                </div>
+                <div class="connector-line h-8"></div>
+                <div class="connector-arrow"></div>
+                <div class="connector-line h-8"></div>
+                <div class="w-full max-w-2xl text-center border-2 border-[#9FB3C8] rounded-lg p-4 bg-white shadow-md">
+                    <h3 class="font-bold text-lg text-[#102A43]">Meta-Core Services</h3>
+                    <p class="text-sm text-[#486581]">Reputation, Identity, Currency Exchange</p>
+                     <p class="text-xs mt-1 font-mono text-[#829AB1]">Phase 2+: QV Governance</p>
+                </div>
+                <div class="connector-line h-8"></div>
+                <div class="connector-arrow"></div>
+                <div class="connector-line h-8"></div>
+                <div class="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8">
+                     <div class="text-center border-2 border-[#9FB3C8] rounded-lg p-4 bg-white shadow-md">
+                        <h3 class="font-bold text-lg text-[#102A43]">Holochain (P2P Layer)</h3>
+                        <p class="text-sm text-[#486581]">Agent-Centric DHT, Source Chains</p>
+                         <p class="text-xs mt-1 font-mono text-[#829AB1]">Phase 2+: Adaptive Sharding</p>
+                     </div>
+                     <div class="text-center border-2 border-[#9FB3C8] rounded-lg p-4 bg-white shadow-md">
+                        <h3 class="font-bold text-lg text-[#102A43]">Layer-2 (Settlement)</h3>
+                        <p class="text-sm text-[#486581]">EVM Smart Contracts, DeFi</p>
+                        <p class="text-xs mt-1 font-mono text-[#829AB1]">Phase 2+: Diversified L2s (zkEVM)</p>
+                     </div>
+                </div>
+                <div class="connector-line h-8"></div>
+                <div class="connector-arrow"></div>
+                <div class="connector-line h-8"></div>
+                <div class="w-full max-w-2xl text-center border-2 border-[#9FB3C8] rounded-lg p-4 bg-white shadow-md">
+                    <h3 class="font-bold text-lg text-[#102A43]">Cross-Chain Bridge</h3>
+                    <p class="text-sm text-[#486581]">Merkle → ZK-Bridge → IBC</p>
+                    <p class="text-xs mt-1 font-mono text-[#829AB1]">Phased Evolution for Security</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="bridge" class="py-16 sm:py-20">
+            <h2 class="text-3xl font-bold text-center text-[#102A43]">The Evolutionary Cross-Chain Bridge</h2>
+            <p class="mt-4 max-w-3xl mx-auto text-center text-lg text-[#486581]">
+                The bridge is the heart of Mycelix's interoperability, designed with a phased architecture to balance immediate feasibility with long-term trustlessness and scalability.
+            </p>
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="card text-center">
+                    <div class="mx-auto bg-[#D9E2EC] text-[#3E6280] w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold">1</div>
+                    <h3 class="mt-4 text-xl font-bold">Phase 1: Verifiable</h3>
+                    <p class="mt-2 text-[#486581]">Merkle proofs combined with staked validators and optimistic fraud proofs. Provides robust economic and cryptographic security, ready for production today.</p>
+                </div>
+                <div class="card text-center">
+                    <div class="mx-auto bg-[#BCCCDC] text-[#3E6280] w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold">2</div>
+                    <h3 class="mt-4 text-xl font-bold">Phase 2: ZK-Powered</h3>
+                    <p class="mt-2 text-[#486581]">Upgrades to a trustless ZK-Rollup architecture using a hybrid SNARK/STARK selector. This eliminates validators, compresses data, and offers mathematical guarantees of correctness.</p>
+                </div>
+                <div class="card text-center">
+                    <div class="mx-auto bg-[#9FB3C8] text-[#102A43] w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold">3</div>
+                    <h3 class="mt-4 text-xl font-bold">Phase 3: Intent-Centric</h3>
+                    <p class="mt-2 text-[#486581]">Integrates Inter-Blockchain Communication (IBC) for seamless, trust-minimized, and intent-based cross-protocol flows, unlocking the full ecosystem.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="security" class="py-16 sm:py-20">
+             <h2 class="text-3xl font-bold text-center text-[#102A43]">A New Paradigm in Security</h2>
+            <p class="mt-4 max-w-3xl mx-auto text-center text-lg text-[#486581]">
+                Security is not a feature; it's the foundation. Mycelix employs a "Defense in Depth" strategy, combining economic incentives, advanced cryptography, and AI-powered monitoring.
+            </p>
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                <div class="card">
+                     <h3 class="text-xl font-bold text-center">Multi-Layered Defense Model</h3>
+                    <p class="mt-2 text-center text-sm text-[#486581]">
+                       The security model is holistic, ensuring resilience against a wide array of threats, from validator collusion to network partitions and quantum attacks.
+                    </p>
+                    <div class="chart-container mt-4">
+                        <canvas id="securityRadarChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="text-xl font-bold text-center">PoGQ + Reputation</h3>
+                    <p class="mt-4 text-7xl font-bold text-center text-[#24A19C]">45%</p>
+                    <p class="mt-2 text-2xl font-semibold text-center text-[#102A43]">Byzantine Fault Tolerance</p>
+                    <p class="mt-4 text-[#486581]">By validating contribution quality (PoGQ) and dynamically weighting influence by reputation, the framework can correctly operate even when up to 45% of nodes are malicious or faulty, significantly surpassing the industry standard of 33%.</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="performance" class="py-16 sm:py-20">
+            <h2 class="text-3xl font-bold text-center text-[#102A43]">Performance & Efficiency</h2>
+            <p class="mt-4 max-w-3xl mx-auto text-center text-lg text-[#486581]">
+                Mycelix's architecture is optimized for both performance and choice, allowing developers to select the right cryptographic tools for their specific needs.
+            </p>
+            <div class="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
+                 <div class="card">
+                    <h3 class="text-xl font-bold text-center">ZK-Proof Hybrid Selector</h3>
+                    <p class="mt-2 text-center text-sm text-[#486581]">
+                       Developers can choose between ZK-SNARKs for ultimate efficiency and ZK-STARKs for transparency and post-quantum security, tailoring the system to their application's threat model.
+                    </p>
+                    <div class="chart-container mt-4">
+                        <canvas id="zkBarChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3 class="text-xl font-bold text-center">DAO Treasury Governance</h3>
+                    <p class="mt-2 text-center text-sm text-[#486581]">
+                       Protocol fees are directed to a DAO treasury, governed by token and reputation holders. A dedicated portion is allocated to a "Red Team" for continuous security testing and anomaly hunting.
+                    </p>
+                     <div class="chart-container mt-4">
+                        <canvas id="treasuryDonutChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+    <footer class="text-center py-10">
+        <p class="text-[#486581]">Mycelix Framework | Q4 2025</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+
+            const wrapLabel = (label, maxLength = 16) => {
+                if (typeof label !== 'string' || label.length <= maxLength) {
+                    return label;
+                }
+                const words = label.split(' ');
+                const lines = [];
+                let currentLine = '';
+                for (const word of words) {
+                    if ((currentLine + ' ' + word).trim().length > maxLength) {
+                        lines.push(currentLine.trim());
+                        currentLine = word;
+                    } else {
+                        currentLine = (currentLine + ' ' + word).trim();
+                    }
+                }
+                if (currentLine) {
+                    lines.push(currentLine.trim());
+                }
+                return lines;
+            };
+
+            const tooltipTitleCallback = (tooltipItems) => {
+                const item = tooltipItems[0];
+                let label = item.chart.data.labels[item.dataIndex];
+                if (Array.isArray(label)) {
+                    return label.join(' ');
+                }
+                return label;
+            };
+
+            const brilliantBlues = {
+                darkBlue: '#102A43',
+                midBlue: '#3E6280',
+                lightBlue: '#829AB1',
+                teal: '#24A19C',
+                lightTeal: '#A0D5D3',
+                bgColor: 'rgba(36, 161, 156, 0.2)',
+                borderColor: 'rgba(36, 161, 156, 1)',
+            };
+
+            const initSecurityRadarChart = () => {
+                const ctx = document.getElementById('securityRadarChart')?.getContext('2d');
+                if (!ctx) return;
+
+                const labels = [
+                    'Economic Security',
+                    'Cryptographic Proofs',
+                    'AI-Enhanced Monitoring',
+                    wrapLabel('Formal Verification'),
+                    'High BFT (45%)'
+                ].map(l => typeof l === 'string' ? wrapLabel(l) : l);
+
+                new Chart(ctx, {
+                    type: 'radar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Defense Layer Strength',
+                            data: [90, 95, 85, 80, 98],
+                            backgroundColor: brilliantBlues.bgColor,
+                            borderColor: brilliantBlues.borderColor,
+                            pointBackgroundColor: brilliantBlues.borderColor,
+                            pointBorderColor: '#fff',
+                            pointHoverBackgroundColor: '#fff',
+                            pointHoverBorderColor: brilliantBlues.borderColor
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        scales: {
+                            r: {
+                                angleLines: { color: '#D9E2EC' },
+                                grid: { color: '#D9E2EC' },
+                                pointLabels: {
+                                    font: { size: 12, weight: '500' },
+                                    color: brilliantBlues.midBlue
+                                },
+                                ticks: {
+                                    backdropColor: 'transparent',
+                                    color: brilliantBlues.lightBlue,
+                                    stepSize: 20
+                                },
+                                suggestedMin: 0,
+                                suggestedMax: 100
+                            }
+                        },
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    title: tooltipTitleCallback
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            const initZkBarChart = () => {
+                const ctx = document.getElementById('zkBarChart')?.getContext('2d');
+                if (!ctx) return;
+
+                new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Verification Time (ms)', 'Proof Size (KB)'],
+                        datasets: [{
+                            label: 'ZK-SNARK',
+                            data: [10, 0.2],
+                            backgroundColor: brilliantBlues.borderColor,
+                            borderColor: brilliantBlues.borderColor,
+                            borderWidth: 1
+                        }, {
+                            label: 'ZK-STARK',
+                            data: [100, 30],
+                            backgroundColor: brilliantBlues.lightBlue,
+                            borderColor: brilliantBlues.lightBlue,
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: {
+                                    display: true,
+                                    text: 'Relative Value (Log Scale)',
+                                    color: brilliantBlues.midBlue
+                                },
+                                type: 'logarithmic',
+                                grid: { color: '#F0F4F8' },
+                                ticks: { color: brilliantBlues.lightBlue }
+                            },
+                            x: {
+                                grid: { display: false },
+                                ticks: { color: brilliantBlues.midBlue, font: { weight: '600' }}
+                            }
+                        },
+                        plugins: {
+                           legend: {
+                                position: 'top',
+                                labels: {
+                                    color: brilliantBlues.darkBlue
+                                }
+                           },
+                           tooltip: {
+                                callbacks: {
+                                    title: tooltipTitleCallback
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            const initTreasuryDonutChart = () => {
+                const ctx = document.getElementById('treasuryDonutChart')?.getContext('2d');
+                if (!ctx) return;
+
+                new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Protocol & Ecosystem', 'Red Team Security Fund'],
+                        datasets: [{
+                            label: 'Treasury Allocation',
+                            data: [95, 5],
+                            backgroundColor: [
+                                brilliantBlues.borderColor,
+                                brilliantBlues.lightBlue
+                            ],
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        maintainAspectRatio: false,
+                        cutout: '70%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: {
+                                    color: brilliantBlues.darkBlue,
+                                    padding: 20
+                                }
+                            },
+                           tooltip: {
+                                callbacks: {
+                                    title: tooltipTitleCallback
+                                }
+                            }
+                        }
+                    }
+                });
+            };
+
+            initSecurityRadarChart();
+            initZkBarChart();
+            initTreasuryDonutChart();
+        });
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,115 @@
+# Stage 1 Set B: Heterogeneity Analysis
+#
+# Research Goal: How does data heterogeneity affect Byzantine detection?
+#
+# Configuration:
+# - Data: 3 levels of heterogeneity (IID, Moderate, Extreme)
+# - Byzantine: 30% (3/10 clients)
+# - Attacks: 3 representative attacks (simple, sophisticated, coordinated)
+# - Defenses: Multi-Krum (best baseline), PoGQ (ours)
+#
+# Total: 3 data levels × 3 attacks × 2 defenses = 18 experiments
+#
+# Expected Outcome: Characterize degradation curve from IID → Extreme
+# Hypothesis: PoGQ maintains high accuracy even under extreme non-IID,
+#             while classical methods degrade
+
+experiment_name: "stage1_set_b_heterogeneity_analysis"
+description: "Analyze how data heterogeneity affects Byzantine detection performance"
+
+dataset:
+  name: "mnist"
+  num_train: 60000
+  num_test: 10000
+
+# CRITICAL: This will be run 3 times with different alpha values
+# - alpha = 100 (IID baseline)
+# - alpha = 1.0 (Moderate non-IID, 70/30 label skew)
+# - alpha = 0.1 (Extreme non-IID, 90/10 label skew)
+data_split:
+  type: "dirichlet"
+  alpha: 0.1  # Will be overridden for each run
+  num_clients: 10
+  seed: 42
+
+# Three separate experiment runs:
+heterogeneity_levels:
+  - name: "iid"
+    alpha: 100  # Approaches uniform (IID)
+    description: "Baseline control - uniform data distribution"
+
+  - name: "moderate"
+    alpha: 1.0  # Moderate heterogeneity
+    description: "Moderate non-IID (~70% of data from 5 classes per client)"
+
+  - name: "extreme"
+    alpha: 0.1  # Extreme heterogeneity
+    description: "Extreme non-IID (~90% of data from 2 classes per client)"
+
+training:
+  num_rounds: 50
+  local_epochs: 1
+  batch_size: 32
+  learning_rate: 0.01
+
+federated:
+  num_clients: 10
+  batch_size: 32
+  local_epochs: 1
+  num_rounds: 50
+  learning_rate: 0.01
+  fraction_clients: 1.0
+  num_byzantine: 3  # 30% Byzantine
+
+  quality_threshold: 0.3
+  reputation_decay: 0.95
+
+byzantine:
+  num_byzantine: 3
+
+  # Representative attacks across difficulty spectrum
+  attack_types:
+    - gaussian_noise  # Simple: baseline attack
+    - adaptive        # Sophisticated: evades distance-based detection
+    - sybil           # Coordinated: multiple clients collude
+
+  severity: 1.0
+  enable_peer_context: true
+
+baselines:
+  # Best classical baseline
+  - name: "multikrum"
+    params:
+      num_byzantine: 3
+      k: 7
+
+  # PoGQ+Reputation
+  - name: "pogq"
+    params:
+      quality_threshold: 0.3
+      reputation_decay: 0.95
+
+model:
+  type: "simple_cnn"
+  params:
+    num_classes: 10
+
+device: "cuda"
+
+save:
+  metrics:
+    - train_loss
+    - train_accuracy
+    - test_loss
+    - test_accuracy
+    - num_accepted
+    - avg_quality_score
+    - rejected_clients
+    - heterogeneity_level  # Track which alpha was used
+  per_round: true
+  final_model: false  # Don't save models for space
+  attack_analysis: true
+  degradation_curve: true  # Generate heterogeneity vs accuracy plot
+
+# Estimated time: 3 data levels × 3 attacks × 2 defenses × 50 rounds × ~10 min
+# = ~90 hours (can parallelize to ~30 hours)

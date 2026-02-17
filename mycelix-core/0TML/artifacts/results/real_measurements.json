@@ -1,0 +1,25 @@
+{
+  "timestamp": 1758934218.8268929,
+  "tests": {
+    "5_nodes": {
+      "avg_time_ms": 0.5273342132568359,
+      "throughput": 1896.330590469301,
+      "detection_accuracy": 0.0,
+      "privacy_spent": [
+        10.0,
+        0.0001
+      ]
+    },
+    "10_nodes": {
+      "avg_time_ms": 0.8346080780029297,
+      "throughput": 1198.1671713420558,
+      "detection_accuracy": 0.1,
+      "privacy_spent": [
+        10.0,
+        0.0001
+      ]
+    }
+  },
+  "implementation": "real",
+  "note": "Actual measurements, not simulations"
+}

@@ -1,0 +1,18 @@
+---
+manifest_version: "0"
+name: h-fl
+integrity:
+  uid: 
+  properties: ~
+  origin_time: "2025-09-25T00:00:00.000Z"
+  network_seed: ~
+  zomes:
+    - name: h_fl_integrity
+      bundled: dna/h_fl/h_fl.wasm
+      dependencies: []
+coordinator:
+  zomes:
+    - name: h_fl
+      bundled: dna/h_fl/h_fl.wasm
+      dependencies:
+        - name: h_fl_integrity

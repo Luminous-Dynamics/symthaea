@@ -1,0 +1,22 @@
+---
+# Mycelix Federated Learning DNA
+# Core Byzantine-resistant federated learning for Mycelix
+
+manifest_version: "0"
+name: federated_learning_mycelix
+integrity:
+  network_seed: ~
+  properties:
+    byzantine_tolerance: 0.45
+    defense_algorithm: "MATL"
+    min_participants: 5
+  zomes:
+    - name: federated_learning_integrity
+      path: target/wasm32-unknown-unknown/release/federated_learning_integrity.wasm
+
+coordinator:
+  zomes:
+    - name: federated_learning
+      path: target/wasm32-unknown-unknown/release/federated_learning.wasm
+      dependencies:
+        - name: federated_learning_integrity

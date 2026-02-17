@@ -1,0 +1,24 @@
+[package]
+name = "matl-bridge"
+version = "0.1.0"
+edition = "2021"
+description = "Multi-Agent Trust Layer bridge for Mycelix - connects Holochain DHT with external trust systems"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/luminous-dynamics/mycelix"
+
+[features]
+default = ["async"]
+async = ["tokio"]
+
+[dependencies]
+mycelix-core-types = { path = "../mycelix-core-types", features = ["serde"] }
+rb-bft-consensus = { path = "../rb-bft-consensus" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+# Error handling (standardized to 2.0 across workspace)
+thiserror = "2.0"
+tokio = { version = "1", features = ["sync", "time", "rt"], optional = true }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }

@@ -1,0 +1,49 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": [
+    "src/index.ts",
+    "src/holochain/index.ts"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "../../docs/api/typescript",
+  "name": "Mycelix Mail TypeScript SDK",
+  "includeVersion": true,
+  "readme": "README.md",
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "skipErrorChecking": true,
+  "categorizeByGroup": true,
+  "categoryOrder": [
+    "Core",
+    "Email",
+    "Contacts",
+    "Trust",
+    "Holochain",
+    "Other"
+  ],
+  "sort": [
+    "alphabetical",
+    "source-order"
+  ],
+  "navigation": {
+    "includeCategories": true,
+    "includeGroups": true
+  },
+  "searchInComments": true,
+  "navigationLinks": {
+    "GitHub": "https://github.com/luminous-dynamics/mycelix-mail",
+    "Guides": "../guides/getting-started.md"
+  },
+  "sidebarLinks": {
+    "Rust API": "../rust/index.html",
+    "Getting Started": "../../guides/getting-started.md"
+  },
+  "plugin": [
+    "typedoc-plugin-markdown"
+  ],
+  "theme": "default",
+  "hideGenerator": false,
+  "customCss": "",
+  "treatWarningsAsErrors": false
+}

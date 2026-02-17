@@ -1,0 +1,5 @@
+{
+  "aggregator": "median",
+  "adversary_rate": 0.2,
+  "seed": 202
+}

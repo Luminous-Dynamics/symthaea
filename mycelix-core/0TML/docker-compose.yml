@@ -1,0 +1,108 @@
+# ZeroTrustML Holochain - Docker Compose Configuration
+# Multi-node P2P federated learning network
+
+version: '3.8'
+
+services:
+  # Holochain conductor (shared DHT)
+  holochain:
+    image: holochain/holochain:latest
+    container_name: zerotrustml-holochain
+    ports:
+      - "8888:8888"
+    volumes:
+      - holochain-data:/data
+    networks:
+      - zerotrustml-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Node 1 - Hospital A
+  node1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zerotrustml-node1
+    depends_on:
+      - holochain
+    environment:
+      - ZEROTRUSTML_NODE_ID=hospital-a
+      - ZEROTRUSTML_DATA_PATH=/data
+      - ZEROTRUSTML_HOLOCHAIN_URL=ws://holochain:8888
+      - ZEROTRUSTML_AGGREGATION=krum
+    volumes:
+      - node1-data:/data
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # Node 2 - Hospital B
+  node2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zerotrustml-node2
+    depends_on:
+      - holochain
+    environment:
+      - ZEROTRUSTML_NODE_ID=hospital-b
+      - ZEROTRUSTML_DATA_PATH=/data
+      - ZEROTRUSTML_HOLOCHAIN_URL=ws://holochain:8888
+      - ZEROTRUSTML_AGGREGATION=krum
+    volumes:
+      - node2-data:/data
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # Node 3 - Hospital C
+  node3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zerotrustml-node3
+    depends_on:
+      - holochain
+    environment:
+      - ZEROTRUSTML_NODE_ID=hospital-c
+      - ZEROTRUSTML_DATA_PATH=/data
+      - ZEROTRUSTML_HOLOCHAIN_URL=ws://holochain:8888
+      - ZEROTRUSTML_AGGREGATION=krum
+    volumes:
+      - node3-data:/data
+    networks:
+      - zerotrustml-network
+    restart: unless-stopped
+
+  # Monitoring/Dashboard (optional)
+  monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: zerotrustml-monitor
+    depends_on:
+      - node1
+      - node2
+      - node3
+    environment:
+      - ZEROTRUSTML_MONITOR_MODE=true
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./monitoring:/app/monitoring
+    networks:
+      - zerotrustml-network
+    command: python -m zerotrustml.monitoring.dashboard
+
+networks:
+  zerotrustml-network:
+    driver: bridge
+
+volumes:
+  holochain-data:
+  node1-data:
+  node2-data:
+  node3-data:
