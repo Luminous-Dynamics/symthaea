@@ -13,6 +13,8 @@
 //!
 //! Updated to use HDK 0.6 patterns
 
+#![allow(clippy::unnecessary_sort_by)]
+
 use hdk::prelude::*;
 use governance_bridge_integrity::*;
 

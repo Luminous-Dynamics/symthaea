@@ -12,6 +12,8 @@
 //!
 //! See `EligibilityProof` and `cast_verified_vote` for details.
 
+#![allow(clippy::manual_clamp, clippy::manual_range_contains, clippy::unnecessary_cast)]
+
 use hdi::prelude::*;
 
 /// Anchor entry for deterministic link bases
@@ -1643,4 +1645,499 @@ fn validate_update_proposal_reflection(
     }
 
     Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
+// UNIT TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ========================================================================
+    // ProposalTier tests
+    // ========================================================================
+
+    #[test]
+    fn test_proposal_tier_phi_thresholds() {
+        assert!((ProposalTier::Basic.phi_threshold() - 0.3).abs() < f64::EPSILON);
+        assert!((ProposalTier::Major.phi_threshold() - 0.4).abs() < f64::EPSILON);
+        assert!((ProposalTier::Constitutional.phi_threshold() - 0.6).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_proposal_tier_quorum_requirements() {
+        assert!((ProposalTier::Basic.quorum_requirement() - 0.15).abs() < f64::EPSILON);
+        assert!((ProposalTier::Major.quorum_requirement() - 0.25).abs() < f64::EPSILON);
+        assert!((ProposalTier::Constitutional.quorum_requirement() - 0.40).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_proposal_tier_approval_thresholds() {
+        assert!((ProposalTier::Basic.approval_threshold() - 0.50).abs() < f64::EPSILON);
+        assert!((ProposalTier::Major.approval_threshold() - 0.60).abs() < f64::EPSILON);
+        assert!((ProposalTier::Constitutional.approval_threshold() - 0.67).abs() < f64::EPSILON);
+    }
+
+    // ========================================================================
+    // PhiWeight tests
+    // ========================================================================
+
+    #[test]
+    fn test_composite_weight_all_ones() {
+        let pw = PhiWeight {
+            phi_score: 1.0,
+            k_trust: 1.0,
+            stake_weight: 1.0,
+            participation_score: 1.0,
+            domain_reputation: 1.0,
+        };
+        // 0.3 + 0.25 + 0.2 + 0.15 + 0.1 = 1.0
+        assert!((pw.composite_weight() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_composite_weight_all_zeros() {
+        let pw = PhiWeight {
+            phi_score: 0.0,
+            k_trust: 0.0,
+            stake_weight: 0.0,
+            participation_score: 0.0,
+            domain_reputation: 0.0,
+        };
+        assert!((pw.composite_weight() - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_composite_weight_mixed() {
+        let pw = PhiWeight {
+            phi_score: 0.8,
+            k_trust: 0.6,
+            stake_weight: 0.5,
+            participation_score: 0.4,
+            domain_reputation: 0.3,
+        };
+        // 0.3*0.8 + 0.25*0.6 + 0.2*0.5 + 0.15*0.4 + 0.1*0.3
+        // = 0.24 + 0.15 + 0.10 + 0.06 + 0.03 = 0.58
+        assert!((pw.composite_weight() - 0.58).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_composite_weight_stake_capped_at_one() {
+        let pw = PhiWeight {
+            phi_score: 0.5,
+            k_trust: 0.5,
+            stake_weight: 5.0, // should be capped to 1.0
+            participation_score: 0.5,
+            domain_reputation: 0.5,
+        };
+        let pw_capped = PhiWeight {
+            stake_weight: 1.0,
+            ..pw.clone()
+        };
+        assert!((pw.composite_weight() - pw_capped.composite_weight()).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_meets_threshold_boundary() {
+        // Exactly at threshold
+        let pw = PhiWeight {
+            phi_score: 0.3,
+            k_trust: 0.0,
+            stake_weight: 0.0,
+            participation_score: 0.0,
+            domain_reputation: 0.0,
+        };
+        assert!(pw.meets_threshold(&ProposalTier::Basic));
+        assert!(!pw.meets_threshold(&ProposalTier::Major));
+        assert!(!pw.meets_threshold(&ProposalTier::Constitutional));
+    }
+
+    #[test]
+    fn test_meets_threshold_just_below() {
+        let pw = PhiWeight {
+            phi_score: 0.299,
+            k_trust: 1.0,
+            stake_weight: 1.0,
+            participation_score: 1.0,
+            domain_reputation: 1.0,
+        };
+        // High everything else, but phi_score below Basic threshold
+        assert!(!pw.meets_threshold(&ProposalTier::Basic));
+    }
+
+    #[test]
+    fn test_default_participant() {
+        let pw = PhiWeight::default_participant();
+        assert!((pw.phi_score - 0.1).abs() < f64::EPSILON);
+        assert!((pw.k_trust - 0.1).abs() < f64::EPSILON);
+        assert!((pw.stake_weight - 0.0).abs() < f64::EPSILON);
+        assert!((pw.participation_score - 0.0).abs() < f64::EPSILON);
+        assert!((pw.domain_reputation - 0.0).abs() < f64::EPSILON);
+    }
+
+    // ========================================================================
+    // DelegationDecay tests
+    // ========================================================================
+
+    #[test]
+    fn test_decay_none() {
+        let decay = DelegationDecay::None;
+        assert!((decay.calculate_multiplier(0.0) - 1.0).abs() < f64::EPSILON);
+        assert!((decay.calculate_multiplier(100.0) - 1.0).abs() < f64::EPSILON);
+        assert!((decay.calculate_multiplier(999.0) - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_decay_linear() {
+        let decay = DelegationDecay::Linear { decay_days: 100 };
+        assert!((decay.calculate_multiplier(0.0) - 1.0).abs() < f64::EPSILON);
+        assert!((decay.calculate_multiplier(50.0) - 0.5).abs() < f64::EPSILON);
+        assert!((decay.calculate_multiplier(100.0) - 0.0).abs() < f64::EPSILON);
+        // Past full decay — clamped to 0
+        assert!((decay.calculate_multiplier(150.0) - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_decay_exponential() {
+        let decay = DelegationDecay::Exponential { half_life_days: 30 };
+        assert!((decay.calculate_multiplier(0.0) - 1.0).abs() < f64::EPSILON);
+        assert!((decay.calculate_multiplier(30.0) - 0.5).abs() < 0.001);
+        assert!((decay.calculate_multiplier(60.0) - 0.25).abs() < 0.001);
+        assert!((decay.calculate_multiplier(90.0) - 0.125).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_decay_step() {
+        let decay = DelegationDecay::Step {
+            step_interval_days: 30,
+            drop_per_step: 0.2,
+        };
+        // Day 0: no steps yet
+        assert!((decay.calculate_multiplier(0.0) - 1.0).abs() < f64::EPSILON);
+        // Day 15: still 0 steps
+        assert!((decay.calculate_multiplier(15.0) - 1.0).abs() < f64::EPSILON);
+        // Day 30: 1 step → 1 - 0.2 = 0.8
+        assert!((decay.calculate_multiplier(30.0) - 0.8).abs() < 0.001);
+        // Day 60: 2 steps → 1 - 0.4 = 0.6
+        assert!((decay.calculate_multiplier(60.0) - 0.6).abs() < 0.001);
+        // Day 150: 5 steps → 1 - 1.0 = 0.0
+        assert!((decay.calculate_multiplier(150.0) - 0.0).abs() < 0.001);
+        // Day 180: 6 steps → clamped to 0.0
+        assert!((decay.calculate_multiplier(180.0) - 0.0).abs() < 0.001);
+    }
+
+    // ========================================================================
+    // Delegation tests
+    // ========================================================================
+
+    fn make_delegation(percentage: f64, decay: DelegationDecay) -> Delegation {
+        Delegation {
+            id: "del-1".to_string(),
+            delegator: "did:test:alice".to_string(),
+            delegate: "did:test:bob".to_string(),
+            percentage,
+            topics: None,
+            tier_filter: None,
+            active: true,
+            decay,
+            transitive: false,
+            max_chain_depth: 1,
+            created: Timestamp::from_micros(0),
+            renewed: Timestamp::from_micros(0),
+            expires: None,
+        }
+    }
+
+    #[test]
+    fn test_effective_percentage_no_decay() {
+        let d = make_delegation(0.75, DelegationDecay::None);
+        let later = Timestamp::from_micros(86_400_000_000 * 100); // 100 days
+        assert!((d.effective_percentage(later) - 0.75).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_effective_percentage_linear_decay() {
+        let d = make_delegation(0.80, DelegationDecay::Linear { decay_days: 100 });
+        // 50 days later: multiplier = 0.5, effective = 0.80 * 0.5 = 0.40
+        let t50 = Timestamp::from_micros(86_400_000_000 * 50);
+        assert!((d.effective_percentage(t50) - 0.40).abs() < 0.01);
+    }
+
+    #[test]
+    fn test_is_effectively_expired() {
+        let d = make_delegation(0.80, DelegationDecay::Linear { decay_days: 100 });
+        let min_threshold = 0.05;
+        // At day 0: effective = 0.80 → not expired
+        assert!(!d.is_effectively_expired(Timestamp::from_micros(0), min_threshold));
+        // At day 95: effective = 0.80 * 0.05 = 0.04 → expired (below 0.05)
+        let t95 = Timestamp::from_micros(86_400_000_000 * 95);
+        assert!(d.is_effectively_expired(t95, min_threshold));
+    }
+
+    // ========================================================================
+    // QuadraticVote tests
+    // ========================================================================
+
+    #[test]
+    fn test_quadratic_weight() {
+        assert!((QuadraticVote::calculate_weight(0) - 0.0).abs() < f64::EPSILON);
+        assert!((QuadraticVote::calculate_weight(1) - 1.0).abs() < f64::EPSILON);
+        assert!((QuadraticVote::calculate_weight(4) - 2.0).abs() < f64::EPSILON);
+        assert!((QuadraticVote::calculate_weight(9) - 3.0).abs() < f64::EPSILON);
+        assert!((QuadraticVote::calculate_weight(100) - 10.0).abs() < f64::EPSILON);
+    }
+
+    // ========================================================================
+    // ZkProposalType tests
+    // ========================================================================
+
+    #[test]
+    fn test_zk_proposal_type_from_u8() {
+        assert_eq!(ZkProposalType::from_u8(0), Some(ZkProposalType::Standard));
+        assert_eq!(ZkProposalType::from_u8(1), Some(ZkProposalType::Constitutional));
+        assert_eq!(ZkProposalType::from_u8(2), Some(ZkProposalType::ModelGovernance));
+        assert_eq!(ZkProposalType::from_u8(3), Some(ZkProposalType::Emergency));
+        assert_eq!(ZkProposalType::from_u8(4), Some(ZkProposalType::Treasury));
+        assert_eq!(ZkProposalType::from_u8(5), Some(ZkProposalType::Membership));
+        assert_eq!(ZkProposalType::from_u8(6), None);
+        assert_eq!(ZkProposalType::from_u8(255), None);
+    }
+
+    #[test]
+    fn test_zk_proposal_type_from_tier() {
+        assert_eq!(ZkProposalType::from_tier(&ProposalTier::Basic), ZkProposalType::Standard);
+        assert_eq!(ZkProposalType::from_tier(&ProposalTier::Major), ZkProposalType::Treasury);
+        assert_eq!(ZkProposalType::from_tier(&ProposalTier::Constitutional), ZkProposalType::Constitutional);
+    }
+
+    // ========================================================================
+    // EligibilityProof tests
+    // ========================================================================
+
+    fn make_proof(eligible: bool, proposal_type: ZkProposalType, expires_at: Option<Timestamp>) -> EligibilityProof {
+        EligibilityProof {
+            id: "proof-1".to_string(),
+            voter_did: "did:test:voter".to_string(),
+            voter_commitment: vec![0u8; 32],
+            proposal_type,
+            eligible,
+            requirements_met: if eligible { 5 } else { 3 },
+            active_requirements: 5,
+            proof_bytes: vec![1, 2, 3],
+            generated_at: Timestamp::from_micros(0),
+            expires_at,
+        }
+    }
+
+    #[test]
+    fn test_eligibility_proof_not_expired_no_expiry() {
+        let proof = make_proof(true, ZkProposalType::Standard, None);
+        assert!(!proof.is_expired(Timestamp::from_micros(999_999_999_999)));
+    }
+
+    #[test]
+    fn test_eligibility_proof_not_expired_future() {
+        let proof = make_proof(true, ZkProposalType::Standard, Some(Timestamp::from_micros(1_000_000)));
+        assert!(!proof.is_expired(Timestamp::from_micros(500_000)));
+    }
+
+    #[test]
+    fn test_eligibility_proof_expired() {
+        let proof = make_proof(true, ZkProposalType::Standard, Some(Timestamp::from_micros(1_000_000)));
+        assert!(proof.is_expired(Timestamp::from_micros(1_000_001)));
+    }
+
+    #[test]
+    fn test_is_valid_for_tier_constitutional_works_for_all() {
+        let proof = make_proof(true, ZkProposalType::Constitutional, None);
+        assert!(proof.is_valid_for_tier(&ProposalTier::Basic));
+        assert!(proof.is_valid_for_tier(&ProposalTier::Major));
+        assert!(proof.is_valid_for_tier(&ProposalTier::Constitutional));
+    }
+
+    #[test]
+    fn test_is_valid_for_tier_standard_only_for_basic() {
+        let proof = make_proof(true, ZkProposalType::Standard, None);
+        assert!(proof.is_valid_for_tier(&ProposalTier::Basic));
+        assert!(!proof.is_valid_for_tier(&ProposalTier::Major));
+        assert!(!proof.is_valid_for_tier(&ProposalTier::Constitutional));
+    }
+
+    #[test]
+    fn test_is_valid_for_tier_treasury_for_basic_and_major() {
+        let proof = make_proof(true, ZkProposalType::Treasury, None);
+        assert!(proof.is_valid_for_tier(&ProposalTier::Basic));
+        assert!(proof.is_valid_for_tier(&ProposalTier::Major));
+        assert!(!proof.is_valid_for_tier(&ProposalTier::Constitutional));
+    }
+
+    #[test]
+    fn test_is_valid_for_tier_ineligible_proof_always_false() {
+        let proof = make_proof(false, ZkProposalType::Constitutional, None);
+        assert!(!proof.is_valid_for_tier(&ProposalTier::Basic));
+        assert!(!proof.is_valid_for_tier(&ProposalTier::Major));
+        assert!(!proof.is_valid_for_tier(&ProposalTier::Constitutional));
+    }
+
+    // ========================================================================
+    // ProofAttestation tests
+    // ========================================================================
+
+    fn make_attestation(verified: bool, verified_at: i64, expires_at: i64) -> ProofAttestation {
+        ProofAttestation {
+            id: "att-1".to_string(),
+            proof_hash: vec![0u8; 32],
+            proof_action_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            voter_commitment: vec![0u8; 32],
+            proposal_type: ZkProposalType::Standard,
+            verified,
+            verified_at: Timestamp::from_micros(verified_at),
+            expires_at: Timestamp::from_micros(expires_at),
+            verifier_pubkey: vec![0u8; 32],
+            signature: vec![0u8; 64],
+            security_level: "96-bit".to_string(),
+            verification_time_ms: 100,
+        }
+    }
+
+    #[test]
+    fn test_attestation_not_expired() {
+        let att = make_attestation(true, 0, 1_000_000);
+        assert!(!att.is_expired(Timestamp::from_micros(500_000)));
+    }
+
+    #[test]
+    fn test_attestation_expired() {
+        let att = make_attestation(true, 0, 1_000_000);
+        assert!(att.is_expired(Timestamp::from_micros(1_000_001)));
+    }
+
+    #[test]
+    fn test_attestation_is_valid_verified_not_expired() {
+        let att = make_attestation(true, 0, 1_000_000);
+        assert!(att.is_valid(Timestamp::from_micros(500_000)));
+    }
+
+    #[test]
+    fn test_attestation_is_invalid_when_unverified() {
+        let att = make_attestation(false, 0, 1_000_000);
+        assert!(!att.is_valid(Timestamp::from_micros(500_000)));
+    }
+
+    #[test]
+    fn test_attestation_is_invalid_when_expired() {
+        let att = make_attestation(true, 0, 1_000_000);
+        assert!(!att.is_valid(Timestamp::from_micros(2_000_000)));
+    }
+
+    // ========================================================================
+    // ProposalReflection tests
+    // ========================================================================
+
+    fn make_reflection(
+        echo_risk: EchoChamberRiskLevel,
+        rapid_convergence: bool,
+        fragmentation: bool,
+        harmony_coverage: f64,
+        centralization: f64,
+        needs_review: bool,
+    ) -> ProposalReflection {
+        ProposalReflection {
+            id: "ref-1".to_string(),
+            proposal_id: "MIP-001".to_string(),
+            timestamp: Timestamp::from_micros(0),
+            voter_count: 10,
+            topology_pattern: TopologyPattern::Mesh,
+            centralization,
+            cluster_count: 3,
+            absent_harmonies: vec![],
+            harmony_coverage,
+            average_epistemic_level: 0.7,
+            echo_chamber_risk: echo_risk,
+            agreement_verified: true,
+            agreement_trend: TrendDirection::Stable,
+            centralization_trend: TrendDirection::Stable,
+            rapid_convergence_warning: rapid_convergence,
+            fragmentation_warning: fragmentation,
+            votes_for: 7,
+            votes_against: 2,
+            abstentions: 1,
+            approval_ratio: 0.7,
+            polarization: 0.3,
+            suggested_interventions: vec![],
+            reflection_prompts: vec![],
+            needs_review,
+            summary: "Test reflection".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_has_concerns_none() {
+        let r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        assert!(!r.has_concerns());
+    }
+
+    #[test]
+    fn test_has_concerns_needs_review() {
+        let r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, true);
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_has_concerns_high_echo_chamber() {
+        let r = make_reflection(EchoChamberRiskLevel::High, false, false, 0.8, 0.3, false);
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_has_concerns_critical_echo_chamber() {
+        let r = make_reflection(EchoChamberRiskLevel::Critical, false, false, 0.8, 0.3, false);
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_has_concerns_rapid_convergence() {
+        let r = make_reflection(EchoChamberRiskLevel::Low, true, false, 0.8, 0.3, false);
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_has_concerns_fragmentation() {
+        let r = make_reflection(EchoChamberRiskLevel::Low, false, true, 0.8, 0.3, false);
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_has_concerns_low_harmony_coverage() {
+        let r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.2, 0.3, false);
+        assert!(r.has_concerns());
+    }
+
+    #[test]
+    fn test_concern_severity_zero() {
+        let r = make_reflection(EchoChamberRiskLevel::Low, false, false, 0.8, 0.3, false);
+        assert_eq!(r.concern_severity(), 0);
+    }
+
+    #[test]
+    fn test_concern_severity_moderate_echo() {
+        let r = make_reflection(EchoChamberRiskLevel::Moderate, false, false, 0.8, 0.3, false);
+        assert_eq!(r.concern_severity(), 1);
+    }
+
+    #[test]
+    fn test_concern_severity_max_all_flags() {
+        // Critical(4) + rapid(2) + fragment(2) + low_harmony(2) + high_central(1) = 11 → capped at 10
+        let r = make_reflection(EchoChamberRiskLevel::Critical, true, true, 0.1, 0.9, false);
+        assert_eq!(r.concern_severity(), 10);
+    }
+
+    #[test]
+    fn test_concern_severity_high_echo_plus_convergence() {
+        // High(3) + rapid(2) = 5
+        let r = make_reflection(EchoChamberRiskLevel::High, true, false, 0.8, 0.3, false);
+        assert_eq!(r.concern_severity(), 5);
+    }
 }
