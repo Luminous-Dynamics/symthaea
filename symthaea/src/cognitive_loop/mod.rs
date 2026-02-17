@@ -155,6 +155,7 @@ use crate::consciousness::autopoietic_consciousness::AutopoieticConsciousness;
 use crate::consciousness::enactive_cognition::EnactiveCognition;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::unified_living_mind::UnifiedLivingMind;
+use crate::consciousness::dream::DreamEngine;
 use crate::exploration::SurpriseExplorationBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
@@ -451,6 +452,11 @@ pub struct CognitiveLoopService {
     /// When enabled, provides coherence veto, value checking, goal alignment
     /// via a unified NarrativeSelf + GWT + PredictiveSelf integration.
     narrative_gwt: Option<NarrativeGWTIntegration>,
+
+    /// Counterfactual Dream Engine for learning from surprise.
+    /// When enabled, records high-surprise events during waking cycles and
+    /// dreams during Cruise urgency to discover Phi-improving alternative actions.
+    dream_engine: Option<DreamEngine>,
 
     /// Whether narrative-GWT vetoed the previous cycle (suppresses learning this cycle)
     narrative_veto_active: bool,

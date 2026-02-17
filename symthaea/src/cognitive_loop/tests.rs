@@ -2261,3 +2261,52 @@ fn test_narrative_self_phi_modulates_confidence() {
         "Prediction confidence should be in [0, 1]: got {confidence}"
     );
 }
+
+#[test]
+fn test_dream_replay_records_and_dreams() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_dream_replay: true,
+        learning_threshold: 0.0, // Always learn → prediction error > 0 → events get recorded
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 30 cycles with varied inputs to generate surprise events
+    let inputs = [
+        "the sun rises over the mountain",
+        "quantum entanglement connects distant particles",
+        "the cat sleeps peacefully on the mat",
+        "economic models predict market fluctuations",
+        "music resonates through the concert hall",
+    ];
+    for i in 0..30 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        // Dream metadata fields should be populated
+        assert!(result.metadata.dream_phi_improvement >= 0.0);
+    }
+
+    // After 30 cycles with surprise, the dream engine should have recorded events
+    // and potentially generated wisdom
+    let dream = service.dream_engine.as_ref().unwrap();
+    assert!(
+        dream.memory_size() > 0 || dream.stats().events_rejected > 0,
+        "Dream engine should have processed events: recorded={}, rejected={}",
+        dream.stats().events_recorded,
+        dream.stats().events_rejected,
+    );
+
+    // Stats should reflect dream cycles ran (at least during Cruise or periodic)
+    assert!(
+        dream.stats().dream_cycles > 0,
+        "Dream engine should have run at least one dream cycle in 30 cycles"
+    );
+}
+
+#[test]
+fn test_dream_replay_disabled_by_default() {
+    let service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    assert!(
+        service.dream_engine.is_none(),
+        "Dream engine should be None by default"
+    );
+}

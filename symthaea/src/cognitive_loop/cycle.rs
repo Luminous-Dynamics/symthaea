@@ -1087,6 +1087,58 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // DREAM ENGINE: Record surprise events + dream during Cruise
+        // ═══════════════════════════════════════════════════════════════════════
+        // 1. Every cycle: record high-surprise events for later dreaming.
+        // 2. During Cruise urgency: run a dream cycle to discover better actions.
+        // 3. Apply accumulated wisdom to bias exploration toward Phi-optimal choices.
+        let mut dream_insights: usize = 0;
+        let mut dream_phi_improvement: f32 = 0.0;
+        let mut dream_wisdom_count: usize = 0;
+        if let Some(ref mut dream) = self.dream_engine {
+            // Record: use compressed state as "state", output as "action",
+            // and prediction as "outcome" — these align with the dream API dimensions
+            let dream_state: Vec<f32> = compressed_state.iter().take(64).copied().collect();
+            let dream_action: Vec<f32> = output.iter().take(32).copied().collect();
+            let dream_outcome: Vec<f32> = prediction.iter().take(64).copied().collect();
+            dream.record(&dream_state, &dream_action, &dream_outcome, prediction_error);
+
+            // Dream during Cruise urgency (low-error steady state) or every 20th cycle
+            if matches!(urgency, super::CycleUrgency::Cruise)
+                || urgency.should_run(self.stats.total_cycles, 10, 20, 5)
+            {
+                if let Ok(result) = dream.dream() {
+                    dream_insights = result.insights;
+                    dream_phi_improvement = result.best_phi_improvement;
+
+                    if result.insights > 0 {
+                        tracing::debug!(
+                            insights = result.insights,
+                            phi_improvement = result.best_phi_improvement,
+                            simulations = result.simulations_run,
+                            cycle = self.stats.total_cycles,
+                            "Dream replay generated insights"
+                        );
+                    }
+                }
+            }
+
+            dream_wisdom_count = dream.wisdom().len();
+
+            // Apply wisdom: if we have accumulated wisdom, modulate exploration
+            // toward states where dream counterfactuals found Phi improvements
+            if !dream.wisdom().is_empty() {
+                let avg_phi_improvement: f32 = dream.wisdom().iter()
+                    .map(|w| w.phi_improvement)
+                    .sum::<f32>() / dream.wisdom().len() as f32;
+                // Dream wisdom boosts exploration when Phi improvements are found
+                let wisdom_exploration_boost = (avg_phi_improvement * 0.5).clamp(0.0, 0.2);
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + wisdom_exploration_boost).clamp(0.0, 1.0);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // PREFRONTAL CORTEX: Executive control and working memory gating
         // ═══════════════════════════════════════════════════════════════════════
         let prefrontal_veto = if let Some(ref mut pfc) = self.prefrontal {
@@ -1538,6 +1590,9 @@ impl CognitiveLoopService {
             living_mind_vitality,
             living_mind_coherence,
             urgency,
+            dream_insights,
+            dream_phi_improvement,
+            dream_wisdom_count,
         };
 
         tracing::debug!(

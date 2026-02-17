@@ -187,6 +187,15 @@ pub struct CycleMetadata {
     /// Cycle urgency level (Critical/Normal/Cruise).
     /// Determines how many subsystems ran this cycle.
     pub urgency: CycleUrgency,
+
+    /// Number of insights gained from dream replay this cycle (0 = no dreaming).
+    pub dream_insights: usize,
+
+    /// Best Phi improvement discovered by dream counterfactuals (0.0 = no improvement).
+    pub dream_phi_improvement: f32,
+
+    /// Total accumulated wisdom entries from dreaming.
+    pub dream_wisdom_count: usize,
 }
 
 /// Result of a single cognitive cycle
