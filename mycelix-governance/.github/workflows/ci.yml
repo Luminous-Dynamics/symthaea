@@ -83,7 +83,6 @@ jobs:
 
       - name: Run Clippy
         run: cargo clippy --all-targets --all-features -- -D warnings
-        continue-on-error: true
 
   security:
     runs-on: ubuntu-latest
@@ -98,7 +97,6 @@ jobs:
 
       - name: Security audit
         run: cargo audit
-        continue-on-error: true
 
       - name: Check for secrets in code
         run: |

@@ -12,6 +12,14 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+#[hdk_extern]
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    // Pre-create the pending_timelocks anchor so queries never fail on empty DNA
+    let anchor = Anchor("pending_timelocks".to_string());
+    create_entry(&EntryTypes::Anchor(anchor))?;
+    Ok(InitCallbackResult::Pass)
+}
+
 /// Create a timelock for an approved proposal
 #[hdk_extern]
 pub fn create_timelock(input: CreateTimelockInput) -> ExternResult<Record> {
@@ -335,6 +343,24 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
         &EntryTypes::Timelock(updated_timelock),
     )?;
 
+    // Clean up pending_timelocks link (timelock is no longer pending)
+    if let Ok(pending_links) = get_links(
+        LinkQuery::try_new(anchor_hash("pending_timelocks")?, LinkTypes::PendingTimelocks)?,
+        GetStrategy::default(),
+    ) {
+        for link in pending_links {
+            if let Ok(target_hash) = ActionHash::try_from(link.target.clone()) {
+                if let Ok(Some(record)) = get(target_hash, GetOptions::default()) {
+                    if let Some(tl) = record.entry().to_app_option::<Timelock>().ok().flatten() {
+                        if tl.id == current_timelock.id {
+                            let _ = delete_link(link.create_link_hash, GetOptions::default());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Could not find execution".into()
@@ -541,6 +567,34 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
         )));
     }
 
+    // Verify guardian role: caller must be a member of at least one council
+    let guardian_check = call(
+        CallTargetCell::Local,
+        ZomeName::from("councils"),
+        FunctionName::from("get_member_councils"),
+        None,
+        ExternIO::encode(input.guardian_did.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
+
+    match guardian_check {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            if let Ok(councils) = extern_io.decode::<Vec<Record>>() {
+                if councils.is_empty() {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Only council members (guardians) can veto timelocks".into()
+                    )));
+                }
+            }
+        }
+        _ => {
+            // Councils zome unavailable — fail closed for veto power
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Cannot verify guardian role: councils zome unavailable".into()
+            )));
+        }
+    }
+
     let now = sys_time()?;
     let veto_id = format!("veto:{}:{}", input.timelock_id, now.as_micros());
 
@@ -583,6 +637,24 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
                     &EntryTypes::Timelock(cancelled),
                 )?;
                 break;
+            }
+        }
+    }
+
+    // Clean up pending_timelocks link (timelock was vetoed/cancelled)
+    if let Ok(pending_links) = get_links(
+        LinkQuery::try_new(anchor_hash("pending_timelocks")?, LinkTypes::PendingTimelocks)?,
+        GetStrategy::default(),
+    ) {
+        for link in pending_links {
+            if let Ok(target_hash) = ActionHash::try_from(link.target.clone()) {
+                if let Ok(Some(record)) = get(target_hash, GetOptions::default()) {
+                    if let Some(tl) = record.entry().to_app_option::<Timelock>().ok().flatten() {
+                        if tl.id == input.timelock_id {
+                            let _ = delete_link(link.create_link_hash, GetOptions::default());
+                        }
+                    }
+                }
             }
         }
     }

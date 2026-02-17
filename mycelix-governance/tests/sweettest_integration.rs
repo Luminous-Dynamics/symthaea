@@ -441,6 +441,16 @@ pub enum DkgPhase {
     Dealing,
     Verification,
     Complete,
+    Disbanded,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum CommitteeScope {
+    All,
+    Constitutional,
+    Treasury,
+    Protocol,
+    Custom(Vec<String>),
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -448,15 +458,16 @@ pub struct SigningCommittee {
     pub id: String,
     pub name: String,
     pub threshold: u32,
-    pub min_members: u32,
-    pub max_members: u32,
+    pub member_count: u32,
     pub phase: DkgPhase,
-    pub epoch: u32,
     pub public_key: Option<Vec<u8>>,
-    pub public_commitments: Vec<Vec<u8>>,
-    pub qualified_members: Vec<String>,
+    pub commitments: Vec<Vec<u8>>,
+    pub scope: CommitteeScope,
     pub created_at: Timestamp,
-    pub created_by: String,
+    pub active: bool,
+    pub epoch: u32,
+    #[serde(default)]
+    pub min_phi: Option<f64>,
 }
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -475,26 +486,31 @@ pub struct CommitteeMember {
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ThresholdSignature {
+    pub id: String,
     pub committee_id: String,
-    pub content_hash: Vec<u8>,
-    pub combined_signature: Vec<u8>,
+    pub signed_content_hash: Vec<u8>,
+    pub signed_content_description: String,
+    pub signature: Vec<u8>,
     pub signer_count: u32,
-    pub signer_ids: Vec<u32>,
+    pub signers: Vec<u32>,
     pub verified: bool,
-    pub created_at: Timestamp,
+    pub signed_at: Timestamp,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CreateCommitteeInput {
     pub name: String,
     pub threshold: u32,
-    pub min_members: u32,
-    pub max_members: u32,
+    pub member_count: u32,
+    pub scope: CommitteeScope,
+    #[serde(default)]
+    pub min_phi: Option<f64>,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct RegisterMemberInput {
     pub committee_id: String,
+    pub participant_id: u32,
     pub member_did: String,
     pub trust_score: f64,
 }
@@ -1589,8 +1605,9 @@ mod execution_tests {
         let input = CreateCommitteeInput {
             name: "Treasury Signers".to_string(),
             threshold: 2,
-            min_members: 3,
-            max_members: 5,
+            member_count: 3,
+            scope: CommitteeScope::Treasury,
+            min_phi: None,
         };
 
         let record: Record = conductor
@@ -1601,10 +1618,11 @@ mod execution_tests {
             decode_entry(&record).expect("Failed to decode committee");
         assert_eq!(committee.name, "Treasury Signers");
         assert_eq!(committee.threshold, 2);
-        assert_eq!(committee.min_members, 3);
-        assert_eq!(committee.max_members, 5);
+        assert_eq!(committee.member_count, 3);
+        assert_eq!(committee.scope, CommitteeScope::Treasury);
         assert_eq!(committee.phase, DkgPhase::Registration);
         assert_eq!(committee.epoch, 1);
+        assert!(committee.active);
         assert!(committee.public_key.is_none());
 
         println!("=== test_create_signing_committee PASSED ===\n");
@@ -1626,8 +1644,9 @@ mod execution_tests {
         let committee_input = CreateCommitteeInput {
             name: "Test Signers".to_string(),
             threshold: 2,
-            min_members: 2,
-            max_members: 5,
+            member_count: 3,
+            scope: CommitteeScope::All,
+            min_phi: None,
         };
         let committee_record: Record = conductor
             .call(&cell.zome("threshold_signing"), "create_committee", committee_input)
@@ -1637,6 +1656,7 @@ mod execution_tests {
         // Register a member
         let member_input = RegisterMemberInput {
             committee_id: committee.id.clone(),
+            participant_id: 1,
             member_did: format!("did:mycelix:{}", app.agent_pubkey()),
             trust_score: 0.85,
         };
@@ -1760,7 +1780,7 @@ mod execution_tests {
 
         // Create a proposal (must start as Draft per Phase 4 integrity validation)
         let author_did = format!("did:mycelix:{}", app.agent_pubkey());
-        let proposal = make_proposal("MIP-DRAFT-01", ProposalType::Standard, &author_did);
+        let proposal = make_proposal("MIP-DRAFT-01", &author_did, ProposalType::Standard);
         assert_eq!(proposal.status, ProposalStatus::Draft, "Helper should create Draft proposals");
 
         let record: Record = conductor
@@ -1790,8 +1810,9 @@ mod execution_tests {
             let input = CreateCommitteeInput {
                 name: name.to_string(),
                 threshold: 2,
-                min_members: 3,
-                max_members: 5,
+                member_count: 3,
+                scope: CommitteeScope::All,
+                min_phi: None,
             };
             let _: Record = conductor
                 .call(&cell.zome("threshold_signing"), "create_committee", input)
@@ -1805,6 +1826,67 @@ mod execution_tests {
         assert!(all.len() >= 2, "Should have at least 2 committees");
 
         println!("=== test_get_all_committees PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_threshold_signing_e2e_flow() {
+        println!("=== test_threshold_signing_e2e_flow ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor
+            .setup_app("mycelix-governance", &[dna.clone()])
+            .await
+            .unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Step 1: Create a 2-of-3 committee
+        let committee_input = CreateCommitteeInput {
+            name: "E2E Flow Signers".to_string(),
+            threshold: 2,
+            member_count: 3,
+            scope: CommitteeScope::All,
+            min_phi: None,
+        };
+        let committee_record: Record = conductor
+            .call(&cell.zome("threshold_signing"), "create_committee", committee_input)
+            .await;
+        let committee: SigningCommittee = decode_entry(&committee_record).unwrap();
+        assert_eq!(committee.phase, DkgPhase::Registration);
+        assert!(committee.active);
+
+        // Step 2: Register a member
+        let member_input = RegisterMemberInput {
+            committee_id: committee.id.clone(),
+            participant_id: 1,
+            member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+            trust_score: 0.9,
+        };
+        let member_record: Record = conductor
+            .call(&cell.zome("threshold_signing"), "register_member", member_input)
+            .await;
+        let member: CommitteeMember = decode_entry(&member_record).unwrap();
+        assert_eq!(member.participant_id, 1);
+        assert!(!member.deal_submitted);
+        assert!(!member.qualified);
+
+        // Step 3: Verify committee is still retrievable
+        let all_committees: Vec<Record> = conductor
+            .call(&cell.zome("threshold_signing"), "get_all_committees", ())
+            .await;
+        assert!(!all_committees.is_empty());
+
+        // Step 4: Verify committee members are retrievable
+        let members: Vec<Record> = conductor
+            .call(
+                &cell.zome("threshold_signing"),
+                "get_committee_members",
+                committee.id.clone(),
+            )
+            .await;
+        assert_eq!(members.len(), 1);
+
+        println!("=== test_threshold_signing_e2e_flow PASSED ===\n");
     }
 }
 
@@ -1986,15 +2068,17 @@ mod unit_tests {
         let input = CreateCommitteeInput {
             name: "Test Committee".to_string(),
             threshold: 3,
-            min_members: 5,
-            max_members: 10,
+            member_count: 5,
+            scope: CommitteeScope::All,
+            min_phi: Some(0.4),
         };
 
         let json = serde_json::to_string(&input).expect("serialize");
         let deserialized: CreateCommitteeInput = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(deserialized.name, "Test Committee");
         assert_eq!(deserialized.threshold, 3);
-        assert_eq!(deserialized.min_members, 5);
-        assert_eq!(deserialized.max_members, 10);
+        assert_eq!(deserialized.member_count, 5);
+        assert_eq!(deserialized.scope, CommitteeScope::All);
+        assert_eq!(deserialized.min_phi, Some(0.4));
     }
 }

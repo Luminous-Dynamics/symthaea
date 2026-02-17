@@ -20,19 +20,26 @@ export type DkgPhase =
   | 'Verification'
   | 'Complete';
 
+export type CommitteeScope =
+  | 'All'
+  | 'Constitutional'
+  | 'Treasury'
+  | 'Protocol'
+  | { Custom: string[] };
+
 export interface SigningCommittee {
   id: string;
   name: string;
   threshold: u32;
-  minMembers: u32;
-  maxMembers: u32;
+  memberCount: u32;
   phase: DkgPhase;
-  epoch: u32;
   publicKey?: Uint8Array;
-  publicCommitments: Uint8Array[];
-  qualifiedMembers: string[];
+  commitments: Uint8Array[];
+  scope: CommitteeScope;
   createdAt: number;
-  createdBy: string;
+  active: boolean;
+  epoch: u32;
+  minPhi?: number;
 }
 
 export interface CommitteeMember {
@@ -49,21 +56,24 @@ export interface CommitteeMember {
 }
 
 export interface ThresholdSignature {
+  id: string;
   committeeId: string;
-  contentHash: Uint8Array;
-  combinedSignature: Uint8Array;
+  signedContentHash: Uint8Array;
+  signedContentDescription: string;
+  signature: Uint8Array;
   signerCount: u32;
-  signerIds: u32[];
+  signers: u32[];
   verified: boolean;
-  createdAt: number;
+  signedAt: number;
 }
 
 export interface SignatureShare {
-  committeeId: string;
-  contentHash: Uint8Array;
+  signatureId: string;
   participantId: u32;
+  signer: string;
   share: Uint8Array;
-  createdAt: number;
+  contentHash: Uint8Array;
+  submittedAt: number;
 }
 
 type u32 = number;
@@ -71,44 +81,43 @@ type u32 = number;
 export interface CreateCommitteeInput {
   name: string;
   threshold: number;
-  minMembers: number;
-  maxMembers: number;
+  memberCount: number;
+  scope: CommitteeScope;
+  minPhi?: number;
 }
 
 export interface RegisterMemberInput {
   committeeId: string;
+  participantId: number;
   memberDid: string;
   trustScore: number;
 }
 
 export interface SubmitDkgDealInput {
   committeeId: string;
-  participantId: number;
   vssCommitment: Uint8Array;
-  publicShare: Uint8Array;
 }
 
 export interface FinalizeDkgInput {
   committeeId: string;
   combinedPublicKey: Uint8Array;
   publicCommitments: Uint8Array[];
-  qualifiedMembers: string[];
+  qualifiedMembers: number[];
 }
 
 export interface SubmitSignatureShareInput {
-  committeeId: string;
-  contentHash: Uint8Array;
+  signatureId: string;
   participantId: number;
   share: Uint8Array;
+  contentHash: Uint8Array;
 }
 
 export interface CombineSignaturesInput {
   committeeId: string;
   contentHash: Uint8Array;
+  contentDescription: string;
   combinedSignature: Uint8Array;
-  signerCount: number;
-  signerIds: number[];
-  verified: boolean;
+  signers: number[];
 }
 
 export interface RotateKeysInput {
@@ -182,8 +191,9 @@ export class ThresholdSigningClient extends ZomeClient {
     const record = await this.callZomeOnce<HolochainRecord>('create_committee', {
       name: input.name,
       threshold: input.threshold,
-      min_members: input.minMembers,
-      max_members: input.maxMembers,
+      member_count: input.memberCount,
+      scope: input.scope,
+      min_phi: input.minPhi ?? null,
     });
     return this.mapCommittee(record);
   }
@@ -211,6 +221,7 @@ export class ThresholdSigningClient extends ZomeClient {
   async registerMember(input: RegisterMemberInput): Promise<CommitteeMember> {
     const record = await this.callZomeOnce<HolochainRecord>('register_member', {
       committee_id: input.committeeId,
+      participant_id: input.participantId,
       member_did: input.memberDid,
       trust_score: input.trustScore,
     });
@@ -220,9 +231,7 @@ export class ThresholdSigningClient extends ZomeClient {
   async submitDkgDeal(input: SubmitDkgDealInput): Promise<CommitteeMember> {
     const record = await this.callZomeOnce<HolochainRecord>('submit_dkg_deal', {
       committee_id: input.committeeId,
-      participant_id: input.participantId,
       vss_commitment: Array.from(input.vssCommitment),
-      public_share: Array.from(input.publicShare),
     });
     return this.mapMember(record);
   }
@@ -243,10 +252,10 @@ export class ThresholdSigningClient extends ZomeClient {
 
   async submitSignatureShare(input: SubmitSignatureShareInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('submit_signature_share', {
-      committee_id: input.committeeId,
-      content_hash: Array.from(input.contentHash),
+      signature_id: input.signatureId,
       participant_id: input.participantId,
       share: Array.from(input.share),
+      content_hash: Array.from(input.contentHash),
     });
   }
 
@@ -254,19 +263,15 @@ export class ThresholdSigningClient extends ZomeClient {
     const record = await this.callZomeOnce<HolochainRecord>('combine_signatures', {
       committee_id: input.committeeId,
       content_hash: Array.from(input.contentHash),
+      content_description: input.contentDescription,
       combined_signature: Array.from(input.combinedSignature),
-      signer_count: input.signerCount,
-      signer_ids: input.signerIds,
-      verified: input.verified,
+      signers: input.signers,
     });
     return this.mapSignature(record);
   }
 
-  async getSignatureShares(committeeId: string, contentHash: Uint8Array): Promise<HolochainRecord[]> {
-    return this.callZome<HolochainRecord[]>('get_signature_shares', {
-      committee_id: committeeId,
-      content_hash: Array.from(contentHash),
-    });
+  async getSignatureShares(signatureId: string): Promise<HolochainRecord[]> {
+    return this.callZome<HolochainRecord[]>('get_signature_shares', signatureId);
   }
 
   async getProposalSignature(proposalId: string): Promise<ThresholdSignature | null> {
@@ -302,15 +307,15 @@ export class ThresholdSigningClient extends ZomeClient {
       id: entry.id,
       name: entry.name,
       threshold: entry.threshold,
-      minMembers: entry.min_members,
-      maxMembers: entry.max_members,
+      memberCount: entry.member_count,
       phase: entry.phase,
-      epoch: entry.epoch,
       publicKey: entry.public_key ? new Uint8Array(entry.public_key) : undefined,
-      publicCommitments: (entry.public_commitments ?? []).map((c: number[]) => new Uint8Array(c)),
-      qualifiedMembers: entry.qualified_members ?? [],
+      commitments: (entry.commitments ?? []).map((c: number[]) => new Uint8Array(c)),
+      scope: entry.scope,
       createdAt: entry.created_at,
-      createdBy: entry.created_by,
+      active: entry.active,
+      epoch: entry.epoch,
+      minPhi: entry.min_phi ?? undefined,
     };
   }
 
@@ -333,13 +338,15 @@ export class ThresholdSigningClient extends ZomeClient {
   private mapSignature(record: HolochainRecord): ThresholdSignature {
     const entry = (record as any).entry?.Present?.entry ?? (record as any).entry ?? {};
     return {
+      id: entry.id,
       committeeId: entry.committee_id,
-      contentHash: new Uint8Array(entry.content_hash ?? []),
-      combinedSignature: new Uint8Array(entry.combined_signature ?? []),
+      signedContentHash: new Uint8Array(entry.signed_content_hash ?? []),
+      signedContentDescription: entry.signed_content_description,
+      signature: new Uint8Array(entry.signature ?? []),
       signerCount: entry.signer_count,
-      signerIds: entry.signer_ids ?? [],
+      signers: entry.signers ?? [],
       verified: entry.verified,
-      createdAt: entry.created_at,
+      signedAt: entry.signed_at,
     };
   }
 }

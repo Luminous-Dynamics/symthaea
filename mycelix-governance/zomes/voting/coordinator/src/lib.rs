@@ -90,6 +90,61 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+/// Verify the proposal is currently in its voting period.
+///
+/// Cross-calls the proposals zome to fetch the proposal and deserializes
+/// just the voting_starts/voting_ends fields via the proposals_integrity Proposal type.
+fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
+    let proposal_result = call(
+        CallTargetCell::Local,
+        ZomeName::from("proposals"),
+        FunctionName::from("get_proposal"),
+        None,
+        ExternIO::encode(proposal_id.to_string())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
+
+    match proposal_result {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            if let Ok(Some(record)) = extern_io.decode::<Option<Record>>() {
+                // Use proposals_integrity::Proposal which implements TryFrom<SerializedBytes>
+                if let Some(proposal) = record
+                    .entry()
+                    .to_app_option::<proposals_integrity::Proposal>()
+                    .ok()
+                    .flatten()
+                {
+                    let now = sys_time()?;
+                    if now < proposal.voting_starts {
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Voting has not started yet for this proposal".into()
+                        )));
+                    }
+                    if now > proposal.voting_ends {
+                        return Err(wasm_error!(WasmErrorInner::Guest(
+                            "Voting period has ended for this proposal".into()
+                        )));
+                    }
+                }
+            }
+            Ok(())
+        }
+        _ => {
+            // Proposals zome unavailable — allow voting (graceful degradation)
+            Ok(())
+        }
+    }
+}
+
+// ============================================================================
+// INIT
+// ============================================================================
+
+#[hdk_extern]
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    Ok(InitCallbackResult::Pass)
+}
+
 // ============================================================================
 // LEGACY VOTING (Backward Compatibility)
 // ============================================================================
@@ -107,6 +162,32 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
             return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    // Enforce voting period
+    verify_voting_period(&input.proposal_id)?;
+
+    // Check for duplicate vote: same voter on same proposal
+    let voter_anchor_check = format!("voter:{}", input.voter_did);
+    let existing_votes = get_links(
+        LinkQuery::try_new(anchor_hash(&voter_anchor_check)?, LinkTypes::VoterToVote)?,
+        GetStrategy::default(),
+    )?;
+    for link in &existing_votes {
+        let ah = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(existing_vote) = record.entry().to_app_option::<Vote>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if existing_vote.proposal_id == input.proposal_id {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Voter {} has already voted on proposal {}",
+                        input.voter_did, input.proposal_id
+                    ))));
+                }
+            }
         }
     }
 
@@ -218,6 +299,32 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
     if let Some(ref reason) = input.reason {
         if reason.len() > 4096 {
             return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
+    // Enforce voting period
+    verify_voting_period(&input.proposal_id)?;
+
+    // Check for duplicate Φ vote: same voter on same proposal
+    let phi_voter_check = format!("phi_voter:{}", input.voter_did);
+    let existing_phi_votes = get_links(
+        LinkQuery::try_new(anchor_hash(&phi_voter_check)?, LinkTypes::VoterToVote)?,
+        GetStrategy::default(),
+    )?;
+    for link in &existing_phi_votes {
+        let ah = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(existing_vote) = record.entry().to_app_option::<PhiWeightedVote>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if existing_vote.proposal_id == input.proposal_id {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "Voter {} has already cast a Φ-weighted vote on proposal {}",
+                        input.voter_did, input.proposal_id
+                    ))));
+                }
+            }
         }
     }
 

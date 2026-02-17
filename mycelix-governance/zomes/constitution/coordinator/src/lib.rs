@@ -12,7 +12,18 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+#[hdk_extern]
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    // Pre-create the current_charter anchor so queries never fail on empty DNA
+    let anchor = Anchor("current_charter".to_string());
+    create_entry(&EntryTypes::Anchor(anchor))?;
+    Ok(InitCallbackResult::Pass)
+}
+
 /// Create or update the charter
+///
+/// Only allowed if no charter exists yet (initial setup) or when called
+/// internally from `apply_amendment_to_charter` (governance pipeline).
 #[hdk_extern]
 pub fn create_charter(charter: Charter) -> ExternResult<Record> {
     // Input validation
@@ -23,11 +34,33 @@ pub fn create_charter(charter: Charter) -> ExternResult<Record> {
         return Err(wasm_error!(WasmErrorInner::Guest("Preamble must be 1-4096 characters".into())));
     }
 
+    // Gate: if a charter already exists, only allow versioned updates (from amendments).
+    // A version > 1 indicates this is an amendment-driven update (apply_amendment_to_charter
+    // increments version). Direct external creation of version 1 when a charter already
+    // exists is blocked.
+    if charter.version <= 1 {
+        if let Ok(Some(_)) = get_current_charter(()) {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Charter already exists. Use the amendment process to modify it.".into()
+            )));
+        }
+    }
+
     let action_hash = create_entry(&EntryTypes::Charter(charter))?;
 
     // Create anchor and link as current charter
     let anchor_entry = Anchor("current_charter".to_string());
     create_entry(&EntryTypes::Anchor(anchor_entry))?;
+
+    // Delete stale CurrentCharter links before creating new one
+    if let Ok(existing_links) = get_links(
+        LinkQuery::try_new(anchor_hash("current_charter")?, LinkTypes::CurrentCharter)?,
+        GetStrategy::default(),
+    ) {
+        for link in existing_links {
+            let _ = delete_link(link.create_link_hash, GetOptions::default());
+        }
+    }
 
     create_link(
         anchor_hash("current_charter")?,
@@ -202,15 +235,50 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
         )))?;
 
     // Amendment must be in Voting status to be ratified.
-    // Authorization is provided by the governance vote itself — any agent can
-    // call ratify_amendment on an amendment that has passed its vote (Voting status).
-    // The proposer check is relaxed to allow the execution pipeline to ratify
-    // after the proposal passes, which is the normal governance flow.
     if current_amendment.status != AmendmentStatus::Voting {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Amendment must be in Voting status to ratify, current: {:?}",
             current_amendment.status
         ))));
+    }
+
+    // Verify the linked proposal actually passed by cross-calling the voting tally.
+    // Constitutional amendments require supermajority (handled by the voting zome's
+    // adaptive threshold). We check that the proposal is Approved or the tally shows
+    // consensus_reached.
+    let tally_check = call(
+        CallTargetCell::Local,
+        ZomeName::from("voting"),
+        FunctionName::from("tally_votes"),
+        None,
+        ExternIO::encode(current_amendment.proposal_id.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
+
+    match tally_check {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            // Parse tally result and verify it passed
+            if let Ok(result) = extern_io.decode::<serde_json::Value>() {
+                let approved = result.get("approved").and_then(|a| a.as_bool()).unwrap_or(false);
+                let quorum_reached = result.get("quorum_reached").and_then(|q| q.as_bool()).unwrap_or(false);
+                if !approved || !quorum_reached {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        "Cannot ratify amendment: linked proposal vote did not pass or quorum not reached".into()
+                    )));
+                }
+            }
+        }
+        Ok(ZomeCallResponse::NetworkError(e)) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Network error checking vote tally: {}", e)
+            )));
+        }
+        _ => {
+            // Voting zome unavailable — fail closed for constitutional amendments
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Cannot ratify amendment: voting zome unavailable to verify tally".into()
+            )));
+        }
     }
 
     let now = sys_time()?;
@@ -284,7 +352,8 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
             }));
             Charter {
                 version: charter.version + 1,
-                articles: serde_json::to_string(&articles).unwrap_or_default(),
+                articles: serde_json::to_string(&articles)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize articles: {}", e))))?,
                 last_amended: Some(now),
                 ..charter
             }
@@ -303,7 +372,8 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
             }
             Charter {
                 version: charter.version + 1,
-                articles: serde_json::to_string(&articles).unwrap_or_default(),
+                articles: serde_json::to_string(&articles)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize articles: {}", e))))?,
                 last_amended: Some(now),
                 ..charter
             }
@@ -319,7 +389,8 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
             }
             Charter {
                 version: charter.version + 1,
-                articles: serde_json::to_string(&articles).unwrap_or_default(),
+                articles: serde_json::to_string(&articles)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize articles: {}", e))))?,
                 last_amended: Some(now),
                 ..charter
             }
@@ -373,6 +444,10 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
 }
 
 /// Set a governance parameter
+///
+/// When a parameter already exists, requires a `proposal_id` linking back to
+/// the governance action that authorized the change. New parameters can be set
+/// without a proposal_id (initial bootstrapping).
 #[hdk_extern]
 pub fn set_parameter(input: SetParameterInput) -> ExternResult<Record> {
     // Input validation
@@ -384,6 +459,15 @@ pub fn set_parameter(input: SetParameterInput) -> ExternResult<Record> {
     }
     if input.description.is_empty() || input.description.len() > 4096 {
         return Err(wasm_error!(WasmErrorInner::Guest("Description must be 1-4096 characters".into())));
+    }
+
+    // Gate: existing parameters require a proposal_id (governance authorization)
+    if input.proposal_id.is_none() {
+        if let Ok(Some(_)) = get_parameter(input.name.clone()) {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Parameter already exists. Use a governance proposal to change it.".into()
+            )));
+        }
     }
 
     let now = sys_time()?;

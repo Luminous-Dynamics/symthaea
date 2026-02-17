@@ -12,6 +12,14 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+#[hdk_extern]
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    // Pre-create the active_proposals anchor so queries never fail on empty DNA
+    let anchor = Anchor("active_proposals".to_string());
+    create_entry(&EntryTypes::Anchor(anchor))?;
+    Ok(InitCallbackResult::Pass)
+}
+
 /// Create a new proposal
 #[hdk_extern]
 pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
@@ -140,6 +148,12 @@ pub fn get_proposals_by_author(author_did: String) -> ExternResult<Vec<Record>> 
 }
 
 /// Update proposal status
+///
+/// Authorization rules:
+/// - Author can: Draft→Active, Draft→Cancelled, Active→Cancelled
+/// - Execution pipeline (any agent) can: Active→Ended, Ended→Approved, Ended→Rejected,
+///   Approved→Signed, Signed→Executed, any→Failed
+/// - Unauthorized transitions are rejected
 #[hdk_extern]
 pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
@@ -157,10 +171,32 @@ pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> 
             "Invalid proposal entry".into()
         )))?;
 
+    // Authorization: author-only transitions require caller = author
+    let is_author_transition = matches!(
+        (&current_proposal.status, &input.new_status),
+        (ProposalStatus::Draft, ProposalStatus::Active)
+        | (ProposalStatus::Draft, ProposalStatus::Cancelled)
+        | (ProposalStatus::Active, ProposalStatus::Cancelled)
+    );
+
+    if is_author_transition {
+        let agent_info = agent_info()?;
+        let author_key = current_proposal.author.strip_prefix("did:mycelix:")
+            .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid author DID format".into())))?;
+        if agent_info.agent_initial_pubkey.to_string() != author_key {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only the proposal author can perform this status transition".into()
+            )));
+        }
+    }
+
     let now = sys_time()?;
 
+    let was_active = current_proposal.status == ProposalStatus::Active;
+    let new_status = input.new_status.clone();
+
     let updated_proposal = Proposal {
-        id: current_proposal.id,
+        id: current_proposal.id.clone(),
         title: current_proposal.title,
         description: current_proposal.description,
         proposal_type: current_proposal.proposal_type,
@@ -179,6 +215,26 @@ pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> 
         current_record.action_address().clone(),
         &EntryTypes::Proposal(updated_proposal),
     )?;
+
+    // Clean up active_proposals link when transitioning away from Active
+    if was_active && new_status != ProposalStatus::Active {
+        if let Ok(active_links) = get_links(
+            LinkQuery::try_new(anchor_hash("active_proposals")?, LinkTypes::ActiveProposals)?,
+            GetStrategy::default(),
+        ) {
+            for link in active_links {
+                if let Ok(target_hash) = ActionHash::try_from(link.target.clone()) {
+                    if let Ok(Some(record)) = get(target_hash, GetOptions::default()) {
+                        if let Some(p) = record.entry().to_app_option::<Proposal>().ok().flatten() {
+                            if p.id == current_proposal.id {
+                                let _ = delete_link(link.create_link_hash, GetOptions::default());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(

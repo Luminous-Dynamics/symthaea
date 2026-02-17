@@ -20,12 +20,31 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+#[hdk_extern]
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    Ok(InitCallbackResult::Pass)
+}
+
 /// Create a new signing committee
 ///
 /// This initiates a DKG ceremony. Members must register and complete
 /// the DKG protocol off-chain before the committee can sign.
 #[hdk_extern]
 pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
+    // Validate threshold <= member_count (coordinator-side check supplements integrity)
+    if input.threshold == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Threshold must be at least 1".into())));
+    }
+    if input.member_count < 3 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Committee must have at least 3 members".into())));
+    }
+    if input.threshold > input.member_count {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Threshold ({}) cannot exceed member count ({})",
+            input.threshold, input.member_count
+        ))));
+    }
+
     let now = sys_time()?;
     let committee_id = format!("committee:{}:{}", input.name, now.as_micros());
 
@@ -300,8 +319,41 @@ pub struct SubmitDkgDealInput {
 ///
 /// Called after all members have submitted valid deals.
 /// Updates committee with combined public key.
+/// Only callable by a registered member of the committee.
 #[hdk_extern]
 pub fn finalize_dkg(input: FinalizeDkgInput) -> ExternResult<Record> {
+    // Verify caller is a registered committee member
+    let caller = agent_info()?.agent_initial_pubkey;
+    let member_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", input.committee_id))?,
+            LinkTypes::CommitteeToMember,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    let mut caller_is_member = false;
+    for link in &member_links {
+        let ah = ActionHash::try_from(link.target.clone())
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(m) = record.entry().to_app_option::<CommitteeMember>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if m.agent == caller {
+                    caller_is_member = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    if !caller_is_member {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only registered committee members can finalize DKG".into()
+        )));
+    }
+
     // Get committee
     let committee_links = get_links(
         LinkQuery::try_new(

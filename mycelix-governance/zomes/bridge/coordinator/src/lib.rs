@@ -25,6 +25,11 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+#[hdk_extern]
+pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
+    Ok(InitCallbackResult::Pass)
+}
+
 /// Query governance from another hApp
 #[hdk_extern]
 pub fn query_governance(input: QueryGovernanceInput) -> ExternResult<QueryGovernanceResult> {
@@ -183,13 +188,13 @@ fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceR
                     error: None,
                 })
             } else {
-                // Couldn't decode response — default to eligible (permissive)
+                // Couldn't decode response — fail closed (not eligible)
                 Ok(QueryGovernanceResult {
-                    success: true,
+                    success: false,
                     data: Some(serde_json::json!({
                         "did": did,
-                        "eligible": true,
-                        "voting_power": 1.0,
+                        "eligible": false,
+                        "voting_power": 0.0,
                     })),
                     error: Some("Could not decode council membership response".into()),
                 })
@@ -201,15 +206,15 @@ fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceR
             error: Some(format!("Network error checking eligibility: {}", e)),
         }),
         _ => {
-            // Councils zome unavailable — default to eligible (permissive degradation)
+            // Councils zome unavailable — fail closed (not eligible)
             Ok(QueryGovernanceResult {
-                success: true,
+                success: false,
                 data: Some(serde_json::json!({
                     "did": did,
-                    "eligible": true,
-                    "voting_power": 1.0,
+                    "eligible": false,
+                    "voting_power": 0.0,
                 })),
-                error: Some("Councils zome unavailable — defaulting to eligible".into()),
+                error: Some("Councils zome unavailable — cannot verify eligibility".into()),
             })
         }
     }
