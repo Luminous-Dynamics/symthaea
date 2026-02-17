@@ -389,11 +389,11 @@ impl InteroceptiveState {
     /// Convert to physiological state (bridge to #88)
     pub fn to_physiological(&self) -> PhysiologicalState {
         PhysiologicalState {
-            heart_rate_delta: self.heart_rate - 0.3, // Deviation from baseline
-            skin_conductance: self.visceral_arousal * 0.5,
-            muscle_tension: self.fatigue * 0.3,
-            respiration_delta: self.breathing_rate - 0.3,
-            gut_feeling: self.gut_state,
+            heart_rate_delta: (self.heart_rate - 0.3) as f32,
+            skin_conductance: (self.visceral_arousal * 0.5) as f32,
+            muscle_tension: (self.fatigue * 0.3) as f32,
+            respiration_delta: (self.breathing_rate - 0.3) as f32,
+            gut_feeling: self.gut_state as f32,
         }
     }
 
