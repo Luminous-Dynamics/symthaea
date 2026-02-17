@@ -94,6 +94,9 @@ pub struct CreateCouncilInput {
     pub supermajority: f64,
     pub can_spawn_children: bool,
     pub max_delegation_depth: u8,
+    /// Associated signing committee ID (for threshold-signed decisions)
+    #[serde(default)]
+    pub signing_committee_id: Option<String>,
 }
 
 /// Create a new council
@@ -141,6 +144,7 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
         supermajority: input.supermajority,
         can_spawn_children: input.can_spawn_children,
         max_delegation_depth: input.max_delegation_depth,
+        signing_committee_id: input.signing_committee_id,
         status: CouncilStatus::Active,
         created_at: timestamp,
         last_activity: timestamp,
@@ -1032,6 +1036,42 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
         _ => 0.5,
     };
     let passed = input.phi_weighted_result > threshold;
+
+    // For councils with a signing committee, verify threshold signature
+    // on non-operational decisions (Policy, Resource, Constitutional, SubCouncil)
+    if passed {
+        if let Some(ref committee_id) = council.signing_committee_id {
+            let needs_signature = !matches!(input.decision_type, DecisionType::Operational);
+            if needs_signature {
+                // Check for verified signature via cross-zome call
+                let sig_check = call(
+                    CallTargetCell::Local,
+                    ZomeName::from("threshold_signing"),
+                    FunctionName::from("get_proposal_signature"),
+                    None,
+                    ExternIO::encode(input.proposal_id.clone().unwrap_or_default())
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+                );
+
+                match sig_check {
+                    Ok(ZomeCallResponse::Ok(extern_io)) => {
+                        if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
+                            if maybe_record.is_none() {
+                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                    "Council '{}' requires threshold signature from committee '{}' for {:?} decisions",
+                                    council.id, committee_id, input.decision_type
+                                ))));
+                            }
+                        }
+                    }
+                    _ => {
+                        // Threshold-signing zome unavailable — allow decision without
+                        // signature (graceful degradation)
+                    }
+                }
+            }
+        }
+    }
 
     let decision_id = format!(
         "decision-{}-{}",

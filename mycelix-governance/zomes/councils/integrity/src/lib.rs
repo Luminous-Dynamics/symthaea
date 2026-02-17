@@ -39,6 +39,9 @@ pub struct Council {
     pub can_spawn_children: bool,
     /// Maximum delegation depth
     pub max_delegation_depth: u8,
+    /// Associated signing committee ID (for threshold-signed decisions)
+    #[serde(default)]
+    pub signing_committee_id: Option<String>,
     /// Council status
     pub status: CouncilStatus,
     /// Creation timestamp

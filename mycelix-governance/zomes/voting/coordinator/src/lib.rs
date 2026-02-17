@@ -69,6 +69,13 @@ pub enum GovernanceSignal {
         new_status: String,
         reason: String,
     },
+
+    /// A threshold signature is required for an approved proposal
+    SignatureRequired {
+        proposal_id: String,
+        phi_votes_for: f64,
+        voter_count: u64,
+    },
 }
 
 /// Emit a governance signal to connected clients
@@ -1421,6 +1428,31 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
         // Fire-and-forget: generate reflection but don't fail tally if it fails
         let _ = reflect_on_proposal(ReflectOnProposalInput {
             proposal_id: input.proposal_id.clone(),
+        });
+    }
+
+    // === PROPOSAL STATUS ADVANCEMENT & SIGNATURE REQUEST ===
+    // If approved, advance proposal to Approved and request threshold signature
+    if approved {
+        // Update proposal status to Approved via cross-zome call
+        let status_input = serde_json::json!({
+            "proposal_id": input.proposal_id,
+            "new_status": "Approved",
+        });
+        let _ = call(
+            CallTargetCell::Local,
+            ZomeName::from("proposals"),
+            FunctionName::from("update_proposal_status"),
+            None,
+            ExternIO::encode(status_input)
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+        );
+
+        // Emit signal requesting threshold signature from committee members
+        let _ = emit_governance_signal(GovernanceSignal::SignatureRequired {
+            proposal_id: input.proposal_id.clone(),
+            phi_votes_for,
+            voter_count,
         });
     }
 

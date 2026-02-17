@@ -68,6 +68,8 @@ pub enum ProposalStatus {
     Ended,
     /// Approved, in timelock
     Approved,
+    /// Threshold signature obtained, ready for execution
+    Signed,
     /// Rejected by vote
     Rejected,
     /// Timelock complete, executed

@@ -228,6 +228,84 @@ pub fn cancel_proposal(proposal_id: String) -> ExternResult<Record> {
     })
 }
 
+/// Finalize a proposal with a threshold signature
+///
+/// Called after the signing committee has produced a verified threshold signature
+/// for an approved proposal. Advances the proposal from Approved → Signed,
+/// signaling that the proposal is ready for timelock/execution.
+#[hdk_extern]
+pub fn finalize_proposal_with_signature(input: FinalizeWithSignatureInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.signature_id.is_empty() || input.signature_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Signature ID must be 1-256 characters".into())));
+    }
+
+    // Verify the proposal exists and is in Approved status
+    let current_record = get_proposal(input.proposal_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Proposal not found".into())))?;
+
+    let current_proposal: Proposal = current_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid proposal entry".into())))?;
+
+    if current_proposal.status != ProposalStatus::Approved {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Proposal must be in Approved status to finalize with signature, current: {:?}",
+            current_proposal.status
+        ))));
+    }
+
+    // Verify threshold signature exists via cross-zome call
+    let sig_result = call(
+        CallTargetCell::Local,
+        ZomeName::from("threshold_signing"),
+        FunctionName::from("get_proposal_signature"),
+        None,
+        ExternIO::encode(input.proposal_id.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
+
+    match sig_result {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
+                if maybe_record.is_none() {
+                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                        "No verified threshold signature found for proposal '{}'",
+                        input.proposal_id
+                    ))));
+                }
+            }
+        }
+        Ok(ZomeCallResponse::NetworkError(e)) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Network error checking threshold signature: {}", e)
+            )));
+        }
+        _ => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Threshold signing zome unavailable — cannot finalize without signature".into()
+            )));
+        }
+    }
+
+    // Advance proposal to Signed status
+    update_proposal_status(UpdateStatusInput {
+        proposal_id: input.proposal_id,
+        new_status: ProposalStatus::Signed,
+    })
+}
+
+/// Input for finalizing a proposal with a threshold signature
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FinalizeWithSignatureInput {
+    pub proposal_id: String,
+    pub signature_id: String,
+}
+
 /// Generate next proposal ID
 #[hdk_extern]
 pub fn generate_proposal_id(_: ()) -> ExternResult<String> {

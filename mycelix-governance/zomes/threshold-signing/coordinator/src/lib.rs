@@ -487,11 +487,16 @@ pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record>
         verified = true;
     }
 
+    // Capture content_description before moving into struct
+    let content_description = input.content_description;
+    let is_proposal = content_description.starts_with("MIP-");
+    let proposal_id = if is_proposal { Some(content_description.clone()) } else { None };
+
     let signature = ThresholdSignature {
         id: sig_id.clone(),
         committee_id: input.committee_id.clone(),
         signed_content_hash: input.content_hash,
-        signed_content_description: input.content_description,
+        signed_content_description: content_description,
         signature: input.combined_signature,
         signer_count: input.signers.len() as u32,
         signers: input.signers,
@@ -513,6 +518,18 @@ pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record>
     // Create signature anchor for lookups
     let sig_anchor = format!("signature:{}", sig_id);
     create_entry(&EntryTypes::Anchor(Anchor(sig_anchor.clone())))?;
+
+    // Link proposal to signature (if content_description is a proposal ID)
+    if let Some(ref pid) = proposal_id {
+        let proposal_sig_anchor = format!("proposal_sig:{}", pid);
+        create_entry(&EntryTypes::Anchor(Anchor(proposal_sig_anchor.clone())))?;
+        create_link(
+            anchor_hash(&proposal_sig_anchor)?,
+            action_hash.clone(),
+            LinkTypes::ProposalToSignature,
+            (),
+        )?;
+    }
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find signature".into())))
@@ -767,4 +784,46 @@ pub fn get_committee_history(committee_id: String) -> ExternResult<Vec<Record>> 
     });
 
     Ok(records)
+}
+
+/// Get verified threshold signature for a proposal
+///
+/// Looks up signatures linked to the proposal ID. Returns the first
+/// verified signature found, or None if no verified signature exists.
+#[hdk_extern]
+pub fn get_proposal_signature(proposal_id: String) -> ExternResult<Option<Record>> {
+    let proposal_sig_anchor = format!("proposal_sig:{}", proposal_id);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&proposal_sig_anchor)?,
+            LinkTypes::ProposalToSignature,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    // Return the most recent verified signature
+    let mut best: Option<(Timestamp, Record)> = None;
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            if let Some(sig) = record
+                .entry()
+                .to_app_option::<ThresholdSignature>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if sig.verified {
+                    match &best {
+                        None => best = Some((sig.signed_at, record)),
+                        Some((ts, _)) if sig.signed_at > *ts => {
+                            best = Some((sig.signed_at, record));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(best.map(|(_, r)| r))
 }

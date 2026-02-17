@@ -169,6 +169,8 @@ pub enum LinkTypes {
     AgentToCommittee,
     /// Epoch anchor for committee versioning
     EpochToCommittee,
+    /// Proposal ID to its threshold signature
+    ProposalToSignature,
 }
 
 /// Validation callback using FlatOp pattern
@@ -214,6 +216,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::SignatureToShare => Ok(ValidateCallbackResult::Valid),
             LinkTypes::AgentToCommittee => Ok(ValidateCallbackResult::Valid),
             LinkTypes::EpochToCommittee => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ProposalToSignature => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
         FlatOp::StoreRecord(_) => Ok(ValidateCallbackResult::Valid),

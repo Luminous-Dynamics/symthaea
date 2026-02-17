@@ -156,7 +156,47 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
         )));
     }
 
-    // Execute the actions (simplified - would parse and execute in production)
+    // Verify threshold signature exists for this proposal before execution.
+    // Cross-zome call to threshold_signing — if the zome is present and the proposal
+    // has a verified signature, execution proceeds. If the zome is unavailable
+    // (not installed), we allow execution without signature (graceful degradation).
+    let sig_check = call(
+        CallTargetCell::Local,
+        ZomeName::from("threshold_signing"),
+        FunctionName::from("get_proposal_signature"),
+        None,
+        ExternIO::encode(current_timelock.proposal_id.clone())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
+
+    match sig_check {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            // Threshold-signing zome responded — check if we got a verified signature
+            if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
+                if maybe_record.is_none() {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        format!(
+                            "No verified threshold signature found for proposal '{}'. \
+                             A threshold signature is required before execution.",
+                            current_timelock.proposal_id
+                        )
+                    )));
+                }
+                // Signature exists and is verified — proceed to execution
+            }
+        }
+        Ok(ZomeCallResponse::NetworkError(e)) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                format!("Network error checking threshold signature: {}", e)
+            )));
+        }
+        _ => {
+            // Threshold-signing zome not available — allow execution without signature
+            // (graceful degradation for DNAs without threshold signing installed)
+        }
+    }
+
+    // Execute the actions via cross-zome dispatch
     let execution_result = execute_actions(&current_timelock.actions)?;
 
     let execution_id = format!("execution:{}:{}", input.timelock_id, now.as_micros());
@@ -267,24 +307,73 @@ impl GovernanceAction {
         }
     }
 
-    /// Execute the action and return a description
-    fn execute(&self) -> String {
+    /// Execute the action via cross-zome dispatch
+    fn execute(&self) -> ExternResult<String> {
         match self {
             GovernanceAction::TransferCredits { from, to, amount } => {
-                // In a full implementation, this would call the finance zome
-                format!("TransferCredits: {} -> {} ({} credits)", from, to, amount)
+                let transfer_input = serde_json::json!({
+                    "from": from,
+                    "to": to,
+                    "amount": amount,
+                });
+                match call(
+                    CallTargetCell::Local,
+                    ZomeName::from("governance_bridge"),
+                    FunctionName::from("transfer_credits"),
+                    None,
+                    ExternIO::encode(transfer_input)
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+                )? {
+                    ZomeCallResponse::Ok(_) => {
+                        Ok(format!("TransferCredits: {} -> {} ({} credits) [executed]", from, to, amount))
+                    }
+                    other => {
+                        // Bridge unavailable or call failed — log but don't hard-fail
+                        Ok(format!(
+                            "TransferCredits: {} -> {} ({} credits) [bridge unavailable: {:?}]",
+                            from, to, amount, other
+                        ))
+                    }
+                }
             }
             GovernanceAction::UpdateParameter { parameter, value } => {
-                format!("UpdateParameter: {} = {}", parameter, value)
+                let update_input = serde_json::json!({
+                    "parameter": parameter,
+                    "value": value,
+                });
+                match call(
+                    CallTargetCell::Local,
+                    ZomeName::from("constitution"),
+                    FunctionName::from("update_parameter"),
+                    None,
+                    ExternIO::encode(update_input)
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+                )? {
+                    ZomeCallResponse::Ok(_) => {
+                        Ok(format!("UpdateParameter: {} = {} [executed]", parameter, value))
+                    }
+                    other => {
+                        Ok(format!(
+                            "UpdateParameter: {} = {} [constitution zome unavailable: {:?}]",
+                            parameter, value, other
+                        ))
+                    }
+                }
             }
             GovernanceAction::EmitEvent { event, payload } => {
-                format!("EmitEvent: {} (payload: {})", event, payload)
+                // Emit as a governance signal to connected clients
+                let _ = emit_signal(&serde_json::json!({
+                    "type": "GovernanceActionExecuted",
+                    "event": event,
+                    "payload": payload,
+                }));
+                Ok(format!("EmitEvent: {} [emitted]", event))
             }
         }
     }
 }
 
-/// Execute actions parsed from JSON
+/// Execute actions parsed from JSON via cross-zome dispatch
 fn execute_actions(actions_json: &str) -> ExternResult<ActionExecutionResult> {
     // Parse as typed enum array (or single action)
     let actions: Vec<GovernanceAction> = match serde_json::from_str(actions_json) {
@@ -313,7 +402,16 @@ fn execute_actions(actions_json: &str) -> ExternResult<ActionExecutionResult> {
                 error: Some(format!("Action {}: {}", i, msg)),
             });
         }
-        results.push(action.execute());
+        match action.execute() {
+            Ok(description) => results.push(description),
+            Err(e) => {
+                return Ok(ActionExecutionResult {
+                    success: false,
+                    result: Some(format!("Executed {} of {} actions before failure", i, actions.len())),
+                    error: Some(format!("Action {} execution failed: {}", i, e)),
+                });
+            }
+        }
     }
 
     Ok(ActionExecutionResult {
