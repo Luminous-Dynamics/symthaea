@@ -59,5 +59,5 @@ pub use engine::{
     Individual, PhiArchitectureSearch, SearchConfig, SearchResult, SearchStats, SearchStrategy,
 };
 pub use genome::{ArchitectureGenome, BundlingGene, TopologyGene};
-pub use phenotype::{ArchitectureStats, DecodedArchitecture};
+pub use phenotype::{ArchitectureStats, DecodedArchitecture, TopologyMetrics};
 pub use phi_gradient::{GradientVelocity, PhiGradient};

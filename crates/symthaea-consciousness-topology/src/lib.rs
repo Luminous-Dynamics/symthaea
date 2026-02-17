@@ -180,12 +180,20 @@ impl SimplicialComplex {
 
     /// Get simplices at a specific dimension
     pub fn simplices_at_dim(&self, dim: usize) -> &HashSet<Simplex> {
-        use std::sync::LazyLock;
         if dim < self.simplices_by_dim.len() {
             &self.simplices_by_dim[dim]
         } else {
-            static EMPTY: LazyLock<HashSet<Simplex>> = LazyLock::new(HashSet::new);
-            &EMPTY
+            // Return an empty set without static allocation.
+            // Safe because simplices_by_dim[0] always exists after new().
+            // Callers checking out-of-range dims expect empty results.
+            debug_assert!(
+                !self.simplices_by_dim.is_empty(),
+                "simplices_by_dim should never be empty"
+            );
+            // Fallback: return dim 0 if it's empty, or just return an allocated empty set
+            // via a workaround for MSRV 1.75 (no LazyLock).
+            static EMPTY: std::sync::OnceLock<HashSet<Simplex>> = std::sync::OnceLock::new();
+            EMPTY.get_or_init(HashSet::new)
         }
     }
 
@@ -425,7 +433,7 @@ impl ConsciousnessTopologyAnalyzer {
         self.point_window.push_back(point);
 
         // Rebuild complex periodically
-        if self.point_counter.is_multiple_of(10) {
+        if self.point_counter % 10 == 0 {
             self.rebuild_complex();
         }
     }

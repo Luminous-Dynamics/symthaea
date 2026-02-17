@@ -427,6 +427,74 @@ impl DecodedArchitecture {
             min_degree,
             num_modules: self.genome.num_modules,
             hierarchy_depth: self.genome.hierarchy_depth,
+            topology: Some(self.topology_metrics()),
+        }
+    }
+
+    /// Compute topological metrics using consciousness topology analysis.
+    ///
+    /// Converts the architecture's adjacency list into a simplicial complex
+    /// and computes Betti numbers (connected components, loops, voids).
+    pub fn topology_metrics(&self) -> TopologyMetrics {
+        use symthaea_consciousness_topology::{BettiNumbers, Simplex, SimplicialComplex};
+
+        let mut complex = SimplicialComplex::new();
+        let n = self.nodes.len();
+
+        // Add 0-simplices (vertices)
+        for i in 0..n {
+            complex.add_simplex(Simplex::new(vec![i]), 0.0);
+        }
+
+        // Add 1-simplices (edges) from adjacency
+        for (i, neighbors) in self.adjacency.iter().enumerate() {
+            for &(j, weight) in neighbors {
+                if j > i {
+                    // Undirected: add each edge once
+                    complex.add_simplex(Simplex::new(vec![i, j]), weight as f64);
+                }
+            }
+        }
+
+        // Add 2-simplices (triangles) where all edges exist
+        let edge_set: std::collections::HashSet<(usize, usize)> = self
+            .adjacency
+            .iter()
+            .enumerate()
+            .flat_map(|(i, neighbors)| {
+                neighbors
+                    .iter()
+                    .map(move |&(j, _)| if i < j { (i, j) } else { (j, i) })
+            })
+            .collect();
+
+        for i in 0..n {
+            for &(j, _) in &self.adjacency[i] {
+                if j <= i {
+                    continue;
+                }
+                for &(k, _) in &self.adjacency[j] {
+                    if k <= j {
+                        continue;
+                    }
+                    // Check if triangle i-j-k exists (all 3 edges)
+                    if edge_set.contains(&(i, k)) {
+                        complex.add_simplex(Simplex::new(vec![i, j, k]), 0.0);
+                    }
+                }
+            }
+        }
+
+        let betti = BettiNumbers::from_complex(&complex);
+        let interp = betti.interpretation();
+
+        TopologyMetrics {
+            betti_0: betti.beta_0,
+            betti_1: betti.beta_1,
+            betti_2: betti.beta_2,
+            euler_characteristic: betti.euler_characteristic,
+            unity: interp.unity,
+            complexity: interp.complexity,
         }
     }
 }
@@ -442,4 +510,23 @@ pub struct ArchitectureStats {
     pub min_degree: usize,
     pub num_modules: usize,
     pub hierarchy_depth: usize,
+    /// Topological metrics from consciousness topology analysis
+    pub topology: Option<TopologyMetrics>,
+}
+
+/// Topological metrics for an architecture (Betti numbers + interpretation)
+#[derive(Debug, Clone)]
+pub struct TopologyMetrics {
+    /// Connected components (1 = unified)
+    pub betti_0: usize,
+    /// 1-dimensional holes (loops/cycles)
+    pub betti_1: usize,
+    /// 2-dimensional voids
+    pub betti_2: usize,
+    /// Euler characteristic: chi = beta_0 - beta_1 + beta_2
+    pub euler_characteristic: i64,
+    /// Unity score (1.0 = fully connected, <1.0 = fragmented)
+    pub unity: f64,
+    /// Topological complexity (loops + voids)
+    pub complexity: f64,
 }

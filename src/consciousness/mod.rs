@@ -458,7 +458,7 @@ pub mod phi_validation;
 pub use symthaea_field_dynamics as consciousness_field_dynamics;
 pub mod consciousness_holography;
 pub mod consciousness_resonance;
-pub mod consciousness_topology;
+pub use symthaea_consciousness_topology as consciousness_topology;
 pub mod dissipative_consciousness;
 pub mod embodied_cognition;
 pub use symthaea_enactive as enactive_cognition;

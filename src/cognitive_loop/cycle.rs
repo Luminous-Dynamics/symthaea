@@ -549,6 +549,16 @@ impl CognitiveLoopService {
         let mut reasoning_confidence: f32 = 0.0;
         #[allow(unused_mut)]
         let mut reasoning_lr_factor: f32 = 1.0;
+        #[allow(unused_mut)]
+        let mut reasoning_gate_blocked: bool = false;
+        #[allow(unused_mut)]
+        let mut reasoning_fallback: Option<String> = None;
+        #[allow(unused_mut)]
+        let mut reasoning_plan_action: Option<usize> = None;
+        #[allow(unused_mut)]
+        let mut reasoning_plan_confidence: f32 = 0.0;
+        #[allow(unused_mut)]
+        let mut reasoning_narrative: Option<String> = None;
         #[cfg(feature = "reasoning_engine")]
         if let Some(ref mut reasoning_engine) = self.reasoning_engine {
             use crate::consciousness::epistemic_conflict::MultiTheoryMetrics as ECMetrics;
@@ -581,18 +591,47 @@ impl CognitiveLoopService {
 
             let reasoning_result = reasoning_engine.reason(&reasoning_ctx);
 
-            // Capture reasoning outputs for downstream use:
             // 1. Phi_eff modulates confidence (higher = more reliable reasoning)
             reasoning_confidence = reasoning_result.phi_eff as f32;
 
             // 2. Reliability modulates learning rate — low reliability = cautious learning
             reasoning_lr_factor = reasoning_result.reliability as f32;
 
-            // 3. Log reasoning tier and timing for observability
+            // 3. Tool gate: check if the gate blocked an action
+            if let Some(ref gate) = reasoning_result.gate {
+                if !gate.is_allowed() {
+                    reasoning_gate_blocked = true;
+                    reasoning_fallback =
+                        gate.fallback.as_ref().map(|f| format!("{:?}", f));
+                    // Gate blocked → suppress learning this cycle (safety measure)
+                    reasoning_lr_factor = 0.0;
+                    tracing::info!(
+                        risk = ?gate.risk_level,
+                        required_phi = gate.required_phi,
+                        actual_phi = gate.actual_phi_eff,
+                        "Reasoning gate blocked action"
+                    );
+                }
+            }
+
+            // 4. MCTS planning result (Tier 1+)
+            if let Some(ref plan) = reasoning_result.plan {
+                if plan.did_plan {
+                    reasoning_plan_action = plan.best_action_idx;
+                    reasoning_plan_confidence = plan.confidence as f32;
+                }
+            }
+
+            // 5. Narrative (Tier 2, best-effort)
+            reasoning_narrative = reasoning_result.narrative.clone();
+
+            // 6. Log reasoning tier and timing for observability
             tracing::debug!(
                 tier = ?reasoning_result.tier,
                 phi_eff = reasoning_result.phi_eff,
                 reliability = reasoning_result.reliability,
+                gate_blocked = reasoning_gate_blocked,
+                plan_confidence = reasoning_plan_confidence,
                 wall_time_us = reasoning_result.wall_time_us,
                 budget_exceeded = reasoning_result.budget_exceeded,
                 "Reasoning engine cycle"
@@ -1003,6 +1042,11 @@ impl CognitiveLoopService {
             prefrontal_veto,
             reasoning_confidence,
             exploration_action,
+            reasoning_gate_blocked,
+            reasoning_fallback,
+            reasoning_plan_action,
+            reasoning_plan_confidence,
+            reasoning_narrative,
         };
 
         tracing::debug!(

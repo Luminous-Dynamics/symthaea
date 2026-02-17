@@ -22,6 +22,22 @@ pub struct CycleMetadata {
 
     /// Description of the exploration action taken (if any)
     pub exploration_action: Option<String>,
+
+    /// Whether the reasoning engine's tool gate blocked an action this cycle.
+    /// When true, the system used a fallback strategy instead.
+    pub reasoning_gate_blocked: bool,
+
+    /// Fallback strategy selected when gating blocked an action (if any)
+    pub reasoning_fallback: Option<String>,
+
+    /// Best action from MCTS planning (Tier 1+), if planning ran
+    pub reasoning_plan_action: Option<usize>,
+
+    /// MCTS plan confidence (0.0 = no plan, >0 = plan confidence)
+    pub reasoning_plan_confidence: f32,
+
+    /// Human-readable reasoning narrative (Tier 2, best-effort)
+    pub reasoning_narrative: Option<String>,
 }
 
 /// Result of a single cognitive cycle
