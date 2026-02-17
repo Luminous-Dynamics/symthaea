@@ -48,7 +48,7 @@ fn test_error_decreases_over_repeated_input() {
     let second_half_avg: f32 = errors[10..].iter().sum::<f32>() / 10.0;
 
     assert!(
-        second_half_avg <= first_half_avg + 0.15,
+        second_half_avg <= first_half_avg + 0.08,
         "Error should decrease or stabilize: first_half={first_half_avg:.4}, second_half={second_half_avg:.4}"
     );
 }
@@ -211,6 +211,51 @@ fn test_100_cycle_stability() {
     }
 
     assert_eq!(service.stats().total_cycles, 100);
+
+    let avg_error = service.stats().avg_prediction_error;
+    assert!(
+        avg_error < 1.0,
+        "Average prediction error should be bounded over 100 cycles: got {avg_error:.4}"
+    );
+}
+
+// ── All Modules No Degradation ───────────────────────────────────
+
+#[test]
+fn test_all_modules_no_degradation() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        async_training: false,
+        enable_virtual_body: true,
+        enable_surprise_exploration: true,
+        enable_prefrontal: true,
+        enable_meta_cognition: true,
+        enable_narrative_self: true,
+        enable_predictive_self: true,
+        enable_attention_schema: true,
+        enable_gwt: true,
+        enable_temporal_consciousness: true,
+        enable_embodied_cognition: true,
+        enable_narrative_gwt: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut errors = Vec::new();
+    for _ in 0..50 {
+        let result = service.cycle("all modules integration stability test");
+        errors.push(result.prediction_error);
+        assert!(
+            result.prediction_error.is_finite(),
+            "Error must be finite with all modules enabled"
+        );
+    }
+
+    let avg = errors.iter().sum::<f32>() / errors.len() as f32;
+    assert!(
+        avg < 1.0,
+        "Average error with all modules should be bounded: got {avg:.4}"
+    );
 }
 
 // ── Virtual Body Enabled by Default ─────────────────────────────────

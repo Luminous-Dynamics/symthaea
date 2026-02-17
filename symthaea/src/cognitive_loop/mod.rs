@@ -149,6 +149,12 @@ use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
 use crate::consciousness::temporal_consciousness::TemporalConsciousnessAnalyzer;
 use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
 use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::autopoietic_consciousness::AutopoieticConsciousness;
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::enactive_cognition::EnactiveCognition;
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::exploration::SurpriseExplorationBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
@@ -446,6 +452,9 @@ pub struct CognitiveLoopService {
     /// via a unified NarrativeSelf + GWT + PredictiveSelf integration.
     narrative_gwt: Option<NarrativeGWTIntegration>,
 
+    /// Whether narrative-GWT vetoed the previous cycle (suppresses learning this cycle)
+    narrative_veto_active: bool,
+
     /// Relational Phi from dyad computation (set externally by Symthaea facade).
     /// Blended into unified_phi at 15% weight when > 0.
     relational_phi: f64,
@@ -463,10 +472,29 @@ pub struct CognitiveLoopService {
     /// Previous cycle's body phi modulation (fed back into next cycle's unified_phi)
     prev_body_phi_modulation: f64,
 
+    /// Previous cycle's embodied cognition phi modulation (fed back into unified_phi)
+    prev_embodied_phi_modulation: f64,
+
     /// Master Consciousness Equation (MCE) — comprehensive consciousness metric.
     /// C(t) = σ(softmin(Φ, B, W, A, R, E, K; τ)) × weighted_sum × S × ρ(t) × M × N × Soc
     /// Runs every 10th cycle to provide richer consciousness measurement than Phi alone.
     master_equation: MasterConsciousnessEquation,
+
+    /// Unified Living Mind: life-mind continuity integration (full_consciousness feature).
+    /// Integrates autopoietic self-maintenance, enactive sense-making, affect, and prediction
+    /// into a unified vitality/coherence state that measures "aliveness" of the system.
+    #[cfg(feature = "full_consciousness")]
+    unified_living_mind: UnifiedLivingMind,
+
+    /// Autopoietic consciousness for self-production/maintenance (full_consciousness feature).
+    /// Tracks boundary maintenance, self-model updates, and component health.
+    #[cfg(feature = "full_consciousness")]
+    autopoietic: AutopoieticConsciousness,
+
+    /// Enactive cognition for embodied sense-making (full_consciousness feature).
+    /// Tracks action-perception coupling, meaning emergence, and enacted world.
+    #[cfg(feature = "full_consciousness")]
+    enactive: EnactiveCognition,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

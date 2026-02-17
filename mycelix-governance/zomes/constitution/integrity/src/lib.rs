@@ -175,7 +175,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Charter(charter) => {
                     validate_update_charter(action, charter, original_action_hash)
                 }
-                EntryTypes::Amendment(amendment) => validate_update_amendment(action, amendment),
+                EntryTypes::Amendment(amendment) => validate_update_amendment(action, amendment, original_action_hash),
                 EntryTypes::GovernanceParameter(param) => validate_update_parameter(action, param),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -242,11 +242,63 @@ fn validate_create_charter(
 /// Validate charter update
 fn validate_update_charter(
     _action: Update,
-    _charter: Charter,
-    _original_action_hash: ActionHash,
+    charter: Charter,
+    original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Charter updates require constitutional amendment process
-    // Additional validation could check that an amendment was ratified
+    // Get original charter for comparison
+    let original_record = must_get_valid_record(original_action_hash)?;
+    let original_charter: Charter = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original charter not found".into()
+        )))?;
+
+    // Charter ID cannot change
+    if charter.id != original_charter.id {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change charter ID".into(),
+        ));
+    }
+
+    // Version must increment by exactly 1
+    if charter.version != original_charter.version + 1 {
+        return Ok(ValidateCallbackResult::Invalid(format!(
+            "Charter version must increment by 1 (expected {}, got {})",
+            original_charter.version + 1,
+            charter.version
+        )));
+    }
+
+    // Preamble cannot be empty
+    if charter.preamble.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Charter must have a preamble".into(),
+        ));
+    }
+
+    // Articles must be valid JSON
+    if serde_json::from_str::<serde_json::Value>(&charter.articles).is_err() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Articles must be valid JSON".into(),
+        ));
+    }
+
+    // Must still have at least one right
+    if charter.rights.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Charter must define fundamental rights".into(),
+        ));
+    }
+
+    // Adoption date cannot change
+    if charter.adopted != original_charter.adopted {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change charter adoption date".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -293,12 +345,51 @@ fn validate_create_amendment(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate amendment update
+/// Validate amendment update — enforce status transition whitelist
 fn validate_update_amendment(
     _action: Update,
-    _amendment: Amendment,
+    amendment: Amendment,
+    original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Amendments can be updated (status changes during ratification process)
+    let original_record = must_get_valid_record(original_action_hash)?;
+    let original_amendment: Amendment = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original amendment not found".into()
+        )))?;
+
+    // Immutable fields: id, charter_version, amendment_type, proposer, proposal_id, created
+    if amendment.id != original_amendment.id {
+        return Ok(ValidateCallbackResult::Invalid("Cannot change amendment ID".into()));
+    }
+    if amendment.proposer != original_amendment.proposer {
+        return Ok(ValidateCallbackResult::Invalid("Cannot change amendment proposer".into()));
+    }
+    if amendment.proposal_id != original_amendment.proposal_id {
+        return Ok(ValidateCallbackResult::Invalid("Cannot change amendment proposal_id".into()));
+    }
+
+    // Status transition whitelist
+    if amendment.status != original_amendment.status {
+        let valid = matches!(
+            (&original_amendment.status, &amendment.status),
+            (AmendmentStatus::Draft, AmendmentStatus::Deliberation)
+                | (AmendmentStatus::Draft, AmendmentStatus::Withdrawn)
+                | (AmendmentStatus::Deliberation, AmendmentStatus::Voting)
+                | (AmendmentStatus::Deliberation, AmendmentStatus::Withdrawn)
+                | (AmendmentStatus::Voting, AmendmentStatus::Ratified)
+                | (AmendmentStatus::Voting, AmendmentStatus::Rejected)
+        );
+        if !valid {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid amendment status transition: {:?} -> {:?}",
+                original_amendment.status, amendment.status
+            )));
+        }
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 

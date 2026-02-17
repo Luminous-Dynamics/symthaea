@@ -286,8 +286,13 @@ pub fn finalize_proposal_with_signature(input: FinalizeWithSignatureInput) -> Ex
             )));
         }
         _ => {
+            // Unlike execute_timelock (which allows graceful degradation when the
+            // threshold-signing zome is not installed), finalize_proposal_with_signature
+            // inherently requires a signature — it cannot degrade gracefully.
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Threshold signing zome unavailable — cannot finalize without signature".into()
+                "Threshold-signing zome not installed. Cannot finalize proposal without \
+                 signature. If this DNA does not use threshold signing, advance the \
+                 proposal directly to Executed via execute_timelock instead.".into()
             )));
         }
     }

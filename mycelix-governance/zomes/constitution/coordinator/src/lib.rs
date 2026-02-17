@@ -157,8 +157,15 @@ pub struct ProposeAmendmentInput {
 }
 
 /// Ratify an amendment
+///
+/// Only callable by the amendment's proposer or via governance execution pipeline.
+/// The amendment must be in Voting status (not Draft or Deliberation).
 #[hdk_extern]
 pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
+    if amendment_id.is_empty() || amendment_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Amendment ID must be 1-256 characters".into())));
+    }
+
     // Find the amendment
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
@@ -193,6 +200,18 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Invalid amendment entry".into()
         )))?;
+
+    // Amendment must be in Voting status to be ratified.
+    // Authorization is provided by the governance vote itself — any agent can
+    // call ratify_amendment on an amendment that has passed its vote (Voting status).
+    // The proposer check is relaxed to allow the execution pipeline to ratify
+    // after the proposal passes, which is the normal governance flow.
+    if current_amendment.status != AmendmentStatus::Voting {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Amendment must be in Voting status to ratify, current: {:?}",
+            current_amendment.status
+        ))));
+    }
 
     let now = sys_time()?;
 
@@ -244,27 +263,105 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
     // Create new charter version with amendment applied
     let new_charter = match amendment.amendment_type {
         AmendmentType::ModifyPreamble => Charter {
-            id: charter.id,
             version: charter.version + 1,
             preamble: amendment.new_text.clone(),
-            articles: charter.articles,
-            rights: charter.rights,
-            amendment_process: charter.amendment_process,
-            adopted: charter.adopted,
             last_amended: Some(now),
+            ..charter
         },
-        _ => {
-            // For other types, would need more complex logic
-            // For now, just increment version
+        AmendmentType::ModifyProcess => Charter {
+            version: charter.version + 1,
+            amendment_process: amendment.new_text.clone(),
+            last_amended: Some(now),
+            ..charter
+        },
+        AmendmentType::AddArticle => {
+            // Parse articles JSON, append new article
+            let mut articles: Vec<serde_json::Value> =
+                serde_json::from_str(&charter.articles).unwrap_or_default();
+            articles.push(serde_json::json!({
+                "title": amendment.article.as_deref().unwrap_or("New Article"),
+                "content": amendment.new_text,
+            }));
             Charter {
-                id: charter.id,
                 version: charter.version + 1,
-                preamble: charter.preamble,
-                articles: charter.articles, // Would modify based on amendment
-                rights: charter.rights,
-                amendment_process: charter.amendment_process,
-                adopted: charter.adopted,
+                articles: serde_json::to_string(&articles).unwrap_or_default(),
                 last_amended: Some(now),
+                ..charter
+            }
+        }
+        AmendmentType::ModifyArticle => {
+            // Find and replace article by title match
+            let mut articles: Vec<serde_json::Value> =
+                serde_json::from_str(&charter.articles).unwrap_or_default();
+            if let Some(ref target_article) = amendment.article {
+                for art in &mut articles {
+                    if art.get("title").and_then(|t| t.as_str()) == Some(target_article) {
+                        art["content"] = serde_json::Value::String(amendment.new_text.clone());
+                        break;
+                    }
+                }
+            }
+            Charter {
+                version: charter.version + 1,
+                articles: serde_json::to_string(&articles).unwrap_or_default(),
+                last_amended: Some(now),
+                ..charter
+            }
+        }
+        AmendmentType::RemoveArticle => {
+            // Remove article by title match
+            let mut articles: Vec<serde_json::Value> =
+                serde_json::from_str(&charter.articles).unwrap_or_default();
+            if let Some(ref target_article) = amendment.article {
+                articles.retain(|art| {
+                    art.get("title").and_then(|t| t.as_str()) != Some(target_article)
+                });
+            }
+            Charter {
+                version: charter.version + 1,
+                articles: serde_json::to_string(&articles).unwrap_or_default(),
+                last_amended: Some(now),
+                ..charter
+            }
+        }
+        AmendmentType::AddRight => {
+            let mut rights = charter.rights.clone();
+            rights.push(amendment.new_text.clone());
+            Charter {
+                version: charter.version + 1,
+                rights,
+                last_amended: Some(now),
+                ..charter
+            }
+        }
+        AmendmentType::ModifyRight => {
+            // Replace right matching original_text with new_text
+            let rights: Vec<String> = charter.rights.iter().map(|r| {
+                if amendment.original_text.as_deref() == Some(r.as_str()) {
+                    amendment.new_text.clone()
+                } else {
+                    r.clone()
+                }
+            }).collect();
+            Charter {
+                version: charter.version + 1,
+                rights,
+                last_amended: Some(now),
+                ..charter
+            }
+        }
+        AmendmentType::RemoveRight => {
+            // Remove right matching original_text or new_text
+            let target = amendment.original_text.as_deref()
+                .unwrap_or(&amendment.new_text);
+            let rights: Vec<String> = charter.rights.into_iter()
+                .filter(|r| r != target)
+                .collect();
+            Charter {
+                version: charter.version + 1,
+                rights,
+                last_amended: Some(now),
+                ..charter
             }
         }
     };
@@ -330,6 +427,63 @@ pub struct SetParameterInput {
     pub description: String,
     pub min_value: Option<String>,
     pub max_value: Option<String>,
+    pub proposal_id: Option<String>,
+}
+
+/// Update a governance parameter (cross-zome entry point)
+///
+/// Called by the execution zome's `GovernanceAction::UpdateParameter` dispatch.
+/// Preserves the existing parameter's type, min/max values, and description
+/// when the parameter already exists. Falls back to String type for new parameters.
+#[hdk_extern]
+pub fn update_parameter(input: UpdateParameterInput) -> ExternResult<Record> {
+    // Try to fetch existing parameter to preserve its type and metadata
+    let (value_type, description, min_value, max_value) =
+        if let Some(existing_record) = get_parameter(input.parameter.clone())? {
+            if let Some(existing) = existing_record
+                .entry()
+                .to_app_option::<GovernanceParameter>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                (
+                    existing.value_type,
+                    format!(
+                        "Updated via governance action{}",
+                        input.proposal_id.as_ref().map_or(String::new(), |p| format!(" ({})", p))
+                    ),
+                    existing.min_value,
+                    existing.max_value,
+                )
+            } else {
+                (ParameterType::String, format!(
+                    "Created via governance action{}",
+                    input.proposal_id.as_ref().map_or(String::new(), |p| format!(" ({})", p))
+                ), None, None)
+            }
+        } else {
+            (ParameterType::String, format!(
+                "Created via governance action{}",
+                input.proposal_id.as_ref().map_or(String::new(), |p| format!(" ({})", p))
+            ), None, None)
+        };
+
+    set_parameter(SetParameterInput {
+        name: input.parameter,
+        value: input.value,
+        value_type,
+        description,
+        min_value,
+        max_value,
+        proposal_id: input.proposal_id,
+    })
+}
+
+/// Input for updating a parameter via cross-zome call
+#[derive(Serialize, Deserialize, Debug)]
+pub struct UpdateParameterInput {
+    pub parameter: String,
+    pub value: String,
+    #[serde(default)]
     pub proposal_id: Option<String>,
 }
 

@@ -382,6 +382,13 @@ fn validate_create_proposal(
         ));
     }
 
+    // New proposals must start in Draft status
+    if proposal.status != ProposalStatus::Draft {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New proposals must start in Draft status".into(),
+        ));
+    }
+
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -415,12 +422,45 @@ fn validate_update_proposal(
         ));
     }
 
-    // Cannot modify after voting starts (unless cancelling)
-    if original_proposal.status == ProposalStatus::Active
-        && proposal.status != ProposalStatus::Cancelled
+    // Enforce valid status transitions
+    if proposal.status != original_proposal.status {
+        let valid = matches!(
+            (&original_proposal.status, &proposal.status),
+            // Draft: submit for voting or cancel
+            (ProposalStatus::Draft, ProposalStatus::Active)
+            | (ProposalStatus::Draft, ProposalStatus::Cancelled)
+            // Active: end voting period or cancel
+            | (ProposalStatus::Active, ProposalStatus::Ended)
+            | (ProposalStatus::Active, ProposalStatus::Cancelled)
+            // Ended: tally determines outcome
+            | (ProposalStatus::Ended, ProposalStatus::Approved)
+            | (ProposalStatus::Ended, ProposalStatus::Rejected)
+            // Approved: threshold signature obtained, or cancel
+            | (ProposalStatus::Approved, ProposalStatus::Signed)
+            | (ProposalStatus::Approved, ProposalStatus::Cancelled)
+            // Signed: execution outcome
+            | (ProposalStatus::Signed, ProposalStatus::Executed)
+            | (ProposalStatus::Signed, ProposalStatus::Failed)
+            | (ProposalStatus::Signed, ProposalStatus::Cancelled)
+        );
+
+        if !valid {
+            return Ok(ValidateCallbackResult::Invalid(format!(
+                "Invalid status transition: {:?} -> {:?}",
+                original_proposal.status, proposal.status
+            )));
+        }
+    }
+
+    // Cannot modify content fields after voting starts (only status changes allowed)
+    if original_proposal.status != ProposalStatus::Draft
+        && (proposal.title != original_proposal.title
+            || proposal.description != original_proposal.description
+            || proposal.actions != original_proposal.actions
+            || proposal.proposal_type != original_proposal.proposal_type)
     {
         return Ok(ValidateCallbackResult::Invalid(
-            "Cannot modify proposal during active voting".into(),
+            "Cannot modify proposal content after leaving Draft status".into(),
         ));
     }
 

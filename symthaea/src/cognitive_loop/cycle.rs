@@ -57,18 +57,29 @@ impl CognitiveLoopService {
                 .route_from_cycle(prior_error, prior_pattern, prior_valence);
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PHASE 0.4: Moral Evaluation
+        // PHASE 0.4: Moral Evaluation (throttled: every 5th cycle or on new input)
         // ═══════════════════════════════════════════════════════════════════════
         // Evaluate input for moral alignment using HDC-based moral algebra.
-        // This informs downstream processing and can trigger ethical safeguards.
+        // Throttled to amortize cost: reuse last judgment when input is unchanged.
 
-        let moral_judgment = self.evaluate_moral_alignment(input);
+        let moral_judgment = if self.stats.total_cycles % 5 == 1
+            || self
+                .last_moral_judgment
+                .as_ref()
+                .map_or(true, |j| j.input != input)
+        {
+            let j = self.evaluate_moral_alignment(input);
+            self.stats.moral_evaluations += 1;
+            j
+        } else if let Some(ref cached) = self.last_moral_judgment {
+            cached.clone()
+        } else {
+            self.evaluate_moral_alignment(input)
+        };
         let moral_concern_detected = moral_judgment.moral_score < -0.3
             || moral_judgment.consent_violation
             || !moral_judgment.violations.is_empty();
 
-        // Update stats with moral evaluation
-        self.stats.moral_evaluations += 1;
         if moral_concern_detected {
             self.stats.moral_concerns_detected += 1;
         }
@@ -118,6 +129,11 @@ impl CognitiveLoopService {
         // 1. HDC encode with attention from previous prediction
         let encoding_result = self.encoder.encode(input);
         let prediction_error = encoding_result.prediction_error;
+
+        // Pre-compute BinaryHV once for all subsystems that need it.
+        // real_hv_to_hv16 iterates 16,384 floats twice (mean + threshold).
+        // Previously called 7× per cycle — this caches the result.
+        let hv16_cached = real_hv_to_hv16(&encoding_result.hdv);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1.1 Surprise-Driven Exploration: Track surprise, modulate curiosity
@@ -566,8 +582,11 @@ impl CognitiveLoopService {
         };
         // Previous cycle's body phi modulation feeds back into unified_phi (±0.05 range)
         let body_phi_contrib = (self.prev_body_phi_modulation - 1.0) * 0.1;
+        // FEEDBACK: Embodied cognition phi modulation feeds back into unified_phi (±2.5% range)
+        // Science: Merleau-Ponty, Damasio — body schema modulates consciousness level
+        let embodied_phi_contrib = (self.prev_embodied_phi_modulation - 1.0) * 0.05;
         let unified_phi =
-            (coherence_phi + voice_phi + flow_phi + relational_phi_contrib + body_phi_contrib as f32).clamp(0.0, 1.0) as f64;
+            (coherence_phi + voice_phi + flow_phi + relational_phi_contrib + body_phi_contrib as f32 + embodied_phi_contrib as f32).clamp(0.0, 1.0) as f64;
         self.unification_engine.update_phi(unified_phi);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -684,9 +703,12 @@ impl CognitiveLoopService {
             .clamp(0.0, 0.01); // Hard cap: reduced from 0.05 to 0.01 to prevent oscillation with cyclic patterns
 
         // 11. Learn if error is significant AND we have a previous state AND not paused
+        // FEEDBACK: Narrative-GWT veto suppresses learning (consciousness governance)
+        // Science: Baars (2005) — global workspace vetoing prevents consolidation
         let (learning_occurred, training_loss) = if prediction_error
             > self.config.learning_threshold
             && !self.adaptive_behavior.pause_learning
+            && !self.narrative_veto_active
         {
             self.stats.learning_cycles += 1;
 
@@ -850,10 +872,9 @@ impl CognitiveLoopService {
                 || {
                     // Stability regime: CfC dynamics for primitives
                     // Frequently-used primitives crystallize, rarely-used stay fluid
-                    let hv16_input = real_hv_to_hv16(&encoding_result.hdv);
                     let timestamp = pp_total_cycles as f64 * delta_t as f64;
                     let (_regime_state, transitions) =
-                        stability_regime.process_input(&hv16_input, delta_t, timestamp);
+                        stability_regime.process_input(&hv16_cached, delta_t, timestamp);
 
                     for transition in &transitions {
                         if let RegimeTransition::Crystallized {
@@ -1083,6 +1104,12 @@ impl CognitiveLoopService {
             false
         };
 
+        // FEEDBACK: Prefrontal veto suppresses exploration (executive control)
+        // Science: Miller & Cohen (2001) — PFC inhibits impulsive exploration when WM overloaded
+        if prefrontal_veto {
+            self.curiosity_drive.exploration_urge = 0.0;
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // META-COGNITION: Recursive self-modeling and learning rate modulation
         // ═══════════════════════════════════════════════════════════════════════
@@ -1140,9 +1167,6 @@ impl CognitiveLoopService {
         // NARRATIVE SELF: Process experience and track self-Φ
         // ═══════════════════════════════════════════════════════════════════════
         let narrative_self_phi = if let Some(ref mut narrative) = self.narrative_self {
-            // Convert ContinuousHV to BinaryHV for narrative self processing
-            let binary_hv = real_hv_to_hv16(&encoding_result.hdv);
-
             // Significance: higher when prediction error is high or moral concern detected
             let significance = if moral_concern_detected {
                 0.8
@@ -1151,7 +1175,7 @@ impl CognitiveLoopService {
             };
 
             narrative.process_experience(
-                &binary_hv,
+                &hv16_cached,
                 input,
                 prediction_error < self.config.learning_threshold, // success
                 coherence as f64,                                  // effort ~ coherence
@@ -1178,17 +1202,29 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // FEEDBACK: Low self-model confidence reduces learning rate (precision-weighting)
+        // Science: Clark (2013) — low precision on self-model predictions should reduce LR
+        if predictive_self_safety > 0.0 && predictive_self_safety < 0.4 {
+            let safety_factor = 0.85 + predictive_self_safety * 0.375; // 0.85-1.0
+            self.stats.effective_learning_rate *= safety_factor;
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // ATTENTION SCHEMA: Track attention state and generate control signals
         // ═══════════════════════════════════════════════════════════════════════
         let attention_schema_focus = if let Some(ref mut schema) = self.attention_schema {
-            let hv16 = real_hv_to_hv16(&encoding_result.hdv);
             let salience = prediction_error.max(0.1); // Prediction error as salience proxy
-            let update = schema.update(hv16, salience);
-            // Apply attention control signal to adaptive behavior
-            if update.control_signal > 0.5 {
-                self.adaptive_behavior.attention_sensitivity *= 1.0 + (update.control_signal - 0.5) * 0.2;
-            }
+            let update = schema.update(hv16_cached, salience);
+            // FEEDBACK: Attention schema modulates processing (bidirectional)
+            // Science: Graziano (2013) AST — attention schema actively shapes processing
+            let gain = if update.control_signal > 0.3 {
+                ((update.control_signal - 0.3) * 0.6).min(0.3) // up to +30%
+            } else if update.control_signal < 0.2 {
+                -0.1 // -10% when attention weak
+            } else {
+                0.0
+            };
+            self.adaptive_behavior.attention_sensitivity *= 1.0 + gain;
             update.new_intensity
         } else {
             0.0
@@ -1198,12 +1234,11 @@ impl CognitiveLoopService {
         // GWT INTEGRATION: Submit encoding to global workspace for broadcast
         // ═══════════════════════════════════════════════════════════════════════
         let gwt_broadcast = if let Some(ref mut gwt) = self.gwt {
-            let hv16 = real_hv_to_hv16(&encoding_result.hdv);
             let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
             gwt.submit_strategy(
                 "cognitive_loop",
                 activation,
-                vec![hv16],
+                vec![hv16_cached],
                 vec!["encoder".to_string()],
             );
             let result = gwt.process();
@@ -1211,6 +1246,12 @@ impl CognitiveLoopService {
         } else {
             false
         };
+
+        // FEEDBACK: GWT broadcast boosts confidence (conscious access moment)
+        // Science: Baars (1988) — broadcast = conscious access, should amplify integration
+        if gwt_broadcast {
+            self.prediction_confidence = (self.prediction_confidence + 0.03).clamp(0.0, 1.0);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS RESONANCE: Extract harmonic modes from Phi time-series
@@ -1238,8 +1279,7 @@ impl CognitiveLoopService {
         // QUANTUM COHERENCE: Monitor CfC hidden states for superposition
         // ═══════════════════════════════════════════════════════════════════════
         let quantum_coherence_level = if let Some(ref mut qc) = self.quantum_coherence {
-            let hv16 = real_hv_to_hv16(&encoding_result.hdv);
-            qc.observe(&hv16, unified_phi);
+            qc.observe(&hv16_cached, unified_phi);
             qc.coherence()
         } else {
             0.0
@@ -1250,10 +1290,9 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let (temporal_coherence_score, temporal_discontinuity) =
             if let Some(ref mut temporal) = self.temporal_consciousness {
-                let hv16 = real_hv_to_hv16(&encoding_result.hdv);
                 // Pass narrative_self and predictive_self refs for identity coherence
                 temporal.observe(
-                    &hv16,
+                    &hv16_cached,
                     unified_phi,
                     self.narrative_self.as_ref(),
                     self.predictive_self.as_ref(),
@@ -1264,6 +1303,13 @@ impl CognitiveLoopService {
             } else {
                 (0.0, false)
             };
+
+        // FEEDBACK: Temporal discontinuity resets adaptation (context shift re-calibration)
+        // Science: Varela (1999) — temporal discontinuities require re-orientation
+        if temporal_discontinuity {
+            self.fep_lr_boost = 1.0;
+            self.prediction_confidence *= 0.8;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // EMBODIED COGNITION: Bridge virtual body to full body schema
@@ -1281,18 +1327,20 @@ impl CognitiveLoopService {
                 (1.0, 0.0)
             };
 
+        // Store embodied phi modulation for next cycle's feedback loop
+        self.prev_embodied_phi_modulation = embodied_phi_modulation;
+
         // ═══════════════════════════════════════════════════════════════════════
         // NARRATIVE-GWT INTEGRATION: Consciousness governance capstone
         // ═══════════════════════════════════════════════════════════════════════
         let (narrative_gwt_veto, narrative_gwt_self_phi) =
             if let Some(ref mut ngwt) = self.narrative_gwt {
-                let hv16 = real_hv_to_hv16(&encoding_result.hdv);
                 let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
 
                 // Submit current cycle's content to narrative-GWT workspace
                 let veto = ngwt.submit_content(
                     "cognitive_loop",
-                    vec![hv16],
+                    vec![hv16_cached],
                     input,
                     vec!["encoder".to_string(), "temporal".to_string()],
                     activation,
@@ -1306,6 +1354,62 @@ impl CognitiveLoopService {
             } else {
                 (false, 0.0)
             };
+
+        // Store narrative-GWT veto for next cycle's learning gate
+        self.narrative_veto_active = narrative_gwt_veto;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // UNIFIED LIVING MIND: life-mind continuity (full_consciousness only)
+        // ═══════════════════════════════════════════════════════════════════════
+        // Integrates autopoietic self-maintenance, enactive sense-making, and
+        // predictive processing into a unified vitality/coherence measure.
+        #[cfg(feature = "full_consciousness")]
+        let (living_mind_vitality, living_mind_coherence) = {
+            // Update autopoietic self-maintenance with current consciousness signals
+            self.autopoietic
+                .update(unified_phi, coherence as f64, prediction_error as f64);
+
+            // Map cognitive loop action to enactive ActionType based on adaptive behavior
+            let enactive_action = match self.adaptive_behavior.action_hint {
+                super::ActionHint::Explore => crate::consciousness::enactive_cognition::ActionType::Explore,
+                super::ActionHint::SeekInput => crate::consciousness::enactive_cognition::ActionType::Observe,
+                super::ActionHint::SlowDown => crate::consciousness::enactive_cognition::ActionType::Reflect,
+                super::ActionHint::SpeedUp => crate::consciousness::enactive_cognition::ActionType::Execute,
+                _ => crate::consciousness::enactive_cognition::ActionType::Observe,
+            };
+
+            // Build perception summary from current cycle signals
+            let perception = crate::consciousness::enactive_cognition::PerceptionSummary {
+                features: {
+                    let mut f = std::collections::HashMap::new();
+                    f.insert("prediction_error".into(), prediction_error as f64);
+                    f.insert("coherence".into(), coherence as f64);
+                    f.insert("phi".into(), unified_phi);
+                    f
+                },
+                surprise: prediction_error as f64,
+                affordances: encoding_result
+                    .detected_primitives
+                    .iter()
+                    .take(3)
+                    .cloned()
+                    .collect(),
+            };
+
+            // Run enactive sense-making cycle
+            let _meaning = self.enactive.cycle(enactive_action, perception, input);
+
+            // Integrate all subsystems into unified living state
+            let free_energy = self.fep_agent.current_free_energy();
+            let unified_state =
+                self.unified_living_mind
+                    .integrate(&self.autopoietic, &self.enactive, unified_phi, free_energy);
+
+            (unified_state.vitality, unified_state.coherence)
+        };
+
+        #[cfg(not(feature = "full_consciousness"))]
+        let (living_mind_vitality, living_mind_coherence) = (0.0, 0.0);
 
         // ═══════════════════════════════════════════════════════════════════════
         // MASTER CONSCIOUSNESS EQUATION: comprehensive consciousness metric
@@ -1365,6 +1469,8 @@ impl CognitiveLoopService {
             embodied_agency,
             narrative_gwt_veto,
             narrative_gwt_self_phi,
+            living_mind_vitality,
+            living_mind_coherence,
         };
 
         tracing::debug!(

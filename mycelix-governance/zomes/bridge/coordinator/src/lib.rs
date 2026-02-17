@@ -115,27 +115,104 @@ fn get_active_proposals_internal() -> ExternResult<QueryGovernanceResult> {
 }
 
 fn get_proposal_by_id_internal(id: &str) -> ExternResult<QueryGovernanceResult> {
-    Ok(QueryGovernanceResult {
-        success: true,
-        data: Some(serde_json::json!({
-            "proposal_id": id,
-            "found": false,
-        })),
-        error: None,
-    })
+    // Cross-zome call to proposals coordinator
+    let call_result = call(
+        CallTargetCell::Local,
+        ZomeName::from("proposals"),
+        FunctionName::from("get_proposal"),
+        None,
+        ExternIO::encode(id.to_string())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
+
+    match call_result {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
+                Ok(QueryGovernanceResult {
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "proposal_id": id,
+                        "found": maybe_record.is_some(),
+                    })),
+                    error: None,
+                })
+            } else {
+                Ok(QueryGovernanceResult {
+                    success: true,
+                    data: Some(serde_json::json!({"proposal_id": id, "found": false})),
+                    error: Some("Failed to decode proposal response".into()),
+                })
+            }
+        }
+        Ok(ZomeCallResponse::NetworkError(e)) => Ok(QueryGovernanceResult {
+            success: false,
+            data: None,
+            error: Some(format!("Network error querying proposal: {}", e)),
+        }),
+        _ => Ok(QueryGovernanceResult {
+            success: true,
+            data: Some(serde_json::json!({"proposal_id": id, "found": false})),
+            error: Some("Proposals zome unavailable".into()),
+        }),
+    }
 }
 
 fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceResult> {
-    Ok(QueryGovernanceResult {
-        success: true,
-        data: Some(serde_json::json!({
-            "did": did,
-            "eligible": true,
-            "matl_score": 0.5,
-            "voting_power": 1.0,
-        })),
-        error: None,
-    })
+    // Cross-zome call to councils coordinator to check membership
+    let call_result = call(
+        CallTargetCell::Local,
+        ZomeName::from("councils"),
+        FunctionName::from("get_member_councils"),
+        None,
+        ExternIO::encode(did.to_string())
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+    );
+
+    match call_result {
+        Ok(ZomeCallResponse::Ok(extern_io)) => {
+            if let Ok(councils) = extern_io.decode::<Vec<Record>>() {
+                let eligible = !councils.is_empty();
+                Ok(QueryGovernanceResult {
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "did": did,
+                        "eligible": eligible,
+                        "council_count": councils.len(),
+                        "voting_power": if eligible { 1.0 } else { 0.0 },
+                    })),
+                    error: None,
+                })
+            } else {
+                // Couldn't decode response — default to eligible (permissive)
+                Ok(QueryGovernanceResult {
+                    success: true,
+                    data: Some(serde_json::json!({
+                        "did": did,
+                        "eligible": true,
+                        "voting_power": 1.0,
+                    })),
+                    error: Some("Could not decode council membership response".into()),
+                })
+            }
+        }
+        Ok(ZomeCallResponse::NetworkError(e)) => Ok(QueryGovernanceResult {
+            success: false,
+            data: None,
+            error: Some(format!("Network error checking eligibility: {}", e)),
+        }),
+        _ => {
+            // Councils zome unavailable — default to eligible (permissive degradation)
+            Ok(QueryGovernanceResult {
+                success: true,
+                data: Some(serde_json::json!({
+                    "did": did,
+                    "eligible": true,
+                    "voting_power": 1.0,
+                })),
+                error: Some("Councils zome unavailable — defaulting to eligible".into()),
+            })
+        }
+    }
 }
 
 /// Request execution from governance to another hApp
@@ -418,6 +495,45 @@ pub struct PublishProposalReferenceInput {
     pub votes_for: u64,
     pub votes_against: u64,
     pub ends_at: Timestamp,
+}
+
+/// Transfer credits between accounts (cross-zome entry point)
+///
+/// Called by the execution zome's `GovernanceAction::TransferCredits` dispatch.
+/// Records the transfer as a governance event. Actual fund movement is handled
+/// by the fund allocation system in the execution zome.
+#[hdk_extern]
+pub fn transfer_credits(input: TransferCreditsInput) -> ExternResult<Record> {
+    if input.from.is_empty() || input.from.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("From account must be 1-256 characters".into())));
+    }
+    if input.to.is_empty() || input.to.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("To account must be 1-256 characters".into())));
+    }
+    if input.amount <= 0.0 || !input.amount.is_finite() {
+        return Err(wasm_error!(WasmErrorInner::Guest("Amount must be positive and finite".into())));
+    }
+
+    // Record the transfer as a governance event
+    broadcast_governance_event(BroadcastGovernanceEventInput {
+        event_type: GovernanceEventType::ProposalExecuted,
+        proposal_id: None,
+        subject: format!("Credit transfer: {} -> {} ({} credits)", input.from, input.to, input.amount),
+        payload: serde_json::to_string(&serde_json::json!({
+            "type": "transfer_credits",
+            "from": input.from,
+            "to": input.to,
+            "amount": input.amount,
+        })).unwrap_or_default(),
+    })
+}
+
+/// Input for credit transfers via cross-zome call
+#[derive(Serialize, Deserialize, Debug)]
+pub struct TransferCreditsInput {
+    pub from: String,
+    pub to: String,
+    pub amount: f64,
 }
 
 /// Get events by proposal ID - for filtering events related to a specific proposal

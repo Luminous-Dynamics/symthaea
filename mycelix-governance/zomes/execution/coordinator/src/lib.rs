@@ -96,6 +96,80 @@ pub fn get_proposal_timelock(proposal_id: String) -> ExternResult<Option<Record>
     Ok(None)
 }
 
+/// Mark a timelock as ready for execution (after signature verification)
+///
+/// Transitions a timelock from Pending to Ready once pre-conditions are met
+/// (e.g., threshold signature obtained, waiting period elapsed).
+#[hdk_extern]
+pub fn mark_timelock_ready(input: MarkTimelockReadyInput) -> ExternResult<Record> {
+    if input.timelock_id.is_empty() || input.timelock_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Timelock ID must be 1-256 characters".into())));
+    }
+
+    // Find the timelock
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Timelock,
+        )?))
+        .include_entries(true);
+
+    let records = query(filter)?;
+
+    let mut timelock_record: Option<Record> = None;
+    for record in records {
+        if let Some(tl) = record
+            .entry()
+            .to_app_option::<Timelock>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if tl.id == input.timelock_id {
+                timelock_record = Some(record);
+                break;
+            }
+        }
+    }
+
+    let current_record = timelock_record.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Timelock not found".into()
+    )))?;
+
+    let current_timelock: Timelock = current_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid timelock entry".into()
+        )))?;
+
+    if current_timelock.status != TimelockStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Can only mark Pending timelocks as Ready, current status: {:?}",
+            current_timelock.status
+        ))));
+    }
+
+    let ready_timelock = Timelock {
+        status: TimelockStatus::Ready,
+        ..current_timelock
+    };
+
+    let action_hash = update_entry(
+        current_record.action_address().clone(),
+        &EntryTypes::Timelock(ready_timelock),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not find updated timelock".into()
+        )))
+}
+
+/// Input for marking a timelock as ready
+#[derive(Serialize, Deserialize, Debug)]
+pub struct MarkTimelockReadyInput {
+    pub timelock_id: String,
+}
+
 /// Execute a ready timelock
 #[hdk_extern]
 pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
@@ -105,6 +179,15 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
     }
     if input.executor_did.is_empty() || input.executor_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Executor DID must be 1-256 characters".into())));
+    }
+
+    // Verify the executor DID matches the calling agent
+    let agent = agent_info()?;
+    let expected_did = format!("did:mycelix:{}", agent.agent_initial_pubkey);
+    if input.executor_did != expected_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Executor DID must match the calling agent".into()
+        )));
     }
 
     // Find the timelock
@@ -150,49 +233,63 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
         )));
     }
 
-    if current_timelock.status != TimelockStatus::Pending {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Timelock is not in pending status".into()
-        )));
-    }
+    // Timelock must be in Ready status (transitioned via mark_timelock_ready after
+    // signature verification). Fall back to accepting Pending if threshold-signing
+    // zome is not installed (graceful degradation).
+    match current_timelock.status {
+        TimelockStatus::Ready => {
+            // Normal path — timelock was marked ready after signature verification
+        }
+        TimelockStatus::Pending => {
+            // Check if threshold-signing zome is installed
+            let sig_check = call(
+                CallTargetCell::Local,
+                ZomeName::from("threshold_signing"),
+                FunctionName::from("get_proposal_signature"),
+                None,
+                ExternIO::encode(current_timelock.proposal_id.clone())
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+            );
 
-    // Verify threshold signature exists for this proposal before execution.
-    // Cross-zome call to threshold_signing — if the zome is present and the proposal
-    // has a verified signature, execution proceeds. If the zome is unavailable
-    // (not installed), we allow execution without signature (graceful degradation).
-    let sig_check = call(
-        CallTargetCell::Local,
-        ZomeName::from("threshold_signing"),
-        FunctionName::from("get_proposal_signature"),
-        None,
-        ExternIO::encode(current_timelock.proposal_id.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match sig_check {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            // Threshold-signing zome responded — check if we got a verified signature
-            if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
-                if maybe_record.is_none() {
+            match sig_check {
+                Ok(ZomeCallResponse::Ok(extern_io)) => {
+                    // Threshold-signing zome is installed — require Ready status
+                    if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
+                        if maybe_record.is_none() {
+                            return Err(wasm_error!(WasmErrorInner::Guest(
+                                format!(
+                                    "No verified threshold signature found for proposal '{}'. \
+                                     Call mark_timelock_ready after obtaining a signature.",
+                                    current_timelock.proposal_id
+                                )
+                            )));
+                        }
+                        // Signature exists — allow execution from Pending (backwards compat)
+                    }
+                }
+                Ok(ZomeCallResponse::NetworkError(e)) => {
                     return Err(wasm_error!(WasmErrorInner::Guest(
-                        format!(
-                            "No verified threshold signature found for proposal '{}'. \
-                             A threshold signature is required before execution.",
-                            current_timelock.proposal_id
-                        )
+                        format!("Network error checking threshold signature: {}", e)
                     )));
                 }
-                // Signature exists and is verified — proceed to execution
+                _ => {
+                    // Threshold-signing zome not installed — graceful degradation
+                    let _ = emit_signal(&serde_json::json!({
+                        "type": "GovernanceWarning",
+                        "warning": "threshold_signing_unavailable",
+                        "message": format!(
+                            "Threshold-signing zome not installed. Executing proposal '{}' without signature verification.",
+                            current_timelock.proposal_id
+                        ),
+                    }));
+                }
             }
         }
-        Ok(ZomeCallResponse::NetworkError(e)) => {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Network error checking threshold signature: {}", e)
-            )));
-        }
-        _ => {
-            // Threshold-signing zome not available — allow execution without signature
-            // (graceful degradation for DNAs without threshold signing installed)
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Timelock must be in Ready or Pending status, current: {:?}",
+                other
+            ))));
         }
     }
 
@@ -435,6 +532,15 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
         return Err(wasm_error!(WasmErrorInner::Guest("Veto reason must be 1-4096 characters".into())));
     }
 
+    // Verify the guardian DID matches the calling agent
+    let agent = agent_info()?;
+    let expected_did = format!("did:mycelix:{}", agent.agent_initial_pubkey);
+    if input.guardian_did != expected_did {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Guardian DID must match the calling agent".into()
+        )));
+    }
+
     let now = sys_time()?;
     let veto_id = format!("veto:{}:{}", input.timelock_id, now.as_micros());
 
@@ -462,7 +568,7 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
             .to_app_option::<Timelock>()
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         {
-            if tl.id == input.timelock_id && tl.status == TimelockStatus::Pending {
+            if tl.id == input.timelock_id && matches!(tl.status, TimelockStatus::Pending | TimelockStatus::Ready) {
                 let cancelled = Timelock {
                     id: tl.id,
                     proposal_id: tl.proposal_id,
