@@ -52,6 +52,7 @@ pub struct Council {
 
 /// Types of councils with different powers
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[serde(tag = "type")]
 pub enum CouncilType {
     /// Root governance council (constitutional powers)
     Root,
@@ -844,5 +845,46 @@ mod tests {
         decision.phi_weighted_result = -0.1;
         let err = check_create_decision(&decision).unwrap_err();
         assert!(err.contains("Phi-weighted result must be between 0 and 1"));
+    }
+
+    // --- Serde round-trip tests (verify TS SDK compatibility) ---
+
+    #[test]
+    fn test_council_type_serde_internally_tagged() {
+        // Unit variant: TS sends {"type":"Root"}
+        let json = serde_json::to_string(&CouncilType::Root).unwrap();
+        assert_eq!(json, r#"{"type":"Root"}"#);
+        let rt: CouncilType = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt, CouncilType::Root);
+
+        // Struct variant: TS sends {"type":"Domain","domain":"water"}
+        let json = serde_json::to_string(&CouncilType::Domain { domain: "water".into() }).unwrap();
+        assert!(json.contains(r#""type":"Domain""#));
+        assert!(json.contains(r#""domain":"water""#));
+        let rt: CouncilType = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt, CouncilType::Domain { domain: "water".into() });
+
+        // WorkingGroup with optional expires
+        let json = serde_json::to_string(&CouncilType::WorkingGroup {
+            focus: "testing".into(),
+            expires: None,
+        }).unwrap();
+        assert!(json.contains(r#""type":"WorkingGroup""#));
+        let rt: CouncilType = serde_json::from_str(&json).unwrap();
+        assert_eq!(rt, CouncilType::WorkingGroup { focus: "testing".into(), expires: None });
+    }
+
+    #[test]
+    fn test_member_role_serde_externally_tagged() {
+        // Unit variant: TS sends bare string "Member"
+        let json = serde_json::to_string(&MemberRole::Member).unwrap();
+        assert_eq!(json, r#""Member""#);
+
+        // Struct variant: TS sends {"Delegate":{"from_council":"council-1"}}
+        let json = serde_json::to_string(&MemberRole::Delegate {
+            from_council: "council-1".into(),
+        }).unwrap();
+        assert!(json.contains(r#""Delegate""#));
+        assert!(json.contains(r#""from_council":"council-1""#));
     }
 }

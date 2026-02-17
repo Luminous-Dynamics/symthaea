@@ -7,6 +7,14 @@
 use hdk::prelude::*;
 use voting_integrity::*;
 
+/// Minimal proposal fields for voting-period verification.
+/// Avoids linking proposals_integrity which causes duplicate HDI symbols in WASM.
+#[derive(Debug, Serialize, Deserialize, SerializedBytes)]
+struct ProposalVotingPeriod {
+    voting_starts: Timestamp,
+    voting_ends: Timestamp,
+}
+
 // ============================================================================
 // REAL-TIME SIGNALS
 // ============================================================================
@@ -90,6 +98,49 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+/// Enforce one-agent-one-vote: prevents a single Holochain agent from voting
+/// multiple times on the same proposal under different DIDs.
+fn enforce_agent_vote_limit(proposal_id: &str, vote_type: &str) -> ExternResult<AgentPubKey> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let agent_key = format!("{}:{}:{}", vote_type, hex::encode(caller.get_raw_39()), proposal_id);
+    let existing = get_links(
+        LinkQuery::try_new(anchor_hash(&agent_key)?, LinkTypes::VoterToVote)?,
+        GetStrategy::default(),
+    )?;
+    if !existing.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "This agent has already voted on this proposal".into()
+        )));
+    }
+    Ok(caller)
+}
+
+/// Record agent's vote for dedup tracking (call after creating vote entry)
+fn record_agent_vote(proposal_id: &str, vote_type: &str, vote_hash: ActionHash) -> ExternResult<()> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let agent_key = format!("{}:{}:{}", vote_type, hex::encode(caller.get_raw_39()), proposal_id);
+    create_entry(&EntryTypes::Anchor(Anchor(agent_key.clone())))?;
+    create_link(
+        anchor_hash(&agent_key)?,
+        vote_hash,
+        LinkTypes::VoterToVote,
+        (),
+    )?;
+    Ok(())
+}
+
+/// Verify the caller is the original author of a record
+fn verify_record_author(record: &Record) -> ExternResult<AgentPubKey> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let author = record.action().author().clone();
+    if caller != author {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the original author can modify this record".into()
+        )));
+    }
+    Ok(caller)
+}
+
 /// Verify the proposal is currently in its voting period.
 ///
 /// Cross-calls the proposals zome to fetch the proposal and deserializes
@@ -107,10 +158,9 @@ fn verify_voting_period(proposal_id: &str) -> ExternResult<()> {
     match proposal_result {
         Ok(ZomeCallResponse::Ok(extern_io)) => {
             if let Ok(Some(record)) = extern_io.decode::<Option<Record>>() {
-                // Use proposals_integrity::Proposal which implements TryFrom<SerializedBytes>
                 if let Some(proposal) = record
                     .entry()
-                    .to_app_option::<proposals_integrity::Proposal>()
+                    .to_app_option::<ProposalVotingPeriod>()
                     .ok()
                     .flatten()
                 {
@@ -164,6 +214,9 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
             return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
         }
     }
+
+    // Agent-level Sybil prevention: one agent, one vote per proposal
+    let _caller = enforce_agent_vote_limit(&input.proposal_id, "agent_vote")?;
 
     // Enforce voting period
     verify_voting_period(&input.proposal_id)?;
@@ -230,6 +283,9 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
         LinkTypes::VoterToVote,
         (),
     )?;
+
+    // Record agent-level vote binding for Sybil prevention
+    record_agent_vote(&input.proposal_id, "agent_vote", action_hash.clone())?;
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -301,6 +357,9 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
             return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
         }
     }
+
+    // Agent-level Sybil prevention: one agent, one phi vote per proposal
+    let _caller = enforce_agent_vote_limit(&input.proposal_id, "agent_phi_vote")?;
 
     // Enforce voting period
     verify_voting_period(&input.proposal_id)?;
@@ -386,6 +445,9 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
         LinkTypes::VoterToVote,
         (),
     )?;
+
+    // Record agent-level vote binding for Sybil prevention
+    record_agent_vote(&input.proposal_id, "agent_phi_vote", action_hash.clone())?;
 
     // Emit real-time signal for connected clients
     let _ = emit_governance_signal(GovernanceSignal::VoteCast {
@@ -805,6 +867,9 @@ pub fn cast_quadratic_vote(input: CastQuadraticVoteInput) -> ExternResult<Record
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
     }
+    // Agent-level Sybil prevention: one agent, one quadratic vote per proposal
+    let _caller = enforce_agent_vote_limit(&input.proposal_id, "agent_qv")?;
+
     if input.voter_did.is_empty() || input.voter_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Voter DID must be 1-256 characters".into())));
     }
@@ -869,6 +934,9 @@ pub fn cast_quadratic_vote(input: CastQuadraticVoteInput) -> ExternResult<Record
         LinkTypes::VoterToVote,
         (),
     )?;
+
+    // Record agent-level vote binding for Sybil prevention
+    record_agent_vote(&input.proposal_id, "agent_qv", action_hash.clone())?;
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -985,8 +1053,19 @@ pub fn allocate_voice_credits(input: AllocateCreditsInput) -> ExternResult<Recor
     if input.owner_did.is_empty() || input.owner_did.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Owner DID must be 1-256 characters".into())));
     }
+    if input.amount == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Credit amount must be at least 1".into())));
+    }
+    if input.amount > 10_000 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Credit amount cannot exceed 10,000".into())));
+    }
 
     let now = sys_time()?;
+
+    // period_end must be in the future
+    if input.period_end <= now {
+        return Err(wasm_error!(WasmErrorInner::Guest("Credit period end must be in the future".into())));
+    }
 
     let credits = VoiceCredits {
         owner: input.owner_did.clone(),
@@ -1130,6 +1209,9 @@ pub fn renew_delegation(input: RenewDelegationInput) -> ExternResult<Record> {
     let original_record = get(input.original_action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Delegation not found".into())))?;
 
+    // Authorization: only the original author can renew a delegation
+    verify_record_author(&original_record)?;
+
     let mut delegation: Delegation = original_record
         .entry()
         .to_app_option()
@@ -1139,8 +1221,13 @@ pub fn renew_delegation(input: RenewDelegationInput) -> ExternResult<Record> {
     // Reset renewal timestamp
     delegation.renewed = now;
 
-    // Optionally update percentage
+    // Optionally update percentage (with bounds check)
     if let Some(new_percentage) = input.new_percentage {
+        if new_percentage <= 0.0 || new_percentage > 1.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Percentage must be between 0 (exclusive) and 1 (inclusive)".into()
+            )));
+        }
         delegation.percentage = new_percentage;
     }
 
@@ -1165,6 +1252,9 @@ pub fn revoke_delegation(input: RevokeDelegationInput) -> ExternResult<Record> {
     // Get current delegation
     let original_record = get(input.original_action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Delegation not found".into())))?;
+
+    // Authorization: only the original author can revoke a delegation
+    verify_record_author(&original_record)?;
 
     let mut delegation: Delegation = original_record
         .entry()

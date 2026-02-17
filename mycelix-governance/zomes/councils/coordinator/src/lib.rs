@@ -65,6 +65,44 @@ fn emit_council_signal(signal: CouncilSignal) -> ExternResult<()> {
 }
 
 /// Helper to create anchor hashes
+/// Verify the caller is an active member of the specified council
+fn require_council_member(council_id: &str) -> ExternResult<AgentPubKey> {
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    let council_record = get_council_by_id(council_id.to_string())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Council not found".into())))?;
+
+    let council_hash = council_record.action_hashed().hash.clone();
+    let links = get_links(
+        LinkQuery::try_new(council_hash, LinkTypes::CouncilToMember)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        if let Some(target) = link.target.into_action_hash() {
+            if let Some(record) = get(target, GetOptions::default())? {
+                // Check if this membership record was created by the caller
+                if record.action().author() == &caller {
+                    if let Some(membership) = record
+                        .entry()
+                        .to_app_option::<CouncilMembership>()
+                        .ok()
+                        .flatten()
+                    {
+                        if membership.status == MembershipStatus::Active {
+                            return Ok(caller);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Caller is not an active member of this council".into()
+    )))
+}
+
 fn anchor_hash(anchor_name: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_name.to_string());
     hash_entry(&anchor)
@@ -1017,6 +1055,9 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
     if input.phi_weighted_result < 0.0 || input.phi_weighted_result > 1.0 {
         return Err(wasm_error!(WasmErrorInner::Guest("Phi weighted result must be between 0.0 and 1.0".into())));
     }
+
+    // Authorization: only active council members can record decisions
+    require_council_member(&input.council_id)?;
 
     let timestamp = sys_time()?;
 

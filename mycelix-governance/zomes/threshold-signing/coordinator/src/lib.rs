@@ -14,6 +14,37 @@ use hdk::prelude::*;
 use k256::ecdsa::signature::Verifier;
 use threshold_signing_integrity::*;
 
+/// Verify the caller is a registered member of the committee.
+/// Returns the caller's AgentPubKey on success.
+fn require_committee_member(committee_id: &str) -> ExternResult<AgentPubKey> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let member_links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&format!("committee:{}", committee_id))?,
+            LinkTypes::CommitteeToMember,
+        )?,
+        GetStrategy::default(),
+    )?;
+
+    for link in member_links {
+        if let Ok(ah) = ActionHash::try_from(link.target) {
+            if let Some(record) = get(ah, GetOptions::default())? {
+                if let Some(m) = record.entry().to_app_option::<CommitteeMember>()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                {
+                    if m.agent == caller {
+                        return Ok(caller);
+                    }
+                }
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Caller is not a member of this committee".into()
+    )))
+}
+
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -31,6 +62,16 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// the DKG protocol off-chain before the committee can sign.
 #[hdk_extern]
 pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
+    // Input validation
+    if input.name.is_empty() || input.name.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Committee name must be 1-256 characters".into())));
+    }
+    if let Some(min_phi) = input.min_phi {
+        if min_phi < 0.0 || min_phi > 1.0 {
+            return Err(wasm_error!(WasmErrorInner::Guest("min_phi must be between 0.0 and 1.0".into())));
+        }
+    }
+    // scope is a CommitteeScope enum — no additional validation needed
     // Validate threshold <= member_count (coordinator-side check supplements integrity)
     if input.threshold == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest("Threshold must be at least 1".into())));
@@ -108,6 +149,17 @@ pub struct CreateCommitteeInput {
 /// score is checked via the governance bridge before registration is allowed.
 #[hdk_extern]
 pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
+    // Input validation
+    if input.committee_id.is_empty() || input.committee_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Committee ID must be 1-256 characters".into())));
+    }
+    if input.member_did.is_empty() || input.member_did.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
+    }
+    if input.trust_score < 0.0 || input.trust_score > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Trust score must be between 0.0 and 1.0".into())));
+    }
+
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
 
@@ -208,6 +260,22 @@ pub struct RegisterMemberInput {
 /// Called by members after running DKG dealing phase off-chain.
 #[hdk_extern]
 pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
+    // Phase guard: reject deals on already-completed committees
+    if let Some(committee_record) = get_committee(input.committee_id.clone())? {
+        if let Some(committee) = committee_record
+            .entry()
+            .to_app_option::<SigningCommittee>()
+            .ok()
+            .flatten()
+        {
+            if committee.phase == DkgPhase::Complete {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "Cannot submit deals on an already-completed committee".into()
+                )));
+            }
+        }
+    }
+
     // Get member's record
     let member_links = get_links(
         LinkQuery::try_new(
@@ -697,6 +765,9 @@ pub fn get_all_committees(_: ()) -> ExternResult<Vec<Record>> {
 /// Creates a new epoch and initiates a fresh DKG ceremony.
 #[hdk_extern]
 pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
+    // Authorization: only committee members can trigger key rotation
+    require_committee_member(&committee_id)?;
+
     // Get current committee
     let current = get_committee(committee_id.clone())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Committee not found".into())))?;

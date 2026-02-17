@@ -79,6 +79,9 @@ pub fn create_timelock(input: CreateTimelockInput) -> ExternResult<Record> {
     if input.duration_hours == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest("Duration must be at least 1 hour".into())));
     }
+    if input.duration_hours > 8760 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Duration cannot exceed 8,760 hours (1 year)".into())));
+    }
 
     let now = sys_time()?;
     let timelock_id = format!("timelock:{}:{}", input.proposal_id, now.as_micros());
@@ -173,6 +176,15 @@ pub fn mark_timelock_ready(input: MarkTimelockReadyInput) -> ExternResult<Record
 
     // Find the timelock via O(1) link-based lookup
     let current_record = find_timelock_by_id(&input.timelock_id)?;
+
+    // Authorization: only the timelock creator can mark it ready
+    let caller = agent_info()?.agent_initial_pubkey;
+    let author = current_record.action().author().clone();
+    if caller != author {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the timelock creator can mark it as ready".into()
+        )));
+    }
 
     let current_timelock: Timelock = current_record
         .entry()
@@ -688,8 +700,18 @@ pub fn lock_proposal_funds(input: LockFundsInput) -> ExternResult<Record> {
     if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
     }
-    if input.source_account.is_empty() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Source account is required".into())));
+    if input.source_account.is_empty() || input.source_account.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Source account must be 1-256 characters".into())));
+    }
+    if let Some(ref currency) = input.currency {
+        if currency.len() > 64 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Currency must be at most 64 characters".into())));
+        }
+    }
+    if let Some(ref tl_id) = input.timelock_id {
+        if tl_id.len() > 256 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Timelock ID must be at most 256 characters".into())));
+        }
     }
     if input.amount <= 0.0 || !input.amount.is_finite() {
         return Err(wasm_error!(WasmErrorInner::Guest("Amount must be positive and finite".into())));
@@ -746,10 +768,27 @@ pub struct LockFundsInput {
 /// Release locked funds after successful execution
 #[hdk_extern]
 pub fn release_locked_funds(input: ReleaseFundsInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if let Some(ref reason) = input.reason {
+        if reason.len() > 4096 {
+            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+        }
+    }
+
     let (record, alloc) = find_fund_allocation_for_proposal(&input.proposal_id)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             format!("No fund allocation found for proposal '{}'", input.proposal_id)
         )))?;
+
+    // Authorization: only the fund allocation creator can release
+    let caller = agent_info()?.agent_initial_pubkey;
+    if caller != *record.action().author() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the fund allocation creator can release locked funds".into()
+        )));
+    }
 
     if alloc.status != AllocationStatus::Locked {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -782,10 +821,25 @@ pub struct ReleaseFundsInput {
 /// Refund locked funds (e.g., after veto or expiration)
 #[hdk_extern]
 pub fn refund_locked_funds(input: RefundFundsInput) -> ExternResult<Record> {
+    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
+    }
+    if input.reason.len() > 4096 {
+        return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
+    }
+
     let (record, alloc) = find_fund_allocation_for_proposal(&input.proposal_id)?
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             format!("No fund allocation found for proposal '{}'", input.proposal_id)
         )))?;
+
+    // Authorization: only the fund allocation creator or a guardian can refund
+    let caller = agent_info()?.agent_initial_pubkey;
+    if caller != *record.action().author() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the fund allocation creator can refund locked funds".into()
+        )));
+    }
 
     if alloc.status != AllocationStatus::Locked {
         return Err(wasm_error!(WasmErrorInner::Guest(
