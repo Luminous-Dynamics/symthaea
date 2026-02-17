@@ -157,7 +157,7 @@ pub fn propose_amendment(input: ProposeAmendmentInput) -> ExternResult<Record> {
         ratified: None,
     };
 
-    let action_hash = create_entry(&EntryTypes::Amendment(amendment))?;
+    let action_hash = create_entry(&EntryTypes::Amendment(amendment.clone()))?;
 
     // Create anchor and link charter to amendment
     let version_anchor = format!("charter_v{}", charter_version);
@@ -168,6 +168,16 @@ pub fn propose_amendment(input: ProposeAmendmentInput) -> ExternResult<Record> {
         anchor_hash(&version_anchor)?,
         action_hash.clone(),
         LinkTypes::CharterToAmendment,
+        (),
+    )?;
+
+    // Create anchor and link for O(1) lookup by amendment ID
+    let aid_anchor = format!("aid:{}", amendment.id);
+    create_entry(&EntryTypes::Anchor(Anchor(aid_anchor.clone())))?;
+    create_link(
+        anchor_hash(&aid_anchor)?,
+        action_hash.clone(),
+        LinkTypes::AmendmentById,
         (),
     )?;
 
@@ -199,32 +209,51 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
         return Err(wasm_error!(WasmErrorInner::Guest("Amendment ID must be 1-256 characters".into())));
     }
 
-    // Find the amendment
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Amendment,
-        )?))
-        .include_entries(true);
+    // Find the amendment via O(1) link-based lookup (with chain scan fallback)
+    let current_record = {
+        let aid_anchor = format!("aid:{}", amendment_id);
+        let mut found: Option<Record> = None;
 
-    let records = query(filter)?;
-
-    let mut amendment_record: Option<Record> = None;
-    for record in records {
-        if let Some(amend) = record
-            .entry()
-            .to_app_option::<Amendment>()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        {
-            if amend.id == amendment_id {
-                amendment_record = Some(record);
-                break;
+        if let Ok(entry_hash) = anchor_hash(&aid_anchor) {
+            if let Ok(links) = get_links(
+                LinkQuery::try_new(entry_hash, LinkTypes::AmendmentById)?,
+                GetStrategy::default(),
+            ) {
+                if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
+                    if let Ok(ah) = ActionHash::try_from(link.target) {
+                        found = get(ah, GetOptions::default())?;
+                    }
+                }
             }
         }
-    }
 
-    let current_record = amendment_record.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Amendment not found".into()
-    )))?;
+        // Fallback: O(n) chain scan for amendments created before the link was added
+        if found.is_none() {
+            let filter = ChainQueryFilter::new()
+                .entry_type(EntryType::App(AppEntryDef::try_from(
+                    UnitEntryTypes::Amendment,
+                )?))
+                .include_entries(true);
+
+            let records = query(filter)?;
+            for record in records {
+                if let Some(amend) = record
+                    .entry()
+                    .to_app_option::<Amendment>()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                {
+                    if amend.id == amendment_id {
+                        found = Some(record);
+                        break;
+                    }
+                }
+            }
+        }
+
+        found.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Amendment not found".into()
+        )))?
+    };
 
     let current_amendment: Amendment = current_record
         .entry()

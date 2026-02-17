@@ -74,14 +74,36 @@ export interface CouncilReflection {
   timestamp: number;
 }
 
+export type DecisionType =
+  | 'Operational'
+  | 'Policy'
+  | 'Resource'
+  | 'Membership'
+  | 'SubCouncil'
+  | 'Constitutional';
+
+export type DecisionStatus =
+  | 'Pending'
+  | 'Approved'
+  | 'Rejected'
+  | 'Executed'
+  | 'Vetoed';
+
 export interface CouncilDecision {
   id: string;
   councilId: string;
   proposalId?: string;
-  decision: string;
-  participants: string[];
-  consensusLevel: number;
-  timestamp: number;
+  title: string;
+  content: string;
+  decisionType: DecisionType;
+  votesFor: number;
+  votesAgainst: number;
+  abstentions: number;
+  phiWeightedResult: number;
+  passed: boolean;
+  status: DecisionStatus;
+  createdAt: number;
+  executedAt?: number;
 }
 
 export interface CreateCouncilInput {
@@ -114,9 +136,9 @@ export interface ReflectOnCouncilInput {
 export interface RecordDecisionInput {
   councilId: string;
   proposalId?: string;
-  decision: string;
-  participants: string[];
-  consensusLevel: number;
+  title: string;
+  content: string;
+  decisionType: DecisionType;
 }
 
 // ============================================================================
@@ -257,9 +279,9 @@ export class CouncilsClient extends ZomeClient {
     const record = await this.callZomeOnce<HolochainRecord>('record_decision', {
       council_id: input.councilId,
       proposal_id: input.proposalId,
-      decision: input.decision,
-      participants: input.participants,
-      consensus_level: input.consensusLevel,
+      title: input.title,
+      content: input.content,
+      decision_type: input.decisionType,
     });
     return this.mapDecision(record);
   }
@@ -328,10 +350,17 @@ export class CouncilsClient extends ZomeClient {
       id: entry.id,
       councilId: entry.council_id,
       proposalId: entry.proposal_id,
-      decision: entry.decision,
-      participants: entry.participants,
-      consensusLevel: entry.consensus_level,
-      timestamp: entry.timestamp,
+      title: entry.title,
+      content: entry.content,
+      decisionType: entry.decision_type,
+      votesFor: entry.votes_for,
+      votesAgainst: entry.votes_against,
+      abstentions: entry.abstentions,
+      phiWeightedResult: entry.phi_weighted_result,
+      passed: entry.passed,
+      status: entry.status,
+      createdAt: entry.created_at,
+      executedAt: entry.executed_at,
     };
   }
 }

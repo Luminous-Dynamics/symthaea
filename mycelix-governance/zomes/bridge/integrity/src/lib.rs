@@ -1144,6 +1144,8 @@ pub enum LinkTypes {
     AgentToSlashing,
     ActiveParticipants,
     ActiveRounds,
+    /// O(1) lookup: execution ID anchor → execution request record
+    ExecutionById,
 }
 
 /// HDI 0.7 single validation callback using FlatOp pattern
@@ -1258,6 +1260,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::AgentToSlashing => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ActiveParticipants => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ActiveRounds => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ExecutionById => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,

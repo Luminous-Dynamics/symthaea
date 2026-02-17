@@ -171,7 +171,7 @@ export interface DAOFilter extends PaginationFilter {
 /**
  * Proposal types with different voting periods
  */
-export type ProposalType = 'Standard' | 'Emergency' | 'Constitutional';
+export type ProposalType = 'Standard' | 'Emergency' | 'Constitutional' | 'Parameter' | 'Funding';
 
 /**
  * Proposal lifecycle status
@@ -179,12 +179,13 @@ export type ProposalType = 'Standard' | 'Emergency' | 'Constitutional';
 export type ProposalStatus =
   | 'Draft'
   | 'Active'
-  | 'Passed'
+  | 'Ended'
+  | 'Approved'
+  | 'Signed'
   | 'Rejected'
   | 'Executed'
-  | 'Expired'
-  | 'Vetoed'
-  | 'Cancelled';
+  | 'Cancelled'
+  | 'Failed';
 
 /**
  * Governance proposal
@@ -575,7 +576,7 @@ export interface TreasuryBalance {
 }
 
 /**
- * Treasury allocation status
+ * Treasury allocation status (SDK-layer abstraction)
  */
 export type AllocationStatus =
   | 'Proposed'
@@ -584,6 +585,14 @@ export type AllocationStatus =
   | 'Executed'
   | 'Rejected'
   | 'Cancelled';
+
+/**
+ * Fund allocation status (matches Rust execution zome AllocationStatus)
+ */
+export type FundAllocationStatus =
+  | 'Locked'
+  | 'Released'
+  | 'Refunded';
 
 /**
  * Treasury allocation record
@@ -660,96 +669,137 @@ export interface ProposeAllocationInput {
 }
 
 // ============================================================================
-// Execution Types
+// Execution Types (matches Rust execution integrity zome)
 // ============================================================================
 
 /**
- * Execution status
+ * Timelock status
+ */
+export type TimelockStatus =
+  | 'Pending'
+  | 'Ready'
+  | 'Executed'
+  | 'Cancelled'
+  | 'Failed';
+
+/**
+ * Execution result status
  */
 export type ExecutionStatus =
-  | 'Pending'
-  | 'InProgress'
-  | 'Completed'
-  | 'Failed'
-  | 'Reverted'
-  | 'Cancelled';
+  | 'Success'
+  | 'PartialSuccess'
+  | 'Failed';
 
 /**
- * Proposal execution record
+ * Timelock record — proposal actions locked until delay expires
  */
-export interface ProposalExecution {
-  /** Execution action hash */
-  id: ActionHash;
-  /** Proposal being executed */
-  proposalId: ActionHash;
-  /** Target hApp for execution */
-  targetHapp: string;
-  /** Action to execute */
-  action: string;
-  /** Payload (JSON) */
-  payload: string;
+export interface Timelock {
+  /** Timelock identifier */
+  id: string;
+  /** Associated proposal */
+  proposalId: string;
+  /** Actions to execute (JSON) */
+  actions: string;
+  /** Timelock start timestamp */
+  started: Timestamp;
+  /** Timelock expiry timestamp */
+  expires: Timestamp;
   /** Current status */
-  status: ExecutionStatus;
-  /** Executor DID */
-  executorDid: string;
-  /** Result data (JSON) */
-  resultData?: string;
-  /** Error message (if failed) */
-  errorMessage?: string;
-  /** Number of retry attempts */
-  retryCount: number;
-  /** Maximum retries allowed */
-  maxRetries: number;
-  /** Request timestamp */
-  requestedAt: Timestamp;
-  /** Start timestamp */
-  startedAt?: Timestamp;
-  /** Completion timestamp */
-  completedAt?: Timestamp;
+  status: TimelockStatus;
+  /** Reason for cancellation (if cancelled) */
+  cancellationReason?: string;
 }
 
 /**
- * Input for requesting execution
+ * Execution record — result of executing a timelocked proposal
  */
-export interface RequestExecutionInput {
-  /** Proposal to execute */
-  proposalId: ActionHash;
-  /** Target hApp */
-  targetHapp?: string;
-  /** Action (defaults to proposal's execution action) */
-  action?: string;
-  /** Payload (defaults to proposal's execution payload) */
-  payload?: string;
-}
-
-/**
- * Input for acknowledging execution completion
- */
-export interface AcknowledgeExecutionInput {
+export interface Execution {
   /** Execution identifier */
-  executionId: ActionHash;
-  /** Whether execution succeeded */
-  success: boolean;
+  id: string;
+  /** Timelock this execution belongs to */
+  timelockId: string;
+  /** Original proposal */
+  proposalId: string;
+  /** Executor DID */
+  executor: string;
+  /** Execution result status */
+  status: ExecutionStatus;
   /** Result data (JSON) */
-  resultData?: string;
+  result?: string;
   /** Error message (if failed) */
-  errorMessage?: string;
+  error?: string;
+  /** Execution timestamp */
+  executedAt: Timestamp;
 }
 
 /**
- * Execution schedule for delayed execution
+ * Guardian veto record
  */
-export interface ExecutionSchedule {
-  /** Schedule action hash */
-  id: ActionHash;
-  /** Proposal to execute */
-  proposalId: ActionHash;
-  /** Scheduled execution time */
-  scheduledAt: Timestamp;
-  /** Whether schedule is active */
-  active: boolean;
-  /** Creation timestamp */
-  createdAt: Timestamp;
+export interface GuardianVeto {
+  /** Veto identifier */
+  id: string;
+  /** Timelock being vetoed */
+  timelockId: string;
+  /** Guardian DID */
+  guardian: string;
+  /** Veto reason */
+  reason: string;
+  /** Veto timestamp */
+  vetoedAt: Timestamp;
+}
+
+/**
+ * Fund allocation record
+ */
+export interface FundAllocation {
+  /** Allocation identifier */
+  id: string;
+  /** Associated proposal */
+  proposalId: string;
+  /** Associated timelock */
+  timelockId: string;
+  /** Source account */
+  sourceAccount: string;
+  /** Amount to allocate */
+  amount: number;
+  /** Currency code */
+  currency: string;
+  /** When funds were locked */
+  lockedAt: Timestamp;
+  /** Current status */
+  status: FundAllocationStatus;
+  /** Reason for status change */
+  statusReason?: string;
+}
+
+/**
+ * Input for creating a timelock
+ */
+export interface CreateTimelockInput {
+  /** Associated proposal */
+  proposalId: string;
+  /** Actions to execute (JSON) */
+  actions: string;
+  /** Delay duration in hours */
+  delayHours: number;
+}
+
+/**
+ * Input for executing a timelock
+ */
+export interface ExecuteTimelockInput {
+  /** Timelock identifier */
+  timelockId: string;
+}
+
+/**
+ * Input for vetoing a timelock
+ */
+export interface VetoTimelockInput {
+  /** Timelock identifier */
+  timelockId: string;
+  /** Veto reason */
+  reason: string;
 }
 
 // ============================================================================
@@ -760,36 +810,31 @@ export interface ExecutionSchedule {
  * Governance bridge event types
  */
 export type GovernanceBridgeEventType =
-  | 'DAOCreated'
   | 'ProposalCreated'
-  | 'ProposalActivated'
+  | 'VotingStarted'
+  | 'VoteReceived'
+  | 'VotingEnded'
   | 'ProposalPassed'
-  | 'ProposalRejected'
+  | 'ProposalFailed'
   | 'ProposalExecuted'
-  | 'VoteCast'
-  | 'DelegationCreated'
-  | 'DelegationRevoked'
-  | 'MemberJoined'
-  | 'TreasuryAllocated';
+  | 'ConstitutionAmended';
 
 /**
  * Governance bridge event
  */
 export interface GovernanceBridgeEvent {
-  /** Event action hash */
-  id: ActionHash;
+  /** Event identifier */
+  id: string;
   /** Event type */
   eventType: GovernanceBridgeEventType;
-  /** Source hApp */
-  sourceHapp: string;
-  /** Related DAO */
-  daoId?: ActionHash;
-  /** Related proposal */
-  proposalId?: ActionHash;
-  /** Subject DID */
-  subjectDid?: string;
+  /** Related proposal (optional) */
+  proposalId?: string;
+  /** Subject description */
+  subject: string;
   /** Event payload (JSON) */
   payload: string;
+  /** Source hApp */
+  sourceHapp: string;
   /** Event timestamp */
   timestamp: Timestamp;
 }
@@ -840,12 +885,10 @@ export interface CrossHappProposal {
 export interface BroadcastEventInput {
   /** Event type */
   eventType: GovernanceBridgeEventType;
-  /** Related DAO */
-  daoId?: ActionHash;
-  /** Related proposal */
-  proposalId?: ActionHash;
-  /** Subject DID */
-  subjectDid?: string;
+  /** Related proposal (optional) */
+  proposalId?: string;
+  /** Subject description */
+  subject: string;
   /** Event payload (JSON) */
   payload: string;
 }

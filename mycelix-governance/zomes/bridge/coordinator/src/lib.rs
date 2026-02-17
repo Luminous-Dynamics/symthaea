@@ -247,7 +247,17 @@ pub fn request_execution(input: RequestExecutionInput) -> ExternResult<Record> {
         executed_at: None,
     };
 
-    let action_hash = create_entry(&EntryTypes::ExecutionRequest(request))?;
+    let action_hash = create_entry(&EntryTypes::ExecutionRequest(request.clone()))?;
+
+    // Create anchor and link for O(1) lookup by execution ID
+    let eid_anchor = format!("eid:{}", request.id);
+    create_entry(&EntryTypes::Anchor(Anchor(eid_anchor.clone())))?;
+    create_link(
+        anchor_hash(&eid_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ExecutionById,
+        (),
+    )?;
 
     // Create anchor and link hApp to execution
     let happ_anchor = format!("happ:{}", input.target_happ);
@@ -399,45 +409,74 @@ pub fn acknowledge_execution(input: AcknowledgeExecutionInput) -> ExternResult<b
         }
     }
 
-    // Find the execution request by ID
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::ExecutionRequest,
-        )?))
-        .include_entries(true);
+    // Find the execution request by ID via O(1) link-based lookup
+    let eid_anchor = format!("eid:{}", input.execution_id);
+    let mut found = false;
 
-    let records = query(filter)?;
-
-    for record in records {
-        if let Some(exec) = record
-            .entry()
-            .to_app_option::<ExecutionRequest>()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        {
-            if exec.id == input.execution_id {
-                // Update the execution request status
-                let updated_exec = ExecutionRequest {
-                    id: exec.id,
-                    proposal_id: exec.proposal_id,
-                    target_happ: exec.target_happ,
-                    action: exec.action,
-                    parameters: exec.parameters,
-                    status: input.status.clone(),
-                    requested_at: exec.requested_at,
-                    executed_at: Some(sys_time()?),
-                };
-
-                update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::ExecutionRequest(updated_exec),
-                )?;
-
-                return Ok(true);
+    if let Ok(entry_hash) = anchor_hash(&eid_anchor) {
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(entry_hash, LinkTypes::ExecutionById)?,
+            GetStrategy::default(),
+        ) {
+            if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
+                if let Ok(ah) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(ah, GetOptions::default())? {
+                        if let Some(exec) = record
+                            .entry()
+                            .to_app_option::<ExecutionRequest>()
+                            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                        {
+                            let updated_exec = ExecutionRequest {
+                                status: input.status.clone(),
+                                executed_at: Some(sys_time()?),
+                                ..exec
+                            };
+                            update_entry(
+                                record.action_address().clone(),
+                                &EntryTypes::ExecutionRequest(updated_exec),
+                            )?;
+                            found = true;
+                        }
+                    }
+                }
             }
         }
     }
 
-    Ok(false)
+    // Fallback: O(n) chain scan for execution requests created before the link was added
+    if !found {
+        let filter = ChainQueryFilter::new()
+            .entry_type(EntryType::App(AppEntryDef::try_from(
+                UnitEntryTypes::ExecutionRequest,
+            )?))
+            .include_entries(true);
+
+        let records = query(filter)?;
+
+        for record in records {
+            if let Some(exec) = record
+                .entry()
+                .to_app_option::<ExecutionRequest>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                if exec.id == input.execution_id {
+                    let updated_exec = ExecutionRequest {
+                        status: input.status.clone(),
+                        executed_at: Some(sys_time()?),
+                        ..exec
+                    };
+                    update_entry(
+                        record.action_address().clone(),
+                        &EntryTypes::ExecutionRequest(updated_exec),
+                    )?;
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+
+    Ok(found)
 }
 
 #[derive(Serialize, Deserialize, Debug)]

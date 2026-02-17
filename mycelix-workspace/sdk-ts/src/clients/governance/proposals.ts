@@ -37,9 +37,11 @@ const DEFAULT_CONFIG: ProposalsClientConfig = {
  * Voting periods by proposal type (in hours)
  */
 export const VOTING_PERIODS: Record<ProposalType, number> = {
-  Standard: 168,      // 7 days
-  Emergency: 24,      // 24 hours
+  Standard: 168,       // 7 days
+  Emergency: 24,       // 24 hours
   Constitutional: 720, // 30 days
+  Parameter: 168,      // 7 days (same as standard)
+  Funding: 168,        // 7 days (same as standard)
 };
 
 /**
@@ -374,12 +376,13 @@ export class ProposalsClient extends ZomeClient {
     const descriptions: Record<ProposalStatus, string> = {
       Draft: 'Proposal is being prepared and can be edited',
       Active: 'Proposal is currently open for voting',
-      Passed: 'Proposal has passed and is awaiting execution',
+      Ended: 'Voting period has ended, awaiting tally',
+      Approved: 'Proposal has been approved by voters',
+      Signed: 'Proposal has been signed by threshold committee',
       Rejected: 'Proposal was rejected by voters',
       Executed: 'Proposal has been executed',
-      Expired: 'Proposal voting period ended without quorum',
-      Vetoed: 'Proposal was vetoed by governance',
       Cancelled: 'Proposal was cancelled by proposer',
+      Failed: 'Proposal execution failed',
     };
     return descriptions[status];
   }

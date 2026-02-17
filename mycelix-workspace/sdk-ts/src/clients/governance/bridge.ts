@@ -71,12 +71,10 @@ const DEFAULT_CONFIG: BridgeClientConfig = {
  */
 export class BridgeClient extends ZomeClient {
   protected readonly zomeName = 'bridge';
-  private readonly config: BridgeClientConfig;
 
   constructor(client: AppClient, config: BridgeClientConfig = {}) {
     const mergedConfig = { ...DEFAULT_CONFIG, ...config };
     super(client, { roleName: mergedConfig.roleName! });
-    this.config = mergedConfig;
   }
 
   // ============================================================================
@@ -92,13 +90,11 @@ export class BridgeClient extends ZomeClient {
    * @returns The broadcast event
    */
   async broadcastEvent(input: BroadcastEventInput): Promise<GovernanceBridgeEvent> {
-    const record = await this.callZomeOnce<HolochainRecord>('broadcast_event', {
+    const record = await this.callZomeOnce<HolochainRecord>('broadcast_governance_event', {
       event_type: input.eventType,
-      dao_id: input.daoId,
       proposal_id: input.proposalId,
-      subject_did: input.subjectDid,
+      subject: input.subject,
       payload: input.payload,
-      source_happ: this.config.sourceHapp,
     });
     return this.mapEvent(record);
   }
@@ -113,17 +109,15 @@ export class BridgeClient extends ZomeClient {
    * @returns The broadcast event
    */
   async broadcastProposalCreated(
-    daoId: ActionHash,
-    proposalId: ActionHash,
+    proposalId: string,
     proposerDid: string,
     title: string
   ): Promise<GovernanceBridgeEvent> {
     return this.broadcastEvent({
       eventType: 'ProposalCreated',
-      daoId,
       proposalId,
-      subjectDid: proposerDid,
-      payload: JSON.stringify({ title }),
+      subject: `Proposal created by ${proposerDid}`,
+      payload: JSON.stringify({ title, proposer: proposerDid }),
     });
   }
 
@@ -136,14 +130,13 @@ export class BridgeClient extends ZomeClient {
    * @returns The broadcast event
    */
   async broadcastProposalPassed(
-    daoId: ActionHash,
-    proposalId: ActionHash,
+    proposalId: string,
     approvalPercentage: number
   ): Promise<GovernanceBridgeEvent> {
     return this.broadcastEvent({
       eventType: 'ProposalPassed',
-      daoId,
       proposalId,
+      subject: `Proposal passed with ${approvalPercentage}% approval`,
       payload: JSON.stringify({ approval_percentage: approvalPercentage }),
     });
   }
@@ -156,15 +149,14 @@ export class BridgeClient extends ZomeClient {
    * @param reason - Rejection reason (quorum, threshold, etc.)
    * @returns The broadcast event
    */
-  async broadcastProposalRejected(
-    daoId: ActionHash,
-    proposalId: ActionHash,
+  async broadcastProposalFailed(
+    proposalId: string,
     reason: string
   ): Promise<GovernanceBridgeEvent> {
     return this.broadcastEvent({
-      eventType: 'ProposalRejected',
-      daoId,
+      eventType: 'ProposalFailed',
       proposalId,
+      subject: `Proposal failed: ${reason}`,
       payload: JSON.stringify({ reason }),
     });
   }
@@ -179,19 +171,17 @@ export class BridgeClient extends ZomeClient {
    * @param weight - Vote weight
    * @returns The broadcast event
    */
-  async broadcastVoteCast(
-    daoId: ActionHash,
-    proposalId: ActionHash,
+  async broadcastVoteReceived(
+    proposalId: string,
     voterDid: string,
     choice: string,
     weight: number
   ): Promise<GovernanceBridgeEvent> {
     return this.broadcastEvent({
-      eventType: 'VoteCast',
-      daoId,
+      eventType: 'VoteReceived',
       proposalId,
-      subjectDid: voterDid,
-      payload: JSON.stringify({ choice, weight }),
+      subject: `Vote by ${voterDid}: ${choice}`,
+      payload: JSON.stringify({ voter: voterDid, choice, weight }),
     });
   }
 
@@ -202,15 +192,15 @@ export class BridgeClient extends ZomeClient {
    * @param memberDid - New member's DID
    * @returns The broadcast event
    */
-  async broadcastMemberJoined(
-    daoId: ActionHash,
-    memberDid: string
+  async broadcastConstitutionAmended(
+    proposalId: string,
+    amendmentDescription: string
   ): Promise<GovernanceBridgeEvent> {
     return this.broadcastEvent({
-      eventType: 'MemberJoined',
-      daoId,
-      subjectDid: memberDid,
-      payload: JSON.stringify({}),
+      eventType: 'ConstitutionAmended',
+      proposalId,
+      subject: amendmentDescription,
+      payload: JSON.stringify({ description: amendmentDescription }),
     });
   }
 
@@ -562,13 +552,12 @@ export class BridgeClient extends ZomeClient {
   private mapEvent(record: HolochainRecord): GovernanceBridgeEvent {
     const entry = this.extractEntry<any>(record);
     return {
-      id: record.signed_action.hashed.hash as unknown as string,
+      id: entry.id,
       eventType: entry.event_type,
-      sourceHapp: entry.source_happ,
-      daoId: entry.dao_id,
       proposalId: entry.proposal_id,
-      subjectDid: entry.subject_did,
+      subject: entry.subject,
       payload: entry.payload,
+      sourceHapp: entry.source_happ,
       timestamp: entry.timestamp,
     };
   }

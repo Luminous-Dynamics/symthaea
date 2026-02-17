@@ -152,6 +152,125 @@ pub enum LinkTypes {
     CharterToAmendment,
     /// Parameter name to parameter
     ParameterIndex,
+    /// O(1) lookup: amendment ID anchor → amendment record
+    AmendmentById,
+}
+
+// ── Pure check functions (no HDI host calls) ───────────────────────────
+
+/// Check charter validity on creation.
+pub fn check_create_charter(charter: &Charter) -> Result<(), String> {
+    if charter.preamble.is_empty() {
+        return Err("Charter must have a preamble".into());
+    }
+    if serde_json::from_str::<serde_json::Value>(&charter.articles).is_err() {
+        return Err("Articles must be valid JSON".into());
+    }
+    if charter.rights.is_empty() {
+        return Err("Charter must define fundamental rights".into());
+    }
+    Ok(())
+}
+
+/// Check charter validity on update (compares original and updated).
+pub fn check_update_charter(original: &Charter, updated: &Charter) -> Result<(), String> {
+    if updated.id != original.id {
+        return Err("Cannot change charter ID".into());
+    }
+    if updated.version != original.version + 1 {
+        return Err(format!(
+            "Charter version must increment by 1 (expected {}, got {})",
+            original.version + 1,
+            updated.version
+        ));
+    }
+    if updated.preamble.is_empty() {
+        return Err("Charter must have a preamble".into());
+    }
+    if serde_json::from_str::<serde_json::Value>(&updated.articles).is_err() {
+        return Err("Articles must be valid JSON".into());
+    }
+    if updated.rights.is_empty() {
+        return Err("Charter must define fundamental rights".into());
+    }
+    if updated.adopted != original.adopted {
+        return Err("Cannot change charter adoption date".into());
+    }
+    Ok(())
+}
+
+/// Check amendment validity on creation.
+pub fn check_create_amendment(amendment: &Amendment) -> Result<(), String> {
+    if !amendment.proposer.starts_with("did:") {
+        return Err("Proposer must be a valid DID".into());
+    }
+    if amendment.new_text.is_empty() {
+        return Err("Amendment must have new text".into());
+    }
+    if amendment.rationale.is_empty() {
+        return Err("Amendment must have rationale".into());
+    }
+    match amendment.amendment_type {
+        AmendmentType::ModifyArticle
+        | AmendmentType::ModifyRight
+        | AmendmentType::ModifyPreamble => {
+            if amendment.original_text.is_none() {
+                return Err("Modification amendments must include original text".into());
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+/// Check amendment validity on update (compares original and updated).
+pub fn check_update_amendment(original: &Amendment, updated: &Amendment) -> Result<(), String> {
+    if updated.id != original.id {
+        return Err("Cannot change amendment ID".into());
+    }
+    if updated.proposer != original.proposer {
+        return Err("Cannot change amendment proposer".into());
+    }
+    if updated.proposal_id != original.proposal_id {
+        return Err("Cannot change amendment proposal_id".into());
+    }
+    if updated.status != original.status {
+        let valid = matches!(
+            (&original.status, &updated.status),
+            (AmendmentStatus::Draft, AmendmentStatus::Deliberation)
+                | (AmendmentStatus::Draft, AmendmentStatus::Withdrawn)
+                | (AmendmentStatus::Deliberation, AmendmentStatus::Voting)
+                | (AmendmentStatus::Deliberation, AmendmentStatus::Withdrawn)
+                | (AmendmentStatus::Voting, AmendmentStatus::Ratified)
+                | (AmendmentStatus::Voting, AmendmentStatus::Rejected)
+        );
+        if !valid {
+            return Err(format!(
+                "Invalid amendment status transition: {:?} -> {:?}",
+                original.status, updated.status
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// Check governance parameter validity on creation.
+pub fn check_create_parameter(param: &GovernanceParameter) -> Result<(), String> {
+    if param.name.is_empty() {
+        return Err("Parameter name cannot be empty".into());
+    }
+    if serde_json::from_str::<serde_json::Value>(&param.value).is_err() {
+        return Err("Parameter value must be valid JSON".into());
+    }
+    Ok(())
+}
+
+/// Check governance parameter validity on update.
+pub fn check_update_parameter(param: &GovernanceParameter) -> Result<(), String> {
+    if serde_json::from_str::<serde_json::Value>(&param.value).is_err() {
+        return Err("Parameter value must be valid JSON".into());
+    }
+    Ok(())
 }
 
 /// HDI 0.7 single validation callback using FlatOp pattern
@@ -191,6 +310,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::CharterHistory => Ok(ValidateCallbackResult::Valid),
             LinkTypes::CharterToAmendment => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ParameterIndex => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::AmendmentById => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -215,28 +335,10 @@ fn validate_create_charter(
     _action: Create,
     charter: Charter,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate preamble not empty
-    if charter.preamble.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Charter must have a preamble".into(),
-        ));
+    match check_create_charter(&charter) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
     }
-
-    // Validate articles is valid JSON
-    if serde_json::from_str::<serde_json::Value>(&charter.articles).is_err() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Articles must be valid JSON".into(),
-        ));
-    }
-
-    // Validate at least one right
-    if charter.rights.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Charter must define fundamental rights".into(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate charter update
@@ -245,7 +347,6 @@ fn validate_update_charter(
     charter: Charter,
     original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Get original charter for comparison
     let original_record = must_get_valid_record(original_action_hash)?;
     let original_charter: Charter = original_record
         .entry()
@@ -255,51 +356,10 @@ fn validate_update_charter(
             "Original charter not found".into()
         )))?;
 
-    // Charter ID cannot change
-    if charter.id != original_charter.id {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot change charter ID".into(),
-        ));
+    match check_update_charter(&original_charter, &charter) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
     }
-
-    // Version must increment by exactly 1
-    if charter.version != original_charter.version + 1 {
-        return Ok(ValidateCallbackResult::Invalid(format!(
-            "Charter version must increment by 1 (expected {}, got {})",
-            original_charter.version + 1,
-            charter.version
-        )));
-    }
-
-    // Preamble cannot be empty
-    if charter.preamble.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Charter must have a preamble".into(),
-        ));
-    }
-
-    // Articles must be valid JSON
-    if serde_json::from_str::<serde_json::Value>(&charter.articles).is_err() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Articles must be valid JSON".into(),
-        ));
-    }
-
-    // Must still have at least one right
-    if charter.rights.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Charter must define fundamental rights".into(),
-        ));
-    }
-
-    // Adoption date cannot change
-    if charter.adopted != original_charter.adopted {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot change charter adoption date".into(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate amendment creation
@@ -307,42 +367,10 @@ fn validate_create_amendment(
     _action: Create,
     amendment: Amendment,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate proposer is a DID
-    if !amendment.proposer.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposer must be a valid DID".into(),
-        ));
+    match check_create_amendment(&amendment) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
     }
-
-    // Validate new text not empty
-    if amendment.new_text.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Amendment must have new text".into(),
-        ));
-    }
-
-    // Validate rationale provided
-    if amendment.rationale.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Amendment must have rationale".into(),
-        ));
-    }
-
-    // Validate modification amendments have original text
-    match amendment.amendment_type {
-        AmendmentType::ModifyArticle
-        | AmendmentType::ModifyRight
-        | AmendmentType::ModifyPreamble => {
-            if amendment.original_text.is_none() {
-                return Ok(ValidateCallbackResult::Invalid(
-                    "Modification amendments must include original text".into(),
-                ));
-            }
-        }
-        _ => {}
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate amendment update — enforce status transition whitelist
@@ -360,37 +388,10 @@ fn validate_update_amendment(
             "Original amendment not found".into()
         )))?;
 
-    // Immutable fields: id, charter_version, amendment_type, proposer, proposal_id, created
-    if amendment.id != original_amendment.id {
-        return Ok(ValidateCallbackResult::Invalid("Cannot change amendment ID".into()));
+    match check_update_amendment(&original_amendment, &amendment) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
     }
-    if amendment.proposer != original_amendment.proposer {
-        return Ok(ValidateCallbackResult::Invalid("Cannot change amendment proposer".into()));
-    }
-    if amendment.proposal_id != original_amendment.proposal_id {
-        return Ok(ValidateCallbackResult::Invalid("Cannot change amendment proposal_id".into()));
-    }
-
-    // Status transition whitelist
-    if amendment.status != original_amendment.status {
-        let valid = matches!(
-            (&original_amendment.status, &amendment.status),
-            (AmendmentStatus::Draft, AmendmentStatus::Deliberation)
-                | (AmendmentStatus::Draft, AmendmentStatus::Withdrawn)
-                | (AmendmentStatus::Deliberation, AmendmentStatus::Voting)
-                | (AmendmentStatus::Deliberation, AmendmentStatus::Withdrawn)
-                | (AmendmentStatus::Voting, AmendmentStatus::Ratified)
-                | (AmendmentStatus::Voting, AmendmentStatus::Rejected)
-        );
-        if !valid {
-            return Ok(ValidateCallbackResult::Invalid(format!(
-                "Invalid amendment status transition: {:?} -> {:?}",
-                original_amendment.status, amendment.status
-            )));
-        }
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate governance parameter creation
@@ -398,21 +399,10 @@ fn validate_create_parameter(
     _action: Create,
     param: GovernanceParameter,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate name not empty
-    if param.name.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Parameter name cannot be empty".into(),
-        ));
+    match check_create_parameter(&param) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
     }
-
-    // Validate value is valid JSON
-    if serde_json::from_str::<serde_json::Value>(&param.value).is_err() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Parameter value must be valid JSON".into(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate governance parameter update
@@ -420,12 +410,186 @@ fn validate_update_parameter(
     _action: Update,
     param: GovernanceParameter,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate value is valid JSON
-    if serde_json::from_str::<serde_json::Value>(&param.value).is_err() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Parameter value must be valid JSON".into(),
-        ));
+    match check_update_parameter(&param) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
     }
 
-    Ok(ValidateCallbackResult::Valid)
+    fn valid_charter() -> Charter {
+        Charter {
+            id: "charter-1".into(),
+            version: 1,
+            preamble: "We the people".into(),
+            articles: r#"[{"title":"Article 1"}]"#.into(),
+            rights: vec!["Right to dignity".into()],
+            amendment_process: "2/3 vote".into(),
+            adopted: ts(1000000),
+            last_amended: None,
+        }
+    }
+
+    fn valid_amendment() -> Amendment {
+        Amendment {
+            id: "amend-1".into(),
+            charter_version: 1,
+            amendment_type: AmendmentType::AddArticle,
+            article: None,
+            original_text: None,
+            new_text: "New article text".into(),
+            rationale: "Needed for clarity".into(),
+            proposer: "did:key:z6Mk...".into(),
+            proposal_id: "prop-1".into(),
+            status: AmendmentStatus::Draft,
+            created: ts(2000000),
+            ratified: None,
+        }
+    }
+
+    fn valid_parameter() -> GovernanceParameter {
+        GovernanceParameter {
+            name: "quorum".into(),
+            value: r#"{"threshold": 0.67}"#.into(),
+            value_type: ParameterType::Percentage,
+            description: "Minimum quorum for votes".into(),
+            min_value: Some("0.5".into()),
+            max_value: Some("1.0".into()),
+            updated: ts(3000000),
+            changed_by_proposal: None,
+        }
+    }
+
+    #[test]
+    fn test_valid_charter_accepted() {
+        assert!(check_create_charter(&valid_charter()).is_ok());
+    }
+
+    #[test]
+    fn test_charter_preamble_required() {
+        let mut c = valid_charter();
+        c.preamble = String::new();
+        let err = check_create_charter(&c).unwrap_err();
+        assert!(err.contains("preamble"));
+    }
+
+    #[test]
+    fn test_charter_articles_must_be_json() {
+        let mut c = valid_charter();
+        c.articles = "not json {{{".into();
+        let err = check_create_charter(&c).unwrap_err();
+        assert!(err.contains("JSON"));
+    }
+
+    #[test]
+    fn test_charter_must_have_rights() {
+        let mut c = valid_charter();
+        c.rights = vec![];
+        let err = check_create_charter(&c).unwrap_err();
+        assert!(err.contains("rights"));
+    }
+
+    #[test]
+    fn test_charter_update_version_must_increment() {
+        let original = valid_charter();
+        let mut updated = original.clone();
+        updated.version = 5; // jump from 1 to 5 instead of 2
+        let err = check_update_charter(&original, &updated).unwrap_err();
+        assert!(err.contains("increment by 1"));
+    }
+
+    #[test]
+    fn test_charter_update_id_immutable() {
+        let original = valid_charter();
+        let mut updated = original.clone();
+        updated.version = 2;
+        updated.id = "different-id".into();
+        let err = check_update_charter(&original, &updated).unwrap_err();
+        assert!(err.contains("charter ID"));
+    }
+
+    #[test]
+    fn test_amendment_proposer_must_be_did() {
+        let mut a = valid_amendment();
+        a.proposer = "not-a-did".into();
+        let err = check_create_amendment(&a).unwrap_err();
+        assert!(err.contains("DID"));
+    }
+
+    #[test]
+    fn test_amendment_new_text_required() {
+        let mut a = valid_amendment();
+        a.new_text = String::new();
+        let err = check_create_amendment(&a).unwrap_err();
+        assert!(err.contains("new text"));
+    }
+
+    #[test]
+    fn test_amendment_modification_requires_original_text() {
+        let mut a = valid_amendment();
+        a.amendment_type = AmendmentType::ModifyArticle;
+        a.original_text = None;
+        let err = check_create_amendment(&a).unwrap_err();
+        assert!(err.contains("original text"));
+    }
+
+    #[test]
+    fn test_amendment_valid_status_transitions() {
+        let transitions = vec![
+            (AmendmentStatus::Draft, AmendmentStatus::Deliberation),
+            (AmendmentStatus::Draft, AmendmentStatus::Withdrawn),
+            (AmendmentStatus::Deliberation, AmendmentStatus::Voting),
+            (AmendmentStatus::Deliberation, AmendmentStatus::Withdrawn),
+            (AmendmentStatus::Voting, AmendmentStatus::Ratified),
+            (AmendmentStatus::Voting, AmendmentStatus::Rejected),
+        ];
+        for (from, to) in transitions {
+            let mut original = valid_amendment();
+            original.status = from;
+            let mut updated = original.clone();
+            updated.status = to;
+            assert!(
+                check_update_amendment(&original, &updated).is_ok(),
+                "Transition {:?} -> {:?} should be valid",
+                original.status,
+                updated.status
+            );
+        }
+    }
+
+    #[test]
+    fn test_amendment_invalid_status_transition() {
+        let mut original = valid_amendment();
+        original.status = AmendmentStatus::Voting;
+        let mut updated = original.clone();
+        updated.status = AmendmentStatus::Draft;
+        let err = check_update_amendment(&original, &updated).unwrap_err();
+        assert!(err.contains("Invalid amendment status transition"));
+    }
+
+    #[test]
+    fn test_parameter_name_required() {
+        let mut p = valid_parameter();
+        p.name = String::new();
+        let err = check_create_parameter(&p).unwrap_err();
+        assert!(err.contains("name"));
+    }
+
+    #[test]
+    fn test_parameter_value_must_be_json() {
+        let mut p = valid_parameter();
+        p.value = "not json!!!".into();
+        let err = check_create_parameter(&p).unwrap_err();
+        assert!(err.contains("JSON"));
+        // Also test the update path
+        let err = check_update_parameter(&p).unwrap_err();
+        assert!(err.contains("JSON"));
+    }
 }

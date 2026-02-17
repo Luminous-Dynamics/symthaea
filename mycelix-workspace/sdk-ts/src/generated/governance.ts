@@ -49,13 +49,13 @@ export interface Proposal {
  * Type of governance proposal
  * @generated
  */
-export type ProposalType = 'Standard' | 'Emergency' | 'Constitutional';
+export type ProposalType = 'Standard' | 'Emergency' | 'Constitutional' | 'Parameter' | 'Funding';
 
 /**
  * Status of a governance proposal
  * @generated
  */
-export type ProposalStatus = 'Draft' | 'Active' | 'Passed' | 'Rejected' | 'Executed' | 'Expired' | 'Cancelled';
+export type ProposalStatus = 'Draft' | 'Active' | 'Ended' | 'Approved' | 'Signed' | 'Rejected' | 'Executed' | 'Cancelled' | 'Failed';
 
 /**
  * A vote on a governance proposal

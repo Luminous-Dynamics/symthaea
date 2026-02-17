@@ -12,6 +12,52 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
+/// O(1) link-based lookup: find a timelock record by its string ID.
+/// Falls back to O(n) chain scan if the link is missing (backwards compat).
+fn find_timelock_by_id(timelock_id: &str) -> ExternResult<Record> {
+    // Try link-based lookup first (O(1))
+    let anchor_key = format!("tl:{}", timelock_id);
+    if let Ok(entry_hash) = anchor_hash(&anchor_key) {
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(entry_hash, LinkTypes::TimelockById)?,
+            GetStrategy::default(),
+        ) {
+            if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
+                if let Ok(ah) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(ah, GetOptions::default())? {
+                        return Ok(record);
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: O(n) chain scan for timelocks created before the link was added
+    let filter = ChainQueryFilter::new()
+        .entry_type(EntryType::App(AppEntryDef::try_from(
+            UnitEntryTypes::Timelock,
+        )?))
+        .include_entries(true);
+
+    let records = query(filter)?;
+
+    for record in records {
+        if let Some(tl) = record
+            .entry()
+            .to_app_option::<Timelock>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if tl.id == timelock_id {
+                return Ok(record);
+            }
+        }
+    }
+
+    Err(wasm_error!(WasmErrorInner::Guest(
+        "Timelock not found".into()
+    )))
+}
+
 #[hdk_extern]
 pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
     // Pre-create the pending_timelocks anchor so queries never fail on empty DNA
@@ -47,6 +93,7 @@ pub fn create_timelock(input: CreateTimelockInput) -> ExternResult<Record> {
         cancellation_reason: None,
     };
 
+    let tl_id = timelock.id.clone();
     let action_hash = create_entry(&EntryTypes::Timelock(timelock))?;
 
     // Create anchor and link proposal to timelock
@@ -56,6 +103,16 @@ pub fn create_timelock(input: CreateTimelockInput) -> ExternResult<Record> {
         anchor_hash(&proposal_anchor)?,
         action_hash.clone(),
         LinkTypes::ProposalToTimelock,
+        (),
+    )?;
+
+    // Create anchor and link for O(1) lookup by timelock ID
+    let tl_anchor = format!("tl:{}", tl_id);
+    create_entry(&EntryTypes::Anchor(Anchor(tl_anchor.clone())))?;
+    create_link(
+        anchor_hash(&tl_anchor)?,
+        action_hash.clone(),
+        LinkTypes::TimelockById,
         (),
     )?;
 
@@ -114,32 +171,8 @@ pub fn mark_timelock_ready(input: MarkTimelockReadyInput) -> ExternResult<Record
         return Err(wasm_error!(WasmErrorInner::Guest("Timelock ID must be 1-256 characters".into())));
     }
 
-    // Find the timelock
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Timelock,
-        )?))
-        .include_entries(true);
-
-    let records = query(filter)?;
-
-    let mut timelock_record: Option<Record> = None;
-    for record in records {
-        if let Some(tl) = record
-            .entry()
-            .to_app_option::<Timelock>()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        {
-            if tl.id == input.timelock_id {
-                timelock_record = Some(record);
-                break;
-            }
-        }
-    }
-
-    let current_record = timelock_record.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Timelock not found".into()
-    )))?;
+    // Find the timelock via O(1) link-based lookup
+    let current_record = find_timelock_by_id(&input.timelock_id)?;
 
     let current_timelock: Timelock = current_record
         .entry()
@@ -198,32 +231,8 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
         )));
     }
 
-    // Find the timelock
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Timelock,
-        )?))
-        .include_entries(true);
-
-    let records = query(filter)?;
-
-    let mut timelock_record: Option<Record> = None;
-    for record in records {
-        if let Some(tl) = record
-            .entry()
-            .to_app_option::<Timelock>()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        {
-            if tl.id == input.timelock_id {
-                timelock_record = Some(record);
-                break;
-            }
-        }
-    }
-
-    let current_record = timelock_record.ok_or(wasm_error!(WasmErrorInner::Guest(
-        "Timelock not found".into()
-    )))?;
+    // Find the timelock via O(1) link-based lookup
+    let current_record = find_timelock_by_id(&input.timelock_id)?;
 
     let current_timelock: Timelock = current_record
         .entry()
@@ -608,37 +617,23 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::GuardianVeto(veto))?;
 
-    // Update timelock status to cancelled
-    let filter = ChainQueryFilter::new()
-        .entry_type(EntryType::App(AppEntryDef::try_from(
-            UnitEntryTypes::Timelock,
-        )?))
-        .include_entries(true);
-
-    let records = query(filter)?;
-    for record in records {
-        if let Some(tl) = record
-            .entry()
-            .to_app_option::<Timelock>()
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        {
-            if tl.id == input.timelock_id && matches!(tl.status, TimelockStatus::Pending | TimelockStatus::Ready) {
-                let cancelled = Timelock {
-                    id: tl.id,
-                    proposal_id: tl.proposal_id,
-                    actions: tl.actions,
-                    started: tl.started,
-                    expires: tl.expires,
-                    status: TimelockStatus::Cancelled,
-                    cancellation_reason: Some(input.reason.clone()),
-                };
-                update_entry(
-                    record.action_address().clone(),
-                    &EntryTypes::Timelock(cancelled),
-                )?;
-                break;
-            }
-        }
+    // Update timelock status to cancelled via O(1) link-based lookup
+    let tl_record = find_timelock_by_id(&input.timelock_id)?;
+    let tl: Timelock = tl_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Invalid timelock entry".into())))?;
+    if matches!(tl.status, TimelockStatus::Pending | TimelockStatus::Ready) {
+        let cancelled = Timelock {
+            status: TimelockStatus::Cancelled,
+            cancellation_reason: Some(input.reason.clone()),
+            ..tl
+        };
+        update_entry(
+            tl_record.action_address().clone(),
+            &EntryTypes::Timelock(cancelled),
+        )?;
     }
 
     // Clean up pending_timelocks link (timelock was vetoed/cancelled)

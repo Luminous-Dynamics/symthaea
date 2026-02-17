@@ -1,8 +1,8 @@
 /**
  * Execution Zome Client
  *
- * Handles proposal execution, scheduling, and cross-hApp action triggers
- * for the Governance hApp.
+ * Handles timelock management, proposal execution, guardian vetoes,
+ * and fund allocation for the Governance hApp.
  *
  * @module @mycelix/sdk/clients/governance/execution
  */
@@ -10,14 +10,13 @@
 import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
 import type {
-  ProposalExecution,
-  RequestExecutionInput,
-  AcknowledgeExecutionInput,
-  ExecutionSchedule,
-  ExecutionStatus,
+  Timelock,
+  FundAllocation,
+  TimelockStatus,
+  CreateTimelockInput,
+  ExecuteTimelockInput,
+  VetoTimelockInput,
 } from './types';
-// GovernanceError removed (unused)
-import type { ActionHash } from '../../generated/common';
 
 /**
  * Configuration for the Execution client
@@ -34,11 +33,10 @@ const DEFAULT_CONFIG: ExecutionClientConfig = {
 /**
  * Client for Execution operations
  *
- * Handles the execution of passed proposals, including:
- * - Direct execution within the governance hApp
- * - Cross-hApp execution via bridge
- * - Scheduled/delayed execution
- * - Retry handling for failed executions
+ * Manages the timelock-based execution of passed proposals, including:
+ * - Timelock creation and lifecycle (Pending → Ready → Executed/Cancelled/Failed)
+ * - Guardian vetoes during timelock period
+ * - Fund allocation and release
  *
  * @example
  * ```typescript
@@ -46,341 +44,175 @@ const DEFAULT_CONFIG: ExecutionClientConfig = {
  *
  * const execution = new ExecutionClient(appClient);
  *
- * // Request execution of a passed proposal
- * const exec = await execution.requestExecution({
- *   proposalId: 'uhCkkq...',
+ * // Create a timelock for a passed proposal
+ * const timelock = await execution.createTimelock({
+ *   proposalId: 'proposal:123',
+ *   actions: JSON.stringify({ action: 'transfer', amount: 5000 }),
+ *   delayHours: 48,
  * });
  *
- * // Monitor execution status
- * const status = await execution.getExecution(exec.id);
- * if (status.status === 'Completed') {
- *   console.log('Execution successful!');
- * }
- *
- * // Schedule delayed execution
- * const scheduled = await execution.scheduleExecution(
- *   'uhCkkq...',
- *   Date.now() + 86400000 // 24 hours from now
- * );
+ * // Later, execute the timelock
+ * const result = await execution.executeTimelock({ timelockId: timelock.id });
  * ```
  */
 export class ExecutionClient extends ZomeClient {
   protected readonly zomeName = 'execution';
-  
 
   constructor(client: AppClient, config: ExecutionClientConfig = {}) {
     const mergedConfig = { ...DEFAULT_CONFIG, ...config };
     super(client, { roleName: mergedConfig.roleName! });
-    
   }
 
   // ============================================================================
-  // Execution Operations
+  // Timelock Operations
   // ============================================================================
 
   /**
-   * Request execution of a passed proposal
+   * Create a timelock for a passed proposal
    *
-   * Only proposals with status 'Passed' can be executed.
-   * Creates an execution record and begins processing.
-   *
-   * @param input - Execution request parameters
-   * @returns The execution record
+   * @param input - Timelock creation parameters
+   * @returns The timelock record
    */
-  async requestExecution(input: RequestExecutionInput): Promise<ProposalExecution> {
-    const record = await this.callZomeOnce<HolochainRecord>('request_execution', {
+  async createTimelock(input: CreateTimelockInput): Promise<Timelock> {
+    const record = await this.callZomeOnce<HolochainRecord>('create_timelock', {
       proposal_id: input.proposalId,
-      target_happ: input.targetHapp,
-      action: input.action,
-      payload: input.payload,
+      actions: input.actions,
+      delay_hours: input.delayHours,
     });
-    return this.mapExecution(record);
+    return this.mapTimelock(record);
   }
 
   /**
-   * Execute a proposal immediately
-   *
-   * Combines request and execution in one call for immediate processing.
-   *
-   * @param proposalId - Proposal to execute
-   * @returns The execution record
-   */
-  async executeNow(proposalId: ActionHash): Promise<ProposalExecution> {
-    const record = await this.callZomeOnce<HolochainRecord>('execute_now', proposalId);
-    return this.mapExecution(record);
-  }
-
-  /**
-   * Get an execution by ID
-   *
-   * @param executionId - Execution identifier
-   * @returns The execution or null
-   */
-  async getExecution(executionId: ActionHash): Promise<ProposalExecution | null> {
-    const record = await this.callZomeOrNull<HolochainRecord>('get_execution', executionId);
-    if (!record) return null;
-    return this.mapExecution(record);
-  }
-
-  /**
-   * Get execution for a proposal
+   * Get timelock for a proposal
    *
    * @param proposalId - Proposal identifier
-   * @returns The execution or null
+   * @returns The timelock or null
    */
-  async getExecutionForProposal(proposalId: ActionHash): Promise<ProposalExecution | null> {
-    const record = await this.callZomeOrNull<HolochainRecord>(
-      'get_execution_for_proposal',
-      proposalId
-    );
+  async getProposalTimelock(proposalId: string): Promise<Timelock | null> {
+    const record = await this.callZomeOrNull<HolochainRecord>('get_proposal_timelock', proposalId);
     if (!record) return null;
-    return this.mapExecution(record);
+    return this.mapTimelock(record);
   }
 
   /**
-   * List all executions with optional status filter
+   * Mark a timelock as ready for execution (delay period expired)
    *
-   * @param statusFilter - Optional status filter
-   * @param limit - Maximum results
-   * @returns Array of executions
+   * @param timelockId - Timelock identifier
+   * @returns Updated timelock record
    */
-  async listExecutions(
-    statusFilter?: ExecutionStatus,
-    limit?: number
-  ): Promise<ProposalExecution[]> {
-    const records = await this.callZome<HolochainRecord[]>('list_executions', {
-      status_filter: statusFilter,
-      limit,
+  async markTimelockReady(timelockId: string): Promise<Timelock> {
+    const record = await this.callZomeOnce<HolochainRecord>('mark_timelock_ready', {
+      timelock_id: timelockId,
     });
-    return records.map(r => this.mapExecution(r));
+    return this.mapTimelock(record);
   }
 
   /**
-   * Get pending executions
+   * Execute a ready timelock
    *
-   * @returns Array of pending executions
+   * @param input - Execution parameters
+   * @returns The execution result record
    */
-  async getPendingExecutions(): Promise<ProposalExecution[]> {
-    return this.listExecutions('Pending');
-  }
-
-  /**
-   * Get in-progress executions
-   *
-   * @returns Array of in-progress executions
-   */
-  async getInProgressExecutions(): Promise<ProposalExecution[]> {
-    return this.listExecutions('InProgress');
-  }
-
-  /**
-   * Get failed executions
-   *
-   * @returns Array of failed executions
-   */
-  async getFailedExecutions(): Promise<ProposalExecution[]> {
-    return this.listExecutions('Failed');
-  }
-
-  // ============================================================================
-  // Execution Acknowledgment
-  // ============================================================================
-
-  /**
-   * Acknowledge execution completion
-   *
-   * Called after cross-hApp execution completes (success or failure).
-   *
-   * @param input - Acknowledgment parameters
-   * @returns Updated execution record
-   */
-  async acknowledgeExecution(input: AcknowledgeExecutionInput): Promise<ProposalExecution> {
-    const record = await this.callZomeOnce<HolochainRecord>('acknowledge_execution', {
-      execution_id: input.executionId,
-      success: input.success,
-      result_data: input.resultData,
-      error_message: input.errorMessage,
-    });
-    return this.mapExecution(record);
-  }
-
-  /**
-   * Mark execution as successful
-   *
-   * @param executionId - Execution identifier
-   * @param resultData - Optional result data (JSON)
-   * @returns Updated execution record
-   */
-  async markSuccess(executionId: ActionHash, resultData?: string): Promise<ProposalExecution> {
-    return this.acknowledgeExecution({
-      executionId,
-      success: true,
-      resultData,
+  async executeTimelock(input: ExecuteTimelockInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('execute_timelock', {
+      timelock_id: input.timelockId,
     });
   }
 
   /**
-   * Mark execution as failed
+   * Get all pending timelocks
    *
-   * @param executionId - Execution identifier
-   * @param errorMessage - Error message
-   * @returns Updated execution record
+   * @returns Array of pending timelocks
    */
-  async markFailed(executionId: ActionHash, errorMessage: string): Promise<ProposalExecution> {
-    return this.acknowledgeExecution({
-      executionId,
-      success: false,
-      errorMessage,
+  async getPendingTimelocks(): Promise<Timelock[]> {
+    const records = await this.callZome<HolochainRecord[]>('get_pending_timelocks', null);
+    return records.map(r => this.mapTimelock(r));
+  }
+
+  // ============================================================================
+  // Guardian Veto
+  // ============================================================================
+
+  /**
+   * Veto a timelock (guardian action)
+   *
+   * @param input - Veto parameters
+   * @returns The veto and cancelled timelock records
+   */
+  async vetoTimelock(input: VetoTimelockInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('veto_timelock', {
+      timelock_id: input.timelockId,
+      reason: input.reason,
     });
   }
 
   // ============================================================================
-  // Retry & Cancel Operations
+  // Fund Allocation
   // ============================================================================
 
   /**
-   * Retry a failed execution
+   * Lock funds for a proposal execution
    *
-   * @param executionId - Execution identifier
-   * @returns Updated execution record
+   * @param proposalId - Proposal identifier
+   * @param timelockId - Associated timelock
+   * @param sourceAccount - Source account for funds
+   * @param amount - Amount to lock
+   * @param currency - Currency code
+   * @returns The fund allocation record
    */
-  async retryExecution(executionId: ActionHash): Promise<ProposalExecution> {
-    const record = await this.callZomeOnce<HolochainRecord>('retry_execution', executionId);
-    return this.mapExecution(record);
-  }
-
-  /**
-   * Cancel a pending execution
-   *
-   * @param executionId - Execution identifier
-   * @param reason - Cancellation reason
-   * @returns Updated execution record
-   */
-  async cancelExecution(executionId: ActionHash, reason: string): Promise<ProposalExecution> {
-    const record = await this.callZomeOnce<HolochainRecord>('cancel_execution', {
-      execution_id: executionId,
-      reason,
-    });
-    return this.mapExecution(record);
-  }
-
-  /**
-   * Revert a completed execution
-   *
-   * For executions that support rollback.
-   *
-   * @param executionId - Execution identifier
-   * @param reason - Revert reason
-   * @returns Updated execution record
-   */
-  async revertExecution(executionId: ActionHash, reason: string): Promise<ProposalExecution> {
-    const record = await this.callZomeOnce<HolochainRecord>('revert_execution', {
-      execution_id: executionId,
-      reason,
-    });
-    return this.mapExecution(record);
-  }
-
-  // ============================================================================
-  // Scheduled Execution
-  // ============================================================================
-
-  /**
-   * Schedule execution for a future time
-   *
-   * @param proposalId - Proposal to execute
-   * @param scheduledAt - Scheduled execution time (milliseconds)
-   * @returns The schedule record
-   */
-  async scheduleExecution(
-    proposalId: ActionHash,
-    scheduledAt: number
-  ): Promise<ExecutionSchedule> {
-    const result = await this.callZomeOnce<any>('schedule_execution', {
+  async lockFunds(
+    proposalId: string,
+    timelockId: string,
+    sourceAccount: string,
+    amount: number,
+    currency: string
+  ): Promise<FundAllocation> {
+    const record = await this.callZomeOnce<HolochainRecord>('lock_proposal_funds', {
       proposal_id: proposalId,
-      scheduled_at: scheduledAt * 1000, // Convert to microseconds
+      timelock_id: timelockId,
+      source_account: sourceAccount,
+      amount,
+      currency,
     });
-    return {
-      id: result.id,
-      proposalId: result.proposal_id,
-      scheduledAt: result.scheduled_at,
-      active: result.active,
-      createdAt: result.created_at,
-    };
+    return this.mapFundAllocation(record);
   }
 
   /**
-   * Cancel a scheduled execution
+   * Release locked funds after successful execution
    *
-   * @param scheduleId - Schedule identifier
+   * @param proposalId - Proposal identifier
+   * @returns Updated fund allocation record
    */
-  async cancelSchedule(scheduleId: ActionHash): Promise<void> {
-    await this.callZomeOnce('cancel_schedule', scheduleId);
+  async releaseFunds(proposalId: string): Promise<FundAllocation> {
+    const record = await this.callZomeOnce<HolochainRecord>('release_locked_funds', {
+      proposal_id: proposalId,
+    });
+    return this.mapFundAllocation(record);
   }
 
   /**
-   * Get scheduled executions
+   * Refund locked funds (execution failed/cancelled/vetoed)
    *
-   * @returns Array of scheduled executions
+   * @param proposalId - Proposal identifier
+   * @returns Updated fund allocation record
    */
-  async getScheduledExecutions(): Promise<ExecutionSchedule[]> {
-    const results = await this.callZome<any[]>('get_scheduled_executions', null);
-    return results.map(r => ({
-      id: r.id,
-      proposalId: r.proposal_id,
-      scheduledAt: r.scheduled_at,
-      active: r.active,
-      createdAt: r.created_at,
-    }));
+  async refundFunds(proposalId: string): Promise<FundAllocation> {
+    const record = await this.callZomeOnce<HolochainRecord>('refund_locked_funds', {
+      proposal_id: proposalId,
+    });
+    return this.mapFundAllocation(record);
   }
 
   /**
-   * Get due scheduled executions
+   * Get fund allocation for a proposal
    *
-   * Returns executions that are past their scheduled time.
-   *
-   * @returns Array of due executions
+   * @param proposalId - Proposal identifier
+   * @returns The fund allocation or null
    */
-  async getDueExecutions(): Promise<ExecutionSchedule[]> {
-    const results = await this.callZome<any[]>('get_due_executions', null);
-    return results.map(r => ({
-      id: r.id,
-      proposalId: r.proposal_id,
-      scheduledAt: r.scheduled_at,
-      active: r.active,
-      createdAt: r.created_at,
-    }));
-  }
-
-  // ============================================================================
-  // Cross-hApp Execution
-  // ============================================================================
-
-  /**
-   * Get executions targeting a specific hApp
-   *
-   * @param targetHapp - Target hApp identifier
-   * @returns Array of executions
-   */
-  async getExecutionsForHapp(targetHapp: string): Promise<ProposalExecution[]> {
-    const records = await this.callZome<HolochainRecord[]>('get_executions_for_happ', targetHapp);
-    return records.map(r => this.mapExecution(r));
-  }
-
-  /**
-   * Get pending executions for a target hApp
-   *
-   * Useful for hApps that need to process incoming governance actions.
-   *
-   * @param targetHapp - Target hApp identifier
-   * @returns Array of pending executions
-   */
-  async getPendingExecutionsForHapp(targetHapp: string): Promise<ProposalExecution[]> {
-    const records = await this.callZome<HolochainRecord[]>(
-      'get_pending_executions_for_happ',
-      targetHapp
-    );
-    return records.map(r => this.mapExecution(r));
+  async getFundAllocation(proposalId: string): Promise<FundAllocation | null> {
+    const record = await this.callZomeOrNull<HolochainRecord>('get_fund_allocation', proposalId);
+    if (!record) return null;
+    return this.mapFundAllocation(record);
   }
 
   // ============================================================================
@@ -388,97 +220,48 @@ export class ExecutionClient extends ZomeClient {
   // ============================================================================
 
   /**
-   * Get execution status description
-   *
-   * @param status - Execution status
-   * @returns Human-readable description
+   * Get timelock status description
    */
-  getStatusDescription(status: ExecutionStatus): string {
-    const descriptions: Record<ExecutionStatus, string> = {
-      Pending: 'Execution is queued and waiting to be processed',
-      InProgress: 'Execution is currently being processed',
-      Completed: 'Execution completed successfully',
-      Failed: 'Execution failed and may be retried',
-      Reverted: 'Execution was completed but then reverted',
-      Cancelled: 'Execution was cancelled before processing',
+  getStatusDescription(status: TimelockStatus): string {
+    const descriptions: Record<TimelockStatus, string> = {
+      Pending: 'Timelock delay period is active',
+      Ready: 'Timelock delay expired, ready for execution',
+      Executed: 'Proposal actions have been executed',
+      Cancelled: 'Timelock was cancelled (e.g., via veto)',
+      Failed: 'Execution failed',
     };
     return descriptions[status];
-  }
-
-  /**
-   * Check if execution can be retried
-   *
-   * @param execution - The execution record
-   * @returns True if can be retried
-   */
-  canRetry(execution: ProposalExecution): boolean {
-    return (
-      execution.status === 'Failed' &&
-      execution.retryCount < execution.maxRetries
-    );
-  }
-
-  /**
-   * Check if execution can be cancelled
-   *
-   * @param execution - The execution record
-   * @returns True if can be cancelled
-   */
-  canCancel(execution: ProposalExecution): boolean {
-    return execution.status === 'Pending';
-  }
-
-  /**
-   * Get execution duration in seconds
-   *
-   * @param execution - The execution record
-   * @returns Duration in seconds, or null if not started/completed
-   */
-  getExecutionDuration(execution: ProposalExecution): number | null {
-    if (!execution.startedAt) return null;
-
-    const endTime = execution.completedAt ?? Date.now() * 1000;
-    return Math.floor((endTime - execution.startedAt) / 1000000);
-  }
-
-  /**
-   * Get execution history for a proposal
-   *
-   * @param proposalId - Proposal identifier
-   * @returns Array of executions (including retries)
-   */
-  async getExecutionHistory(proposalId: ActionHash): Promise<ProposalExecution[]> {
-    const records = await this.callZome<HolochainRecord[]>(
-      'get_execution_history',
-      proposalId
-    );
-    return records.map(r => this.mapExecution(r));
   }
 
   // ============================================================================
   // Private Helpers
   // ============================================================================
 
-  /**
-   * Map Holochain record to ProposalExecution type
-   */
-  private mapExecution(record: HolochainRecord): ProposalExecution {
-    const entry = this.extractEntry<any>(record);
+  private mapTimelock(record: HolochainRecord): Timelock {
+    const entry = (record as any).entry?.Present?.entry ?? (record as any).entry ?? {};
     return {
-      id: record.signed_action.hashed.hash as unknown as string,
+      id: entry.id,
       proposalId: entry.proposal_id,
-      targetHapp: entry.target_happ,
-      action: entry.action,
-      payload: entry.payload,
+      actions: entry.actions,
+      started: entry.started,
+      expires: entry.expires,
       status: entry.status,
-      executorDid: entry.executor_did,
-      resultData: entry.result_data,
-      errorMessage: entry.error_message,
-      retryCount: entry.retry_count,
-      maxRetries: entry.max_retries,
-      requestedAt: entry.requested_at,
-      startedAt: entry.started_at,
-      completedAt: entry.completed_at,
+      cancellationReason: entry.cancellation_reason,
+    };
+  }
+
+  private mapFundAllocation(record: HolochainRecord): FundAllocation {
+    const entry = (record as any).entry?.Present?.entry ?? (record as any).entry ?? {};
+    return {
+      id: entry.id,
+      proposalId: entry.proposal_id,
+      timelockId: entry.timelock_id,
+      sourceAccount: entry.source_account,
+      amount: entry.amount,
+      currency: entry.currency,
+      lockedAt: entry.locked_at,
+      status: entry.status,
+      statusReason: entry.status_reason,
     };
   }
 }

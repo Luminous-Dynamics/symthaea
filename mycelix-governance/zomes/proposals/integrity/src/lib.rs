@@ -255,7 +255,133 @@ pub enum LinkTypes {
     ContributionToReply,
     /// Proposal to discussion reflections
     ProposalToDiscussionReflection,
+    /// O(1) lookup: proposal ID anchor → proposal record
+    ProposalById,
 }
+
+// ============================================================================
+// PURE VALIDATION FUNCTIONS (testable without HDI host)
+// ============================================================================
+
+pub fn check_create_proposal(proposal: &Proposal) -> Result<(), String> {
+    if !proposal.id.starts_with("MIP-") {
+        return Err("Proposal ID must start with 'MIP-'".into());
+    }
+    if !proposal.author.starts_with("did:") {
+        return Err("Author must be a valid DID".into());
+    }
+    if proposal.title.is_empty() {
+        return Err("Proposal title cannot be empty".into());
+    }
+    if proposal.description.is_empty() {
+        return Err("Proposal description cannot be empty".into());
+    }
+    if proposal.voting_ends <= proposal.voting_starts {
+        return Err("Voting end must be after voting start".into());
+    }
+    if serde_json::from_str::<serde_json::Value>(&proposal.actions).is_err() {
+        return Err("Actions must be valid JSON".into());
+    }
+    if proposal.version != 1 {
+        return Err("Initial proposal version must be 1".into());
+    }
+    if proposal.status != ProposalStatus::Draft {
+        return Err("New proposals must start in Draft status".into());
+    }
+    Ok(())
+}
+
+pub fn check_update_proposal(original: &Proposal, updated: &Proposal) -> Result<(), String> {
+    if updated.id != original.id {
+        return Err("Cannot change proposal ID".into());
+    }
+    if updated.author != original.author {
+        return Err("Cannot change proposal author".into());
+    }
+    if updated.status != original.status {
+        let valid = matches!(
+            (&original.status, &updated.status),
+            (ProposalStatus::Draft, ProposalStatus::Active)
+            | (ProposalStatus::Draft, ProposalStatus::Cancelled)
+            | (ProposalStatus::Active, ProposalStatus::Ended)
+            | (ProposalStatus::Active, ProposalStatus::Cancelled)
+            | (ProposalStatus::Ended, ProposalStatus::Approved)
+            | (ProposalStatus::Ended, ProposalStatus::Rejected)
+            | (ProposalStatus::Approved, ProposalStatus::Signed)
+            | (ProposalStatus::Approved, ProposalStatus::Cancelled)
+            | (ProposalStatus::Signed, ProposalStatus::Executed)
+            | (ProposalStatus::Signed, ProposalStatus::Failed)
+            | (ProposalStatus::Signed, ProposalStatus::Cancelled)
+        );
+        if !valid {
+            return Err(format!(
+                "Invalid status transition: {:?} -> {:?}",
+                original.status, updated.status
+            ));
+        }
+    }
+    if original.status != ProposalStatus::Draft
+        && (updated.title != original.title
+            || updated.description != original.description
+            || updated.actions != original.actions
+            || updated.proposal_type != original.proposal_type)
+    {
+        return Err("Cannot modify proposal content after leaving Draft status".into());
+    }
+    if updated.version != original.version + 1 {
+        return Err("Version must be incremented by 1".into());
+    }
+    Ok(())
+}
+
+pub fn check_create_amendment(amendment: &ProposalAmendment) -> Result<(), String> {
+    if !amendment.proposer.starts_with("did:") {
+        return Err("Proposer must be a valid DID".into());
+    }
+    if amendment.changes.is_empty() {
+        return Err("Amendment changes cannot be empty".into());
+    }
+    if amendment.reason.is_empty() {
+        return Err("Amendment reason cannot be empty".into());
+    }
+    Ok(())
+}
+
+pub fn check_create_contribution(contribution: &DiscussionContribution) -> Result<(), String> {
+    if !contribution.contributor.starts_with("did:") {
+        return Err("Contributor must be a valid DID".into());
+    }
+    if contribution.proposal_id.is_empty() {
+        return Err("Proposal ID cannot be empty".into());
+    }
+    if contribution.content.is_empty() {
+        return Err("Contribution content cannot be empty".into());
+    }
+    if contribution.harmony_tags.len() > 7 {
+        return Err("Cannot have more than 7 harmony tags".into());
+    }
+    Ok(())
+}
+
+pub fn check_create_reflection(reflection: &DiscussionReflection) -> Result<(), String> {
+    if reflection.proposal_id.is_empty() {
+        return Err("Proposal ID cannot be empty".into());
+    }
+    if reflection.harmony_diversity < 0.0 || reflection.harmony_diversity > 1.0 {
+        return Err("Harmony diversity must be between 0 and 1".into());
+    }
+    if reflection.voice_concentration < 0.0 || reflection.voice_concentration > 1.0 {
+        return Err("Voice concentration must be between 0 and 1".into());
+    }
+    if reflection.preliminary_sentiment < 0.0 || reflection.preliminary_sentiment > 1.0 {
+        return Err("Preliminary sentiment must be between 0 and 1".into());
+    }
+    Ok(())
+}
+
+// ============================================================================
+// VALIDATION CALLBACK
+// ============================================================================
 
 /// HDI 0.7 single validation callback using FlatOp pattern
 #[hdk_extern]
@@ -303,6 +429,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::ContributorToContribution => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ContributionToReply => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ProposalToDiscussionReflection => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ProposalById => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -333,63 +460,10 @@ fn validate_create_proposal(
     _action: Create,
     proposal: Proposal,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate ID format (MIP-XXX)
-    if !proposal.id.starts_with("MIP-") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposal ID must start with 'MIP-'".into(),
-        ));
+    match check_create_proposal(&proposal) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(reason) => Ok(ValidateCallbackResult::Invalid(reason)),
     }
-
-    // Validate author is a DID
-    if !proposal.author.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Author must be a valid DID".into(),
-        ));
-    }
-
-    // Validate title not empty
-    if proposal.title.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposal title cannot be empty".into(),
-        ));
-    }
-
-    // Validate description not empty
-    if proposal.description.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposal description cannot be empty".into(),
-        ));
-    }
-
-    // Validate voting period
-    if proposal.voting_ends <= proposal.voting_starts {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Voting end must be after voting start".into(),
-        ));
-    }
-
-    // Validate actions is valid JSON
-    if serde_json::from_str::<serde_json::Value>(&proposal.actions).is_err() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Actions must be valid JSON".into(),
-        ));
-    }
-
-    // Validate initial version is 1
-    if proposal.version != 1 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Initial proposal version must be 1".into(),
-        ));
-    }
-
-    // New proposals must start in Draft status
-    if proposal.status != ProposalStatus::Draft {
-        return Ok(ValidateCallbackResult::Invalid(
-            "New proposals must start in Draft status".into(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate proposal update
@@ -398,7 +472,6 @@ fn validate_update_proposal(
     proposal: Proposal,
     original_action_hash: ActionHash,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Get original proposal for comparison
     let original_record = must_get_valid_record(original_action_hash)?;
     let original_proposal: Proposal = original_record
         .entry()
@@ -408,70 +481,10 @@ fn validate_update_proposal(
             "Original proposal not found".into()
         )))?;
 
-    // Cannot change proposal ID
-    if proposal.id != original_proposal.id {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot change proposal ID".into(),
-        ));
+    match check_update_proposal(&original_proposal, &proposal) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(reason) => Ok(ValidateCallbackResult::Invalid(reason)),
     }
-
-    // Cannot change author
-    if proposal.author != original_proposal.author {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot change proposal author".into(),
-        ));
-    }
-
-    // Enforce valid status transitions
-    if proposal.status != original_proposal.status {
-        let valid = matches!(
-            (&original_proposal.status, &proposal.status),
-            // Draft: submit for voting or cancel
-            (ProposalStatus::Draft, ProposalStatus::Active)
-            | (ProposalStatus::Draft, ProposalStatus::Cancelled)
-            // Active: end voting period or cancel
-            | (ProposalStatus::Active, ProposalStatus::Ended)
-            | (ProposalStatus::Active, ProposalStatus::Cancelled)
-            // Ended: tally determines outcome
-            | (ProposalStatus::Ended, ProposalStatus::Approved)
-            | (ProposalStatus::Ended, ProposalStatus::Rejected)
-            // Approved: threshold signature obtained, or cancel
-            | (ProposalStatus::Approved, ProposalStatus::Signed)
-            | (ProposalStatus::Approved, ProposalStatus::Cancelled)
-            // Signed: execution outcome
-            | (ProposalStatus::Signed, ProposalStatus::Executed)
-            | (ProposalStatus::Signed, ProposalStatus::Failed)
-            | (ProposalStatus::Signed, ProposalStatus::Cancelled)
-        );
-
-        if !valid {
-            return Ok(ValidateCallbackResult::Invalid(format!(
-                "Invalid status transition: {:?} -> {:?}",
-                original_proposal.status, proposal.status
-            )));
-        }
-    }
-
-    // Cannot modify content fields after voting starts (only status changes allowed)
-    if original_proposal.status != ProposalStatus::Draft
-        && (proposal.title != original_proposal.title
-            || proposal.description != original_proposal.description
-            || proposal.actions != original_proposal.actions
-            || proposal.proposal_type != original_proposal.proposal_type)
-    {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot modify proposal content after leaving Draft status".into(),
-        ));
-    }
-
-    // Version must increment
-    if proposal.version != original_proposal.version + 1 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Version must be incremented by 1".into(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate amendment creation
@@ -479,28 +492,10 @@ fn validate_create_amendment(
     _action: Create,
     amendment: ProposalAmendment,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate proposer is a DID
-    if !amendment.proposer.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposer must be a valid DID".into(),
-        ));
+    match check_create_amendment(&amendment) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(reason) => Ok(ValidateCallbackResult::Invalid(reason)),
     }
-
-    // Validate changes not empty
-    if amendment.changes.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Amendment changes cannot be empty".into(),
-        ));
-    }
-
-    // Validate reason not empty
-    if amendment.reason.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Amendment reason cannot be empty".into(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate amendment update
@@ -521,35 +516,10 @@ fn validate_create_contribution(
     _action: Create,
     contribution: DiscussionContribution,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate contributor is a DID
-    if !contribution.contributor.starts_with("did:") {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Contributor must be a valid DID".into(),
-        ));
+    match check_create_contribution(&contribution) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(reason) => Ok(ValidateCallbackResult::Invalid(reason)),
     }
-
-    // Validate proposal ID not empty
-    if contribution.proposal_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposal ID cannot be empty".into(),
-        ));
-    }
-
-    // Validate content not empty
-    if contribution.content.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Contribution content cannot be empty".into(),
-        ));
-    }
-
-    // Validate harmony tags (max 7 - the Seven Harmonies)
-    if contribution.harmony_tags.len() > 7 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Cannot have more than 7 harmony tags".into(),
-        ));
-    }
-
-    Ok(ValidateCallbackResult::Valid)
 }
 
 /// Validate discussion reflection creation
@@ -557,33 +527,242 @@ fn validate_create_discussion_reflection(
     _action: Create,
     reflection: DiscussionReflection,
 ) -> ExternResult<ValidateCallbackResult> {
-    // Validate proposal ID not empty
-    if reflection.proposal_id.is_empty() {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Proposal ID cannot be empty".into(),
-        ));
+    match check_create_reflection(&reflection) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(reason) => Ok(ValidateCallbackResult::Invalid(reason)),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
     }
 
-    // Validate harmony diversity in range
-    if reflection.harmony_diversity < 0.0 || reflection.harmony_diversity > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Harmony diversity must be between 0 and 1".into(),
-        ));
+    fn make_proposal() -> Proposal {
+        Proposal {
+            id: "MIP-001".into(),
+            title: "Test Proposal".into(),
+            description: "A test proposal".into(),
+            proposal_type: ProposalType::Standard,
+            author: "did:mycelix:test123".into(),
+            status: ProposalStatus::Draft,
+            actions: "{}".into(),
+            discussion_url: None,
+            voting_starts: ts(1000000),
+            voting_ends: ts(2000000),
+            created: ts(1000000),
+            updated: ts(1000000),
+            version: 1,
+        }
     }
 
-    // Validate voice concentration in range
-    if reflection.voice_concentration < 0.0 || reflection.voice_concentration > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Voice concentration must be between 0 and 1".into(),
-        ));
+    #[test]
+    fn test_valid_proposal_accepted() {
+        assert!(check_create_proposal(&make_proposal()).is_ok());
     }
 
-    // Validate preliminary sentiment in range
-    if reflection.preliminary_sentiment < 0.0 || reflection.preliminary_sentiment > 1.0 {
-        return Ok(ValidateCallbackResult::Invalid(
-            "Preliminary sentiment must be between 0 and 1".into(),
-        ));
+    #[test]
+    fn test_proposal_id_must_start_with_mip() {
+        let mut p = make_proposal();
+        p.id = "BAD-001".into();
+        assert!(check_create_proposal(&p).unwrap_err().contains("MIP-"));
     }
 
-    Ok(ValidateCallbackResult::Valid)
+    #[test]
+    fn test_proposal_author_must_be_did() {
+        let mut p = make_proposal();
+        p.author = "not-a-did".into();
+        assert!(check_create_proposal(&p).unwrap_err().contains("DID"));
+    }
+
+    #[test]
+    fn test_proposal_title_not_empty() {
+        let mut p = make_proposal();
+        p.title = "".into();
+        assert!(check_create_proposal(&p).unwrap_err().contains("title"));
+    }
+
+    #[test]
+    fn test_proposal_description_not_empty() {
+        let mut p = make_proposal();
+        p.description = "".into();
+        assert!(check_create_proposal(&p).unwrap_err().contains("description"));
+    }
+
+    #[test]
+    fn test_proposal_voting_period_end_after_start() {
+        let mut p = make_proposal();
+        p.voting_ends = ts(500000); // before start
+        assert!(check_create_proposal(&p).unwrap_err().contains("Voting end"));
+    }
+
+    #[test]
+    fn test_proposal_actions_must_be_json() {
+        let mut p = make_proposal();
+        p.actions = "not json {{{".into();
+        assert!(check_create_proposal(&p).unwrap_err().contains("JSON"));
+    }
+
+    #[test]
+    fn test_proposal_initial_version_must_be_1() {
+        let mut p = make_proposal();
+        p.version = 5;
+        assert!(check_create_proposal(&p).unwrap_err().contains("version"));
+    }
+
+    #[test]
+    fn test_proposal_must_start_draft() {
+        let mut p = make_proposal();
+        p.status = ProposalStatus::Active;
+        assert!(check_create_proposal(&p).unwrap_err().contains("Draft"));
+    }
+
+    // --- Update validation ---
+
+    #[test]
+    fn test_valid_status_transitions() {
+        let original = make_proposal();
+        let transitions = vec![
+            (ProposalStatus::Draft, ProposalStatus::Active),
+            (ProposalStatus::Draft, ProposalStatus::Cancelled),
+            (ProposalStatus::Active, ProposalStatus::Ended),
+            (ProposalStatus::Active, ProposalStatus::Cancelled),
+            (ProposalStatus::Ended, ProposalStatus::Approved),
+            (ProposalStatus::Ended, ProposalStatus::Rejected),
+            (ProposalStatus::Approved, ProposalStatus::Signed),
+            (ProposalStatus::Signed, ProposalStatus::Executed),
+            (ProposalStatus::Signed, ProposalStatus::Failed),
+        ];
+        for (from, to) in transitions {
+            let mut orig = original.clone();
+            orig.status = from.clone();
+            let mut updated = orig.clone();
+            updated.status = to.clone();
+            updated.version = orig.version + 1;
+            assert!(check_update_proposal(&orig, &updated).is_ok(),
+                "Transition {:?} -> {:?} should be valid", from, to);
+        }
+    }
+
+    #[test]
+    fn test_invalid_status_transition_rejected() {
+        let mut orig = make_proposal();
+        orig.status = ProposalStatus::Rejected;
+        let mut updated = orig.clone();
+        updated.status = ProposalStatus::Active;
+        updated.version = orig.version + 1;
+        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("Invalid status"));
+    }
+
+    #[test]
+    fn test_cannot_change_proposal_id() {
+        let orig = make_proposal();
+        let mut updated = orig.clone();
+        updated.id = "MIP-999".into();
+        updated.version = orig.version + 1;
+        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("proposal ID"));
+    }
+
+    #[test]
+    fn test_cannot_modify_content_after_draft() {
+        let mut orig = make_proposal();
+        orig.status = ProposalStatus::Active;
+        let mut updated = orig.clone();
+        updated.title = "Changed Title".into();
+        updated.version = orig.version + 1;
+        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("content"));
+    }
+
+    #[test]
+    fn test_version_must_increment() {
+        let orig = make_proposal();
+        let mut updated = orig.clone();
+        updated.status = ProposalStatus::Active;
+        updated.version = orig.version; // same version
+        assert!(check_update_proposal(&orig, &updated).unwrap_err().contains("Version"));
+    }
+
+    // --- Amendment validation ---
+
+    #[test]
+    fn test_amendment_proposer_must_be_did() {
+        let a = ProposalAmendment {
+            id: "A-001".into(),
+            proposal_id: "MIP-001".into(),
+            changes: "some changes".into(),
+            reason: "good reason".into(),
+            proposer: "not-a-did".into(),
+            status: AmendmentStatus::Proposed,
+            created: ts(1000000),
+        };
+        assert!(check_create_amendment(&a).unwrap_err().contains("DID"));
+    }
+
+    #[test]
+    fn test_amendment_changes_not_empty() {
+        let a = ProposalAmendment {
+            id: "A-001".into(),
+            proposal_id: "MIP-001".into(),
+            changes: "".into(),
+            reason: "good reason".into(),
+            proposer: "did:mycelix:test".into(),
+            status: AmendmentStatus::Proposed,
+            created: ts(1000000),
+        };
+        assert!(check_create_amendment(&a).unwrap_err().contains("changes"));
+    }
+
+    // --- Contribution validation ---
+
+    #[test]
+    fn test_contribution_harmony_tags_max_7() {
+        let c = DiscussionContribution {
+            id: "C-001".into(),
+            proposal_id: "MIP-001".into(),
+            contributor: "did:mycelix:test".into(),
+            content: "Some content".into(),
+            harmony_tags: vec!["a".into(), "b".into(), "c".into(), "d".into(),
+                               "e".into(), "f".into(), "g".into(), "h".into()],
+            stance: None,
+            parent_id: None,
+            created_at: ts(1000000),
+            edited: false,
+        };
+        assert!(check_create_contribution(&c).unwrap_err().contains("7"));
+    }
+
+    // --- Reflection validation ---
+
+    #[test]
+    fn test_reflection_harmony_diversity_range() {
+        let r = DiscussionReflection {
+            id: "R-001".into(),
+            proposal_id: "MIP-001".into(),
+            timestamp: ts(1000000),
+            contributor_count: 5,
+            contribution_count: 10,
+            avg_contributions_per_participant: 2.0,
+            max_thread_depth: 3,
+            harmony_coverage: vec![],
+            harmony_diversity: 1.5, // out of range
+            absent_harmonies: vec![],
+            support_count: 3,
+            oppose_count: 2,
+            neutral_count: 1,
+            amend_count: 1,
+            preliminary_sentiment: 0.5,
+            voice_concentration: 0.3,
+            cross_camp_engagement: 0.5,
+            substantiveness_score: 0.7,
+            discussion_saturated: false,
+            unaddressed_concerns: vec![],
+            ready_for_vote: false,
+            readiness_reasoning: "Not ready".into(),
+            summary: "Test reflection".into(),
+        };
+        assert!(check_create_reflection(&r).unwrap_err().contains("Harmony diversity"));
+    }
 }

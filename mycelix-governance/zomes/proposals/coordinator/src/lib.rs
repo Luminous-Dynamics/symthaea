@@ -64,6 +64,16 @@ pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
         (),
     )?;
 
+    // Create anchor and link for O(1) lookup by proposal ID
+    let pid_anchor = format!("pid:{}", proposal.id);
+    create_entry(&EntryTypes::Anchor(Anchor(pid_anchor.clone())))?;
+    create_link(
+        anchor_hash(&pid_anchor)?,
+        action_hash.clone(),
+        LinkTypes::ProposalById,
+        (),
+    )?;
+
     // Link to active proposals if active
     if proposal.status == ProposalStatus::Active {
         create_entry(&EntryTypes::Anchor(Anchor("active_proposals".to_string())))?;
@@ -81,9 +91,27 @@ pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
         )))
 }
 
-/// Get a proposal by ID
+/// Get a proposal by ID (O(1) link-based lookup with chain scan fallback)
 #[hdk_extern]
 pub fn get_proposal(proposal_id: String) -> ExternResult<Option<Record>> {
+    // Try link-based lookup first (O(1))
+    let pid_anchor = format!("pid:{}", proposal_id);
+    if let Ok(entry_hash) = anchor_hash(&pid_anchor) {
+        if let Ok(links) = get_links(
+            LinkQuery::try_new(entry_hash, LinkTypes::ProposalById)?,
+            GetStrategy::default(),
+        ) {
+            if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
+                if let Ok(ah) = ActionHash::try_from(link.target) {
+                    if let Some(record) = get(ah, GetOptions::default())? {
+                        return Ok(Some(record));
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: O(n) chain scan for proposals created before the link was added
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(
             UnitEntryTypes::Proposal,
