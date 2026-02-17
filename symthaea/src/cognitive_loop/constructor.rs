@@ -376,6 +376,10 @@ impl CognitiveLoopService {
             virtual_body,
             prev_body_phi_modulation: 1.0,
             prev_embodied_phi_modulation: 1.0,
+            consecutive_low_error: 0,
+            prev_resonance_frequency: 0.0,
+            prev_quantum_coherence: 0.0,
+            mce_lr_boost: 0.0,
             narrative_veto_active: false,
             master_equation: MasterConsciousnessEquation::default(),
             // Unified Living Mind: life-mind continuity (full_consciousness only)

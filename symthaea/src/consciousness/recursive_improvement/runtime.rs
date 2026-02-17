@@ -68,9 +68,10 @@ use super::{
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// The operational state of the MAGI runtime
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum RuntimeState {
     /// Initial state before first tick
+    #[default]
     Initializing,
     /// Normal operation - making and resolving predictions
     Running,
@@ -84,11 +85,6 @@ pub enum RuntimeState {
     Stopping,
 }
 
-impl Default for RuntimeState {
-    fn default() -> Self {
-        Self::Initializing
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RUNTIME CONFIGURATION
@@ -631,11 +627,8 @@ impl MagiLoopRuntime {
 
             // Check auto-resolve
             if let Some(ref auto) = pred.auto_resolve {
-                match self.check_auto_resolve(auto).await {
-                    Some(success) => {
-                        resolved.push((idx, success));
-                    }
-                    None => {} // Not yet resolvable
+                if let Some(success) = self.check_auto_resolve(auto).await {
+                    resolved.push((idx, success));
                 }
             }
         }

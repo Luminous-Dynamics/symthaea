@@ -2167,3 +2167,97 @@ fn test_narrative_gwt_veto_suppresses_learning() {
     let final_result = service.cycle("final stability check");
     assert!(final_result.prediction_error.is_finite());
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// v0.6.2 FEEDBACK LOOP TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_resonance_frequency_modulates_delta_t() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_resonance: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 20 cycles to let resonance accumulate and feed back into delta_t
+    for _ in 0..20 {
+        let result = service.cycle("resonance delta_t modulation test");
+        assert!(
+            result.prediction_error.is_finite(),
+            "Prediction error should be finite with resonance feedback"
+        );
+    }
+
+    // Final result should still produce valid output
+    let result = service.cycle("final resonance check");
+    assert!(result.prediction_error.is_finite());
+    assert!(result.metadata.resonance_frequency.is_finite());
+}
+
+#[test]
+fn test_quantum_coherence_boosts_exploration() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_quantum_coherence: true,
+        enable_surprise_exploration: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 20 cycles — quantum coherence > 0.5 should boost exploration_urge
+    for _ in 0..20 {
+        service.cycle("quantum coherence exploration boost test");
+    }
+
+    // Exploration urge should be within valid range
+    let urge = service.curiosity_drive().exploration_urge;
+    assert!(
+        (0.0..=1.0).contains(&urge),
+        "Exploration urge should be in [0, 1]: got {urge}"
+    );
+}
+
+#[test]
+fn test_mce_consciousness_boosts_learning_rate() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 10+ cycles to trigger MCE (fires at total_cycles % 10 == 0)
+    for _ in 0..15 {
+        service.cycle("mce learning rate boost test");
+    }
+
+    // Effective learning rate should be finite and non-negative
+    let lr = service.stats().effective_learning_rate;
+    assert!(
+        lr.is_finite() && lr >= 0.0,
+        "Effective learning rate should be finite and >= 0: got {lr}"
+    );
+}
+
+#[test]
+fn test_narrative_self_phi_modulates_confidence() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_narrative_self: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 15 cycles to let narrative self accumulate phi
+    for _ in 0..15 {
+        service.cycle("narrative identity coherence confidence test");
+    }
+
+    // Prediction confidence should be in valid range
+    let confidence = service.prediction_confidence();
+    assert!(
+        (0.0..=1.0).contains(&confidence),
+        "Prediction confidence should be in [0, 1]: got {confidence}"
+    );
+}

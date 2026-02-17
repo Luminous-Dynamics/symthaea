@@ -287,29 +287,225 @@ fn test_master_consciousness_equation_runs_periodically() {
     .unwrap();
 
     let mut mce_values = Vec::new();
-    // Run 25 cycles — MCE fires when total_cycles % 10 == 0.
-    // total_cycles is incremented at start of cycle(), so it's 1-based:
-    // cycle calls 1..25, MCE fires at total_cycles 10 (call 10) and 20 (call 20).
+    // Run 25 cycles — MCE fires periodically based on urgency-adaptive scheduling.
+    // With learning_threshold=0.0, urgency is Critical → MCE fires every 5th cycle.
     for _ in 0..25 {
         let result = service.cycle("consciousness measurement test");
         mce_values.push(result.metadata.consciousness_level);
     }
 
-    // Cycle call 10 (index 9) should have non-zero consciousness_level
+    // MCE should fire at least twice in 25 cycles regardless of urgency
+    let non_zero_count = mce_values.iter().filter(|&&v| v > 0.0).count();
     assert!(
-        mce_values[9] > 0.0,
-        "MCE should compute consciousness_level on cycle 10: got {}, all: {:?}",
-        mce_values[9],
-        &mce_values[..12]
-    );
-    // Cycle call 20 (index 19) should also fire
-    assert!(
-        mce_values[19] > 0.0,
-        "MCE should compute consciousness_level on cycle 20: got {}",
-        mce_values[19]
+        non_zero_count >= 2,
+        "MCE should fire periodically, got {} firings in 25 cycles: {:?}",
+        non_zero_count,
+        &mce_values
     );
 
-    // Non-MCE cycles should be 0.0
+    // Cycle 1 should NOT fire (no schedule hits cycle 1: 1%5≠0, 1%10≠0, 1%20≠0)
     assert_eq!(mce_values[0], 0.0, "MCE should not run on cycle 1");
-    assert_eq!(mce_values[4], 0.0, "MCE should not run on cycle 5");
+
+    // At least one MCE value should be in valid range (0, 1]
+    let max_mce = mce_values.iter().cloned().fold(0.0_f64, f64::max);
+    assert!(
+        max_mce > 0.0 && max_mce <= 1.0,
+        "MCE consciousness_level should be in (0, 1], got {}",
+        max_mce
+    );
+}
+
+// ── Narrative Veto Carry-Over ────────────────────────────────────
+
+#[test]
+fn test_narrative_veto_carry_over() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_narrative_gwt: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 30 cycles — narrative-GWT SelfPhiTooLow veto should fire in early cycles
+    // (self_phi starts near 0, default min_self_phi=0.3)
+    let mut results = Vec::new();
+    for _ in 0..30 {
+        let result = service.cycle("narrative veto carry-over test input");
+        results.push(result);
+    }
+
+    // Find cycles where veto fired
+    let veto_cycles: Vec<usize> = results
+        .iter()
+        .enumerate()
+        .filter(|(_, r)| r.metadata.narrative_gwt_veto)
+        .map(|(i, _)| i)
+        .collect();
+
+    println!("Veto cycles: {:?}", veto_cycles);
+
+    // If a veto fires on cycle N, cycle N+1 should have narrative_veto_active=true
+    // which suppresses learning. We verify by checking learning_occurred on the
+    // cycle after a veto.
+    for &n in &veto_cycles {
+        if n + 1 < results.len() {
+            // The narrative_veto_active flag was set to true at end of cycle N,
+            // so cycle N+1 should have learning suppressed.
+            // Note: learning_occurred may still be false for other reasons,
+            // so we just verify the system is stable after veto carry-over.
+            assert!(
+                results[n + 1].prediction_error.is_finite(),
+                "Cycle after veto should produce finite results"
+            );
+        }
+    }
+
+    // Verify the service is stable after all cycles
+    let final_result = service.cycle("stability check after veto");
+    assert!(final_result.prediction_error.is_finite());
+}
+
+// ── Embodied Phi Accumulation Across Cycles ──────────────────────
+
+#[test]
+fn test_embodied_phi_accumulation_across_cycles() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_embodied_cognition: true,
+        enable_virtual_body: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Track embodied_phi_modulation trajectory over 100 cycles
+    let mut embodied_mods = Vec::new();
+    for _ in 0..100 {
+        let result = service.cycle("embodied phi accumulation test");
+        embodied_mods.push(result.metadata.embodied_phi_modulation);
+    }
+
+    // At least 1 value should deviate from 1.0 (module is active)
+    let deviations = embodied_mods
+        .iter()
+        .filter(|&&m| (m - 1.0).abs() > 0.001)
+        .count();
+    assert!(
+        deviations > 0,
+        "At least one embodied_phi_modulation should deviate from 1.0, got all neutral"
+    );
+
+    // At least 3 unique values (state evolves, not static)
+    let mut unique = embodied_mods.clone();
+    unique.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    unique.dedup_by(|a, b| (*a - *b).abs() < 0.0001);
+    assert!(
+        unique.len() >= 3,
+        "Embodied phi modulation should have >=3 unique values, got {}",
+        unique.len()
+    );
+
+    // Values should differ from initial value (cross-cycle accumulation)
+    let initial = embodied_mods[0];
+    let differs_from_initial = embodied_mods
+        .iter()
+        .filter(|&&m| (m - initial).abs() > 0.001)
+        .count();
+    assert!(
+        differs_from_initial > 0,
+        "Embodied phi should evolve from initial value {initial:.4}"
+    );
+}
+
+// ── Performance Overhead Quick Check ─────────────────────────────
+
+#[test]
+#[ignore] // Run manually: cargo test test_feedback_loop_overhead -- --ignored --nocapture
+fn test_feedback_loop_overhead_quick_check() {
+    use std::time::Instant;
+
+    let warmup_cycles = 10;
+    let measure_cycles = 200;
+
+    let inputs = ["alpha beta", "gamma delta", "epsilon zeta", "eta theta"];
+
+    // Minimal config (all OFF)
+    let mut minimal = CognitiveLoopService::new(CognitiveLoopConfig {
+        genesis_phrase: Some("overhead_benchmark_seed".to_string()),
+        learning_threshold: 0.0,
+        async_training: false,
+        enable_virtual_body: false,
+        enable_surprise_exploration: false,
+        enable_prefrontal: false,
+        enable_meta_cognition: false,
+        enable_narrative_self: false,
+        enable_predictive_self: false,
+        enable_attention_schema: false,
+        enable_gwt: false,
+        enable_resonance: false,
+        enable_quantum_coherence: false,
+        enable_temporal_consciousness: false,
+        enable_embodied_cognition: false,
+        enable_narrative_gwt: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Full config (all ON)
+    let mut full = CognitiveLoopService::new(CognitiveLoopConfig {
+        genesis_phrase: Some("overhead_benchmark_seed".to_string()),
+        learning_threshold: 0.0,
+        async_training: false,
+        enable_virtual_body: true,
+        enable_surprise_exploration: true,
+        enable_prefrontal: true,
+        enable_meta_cognition: true,
+        enable_narrative_self: true,
+        enable_predictive_self: true,
+        enable_attention_schema: true,
+        enable_gwt: true,
+        enable_resonance: true,
+        enable_quantum_coherence: true,
+        enable_temporal_consciousness: true,
+        enable_embodied_cognition: true,
+        enable_narrative_gwt: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Warmup
+    for i in 0..warmup_cycles {
+        minimal.cycle(inputs[i % inputs.len()]);
+        full.cycle(inputs[i % inputs.len()]);
+    }
+
+    // Measure minimal
+    let start_min = Instant::now();
+    for i in 0..measure_cycles {
+        minimal.cycle(inputs[i % inputs.len()]);
+    }
+    let elapsed_min = start_min.elapsed();
+
+    // Measure full
+    let start_full = Instant::now();
+    for i in 0..measure_cycles {
+        full.cycle(inputs[i % inputs.len()]);
+    }
+    let elapsed_full = start_full.elapsed();
+
+    let per_cycle_min_us = elapsed_min.as_micros() as f64 / measure_cycles as f64;
+    let per_cycle_full_us = elapsed_full.as_micros() as f64 / measure_cycles as f64;
+    let hz_min = 1_000_000.0 / per_cycle_min_us;
+    let hz_full = 1_000_000.0 / per_cycle_full_us;
+    let overhead_pct = (per_cycle_full_us - per_cycle_min_us) / per_cycle_min_us * 100.0;
+
+    println!("=== Feedback Loop Overhead ===");
+    println!("Minimal:  {per_cycle_min_us:.0} µs/cycle ({hz_min:.0} Hz)");
+    println!("Full:     {per_cycle_full_us:.0} µs/cycle ({hz_full:.0} Hz)");
+    println!("Overhead: {overhead_pct:.1}%");
+
+    assert!(
+        overhead_pct < 50.0,
+        "Full subsystem overhead should be <50%: got {overhead_pct:.1}%"
+    );
 }

@@ -579,7 +579,7 @@ impl ConsciousnessGradientOptimizer {
             let adam_state = self
                 .adam_states
                 .entry(self.parameters[i].name.clone())
-                .or_insert_with(AdamState::default);
+                .or_default();
 
             // Compute Adam step
             let step = adam_state.update(

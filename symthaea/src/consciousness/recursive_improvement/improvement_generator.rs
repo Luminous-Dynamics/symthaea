@@ -187,9 +187,9 @@ impl ImprovementGenerator {
     /// Generate improvements based on bottlenecks and causal analysis
     ///
     /// **REVOLUTIONARY**: This is where the AI proposes its own improvements!
-    pub fn generate_improvements<'a>(
+    pub fn generate_improvements(
         &mut self,
-        bottlenecks: &[&'a Bottleneck],
+        bottlenecks: &[&Bottleneck],
         causal_chains: &[CausalChain],
         current_phi: f64,
     ) -> Vec<ArchitecturalImprovement> {

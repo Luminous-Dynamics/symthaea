@@ -254,7 +254,7 @@ impl TestSuiteResolver {
         } else {
             // Generic test command
             if let Some(ref pattern) = self.test_pattern {
-                cmd.arg(&pattern);
+                cmd.arg(pattern);
             }
         }
 
@@ -274,12 +274,10 @@ impl TestSuiteResolver {
                 let total = passed + failed;
                 let pass_rate = if total > 0 {
                     passed as f64 / total as f64
+                } else if exit_code == 0 {
+                    1.0
                 } else {
-                    if exit_code == 0 {
-                        1.0
-                    } else {
-                        0.0
-                    }
+                    0.0
                 };
 
                 if pass_rate >= self.pass_threshold {

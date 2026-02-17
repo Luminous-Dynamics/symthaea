@@ -81,7 +81,7 @@ impl LatentConsciousnessState {
     /// Create from a full latent vector
     pub fn from_latent(latent: Vec<f32>) -> Self {
         // Extract observables from latent (first 4 dimensions)
-        let phi = latent.get(0).copied().unwrap_or(0.5) as f64;
+        let phi = latent.first().copied().unwrap_or(0.5) as f64;
         let integration = latent.get(1).copied().unwrap_or(0.5) as f64;
         let coherence = latent.get(2).copied().unwrap_or(0.5) as f64;
         let attention = latent.get(3).copied().unwrap_or(0.5) as f64;
@@ -453,7 +453,7 @@ impl ConsciousnessWorldModel {
         let params = self
             .transition_model
             .entry(action_type)
-            .or_insert_with(TransitionParams::default);
+            .or_default();
 
         // Online update of mean and variance
         params.count += 1;
@@ -468,8 +468,7 @@ impl ConsciousnessWorldModel {
         for i in 0..4 {
             let old_mean = params.mean_delta[i];
             params.mean_delta[i] = old_mean + (deltas[i] - old_mean) / n;
-            params.variance[i] =
-                params.variance[i] + (deltas[i] - old_mean) * (deltas[i] - params.mean_delta[i]);
+            params.variance[i] += (deltas[i] - old_mean) * (deltas[i] - params.mean_delta[i]);
         }
 
         // Store transition

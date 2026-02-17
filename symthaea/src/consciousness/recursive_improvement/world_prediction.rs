@@ -167,9 +167,10 @@ impl OutcomeCategory {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// Resolution status of a prediction
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum Resolution {
     /// Not yet resolved
+    #[default]
     Pending,
     /// Resolved as true (prediction was correct)
     True {
@@ -237,11 +238,6 @@ impl Resolution {
     }
 }
 
-impl Default for Resolution {
-    fn default() -> Self {
-        Self::Pending
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RISK TIER
@@ -483,9 +479,10 @@ pub enum DiffTolerance {
 }
 
 /// Expected state of a resource
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub enum ResourceExpectation {
     /// Resource should exist
+    #[default]
     Exists,
     /// Resource should NOT exist
     NotExists,
@@ -499,11 +496,6 @@ pub enum ResourceExpectation {
     ModifiedAfter(#[serde(skip)] Option<Instant>),
 }
 
-impl Default for ResourceExpectation {
-    fn default() -> Self {
-        Self::Exists
-    }
-}
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RESOLUTION CONTRACT (UPGRADE A)
