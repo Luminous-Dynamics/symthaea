@@ -171,6 +171,7 @@ sacred.txt
 !mycelix-care/zomes/credentials/
 !mycelix-care/zomes/credentials/**
 !mycelix-workspace/sdk/src/credentials/**
+!mycelix-workspace/sdk-ts/src/clients/identity/credentials.ts
 !mycelix-commons/zomes/care-credentials/
 !mycelix-commons/zomes/care-credentials/**
 *secret*
