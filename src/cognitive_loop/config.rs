@@ -181,6 +181,47 @@ pub struct CognitiveLoopConfig {
     /// to somatic states (heart rate, breathing, fatigue, etc.). The resulting
     /// phi_modulation factor scales consciousness via somatic marker feedback.
     pub enable_virtual_body: bool,
+
+    /// Enable predictive self-model.
+    /// When true, the cognitive loop maintains a model of its own future states
+    /// and evaluates action safety based on self-prediction accuracy.
+    pub enable_predictive_self: bool,
+
+    /// Enable attention schema (AST).
+    /// When true, the cognitive loop maintains a model of its own attention state,
+    /// detecting shifts, computing control signals, and grounding attention modes
+    /// in consciousness primitives.
+    pub enable_attention_schema: bool,
+
+    /// Enable Global Workspace Theory integration.
+    /// When true, submits HDC encodings to a unified global workspace for
+    /// conscious broadcast. Workspace broadcast modulates coherence.
+    pub enable_gwt: bool,
+
+    /// Enable consciousness resonance monitoring.
+    /// When true, feeds Phi time-series to extract harmonic modes.
+    /// Pure measurement module — reports in CycleMetadata only.
+    pub enable_resonance: bool,
+
+    /// Enable quantum coherence monitoring.
+    /// When true, observes CfC hidden states and reports superposition
+    /// richness and decoherence events in CycleMetadata.
+    pub enable_quantum_coherence: bool,
+
+    /// Enable temporal consciousness analysis.
+    /// When true, tracks Phi trajectory, continuity, Husserlian time analysis,
+    /// and temporal identity coherence. Depends on narrative_self + predictive_self.
+    pub enable_temporal_consciousness: bool,
+
+    /// Enable embodied cognition analyzer.
+    /// When true, bridges virtual body InteroceptiveState to the full embodied
+    /// cognition module (body schema, sensorimotor engine, affordance detection).
+    pub enable_embodied_cognition: bool,
+
+    /// Enable narrative-GWT integration (consciousness governance capstone).
+    /// When true, provides coherence veto, value checking, and goal alignment
+    /// via a unified NarrativeSelf + GWT + PredictiveSelf integration layer.
+    pub enable_narrative_gwt: bool,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -211,7 +252,15 @@ impl Default for CognitiveLoopConfig {
             enable_prefrontal: false,
             enable_meta_cognition: false,
             enable_narrative_self: false,
-            enable_virtual_body: false,
+            enable_virtual_body: true,
+            enable_predictive_self: false,
+            enable_attention_schema: false,
+            enable_gwt: false,
+            enable_resonance: false,
+            enable_quantum_coherence: false,
+            enable_temporal_consciousness: false,
+            enable_embodied_cognition: false,
+            enable_narrative_gwt: false,
         }
     }
 }

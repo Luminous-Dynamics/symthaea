@@ -2,8 +2,17 @@
 
 use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
+use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
 use crate::brain::prefrontal::PrefrontalCortex;
+use crate::consciousness::attention_schema::AttentionSchema;
+use crate::consciousness::consciousness_resonance::{ResonanceAnalyzer, ResonanceConfig};
+use crate::consciousness::gwt_integration::{UnifiedGWTConfig, UnifiedGlobalWorkspace};
 use crate::consciousness::narrative_self::{NarrativeSelfConfig, NarrativeSelfModel};
+use crate::consciousness::predictive_self::{PredictiveSelfConfig, PredictiveSelfModel};
+use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
+use crate::consciousness::temporal_consciousness::{TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig};
+use crate::consciousness::embodied_cognition::{EmbodiedConfig, EmbodiedConsciousnessAnalyzer};
+use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 use crate::exploration::SurpriseExplorationBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::fep_active_inference::{
@@ -171,6 +180,64 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional predictive self-model
+        let predictive_self = if config.enable_predictive_self {
+            Some(PredictiveSelfModel::new(PredictiveSelfConfig::default()))
+        } else {
+            None
+        };
+
+        // Build optional attention schema
+        let attention_schema = if config.enable_attention_schema {
+            Some(AttentionSchema::new())
+        } else {
+            None
+        };
+
+        // Build optional GWT integration
+        let gwt = if config.enable_gwt {
+            Some(UnifiedGlobalWorkspace::new(UnifiedGWTConfig::default()))
+        } else {
+            None
+        };
+
+        // Build optional consciousness resonance monitor
+        let consciousness_resonance = if config.enable_resonance {
+            Some(ResonanceAnalyzer::new(ResonanceConfig::default()))
+        } else {
+            None
+        };
+
+        // Build optional quantum coherence observer
+        let quantum_coherence = if config.enable_quantum_coherence {
+            Some(QuantumCoherenceAnalyzer::new(
+                crate::consciousness::quantum_coherence::CoherenceConfig::default(),
+            ))
+        } else {
+            None
+        };
+
+        // Build optional temporal consciousness analyzer
+        let temporal_consciousness = if config.enable_temporal_consciousness {
+            Some(TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default()))
+        } else {
+            None
+        };
+
+        // Build optional embodied cognition analyzer
+        let embodied_cognition = if config.enable_embodied_cognition {
+            Some(EmbodiedConsciousnessAnalyzer::new(EmbodiedConfig::default()))
+        } else {
+            None
+        };
+
+        // Build optional narrative-GWT integration (consciousness governance capstone)
+        let narrative_gwt = if config.enable_narrative_gwt {
+            Some(NarrativeGWTIntegration::default_config())
+        } else {
+            None
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -290,8 +357,19 @@ impl CognitiveLoopService {
             prefrontal,
             meta_cognition,
             narrative_self,
+            predictive_self,
+            attention_schema,
+            gwt,
+            consciousness_resonance,
+            quantum_coherence,
+            temporal_consciousness,
+            embodied_cognition,
+            narrative_gwt,
             relational_phi: 0.0,
+            external_reward: 0.0,
             virtual_body,
+            prev_body_phi_modulation: 1.0,
+            master_equation: MasterConsciousnessEquation::default(),
         })
     }
 

@@ -267,6 +267,13 @@ impl CognitiveLoopService {
         self.relational_phi = phi;
     }
 
+    /// Inject external reward signal for the next cycle.
+    /// Blended with internal prediction-error-based reward at 50% weight.
+    /// Resets to 0.0 after consumption in the next cycle.
+    pub fn provide_reward(&mut self, reward: f32) {
+        self.external_reward = reward.clamp(-1.0, 1.0);
+    }
+
     // ========== Flow State Methods ==========
 
     /// Check if currently in flow state

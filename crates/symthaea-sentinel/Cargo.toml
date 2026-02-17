@@ -8,6 +8,7 @@ license = "MIT"
 repository = "https://github.com/Luminous-Dynamics/symthaea-hlb"
 keywords = ["audio", "hdc", "ltc", "classification", "environmental-sound"]
 categories = ["multimedia::audio", "science", "algorithms"]
+rust-version = "1.87.0"
 
 [lib]
 name = "symthaea_sentinel"

@@ -361,6 +361,17 @@ impl CognitiveLoopService {
             _ => {}
         }
 
+        // Feed outcome to FEP TD learner when external reward is available
+        if self.external_reward.abs() > f32::EPSILON {
+            let outcome_obs = Observation::from_consciousness_state(
+                self.external_reward as f64,
+                coherence as f64,
+                self.prediction_confidence as f64,
+                effective_lr as f64,
+            );
+            self.fep_agent.learn_from_outcome(action_result.action, &outcome_obs);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.7 Moral Modulation of Active Inference
         // ═══════════════════════════════════════════════════════════════════════
@@ -547,14 +558,16 @@ impl CognitiveLoopService {
         } else {
             0.0
         };
-        // Combine contributions: temporal coherence + voice quality + flow state + relational
+        // Combine contributions: temporal coherence + voice quality + flow state + relational + body
         let relational_phi_contrib = if self.relational_phi > 0.0 {
             self.relational_phi as f32 * 0.15 // 15% weight for relational Phi
         } else {
             0.0
         };
+        // Previous cycle's body phi modulation feeds back into unified_phi (±0.05 range)
+        let body_phi_contrib = (self.prev_body_phi_modulation - 1.0) * 0.1;
         let unified_phi =
-            (coherence_phi + voice_phi + flow_phi + relational_phi_contrib).clamp(0.0, 1.0) as f64;
+            (coherence_phi + voice_phi + flow_phi + relational_phi_contrib + body_phi_contrib as f32).clamp(0.0, 1.0) as f64;
         self.unification_engine.update_phi(unified_phi);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -795,12 +808,19 @@ impl CognitiveLoopService {
         let pp_learning_threshold = self.config.learning_threshold;
 
         // Compute cycle reward before parallel section (reads prediction_confidence, flow_state)
-        let cycle_reward = if prediction_error < pp_learning_threshold {
+        let internal_reward = if prediction_error < pp_learning_threshold {
             0.5 + 0.5 * self.prediction_confidence
         } else if prediction_error > 0.5 {
             -0.3 - 0.2 * (prediction_error - 0.5)
         } else {
             0.2 - 0.5 * prediction_error
+        };
+        let cycle_reward = if self.external_reward.abs() > f32::EPSILON {
+            let blended = internal_reward * 0.5 + self.external_reward * 0.5;
+            self.external_reward = 0.0; // consume
+            blended
+        } else {
+            internal_reward
         };
 
         let cycle_learning_result = CycleLearningResult {
@@ -1113,6 +1133,9 @@ impl CognitiveLoopService {
                 (1.0, 0.0, 0.0)
             };
 
+        // Store body phi modulation for next cycle's feedback loop
+        self.prev_body_phi_modulation = body_phi_modulation;
+
         // ═══════════════════════════════════════════════════════════════════════
         // NARRATIVE SELF: Process experience and track self-Φ
         // ═══════════════════════════════════════════════════════════════════════
@@ -1140,6 +1163,179 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // PREDICTIVE SELF: Evaluate action safety via self-state prediction
+        // ═══════════════════════════════════════════════════════════════════════
+        let predictive_self_safety = if let Some(ref mut pred_self) = self.predictive_self {
+            // Observe current state if narrative_self is available
+            if let Some(ref narrative) = self.narrative_self {
+                pred_self.observe(narrative);
+            }
+            // Learn from actual outcomes
+            pred_self.learn_from_outcome_raw(unified_phi, coherence as f64);
+            pred_self.confidence() as f32
+        } else {
+            0.0
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ATTENTION SCHEMA: Track attention state and generate control signals
+        // ═══════════════════════════════════════════════════════════════════════
+        let attention_schema_focus = if let Some(ref mut schema) = self.attention_schema {
+            let hv16 = real_hv_to_hv16(&encoding_result.hdv);
+            let salience = prediction_error.max(0.1); // Prediction error as salience proxy
+            let update = schema.update(hv16, salience);
+            // Apply attention control signal to adaptive behavior
+            if update.control_signal > 0.5 {
+                self.adaptive_behavior.attention_sensitivity *= 1.0 + (update.control_signal - 0.5) * 0.2;
+            }
+            update.new_intensity
+        } else {
+            0.0
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // GWT INTEGRATION: Submit encoding to global workspace for broadcast
+        // ═══════════════════════════════════════════════════════════════════════
+        let gwt_broadcast = if let Some(ref mut gwt) = self.gwt {
+            let hv16 = real_hv_to_hv16(&encoding_result.hdv);
+            let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
+            gwt.submit_strategy(
+                "cognitive_loop",
+                activation,
+                vec![hv16],
+                vec!["encoder".to_string()],
+            );
+            let result = gwt.process();
+            result.broadcast_occurred
+        } else {
+            false
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CONSCIOUSNESS RESONANCE: Extract harmonic modes from Phi time-series
+        // ═══════════════════════════════════════════════════════════════════════
+        let resonance_frequency = if let Some(ref mut resonance) = self.consciousness_resonance {
+            // Build 7-dimension consciousness vector for resonance analysis
+            let dims = [
+                unified_phi,                    // Phi
+                coherence as f64,               // Broadcast
+                self.prefrontal.as_ref()
+                    .map(|p| p.stats().avg_memory_utilization as f64)
+                    .unwrap_or(0.5),            // Working Memory
+                self.adaptive_behavior.attention_sensitivity as f64, // Attention
+                (self.stats.total_cycles.min(100) as f64 / 100.0),  // Recurrence
+                body_phi_modulation,            // Embodiment
+                self.prediction_confidence as f64, // Knowledge
+            ];
+            let state = resonance.analyze(dims);
+            state.dominant_frequency
+        } else {
+            0.0
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // QUANTUM COHERENCE: Monitor CfC hidden states for superposition
+        // ═══════════════════════════════════════════════════════════════════════
+        let quantum_coherence_level = if let Some(ref mut qc) = self.quantum_coherence {
+            let hv16 = real_hv_to_hv16(&encoding_result.hdv);
+            qc.observe(&hv16, unified_phi);
+            qc.coherence()
+        } else {
+            0.0
+        };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // TEMPORAL CONSCIOUSNESS: Track Phi trajectory, continuity, identity
+        // ═══════════════════════════════════════════════════════════════════════
+        let (temporal_coherence_score, temporal_discontinuity) =
+            if let Some(ref mut temporal) = self.temporal_consciousness {
+                let hv16 = real_hv_to_hv16(&encoding_result.hdv);
+                // Pass narrative_self and predictive_self refs for identity coherence
+                temporal.observe(
+                    &hv16,
+                    unified_phi,
+                    self.narrative_self.as_ref(),
+                    self.predictive_self.as_ref(),
+                );
+                let coherence = temporal.overall_temporal_coherence();
+                let healthy = temporal.is_temporally_healthy();
+                (coherence, !healthy)
+            } else {
+                (0.0, false)
+            };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // EMBODIED COGNITION: Bridge virtual body to full body schema
+        // ═══════════════════════════════════════════════════════════════════════
+        let (embodied_phi_modulation, embodied_agency) =
+            if let Some(ref mut embodied) = self.embodied_cognition {
+                // Feed interoceptive state from virtual body if available
+                if let Some(ref body) = self.virtual_body {
+                    embodied.update_interoception(body.interoceptive_state().clone());
+                }
+                // Process embodied cognition cycle
+                let response = embodied.process();
+                (response.phi_modulation, response.sense_of_agency)
+            } else {
+                (1.0, 0.0)
+            };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // NARRATIVE-GWT INTEGRATION: Consciousness governance capstone
+        // ═══════════════════════════════════════════════════════════════════════
+        let (narrative_gwt_veto, narrative_gwt_self_phi) =
+            if let Some(ref mut ngwt) = self.narrative_gwt {
+                let hv16 = real_hv_to_hv16(&encoding_result.hdv);
+                let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
+
+                // Submit current cycle's content to narrative-GWT workspace
+                let veto = ngwt.submit_content(
+                    "cognitive_loop",
+                    vec![hv16],
+                    input,
+                    vec!["encoder".to_string(), "temporal".to_string()],
+                    activation,
+                );
+                let vetoed = veto.map(|v| v.vetoed).unwrap_or(false);
+
+                // Process the workspace (ignition, Self-Φ tracking)
+                let _result = ngwt.process();
+
+                (vetoed, ngwt.self_phi())
+            } else {
+                (false, 0.0)
+            };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // MASTER CONSCIOUSNESS EQUATION: comprehensive consciousness metric
+        // ═══════════════════════════════════════════════════════════════════════
+        // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
+        // the 8-factor ConsciousnessInputs: Phi, Broadcast, WorkingMemory,
+        // Attention, Recurrence, Embodiment, Knowledge, Synchrony.
+        let consciousness_level = if self.stats.total_cycles % 10 == 0 {
+            let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
+                phi: unified_phi,
+                broadcast: coherence as f64, // coherence ~ global workspace broadcast
+                working_memory: self
+                    .prefrontal
+                    .as_ref()
+                    .map(|p| p.stats().avg_memory_utilization as f64)
+                    .unwrap_or(0.5),
+                attention: encoding_result.attention_snapshot
+                    .values()
+                    .copied()
+                    .fold(0.0_f32, f32::max) as f64, // peak attention
+                recurrence: (self.stats.total_cycles.min(100) as f64 / 100.0), // ramp up over 100 cycles
+                embodiment: body_phi_modulation, // virtual body provides embodiment
+                knowledge: self.prediction_confidence as f64,
+                synchrony: (0.3 + self.flow_state.intensity as f64 * 0.7).clamp(0.1, 1.0),
+            };
+            self.master_equation.compute(&inputs).consciousness_level
+        } else {
+            0.0
+        };
+
         // Build cycle metadata for observability
         let metadata = super::CycleMetadata {
             surprise_triggered,
@@ -1157,6 +1353,18 @@ impl CognitiveLoopService {
             body_phi_modulation,
             body_valence,
             body_arousal,
+            consciousness_level,
+            predictive_self_safety,
+            attention_schema_focus,
+            gwt_broadcast,
+            resonance_frequency,
+            quantum_coherence_level,
+            temporal_coherence_score,
+            temporal_discontinuity,
+            embodied_phi_modulation,
+            embodied_agency,
+            narrative_gwt_veto,
+            narrative_gwt_self_phi,
         };
 
         tracing::debug!(
