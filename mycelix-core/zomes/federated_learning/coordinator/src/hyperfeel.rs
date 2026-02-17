@@ -67,6 +67,19 @@ pub struct CompressedGradientResult {
 pub fn submit_compressed_gradient(input: SubmitCompressedGradientInput) -> ExternResult<CompressedGradientResult> {
     // F-01: Validate node_id
     validate_node_id(&input.node_id)?;
+
+    // H-02: Bind node_id to caller's AgentPubKey
+    // This prevents impersonation: only the actual caller can submit gradients under their own ID
+    let agent = agent_info()?.agent_initial_pubkey;
+    let caller_id = agent.to_string();
+    if input.node_id != caller_id {
+        // H-02: node_id must match caller's AgentPubKey
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "node_id must match caller's agent pubkey. Expected: {}, got: {}",
+            caller_id, input.node_id
+        ))));
+    }
+
     // F-06: Check rate limit
     check_rate_limit("submit_gradient")?;
 
@@ -83,7 +96,7 @@ pub fn submit_compressed_gradient(input: SubmitCompressedGradientInput) -> Exter
     if !proof_verified {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "zkSTARK proof verification failed. Real proof verification is required for production. \
-             Enable 'stub-proofs' feature for development/testing only.".to_string()
+             Enable 'zkstark' feature for development/testing only.".to_string()
         )));
     }
 
@@ -213,15 +226,15 @@ pub fn submit_compressed_gradient(input: SubmitCompressedGradientInput) -> Exter
     })
 }
 
-/// Verify zkSTARK proof - STUB version (development/testing only)
+/// Verify zkSTARK proof - simulation/stub version (development/testing only)
 ///
 /// This stub only checks proof size and an epochs field at a fixed offset.
 /// It provides ZERO actual cryptographic verification.
-/// Enable the `stub-proofs` feature ONLY for development/testing.
-#[cfg(feature = "stub-proofs")]
+/// Enable the `zkstark` feature to use this path.
+#[cfg(feature = "zkstark")]
 pub(crate) fn verify_zkstark_proof(proof_bytes: &[u8], epochs: u32) -> bool {
-    // STUB: Only checks proof size and epochs field. NOT cryptographically secure.
-    // Enable "stub-proofs" feature ONLY for development/testing.
+    // zkstark feature enabled: simulation-mode proof verification.
+    // Checks proof size and epochs field. NOT cryptographically secure.
     if proof_bytes.len() < 10_000 {
         return false;
     }
@@ -242,14 +255,15 @@ pub(crate) fn verify_zkstark_proof(proof_bytes: &[u8], epochs: u32) -> bool {
     true
 }
 
-/// Verify zkSTARK proof - production version (always rejects until real verification is implemented)
+/// Verify zkSTARK proof - fail-closed default (no zkstark feature)
 ///
-/// Real zkSTARK verification is not yet implemented. All proof submissions are
-/// rejected until a genuine cryptographic verifier is integrated.
-#[cfg(not(feature = "stub-proofs"))]
+/// C-03: zkSTARK verification requires the 'zkstark' feature flag.
+/// Without the feature, ALL proof submissions are rejected (fail-closed).
+/// This prevents silently passing invalid proofs.
+#[cfg(not(feature = "zkstark"))]
 pub(crate) fn verify_zkstark_proof(_proof_bytes: &[u8], _epochs: u32) -> bool {
-    // Real zkSTARK verification not yet implemented.
-    // All proof submissions are rejected until real verification is available.
+    // C-03: zkSTARK verification requires the 'zkstark' feature flag. Enable it or use submit_gradient() instead.
+    // Fail-closed: reject all proofs when real verification is not available.
     false
 }
 

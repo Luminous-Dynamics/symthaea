@@ -46,22 +46,31 @@ pub struct BootstrapResult {
 /// Only callable during the bootstrap window and requires cryptographic proofs.
 #[hdk_extern]
 pub fn initialize_bootstrap(input: InitializeBootstrapInput) -> ExternResult<BootstrapResult> {
-    // Verify authority proof: must be a valid signature by this agent over their own pubkey
+    // C-04: Verify authority proofs cryptographically
+    // Each genesis coordinator must have a valid Ed25519 signature over a structured payload
     let agent = agent_info()?.agent_initial_pubkey;
     let agent_bytes = agent.get_raw_39().to_vec();
-    for proof in &input.authority_proofs {
+    for (i, proof) in input.authority_proofs.iter().enumerate() {
+        let coord_id = input.genesis_coordinators.get(i).map(|s| s.as_str()).unwrap_or("unknown");
         if proof.len() < 64 {
+            // C-04: Authority proof for coordinator must be at least 64 bytes
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Authority proof must be at least 64 bytes (Ed25519 signature)".to_string()
+                format!("C-04: Authority proof for coordinator {} must be at least 64 bytes (Ed25519 signature)", coord_id)
             )));
         }
-        // Verify the proof is a valid signature over the agent's pubkey
+        // Build structured payload: GenesisCoordinator:<pubkey>
+        let mut payload = Vec::new();
+        payload.extend_from_slice(b"GenesisCoordinator:");
+        payload.extend_from_slice(coord_id.as_bytes());
+        payload.extend_from_slice(&agent_bytes);
+        // Verify the proof is a valid signature over the structured payload
         let mut sig_arr = [0u8; 64];
         sig_arr.copy_from_slice(&proof[..64]);
         let sig = Signature::from(sig_arr);
-        if !verify_signature(agent.clone(), sig, agent_bytes.clone())? {
+        if !verify_signature(agent.clone(), sig, payload)? {
+            // C-04: Authority proof verification FAILED
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Authority proof signature verification failed".to_string()
+                format!("C-04: Authority proof verification FAILED for coordinator {}", coord_id)
             )));
         }
     }
@@ -281,15 +290,21 @@ pub fn vote_for_coordinator(input: VoteForCoordinatorInput) -> ExternResult<Vote
         )));
     }
 
-    // Verify the signature cryptographically (not just length)
+    // C-05: Verify Ed25519 signature cryptographically
+    // Build structured payload with CoordinatorVote: prefix to prevent replay attacks
     let voter_key = agent_info()?.agent_initial_pubkey;
-    let vote_payload = format!("{}:{}", input.candidate_pubkey, voter_key);
+    let mut vote_payload = Vec::new();
+    vote_payload.extend_from_slice(b"CoordinatorVote:");
+    vote_payload.extend_from_slice(input.candidate_pubkey.as_bytes());
+    vote_payload.push(b':');
+    vote_payload.extend_from_slice(voter_key.to_string().as_bytes());
     let mut sig_arr = [0u8; 64];
     sig_arr.copy_from_slice(&input.signature[..64]);
     let sig = Signature::from(sig_arr);
-    if !verify_signature(voter_key.clone(), sig, vote_payload.into_bytes())? {
+    if !verify_signature(voter_key.clone(), sig, vote_payload)? {
+        // C-05: Vote signature verification failed
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Vote signature verification failed".to_string()
+            "C-05: Vote signature verification failed".to_string()
         )));
     }
 
@@ -812,7 +827,7 @@ pub struct InitBootstrapResult {
 /// Can only be called once - subsequent calls will fail.
 #[hdk_extern]
 pub fn init_bootstrap(input: InitBootstrapInput) -> ExternResult<InitBootstrapResult> {
-    // Verify authority proof: must be a valid signature by this agent over their own pubkey
+    // Verify authority proof: must be a valid Ed25519 signature over structured payload
     let agent = agent_info()?.agent_initial_pubkey;
     let agent_bytes = agent.get_raw_39().to_vec();
     if input.authority_proof.len() < 64 {
@@ -820,10 +835,15 @@ pub fn init_bootstrap(input: InitBootstrapInput) -> ExternResult<InitBootstrapRe
             "Authority proof must be at least 64 bytes (Ed25519 signature)".to_string()
         )));
     }
+    // Build structured payload: GenesisCoordinator:<pubkey><agent_bytes>
+    let mut payload = Vec::new();
+    payload.extend_from_slice(b"GenesisCoordinator:");
+    payload.extend_from_slice(input.genesis_coordinator.as_bytes());
+    payload.extend_from_slice(&agent_bytes);
     let mut sig_arr = [0u8; 64];
     sig_arr.copy_from_slice(&input.authority_proof[..64]);
     let sig = Signature::from(sig_arr);
-    if !verify_signature(agent.clone(), sig, agent_bytes.clone())? {
+    if !verify_signature(agent.clone(), sig, payload)? {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Authority proof signature verification failed".to_string()
         )));

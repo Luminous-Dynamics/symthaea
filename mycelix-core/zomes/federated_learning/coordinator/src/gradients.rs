@@ -77,18 +77,19 @@ pub fn submit_gradient(input: SubmitGradientInput) -> ExternResult<ActionHash> {
     // F-01: Validate node_id
     validate_node_id(&input.node_id)?;
 
-    // SECURITY (H-02): node_id must match the caller's agent pubkey
+    // H-02: Bind node_id to caller's AgentPubKey
     // This prevents impersonation and Sybil attacks
     let agent = agent_info()?.agent_initial_pubkey;
     let caller_id = agent.to_string();
     if input.node_id != caller_id {
+        // H-02: node_id must match caller's AgentPubKey
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "node_id must match caller's agent pubkey. Expected: {}, got: {}",
             caller_id, input.node_id
         ))));
     }
 
-    // SECURITY (H-01): Self-reported trust_score is ignored. On-chain reputation is authoritative.
+    // H-01: Ignore self-reported trust_score — on-chain reputation is authoritative.
     // Reputation includes time-based decay computed lazily at retrieval.
     let on_chain_trust = match get_or_create_reputation(&input.node_id) {
         Ok(rep) => {
@@ -155,7 +156,7 @@ pub fn submit_gradient(input: SubmitGradientInput) -> ExternResult<ActionHash> {
         cpu_usage: input.cpu_usage,
         memory_mb: input.memory_mb,
         network_latency_ms: input.network_latency_ms,
-        trust_score: on_chain_trust, // H-01: Uses on-chain reputation, not self-reported value
+        trust_score: on_chain_trust, // H-01: Always use on-chain trust, never self-reported
     };
 
     let action_hash = create_entry(&EntryTypes::ModelGradient(gradient.clone()))?;
