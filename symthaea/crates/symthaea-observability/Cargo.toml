@@ -1,0 +1,16 @@
+[package]
+name = "symthaea-observability"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Observability framework — event tracing, causal correlation, counterfactual reasoning"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["consciousness", "observability", "tracing", "counterfactual", "causal"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+anyhow = { workspace = true }
+serde = { workspace = true }

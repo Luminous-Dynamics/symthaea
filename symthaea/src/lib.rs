@@ -335,7 +335,7 @@ pub mod user_state_inference;
 
 // Observability
 #[cfg(feature = "observability_module")]
-pub mod observability;
+pub use symthaea_observability as observability;
 
 // Shell (enabled - language module provides NixErrorDiagnoser)
 pub mod shell;

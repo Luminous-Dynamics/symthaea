@@ -12526,6 +12526,7 @@ dependencies = [
  "symthaea-hodge",
  "symthaea-narrative-self",
  "symthaea-nix",
+ "symthaea-observability",
  "symthaea-phi-search",
  "symthaea-sensorimotor",
  "symthaea-sentinel",
@@ -12714,6 +12715,14 @@ dependencies = [
  "tree-sitter",
  "tree-sitter-nix",
  "zbus 4.4.0",
+]
+
+[[package]]
+name = "symthaea-observability"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
 ]
 
 [[package]]
