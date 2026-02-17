@@ -1,0 +1,19 @@
+[package]
+name = "symthaea-embeddings"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Semantic embeddings bridge — Qwen3 text encoding and Johnson-Lindenstrauss projection to HDC space"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["embeddings", "HDC", "projection", "qwen3", "semantic"]
+categories = ["science", "algorithms"]
+
+[dependencies]
+anyhow = "1"
+rand = "0.8"
+rand_chacha = "0.3"
+serde = { workspace = true }
+symthaea-core = { path = "../../symthaea-core" }

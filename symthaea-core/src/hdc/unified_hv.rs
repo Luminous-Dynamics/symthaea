@@ -188,6 +188,35 @@ impl ContinuousHV {
         }
     }
 
+    /// Precision-weighted binding (Eq. 17 in HAI paper)
+    ///
+    /// `bind_π(h₁, h₂, π) = (h₁ ⊗ h₂) ⊙ σ(π·1)`
+    ///
+    /// Computes the standard Hadamard bind, then scales element-wise by the
+    /// sigmoid of the precision parameter. High precision (π >> 0) approximates
+    /// a standard bind; low precision (π << 0) attenuates the binding signal
+    /// toward zero, reflecting uncertainty in the association.
+    ///
+    /// This implements the Active Inference precision-weighting mechanism:
+    /// associations formed under high precision are strongly bound, while
+    /// associations formed under low precision are attenuated.
+    ///
+    /// # Arguments
+    /// * `other` - The vector to bind with
+    /// * `precision` - Precision parameter (log-scale; 0.0 → sigmoid = 0.5)
+    #[inline]
+    pub fn bind_precision(&self, other: &Self, precision: f32) -> Self {
+        assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
+        let sigmoid = 1.0 / (1.0 + (-precision).exp());
+        let values: Vec<f32> = self
+            .values
+            .iter()
+            .zip(other.values.iter())
+            .map(|(a, b)| a * b * sigmoid)
+            .collect();
+        Self { values }
+    }
+
     /// Bundling operation (element-wise average)
     ///
     /// Creates a superposition of vectors.
@@ -830,5 +859,74 @@ mod tests {
         assert_eq!(HDC_DIMENSION, 16_384);
         assert_eq!(BINARY_BYTES, 2048);
         assert_eq!(ContinuousHV::DEFAULT_DIM, HDC_DIMENSION);
+    }
+
+    #[test]
+    fn test_bind_precision_high_approximates_standard_bind() {
+        let a = ContinuousHV::random(HDC_DIMENSION, 100);
+        let b = ContinuousHV::random(HDC_DIMENSION, 101);
+
+        let standard = a.bind(&b);
+        let precision_high = a.bind_precision(&b, 10.0); // sigmoid(10) ≈ 0.99995
+
+        // High precision should closely approximate standard bind
+        let sim = standard.similarity(&precision_high);
+        assert!(
+            sim > 0.999,
+            "High precision should approximate standard bind, got similarity {}",
+            sim
+        );
+    }
+
+    #[test]
+    fn test_bind_precision_low_attenuates() {
+        let a = ContinuousHV::random(HDC_DIMENSION, 200);
+        let b = ContinuousHV::random(HDC_DIMENSION, 201);
+
+        let standard = a.bind(&b);
+        let precision_low = a.bind_precision(&b, -5.0); // sigmoid(-5) ≈ 0.0067
+
+        // Low precision should heavily attenuate: norm much smaller than standard
+        let norm_standard: f32 = standard.values.iter().map(|v| v * v).sum::<f32>().sqrt();
+        let norm_low: f32 = precision_low
+            .values
+            .iter()
+            .map(|v| v * v)
+            .sum::<f32>()
+            .sqrt();
+
+        assert!(
+            norm_low < norm_standard * 0.1,
+            "Low precision should attenuate, norm_low={} vs norm_standard={}",
+            norm_low,
+            norm_standard
+        );
+    }
+
+    #[test]
+    fn test_bind_precision_monotonic_gradient() {
+        let a = ContinuousHV::random(HDC_DIMENSION, 300);
+        let b = ContinuousHV::random(HDC_DIMENSION, 301);
+
+        let precisions = [-5.0, -2.0, 0.0, 2.0, 5.0, 10.0];
+        let norms: Vec<f32> = precisions
+            .iter()
+            .map(|&p| {
+                let bound = a.bind_precision(&b, p);
+                bound.values.iter().map(|v| v * v).sum::<f32>().sqrt()
+            })
+            .collect();
+
+        // Norms should be monotonically increasing with precision
+        for i in 1..norms.len() {
+            assert!(
+                norms[i] >= norms[i - 1] - 1e-6,
+                "Norms should increase with precision: norm[{}]={} < norm[{}]={}",
+                i,
+                norms[i],
+                i - 1,
+                norms[i - 1]
+            );
+        }
     }
 }

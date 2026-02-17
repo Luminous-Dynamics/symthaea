@@ -3,6 +3,7 @@
 use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::brain::prefrontal::PrefrontalCortex;
+use crate::consciousness::narrative_self::{NarrativeSelfConfig, NarrativeSelfModel};
 use crate::exploration::SurpriseExplorationBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::fep_active_inference::{
@@ -156,6 +157,20 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional narrative self-model
+        let narrative_self = if config.enable_narrative_self {
+            Some(NarrativeSelfModel::new(NarrativeSelfConfig::default()))
+        } else {
+            None
+        };
+
+        // Build optional virtual body adapter
+        let virtual_body = if config.enable_virtual_body {
+            Some(super::virtual_body::VirtualBody::new())
+        } else {
+            None
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -274,6 +289,9 @@ impl CognitiveLoopService {
             surprise_bridge,
             prefrontal,
             meta_cognition,
+            narrative_self,
+            relational_phi: 0.0,
+            virtual_body,
         })
     }
 

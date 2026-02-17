@@ -284,7 +284,8 @@ impl CognitiveLoopService {
 
         // 10b. Update temporal signature encoder with tau values
         // Record mean tau for consciousness pattern detection
-        let flattened_tau = self.temporal_network.flattened_tau();
+        // Reuse tau_owned from above instead of calling flattened_tau() again
+        let flattened_tau: Vec<f32> = tau_owned.iter().flat_map(|a| a.iter().copied()).collect();
         self.temporal_signature_encoder.record_batch(&flattened_tau);
 
         // 10c. Update adaptive behavior based on consciousness state
@@ -406,18 +407,28 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.6b Enhanced FEP Bridge: Motor commands and learning signals
         // ═══════════════════════════════════════════════════════════════════════
-        // Run enhanced FEP cycle for motor system integration and learning signals
-        let enhanced_result = self.enhanced_fep_bridge.cycle(
-            prediction_error as f64,
-            coherence as f64,
-            self.prediction_confidence as f64,
-            effective_lr as f64,
-        );
+        // Run enhanced FEP cycle for motor system integration and learning signals.
+        // Optimization: run every 4th cycle unless surprised or high prediction error,
+        // since the enhanced bridge overlaps with the primary FEP agent.
+        let run_enhanced = surprise_triggered
+            || is_surprised
+            || prediction_error > self.config.learning_threshold
+            || self.stats.total_cycles % 4 == 0;
+        let enhanced_result = if run_enhanced {
+            let r = self.enhanced_fep_bridge.cycle(
+                prediction_error as f64,
+                coherence as f64,
+                self.prediction_confidence as f64,
+                effective_lr as f64,
+            );
+            self.fep_learning_signal = r.learning_signal as f32;
+            Some(r)
+        } else {
+            None
+        };
 
-        // Update learning signal for downstream systems
-        self.fep_learning_signal = enhanced_result.learning_signal as f32;
-
-        // Apply motor command-based modulations
+        // Apply motor command-based modulations (only when enhanced bridge ran)
+        if let Some(ref enhanced_result) = enhanced_result {
         match enhanced_result.motor_command.command_type {
             MotorCommandType::AttentionShift => {
                 // Shift attention based on motor command intensity
@@ -470,6 +481,7 @@ impl CognitiveLoopService {
             self.world_model
                 .increase_plasticity(self.fep_learning_signal);
         }
+        } // end if let Some(enhanced_result)
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10d.7 Coherence tracking with degradation detection
@@ -535,8 +547,14 @@ impl CognitiveLoopService {
         } else {
             0.0
         };
-        // Combine contributions: temporal coherence + voice quality + flow state
-        let unified_phi = (coherence_phi + voice_phi + flow_phi).clamp(0.0, 1.0) as f64;
+        // Combine contributions: temporal coherence + voice quality + flow state + relational
+        let relational_phi_contrib = if self.relational_phi > 0.0 {
+            self.relational_phi as f32 * 0.15 // 15% weight for relational Phi
+        } else {
+            0.0
+        };
+        let unified_phi =
+            (coherence_phi + voice_phi + flow_phi + relational_phi_contrib).clamp(0.0, 1.0) as f64;
         self.unification_engine.update_phi(unified_phi);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1022,10 +1040,19 @@ impl CognitiveLoopService {
                 );
             }
 
-            // Graduate evicted items to memory coordinator
+            // Graduate evicted items to episodic memory
             let graduates = pfc.drain_graduates();
             if !graduates.is_empty() {
-                tracing::trace!(
+                for grad in &graduates {
+                    self.episodic_memory.encode(
+                        &grad.id,
+                        grad.embedding.values.iter().take(64).copied().collect::<Vec<_>>(),
+                        0.0,
+                        pp_phi,
+                        self.stats.total_cycles,
+                    );
+                }
+                tracing::debug!(
                     count = graduates.len(),
                     "Prefrontal graduated items to episodic memory"
                 );
@@ -1062,6 +1089,57 @@ impl CognitiveLoopService {
                 (0.0, 0)
             };
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // VIRTUAL BODY: Map cognitive signals to interoceptive states
+        // ═══════════════════════════════════════════════════════════════════════
+        let (body_phi_modulation, body_valence, body_arousal) =
+            if let Some(ref mut body) = self.virtual_body {
+                let signals = super::virtual_body::CognitiveSignals {
+                    prediction_error,
+                    coherence,
+                    prediction_confidence: self.prediction_confidence,
+                    unified_phi,
+                    flow_intensity: self.flow_state.intensity,
+                    in_flow: self.flow_state.in_flow,
+                    curiosity_boredom: self.curiosity_drive.boredom,
+                    fep_learning_signal: self.fep_learning_signal,
+                    error_trend: self.stats.error_trend,
+                    cycles_per_second: self.stats.cycles_per_second,
+                    target_frequency: self.config.target_frequency,
+                };
+                let state = body.update(&signals);
+                (state.phi_modulation, state.valence, state.arousal)
+            } else {
+                (1.0, 0.0, 0.0)
+            };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // NARRATIVE SELF: Process experience and track self-Φ
+        // ═══════════════════════════════════════════════════════════════════════
+        let narrative_self_phi = if let Some(ref mut narrative) = self.narrative_self {
+            // Convert ContinuousHV to BinaryHV for narrative self processing
+            let binary_hv = real_hv_to_hv16(&encoding_result.hdv);
+
+            // Significance: higher when prediction error is high or moral concern detected
+            let significance = if moral_concern_detected {
+                0.8
+            } else {
+                (prediction_error as f64).clamp(0.0, 1.0)
+            };
+
+            narrative.process_experience(
+                &binary_hv,
+                input,
+                prediction_error < self.config.learning_threshold, // success
+                coherence as f64,                                  // effort ~ coherence
+                significance,
+            );
+
+            narrative.self_phi()
+        } else {
+            0.0
+        };
+
         // Build cycle metadata for observability
         let metadata = super::CycleMetadata {
             surprise_triggered,
@@ -1075,6 +1153,10 @@ impl CognitiveLoopService {
             reasoning_narrative,
             meta_cognitive_accuracy,
             meta_cognitive_depth,
+            narrative_self_phi,
+            body_phi_modulation,
+            body_valence,
+            body_arousal,
         };
 
         tracing::debug!(

@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop, clippy::manual_clamp)]
 //! Consciousness Resonance Theory - Harmonic Foundations of Awareness
 //!
 //! **REVOLUTIONARY IMPROVEMENT #85**: Consciousness as Resonance Phenomenon
@@ -50,8 +51,8 @@
 //! println!("Mode: {:?}", state.resonance_mode);
 //! ```
 
-use crate::hdc::binary_hv::BinaryHV;
-use crate::hdc::primitive_system::PrimitiveSystem;
+use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;

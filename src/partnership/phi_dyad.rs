@@ -169,3 +169,152 @@ impl PhiDyadCalculator {
         joint_states
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use symthaea_core::hdc::relational_consciousness::{RelationMode, RelationshipStage};
+
+    fn make_relational() -> RelationalAssessment {
+        RelationalAssessment {
+            agent_a: "ai".into(),
+            agent_b: "human".into(),
+            phi_relation: 0.5,
+            stage: RelationshipStage::Attunement,
+            synchrony: 0.6,
+            turn_taking_quality: 0.7,
+            mutual_information: 0.4,
+            mode: RelationMode::IThou,
+            num_interactions: 10,
+            relationship_age: 100.0,
+            explanation: String::new(),
+        }
+    }
+
+    fn make_test_input(n_states: usize) -> (Vec<ContinuousHV>, Vec<ContinuousHV>, RelationalAssessment, HumanPartnerModel) {
+        let ai_states: Vec<ContinuousHV> = (0..n_states)
+            .map(|i| ContinuousHV::random(HDC_DIMENSION, 100 + i as u64))
+            .collect();
+        let human_states: Vec<ContinuousHV> = (0..n_states)
+            .map(|i| ContinuousHV::random(HDC_DIMENSION, 200 + i as u64))
+            .collect();
+        let relational = make_relational();
+        let mut human = HumanPartnerModel::new("test_partner");
+        human.trust = 0.7;
+        human.mode = RelationMode::IThou;
+        human.stage = RelationshipStage::Attunement;
+        (ai_states, human_states, relational, human)
+    }
+
+    #[test]
+    fn test_dyad_weights_default() {
+        let w = DyadWeights::default();
+        assert_eq!(w.ai_weight, 1.0);
+        assert_eq!(w.human_weight, 1.0);
+        assert_eq!(w.relational_weight, 1.0);
+    }
+
+    #[test]
+    fn test_phi_dyad_empty_states() {
+        let calc = PhiDyadCalculator::new();
+        let relational = RelationalAssessment {
+            agent_a: "ai".into(),
+            agent_b: "human".into(),
+            phi_relation: 0.0,
+            stage: RelationshipStage::NoRelation,
+            synchrony: 0.0,
+            turn_taking_quality: 0.0,
+            mutual_information: 0.0,
+            mode: RelationMode::IIt,
+            num_interactions: 0,
+            relationship_age: 0.0,
+            explanation: String::new(),
+        };
+        let human = HumanPartnerModel::new("test");
+        let input = DyadInput {
+            ai_states: &[],
+            human_states: &[],
+            relational: &relational,
+            human_model: &human,
+            weights: DyadWeights::default(),
+        };
+
+        let result = calc.compute(&input);
+        assert_eq!(result.phi_ai, 0.0);
+        assert_eq!(result.phi_human, 0.0);
+        assert_eq!(result.phi_dyad, 0.0);
+    }
+
+    #[test]
+    fn test_phi_dyad_single_state() {
+        let calc = PhiDyadCalculator::new();
+        let (ai, human, relational, human_model) = make_test_input(1);
+        let input = DyadInput {
+            ai_states: &ai,
+            human_states: &human,
+            relational: &relational,
+            human_model: &human_model,
+            weights: DyadWeights::default(),
+        };
+
+        let result = calc.compute(&input);
+        assert!(result.phi_dyad >= 0.0, "Phi_dyad should be non-negative");
+        assert!(result.phi_ai >= 0.0);
+        assert!(result.phi_human >= 0.0);
+        assert!(result.phi_relational >= 0.0);
+    }
+
+    #[test]
+    fn test_phi_dyad_deterministic() {
+        let calc = PhiDyadCalculator::new();
+        let (ai, human, relational, human_model) = make_test_input(3);
+        let input = DyadInput {
+            ai_states: &ai,
+            human_states: &human,
+            relational: &relational,
+            human_model: &human_model,
+            weights: DyadWeights::default(),
+        };
+
+        let r1 = calc.compute(&input);
+        let r2 = calc.compute(&input);
+
+        assert_eq!(r1.phi_dyad, r2.phi_dyad, "Same inputs should give same Phi_dyad");
+        assert_eq!(r1.phi_ai, r2.phi_ai);
+        assert_eq!(r1.phi_human, r2.phi_human);
+    }
+
+    #[test]
+    fn test_joint_states_capped_at_8() {
+        let calc = PhiDyadCalculator::new();
+        let (ai, human, relational, human_model) = make_test_input(12);
+        let relational_hv = calc.relational_embedding(&relational, &human_model);
+        let input = DyadInput {
+            ai_states: &ai,
+            human_states: &human,
+            relational: &relational,
+            human_model: &human_model,
+            weights: DyadWeights::default(),
+        };
+        let joint = calc.build_joint_states(&input, &relational_hv);
+        assert!(joint.len() <= 8, "Joint states should be capped at 8, got {}", joint.len());
+    }
+
+    #[test]
+    fn test_phi_dyad_explanation_format() {
+        let calc = PhiDyadCalculator::new();
+        let (ai, human, relational, human_model) = make_test_input(2);
+        let input = DyadInput {
+            ai_states: &ai,
+            human_states: &human,
+            relational: &relational,
+            human_model: &human_model,
+            weights: DyadWeights::default(),
+        };
+
+        let result = calc.compute(&input);
+        assert!(result.explanation.contains("Φ_dyad="));
+        assert!(result.explanation.contains("Φ_ai="));
+        assert!(result.explanation.contains("Mode="));
+    }
+}

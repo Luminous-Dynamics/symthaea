@@ -132,12 +132,14 @@ mod cycle;
 mod helpers;
 mod moral;
 mod prediction;
+pub mod virtual_body;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
 use crate::causal::CausalLoopEnhancer;
 use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
 use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
 use crate::brain::prefrontal::PrefrontalCortex;
+use crate::consciousness::narrative_self::NarrativeSelfModel;
 use crate::exploration::SurpriseExplorationBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
@@ -394,6 +396,20 @@ pub struct CognitiveLoopService {
     /// When enabled, tracks prediction error tendencies and uses
     /// self-model accuracy to modulate learning rate.
     meta_cognition: Option<MetaCognitiveLayer>,
+
+    /// Narrative self-model for autobiographical identity.
+    /// When enabled, maintains a three-level self-model (proto/core/autobio)
+    /// and tracks self-Φ (integrated information of the self-model).
+    narrative_self: Option<NarrativeSelfModel>,
+
+    /// Relational Phi from dyad computation (set externally by Symthaea facade).
+    /// Blended into unified_phi at 15% weight when > 0.
+    relational_phi: f64,
+
+    /// Virtual body adapter for embodied cognition.
+    /// When enabled, maps cognitive signals to interoceptive states and produces
+    /// a phi_modulation factor that scales consciousness from somatic feedback.
+    virtual_body: Option<virtual_body::VirtualBody>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

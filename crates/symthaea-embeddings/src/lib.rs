@@ -1,3 +1,4 @@
+#![allow(clippy::needless_range_loop)]
 //! # Embeddings Module: Semantic Bridge to HDC Space
 //!
 //! This module provides semantic embedding capabilities and projections
