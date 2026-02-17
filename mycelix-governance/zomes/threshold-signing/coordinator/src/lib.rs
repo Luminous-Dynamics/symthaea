@@ -1,3 +1,4 @@
+#![allow(clippy::manual_range_contains)]
 //! Threshold Signing Coordinator Zome
 //!
 //! Business logic for DKG-based threshold signatures on governance decisions.

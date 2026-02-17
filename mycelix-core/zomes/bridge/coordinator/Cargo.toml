@@ -34,7 +34,7 @@ rmp-serde = "=1.3.0"
 indexmap = "=2.2.6"
 
 # Mycelix SDK for Bridge types
-mycelix-sdk = { path = "/srv/luminous-dynamics/mycelix-workspace/sdk" }
+mycelix-sdk = { path = "../../../../mycelix-workspace/sdk" }
 
 [profile.release]
 opt-level = 'z'

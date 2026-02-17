@@ -12,7 +12,6 @@ import { ZomeClient } from '../../core/zome-client.js';
 import type {
   VerifiableCredential,
   VerifiablePresentation,
-  
   CredentialRequest,
   CredentialRecord,
   PresentationRecord,

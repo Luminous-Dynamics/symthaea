@@ -52,7 +52,7 @@ impl PeerId {
 
     /// Get as hex string
     pub fn to_hex(&self) -> String {
-        hex::encode(&self.0)
+        hex::encode(self.0)
     }
 
     /// Get short identifier (first 8 chars)

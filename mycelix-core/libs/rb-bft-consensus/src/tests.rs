@@ -10,7 +10,6 @@
 //! - Vote tallying
 
 use super::*;
-use mycelix_core_types::KVector;
 
 // =============================================================================
 // VALIDATOR NODE TESTS
@@ -337,7 +336,7 @@ mod byzantine_tolerance_tests {
 
         // Verify with actual set
         let threshold = set.consensus_threshold();
-        let actual_total = set.total_voting_weight();
+        let _actual_total = set.total_voting_weight();
 
         // Honest nodes should exceed threshold
         assert!(honest_weight > threshold,
@@ -350,8 +349,8 @@ mod byzantine_tolerance_tests {
         // Without reputation², same scenario would give Byzantine nodes too much power
 
         // 55% honest, 45% Byzantine (by count)
-        let honest_count = 11;
-        let byzantine_count = 9;
+        let _honest_count = 11;
+        let _byzantine_count = 9;
 
         // With LINEAR weights (reputation, not reputation²)
         let honest_linear_weight = 11.0 * 0.9;   // 9.9

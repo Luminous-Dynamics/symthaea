@@ -1,3 +1,4 @@
+#![allow(clippy::manual_range_contains)]
 //! Governance Bridge Integrity Zome
 //!
 //! Entry types for cross-hApp governance queries and voting verification.

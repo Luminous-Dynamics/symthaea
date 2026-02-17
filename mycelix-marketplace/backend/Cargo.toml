@@ -21,11 +21,10 @@ members = [
   "zomes/security/coordinator",
   "zomes/search/integrity",
   "zomes/search/coordinator",
+  # Utility libraries (used by coordinators as path deps)
+  "zomes/security",
+  "zomes/monitoring",
 ]
-
-# Utility libraries (not Holochain zomes):
-# - zomes/monitoring (metrics aggregation library - used by coordinators)
-# Note: security and search are now proper zomes with integrity/coordinator split
 
 [workspace.dependencies]
 # Holochain 0.6.0 dependencies

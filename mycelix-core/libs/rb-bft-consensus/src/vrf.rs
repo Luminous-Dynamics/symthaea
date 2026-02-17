@@ -141,7 +141,7 @@ impl Serialize for VrfProof {
         S: serde::Serializer,
     {
         // Serialize as hex string for readability
-        serializer.serialize_str(&hex::encode(&self.0))
+        serializer.serialize_str(&hex::encode(self.0))
     }
 }
 

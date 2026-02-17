@@ -86,7 +86,7 @@ impl ValidatorNode {
         } else {
             self.failed_rounds += 1;
             // Decrease reputation towards 0.0
-            self.k_vector.k_r = self.k_vector.k_r * (1.0 - LEARNING_RATE);
+            self.k_vector.k_r *= 1.0 - LEARNING_RATE;
         }
 
         // Update activity score

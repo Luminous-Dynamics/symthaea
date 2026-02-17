@@ -5,7 +5,7 @@ edition = "2021"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
-name = "security"
+name = "security_coordinator"
 
 [dependencies]
 hdk.workspace = true

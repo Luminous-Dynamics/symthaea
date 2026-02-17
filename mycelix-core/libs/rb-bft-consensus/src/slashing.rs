@@ -9,7 +9,7 @@ use crate::validator::SlashingSeverity;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SlashableOffense {
     /// Voting twice in the same round with different decisions
-    DoubleVoting(DoubleVoteEvidence),
+    DoubleVoting(Box<DoubleVoteEvidence>),
 
     /// Proposing multiple different blocks in the same round
     DoubleProposing {
