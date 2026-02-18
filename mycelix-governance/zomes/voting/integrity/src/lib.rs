@@ -78,6 +78,17 @@ impl ProposalTier {
             ProposalTier::Constitutional => 0.67, // 2/3 supermajority
         }
     }
+
+    /// Default timelock duration in hours for this tier
+    ///
+    /// Higher-impact decisions get longer cooling-off periods.
+    pub fn timelock_duration_hours(&self) -> u32 {
+        match self {
+            ProposalTier::Basic => 24,           // 1 day
+            ProposalTier::Major => 72,           // 3 days
+            ProposalTier::Constitutional => 168, // 7 days
+        }
+    }
 }
 
 /// Φ (Phi) weight components for consciousness-integrated governance
@@ -1709,6 +1720,13 @@ mod tests {
         assert!((ProposalTier::Basic.approval_threshold() - 0.50).abs() < f64::EPSILON);
         assert!((ProposalTier::Major.approval_threshold() - 0.60).abs() < f64::EPSILON);
         assert!((ProposalTier::Constitutional.approval_threshold() - 0.67).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_proposal_tier_timelock_durations() {
+        assert_eq!(ProposalTier::Basic.timelock_duration_hours(), 24);
+        assert_eq!(ProposalTier::Major.timelock_duration_hours(), 72);
+        assert_eq!(ProposalTier::Constitutional.timelock_duration_hours(), 168);
     }
 
     // ========================================================================

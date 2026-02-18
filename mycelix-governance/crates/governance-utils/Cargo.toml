@@ -1,0 +1,12 @@
+[package]
+name = "governance-utils"
+version = "0.1.0"
+edition = "2021"
+description = "Shared utilities for governance coordinator zomes"
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }

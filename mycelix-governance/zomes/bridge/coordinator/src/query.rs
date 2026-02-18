@@ -95,18 +95,8 @@ fn get_active_proposals_internal() -> ExternResult<QueryGovernanceResult> {
 }
 
 fn get_proposal_by_id_internal(id: &str) -> ExternResult<QueryGovernanceResult> {
-    // Cross-zome call to proposals coordinator
-    let call_result = call(
-        CallTargetCell::Local,
-        ZomeName::from("proposals"),
-        FunctionName::from("get_proposal"),
-        None,
-        ExternIO::encode(id.to_string())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match call_result {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
+    match governance_utils::call_local_best_effort("proposals", "get_proposal", id.to_string())? {
+        Some(extern_io) => {
             if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
                 Ok(QueryGovernanceResult {
                     success: true,
@@ -124,12 +114,7 @@ fn get_proposal_by_id_internal(id: &str) -> ExternResult<QueryGovernanceResult> 
                 })
             }
         }
-        Ok(ZomeCallResponse::NetworkError(e)) => Ok(QueryGovernanceResult {
-            success: false,
-            data: None,
-            error: Some(format!("Network error querying proposal: {}", e)),
-        }),
-        _ => Ok(QueryGovernanceResult {
+        None => Ok(QueryGovernanceResult {
             success: true,
             data: Some(serde_json::json!({"proposal_id": id, "found": false})),
             error: Some("Proposals zome unavailable".into()),
@@ -138,18 +123,8 @@ fn get_proposal_by_id_internal(id: &str) -> ExternResult<QueryGovernanceResult> 
 }
 
 fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceResult> {
-    // Cross-zome call to councils coordinator to check membership
-    let call_result = call(
-        CallTargetCell::Local,
-        ZomeName::from("councils"),
-        FunctionName::from("get_member_councils"),
-        None,
-        ExternIO::encode(did.to_string())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match call_result {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
+    match governance_utils::call_local_best_effort("councils", "get_member_councils", did.to_string())? {
+        Some(extern_io) => {
             if let Ok(councils) = extern_io.decode::<Vec<Record>>() {
                 let eligible = !councils.is_empty();
                 Ok(QueryGovernanceResult {
@@ -163,35 +138,18 @@ fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceR
                     error: None,
                 })
             } else {
-                // Couldn't decode response — fail closed (not eligible)
                 Ok(QueryGovernanceResult {
                     success: false,
-                    data: Some(serde_json::json!({
-                        "did": did,
-                        "eligible": false,
-                        "voting_power": 0.0,
-                    })),
+                    data: Some(serde_json::json!({"did": did, "eligible": false, "voting_power": 0.0})),
                     error: Some("Could not decode council membership response".into()),
                 })
             }
         }
-        Ok(ZomeCallResponse::NetworkError(e)) => Ok(QueryGovernanceResult {
+        None => Ok(QueryGovernanceResult {
             success: false,
-            data: None,
-            error: Some(format!("Network error checking eligibility: {}", e)),
+            data: Some(serde_json::json!({"did": did, "eligible": false, "voting_power": 0.0})),
+            error: Some("Councils zome unavailable — cannot verify eligibility".into()),
         }),
-        _ => {
-            // Councils zome unavailable — fail closed (not eligible)
-            Ok(QueryGovernanceResult {
-                success: false,
-                data: Some(serde_json::json!({
-                    "did": did,
-                    "eligible": false,
-                    "voting_power": 0.0,
-                })),
-                error: Some("Councils zome unavailable — cannot verify eligibility".into()),
-            })
-        }
     }
 }
 

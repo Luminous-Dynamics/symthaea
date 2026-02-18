@@ -13,5 +13,6 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 hex = "0.4"
 voting_integrity = { path = "../integrity" }
+governance-utils = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 mycelix-core-types = { workspace = true }

@@ -12,3 +12,4 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 constitution_integrity = { path = "../integrity" }
+governance-utils = { workspace = true }

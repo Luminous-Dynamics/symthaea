@@ -1209,12 +1209,20 @@ pub struct GovernancePhiConfig {
     /// Min voter Phi for Constitutional proposals (default 0.5)
     pub min_voter_phi_constitutional: f64,
 
+    // --- Voting weight parameters ---
+    /// Maximum voting weight cap (default 1.5) — per Governance Charter,
+    /// no single voter can exceed this weight to prevent disproportionate influence.
+    #[serde(default = "default_max_voting_weight")]
+    pub max_voting_weight: f64,
+
     // --- Metadata ---
     /// Timestamp of last update
     pub updated_at: Timestamp,
     /// Proposal ID that authorized this change (None = bootstrap)
     pub changed_by_proposal: Option<String>,
 }
+
+fn default_max_voting_weight() -> f64 { 1.5 }
 
 impl GovernancePhiConfig {
     /// Default configuration matching hardcoded values
@@ -1227,6 +1235,7 @@ impl GovernancePhiConfig {
             min_voter_phi_standard: 0.2,
             min_voter_phi_emergency: 0.3,
             min_voter_phi_constitutional: 0.5,
+            max_voting_weight: 1.5,
             updated_at: now,
             changed_by_proposal: None,
         }
@@ -1284,6 +1293,10 @@ pub fn check_phi_config(config: &GovernancePhiConfig) -> Result<(), String> {
     }
     if config.min_voter_phi_emergency > config.min_voter_phi_constitutional {
         return Err("min_voter_phi_emergency must be <= min_voter_phi_constitutional".into());
+    }
+    // Max voting weight must be positive and reasonable (0.5 to 5.0)
+    if config.max_voting_weight < 0.5 || config.max_voting_weight > 5.0 {
+        return Err("max_voting_weight must be between 0.5 and 5.0".into());
     }
     Ok(())
 }
@@ -3514,6 +3527,29 @@ mod consciousness_weighted_consensus_tests {
         config.phi_basic = 0.1;
         config.phi_constitutional = 0.8;
         config.min_voter_phi_constitutional = 0.7;
+        assert!(check_phi_config(&config).is_ok());
+    }
+
+    #[test]
+    fn test_phi_config_max_voting_weight_default() {
+        let config = default_config();
+        assert!((config.max_voting_weight - 1.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_phi_config_max_voting_weight_range() {
+        let mut config = default_config();
+
+        // Too low
+        config.max_voting_weight = 0.3;
+        assert!(check_phi_config(&config).unwrap_err().contains("max_voting_weight"));
+
+        // Too high
+        config.max_voting_weight = 6.0;
+        assert!(check_phi_config(&config).unwrap_err().contains("max_voting_weight"));
+
+        // Valid custom value
+        config.max_voting_weight = 2.0;
         assert!(check_phi_config(&config).is_ok());
     }
 }

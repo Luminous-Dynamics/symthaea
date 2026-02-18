@@ -13,3 +13,4 @@ hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 governance_bridge_integrity = { path = "../integrity" }
+governance-utils = { workspace = true }

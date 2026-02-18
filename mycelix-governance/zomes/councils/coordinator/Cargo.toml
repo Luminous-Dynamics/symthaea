@@ -13,4 +13,5 @@ holochain_serialized_bytes = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 councils_integrity = { path = "../integrity" }
+governance-utils = { workspace = true }
 mycelix-core-types = { workspace = true }

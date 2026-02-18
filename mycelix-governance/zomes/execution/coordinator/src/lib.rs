@@ -6,6 +6,23 @@
 use hdk::prelude::*;
 use execution_integrity::*;
 
+/// Mirror type for ThresholdSignature from threshold-signing integrity zome.
+/// Avoids linking the integrity crate (which causes duplicate HDI symbols in WASM).
+///
+/// Uses `SerializedBytes` for Holochain entry deserialization via `to_app_option()`.
+#[derive(Serialize, Deserialize, Debug, Clone, SerializedBytes)]
+struct ThresholdSignature {
+    pub id: String,
+    pub committee_id: String,
+    pub signed_content_hash: Vec<u8>,
+    pub signed_content_description: String,
+    pub signature: Vec<u8>,
+    pub signer_count: u32,
+    pub signers: Vec<u32>,
+    pub verified: bool,
+    pub signed_at: Timestamp,
+}
+
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -282,9 +299,14 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
 
             match sig_check {
                 Ok(ZomeCallResponse::Ok(extern_io)) => {
-                    // Threshold-signing zome is installed — require Ready status
-                    if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
-                        if maybe_record.is_none() {
+                    // Threshold-signing zome is installed — decode and validate
+                    let maybe_record: Option<Record> = extern_io.decode()
+                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                            format!("Failed to decode threshold signature response: {}", e)
+                        )))?;
+
+                    match maybe_record {
+                        None => {
                             return Err(wasm_error!(WasmErrorInner::Guest(
                                 format!(
                                     "No verified threshold signature found for proposal '{}'. \
@@ -293,7 +315,48 @@ pub fn execute_timelock(input: ExecuteTimelockInput) -> ExternResult<Record> {
                                 )
                             )));
                         }
-                        // Signature exists — allow execution from Pending (backwards compat)
+                        Some(sig_record) => {
+                            // Decode the ThresholdSignature entry for validation
+                            let sig: ThresholdSignature = sig_record
+                                .entry()
+                                .to_app_option()
+                                .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                                    format!("Failed to decode ThresholdSignature entry: {}", e)
+                                )))?
+                                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                                    "Threshold signature record has no entry".into()
+                                )))?;
+
+                            // Defense-in-depth: verify signature is marked verified
+                            if !sig.verified {
+                                return Err(wasm_error!(WasmErrorInner::Guest(
+                                    format!(
+                                        "Threshold signature '{}' for proposal '{}' is not verified",
+                                        sig.id, current_timelock.proposal_id
+                                    )
+                                )));
+                            }
+
+                            // Defense-in-depth: verify signature description references this proposal
+                            if !sig.signed_content_description.contains(&current_timelock.proposal_id) {
+                                return Err(wasm_error!(WasmErrorInner::Guest(
+                                    format!(
+                                        "Threshold signature '{}' content description does not reference proposal '{}' (was: '{}')",
+                                        sig.id, current_timelock.proposal_id, sig.signed_content_description
+                                    )
+                                )));
+                            }
+
+                            // Emit audit signal with signature details
+                            let _ = emit_signal(serde_json::json!({
+                                "type": "ThresholdSignatureVerified",
+                                "proposal_id": current_timelock.proposal_id,
+                                "signature_id": sig.id,
+                                "committee_id": sig.committee_id,
+                                "signer_count": sig.signer_count,
+                                "signers": sig.signers,
+                            }));
+                        }
                     }
                 }
                 Ok(ZomeCallResponse::NetworkError(e)) => {
@@ -455,53 +518,17 @@ impl GovernanceAction {
     fn execute(&self) -> ExternResult<String> {
         match self {
             GovernanceAction::TransferCredits { from, to, amount } => {
-                let transfer_input = serde_json::json!({
-                    "from": from,
-                    "to": to,
-                    "amount": amount,
-                });
-                match call(
-                    CallTargetCell::Local,
-                    ZomeName::from("governance_bridge"),
-                    FunctionName::from("transfer_credits"),
-                    None,
-                    ExternIO::encode(transfer_input)
-                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-                )? {
-                    ZomeCallResponse::Ok(_) => {
-                        Ok(format!("TransferCredits: {} -> {} ({} credits) [executed]", from, to, amount))
-                    }
-                    other => {
-                        // Bridge unavailable or call failed — log but don't hard-fail
-                        Ok(format!(
-                            "TransferCredits: {} -> {} ({} credits) [bridge unavailable: {:?}]",
-                            from, to, amount, other
-                        ))
-                    }
+                let transfer_input = serde_json::json!({"from": from, "to": to, "amount": amount});
+                match governance_utils::call_local_best_effort("governance_bridge", "transfer_credits", transfer_input)? {
+                    Some(_) => Ok(format!("TransferCredits: {} -> {} ({} credits) [executed]", from, to, amount)),
+                    None => Ok(format!("TransferCredits: {} -> {} ({} credits) [bridge unavailable]", from, to, amount)),
                 }
             }
             GovernanceAction::UpdateParameter { parameter, value } => {
-                let update_input = serde_json::json!({
-                    "parameter": parameter,
-                    "value": value,
-                });
-                match call(
-                    CallTargetCell::Local,
-                    ZomeName::from("constitution"),
-                    FunctionName::from("update_parameter"),
-                    None,
-                    ExternIO::encode(update_input)
-                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-                )? {
-                    ZomeCallResponse::Ok(_) => {
-                        Ok(format!("UpdateParameter: {} = {} [executed]", parameter, value))
-                    }
-                    other => {
-                        Ok(format!(
-                            "UpdateParameter: {} = {} [constitution zome unavailable: {:?}]",
-                            parameter, value, other
-                        ))
-                    }
+                let update_input = serde_json::json!({"parameter": parameter, "value": value});
+                match governance_utils::call_local_best_effort("constitution", "update_parameter", update_input)? {
+                    Some(_) => Ok(format!("UpdateParameter: {} = {} [executed]", parameter, value)),
+                    None => Ok(format!("UpdateParameter: {} = {} [constitution zome unavailable]", parameter, value)),
                 }
             }
             GovernanceAction::EmitEvent { event, payload } => {
@@ -589,29 +616,13 @@ pub fn veto_timelock(input: VetoTimelockInput) -> ExternResult<Record> {
     }
 
     // Verify guardian role: caller must be a member of at least one council
-    let guardian_check = call(
-        CallTargetCell::Local,
-        ZomeName::from("councils"),
-        FunctionName::from("get_member_councils"),
-        None,
-        ExternIO::encode(input.guardian_did.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match guardian_check {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            if let Ok(councils) = extern_io.decode::<Vec<Record>>() {
-                if councils.is_empty() {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Only council members (guardians) can veto timelocks".into()
-                    )));
-                }
-            }
-        }
-        _ => {
-            // Councils zome unavailable — fail closed for veto power
+    let guardian_io = governance_utils::call_local(
+        "councils", "get_member_councils", input.guardian_did.clone(),
+    )?;
+    if let Ok(councils) = guardian_io.decode::<Vec<Record>>() {
+        if councils.is_empty() {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                "Cannot verify guardian role: councils zome unavailable".into()
+                "Only council members (guardians) can veto timelocks".into()
             )));
         }
     }
@@ -1114,5 +1125,29 @@ mod tests {
     fn test_governance_action_invalid_json() {
         let json = "not valid json at all {{{";
         assert!(serde_json::from_str::<GovernanceAction>(json).is_err());
+    }
+
+    // =========================================================================
+    // ThresholdSignature mirror type serde
+    // =========================================================================
+
+    #[test]
+    fn test_threshold_signature_serde_roundtrip() {
+        let sig = ThresholdSignature {
+            id: "sig-1".into(),
+            committee_id: "committee-1".into(),
+            signed_content_hash: vec![1, 2, 3],
+            signed_content_description: "proposal:MIP-001".into(),
+            signature: vec![0u8; 64],
+            signer_count: 2,
+            signers: vec![1, 2],
+            verified: true,
+            signed_at: Timestamp::from_micros(1000000),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        let decoded: ThresholdSignature = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "sig-1");
+        assert!(decoded.verified);
+        assert!(decoded.signed_content_description.contains("MIP-001"));
     }
 }

@@ -275,37 +275,15 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
     // Constitutional amendments require supermajority (handled by the voting zome's
     // adaptive threshold). We check that the proposal is Approved or the tally shows
     // consensus_reached.
-    let tally_check = call(
-        CallTargetCell::Local,
-        ZomeName::from("voting"),
-        FunctionName::from("tally_votes"),
-        None,
-        ExternIO::encode(current_amendment.proposal_id.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match tally_check {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            // Parse tally result and verify it passed
-            if let Ok(result) = extern_io.decode::<serde_json::Value>() {
-                let approved = result.get("approved").and_then(|a| a.as_bool()).unwrap_or(false);
-                let quorum_reached = result.get("quorum_reached").and_then(|q| q.as_bool()).unwrap_or(false);
-                if !approved || !quorum_reached {
-                    return Err(wasm_error!(WasmErrorInner::Guest(
-                        "Cannot ratify amendment: linked proposal vote did not pass or quorum not reached".into()
-                    )));
-                }
-            }
-        }
-        Ok(ZomeCallResponse::NetworkError(e)) => {
+    let tally_io = governance_utils::call_local(
+        "voting", "tally_votes", current_amendment.proposal_id.clone(),
+    )?;
+    if let Ok(result) = tally_io.decode::<serde_json::Value>() {
+        let approved = result.get("approved").and_then(|a| a.as_bool()).unwrap_or(false);
+        let quorum_reached = result.get("quorum_reached").and_then(|q| q.as_bool()).unwrap_or(false);
+        if !approved || !quorum_reached {
             return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Network error checking vote tally: {}", e)
-            )));
-        }
-        _ => {
-            // Voting zome unavailable — fail closed for constitutional amendments
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                "Cannot ratify amendment: voting zome unavailable to verify tally".into()
+                "Cannot ratify amendment: linked proposal vote did not pass or quorum not reached".into()
             )));
         }
     }
@@ -580,15 +558,21 @@ pub fn update_parameter(input: UpdateParameterInput) -> ExternResult<Record> {
             ), None, None)
         };
 
-    set_parameter(SetParameterInput {
-        name: input.parameter,
-        value: input.value,
+    let result = set_parameter(SetParameterInput {
+        name: input.parameter.clone(),
+        value: input.value.clone(),
         value_type,
         description,
         min_value,
         max_value,
-        proposal_id: input.proposal_id,
-    })
+        proposal_id: input.proposal_id.clone(),
+    })?;
+
+    // Sync phi-related parameters to the governance bridge's GovernancePhiConfig.
+    // This keeps the bridge's configurable thresholds in sync with constitution parameters.
+    sync_phi_parameter_to_bridge(&input.parameter, &input.value, input.proposal_id.as_deref());
+
+    Ok(result)
 }
 
 /// Input for updating a parameter via cross-zome call
@@ -598,6 +582,55 @@ pub struct UpdateParameterInput {
     pub value: String,
     #[serde(default)]
     pub proposal_id: Option<String>,
+}
+
+/// Maps constitution parameter names to GovernancePhiConfig fields.
+/// Returns Some(bridge_field_name) if this parameter should sync to the bridge.
+fn phi_config_field(param_name: &str) -> Option<&'static str> {
+    match param_name {
+        "phi_basic" => Some("phi_basic"),
+        "phi_proposal_submission" => Some("phi_proposal_submission"),
+        "phi_voting" => Some("phi_voting"),
+        "phi_constitutional" => Some("phi_constitutional"),
+        "min_voter_phi_standard" => Some("min_voter_phi_standard"),
+        "min_voter_phi_emergency" => Some("min_voter_phi_emergency"),
+        "min_voter_phi_constitutional" => Some("min_voter_phi_constitutional"),
+        "max_voting_weight" => Some("max_voting_weight"),
+        _ => None,
+    }
+}
+
+/// Sync a phi-related parameter update to the governance bridge's GovernancePhiConfig.
+///
+/// Best-effort: if the bridge zome is not installed or the call fails, we log a
+/// warning signal but do NOT fail the parameter update. The constitution is the
+/// source of truth; the bridge config is a derived cache.
+fn sync_phi_parameter_to_bridge(param_name: &str, value: &str, proposal_id: Option<&str>) {
+    let Some(field_name) = phi_config_field(param_name) else { return };
+
+    // Parse the value as f64 — all phi config fields are numeric
+    let Ok(numeric_value) = value.parse::<f64>() else {
+        let _ = emit_signal(serde_json::json!({
+            "type": "PhiConfigSyncWarning",
+            "message": format!("Cannot sync '{}' to bridge: value '{}' is not numeric", param_name, value),
+        }));
+        return;
+    };
+
+    // Build a partial update payload — only the changed field is set
+    let mut payload = serde_json::Map::new();
+    payload.insert("proposal_id".into(), serde_json::json!(proposal_id.unwrap_or("constitution_sync")));
+    payload.insert(field_name.into(), serde_json::json!(numeric_value));
+
+    if governance_utils::call_local_best_effort(
+        "governance_bridge", "update_phi_config",
+        serde_json::Value::Object(payload),
+    ).ok().flatten().is_none() {
+        let _ = emit_signal(serde_json::json!({
+            "type": "PhiConfigSyncWarning",
+            "message": format!("Could not sync '{}' to bridge", param_name),
+        }));
+    }
 }
 
 /// Get a governance parameter
@@ -871,5 +904,22 @@ mod tests {
         let amendment = make_amendment(AmendmentType::AddRight);
         let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
         assert_eq!(result.adopted, charter.adopted); // immutable
+    }
+
+    // =========================================================================
+    // Phi config sync mapping
+    // =========================================================================
+
+    #[test]
+    fn test_phi_config_field_mapping() {
+        assert_eq!(phi_config_field("phi_basic"), Some("phi_basic"));
+        assert_eq!(phi_config_field("phi_voting"), Some("phi_voting"));
+        assert_eq!(phi_config_field("phi_constitutional"), Some("phi_constitutional"));
+        assert_eq!(phi_config_field("min_voter_phi_standard"), Some("min_voter_phi_standard"));
+        assert_eq!(phi_config_field("max_voting_weight"), Some("max_voting_weight"));
+        // Non-phi parameters should return None
+        assert_eq!(phi_config_field("quorum_threshold"), None);
+        assert_eq!(phi_config_field("amendment_cooldown"), None);
+        assert_eq!(phi_config_field(""), None);
     }
 }

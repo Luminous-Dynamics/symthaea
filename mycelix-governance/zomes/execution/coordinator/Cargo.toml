@@ -11,5 +11,7 @@ crate-type = ["cdylib", "rlib"]
 hdk = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
 execution_integrity = { path = "../integrity" }
+governance-utils = { workspace = true }
 proposals_integrity = { path = "../../proposals/integrity" }

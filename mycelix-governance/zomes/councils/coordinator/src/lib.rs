@@ -173,6 +173,54 @@ pub fn create_council(input: CreateCouncilInput) -> ExternResult<Record> {
         timestamp.as_micros()
     );
 
+    // Validate signing committee exists if specified
+    if let Some(ref committee_id) = input.signing_committee_id {
+        if committee_id.is_empty() || committee_id.len() > 256 {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Signing committee ID must be 1-256 characters".into()
+            )));
+        }
+
+        // Cross-zome check: verify committee exists in threshold-signing zome
+        let committee_check = call(
+            CallTargetCell::Local,
+            ZomeName::from("threshold_signing"),
+            FunctionName::from("get_committee"),
+            None,
+            ExternIO::encode(committee_id.clone())
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
+        );
+
+        match committee_check {
+            Ok(ZomeCallResponse::Ok(extern_io)) => {
+                let maybe_record: Option<Record> = extern_io.decode()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                        format!("Failed to decode committee response: {}", e)
+                    )))?;
+                if maybe_record.is_none() {
+                    return Err(wasm_error!(WasmErrorInner::Guest(
+                        format!("Signing committee '{}' not found", committee_id)
+                    )));
+                }
+            }
+            Ok(ZomeCallResponse::NetworkError(e)) => {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    format!("Network error verifying committee: {}", e)
+                )));
+            }
+            _ => {
+                // Threshold-signing zome not installed — allow creation with warning
+                let _ = emit_council_signal(CouncilSignal::CouncilStatusChanged {
+                    council_id: id.clone(),
+                    old_status: "none".into(),
+                    new_status: format!(
+                        "warning:threshold_signing_unavailable:committee_id={}", committee_id
+                    ),
+                });
+            }
+        }
+    }
+
     let council = Council {
         id: id.clone(),
         name: input.name,
@@ -1087,31 +1135,20 @@ pub fn record_decision(input: RecordDecisionInput) -> ExternResult<Record> {
             let needs_signature = !matches!(input.decision_type, DecisionType::Operational);
             if needs_signature {
                 // Check for verified signature via cross-zome call
-                let sig_check = call(
-                    CallTargetCell::Local,
-                    ZomeName::from("threshold_signing"),
-                    FunctionName::from("get_proposal_signature"),
-                    None,
-                    ExternIO::encode(input.proposal_id.clone().unwrap_or_default())
-                        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-                );
-
-                match sig_check {
-                    Ok(ZomeCallResponse::Ok(extern_io)) => {
-                        if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
-                            if maybe_record.is_none() {
-                                return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                                    "Council '{}' requires threshold signature from committee '{}' for {:?} decisions",
-                                    council.id, committee_id, input.decision_type
-                                ))));
-                            }
+                if let Some(extern_io) = governance_utils::call_local_best_effort(
+                    "threshold_signing", "get_proposal_signature",
+                    input.proposal_id.clone().unwrap_or_default(),
+                )? {
+                    if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
+                        if maybe_record.is_none() {
+                            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                                "Council '{}' requires threshold signature from committee '{}' for {:?} decisions",
+                                council.id, committee_id, input.decision_type
+                            ))));
                         }
                     }
-                    _ => {
-                        // Threshold-signing zome unavailable — allow decision without
-                        // signature (graceful degradation)
-                    }
                 }
+                // If call_local_best_effort returned None, zome unavailable — graceful degradation
             }
         }
     }
@@ -1220,6 +1257,73 @@ pub fn get_member_councils(member_did: String) -> ExternResult<Vec<Record>> {
     }
 
     Ok(councils)
+}
+
+// =============================================================================
+// COUNCIL ↔ COMMITTEE CROSS-REFERENCES
+// =============================================================================
+
+/// Get the signing committee for a council.
+///
+/// Returns the committee record from the threshold-signing zome if the council
+/// has a `signing_committee_id` set and the committee exists.
+#[hdk_extern]
+pub fn get_council_signing_committee(council_id: String) -> ExternResult<Option<Record>> {
+    let council_record = get_council_by_id(council_id.clone())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            format!("Council '{}' not found", council_id)
+        )))?;
+
+    let council: Council = council_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Council entry missing".into())))?;
+
+    let Some(committee_id) = council.signing_committee_id else {
+        return Ok(None);
+    };
+
+    // Cross-zome fetch from threshold-signing (best-effort: zome may not be installed)
+    match governance_utils::call_local_best_effort("threshold_signing", "get_committee", committee_id)? {
+        Some(extern_io) => extern_io.decode()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(
+                format!("Failed to decode committee: {}", e)
+            ))),
+        None => Ok(None),
+    }
+}
+
+/// Find the council that owns a signing committee.
+///
+/// Scans all councils to find one with `signing_committee_id == committee_id`.
+/// Returns None if no council references this committee.
+#[hdk_extern]
+pub fn get_committee_council(committee_id: String) -> ExternResult<Option<Record>> {
+    let all_councils_hash = anchor_hash("all_councils")?;
+    let links = get_links(
+        LinkQuery::try_new(all_councils_hash, LinkTypes::AllCouncils)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        if let Some(target) = link.target.into_action_hash() {
+            if let Some(record) = get(target, GetOptions::default())? {
+                if let Some(council) = record
+                    .entry()
+                    .to_app_option::<Council>()
+                    .ok()
+                    .flatten()
+                {
+                    if council.signing_committee_id.as_deref() == Some(committee_id.as_str()) {
+                        return Ok(Some(record));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(None)
 }
 
 #[cfg(test)]

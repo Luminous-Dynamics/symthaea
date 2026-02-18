@@ -6,6 +6,33 @@
 use hdk::prelude::*;
 use proposals_integrity::*;
 
+// ============================================================================
+// REAL-TIME SIGNALS
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum ProposalSignal {
+    ProposalCreated {
+        proposal_id: String,
+        author: String,
+        title: String,
+        proposal_type: String,
+    },
+    ProposalStatusChanged {
+        proposal_id: String,
+        new_status: String,
+    },
+    ContributionAdded {
+        proposal_id: String,
+        contributor: String,
+    },
+    DiscussionReflectionGenerated {
+        proposal_id: String,
+        ready_for_vote: bool,
+    },
+}
+
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -42,7 +69,19 @@ pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
         }
     }
 
+    let signal_id = proposal.id.clone();
+    let signal_author = proposal.author.clone();
+    let signal_title = proposal.title.clone();
+    let signal_type = format!("{:?}", proposal.proposal_type);
+
     let action_hash = create_entry(&EntryTypes::Proposal(proposal.clone()))?;
+
+    let _ = emit_signal(&ProposalSignal::ProposalCreated {
+        proposal_id: signal_id,
+        author: signal_author,
+        title: signal_title,
+        proposal_type: signal_type,
+    });
 
     // Create anchors and link author to proposal
     let author_anchor = format!("author:{}", proposal.author);
@@ -223,6 +262,11 @@ pub fn update_proposal_status(input: UpdateStatusInput) -> ExternResult<Record> 
     let was_active = current_proposal.status == ProposalStatus::Active;
     let new_status = input.new_status.clone();
 
+    let _ = emit_signal(&ProposalSignal::ProposalStatusChanged {
+        proposal_id: current_proposal.id.clone(),
+        new_status: format!("{:?}", new_status),
+    });
+
     let updated_proposal = Proposal {
         id: current_proposal.id.clone(),
         title: current_proposal.title,
@@ -344,40 +388,15 @@ pub fn finalize_proposal_with_signature(input: FinalizeWithSignatureInput) -> Ex
     }
 
     // Verify threshold signature exists via cross-zome call
-    let sig_result = call(
-        CallTargetCell::Local,
-        ZomeName::from("threshold_signing"),
-        FunctionName::from("get_proposal_signature"),
-        None,
-        ExternIO::encode(input.proposal_id.clone())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match sig_result {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
-                if maybe_record.is_none() {
-                    return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                        "No verified threshold signature found for proposal '{}'",
-                        input.proposal_id
-                    ))));
-                }
-            }
-        }
-        Ok(ZomeCallResponse::NetworkError(e)) => {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                format!("Network error checking threshold signature: {}", e)
-            )));
-        }
-        _ => {
-            // Unlike execute_timelock (which allows graceful degradation when the
-            // threshold-signing zome is not installed), finalize_proposal_with_signature
-            // inherently requires a signature — it cannot degrade gracefully.
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                "Threshold-signing zome not installed. Cannot finalize proposal without \
-                 signature. If this DNA does not use threshold signing, advance the \
-                 proposal directly to Executed via execute_timelock instead.".into()
-            )));
+    let sig_io = governance_utils::call_local(
+        "threshold_signing", "get_proposal_signature", input.proposal_id.clone(),
+    )?;
+    if let Ok(maybe_record) = sig_io.decode::<Option<Record>>() {
+        if maybe_record.is_none() {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "No verified threshold signature found for proposal '{}'",
+                input.proposal_id
+            ))));
         }
     }
 
@@ -465,6 +484,11 @@ pub fn add_contribution(input: AddContributionInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::DiscussionContribution(contribution.clone()))?;
+
+    let _ = emit_signal(&ProposalSignal::ContributionAdded {
+        proposal_id: input.proposal_id.clone(),
+        contributor: input.contributor_did.clone(),
+    });
 
     // Link proposal to contribution
     let proposal_anchor = format!("discussion:{}", input.proposal_id);

@@ -119,6 +119,7 @@ pub fn update_phi_config(input: UpdatePhiConfigInput) -> ExternResult<Record> {
     if let Some(v) = input.min_voter_phi_standard { config.min_voter_phi_standard = v; }
     if let Some(v) = input.min_voter_phi_emergency { config.min_voter_phi_emergency = v; }
     if let Some(v) = input.min_voter_phi_constitutional { config.min_voter_phi_constitutional = v; }
+    if let Some(v) = input.max_voting_weight { config.max_voting_weight = v; }
 
     config.updated_at = now;
     config.changed_by_proposal = Some(input.proposal_id);
@@ -159,4 +160,5 @@ pub struct UpdatePhiConfigInput {
     pub min_voter_phi_standard: Option<f64>,
     pub min_voter_phi_emergency: Option<f64>,
     pub min_voter_phi_constitutional: Option<f64>,
+    pub max_voting_weight: Option<f64>,
 }

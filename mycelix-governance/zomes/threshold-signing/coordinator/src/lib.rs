@@ -171,20 +171,11 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
         {
             if let Some(min_phi) = committee.min_phi {
                 // Call governance bridge to verify consciousness gate
-                let gate_result = call(
-                    CallTargetCell::Local,
-                    ZomeName::from("governance_bridge"),
-                    FunctionName::from("verify_consciousness_gate"),
-                    None,
-                    serde_json::json!({
-                        "action_type": "Voting",
-                        "action_id": null
-                    }),
-                );
-
-                match gate_result {
-                    Ok(ZomeCallResponse::Ok(extern_io)) => {
-                        // Parse the gate verification result
+                match governance_utils::call_local_best_effort(
+                    "governance_bridge", "verify_consciousness_gate",
+                    serde_json::json!({"action_type": "Voting", "action_id": null}),
+                )? {
+                    Some(extern_io) => {
                         if let Ok(result) = extern_io.decode::<serde_json::Value>() {
                             let phi = result.get("phi").and_then(|p| p.as_f64()).unwrap_or(0.0);
                             if phi < min_phi {
@@ -195,7 +186,7 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
                             }
                         }
                     }
-                    _ => {
+                    None => {
                         // Bridge unavailable — use trust_score as Φ proxy (degraded mode)
                         if input.trust_score < min_phi {
                             return Err(wasm_error!(WasmErrorInner::Guest(format!(
