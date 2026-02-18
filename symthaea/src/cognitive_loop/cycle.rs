@@ -16,7 +16,7 @@ use super::{
     AdaptiveBehavior, CognitiveLoopService, CycleLearningResult, CycleResult, ResponseStrategy,
     TrainingMethod,
 };
-use crate::consciousness::cross_modal_binding::{Modality, ModalRepresentation};
+use crate::consciousness::cross_modal_binding::{ModalRepresentation, Modality};
 
 impl CognitiveLoopService {
     /// Run one cognitive cycle (the core loop)
@@ -61,6 +61,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.4: Moral Evaluation (throttled: every 5th cycle or on new input)
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         // Evaluate input for moral alignment using HDC-based moral algebra.
         // Throttled to amortize cost: reuse last judgment when input is unchanged.
 
@@ -85,6 +86,7 @@ impl CognitiveLoopService {
         if moral_concern_detected {
             self.stats.moral_concerns_detected += 1;
         }
+        module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.5: Closed Learning Loop - Strategy Selection
@@ -140,6 +142,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1.1 Surprise-Driven Exploration: Track surprise, modulate curiosity
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         // When enabled, feed prediction error to surprise bridge. If surprise
         // exceeds the adaptive threshold, lower the boredom threshold to
         // encourage exploration of novel states.
@@ -152,12 +155,8 @@ impl CognitiveLoopService {
                 .as_slice()
                 .get(..predicted.len().max(1).min(64))
                 .unwrap_or(&[]);
-            let current_state = self
-                .last_state
-                .as_deref()
-                .unwrap_or(&[0.0; 8]);
-            let (surprise, should_explore, action) =
-                bridge.cycle(predicted, actual, current_state);
+            let current_state = self.last_state.as_deref().unwrap_or(&[0.0; 8]);
+            let (surprise, should_explore, action) = bridge.cycle(predicted, actual, current_state);
 
             if should_explore {
                 surprise_triggered = true;
@@ -166,11 +165,16 @@ impl CognitiveLoopService {
                 self.curiosity_drive
                     .set_boredom_threshold(current_threshold * 0.7);
                 // Boost exploration urge proportional to surprise intensity
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + bridge.exploration_factor * 0.3)
-                        .clamp(0.0, 1.0);
-                exploration_action =
-                    action.map(|a| format!("perturbation[{}d,scale={:.3}]", a.len(), bridge.exploration_factor));
+                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
+                    + bridge.exploration_factor * 0.3)
+                    .clamp(0.0, 1.0);
+                exploration_action = action.map(|a| {
+                    format!(
+                        "perturbation[{}d,scale={:.3}]",
+                        a.len(),
+                        bridge.exploration_factor
+                    )
+                });
                 tracing::debug!(
                     surprise = surprise,
                     threshold = bridge.tracker().threshold(),
@@ -180,6 +184,8 @@ impl CognitiveLoopService {
                 );
             }
         }
+
+        module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1.2 Adaptive Urgency: determine how many subsystems run this cycle
@@ -418,7 +424,8 @@ impl CognitiveLoopService {
                 self.prediction_confidence as f64,
                 effective_lr as f64,
             );
-            self.fep_agent.learn_from_outcome(action_result.action, &outcome_obs);
+            self.fep_agent
+                .learn_from_outcome(action_result.action, &outcome_obs);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -490,58 +497,59 @@ impl CognitiveLoopService {
 
         // Apply motor command-based modulations (only when enhanced bridge ran)
         if let Some(ref enhanced_result) = enhanced_result {
-        match enhanced_result.motor_command.command_type {
-            MotorCommandType::AttentionShift => {
-                // Shift attention based on motor command intensity
-                let shift_amount = enhanced_result.motor_command.intensity as f32 * 0.1;
-                // Could modulate HDC attention weights here
-                self.stats.attention_shift = shift_amount;
-            }
-            MotorCommandType::LearningRateAdjust => {
-                // Precision-weighted learning rate adjustment
-                if enhanced_result.should_learn {
-                    let lr_mod = enhanced_result.fep_result.learning_rate_modulation as f32;
-                    self.stats.adaptive_learning_rate =
-                        (self.stats.adaptive_learning_rate * 0.9 + lr_mod * 0.1).clamp(0.01, 1.0);
+            match enhanced_result.motor_command.command_type {
+                MotorCommandType::AttentionShift => {
+                    // Shift attention based on motor command intensity
+                    let shift_amount = enhanced_result.motor_command.intensity as f32 * 0.1;
+                    // Could modulate HDC attention weights here
+                    self.stats.attention_shift = shift_amount;
+                }
+                MotorCommandType::LearningRateAdjust => {
+                    // Precision-weighted learning rate adjustment
+                    if enhanced_result.should_learn {
+                        let lr_mod = enhanced_result.fep_result.learning_rate_modulation as f32;
+                        self.stats.adaptive_learning_rate =
+                            (self.stats.adaptive_learning_rate * 0.9 + lr_mod * 0.1)
+                                .clamp(0.01, 1.0);
+                    }
+                }
+                MotorCommandType::ExplorationTrigger => {
+                    // Boost exploration based on epistemic value
+                    if enhanced_result.fep_result.epistemic_value > 0.5 {
+                        self.curiosity_drive.exploration_urge =
+                            (self.curiosity_drive.exploration_urge + 0.1).clamp(0.0, 1.0);
+                    }
+                }
+                MotorCommandType::ReflectionInitiate => {
+                    // Force reflection if motor command intensity is high
+                    if enhanced_result.motor_command.intensity > 0.7 {
+                        self.self_reflection.force_reflection();
+                    }
+                }
+                MotorCommandType::MemoryConsolidate => {
+                    // Signal episodic memory for consolidation
+                    if enhanced_result.motor_command.intensity > 0.5 {
+                        self.episodic_memory.consolidate_recent();
+                    }
+                }
+                MotorCommandType::ExpectationReset => {
+                    // Clear prediction cache if action-outcome coupling is poor
+                    if enhanced_result.action_outcome_coupling < 0.3 {
+                        self.last_prediction = None;
+                        self.prediction_confidence = 0.5;
+                    }
+                }
+                MotorCommandType::MotorOutput | MotorCommandType::NoOp => {
+                    // No cognitive modulation
                 }
             }
-            MotorCommandType::ExplorationTrigger => {
-                // Boost exploration based on epistemic value
-                if enhanced_result.fep_result.epistemic_value > 0.5 {
-                    self.curiosity_drive.exploration_urge =
-                        (self.curiosity_drive.exploration_urge + 0.1).clamp(0.0, 1.0);
-                }
-            }
-            MotorCommandType::ReflectionInitiate => {
-                // Force reflection if motor command intensity is high
-                if enhanced_result.motor_command.intensity > 0.7 {
-                    self.self_reflection.force_reflection();
-                }
-            }
-            MotorCommandType::MemoryConsolidate => {
-                // Signal episodic memory for consolidation
-                if enhanced_result.motor_command.intensity > 0.5 {
-                    self.episodic_memory.consolidate_recent();
-                }
-            }
-            MotorCommandType::ExpectationReset => {
-                // Clear prediction cache if action-outcome coupling is poor
-                if enhanced_result.action_outcome_coupling < 0.3 {
-                    self.last_prediction = None;
-                    self.prediction_confidence = 0.5;
-                }
-            }
-            MotorCommandType::MotorOutput | MotorCommandType::NoOp => {
-                // No cognitive modulation
-            }
-        }
 
-        // Use learning signal to modulate other systems
-        if self.fep_learning_signal > 0.5 && enhanced_result.should_learn {
-            // High learning signal: increase plasticity in world model
-            self.world_model
-                .increase_plasticity(self.fep_learning_signal);
-        }
+            // Use learning signal to modulate other systems
+            if self.fep_learning_signal > 0.5 && enhanced_result.should_learn {
+                // High learning signal: increase plasticity in world model
+                self.world_model
+                    .increase_plasticity(self.fep_learning_signal);
+            }
         } // end if let Some(enhanced_result)
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -619,8 +627,13 @@ impl CognitiveLoopService {
         // FEEDBACK: Embodied cognition phi modulation feeds back into unified_phi (±2.5% range)
         // Science: Merleau-Ponty, Damasio — body schema modulates consciousness level
         let embodied_phi_contrib = (self.prev_embodied_phi_modulation - 1.0) * 0.05;
-        let unified_phi =
-            (coherence_phi + voice_phi + flow_phi + relational_phi_contrib + body_phi_contrib as f32 + embodied_phi_contrib as f32).clamp(0.0, 1.0) as f64;
+        let unified_phi = (coherence_phi
+            + voice_phi
+            + flow_phi
+            + relational_phi_contrib
+            + body_phi_contrib as f32
+            + embodied_phi_contrib as f32)
+            .clamp(0.0, 1.0) as f64;
         self.unification_engine.update_phi(unified_phi);
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -707,8 +720,7 @@ impl CognitiveLoopService {
             if let Some(ref gate) = reasoning_result.gate {
                 if !gate.is_allowed() {
                     reasoning_gate_blocked = true;
-                    reasoning_fallback =
-                        gate.fallback.as_ref().map(|f| format!("{:?}", f));
+                    reasoning_fallback = gate.fallback.as_ref().map(|f| format!("{:?}", f));
                     // Gate blocked → suppress learning this cycle (safety measure)
                     reasoning_lr_factor = 0.0;
                     tracing::info!(
@@ -939,7 +951,8 @@ impl CognitiveLoopService {
                                 encoding,
                             } = transition
                             {
-                                discovery_service.seed_neighbor_exploration(primitive_name, encoding);
+                                discovery_service
+                                    .seed_neighbor_exploration(primitive_name, encoding);
                             }
                         }
                     }
@@ -1113,6 +1126,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // DREAM ENGINE: Record surprise events + dream during Cruise
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         // 1. Every cycle: record high-surprise events for later dreaming.
         // 2. During Cruise urgency: run a dream cycle to discover better actions.
         // 3. Apply accumulated wisdom to bias exploration toward Phi-optimal choices.
@@ -1125,7 +1139,12 @@ impl CognitiveLoopService {
             let dream_state: Vec<f32> = compressed_state.iter().take(64).copied().collect();
             let dream_action: Vec<f32> = output.iter().take(32).copied().collect();
             let dream_outcome: Vec<f32> = prediction.iter().take(64).copied().collect();
-            dream.record(&dream_state, &dream_action, &dream_outcome, prediction_error);
+            dream.record(
+                &dream_state,
+                &dream_action,
+                &dream_outcome,
+                prediction_error,
+            );
 
             // Dream during Cruise urgency (low-error steady state) or every 20th cycle
             if matches!(urgency, super::CycleUrgency::Cruise)
@@ -1152,26 +1171,31 @@ impl CognitiveLoopService {
             // Apply wisdom: if we have accumulated wisdom, modulate exploration
             // toward states where dream counterfactuals found Phi improvements
             if !dream.wisdom().is_empty() {
-                let avg_phi_improvement: f32 = dream.wisdom().iter()
+                let avg_phi_improvement: f32 = dream
+                    .wisdom()
+                    .iter()
                     .map(|w| w.phi_improvement)
-                    .sum::<f32>() / dream.wisdom().len() as f32;
+                    .sum::<f32>()
+                    / dream.wisdom().len() as f32;
                 // Dream wisdom boosts exploration when Phi improvements are found
                 let wisdom_exploration_boost = (avg_phi_improvement * 0.5).clamp(0.0, 0.2);
-                self.curiosity_drive.exploration_urge =
-                    (self.curiosity_drive.exploration_urge + wisdom_exploration_boost).clamp(0.0, 1.0);
+                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
+                    + wisdom_exploration_boost)
+                    .clamp(0.0, 1.0);
             }
         }
+
+        module_timings.dream_replay = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PREFRONTAL CORTEX: Executive control and working memory gating
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let prefrontal_veto = if let Some(ref mut pfc) = self.prefrontal {
             // Add current input as a working memory item
             let wm_item = crate::brain::prefrontal::WorkingMemoryItem::new(
                 format!("cycle_{}", self.stats.total_cycles),
-                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(
-                    compressed_state.clone(),
-                ),
+                symthaea_core::hdc::unified_hv::ContinuousHV::from_vec(compressed_state.clone()),
             );
             pfc.add_to_memory(wm_item);
 
@@ -1179,8 +1203,7 @@ impl CognitiveLoopService {
             pfc.tick();
 
             // Check memory utilization — high utilization triggers inhibition
-            let utilization =
-                pfc.memory_contents().len() as f32 / 7.0; // default capacity
+            let utilization = pfc.memory_contents().len() as f32 / 7.0; // default capacity
             let veto = utilization > self.config.learning_threshold.max(0.8);
 
             if veto {
@@ -1197,7 +1220,12 @@ impl CognitiveLoopService {
                 for grad in &graduates {
                     self.episodic_memory.encode(
                         &grad.id,
-                        grad.embedding.values.iter().take(64).copied().collect::<Vec<_>>(),
+                        grad.embedding
+                            .values
+                            .iter()
+                            .take(64)
+                            .copied()
+                            .collect::<Vec<_>>(),
                         0.0,
                         pp_phi,
                         self.stats.total_cycles,
@@ -1219,11 +1247,13 @@ impl CognitiveLoopService {
         if prefrontal_veto {
             self.curiosity_drive.exploration_urge = 0.0;
         }
+        module_timings.prefrontal = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // META-COGNITION: Recursive self-modeling and learning rate modulation
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (meta_cognitive_accuracy, meta_cognitive_depth) =
             if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut meta) = self.meta_cognition {
@@ -1243,10 +1273,13 @@ impl CognitiveLoopService {
                 (0.0, 0)
             };
 
+        module_timings.meta_cognition = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // VIRTUAL BODY: Map cognitive signals to interoceptive states
         // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (body_phi_modulation, body_valence, body_arousal) =
             if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
                 if let Some(ref mut body) = self.virtual_body {
@@ -1272,6 +1305,8 @@ impl CognitiveLoopService {
             } else {
                 (self.prev_body_phi_modulation, 0.0, 0.0)
             };
+
+        module_timings.virtual_body = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // AFFECTIVE BRIDGE: Evaluate somatic markers from cognitive signals
@@ -1320,6 +1355,7 @@ impl CognitiveLoopService {
         // NARRATIVE SELF: Process experience and track self-Φ
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let narrative_self_phi = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
             if let Some(ref mut narrative) = self.narrative_self {
                 let significance = if moral_concern_detected {
@@ -1350,25 +1386,26 @@ impl CognitiveLoopService {
             self.prediction_confidence = (self.prediction_confidence * 0.95).clamp(0.0, 1.0);
         }
 
+        module_timings.narrative_self = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // PREDICTIVE PROCESSING: Hierarchical predictive coding + precision
         // Runs every cycle (lightweight: BinaryHV → prediction → free energy)
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (predictive_free_energy, predictive_phi_modulation) =
-            if let Some(ref mut mind) = self.predictive_mind {
-                if self.affective_bridge.is_some() {
-                    mind.precision.apply_affective_modulation(
-                        affective_arousal as f64,
-                        affective_valence as f64,
-                    );
-                }
-                let state = mind.process(&hv16_cached);
-                self.prev_predictive_phi_modulation = state.phi_modulation;
-                (state.free_energy, state.phi_modulation)
-            } else {
-                (0.0, 1.0)
-            };
+        let (predictive_free_energy, predictive_phi_modulation) = if let Some(ref mut mind) =
+            self.predictive_mind
+        {
+            if self.affective_bridge.is_some() {
+                mind.precision
+                    .apply_affective_modulation(affective_arousal as f64, affective_valence as f64);
+            }
+            let state = mind.process(&hv16_cached);
+            self.prev_predictive_phi_modulation = state.phi_modulation;
+            (state.free_energy, state.phi_modulation)
+        } else {
+            (0.0, 1.0)
+        };
 
         // FEEDBACK: Predictive phi modulation gates plasticity (Friston 2010)
         if predictive_phi_modulation > 1.0 {
@@ -1378,6 +1415,39 @@ impl CognitiveLoopService {
             self.stats.effective_learning_rate *= 0.9; // reduce LR when free energy is low
         }
         module_timings.predictive_processing = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // HIERARCHICAL FREE ENERGY: Multi-level variational decomposition
+        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
+        // Science: Friston (2008) — hierarchical predictive processing
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let hierarchical_total_free_energy = if urgency.should_run(self.stats.total_cycles, 1, 2, 4)
+        {
+            if let Some(ref mut hfe) = self.hierarchical_free_energy {
+                // Build observation from compressed state (clamped to state_dim)
+                let obs: Vec<f64> = compressed_state
+                    .iter()
+                    .take(hfe.config.state_dim)
+                    .map(|&x| x as f64)
+                    .collect();
+                hfe.update_beliefs(&obs);
+                hfe.total_free_energy()
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        // FEEDBACK: High hierarchical free energy suppresses exploration (Friston 2008)
+        // The system should focus on minimizing surprise rather than exploring when FE is high
+        if hierarchical_total_free_energy > 1.0 {
+            let fe_factor = (1.0 / (1.0 + hierarchical_total_free_energy * 0.1)) as f32;
+            self.curiosity_drive.boredom *= fe_factor; // suppress exploration urge
+        }
+
+        module_timings.hierarchical_free_energy = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PREDICTIVE SELF: Evaluate action safety via self-state prediction
@@ -1408,6 +1478,7 @@ impl CognitiveLoopService {
         // ATTENTION SCHEMA: Track attention state and generate control signals
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let attention_schema_focus = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
             if let Some(ref mut schema) = self.attention_schema {
                 let salience = prediction_error.max(0.1);
@@ -1428,10 +1499,13 @@ impl CognitiveLoopService {
             0.0
         };
 
+        module_timings.attention_schema = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // GWT INTEGRATION: Submit encoding to global workspace for broadcast
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let gwt_broadcast = if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
             if let Some(ref mut gwt) = self.gwt {
                 let activation = (1.0 - prediction_error as f64).clamp(0.0, 1.0);
@@ -1456,6 +1530,8 @@ impl CognitiveLoopService {
             self.prediction_confidence = (self.prediction_confidence + 0.03).clamp(0.0, 1.0);
         }
 
+        module_timings.gwt = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // CROSS-MODAL BINDING: Bind HDC encodings across modalities
         // Runs every cycle (lightweight: 2 HV ops + similarity)
@@ -1476,8 +1552,7 @@ impl CognitiveLoopService {
                 binder.add_representation(linguistic_repr);
                 if self.affective_bridge.is_some() {
                     let affect_seed = (affective_valence * 1000.0) as u64;
-                    let affective_hv =
-                        symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
+                    let affective_hv = symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
                     binder.update_modality(Modality::Affective, affective_hv);
                 }
                 let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);
@@ -1515,14 +1590,17 @@ impl CognitiveLoopService {
         module_timings.cross_modal_binding = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // CONSCIOUSNESS MONITORS: Skip in Cruise mode (measurement-only, no feedback)
+        // CONSCIOUSNESS MONITORS: Resonance + Quantum coherence
+        // Urgency-gated: skip in Cruise mode
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let resonance_frequency = if urgency.run_consciousness_monitors() {
             if let Some(ref mut resonance) = self.consciousness_resonance {
                 let dims = [
                     unified_phi,
                     coherence as f64,
-                    self.prefrontal.as_ref()
+                    self.prefrontal
+                        .as_ref()
                         .map(|p| p.stats().avg_memory_utilization as f64)
                         .unwrap_or(0.5),
                     self.adaptive_behavior.attention_sensitivity as f64,
@@ -1539,6 +1617,14 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // FEEDBACK: Resonance frequency modulates attention sensitivity (Engel 2001)
+        // Stable resonance near 0.5 → sharp attention; deviant frequency → diffuse
+        if resonance_frequency > 0.0 {
+            let resonance_quality = 1.0 - (resonance_frequency - 0.5).abs() * 2.0; // peaks at 0.5
+            let attention_mod = 1.0 + (resonance_quality as f32 - 0.5) * 0.1; // ±5%
+            self.adaptive_behavior.attention_sensitivity *= attention_mod;
+        }
+
         let quantum_coherence_level = if urgency.run_consciousness_monitors() {
             if let Some(ref mut qc) = self.quantum_coherence {
                 qc.observe(&hv16_cached, unified_phi);
@@ -1550,9 +1636,69 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // FEEDBACK: Quantum coherence modulates prediction confidence (Penrose & Hameroff 2014)
+        // High coherence → quantum-enhanced processing → slightly boost confidence
+        // Decoherence → noisy processing → reduce confidence
+        if quantum_coherence_level > 0.6 {
+            let qc_boost = (quantum_coherence_level - 0.6) as f32 * 0.05; // up to +2%
+            self.prediction_confidence = (self.prediction_confidence + qc_boost).clamp(0.0, 1.0);
+        } else if quantum_coherence_level > 0.0 && quantum_coherence_level < 0.2 {
+            self.prediction_confidence *= 0.98; // slight reduction during decoherence
+        }
+
+        module_timings.consciousness_resonance = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHENOMENAL BINDING: Temporal synchronization across consciousness dims
+        // Urgency-gated: same as consciousness monitors (skip in Cruise)
+        // Science: Singer & Gray (1989) — temporal binding hypothesis
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (phenomenal_binding_strength, phenomenal_fragmented) =
+            if urgency.run_consciousness_monitors() {
+                if let Some(ref mut binding) = self.phenomenal_binding {
+                    let dims = [
+                        unified_phi,
+                        coherence as f64,
+                        self.prefrontal
+                            .as_ref()
+                            .map(|p| p.stats().avg_memory_utilization as f64)
+                            .unwrap_or(0.5),
+                        self.adaptive_behavior.attention_sensitivity as f64,
+                        (self.stats.total_cycles.min(100) as f64 / 100.0),
+                        body_phi_modulation,
+                        self.prediction_confidence as f64,
+                    ];
+                    binding.observe_all(&dims);
+                    let strength = binding.phenomenal_binding_strength();
+                    let fragmented = binding.detect_fragmentation().is_some();
+                    (strength, fragmented)
+                } else {
+                    (0.0, false)
+                }
+            } else {
+                (0.0, false)
+            };
+
+        // FEEDBACK: Fragmentation suppresses exploration (Singer 1989)
+        // When consciousness is fragmented, focus on integration not exploration
+        if phenomenal_fragmented {
+            self.curiosity_drive.boredom *= 0.8;
+            self.adaptive_behavior.exploration_factor *= 0.7;
+        }
+
+        // FEEDBACK: High binding strength (flow) boosts learning rate (Csikszentmihalyi 1990)
+        if phenomenal_binding_strength > 0.8 {
+            let binding_boost = ((phenomenal_binding_strength - 0.8) * 0.2) as f32; // up to +4%
+            self.stats.effective_learning_rate *= 1.0 + binding_boost;
+        }
+
+        module_timings.phenomenal_binding = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // TEMPORAL CONSCIOUSNESS: Track Phi trajectory, continuity, identity
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (temporal_coherence_score, temporal_discontinuity) =
             if urgency.run_consciousness_monitors() {
                 if let Some(ref mut temporal) = self.temporal_consciousness {
@@ -1579,10 +1725,77 @@ impl CognitiveLoopService {
             self.prediction_confidence *= 0.8;
         }
 
+        // FEEDBACK: High temporal coherence strengthens narrative self engagement
+        // Science: Damasio (2010) — temporal continuity is the substrate of selfhood
+        if temporal_coherence_score > 0.6 {
+            if let Some(ref mut narrative) = self.narrative_self {
+                let continuity_boost = (temporal_coherence_score - 0.6) * 0.1; // up to +4%
+                narrative.boost_coherence(continuity_boost);
+            }
+        }
+
+        module_timings.temporal_consciousness = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CONSCIOUSNESS THERMODYNAMICS: Phase transitions & free energy
+        // Urgency-gated: same as consciousness monitors (skip in Cruise)
+        // Science: Friston (2010) — free energy, Kelso — critical fluctuations
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (thermodynamic_entropy, thermodynamic_free_energy) =
+            if urgency.run_consciousness_monitors() {
+                if let Some(ref mut thermo) = self.consciousness_thermodynamics {
+                    let dims = [
+                        unified_phi,
+                        coherence as f64,
+                        self.prefrontal
+                            .as_ref()
+                            .map(|p| p.stats().avg_memory_utilization as f64)
+                            .unwrap_or(0.5),
+                        self.adaptive_behavior.attention_sensitivity as f64,
+                        (self.stats.total_cycles.min(100) as f64 / 100.0),
+                        body_phi_modulation,
+                        self.prediction_confidence as f64,
+                    ];
+                    let state = thermo.analyze(dims);
+                    // FEEDBACK: Phase-dependent exploration modulation (Kelso 1995)
+                    use crate::consciousness::consciousness_thermodynamics::ConsciousnessPhase;
+                    match state.phase {
+                        ConsciousnessPhase::Critical => {
+                            // Edge of chaos — maximum creativity, boost exploration
+                            self.curiosity_drive.boredom *= 1.1;
+                            self.adaptive_behavior.exploration_factor *= 1.15;
+                        }
+                        ConsciousnessPhase::Flow => {
+                            // Superfluid state — boost learning rate
+                            self.stats.effective_learning_rate *= 1.05;
+                        }
+                        ConsciousnessPhase::Chaotic => {
+                            // Fragmented — suppress exploration, seek stability
+                            self.curiosity_drive.boredom *= 0.7;
+                            self.adaptive_behavior.exploration_factor *= 0.5;
+                        }
+                        ConsciousnessPhase::Frozen => {
+                            // Rigid — nudge toward exploration to unfreeze
+                            self.curiosity_drive.boredom *= 1.05;
+                        }
+                        _ => {} // Normal, Unified — no modulation needed
+                    }
+                    (state.entropy, state.free_energy)
+                } else {
+                    (0.0, 0.0)
+                }
+            } else {
+                (0.0, 0.0)
+            };
+
+        module_timings.consciousness_thermodynamics = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // EMBODIED COGNITION: Bridge virtual body to full body schema
         // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (embodied_phi_modulation, embodied_agency) =
             if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
                 if let Some(ref mut embodied) = self.embodied_cognition {
@@ -1599,10 +1812,13 @@ impl CognitiveLoopService {
                 (self.prev_embodied_phi_modulation, 0.0)
             };
 
+        module_timings.embodied_cognition = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // NARRATIVE-GWT INTEGRATION: Consciousness governance capstone
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (narrative_gwt_veto, narrative_gwt_self_phi) =
             if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
                 if let Some(ref mut ngwt) = self.narrative_gwt {
@@ -1626,6 +1842,7 @@ impl CognitiveLoopService {
 
         // Store narrative-GWT veto for next cycle's learning gate
         self.narrative_veto_active = narrative_gwt_veto;
+        module_timings.narrative_gwt = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // UNIFIED LIVING MIND: life-mind continuity (full_consciousness only)
@@ -1640,10 +1857,18 @@ impl CognitiveLoopService {
 
             // Map cognitive loop action to enactive ActionType based on adaptive behavior
             let enactive_action = match self.adaptive_behavior.action_hint {
-                super::ActionHint::Explore => crate::consciousness::enactive_cognition::ActionType::Explore,
-                super::ActionHint::SeekInput => crate::consciousness::enactive_cognition::ActionType::Observe,
-                super::ActionHint::SlowDown => crate::consciousness::enactive_cognition::ActionType::Reflect,
-                super::ActionHint::SpeedUp => crate::consciousness::enactive_cognition::ActionType::Execute,
+                super::ActionHint::Explore => {
+                    crate::consciousness::enactive_cognition::ActionType::Explore
+                }
+                super::ActionHint::SeekInput => {
+                    crate::consciousness::enactive_cognition::ActionType::Observe
+                }
+                super::ActionHint::SlowDown => {
+                    crate::consciousness::enactive_cognition::ActionType::Reflect
+                }
+                super::ActionHint::SpeedUp => {
+                    crate::consciousness::enactive_cognition::ActionType::Execute
+                }
                 _ => crate::consciousness::enactive_cognition::ActionType::Observe,
             };
 
@@ -1670,9 +1895,12 @@ impl CognitiveLoopService {
 
             // Integrate all subsystems into unified living state
             let free_energy = self.fep_agent.current_free_energy();
-            let unified_state =
-                self.unified_living_mind
-                    .integrate(&self.autopoietic, &self.enactive, unified_phi, free_energy);
+            let unified_state = self.unified_living_mind.integrate(
+                &self.autopoietic,
+                &self.enactive,
+                unified_phi,
+                free_energy,
+            );
 
             (unified_state.vitality, unified_state.coherence)
         };
@@ -1764,6 +1992,11 @@ impl CognitiveLoopService {
             cross_modal_phi,
             affective_valence,
             affective_arousal,
+            thermodynamic_entropy,
+            thermodynamic_free_energy,
+            phenomenal_binding_strength,
+            phenomenal_fragmented,
+            hierarchical_total_free_energy,
             module_timings_us: module_timings,
         };
 

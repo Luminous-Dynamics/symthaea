@@ -450,10 +450,7 @@ impl ConsciousnessWorldModel {
         let action_type = transition.action.action_type;
         let delta = transition.delta();
 
-        let params = self
-            .transition_model
-            .entry(action_type)
-            .or_default();
+        let params = self.transition_model.entry(action_type).or_default();
 
         // Online update of mean and variance
         params.count += 1;

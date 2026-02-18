@@ -303,7 +303,10 @@ impl PredictiveHdcEncoder {
 
         // Check each primitive for presence in input
         // Uses pre-lowercased names (computed once at construction, not 200x per cycle)
-        for (name, name_lower) in self.primitive_names.iter().zip(self.primitive_names_lower.iter())
+        for (name, name_lower) in self
+            .primitive_names
+            .iter()
+            .zip(self.primitive_names_lower.iter())
         {
             if input_lower.contains(name_lower.as_str()) {
                 detected.push(name.clone());

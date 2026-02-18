@@ -310,8 +310,8 @@ impl WithCausalMetadata for BrocaPipelineEvent {
 
 #[cfg(test)]
 mod tests {
-    use crate::NullObserver;
     use super::*;
+    use crate::NullObserver;
 
     fn make_phi_event() -> PhiMeasurementEvent {
         PhiMeasurementEvent {

@@ -220,7 +220,10 @@ fn main() {
             }
 
             if best_class != actual {
-                for (p, &e) in hdc_prototypes[best_class].iter_mut().zip(encoded.values.iter()) {
+                for (p, &e) in hdc_prototypes[best_class]
+                    .iter_mut()
+                    .zip(encoded.values.iter())
+                {
                     *p -= 0.1 * e;
                 }
                 for (p, &e) in hdc_prototypes[actual].iter_mut().zip(encoded.values.iter()) {
@@ -230,7 +233,11 @@ fn main() {
             }
         }
         let acc = 1.0 - corrections as f64 / train_images.len() as f64;
-        println!("  Retrain {}/5: {corrections} corrections, train acc = {:.2}%", iter + 1, acc * 100.0);
+        println!(
+            "  Retrain {}/5: {corrections} corrections, train acc = {:.2}%",
+            iter + 1,
+            acc * 100.0
+        );
     }
     // Normalize after retrain
     for proto in &mut hdc_prototypes {
@@ -263,8 +270,12 @@ fn main() {
     }
     let hdc_accuracy = hdc_correct as f64 / test_images.len() as f64;
     let hdc_test_time = test_start.elapsed().as_secs_f64();
-    println!("\n  HDC-only accuracy: {:.2}% ({hdc_correct}/{}) in {:.1}s",
-        hdc_accuracy * 100.0, test_images.len(), hdc_test_time);
+    println!(
+        "\n  HDC-only accuracy: {:.2}% ({hdc_correct}/{}) in {:.1}s",
+        hdc_accuracy * 100.0,
+        test_images.len(),
+        hdc_test_time
+    );
 
     // ── Step 3: CfC-Integrated ──────────────────────────────────────────────
     println!("\n━━━ Phase 2: CfC-Integrated (HDC → Cognitive Loop) ━━━");
@@ -286,8 +297,11 @@ fn main() {
         let hdv = encoder.encode(img);
         let _ = service.cycle_with_hv(&hdv);
     }
-    println!("  Warmup: {:.1}s ({:.1}ms/cycle)", warmup_start.elapsed().as_secs_f64(),
-        warmup_start.elapsed().as_secs_f64() * 10.0);
+    println!(
+        "  Warmup: {:.1}s ({:.1}ms/cycle)",
+        warmup_start.elapsed().as_secs_f64(),
+        warmup_start.elapsed().as_secs_f64() * 10.0
+    );
 
     // Build CfC output prototypes from training set
     // Use a subset (5000 samples) for speed
@@ -299,7 +313,11 @@ fn main() {
     let mut cfc_counts = vec![0usize; 10];
     let mut cfc_dim = 0;
 
-    for (img, &label) in train_images.iter().zip(train_labels.iter()).take(train_subset) {
+    for (img, &label) in train_images
+        .iter()
+        .zip(train_labels.iter())
+        .take(train_subset)
+    {
         let hdv = encoder.encode(img);
         let result = service.cycle_with_hv(&hdv);
         let c = label as usize;
@@ -325,7 +343,10 @@ fn main() {
         }
     }
 
-    println!("  CfC training: {:.1}s (output dim={cfc_dim})", cfc_train_start.elapsed().as_secs_f64());
+    println!(
+        "  CfC training: {:.1}s (output dim={cfc_dim})",
+        cfc_train_start.elapsed().as_secs_f64()
+    );
 
     // Test CfC-integrated
     println!("  Testing CfC-integrated classification...");
@@ -355,26 +376,39 @@ fn main() {
     let cfc_test_time = cfc_test_start.elapsed().as_secs_f64();
     let avg_prediction_error = total_prediction_error / test_images.len() as f64;
 
-    println!("\n  CfC-integrated accuracy: {:.2}% ({cfc_correct}/{}) in {:.1}s",
-        cfc_accuracy * 100.0, test_images.len(), cfc_test_time);
+    println!(
+        "\n  CfC-integrated accuracy: {:.2}% ({cfc_correct}/{}) in {:.1}s",
+        cfc_accuracy * 100.0,
+        test_images.len(),
+        cfc_test_time
+    );
     println!("  Avg prediction error: {:.6}", avg_prediction_error);
-    println!("  Avg CfC inference: {:.3}ms/sample",
-        cfc_test_time / test_images.len() as f64 * 1000.0);
+    println!(
+        "  Avg CfC inference: {:.3}ms/sample",
+        cfc_test_time / test_images.len() as f64 * 1000.0
+    );
 
     // ── Summary ─────────────────────────────────────────────────────────────
     println!("\n╔═══════════════════════════════════════════════════════════════════════╗");
     println!("║                         COMPARISON SUMMARY                          ║");
     println!("╠═══════════════════════════════════════════════════════════════════════╣");
-    println!("║ {:35} │ {:>8} │ {:>10} ║", "Method", "Accuracy", "ms/sample");
+    println!(
+        "║ {:35} │ {:>8} │ {:>10} ║",
+        "Method", "Accuracy", "ms/sample"
+    );
     println!("╟─────────────────────────────────────┼──────────┼────────────╢");
-    println!("║ {:35} │ {:>7.2}% │ {:>9.3} ║",
+    println!(
+        "║ {:35} │ {:>7.2}% │ {:>9.3} ║",
         "HDC-only (4K, 32L, 5 retrain)",
         hdc_accuracy * 100.0,
-        hdc_test_time / test_images.len() as f64 * 1000.0);
-    println!("║ {:35} │ {:>7.2}% │ {:>9.3} ║",
+        hdc_test_time / test_images.len() as f64 * 1000.0
+    );
+    println!(
+        "║ {:35} │ {:>7.2}% │ {:>9.3} ║",
         "CfC-integrated (HDC→CfC→classify)",
         cfc_accuracy * 100.0,
-        cfc_test_time / test_images.len() as f64 * 1000.0);
+        cfc_test_time / test_images.len() as f64 * 1000.0
+    );
     println!("╚═══════════════════════════════════════════════════════════════════════╝");
 
     let delta = cfc_accuracy - hdc_accuracy;
@@ -386,6 +420,9 @@ fn main() {
         println!("\n  Identical accuracy");
     }
 
-    println!("  CfC avg prediction error: {:.6} (lower = better temporal model)", avg_prediction_error);
+    println!(
+        "  CfC avg prediction error: {:.6} (lower = better temporal model)",
+        avg_prediction_error
+    );
     println!("  Total cognitive cycles: {}", service.stats().total_cycles);
 }

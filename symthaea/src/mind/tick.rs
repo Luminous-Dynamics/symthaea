@@ -143,7 +143,8 @@ impl ContinuousMind {
                 self.state.current_thought = input.content.clone();
             } else {
                 // Exponential moving average: 70% retain, 30% new input
-                self.state.current_thought
+                self.state
+                    .current_thought
                     .lerp_in_place(&input.content, 0.7, 0.3);
             }
 

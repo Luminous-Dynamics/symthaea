@@ -736,7 +736,10 @@ impl HdcCfcBridge {
         // Step 3: Context-aware attention
         let attended = self.attention.forward_with_context(
             normalized.as_standard_layout().as_slice().unwrap(),
-            context_intermediate.as_standard_layout().as_slice().unwrap(),
+            context_intermediate
+                .as_standard_layout()
+                .as_slice()
+                .unwrap(),
         );
         let attended_array = Array1::from_vec(attended.values);
 
@@ -774,7 +777,10 @@ impl HdcCfcBridge {
         // Step 3: Context-aware attention
         let attended = self.attention.forward_with_context(
             normalized.as_standard_layout().as_slice().unwrap(),
-            context_intermediate.as_standard_layout().as_slice().unwrap(),
+            context_intermediate
+                .as_standard_layout()
+                .as_slice()
+                .unwrap(),
         );
         let attended_array = Array1::from_vec(attended.values);
 

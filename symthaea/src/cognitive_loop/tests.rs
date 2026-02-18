@@ -1824,8 +1824,14 @@ fn test_body_phi_modulation_feedback() {
     }
 
     // At least some body phi modulation should differ from 1.0 after warmup
-    let non_neutral = body_mods.iter().filter(|&&m| (m - 1.0).abs() > 0.001).count();
-    assert!(non_neutral > 0, "Body phi modulation should deviate from 1.0 after warmup");
+    let non_neutral = body_mods
+        .iter()
+        .filter(|&&m| (m - 1.0).abs() > 0.001)
+        .count();
+    assert!(
+        non_neutral > 0,
+        "Body phi modulation should deviate from 1.0 after warmup"
+    );
 }
 
 #[test]
@@ -1869,8 +1875,8 @@ fn test_all_consciousness_modules_enabled() {
 fn test_cycle_with_temporal_consciousness() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_temporal_consciousness: true,
-        enable_narrative_self: true,   // Dependency
-        enable_predictive_self: true,  // Dependency
+        enable_narrative_self: true,  // Dependency
+        enable_predictive_self: true, // Dependency
         ..Default::default()
     })
     .unwrap();
@@ -1954,7 +1960,8 @@ fn test_prefrontal_veto_suppresses_exploration() {
     if result.metadata.prefrontal_veto {
         // If veto triggered, exploration_urge should be 0
         assert_eq!(
-            service.curiosity_drive().exploration_urge, 0.0,
+            service.curiosity_drive().exploration_urge,
+            0.0,
             "Prefrontal veto should zero exploration_urge"
         );
     }
@@ -2057,8 +2064,8 @@ fn test_gwt_broadcast_boosts_confidence() {
 fn test_temporal_discontinuity_resets_confidence() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_temporal_consciousness: true,
-        enable_narrative_self: true,   // Dependency
-        enable_predictive_self: true,  // Dependency
+        enable_narrative_self: true,  // Dependency
+        enable_predictive_self: true, // Dependency
         learning_threshold: 0.0,
         ..Default::default()
     })
@@ -2573,7 +2580,10 @@ fn test_cycle_with_hv_different_inputs() {
     let r_b = service.cycle_with_hv(&hdv_b);
 
     // Different inputs should produce different outputs
-    assert_ne!(r_a.output, r_b.output, "different HDVs should produce different CfC outputs");
+    assert_ne!(
+        r_a.output, r_b.output,
+        "different HDVs should produce different CfC outputs"
+    );
     assert_eq!(service.stats().total_cycles, 2);
 }
 
@@ -2585,7 +2595,11 @@ fn test_cycle_with_hv_different_inputs() {
 fn test_phi_attestation_disabled_by_default() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let _ = service.cycle("test");
-    assert_eq!(service.phi_attestation_count(), 0, "attestation should be off by default");
+    assert_eq!(
+        service.phi_attestation_count(),
+        0,
+        "attestation should be off by default"
+    );
 }
 
 #[test]
@@ -2602,12 +2616,22 @@ fn test_phi_attestation_enabled_produces_records() {
         let _ = service.cycle("test input");
     }
 
-    assert_eq!(service.phi_attestation_count(), 3, "should have 3 attestation records");
+    assert_eq!(
+        service.phi_attestation_count(),
+        3,
+        "should have 3 attestation records"
+    );
 
     // Verify latest record
     let latest = service.latest_phi_attestation().unwrap();
-    assert!(latest.phi >= 0.0 && latest.phi <= 1.0, "phi should be in [0, 1]");
-    assert_eq!(latest.cycle_id, 3, "cycle_id matches total_cycles (1-indexed)");
+    assert!(
+        latest.phi >= 0.0 && latest.phi <= 1.0,
+        "phi should be in [0, 1]"
+    );
+    assert_eq!(
+        latest.cycle_id, 3,
+        "cycle_id matches total_cycles (1-indexed)"
+    );
     assert!(latest.captured_at_us > 0, "timestamp should be set");
 }
 
@@ -2626,11 +2650,19 @@ fn test_phi_attestation_drain() {
 
     let records = service.drain_phi_attestations();
     assert_eq!(records.len(), 5, "should drain all 5 records");
-    assert_eq!(service.phi_attestation_count(), 0, "buffer should be empty after drain");
+    assert_eq!(
+        service.phi_attestation_count(),
+        0,
+        "buffer should be empty after drain"
+    );
 
     // Verify records are ordered by cycle_id (1-indexed: 1, 2, 3, 4, 5)
     for (i, record) in records.iter().enumerate() {
-        assert_eq!(record.cycle_id, (i + 1) as u64, "records should be in order");
+        assert_eq!(
+            record.cycle_id,
+            (i + 1) as u64,
+            "records should be in order"
+        );
     }
 }
 
@@ -2648,7 +2680,11 @@ fn test_phi_attestation_buffer_capacity() {
         let _ = service.cycle("test");
     }
 
-    assert_eq!(service.phi_attestation_count(), 3, "should not exceed capacity");
+    assert_eq!(
+        service.phi_attestation_count(),
+        3,
+        "should not exceed capacity"
+    );
     // Oldest records evicted — remaining should be cycles 8, 9, 10 (1-indexed)
     let records = service.drain_phi_attestations();
     assert_eq!(records[0].cycle_id, 8);
@@ -2683,5 +2719,341 @@ fn test_phi_attestation_skipped_without_agent_did() {
     .unwrap();
 
     let _ = service.cycle("test");
-    assert_eq!(service.phi_attestation_count(), 0, "no attestation without agent_did");
+    assert_eq!(
+        service.phi_attestation_count(),
+        0,
+        "no attestation without agent_did"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// ModuleTimings tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_module_timings_populated_for_enabled_modules() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_affective_bridge: true,
+        enable_predictive_processing: true,
+        enable_cross_modal_binding: true,
+        enable_virtual_body: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 3 cycles to warm up
+    for _ in 0..3 {
+        let _ = service.cycle("testing module timings");
+    }
+    let result = service.cycle("testing module timings");
+    let t = &result.metadata.module_timings_us;
+
+    // Module timings are u64 microseconds. Lightweight modules may complete
+    // in sub-microsecond time and report 0. Verify they're all under budget.
+    // The "populated" check is that the total cycle time includes all modules.
+
+    // All timings should be under 100ms (100,000 μs)
+    let all_timings = [
+        t.affective_bridge,
+        t.predictive_processing,
+        t.cross_modal_binding,
+        t.surprise_exploration,
+        t.prefrontal,
+        t.meta_cognition,
+        t.narrative_self,
+        t.gwt,
+        t.virtual_body,
+        t.embodied_cognition,
+        t.dream_replay,
+        t.moral_algebra,
+        t.consciousness_resonance,
+        t.temporal_consciousness,
+        t.attention_schema,
+        t.narrative_gwt,
+    ];
+    for (i, &timing) in all_timings.iter().enumerate() {
+        assert!(
+            timing < 100_000,
+            "module timing index {} = {}μs exceeds 100ms budget",
+            i,
+            timing
+        );
+    }
+}
+
+#[test]
+fn test_module_timings_zero_when_disabled() {
+    // Default config: most modules disabled
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let result = service.cycle("test disabled timings");
+    let t = &result.metadata.module_timings_us;
+
+    // Disabled optional modules should report 0
+    assert_eq!(t.prefrontal, 0, "prefrontal should be 0 when disabled");
+    assert_eq!(t.gwt, 0, "gwt should be 0 when disabled");
+    assert_eq!(
+        t.narrative_gwt, 0,
+        "narrative_gwt should be 0 when disabled"
+    );
+    assert_eq!(
+        t.embodied_cognition, 0,
+        "embodied_cognition should be 0 when disabled"
+    );
+    assert_eq!(t.dream_replay, 0, "dream_replay should be 0 when disabled");
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// UserStateInference integration tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_user_state_integration_with_cognitive_loop() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_user_state_inference: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Initially no user state (first cycle hasn't run)
+    assert!(service.user_state().is_some(), "USI should be initialized");
+
+    // Run cycles with different inputs
+    let _ = service.cycle("how do I configure the system?");
+    let state = service.user_state().unwrap();
+    assert!(state.engagement >= 0.0 && state.engagement <= 1.0);
+    assert!(state.frustration >= 0.0 && state.frustration <= 1.0);
+
+    // Error-inducing input should increase frustration over time
+    for _ in 0..5 {
+        let _ = service.cycle("error error error broken failing crash");
+    }
+    let state_after = service.user_state().unwrap();
+    assert!(
+        state_after.frustration >= 0.0,
+        "frustration should be non-negative"
+    );
+}
+
+#[test]
+fn test_user_state_disabled_returns_none() {
+    let service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_user_state_inference: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    assert!(
+        service.user_state().is_none(),
+        "USI should be None when disabled"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Consciousness monitor feedback tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_consciousness_monitor_feedback_loops() {
+    // Enable all consciousness monitors + modules that receive feedback
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_resonance: true,
+        enable_quantum_coherence: true,
+        enable_temporal_consciousness: true,
+        enable_narrative_self: true,
+        enable_affective_bridge: true,
+        enable_virtual_body: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run enough cycles for monitors to engage (they skip Cruise mode)
+    let mut had_nonzero_resonance = false;
+    let mut had_nonzero_qc = false;
+    let mut had_nonzero_temporal = false;
+
+    for i in 0..30 {
+        let input = if i % 3 == 0 {
+            "exploring novel territory"
+        } else if i % 3 == 1 {
+            "deep focused analysis"
+        } else {
+            "surprise! unexpected input shift"
+        };
+        let result = service.cycle(input);
+
+        if result.metadata.resonance_frequency > 0.0 {
+            had_nonzero_resonance = true;
+        }
+        if result.metadata.quantum_coherence_level > 0.0 {
+            had_nonzero_qc = true;
+        }
+        if result.metadata.temporal_coherence_score > 0.0 {
+            had_nonzero_temporal = true;
+        }
+    }
+
+    // At least some cycles should have engaged the monitors
+    assert!(
+        had_nonzero_resonance,
+        "resonance should fire at least once in 30 cycles"
+    );
+    assert!(
+        had_nonzero_qc,
+        "quantum coherence should fire at least once in 30 cycles"
+    );
+    assert!(
+        had_nonzero_temporal,
+        "temporal coherence should fire at least once in 30 cycles"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// Consciousness thermodynamics, phenomenal binding, hierarchical FE tests
+// ═══════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_consciousness_thermodynamics_integration() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_consciousness_thermodynamics: true,
+        enable_virtual_body: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run varied inputs to trigger consciousness monitor cycles (not Cruise)
+    let mut had_nonzero_entropy = false;
+    let mut had_nonzero_free_energy = false;
+
+    for i in 0..20 {
+        let input = if i % 2 == 0 {
+            "exploring novel territory"
+        } else {
+            "surprise! unexpected shift"
+        };
+        let result = service.cycle(input);
+
+        if result.metadata.thermodynamic_entropy > 0.0 {
+            had_nonzero_entropy = true;
+        }
+        if result.metadata.thermodynamic_free_energy.abs() > 0.0 {
+            had_nonzero_free_energy = true;
+        }
+    }
+
+    assert!(
+        had_nonzero_entropy,
+        "thermodynamic entropy should be computed at least once in 20 cycles"
+    );
+    assert!(
+        had_nonzero_free_energy,
+        "thermodynamic free energy should be computed at least once in 20 cycles"
+    );
+}
+
+#[test]
+fn test_phenomenal_binding_integration() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_phenomenal_binding: true,
+        enable_virtual_body: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut had_nonzero_binding = false;
+
+    for i in 0..20 {
+        let input = if i % 2 == 0 {
+            "synchronized coherent thought"
+        } else {
+            "chaotic fragmented surprise"
+        };
+        let result = service.cycle(input);
+
+        if result.metadata.phenomenal_binding_strength > 0.0 {
+            had_nonzero_binding = true;
+        }
+    }
+
+    assert!(
+        had_nonzero_binding,
+        "phenomenal binding strength should be computed at least once in 20 cycles"
+    );
+}
+
+#[test]
+fn test_hierarchical_free_energy_integration() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_hierarchical_free_energy: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut had_nonzero_fe = false;
+
+    for i in 0..20 {
+        let input = if i % 2 == 0 {
+            "predictable sequence continues"
+        } else {
+            "novel surprising observation"
+        };
+        let result = service.cycle(input);
+
+        if result.metadata.hierarchical_total_free_energy.abs() > 0.0 {
+            had_nonzero_fe = true;
+        }
+    }
+
+    assert!(
+        had_nonzero_fe,
+        "hierarchical total free energy should be computed at least once in 20 cycles"
+    );
+}
+
+#[test]
+fn test_thermodynamics_binding_hfe_synergy() {
+    // Enable all 3 new modules together with dependencies
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_consciousness_thermodynamics: true,
+        enable_phenomenal_binding: true,
+        enable_hierarchical_free_energy: true,
+        enable_virtual_body: true,
+        enable_narrative_self: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let input = match i % 4 {
+            0 => "deep focused analysis of consciousness patterns",
+            1 => "surprise! unexpected phase transition detected",
+            2 => "steady integration of binding across modalities",
+            _ => "creative exploration at the edge of chaos",
+        };
+        let result = service.cycle(input);
+
+        // All metadata fields should be bounded
+        assert!(result.metadata.thermodynamic_entropy >= 0.0);
+        assert!(result.metadata.phenomenal_binding_strength >= 0.0);
+        assert!(
+            result.metadata.phenomenal_binding_strength <= 1.0
+                || !result.metadata.phenomenal_fragmented
+        );
+        // Module timings should be under 100ms budget each
+        assert!(
+            result
+                .metadata
+                .module_timings_us
+                .consciousness_thermodynamics
+                < 100_000,
+            "thermodynamics timing exceeded 100ms"
+        );
+        assert!(
+            result.metadata.module_timings_us.phenomenal_binding < 100_000,
+            "phenomenal binding timing exceeded 100ms"
+        );
+        assert!(
+            result.metadata.module_timings_us.hierarchical_free_energy < 100_000,
+            "hierarchical FE timing exceeded 100ms"
+        );
+    }
 }

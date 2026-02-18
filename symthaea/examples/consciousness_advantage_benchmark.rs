@@ -478,8 +478,7 @@ fn print_shift_table(results: &[ShiftResult]) {
 
         println!("\n  Analysis:");
         if full.cycles_to_recover < best_ablated_recovery {
-            let speedup =
-                best_ablated_recovery as f64 / full.cycles_to_recover.max(1) as f64;
+            let speedup = best_ablated_recovery as f64 / full.cycles_to_recover.max(1) as f64;
             println!(
                 "  * Full system recovers {:.1}x faster than best ablated config",
                 speedup
@@ -534,11 +533,7 @@ fn print_depth_table(results: &[DepthResult]) {
     }
 }
 
-fn print_summary(
-    shift: &[ShiftResult],
-    gen: &[GenResult],
-    depth: &[DepthResult],
-) {
+fn print_summary(shift: &[ShiftResult], gen: &[GenResult], depth: &[DepthResult]) {
     println!("\n═══════════════════════════════════════════════════════════════════");
     println!("  CONSCIOUSNESS ADVANTAGE SUMMARY");
     println!("═══════════════════════════════════════════════════════════════════\n");
@@ -559,13 +554,19 @@ fn print_summary(
         if let Some(h) = hdc {
             let _advantage = h.recovery_pct - full.recovery_pct;
             if full.recovery_pct > h.recovery_pct {
-                println!("    => Full system: {:+.1}pp better recovery", full.recovery_pct - h.recovery_pct);
+                println!(
+                    "    => Full system: {:+.1}pp better recovery",
+                    full.recovery_pct - h.recovery_pct
+                );
             }
         }
 
         if let Some(c) = cfc {
             if full.recovery_pct > c.recovery_pct {
-                println!("    => Full vs CfC-only: {:+.1}pp better recovery", full.recovery_pct - c.recovery_pct);
+                println!(
+                    "    => Full vs CfC-only: {:+.1}pp better recovery",
+                    full.recovery_pct - c.recovery_pct
+                );
             }
         }
     }
@@ -590,12 +591,24 @@ fn print_summary(
         println!("\n  Consciousness Depth (Full system only):");
         println!("    Phi (mean):             {:.4}", full.phi_mean);
         println!("    MCE (mean):             {:.4}", full.mce_mean);
-        println!("    Narrative Self-Phi:      {:.4}", full.narrative_phi_mean);
-        println!("    Embodied Agency:         {:.4}", full.embodied_agency_mean);
-        println!("    Meta-Cognitive Accuracy: {:.3}", full.meta_accuracy_mean);
+        println!(
+            "    Narrative Self-Phi:      {:.4}",
+            full.narrative_phi_mean
+        );
+        println!(
+            "    Embodied Agency:         {:.4}",
+            full.embodied_agency_mean
+        );
+        println!(
+            "    Meta-Cognitive Accuracy: {:.3}",
+            full.meta_accuracy_mean
+        );
         println!("    GWT Broadcasts:          {}", full.gwt_broadcast_count);
         println!("    Surprise Triggers:       {}", full.surprise_count);
-        println!("    Prefrontal Vetoes:       {}", full.prefrontal_veto_count);
+        println!(
+            "    Prefrontal Vetoes:       {}",
+            full.prefrontal_veto_count
+        );
 
         // Count active subsystems in ablated configs
         let active_in_full = [

@@ -716,7 +716,9 @@ impl KosmicSong {
     /// useful for similarity comparisons with other semantic vectors.
     pub fn resonant_harmony_encoding(&self) -> Option<crate::hdc::BinaryHV> {
         let harmonies_system = SevenHarmonies::new();
-        harmonies_system.get(self.resonant_harmony).map(|e| e.encoding)
+        harmonies_system
+            .get(self.resonant_harmony)
+            .map(|e| e.encoding)
     }
 
     // === Private helpers ===

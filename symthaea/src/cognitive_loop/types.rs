@@ -62,7 +62,13 @@ impl CycleUrgency {
     /// Whether this urgency level should run a subsystem at the given cycle interval.
     /// Returns true if the subsystem should run this cycle.
     #[inline]
-    pub fn should_run(&self, cycle: usize, critical_interval: usize, normal_interval: usize, cruise_interval: usize) -> bool {
+    pub fn should_run(
+        &self,
+        cycle: usize,
+        critical_interval: usize,
+        normal_interval: usize,
+        cruise_interval: usize,
+    ) -> bool {
         let interval = match self {
             CycleUrgency::Critical => critical_interval,
             CycleUrgency::Normal => normal_interval,
@@ -217,6 +223,21 @@ pub struct CycleMetadata {
     /// Affective bridge arousal (0 to 1, 0.5 when off — neutral).
     pub affective_arousal: f32,
 
+    /// Consciousness thermodynamic entropy (0.0 when off).
+    pub thermodynamic_entropy: f64,
+
+    /// Consciousness thermodynamic free energy (0.0 when off).
+    pub thermodynamic_free_energy: f64,
+
+    /// Phenomenal binding strength Ψ (0.0 when off).
+    pub phenomenal_binding_strength: f64,
+
+    /// Whether phenomenal binding detected fragmentation.
+    pub phenomenal_fragmented: bool,
+
+    /// Hierarchical total free energy (0.0 when off).
+    pub hierarchical_total_free_energy: f64,
+
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
 }
@@ -240,6 +261,9 @@ pub struct ModuleTimings {
     pub temporal_consciousness: u64,
     pub attention_schema: u64,
     pub narrative_gwt: u64,
+    pub consciousness_thermodynamics: u64,
+    pub phenomenal_binding: u64,
+    pub hierarchical_free_energy: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

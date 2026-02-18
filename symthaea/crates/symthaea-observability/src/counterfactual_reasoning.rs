@@ -331,10 +331,7 @@ impl CounterfactualEngine {
         let link_idx = self.links.len();
         let from = link.from.clone();
         self.links.push(link);
-        self.adjacency
-            .entry(from)
-            .or_default()
-            .push(link_idx);
+        self.adjacency.entry(from).or_default().push(link_idx);
     }
 
     /// Set an observation (evidence)

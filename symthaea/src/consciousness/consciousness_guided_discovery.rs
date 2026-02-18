@@ -426,10 +426,7 @@ impl CompositionGrammar {
         *self.successful_patterns.entry(key).or_insert(0) += 1;
 
         // Update type preferences
-        let prefs = self
-            .type_preferences
-            .entry(prefix)
-            .or_default();
+        let prefs = self.type_preferences.entry(prefix).or_default();
         let count = *prefs.get(&comp_type).unwrap_or(&0.0);
         prefs.insert(comp_type, count + 1.0);
     }

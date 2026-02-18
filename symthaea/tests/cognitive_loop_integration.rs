@@ -145,7 +145,10 @@ fn test_learning_occurs_when_threshold_met() {
         }
     }
 
-    assert!(any_learning, "Learning should occur at least once in 10 cycles");
+    assert!(
+        any_learning,
+        "Learning should occur at least once in 10 cycles"
+    );
 }
 
 // ── Stats Accumulation ──────────────────────────────────────────────
@@ -263,7 +266,10 @@ fn test_all_modules_no_degradation() {
 #[test]
 fn test_virtual_body_enabled_by_default() {
     let config = CognitiveLoopConfig::default();
-    assert!(config.enable_virtual_body, "Virtual body should be enabled by default");
+    assert!(
+        config.enable_virtual_body,
+        "Virtual body should be enabled by default"
+    );
 
     let mut service = CognitiveLoopService::new(config).unwrap();
 
@@ -604,8 +610,14 @@ fn test_predictive_affective_crossmodal_synergy() {
     println!("Synergy check: affective={saw_affective}, predictive={saw_predictive}, binding={saw_binding}");
 
     // Over 100 cycles, all three modules should have produced non-default output
-    assert!(saw_affective, "Affective bridge should produce non-default values over 100 cycles");
-    assert!(saw_predictive, "Predictive processing should produce non-default values over 100 cycles");
+    assert!(
+        saw_affective,
+        "Affective bridge should produce non-default values over 100 cycles"
+    );
+    assert!(
+        saw_predictive,
+        "Predictive processing should produce non-default values over 100 cycles"
+    );
     // Cross-modal binding requires modality data; may or may not bind depending on input
     // Just verify stability
     assert_eq!(service.stats().total_cycles, 100);

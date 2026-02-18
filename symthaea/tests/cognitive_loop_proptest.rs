@@ -27,10 +27,10 @@ fn arbitrary_input() -> impl Strategy<Value = String> {
 /// Strategy for generating valid CognitiveLoopConfig
 fn arbitrary_config() -> impl Strategy<Value = CognitiveLoopConfig> {
     (
-        0.0f32..0.5,       // learning_threshold
-        prop::bool::ANY,   // async_training
-        prop::bool::ANY,   // enable_surprise_exploration
-        prop::bool::ANY,   // enable_prefrontal
+        0.0f32..0.5,     // learning_threshold
+        prop::bool::ANY, // async_training
+        prop::bool::ANY, // enable_surprise_exploration
+        prop::bool::ANY, // enable_prefrontal
     )
         .prop_map(
             |(learning_threshold, async_training, surprise, prefrontal)| CognitiveLoopConfig {

@@ -6,7 +6,7 @@
 //! Usage: `cargo run --example reproduce_all_benchmarks`
 
 use symthaea::benchmarks::fep_temporal_benchmark::{
-    FepTemporalBenchmark, FepTemporalBenchmarkConfig, TMazeConfig, run_t_maze,
+    run_t_maze, FepTemporalBenchmark, FepTemporalBenchmarkConfig, TMazeConfig,
 };
 use symthaea::cognitive_loop::{CognitiveLoopConfig, CognitiveLoopService};
 
@@ -48,7 +48,9 @@ fn run_fep_benchmarks() {
     let sine = bench.run_sine_pattern();
     println!(
         "  Sine:  init_err={:.4}  final_err={:.4}  reduction={:+.1}%  coherence={:.3}  {}",
-        sine.initial_error, sine.final_error, sine.error_reduction_pct,
+        sine.initial_error,
+        sine.final_error,
+        sine.error_reduction_pct,
         sine.coherence_stability,
         if sine.passed { "PASS" } else { "FAIL" }
     );
@@ -63,7 +65,9 @@ fn run_fep_benchmarks() {
     let step = bench2.run_step_function();
     println!(
         "  Step:  init_err={:.4}  final_err={:.4}  reduction={:+.1}%  coherence={:.3}  {}",
-        step.initial_error, step.final_error, step.error_reduction_pct,
+        step.initial_error,
+        step.final_error,
+        step.error_reduction_pct,
         step.coherence_stability,
         if step.passed { "PASS" } else { "FAIL" }
     );
@@ -72,7 +76,9 @@ fn run_fep_benchmarks() {
     let noisy = bench.run_noisy_pattern();
     println!(
         "  Noisy: init_err={:.4}  final_err={:.4}  reduction={:+.1}%  coherence={:.3}  {}",
-        noisy.initial_error, noisy.final_error, noisy.error_reduction_pct,
+        noisy.initial_error,
+        noisy.final_error,
+        noisy.error_reduction_pct,
         noisy.coherence_stability,
         if noisy.passed { "PASS" } else { "FAIL" }
     );
@@ -85,49 +91,41 @@ fn run_tmaze_benchmark() {
         warmup_episodes: 10,
     };
     let result = run_t_maze(config);
-    println!(
-        "  Accuracy:       {:.1}%",
-        result.accuracy * 100.0
-    );
-    println!(
-        "  Early accuracy: {:.1}%",
-        result.early_accuracy * 100.0
-    );
-    println!(
-        "  Late accuracy:  {:.1}%",
-        result.late_accuracy * 100.0
-    );
-    println!(
-        "  Avg steps:      {:.1}",
-        result.avg_steps
-    );
-    println!(
-        "  Avg pred error:  {:.4}",
-        result.avg_prediction_error
-    );
+    println!("  Accuracy:       {:.1}%", result.accuracy * 100.0);
+    println!("  Early accuracy: {:.1}%", result.early_accuracy * 100.0);
+    println!("  Late accuracy:  {:.1}%", result.late_accuracy * 100.0);
+    println!("  Avg steps:      {:.1}", result.avg_steps);
+    println!("  Avg pred error:  {:.4}", result.avg_prediction_error);
     println!(
         "  Learning signal: {}",
-        if result.late_accuracy > result.early_accuracy { "YES" } else { "marginal" }
+        if result.late_accuracy > result.early_accuracy {
+            "YES"
+        } else {
+            "marginal"
+        }
     );
-    println!(
-        "  {}",
-        if result.passed { "PASS" } else { "FAIL" }
-    );
+    println!("  {}", if result.passed { "PASS" } else { "FAIL" });
 }
 
 fn run_phi_proxy_analysis() {
     // Run cognitive loop across different configurations and measure unified Phi
     let configs = [
         ("CfC_default", CognitiveLoopConfig::with_cfc()),
-        ("HdcLtc_default", CognitiveLoopConfig::with_hdc_ltc_unified()),
+        (
+            "HdcLtc_default",
+            CognitiveLoopConfig::with_hdc_ltc_unified(),
+        ),
         ("HdcLtc_fast", CognitiveLoopConfig::with_hdc_ltc_fast()),
     ];
 
-    println!("  {:<20} {:>8} {:>8} {:>8} {:>10}", "Config", "Phi_mean", "Phi_std", "Coh_mean", "Cycles/s");
+    println!(
+        "  {:<20} {:>8} {:>8} {:>8} {:>10}",
+        "Config", "Phi_mean", "Phi_std", "Coh_mean", "Cycles/s"
+    );
 
     for (name, config) in &configs {
-        let mut service = CognitiveLoopService::new(config.clone())
-            .expect("Failed to create service");
+        let mut service =
+            CognitiveLoopService::new(config.clone()).expect("Failed to create service");
 
         let words = ["alpha beta", "gamma delta", "epsilon zeta", "eta theta"];
         let mut phi_values = Vec::new();
@@ -142,11 +140,13 @@ fn run_phi_proxy_analysis() {
         let elapsed = start.elapsed();
 
         let phi_mean: f64 = phi_values.iter().sum::<f64>() / phi_values.len() as f64;
-        let phi_std: f64 = (phi_values.iter().map(|v| (v - phi_mean).powi(2)).sum::<f64>()
+        let phi_std: f64 = (phi_values
+            .iter()
+            .map(|v| (v - phi_mean).powi(2))
+            .sum::<f64>()
             / phi_values.len() as f64)
             .sqrt();
-        let coh_mean: f32 =
-            coherence_values.iter().sum::<f32>() / coherence_values.len() as f32;
+        let coh_mean: f32 = coherence_values.iter().sum::<f32>() / coherence_values.len() as f32;
         let cycles_per_sec = 100.0 / elapsed.as_secs_f64();
 
         println!(

@@ -944,8 +944,7 @@ impl PredictiveMind {
         // Consciousness is brightest when predictions are accurate
         // but there's still something to predict (not boring).
         // Clamp to >= 0 so the product stays positive.
-        let optimal_surprise =
-            (1.0 - (self.perception.free_energy - 0.3).abs() * 2.0).max(0.0);
+        let optimal_surprise = (1.0 - (self.perception.free_energy - 0.3).abs() * 2.0).max(0.0);
 
         // Scale raw product [0, ~0.5] into useful modulation range [0.5, 1.5]
         let raw = prediction_quality * precision_stability * model_evidence * optimal_surprise;

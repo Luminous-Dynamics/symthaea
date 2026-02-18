@@ -99,7 +99,8 @@ impl CoreAffect {
 
     /// Emotional intensity (Euclidean magnitude in VAD space)
     pub fn intensity(&self) -> f64 {
-        ((self.valence * self.valence + self.arousal * self.arousal
+        ((self.valence * self.valence
+            + self.arousal * self.arousal
             + self.dominance * self.dominance) as f64)
             .sqrt()
     }

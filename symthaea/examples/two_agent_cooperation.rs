@@ -75,8 +75,14 @@ fn main() {
         mind_b.tick();
     }
 
-    println!("Agent A (Explorer)  — consciousness: {:.3}", mind_a.state().consciousness_level);
-    println!("Agent B (Homesteader) — consciousness: {:.3}\n", mind_b.state().consciousness_level);
+    println!(
+        "Agent A (Explorer)  — consciousness: {:.3}",
+        mind_a.state().consciousness_level
+    );
+    println!(
+        "Agent B (Homesteader) — consciousness: {:.3}\n",
+        mind_b.state().consciousness_level
+    );
 
     // ── Phase 1: First Contact (ticks 6-25) ─────────────────────────────
     println!("─── Phase 1: First Contact (20 ticks) ───");
@@ -170,8 +176,14 @@ fn main() {
     // Cooperation decisions
     let a_cooperates = sc_a.should_cooperate("homesteader");
     let b_cooperates = sc_b.should_cooperate("explorer");
-    println!("Explorer cooperates with Homesteader? {}", if a_cooperates { "YES" } else { "NO" });
-    println!("Homesteader cooperates with Explorer? {}", if b_cooperates { "YES" } else { "NO" });
+    println!(
+        "Explorer cooperates with Homesteader? {}",
+        if a_cooperates { "YES" } else { "NO" }
+    );
+    println!(
+        "Homesteader cooperates with Explorer? {}",
+        if b_cooperates { "YES" } else { "NO" }
+    );
 
     // Predictions
     let action = ContinuousHV::random(dim, 0xAC71_0001);
@@ -195,10 +207,14 @@ fn main() {
     let stats_a = sc_a.stats();
     let stats_b = sc_b.stats();
     println!("\n--- Social Stats ---");
-    println!("Explorer:    {} agents modeled, {} interactions, avg trust {:.2}",
-             stats_a.agents_modeled, stats_a.interactions_recorded, stats_a.avg_trust);
-    println!("Homesteader: {} agents modeled, {} interactions, avg trust {:.2}",
-             stats_b.agents_modeled, stats_b.interactions_recorded, stats_b.avg_trust);
+    println!(
+        "Explorer:    {} agents modeled, {} interactions, avg trust {:.2}",
+        stats_a.agents_modeled, stats_a.interactions_recorded, stats_a.avg_trust
+    );
+    println!(
+        "Homesteader: {} agents modeled, {} interactions, avg trust {:.2}",
+        stats_b.agents_modeled, stats_b.interactions_recorded, stats_b.avg_trust
+    );
 
     println!("\n=== Demo Complete ===");
 }
@@ -234,8 +250,10 @@ fn print_social_status(mind_a: &ContinuousMind, mind_b: &ContinuousMind, phase: 
             println!("  Explorer → Homesteader:  (no relationship yet)");
         }
         if let Some(model) = sc.get_mental_model("homesteader") {
-            println!("  Explorer's model of Homesteader: confidence={:.2}  observations={}",
-                     model.confidence, model.observation_count);
+            println!(
+                "  Explorer's model of Homesteader: confidence={:.2}  observations={}",
+                model.confidence, model.observation_count
+            );
         }
     }
 
@@ -247,8 +265,10 @@ fn print_social_status(mind_a: &ContinuousMind, mind_b: &ContinuousMind, phase: 
             println!("  Homesteader → Explorer:  (no relationship yet)");
         }
         if let Some(model) = sc.get_mental_model("explorer") {
-            println!("  Homesteader's model of Explorer: confidence={:.2}  observations={}",
-                     model.confidence, model.observation_count);
+            println!(
+                "  Homesteader's model of Explorer: confidence={:.2}  observations={}",
+                model.confidence, model.observation_count
+            );
         }
     }
 }

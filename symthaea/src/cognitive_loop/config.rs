@@ -263,6 +263,26 @@ pub struct CognitiveLoopConfig {
     /// consciousness data. Without this, governance falls back to reputation-only voting.
     pub enable_phi_attestation: bool,
 
+    /// Enable consciousness thermodynamics analysis.
+    /// When true, the cognitive loop analyzes thermodynamic state of consciousness
+    /// (entropy, free energy, phase transitions) from the 7 consciousness dimensions.
+    /// Phase gates exploration: Critical → boost reasoning, Flow → boost exploration.
+    /// Science: Friston (2010) — free energy principle, Kelso — phase transitions
+    pub enable_consciousness_thermodynamics: bool,
+
+    /// Enable phenomenal binding analysis (temporal synchronization).
+    /// When true, the cognitive loop tracks phase coherence across the 7 consciousness
+    /// dimensions to measure unified experience quality. Fragmentation reduces exploration,
+    /// flow state boosts learning rate.
+    /// Science: Singer & Gray (1989) — temporal binding hypothesis
+    pub enable_phenomenal_binding: bool,
+
+    /// Enable hierarchical free energy decomposition.
+    /// When true, the cognitive loop maintains a multi-level variational free energy
+    /// hierarchy. High total free energy reduces exploration, convergence boosts confidence.
+    /// Science: Friston (2008) — hierarchical predictive processing
+    pub enable_hierarchical_free_energy: bool,
+
     /// Agent DID for attestation signing (e.g., "did:key:z6Mk...").
     /// Required when `enable_phi_attestation` is true. If None, attestation generation
     /// is silently skipped even when enabled.
@@ -315,6 +335,9 @@ impl Default for CognitiveLoopConfig {
             enable_cross_modal_binding: false,
             enable_affective_bridge: false,
             enable_user_state_inference: false,
+            enable_consciousness_thermodynamics: false,
+            enable_phenomenal_binding: false,
+            enable_hierarchical_free_energy: false,
             enable_phi_attestation: false,
             agent_did: None,
             attestation_buffer_capacity: 64,
