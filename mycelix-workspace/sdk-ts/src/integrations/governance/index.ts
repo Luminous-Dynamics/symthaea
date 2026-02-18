@@ -688,6 +688,64 @@ export type {
   GovernanceEventType as ZomeGovernanceEventType,
   // Error types
   GovernanceSdkErrorCode,
+  // Phi-weighted voting
+  ProposalTier,
+  TallyPhiVotesInput,
+  PhiWeightedTally,
+  PhiTierBreakdown,
+  TallySegment,
+  // Quadratic voting
+  AllocateCreditsInput,
+  VoiceCredits,
+  CastQuadraticVoteInput,
+  QuadraticVote,
+  TallyQuadraticVotesInput,
+  QuadraticTally,
+  // Consciousness metrics
+  RecordSnapshotInput,
+  VerifyGateInput,
+  GateVerificationResult,
+  GovernanceActionType,
+  PhiThresholds,
+  // Execution & timelock
+  TimelockStatus,
+  Timelock,
+  CreateTimelockInput,
+  ExecuteTimelockInput,
+  MarkTimelockReadyInput,
+  VetoTimelockInput,
+  GuardianVeto,
+  // Fund management
+  AllocationStatus,
+  FundAllocation,
+  LockFundsInput,
+  ReleaseFundsInput,
+  RefundFundsInput,
+  // Council decisions
+  DecisionType,
+  DecisionStatus,
+  CouncilDecision,
+  RecordDecisionInput,
+  // Threshold signing
+  DkgPhase,
+  CommitteeScope,
+  SigningCommittee,
+  CommitteeMember,
+  ThresholdSignature,
+  CreateCommitteeInput,
+  RegisterMemberInput,
+  CombineSignaturesInput,
+  // Signals
+  ProposalSignal,
+  ThresholdSigningSignal,
+  BridgeSignal,
+  GovernanceSignal,
 } from './types';
 
-export { GovernanceSdkError } from './types';
+export {
+  GovernanceSdkError,
+  isProposalSignal,
+  isThresholdSigningSignal,
+  isBridgeSignal,
+  isGovernanceSignal,
+} from './types';

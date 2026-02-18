@@ -1,10 +1,10 @@
 ---
 # Mycelix Unified hApp Bundle
-# Combines Commons + Civic DNAs for cross-cluster communication.
+# Combines Personal + Identity + Commons + Civic DNAs for cross-cluster communication.
 #
 # When both DNAs are installed as separate roles within the same hApp,
 # zomes can call between clusters using:
-#   call(CallTargetCell::OtherRole("commons"/"civic"), zome, fn, None, payload)
+#   call(CallTargetCell::OtherRole("identity"/"commons"/"civic"), zome, fn, None, payload)
 #
 # This is the deployment manifest for environments that need
 # cross-cluster integration (e.g., justice enforcement freezing
@@ -16,8 +16,9 @@
 manifest_version: "0"
 name: mycelix-unified
 description: |
-  Unified Mycelix platform — Fractal CivOS 3-tier architecture:
-  - Personal (Sovereign): Private identity, health, credentials
+  Unified Mycelix platform — Fractal CivOS 4-tier architecture:
+  - Personal (Sovereign): Private identity vault, health vault, credentials
+  - Identity (Authority): DID registry, verifiable credentials, MFA, recovery
   - Civic (WE): Justice, emergency, media (permissioned)
   - Commons (ALL): Property, housing, care, water, food, transport (public)
   Enables cross-cluster calls between all tiers via OtherRole dispatch.
@@ -29,6 +30,17 @@ roles:
       deferred: false
     dna:
       path: ./personal/dna/mycelix_personal.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: identity
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./identity/dna/mycelix_identity_dna.dna
       modifiers:
         network_seed: ~
         properties: ~

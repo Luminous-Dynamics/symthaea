@@ -45,6 +45,12 @@ const ALLOWED_GOVERNANCE_ZOMES: &[&str] = &[
     "governance_bridge",
 ];
 
+const ALLOWED_IDENTITY_ZOMES: &[&str] = &[
+    "identity_bridge",
+    "did_registry",
+    "verifiable_credential",
+];
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -469,6 +475,7 @@ pub fn submit_phi_attestation(input: SubmitPhiAttestationInput) -> ExternResult<
 const COMMONS_ROLE: &str = "commons";
 const CIVIC_ROLE: &str = "civic";
 const GOVERNANCE_ROLE: &str = "governance";
+const IDENTITY_ROLE: &str = "identity";
 
 /// Dispatch a call to the Commons cluster.
 #[hdk_extern]
@@ -507,6 +514,197 @@ pub fn dispatch_governance_call(input: CrossClusterDispatchInput) -> ExternResul
         payload: input.payload,
     };
     bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_GOVERNANCE_ZOMES)
+}
+
+/// Dispatch a call to the Identity cluster.
+#[hdk_extern]
+pub fn dispatch_identity_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("identity:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+// ============================================================================
+// Identity Cluster Proxy — DID Registry (Task #88)
+// ============================================================================
+
+/// Resolve a DID document from the identity cluster's DID registry.
+///
+/// Proxies to `identity:did_registry:resolve_did`. Returns the DID document
+/// record if found, or an error if the DID doesn't exist.
+#[hdk_extern]
+pub fn resolve_did(did: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:did_registry")?;
+    let payload = ExternIO::encode(did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "did_registry".to_string(),
+        fn_name: "resolve_did".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Check whether a DID is currently active (not deactivated).
+#[hdk_extern]
+pub fn is_did_active(did: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:did_registry")?;
+    let payload = ExternIO::encode(did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "did_registry".to_string(),
+        fn_name: "is_did_active".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Query identity verification via the identity bridge.
+///
+/// Performs a full DID lookup including MATL score, credential count,
+/// and deactivation status. The identity bridge audits this query.
+#[hdk_extern]
+pub fn query_identity(input: QueryIdentityInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:identity_bridge")?;
+    let payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "query_identity".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Check MATL trust score for a DID.
+#[hdk_extern]
+pub fn get_matl_score(did: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:identity_bridge")?;
+    let payload = ExternIO::encode(did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "get_matl_score".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Input for querying identity verification from the identity bridge.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct QueryIdentityInput {
+    pub did: String,
+    pub source_happ: String,
+    pub requested_fields: Vec<String>,
+}
+
+// ============================================================================
+// Identity Cluster Proxy — Verifiable Credentials (Task #89)
+// ============================================================================
+
+/// Verify a credential by ID via the identity cluster.
+///
+/// Proxies to `identity:verifiable_credential:verify_credential`.
+/// Returns the full verification result including revocation status.
+#[hdk_extern]
+pub fn verify_credential(credential_id: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:verifiable_credential")?;
+    let payload = ExternIO::encode(credential_id)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "verifiable_credential".to_string(),
+        fn_name: "verify_credential".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Get a credential record by ID.
+#[hdk_extern]
+pub fn get_credential(credential_id: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:verifiable_credential")?;
+    let payload = ExternIO::encode(credential_id)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "verifiable_credential".to_string(),
+        fn_name: "get_credential".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Check whether a credential has been revoked.
+#[hdk_extern]
+pub fn is_credential_revoked(credential_id: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:verifiable_credential")?;
+    let payload = ExternIO::encode(credential_id)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "verifiable_credential".to_string(),
+        fn_name: "is_credential_revoked".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Get all credentials issued to the calling agent's DID.
+#[hdk_extern]
+pub fn get_my_credentials_from_identity(_: ()) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:verifiable_credential")?;
+    let payload = ExternIO::encode(())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "verifiable_credential".to_string(),
+        fn_name: "get_my_credentials".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Create a verifiable presentation from credentials held in the identity cluster.
+#[hdk_extern]
+pub fn create_presentation(input: CreatePresentationInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:verifiable_credential")?;
+    let payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "verifiable_credential".to_string(),
+        fn_name: "create_presentation".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Input for creating a verifiable presentation.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CreatePresentationInput {
+    pub credential_hashes: Vec<ActionHash>,
+    pub challenge: Option<String>,
+    pub domain: Option<String>,
+    pub verifier_did: Option<String>,
 }
 
 // ============================================================================
@@ -762,5 +960,80 @@ mod tests {
         for zome in ALLOWED_GOVERNANCE_ZOMES {
             assert!(seen.insert(zome), "Duplicate in ALLOWED_GOVERNANCE_ZOMES: '{}'", zome);
         }
+    }
+
+    // ---- Identity cluster allowlist ----
+
+    #[test]
+    fn identity_allowlist_contains_bridge() {
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"identity_bridge"));
+    }
+
+    #[test]
+    fn identity_allowlist_contains_did_registry() {
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"did_registry"));
+    }
+
+    #[test]
+    fn identity_allowlist_contains_verifiable_credential() {
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"verifiable_credential"));
+    }
+
+    #[test]
+    fn identity_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_IDENTITY_ZOMES {
+            assert!(seen.insert(zome), "Duplicate in ALLOWED_IDENTITY_ZOMES: '{}'", zome);
+        }
+    }
+
+    #[test]
+    fn identity_role_constant_correct() {
+        assert_eq!(IDENTITY_ROLE, "identity");
+    }
+
+    // ---- QueryIdentityInput serde ----
+
+    #[test]
+    fn query_identity_input_serde_roundtrip() {
+        let input = QueryIdentityInput {
+            did: "did:mycelix:uhCAktest".into(),
+            source_happ: "personal".into(),
+            requested_fields: vec!["matl_score".into(), "credential_count".into()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: QueryIdentityInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.did, "did:mycelix:uhCAktest");
+        assert_eq!(back.requested_fields.len(), 2);
+    }
+
+    // ---- CreatePresentationInput serde ----
+
+    #[test]
+    fn create_presentation_input_serde_roundtrip() {
+        let input = CreatePresentationInput {
+            credential_hashes: vec![ActionHash::from_raw_36(vec![0u8; 36])],
+            challenge: Some("nonce-123".into()),
+            domain: Some("voting.mycelix.net".into()),
+            verifier_did: Some("did:mycelix:verifier".into()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreatePresentationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.challenge, Some("nonce-123".into()));
+        assert_eq!(back.credential_hashes.len(), 1);
+    }
+
+    #[test]
+    fn create_presentation_input_minimal() {
+        let input = CreatePresentationInput {
+            credential_hashes: vec![],
+            challenge: None,
+            domain: None,
+            verifier_did: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreatePresentationInput = serde_json::from_str(&json).unwrap();
+        assert!(back.credential_hashes.is_empty());
+        assert!(back.challenge.is_none());
     }
 }

@@ -488,3 +488,434 @@ export class GovernanceSdkError extends Error {
     this.name = 'GovernanceSdkError';
   }
 }
+
+// ============================================================================
+// Holochain Zome Types — mirror Rust entry types from governance coordinator
+// ============================================================================
+
+// --- Proposal Tier & Phi-Weighted Voting ---
+
+/** Proposal tier determines thresholds and timelock duration */
+export type ProposalTier = 'Basic' | 'Major' | 'Constitutional';
+
+/** Input for Φ-weighted vote tally */
+export interface TallyPhiVotesInput {
+  proposal_id: string;
+  tier: ProposalTier;
+  eligible_voters?: number;
+  generate_reflection?: boolean;
+}
+
+/** Φ-weighted tally result */
+export interface PhiWeightedTally {
+  proposal_id: string;
+  tier: ProposalTier;
+  phi_votes_for: number;
+  phi_votes_against: number;
+  phi_abstentions: number;
+  raw_votes_for: number;
+  raw_votes_against: number;
+  raw_abstentions: number;
+  average_phi: number;
+  total_phi_weight: number;
+  eligible_voters: number;
+  quorum_requirement: number;
+  quorum_reached: boolean;
+  approval_threshold: number;
+  approved: boolean;
+  /** Timestamp (microseconds) */
+  tallied_at: number;
+  final_tally: boolean;
+  phi_tier_breakdown: PhiTierBreakdown;
+  phi_enhanced_count: number;
+  reputation_only_count: number;
+  phi_coverage: number;
+}
+
+export interface PhiTierBreakdown {
+  high_phi_votes: TallySegment;
+  medium_phi_votes: TallySegment;
+  low_phi_votes: TallySegment;
+}
+
+export interface TallySegment {
+  votes_for: number;
+  votes_against: number;
+  abstentions: number;
+  voter_count: number;
+}
+
+// --- Quadratic Voting ---
+
+/** Input for allocating voice credits */
+export interface AllocateCreditsInput {
+  owner_did: string;
+  amount: number;
+  /** Period end timestamp (microseconds) */
+  period_end: number;
+}
+
+/** Voice credit balance */
+export interface VoiceCredits {
+  owner: string;
+  allocated: number;
+  spent: number;
+  remaining: number;
+  period_start: number;
+  period_end: number;
+}
+
+/** Input for casting a quadratic vote */
+export interface CastQuadraticVoteInput {
+  proposal_id: string;
+  voter_did: string;
+  choice: ZomeVoteChoice;
+  credits_to_spend: number;
+  reason?: string;
+}
+
+/** Quadratic vote record */
+export interface QuadraticVote {
+  id: string;
+  proposal_id: string;
+  voter: string;
+  choice: ZomeVoteChoice;
+  credits_spent: number;
+  /** Effective weight = √credits_spent */
+  effective_weight: number;
+  reason?: string;
+  voted_at: number;
+}
+
+/** Input for tallying quadratic votes */
+export interface TallyQuadraticVotesInput {
+  proposal_id: string;
+  min_voters?: number;
+}
+
+/** Quadratic vote tally result */
+export interface QuadraticTally {
+  proposal_id: string;
+  qv_for: number;
+  qv_against: number;
+  total_credits_spent: number;
+  avg_credits_per_voter: number;
+  voter_count: number;
+  quorum_reached: boolean;
+  approved: boolean;
+  tallied_at: number;
+  final_tally: boolean;
+}
+
+/** Zome-level vote choices (Rust enum: For/Against/Abstain) */
+export type ZomeVoteChoice = 'For' | 'Against' | 'Abstain';
+
+// --- Consciousness Metrics ---
+
+/** Input for recording a consciousness snapshot */
+export interface RecordSnapshotInput {
+  phi: number;
+  meta_awareness: number;
+  self_model_accuracy: number;
+  coherence: number;
+  affective_valence: number;
+  care_activation: number;
+  source?: string;
+}
+
+/** Input for verifying consciousness gate */
+export interface VerifyGateInput {
+  action_type: GovernanceActionType;
+  action_id?: string;
+}
+
+/** Result of consciousness gate verification */
+export interface GateVerificationResult {
+  passed: boolean;
+  phi: number;
+  required_phi: number;
+  action_type: GovernanceActionType;
+  failure_reason?: string;
+  gate_id: string;
+}
+
+/** Governance action types that require Φ thresholds */
+export type GovernanceActionType =
+  | 'Basic'
+  | 'ProposalSubmission'
+  | 'Voting'
+  | 'Constitutional';
+
+/** Current Φ threshold requirements */
+export interface PhiThresholds {
+  basic: number;
+  proposal_submission: number;
+  voting: number;
+  constitutional: number;
+}
+
+// --- Execution & Timelock ---
+
+export type TimelockStatus = 'Pending' | 'Ready' | 'Executed' | 'Cancelled' | 'Failed';
+
+export interface Timelock {
+  id: string;
+  proposal_id: string;
+  actions: string;
+  /** Timestamp (microseconds) */
+  started: number;
+  /** Timestamp (microseconds) */
+  expires: number;
+  status: TimelockStatus;
+  cancellation_reason?: string;
+}
+
+export interface CreateTimelockInput {
+  proposal_id: string;
+  actions: string;
+  duration_hours: number;
+}
+
+export interface ExecuteTimelockInput {
+  timelock_id: string;
+  executor_did: string;
+}
+
+export interface MarkTimelockReadyInput {
+  timelock_id: string;
+}
+
+/** Input for guardian veto of a timelock */
+export interface VetoTimelockInput {
+  timelock_id: string;
+  guardian_did: string;
+  reason: string;
+}
+
+export interface GuardianVeto {
+  id: string;
+  timelock_id: string;
+  guardian: string;
+  reason: string;
+  vetoed_at: number;
+}
+
+// --- Fund Management ---
+
+export type AllocationStatus = 'Locked' | 'Released' | 'Refunded';
+
+export interface FundAllocation {
+  id: string;
+  proposal_id: string;
+  timelock_id: string;
+  source_account: string;
+  amount: number;
+  currency: string;
+  locked_at: number;
+  status: AllocationStatus;
+  status_reason?: string;
+}
+
+export interface LockFundsInput {
+  proposal_id: string;
+  timelock_id?: string;
+  source_account: string;
+  amount: number;
+  currency?: string;
+}
+
+export interface ReleaseFundsInput {
+  proposal_id: string;
+  reason?: string;
+}
+
+export interface RefundFundsInput {
+  proposal_id: string;
+  reason: string;
+}
+
+// --- Council Decisions ---
+
+export type DecisionType =
+  | 'Operational'
+  | 'Policy'
+  | 'Resource'
+  | 'Membership'
+  | 'SubCouncil'
+  | 'Constitutional';
+
+export type DecisionStatus = 'Pending' | 'Approved' | 'Rejected' | 'Executed' | 'Vetoed';
+
+export interface CouncilDecision {
+  id: string;
+  council_id: string;
+  proposal_id?: string;
+  title: string;
+  content: string;
+  decision_type: DecisionType;
+  votes_for: number;
+  votes_against: number;
+  abstentions: number;
+  phi_weighted_result: number;
+  passed: boolean;
+  status: DecisionStatus;
+  created_at: number;
+  executed_at?: number;
+}
+
+export interface RecordDecisionInput {
+  council_id: string;
+  proposal_id?: string;
+  title: string;
+  content: string;
+  decision_type: DecisionType;
+  votes_for: number;
+  votes_against: number;
+  abstentions: number;
+  phi_weighted_result: number;
+}
+
+// --- Threshold Signing ---
+
+export type DkgPhase = 'Registration' | 'Dealing' | 'Verification' | 'Complete' | 'Disbanded';
+
+export type CommitteeScope =
+  | 'All'
+  | 'Constitutional'
+  | 'Treasury'
+  | 'Protocol'
+  | { Custom: string[] };
+
+export interface SigningCommittee {
+  id: string;
+  name: string;
+  threshold: number;
+  member_count: number;
+  phase: DkgPhase;
+  public_key?: number[];
+  commitments: number[][];
+  scope: CommitteeScope;
+  created_at: number;
+  active: boolean;
+  epoch: number;
+  min_phi?: number;
+}
+
+export interface CommitteeMember {
+  committee_id: string;
+  participant_id: number;
+  agent: string;
+  member_did: string;
+  trust_score: number;
+  public_share?: number[];
+  vss_commitment?: number[];
+  deal_submitted: boolean;
+  qualified: boolean;
+  registered_at: number;
+}
+
+export interface ThresholdSignature {
+  id: string;
+  committee_id: string;
+  signed_content_hash: number[];
+  signed_content_description: string;
+  signature: number[];
+  signer_count: number;
+  signers: number[];
+  verified: boolean;
+  signed_at: number;
+}
+
+export interface CreateCommitteeInput {
+  name: string;
+  threshold: number;
+  member_count: number;
+  scope: CommitteeScope;
+  min_phi?: number;
+}
+
+export interface RegisterMemberInput {
+  committee_id: string;
+  participant_id: number;
+  member_did: string;
+  trust_score: number;
+}
+
+export interface CombineSignaturesInput {
+  committee_id: string;
+  content_hash: number[];
+  content_description: string;
+  combined_signature: number[];
+  signers: number[];
+  verified: boolean;
+}
+
+// --- Real-Time Signals ---
+
+/** Signals emitted by proposals coordinator */
+export type ProposalSignal =
+  | { type: 'ProposalCreated'; payload: { proposal_id: string; title: string; author: string } }
+  | { type: 'ProposalStatusChanged'; payload: { proposal_id: string; old_status: string; new_status: string } }
+  | { type: 'ContributionAdded'; payload: { proposal_id: string; contributor: string } }
+  | { type: 'DiscussionReflectionGenerated'; payload: { proposal_id: string } };
+
+/** Signals emitted by threshold-signing coordinator */
+export type ThresholdSigningSignal =
+  | { type: 'CommitteeCreated'; payload: { committee_id: string; threshold: number; member_count: number } }
+  | { type: 'MemberRegistered'; payload: { committee_id: string; member_did: string } }
+  | { type: 'DKGDealSubmitted'; payload: { committee_id: string; participant_id: number } }
+  | { type: 'DKGFinalized'; payload: { committee_id: string; qualified_count: number } }
+  | { type: 'SignatureShareSubmitted'; payload: { signature_id: string; participant_id: number } }
+  | { type: 'ThresholdSignatureCreated'; payload: { signature_id: string; committee_id: string; verified: boolean } }
+  | { type: 'CommitteeKeyRotated'; payload: { committee_id: string; new_epoch: number } };
+
+/** Signals emitted by bridge coordinator */
+export type BridgeSignal =
+  | { type: 'ConsciousnessSnapshotRecorded'; payload: { agent_did: string; phi: number } }
+  | { type: 'ConsciousnessGateVerified'; payload: { agent_did: string; passed: boolean; action_type: string } }
+  | { type: 'ValueAlignmentAssessed'; payload: { proposal_id: string; agent_did: string; recommendation: string } };
+
+/** Union of all governance signals */
+export type GovernanceSignal = ProposalSignal | ThresholdSigningSignal | BridgeSignal;
+
+/** Type guard for proposal signals */
+export function isProposalSignal(signal: unknown): signal is ProposalSignal {
+  return (
+    typeof signal === 'object' &&
+    signal !== null &&
+    'type' in signal &&
+    typeof (signal as { type: string }).type === 'string' &&
+    ['ProposalCreated', 'ProposalStatusChanged', 'ContributionAdded', 'DiscussionReflectionGenerated']
+      .includes((signal as { type: string }).type)
+  );
+}
+
+/** Type guard for threshold-signing signals */
+export function isThresholdSigningSignal(signal: unknown): signal is ThresholdSigningSignal {
+  return (
+    typeof signal === 'object' &&
+    signal !== null &&
+    'type' in signal &&
+    typeof (signal as { type: string }).type === 'string' &&
+    ['CommitteeCreated', 'MemberRegistered', 'DKGDealSubmitted', 'DKGFinalized',
+     'SignatureShareSubmitted', 'ThresholdSignatureCreated', 'CommitteeKeyRotated']
+      .includes((signal as { type: string }).type)
+  );
+}
+
+/** Type guard for bridge signals */
+export function isBridgeSignal(signal: unknown): signal is BridgeSignal {
+  return (
+    typeof signal === 'object' &&
+    signal !== null &&
+    'type' in signal &&
+    typeof (signal as { type: string }).type === 'string' &&
+    ['ConsciousnessSnapshotRecorded', 'ConsciousnessGateVerified', 'ValueAlignmentAssessed']
+      .includes((signal as { type: string }).type)
+  );
+}
+
+/** Type guard for any governance signal */
+export function isGovernanceSignal(signal: unknown): signal is GovernanceSignal {
+  return isProposalSignal(signal) || isThresholdSigningSignal(signal) || isBridgeSignal(signal);
+}
