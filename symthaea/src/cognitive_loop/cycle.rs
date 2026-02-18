@@ -34,6 +34,7 @@ impl CognitiveLoopService {
     pub fn cycle(&mut self, input: &str) -> CycleResult {
         let cycle_start = Instant::now();
         self.stats.total_cycles += 1;
+        let mut module_timings = super::ModuleTimings::default();
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE -1: Ingest background-trained weights (non-blocking)
@@ -621,6 +622,28 @@ impl CognitiveLoopService {
         let unified_phi =
             (coherence_phi + voice_phi + flow_phi + relational_phi_contrib + body_phi_contrib as f32 + embodied_phi_contrib as f32).clamp(0.0, 1.0) as f64;
         self.unification_engine.update_phi(unified_phi);
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // 10h.0 Generate PhiAttestation record for governance bridge
+        // ═══════════════════════════════════════════════════════════════════════
+        if self.config.enable_phi_attestation && self.config.agent_did.is_some() {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_micros() as u64;
+            let record = super::PhiAttestationRecord {
+                phi: unified_phi,
+                cycle_id: self.stats.total_cycles as u64,
+                captured_at_us: now,
+                prediction_error,
+                urgency,
+            };
+            self.phi_attestation_buffer.push_back(record);
+            // Evict oldest if over capacity
+            while self.phi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
+                let _ = self.phi_attestation_buffer.pop_front();
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.1 Conscious Reasoning Engine: unified 7-step reasoning cycle
@@ -1254,6 +1277,7 @@ impl CognitiveLoopService {
         // AFFECTIVE BRIDGE: Evaluate somatic markers from cognitive signals
         // Runs every cycle (lightweight: ~5 arithmetic ops + blend)
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (affective_valence, affective_arousal) =
             if let Some(ref mut bridge) = self.affective_bridge {
                 let moral_score = self
@@ -1280,6 +1304,16 @@ impl CognitiveLoopService {
         // FEEDBACK: Positive affect broadens exploration (Fredrickson 2001 broaden-and-build)
         if affective_valence > 0.2 && self.affective_bridge.is_some() {
             self.curiosity_drive.boredom *= 1.05;
+        }
+        module_timings.affective_bridge = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // USER STATE INFERENCE: Infer cognitive load, frustration, engagement
+        // Runs every cycle (lightweight: keyword detection + rolling averages)
+        // ═══════════════════════════════════════════════════════════════════════
+        if let Some(ref mut usi) = self.user_state {
+            let had_error = prediction_error > 0.8;
+            usi.process(input, had_error);
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1320,6 +1354,7 @@ impl CognitiveLoopService {
         // PREDICTIVE PROCESSING: Hierarchical predictive coding + precision
         // Runs every cycle (lightweight: BinaryHV → prediction → free energy)
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (predictive_free_energy, predictive_phi_modulation) =
             if let Some(ref mut mind) = self.predictive_mind {
                 if self.affective_bridge.is_some() {
@@ -1342,6 +1377,7 @@ impl CognitiveLoopService {
         } else if predictive_phi_modulation < 0.8 {
             self.stats.effective_learning_rate *= 0.9; // reduce LR when free energy is low
         }
+        module_timings.predictive_processing = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // PREDICTIVE SELF: Evaluate action safety via self-state prediction
@@ -1424,6 +1460,7 @@ impl CognitiveLoopService {
         // CROSS-MODAL BINDING: Bind HDC encodings across modalities
         // Runs every cycle (lightweight: 2 HV ops + similarity)
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (cross_modal_binding_strength, cross_modal_phi) =
             if let Some(ref mut binder) = self.cross_modal_binder {
                 use symthaea_core::hdc::unified_hv::ContinuousHV;
@@ -1474,6 +1511,8 @@ impl CognitiveLoopService {
                 binder.set_attention_weight(dampen);
             }
         }
+
+        module_timings.cross_modal_binding = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS MONITORS: Skip in Cruise mode (measurement-only, no feedback)
@@ -1725,6 +1764,7 @@ impl CognitiveLoopService {
             cross_modal_phi,
             affective_valence,
             affective_arousal,
+            module_timings_us: module_timings,
         };
 
         tracing::debug!(

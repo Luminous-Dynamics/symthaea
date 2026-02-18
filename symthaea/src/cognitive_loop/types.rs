@@ -216,6 +216,73 @@ pub struct CycleMetadata {
 
     /// Affective bridge arousal (0 to 1, 0.5 when off — neutral).
     pub affective_arousal: f32,
+
+    /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
+    pub module_timings_us: ModuleTimings,
+}
+
+/// Per-module execution timings in microseconds for overhead profiling.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ModuleTimings {
+    pub affective_bridge: u64,
+    pub predictive_processing: u64,
+    pub cross_modal_binding: u64,
+    pub surprise_exploration: u64,
+    pub prefrontal: u64,
+    pub meta_cognition: u64,
+    pub narrative_self: u64,
+    pub gwt: u64,
+    pub virtual_body: u64,
+    pub embodied_cognition: u64,
+    pub dream_replay: u64,
+    pub moral_algebra: u64,
+    pub consciousness_resonance: u64,
+    pub temporal_consciousness: u64,
+    pub attention_schema: u64,
+    pub narrative_gwt: u64,
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHI ATTESTATION RECORD — for governance bridge consumption
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Record of a Phi measurement from a cognitive cycle, ready for attestation.
+///
+/// The cognitive loop produces these after each cycle where Phi is computed.
+/// The personal cluster (or symthaea-mycelix-bridge) can consume these records,
+/// sign them with the agent's cryptographic key, and submit to governance as
+/// authenticated `PhiAttestation` entries.
+///
+/// This is a lightweight struct with no external dependencies — the bridge crate
+/// converts it to the Holochain-compatible `PhiAttestationData` format.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhiAttestationRecord {
+    /// Unified Phi value from this cycle (clamped to [0.0, 1.0])
+    pub phi: f64,
+
+    /// Cognitive cycle number that produced this Phi
+    pub cycle_id: u64,
+
+    /// Timestamp in microseconds since UNIX epoch
+    pub captured_at_us: u64,
+
+    /// Prediction error at time of measurement (context for Phi quality)
+    pub prediction_error: f32,
+
+    /// Urgency level during measurement (Critical/Normal/Cruise)
+    pub urgency: CycleUrgency,
+}
+
+impl PhiAttestationRecord {
+    /// Canonical message for signing: deterministic byte representation.
+    /// The bridge crate signs this with the agent's Ed25519 key.
+    pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
+        format!(
+            "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+            agent_did, self.phi, self.cycle_id, self.captured_at_us,
+        )
+        .into_bytes()
+    }
 }
 
 /// Result of a single cognitive cycle

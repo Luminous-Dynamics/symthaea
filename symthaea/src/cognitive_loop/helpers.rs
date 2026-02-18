@@ -533,6 +533,9 @@ impl CognitiveLoopService {
         self.external_reward = 0.0;
         self.social_trust = 0.5;
         self.social_cooperation_rate = 0.0;
+        if let Some(ref mut usi) = self.user_state {
+            usi.reset();
+        }
         self.prev_body_phi_modulation = 1.0;
         self.prev_embodied_phi_modulation = 1.0;
         self.prev_resonance_frequency = 0.0;

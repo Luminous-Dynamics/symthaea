@@ -499,10 +499,18 @@ pub struct CognitiveLoopService {
     /// Fed into AffectiveBridge arousal modulation.
     social_cooperation_rate: f32,
 
+    /// User state inference for adaptive response generation.
+    /// When enabled, infers user cognitive load, frustration, and engagement from input text.
+    user_state: Option<crate::user_state_inference::UserStateInference>,
+
     /// Virtual body adapter for embodied cognition.
     /// When enabled, maps cognitive signals to interoceptive states and produces
     /// a phi_modulation factor that scales consciousness from somatic feedback.
     virtual_body: Option<virtual_body::VirtualBody>,
+
+    /// Buffer of PhiAttestationRecords ready for governance bridge consumption.
+    /// Populated when `config.enable_phi_attestation` is true.
+    phi_attestation_buffer: VecDeque<PhiAttestationRecord>,
 
     /// Previous cycle's body phi modulation (fed back into next cycle's unified_phi)
     prev_body_phi_modulation: f64,

@@ -2576,3 +2576,112 @@ fn test_cycle_with_hv_different_inputs() {
     assert_ne!(r_a.output, r_b.output, "different HDVs should produce different CfC outputs");
     assert_eq!(service.stats().total_cycles, 2);
 }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PHI ATTESTATION TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_phi_attestation_disabled_by_default() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+    let _ = service.cycle("test");
+    assert_eq!(service.phi_attestation_count(), 0, "attestation should be off by default");
+}
+
+#[test]
+fn test_phi_attestation_enabled_produces_records() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_phi_attestation: true,
+        agent_did: Some("did:key:z6MkTest123".to_string()),
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 3 cycles
+    for _ in 0..3 {
+        let _ = service.cycle("test input");
+    }
+
+    assert_eq!(service.phi_attestation_count(), 3, "should have 3 attestation records");
+
+    // Verify latest record
+    let latest = service.latest_phi_attestation().unwrap();
+    assert!(latest.phi >= 0.0 && latest.phi <= 1.0, "phi should be in [0, 1]");
+    assert_eq!(latest.cycle_id, 3, "cycle_id matches total_cycles (1-indexed)");
+    assert!(latest.captured_at_us > 0, "timestamp should be set");
+}
+
+#[test]
+fn test_phi_attestation_drain() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_phi_attestation: true,
+        agent_did: Some("did:key:z6MkTest456".to_string()),
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..5 {
+        let _ = service.cycle("test");
+    }
+
+    let records = service.drain_phi_attestations();
+    assert_eq!(records.len(), 5, "should drain all 5 records");
+    assert_eq!(service.phi_attestation_count(), 0, "buffer should be empty after drain");
+
+    // Verify records are ordered by cycle_id (1-indexed: 1, 2, 3, 4, 5)
+    for (i, record) in records.iter().enumerate() {
+        assert_eq!(record.cycle_id, (i + 1) as u64, "records should be in order");
+    }
+}
+
+#[test]
+fn test_phi_attestation_buffer_capacity() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_phi_attestation: true,
+        agent_did: Some("did:key:z6MkCapTest".to_string()),
+        attestation_buffer_capacity: 3,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..10 {
+        let _ = service.cycle("test");
+    }
+
+    assert_eq!(service.phi_attestation_count(), 3, "should not exceed capacity");
+    // Oldest records evicted — remaining should be cycles 8, 9, 10 (1-indexed)
+    let records = service.drain_phi_attestations();
+    assert_eq!(records[0].cycle_id, 8);
+    assert_eq!(records[2].cycle_id, 10);
+}
+
+#[test]
+fn test_phi_attestation_sign_message_deterministic() {
+    let record = PhiAttestationRecord {
+        phi: 0.654321,
+        cycle_id: 42,
+        captured_at_us: 1708000000000000,
+        prediction_error: 0.05,
+        urgency: CycleUrgency::Normal,
+    };
+
+    let msg1 = record.sign_message("did:key:z6MkTest");
+    let msg2 = record.sign_message("did:key:z6MkTest");
+    assert_eq!(msg1, msg2, "sign_message should be deterministic");
+
+    let expected = b"symthaea-phi-attestation:v1:did:key:z6MkTest:0.654321:42:1708000000000000";
+    assert_eq!(msg1, expected.to_vec());
+}
+
+#[test]
+fn test_phi_attestation_skipped_without_agent_did() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_phi_attestation: true,
+        agent_did: None, // No DID — should skip
+        ..Default::default()
+    })
+    .unwrap();
+
+    let _ = service.cycle("test");
+    assert_eq!(service.phi_attestation_count(), 0, "no attestation without agent_did");
+}

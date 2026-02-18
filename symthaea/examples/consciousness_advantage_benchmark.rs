@@ -91,6 +91,7 @@ fn all_configs() -> Vec<(&'static str, CognitiveLoopConfig)> {
         ("Full Consciousness", full_config()),
         ("No Surprise", no_surprise_config()),
         ("No Prefrontal", no_prefrontal_config()),
+        ("No Dream", no_dream_config()),
         ("CfC Only", cfc_only_config()),
         ("HDC Only", hdc_only_config()),
     ]
@@ -112,7 +113,7 @@ fn full_config() -> CognitiveLoopConfig {
         enable_predictive_self: true,
         enable_attention_schema: true,
         enable_resonance: true,
-        enable_dream_replay: false,
+        enable_dream_replay: true,
         enable_predictive_processing: true,
         enable_cross_modal_binding: true,
         enable_affective_bridge: true,
@@ -130,6 +131,13 @@ fn no_surprise_config() -> CognitiveLoopConfig {
 fn no_prefrontal_config() -> CognitiveLoopConfig {
     CognitiveLoopConfig {
         enable_prefrontal: false,
+        ..full_config()
+    }
+}
+
+fn no_dream_config() -> CognitiveLoopConfig {
+    CognitiveLoopConfig {
+        enable_dream_replay: false,
         ..full_config()
     }
 }
