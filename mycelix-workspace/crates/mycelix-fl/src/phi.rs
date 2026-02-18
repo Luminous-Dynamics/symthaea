@@ -22,6 +22,11 @@
 
 use serde::{Deserialize, Serialize};
 
+// Canonical Phi threshold constants — must match mycelix_bridge_common::phi_thresholds.
+// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
+const CANONICAL_FL_VETO: f32 = 0.1;
+const CANONICAL_FL_BOOST: f32 = 0.6;
+
 /// Configuration for gradient coherence gating.
 ///
 /// Thresholds should align with `mycelix_bridge_common::phi_thresholds::PhiThresholds`.
@@ -38,9 +43,9 @@ pub struct GradientCoherenceConfig {
 impl Default for GradientCoherenceConfig {
     fn default() -> Self {
         Self {
-            min_coherence: 0.1,
-            boost_threshold: 0.6,
-            veto_threshold: 0.1,
+            min_coherence: CANONICAL_FL_VETO,
+            boost_threshold: CANONICAL_FL_BOOST,
+            veto_threshold: CANONICAL_FL_VETO,
         }
     }
 }

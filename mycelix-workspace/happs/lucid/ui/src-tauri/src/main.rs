@@ -16,11 +16,13 @@ mod symthaea_bridge;
 mod mind_bridge;
 mod api_server;
 mod zkp_bridge;
+mod governance_bridge;
 
 use symthaea_bridge::SymthaeaState;
 use mind_bridge::LucidMindState;
 use api_server::ApiState;
 use zkp_bridge::ZkpState;
+use governance_bridge::GovernanceState;
 use std::sync::Arc;
 use tauri::{
     menu::{Menu, MenuItem},
@@ -50,6 +52,8 @@ fn main() {
         .manage(LucidMindState::new())
         // Manage ZKP state for anonymous proofs
         .manage(ZkpState::new())
+        // Manage governance state (cached Phi tallies from frontend)
+        .manage(GovernanceState::new())
         .setup(|app| {
             // Create system tray menu
             let quit = MenuItem::with_id(app, "quit", "Quit LUCID", true, None::<&str>)?;
@@ -189,6 +193,11 @@ fn main() {
             zkp_bridge::create_value_commitment,
             zkp_bridge::hash_belief_content,
             zkp_bridge::zkp_ready,
+            // Governance bridge commands (Phi-weighted tally caching)
+            governance_bridge::cache_phi_tally,
+            governance_bridge::get_phi_tally,
+            governance_bridge::get_governance_stats,
+            governance_bridge::clear_governance_cache,
         ])
         .run(tauri::generate_context!())
         .expect("error while running LUCID");

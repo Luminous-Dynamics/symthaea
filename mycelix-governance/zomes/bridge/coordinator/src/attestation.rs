@@ -6,9 +6,10 @@ use super::*;
 
 /// Record an authenticated Phi attestation (preferred over record_consciousness_snapshot).
 ///
-/// The agent signs a hash of (agent_did, phi, cycle_id, captured_at) to prove
-/// the Phi value came from their own Symthaea instance. This creates a stronger
-/// guarantee than the unsigned ConsciousnessSnapshot.
+/// The agent signs a message of the form:
+///   `symthaea-phi-attestation:v1:{agent_did}:{phi:.6}:{cycle_id}:{captured_at_us}`
+/// using their Holochain agent key. The signature is Ed25519-verified against
+/// the caller's public key before the entry is committed.
 #[hdk_extern]
 pub fn record_phi_attestation(input: RecordPhiAttestationInput) -> ExternResult<Record> {
     // Validate inputs
@@ -31,6 +32,30 @@ pub fn record_phi_attestation(input: RecordPhiAttestationInput) -> ExternResult<
     let now = sys_time()?;
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
+
+    // Reconstruct the signed message and verify Ed25519 signature.
+    // Message format matches PhiAttestationRecord::sign_message() in Symthaea.
+    let signed_message = format!(
+        "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+        agent_did, input.phi, input.cycle_id, input.captured_at_us,
+    );
+    let signature = Signature::from(
+        <[u8; 64]>::try_from(input.signature.as_slice()).map_err(|_| {
+            wasm_error!(WasmErrorInner::Guest(
+                "Signature must be exactly 64 bytes (Ed25519)".into()
+            ))
+        })?,
+    );
+    let valid = verify_signature_raw(
+        agent_info.agent_initial_pubkey.clone(),
+        signature,
+        signed_message.into_bytes(),
+    )?;
+    if !valid {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Ed25519 signature verification failed — attestation rejected".into()
+        )));
+    }
 
     let attestation = PhiAttestation {
         agent_did: agent_did.clone(),
@@ -61,6 +86,10 @@ pub fn record_phi_attestation(input: RecordPhiAttestationInput) -> ExternResult<
 pub struct RecordPhiAttestationInput {
     pub phi: f64,
     pub cycle_id: u64,
+    /// Microseconds since Unix epoch when the Phi was captured.
+    /// Must match the value used in the signed message.
+    pub captured_at_us: u64,
+    /// Ed25519 signature (64 bytes) over the attestation message.
     pub signature: Vec<u8>,
 }
 

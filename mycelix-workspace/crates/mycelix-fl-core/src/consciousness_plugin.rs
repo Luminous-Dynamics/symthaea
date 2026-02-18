@@ -23,6 +23,14 @@ use crate::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
 use crate::plugins::ByzantinePlugin;
 use crate::types::GradientUpdate;
 
+// Canonical Phi threshold constants — must match mycelix_bridge_common::phi_thresholds::PhiThresholds::default().
+// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
+const CANONICAL_FL_VETO: f32 = 0.1;
+const CANONICAL_FL_DAMPEN: f32 = 0.3;
+const CANONICAL_FL_BOOST: f32 = 0.6;
+const CANONICAL_FL_DAMPEN_FACTOR: f32 = 0.3;
+const CANONICAL_FL_BOOST_FACTOR: f32 = 1.5;
+
 /// Configuration for consciousness-aware Byzantine detection.
 ///
 /// Default values are aligned with the canonical thresholds in
@@ -48,11 +56,11 @@ pub struct ConsciousnessConfig {
 impl Default for ConsciousnessConfig {
     fn default() -> Self {
         Self {
-            phi_threshold: 0.3,
-            phi_boost_threshold: 0.6,
-            dampen_factor: 0.3,
-            boost_factor: 1.5,
-            veto_threshold: 0.1,
+            phi_threshold: CANONICAL_FL_DAMPEN,
+            phi_boost_threshold: CANONICAL_FL_BOOST,
+            dampen_factor: CANONICAL_FL_DAMPEN_FACTOR,
+            boost_factor: CANONICAL_FL_BOOST_FACTOR,
+            veto_threshold: CANONICAL_FL_VETO,
             default_phi: 0.5,
         }
     }

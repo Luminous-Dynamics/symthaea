@@ -39,6 +39,13 @@ pub struct Anchor(pub String);
 // Φ (PHI) WEIGHTED VOTING SYSTEM
 // ============================================================================
 
+// Canonical governance Phi thresholds — must match mycelix_bridge_common::phi_thresholds.
+// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
+// Note: Voting uses a 3-tier system; gov_basic (0.2) maps to the bridge, not voting.
+const GOV_PROPOSAL: f64 = 0.3;
+const GOV_VOTING: f64 = 0.4;
+const GOV_CONSTITUTIONAL: f64 = 0.6;
+
 /// Proposal tier based on governance impact
 /// Different tiers require different Φ thresholds for approval
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -55,9 +62,9 @@ impl ProposalTier {
     /// Get the required Φ threshold for this tier
     pub fn phi_threshold(&self) -> f64 {
         match self {
-            ProposalTier::Basic => 0.3,
-            ProposalTier::Major => 0.4,
-            ProposalTier::Constitutional => 0.6,
+            ProposalTier::Basic => GOV_PROPOSAL,
+            ProposalTier::Major => GOV_VOTING,
+            ProposalTier::Constitutional => GOV_CONSTITUTIONAL,
         }
     }
 
