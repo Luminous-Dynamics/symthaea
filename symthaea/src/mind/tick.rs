@@ -22,6 +22,12 @@ impl ContinuousMind {
         self.state.biorhythm = Some(bio.clone());
         self.state.arousal = bio.arousal_mod as f32;
 
+        // External communications run regardless of dream state —
+        // social signals and federated gradients from peers should never be ignored.
+        self.process_federated();
+        self.process_social();
+        self.sync_iroh_bridge();
+
         // Check for Dream State
         let should_dream = bio.phase == CircadianPhase::Night
             && self.state.cognitive_load < 0.3
@@ -37,15 +43,6 @@ impl ContinuousMind {
         self.process_inputs();
         self.update_consciousness();
         self.process_goals();
-
-        // Federated Learning Gradient Exchange
-        self.process_federated();
-
-        // Social Coherence (Theory of Mind)
-        self.process_social();
-
-        // Iroh P2P Bridge: flush outbox to network, drain inbound to inbox
-        self.sync_iroh_bridge();
 
         // Generate output if appropriate
         let output = self.generate_output();
