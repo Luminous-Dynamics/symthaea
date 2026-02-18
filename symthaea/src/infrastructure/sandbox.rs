@@ -34,7 +34,11 @@ pub struct Sandbox {
 impl Sandbox {
     /// Create a new sandbox
     pub fn new() -> Self {
-        let root = std::env::temp_dir().join(format!("symthaea-sandbox-{}", std::process::id()));
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static COUNTER: AtomicU64 = AtomicU64::new(0);
+        let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root =
+            std::env::temp_dir().join(format!("symthaea-sandbox-{}-{}", std::process::id(), id));
 
         Self {
             root,

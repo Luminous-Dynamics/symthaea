@@ -24,8 +24,18 @@
 
 use std::time::Duration;
 
-use symthaea::mind::{connect_social, AsyncMind, MindConfig};
+use symthaea::mind::{connect_social, AsyncMind, MindConfig, MindState};
 use symthaea_core::hdc::ContinuousHV;
+
+/// Compute pairwise cosine similarities between three agents' current thoughts.
+/// Returns (AB, BC, AC) similarities and the mean.
+fn thought_similarity(a: &MindState, b: &MindState, c: &MindState) -> (f32, f32, f32, f32) {
+    let ab = a.current_thought.similarity(&b.current_thought);
+    let bc = b.current_thought.similarity(&c.current_thought);
+    let ac = a.current_thought.similarity(&c.current_thought);
+    let mean = (ab + bc + ac) / 3.0;
+    (ab, bc, ac, mean)
+}
 
 #[tokio::main]
 async fn main() {
@@ -75,11 +85,12 @@ async fn main() {
             let a = alice.snapshot().await;
             let b = bob.snapshot().await;
             let c = charlie.snapshot().await;
+            let (ab, bc, ac, mean) = thought_similarity(&a, &b, &c);
             println!(
-                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | memory [A={:.0}%, B={:.0}%, C={:.0}%]",
+                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 i + 1,
                 a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                a.memory_utilization * 100.0, b.memory_utilization * 100.0, c.memory_utilization * 100.0,
+                ab, bc, ac, mean,
             );
         }
     }
@@ -106,11 +117,12 @@ async fn main() {
             let a = alice.snapshot().await;
             let b = bob.snapshot().await;
             let c = charlie.snapshot().await;
+            let (ab, bc, ac, mean) = thought_similarity(&a, &b, &c);
             println!(
-                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | memory [A={:.0}%, B={:.0}%, C={:.0}%]",
+                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 30 + i + 1,
                 a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                a.memory_utilization * 100.0, b.memory_utilization * 100.0, c.memory_utilization * 100.0,
+                ab, bc, ac, mean,
             );
         }
     }
@@ -150,11 +162,12 @@ async fn main() {
             let a = alice.snapshot().await;
             let b = bob.snapshot().await;
             let c = charlie.snapshot().await;
+            let (ab, bc, ac, mean) = thought_similarity(&a, &b, &c);
             println!(
-                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | load [A={:.1}%, B={:.1}%, C={:.1}%]",
+                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 60 + i + 1,
                 a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                a.cognitive_load * 100.0, b.cognitive_load * 100.0, c.cognitive_load * 100.0,
+                ab, bc, ac, mean,
             );
         }
     }
@@ -212,24 +225,13 @@ async fn main() {
             let b = bob.snapshot().await;
             let c = charlie.snapshot().await;
 
-            // With specialization, consciousness profiles should differ
-            let consciousness_spread = {
-                let levels = [
-                    a.consciousness_level,
-                    b.consciousness_level,
-                    c.consciousness_level,
-                ];
-                let mean = levels.iter().sum::<f64>() / 3.0;
-                let var = levels.iter().map(|l| (l - mean).powi(2)).sum::<f64>() / 3.0;
-                var.sqrt()
-            };
+            let (ab, bc, ac, mean_sim) = thought_similarity(&a, &b, &c);
 
             println!(
-                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | spread={:.4} | valence [A={:.2}, B={:.2}, C={:.2}]",
+                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim [AB={:.3}, BC={:.3}, AC={:.3}] mean={:.3}",
                 90 + i + 1,
                 a.consciousness_level, b.consciousness_level, c.consciousness_level,
-                consciousness_spread,
-                a.emotional_valence, b.emotional_valence, c.emotional_valence,
+                ab, bc, ac, mean_sim,
             );
         }
     }
@@ -261,9 +263,11 @@ async fn main() {
     let a = alice.snapshot().await;
     let b = bob.snapshot().await;
     let c = charlie.snapshot().await;
+    let (ab, bc, ac, mean) = thought_similarity(&a, &b, &c);
     println!(
-        "  Baseline (tick 140): consciousness [A={:.3}, B={:.3}, C={:.3}]",
+        "  Baseline (tick 140): consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim mean={:.3} [AB={:.3}, BC={:.3}, AC={:.3}]",
         a.consciousness_level, b.consciousness_level, c.consciousness_level,
+        mean, ab, bc, ac,
     );
 
     // Sub-phase B: disrupt Bob (10 ticks)
@@ -284,9 +288,11 @@ async fn main() {
     let a = alice.snapshot().await;
     let b = bob.snapshot().await;
     let c = charlie.snapshot().await;
+    let (ab, bc, ac, mean) = thought_similarity(&a, &b, &c);
     println!(
-        "  Disrupted (tick 150): consciousness [A={:.3}, B={:.3}, C={:.3}]  (Bob gets noise)",
+        "  Disrupted (tick 150): consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim mean={:.3} [AB={:.3}, BC={:.3}, AC={:.3}]  (Bob noise)",
         a.consciousness_level, b.consciousness_level, c.consciousness_level,
+        mean, ab, bc, ac,
     );
 
     // Sub-phase C: recovery (10 ticks — Bob returns to shared signal)
@@ -308,12 +314,14 @@ async fn main() {
             let a = alice.snapshot().await;
             let b = bob.snapshot().await;
             let c = charlie.snapshot().await;
+            let (_ab, _bc, _ac, mean) = thought_similarity(&a, &b, &c);
             println!(
-                "  Recovery  (tick {:>3}): consciousness [A={:.3}, B={:.3}, C={:.3}]",
+                "  Recovery  (tick {:>3}): consciousness [A={:.3}, B={:.3}, C={:.3}] | thought sim mean={:.3}",
                 150 + i + 1,
                 a.consciousness_level,
                 b.consciousness_level,
                 c.consciousness_level,
+                mean,
             );
         }
     }
@@ -364,14 +372,27 @@ async fn main() {
     let variance = levels.iter().map(|l| (l - mean).powi(2)).sum::<f64>() / 3.0;
     let std_dev = variance.sqrt();
 
+    let (ab, bc, ac, mean_sim) = thought_similarity(&a_state, &b_state, &c_state);
+
     println!("\nFinal state:");
     println!("  Consciousness: mean={:.4}, std_dev={:.4}", mean, std_dev);
-    if std_dev < 0.05 {
-        println!("  => Strong convergence: agents synchronized through social relay");
-    } else if std_dev < 0.15 {
-        println!("  => Moderate convergence: agents partially synchronized");
+    println!(
+        "  Thought similarity: AB={:.3}, BC={:.3}, AC={:.3}, mean={:.3}",
+        ab, bc, ac, mean_sim,
+    );
+    if mean_sim > 0.7 {
+        println!("  => High thought alignment: agents converged to similar cognitive states");
+    } else if mean_sim > 0.3 {
+        println!("  => Moderate alignment: agents share some cognitive structure");
     } else {
-        println!("  => Divergent: agents maintained distinct consciousness profiles");
+        println!("  => Low alignment: agents maintain distinct thought patterns");
+    }
+    if std_dev < 0.05 {
+        println!("  => Strong consciousness convergence: synchronized via social relay");
+    } else if std_dev < 0.15 {
+        println!("  => Moderate consciousness convergence: partially synchronized");
+    } else {
+        println!("  => Divergent consciousness: distinct profiles maintained");
     }
 
     // ── Shutdown ─────────────────────────────────────────────────────────────
