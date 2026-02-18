@@ -37,6 +37,29 @@ pub use validation::*;
 const GOVERNANCE_HAPP_ID: &str = "mycelix-governance";
 const SYMTHAEA_SOURCE: &str = "symthaea";
 
+// ============================================================================
+// REAL-TIME SIGNALS
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum BridgeSignal {
+    ConsciousnessSnapshotRecorded {
+        agent_did: String,
+        phi: f64,
+    },
+    ConsciousnessGateVerified {
+        agent_did: String,
+        passed: bool,
+        action_type: String,
+    },
+    ValueAlignmentAssessed {
+        proposal_id: String,
+        agent_did: String,
+        recommendation: String,
+    },
+}
+
 /// Helper to get an anchor entry hash
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());

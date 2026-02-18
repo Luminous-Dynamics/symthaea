@@ -806,6 +806,11 @@ pub fn reflect_on_discussion(proposal_id: String) -> ExternResult<Record> {
         summary,
     };
 
+    let _ = emit_signal(&ProposalSignal::DiscussionReflectionGenerated {
+        proposal_id: proposal_id.clone(),
+        ready_for_vote,
+    });
+
     let action_hash = create_entry(&EntryTypes::DiscussionReflection(reflection))?;
 
     // Link proposal to reflection

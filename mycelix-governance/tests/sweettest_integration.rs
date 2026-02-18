@@ -153,6 +153,128 @@ pub struct VoteTally {
     pub final_tally: bool,
 }
 
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum ProposalTier {
+    Basic,
+    Major,
+    Constitutional,
+}
+
+/// Input mirror for tally_phi_votes
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TallyPhiVotesInput {
+    pub proposal_id: String,
+    pub tier: ProposalTier,
+    pub eligible_voters: Option<u64>,
+    pub generate_reflection: Option<bool>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PhiWeightedTally {
+    pub proposal_id: String,
+    pub tier: ProposalTier,
+    pub phi_votes_for: f64,
+    pub phi_votes_against: f64,
+    pub phi_abstentions: f64,
+    pub raw_votes_for: u64,
+    pub raw_votes_against: u64,
+    pub raw_abstentions: u64,
+    pub average_phi: f64,
+    pub total_phi_weight: f64,
+    pub eligible_voters: u64,
+    pub quorum_requirement: f64,
+    pub quorum_reached: bool,
+    pub approval_threshold: f64,
+    pub approved: bool,
+    pub tallied_at: Timestamp,
+    pub final_tally: bool,
+    pub phi_tier_breakdown: PhiTierBreakdown,
+    #[serde(default)]
+    pub phi_enhanced_count: u64,
+    #[serde(default)]
+    pub reputation_only_count: u64,
+    #[serde(default)]
+    pub phi_coverage: f64,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PhiTierBreakdown {
+    pub high_phi_votes: TallySegment,
+    pub medium_phi_votes: TallySegment,
+    pub low_phi_votes: TallySegment,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct TallySegment {
+    pub votes_for: f64,
+    pub votes_against: f64,
+    pub abstentions: f64,
+    pub voter_count: u64,
+}
+
+// --- Quadratic voting types ---
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct QuadraticVote {
+    pub id: String,
+    pub proposal_id: String,
+    pub voter: String,
+    pub choice: VoteChoice,
+    pub credits_spent: u64,
+    pub effective_weight: f64,
+    pub reason: Option<String>,
+    pub voted_at: Timestamp,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct QuadraticTally {
+    pub proposal_id: String,
+    pub qv_for: f64,
+    pub qv_against: f64,
+    pub total_credits_spent: u64,
+    pub avg_credits_per_voter: f64,
+    pub voter_count: u64,
+    pub quorum_reached: bool,
+    pub approved: bool,
+    pub tallied_at: Timestamp,
+    pub final_tally: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct VoiceCredits {
+    pub owner: String,
+    pub allocated: u64,
+    pub spent: u64,
+    pub remaining: u64,
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
+}
+
+/// Input mirror for allocate_voice_credits
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct AllocateCreditsInput {
+    pub owner_did: String,
+    pub amount: u64,
+    pub period_end: Timestamp,
+}
+
+/// Input mirror for cast_quadratic_vote
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CastQuadraticVoteInput {
+    pub proposal_id: String,
+    pub voter_did: String,
+    pub choice: VoteChoice,
+    pub credits_to_spend: u64,
+    pub reason: Option<String>,
+}
+
+/// Input mirror for tally_quadratic_votes
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct TallyQuadraticVotesInput {
+    pub proposal_id: String,
+    pub min_voters: Option<u64>,
+}
+
 // --- Constitution integrity types ---
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -308,6 +430,67 @@ pub struct ExecuteTimelockInput {
     pub executor_did: String,
 }
 
+/// Input mirror for veto_timelock
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct VetoTimelockInput {
+    pub timelock_id: String,
+    pub guardian_did: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GuardianVeto {
+    pub id: String,
+    pub timelock_id: String,
+    pub guardian: String,
+    pub reason: String,
+    pub vetoed_at: Timestamp,
+}
+
+/// Input mirror for lock_proposal_funds
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct LockFundsInput {
+    pub proposal_id: String,
+    pub timelock_id: Option<String>,
+    pub source_account: String,
+    pub amount: f64,
+    pub currency: Option<String>,
+}
+
+/// Input mirror for release_locked_funds
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ReleaseFundsInput {
+    pub proposal_id: String,
+    pub reason: Option<String>,
+}
+
+/// Input mirror for refund_locked_funds
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RefundFundsInput {
+    pub proposal_id: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct FundAllocation {
+    pub id: String,
+    pub proposal_id: String,
+    pub timelock_id: String,
+    pub source_account: String,
+    pub amount: f64,
+    pub currency: String,
+    pub locked_at: Timestamp,
+    pub status: AllocationStatus,
+    pub status_reason: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum AllocationStatus {
+    Locked,
+    Released,
+    Refunded,
+}
+
 // --- Councils integrity types ---
 
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -375,6 +558,57 @@ pub enum MembershipStatus {
     OnLeave,
     Suspended,
     Removed,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum DecisionType {
+    Operational,
+    Policy,
+    Resource,
+    Membership,
+    SubCouncil,
+    Constitutional,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum DecisionStatus {
+    Pending,
+    Approved,
+    Rejected,
+    Executed,
+    Vetoed,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CouncilDecision {
+    pub id: String,
+    pub council_id: String,
+    pub proposal_id: Option<String>,
+    pub title: String,
+    pub content: String,
+    pub decision_type: DecisionType,
+    pub votes_for: u64,
+    pub votes_against: u64,
+    pub abstentions: u64,
+    pub phi_weighted_result: f64,
+    pub passed: bool,
+    pub status: DecisionStatus,
+    pub created_at: Timestamp,
+    pub executed_at: Option<Timestamp>,
+}
+
+/// Input mirror for record_decision
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct RecordDecisionInput {
+    pub council_id: String,
+    pub proposal_id: Option<String>,
+    pub title: String,
+    pub content: String,
+    pub decision_type: DecisionType,
+    pub votes_for: u64,
+    pub votes_against: u64,
+    pub abstentions: u64,
+    pub phi_weighted_result: f64,
 }
 
 // --- Coordinator input types ---
@@ -1239,6 +1473,263 @@ mod integration_tests {
         assert!(final_proposal.is_some(), "Proposal should exist");
         println!("  5. Final verification complete");
         println!("=== test_complete_governance_flow PASSED ===\n");
+    }
+}
+
+// ============================================================================
+// Full Lifecycle E2E Test: Proposal → Tally → Signature → Execution
+// ============================================================================
+
+#[cfg(test)]
+mod lifecycle_e2e_tests {
+    use super::*;
+    use feldman_dkg::{Dealer, ParticipantId, DkgConfig, DkgCeremony};
+    use k256::ecdsa::{SigningKey, signature::Signer};
+    use rand::rngs::OsRng;
+
+    /// Run a local feldman-dkg 2-of-3 ceremony and return crypto data for zome calls.
+    fn run_local_dkg() -> (Vec<u8>, Vec<Vec<u8>>, SigningKey) {
+        let config = DkgConfig::new(2, 3).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+        for i in 1..=3u32 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        let dealers: Vec<Dealer> = (1..=3)
+            .map(|i| Dealer::new(ParticipantId(i as u32), 2, 3, &mut OsRng).unwrap())
+            .collect();
+        let deals: Vec<_> = dealers.iter().map(|d| d.generate_deal()).collect();
+
+        let commitment_bytes: Vec<Vec<u8>> = deals.iter()
+            .map(|d| d.commitments.to_bytes())
+            .collect();
+
+        for (i, deal) in deals.iter().enumerate() {
+            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+        }
+
+        let result = ceremony.finalize().unwrap();
+        let combined_pk_bytes = result.public_key.to_bytes();
+
+        let shares: Vec<_> = (1..=3)
+            .map(|i| ceremony.get_combined_share(ParticipantId(i as u32)).unwrap())
+            .collect();
+        let combined_secret = ceremony.reconstruct_secret(&shares[..2]).unwrap();
+        let secret_bytes = combined_secret.to_bytes();
+        let signing_key = SigningKey::from_bytes(&secret_bytes.into()).unwrap();
+
+        (combined_pk_bytes, commitment_bytes, signing_key)
+    }
+
+    /// Full governance lifecycle: create → vote → tally → timelock → sign → ready → execute
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle + Holochain conductor
+    async fn test_full_proposal_to_execution_lifecycle() {
+        println!("=== test_full_proposal_to_execution_lifecycle ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app1 = conductor.setup_app("life-a1", &[dna.clone()]).await.unwrap();
+        let app2 = conductor.setup_app("life-a2", &[dna.clone()]).await.unwrap();
+        let app3 = conductor.setup_app("life-a3", &[dna.clone()]).await.unwrap();
+
+        let cells = [
+            app1.cells()[0].clone(),
+            app2.cells()[0].clone(),
+            app3.cells()[0].clone(),
+        ];
+        let agents = [
+            app1.agent().clone(),
+            app2.agent().clone(),
+            app3.agent().clone(),
+        ];
+        let dids: Vec<String> = agents.iter()
+            .map(|a| format!("did:mycelix:{}", a))
+            .collect();
+
+        // ===== Step 1: Create proposal =====
+        let proposal = make_proposal("MIP-LIFECYCLE-01", &dids[0], ProposalType::Standard);
+        let _: Record = conductor
+            .call(&cells[0].zome("proposals"), "create_proposal", proposal)
+            .await;
+        println!("  1. Proposal MIP-LIFECYCLE-01 created");
+
+        // ===== Step 2: Cast votes from all 3 agents =====
+        for (cell, did) in cells.iter().zip(dids.iter()) {
+            let vote_input = make_cast_vote_input("MIP-LIFECYCLE-01", did, VoteChoice::For);
+            let _: Record = conductor
+                .call(&cell.zome("voting"), "cast_vote", vote_input)
+                .await;
+        }
+        println!("  2. All 3 agents voted For");
+
+        // ===== Step 3: Tally with Φ weighting (triggers timelock auto-creation) =====
+        let tally_input = TallyPhiVotesInput {
+            proposal_id: "MIP-LIFECYCLE-01".to_string(),
+            tier: ProposalTier::Basic,
+            eligible_voters: Some(3),
+            generate_reflection: Some(false),
+        };
+        let tally_record: Record = conductor
+            .call(&cells[0].zome("voting"), "tally_phi_votes", tally_input)
+            .await;
+
+        let tally: PhiWeightedTally = decode_entry(&tally_record)
+            .expect("Failed to decode PhiWeightedTally");
+        assert!(tally.approved, "Unanimous vote should be approved");
+        assert!(tally.quorum_reached, "3/3 voters should reach quorum");
+        assert_eq!(tally.raw_votes_for, 3);
+        println!("  3. Φ-weighted tally complete: approved={}, quorum={}", tally.approved, tally.quorum_reached);
+
+        // ===== Step 4: Verify timelock was auto-created by tally =====
+        let timelock_opt: Option<Record> = conductor
+            .call(
+                &cells[0].zome("execution"),
+                "get_proposal_timelock",
+                "MIP-LIFECYCLE-01".to_string(),
+            )
+            .await;
+
+        let timelock = if let Some(record) = timelock_opt {
+            let tl: Timelock = decode_entry(&record).expect("Failed to decode Timelock");
+            assert_eq!(tl.proposal_id, "MIP-LIFECYCLE-01");
+            assert_eq!(tl.status, TimelockStatus::Pending);
+            println!("  4. Timelock auto-created: id={}, status=Pending", tl.id);
+            tl
+        } else {
+            // If cross-zome call didn't create the timelock (best-effort),
+            // create it manually to continue the lifecycle test
+            println!("  4. Timelock not auto-created (best-effort cross-zome); creating manually");
+            let create_input = CreateTimelockInput {
+                proposal_id: "MIP-LIFECYCLE-01".to_string(),
+                actions: serde_json::json!([{"type": "UpdateParameter", "parameter": "test", "value": "1"}]).to_string(),
+                duration_hours: 1, // 1 hour for Basic tier in test
+            };
+            let record: Record = conductor
+                .call(&cells[0].zome("execution"), "create_timelock", create_input)
+                .await;
+            decode_entry(&record).expect("Failed to decode Timelock")
+        };
+
+        // ===== Step 5: Create signing committee + DKG ceremony =====
+        let committee_record: Record = conductor
+            .call(&cells[0].zome("threshold_signing"), "create_committee", CreateCommitteeInput {
+                name: "Lifecycle Signers".to_string(),
+                threshold: 2,
+                member_count: 3,
+                scope: CommitteeScope::All,
+                min_phi: None,
+            })
+            .await;
+        let committee: SigningCommittee = decode_entry(&committee_record).unwrap();
+
+        // Register all 3 members
+        for (i, (cell, did)) in cells.iter().zip(dids.iter()).enumerate() {
+            let _: Record = conductor.call(
+                &cell.zome("threshold_signing"),
+                "register_member",
+                RegisterMemberInput {
+                    committee_id: committee.id.clone(),
+                    participant_id: (i + 1) as u32,
+                    member_did: did.clone(),
+                    trust_score: 0.85,
+                },
+            ).await;
+        }
+
+        // Run local DKG and submit deals
+        let (combined_pk, commitments, signing_key) = run_local_dkg();
+        for (i, cell) in cells.iter().enumerate() {
+            let _: Record = conductor.call(
+                &cell.zome("threshold_signing"),
+                "submit_dkg_deal",
+                SubmitDkgDealInput {
+                    committee_id: committee.id.clone(),
+                    vss_commitment: commitments[i].clone(),
+                },
+            ).await;
+        }
+
+        // Finalize DKG
+        let _: Record = conductor.call(
+            &cells[0].zome("threshold_signing"),
+            "finalize_dkg",
+            FinalizeDkgInput {
+                committee_id: committee.id.clone(),
+                combined_public_key: combined_pk,
+                public_commitments: commitments,
+                qualified_members: vec![1, 2, 3],
+            },
+        ).await;
+        println!("  5. DKG ceremony complete for committee {}", committee.id);
+
+        // ===== Step 6: Create threshold signature on the proposal =====
+        let content_hash = blake3::hash(b"MIP-LIFECYCLE-01").as_bytes().to_vec();
+        let signature: k256::ecdsa::Signature = signing_key.sign(&content_hash);
+        let sig_bytes = signature.to_bytes().to_vec();
+
+        // Submit signature shares (simulated — shares go through combine_signatures)
+        let combine_input = CombineSignaturesInput {
+            committee_id: committee.id.clone(),
+            content_hash: content_hash.clone(),
+            content_description: "Approval of MIP-LIFECYCLE-01".to_string(),
+            combined_signature: sig_bytes,
+            signers: vec![1, 2],
+            verified: false, // Let coordinator verify via ECDSA
+        };
+        let sig_record: Record = conductor
+            .call(&cells[0].zome("threshold_signing"), "combine_signatures", combine_input)
+            .await;
+
+        let threshold_sig: ThresholdSignature = decode_entry(&sig_record)
+            .expect("Failed to decode ThresholdSignature");
+        assert!(threshold_sig.verified, "Threshold signature should be verified via ECDSA");
+        println!("  6. Threshold signature created and verified: {}", threshold_sig.id);
+
+        // ===== Step 7: Mark timelock as ready =====
+        let ready_record: Record = conductor
+            .call(
+                &cells[0].zome("execution"),
+                "mark_timelock_ready",
+                MarkTimelockReadyInput { timelock_id: timelock.id.clone() },
+            )
+            .await;
+
+        let ready_timelock: Timelock = decode_entry(&ready_record)
+            .expect("Failed to decode ready timelock");
+        assert_eq!(ready_timelock.status, TimelockStatus::Ready);
+        println!("  7. Timelock marked Ready");
+
+        // ===== Step 8: Execute the timelock =====
+        let exec_record: Record = conductor
+            .call(
+                &cells[0].zome("execution"),
+                "execute_timelock",
+                ExecuteTimelockInput {
+                    timelock_id: timelock.id.clone(),
+                    executor_did: dids[0].clone(),
+                },
+            )
+            .await;
+
+        let execution: Execution = decode_entry(&exec_record)
+            .expect("Failed to decode Execution");
+        assert_eq!(execution.proposal_id, "MIP-LIFECYCLE-01");
+        // Execution may succeed or fail depending on action dispatch, but the record should exist
+        println!("  8. Execution complete: status={:?}, proposal={}", execution.status, execution.proposal_id);
+
+        // ===== Step 9: Verify final proposal state =====
+        let final_proposal: Option<Record> = conductor
+            .call(
+                &cells[0].zome("proposals"),
+                "get_proposal",
+                "MIP-LIFECYCLE-01".to_string(),
+            )
+            .await;
+        assert!(final_proposal.is_some(), "Proposal should still exist");
+        println!("  9. Final verification: proposal exists");
+
+        println!("=== test_full_proposal_to_execution_lifecycle PASSED ===\n");
     }
 }
 
@@ -2577,5 +3068,462 @@ mod unit_tests {
         assert_eq!(deserialized.member_count, 5);
         assert_eq!(deserialized.scope, CommitteeScope::All);
         assert_eq!(deserialized.min_phi, Some(0.4));
+    }
+}
+
+// ============================================================================
+// Veto & Fund Locking E2E Tests
+// ============================================================================
+
+#[cfg(test)]
+mod veto_fund_tests {
+    use super::*;
+
+    /// Test guardian veto of a pending timelock
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle + Holochain conductor
+    async fn test_veto_timelock_lifecycle() {
+        println!("=== test_veto_timelock_lifecycle ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("veto-test", &[dna.clone()]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent_did = format!("did:mycelix:{}", app.agent_pubkey());
+
+        // 1. Create a council and join as member (required for veto authorization)
+        let council_input = CreateCouncilInput {
+            name: "Guardian Council".to_string(),
+            purpose: "Governance oversight".to_string(),
+            council_type: CouncilType::Root,
+            parent_council_id: None,
+            phi_threshold: 0.3,
+            quorum: 0.5,
+            supermajority: 0.67,
+            can_spawn_children: false,
+            max_delegation_depth: 0,
+            signing_committee_id: None,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("councils"), "create_council", council_input)
+            .await;
+
+        let council_records: Vec<Record> = conductor
+            .call(&cell.zome("councils"), "get_all_councils", ())
+            .await;
+        let council: Council = decode_entry(&council_records[0]).unwrap();
+
+        let join_input = JoinCouncilInput {
+            council_id: council.id.clone(),
+            member_did: agent_did.clone(),
+            role: MemberRole::Steward,
+            phi_score: 0.8,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("councils"), "join_council", join_input)
+            .await;
+        println!("  1. Guardian council created, agent joined as Steward");
+
+        // 2. Create a timelock to be vetoed
+        let create_input = CreateTimelockInput {
+            proposal_id: "MIP-VETO-01".to_string(),
+            actions: serde_json::json!([{"type": "UpdateParameter", "parameter": "dangerous_setting", "value": "true"}]).to_string(),
+            duration_hours: 72,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("execution"), "create_timelock", create_input)
+            .await;
+
+        // Retrieve timelock to get ID
+        let tl_record: Option<Record> = conductor
+            .call(&cell.zome("execution"), "get_proposal_timelock", "MIP-VETO-01".to_string())
+            .await;
+        let timelock: Timelock = decode_entry(&tl_record.unwrap()).unwrap();
+        assert_eq!(timelock.status, TimelockStatus::Pending);
+        println!("  2. Timelock created: id={}", timelock.id);
+
+        // 3. Veto the timelock
+        let veto_input = VetoTimelockInput {
+            timelock_id: timelock.id.clone(),
+            guardian_did: agent_did.clone(),
+            reason: "Parameter change is dangerous without further review".to_string(),
+        };
+        let veto_record: Record = conductor
+            .call(&cell.zome("execution"), "veto_timelock", veto_input)
+            .await;
+
+        let veto: GuardianVeto = decode_entry(&veto_record).expect("decode veto");
+        assert_eq!(veto.timelock_id, timelock.id);
+        assert_eq!(veto.guardian, agent_did);
+        println!("  3. Timelock vetoed: reason={}", veto.reason);
+
+        // 4. Verify timelock is now Cancelled
+        let cancelled_record: Option<Record> = conductor
+            .call(&cell.zome("execution"), "get_proposal_timelock", "MIP-VETO-01".to_string())
+            .await;
+        let cancelled_tl: Timelock = decode_entry(&cancelled_record.unwrap()).unwrap();
+        assert_eq!(cancelled_tl.status, TimelockStatus::Cancelled);
+        println!("  4. Timelock verified as Cancelled");
+
+        println!("=== test_veto_timelock_lifecycle PASSED ===\n");
+    }
+
+    /// Test fund locking: lock → release and lock → refund paths
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle + Holochain conductor
+    async fn test_fund_locking_lifecycle() {
+        println!("=== test_fund_locking_lifecycle ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("fund-test", &[dna.clone()]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // === Path A: Lock → Release ===
+
+        // 1. Lock funds for a proposal
+        let lock_input = LockFundsInput {
+            proposal_id: "MIP-FUND-01".to_string(),
+            timelock_id: None,
+            source_account: "treasury:general".to_string(),
+            amount: 1000.0,
+            currency: Some("credits".to_string()),
+        };
+        let lock_record: Record = conductor
+            .call(&cell.zome("execution"), "lock_proposal_funds", lock_input)
+            .await;
+
+        let allocation: FundAllocation = decode_entry(&lock_record).expect("decode allocation");
+        assert_eq!(allocation.proposal_id, "MIP-FUND-01");
+        assert_eq!(allocation.amount, 1000.0);
+        assert_eq!(allocation.status, AllocationStatus::Locked);
+        println!("  1. Funds locked: {} {} from {}", allocation.amount, allocation.currency, allocation.source_account);
+
+        // 2. Verify allocation retrievable
+        let retrieved: Option<Record> = conductor
+            .call(&cell.zome("execution"), "get_fund_allocation", "MIP-FUND-01".to_string())
+            .await;
+        assert!(retrieved.is_some(), "Fund allocation should be retrievable");
+        println!("  2. Allocation verified retrievable");
+
+        // 3. Release funds (successful execution)
+        let release_input = ReleaseFundsInput {
+            proposal_id: "MIP-FUND-01".to_string(),
+            reason: Some("Proposal executed successfully".to_string()),
+        };
+        let release_record: Record = conductor
+            .call(&cell.zome("execution"), "release_locked_funds", release_input)
+            .await;
+
+        let released: FundAllocation = decode_entry(&release_record).expect("decode released");
+        assert_eq!(released.status, AllocationStatus::Released);
+        println!("  3. Funds released: status={:?}", released.status);
+
+        // === Path B: Lock → Refund ===
+
+        // 4. Lock funds for another proposal
+        let lock_input2 = LockFundsInput {
+            proposal_id: "MIP-FUND-02".to_string(),
+            timelock_id: None,
+            source_account: "treasury:general".to_string(),
+            amount: 500.0,
+            currency: Some("credits".to_string()),
+        };
+        let _: Record = conductor
+            .call(&cell.zome("execution"), "lock_proposal_funds", lock_input2)
+            .await;
+        println!("  4. Second allocation locked: 500 credits");
+
+        // 5. Refund (proposal failed/vetoed)
+        let refund_input = RefundFundsInput {
+            proposal_id: "MIP-FUND-02".to_string(),
+            reason: "Proposal vetoed by guardian council".to_string(),
+        };
+        let refund_record: Record = conductor
+            .call(&cell.zome("execution"), "refund_locked_funds", refund_input)
+            .await;
+
+        let refunded: FundAllocation = decode_entry(&refund_record).expect("decode refunded");
+        assert_eq!(refunded.status, AllocationStatus::Refunded);
+        println!("  5. Funds refunded: status={:?}", refunded.status);
+
+        println!("=== test_fund_locking_lifecycle PASSED ===\n");
+    }
+
+    /// Test pending timelocks query
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_get_pending_timelocks() {
+        println!("=== test_get_pending_timelocks ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("pending-test", &[dna.clone()]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create 2 timelocks
+        for id in ["MIP-PENDING-01", "MIP-PENDING-02"] {
+            let input = CreateTimelockInput {
+                proposal_id: id.to_string(),
+                actions: serde_json::json!([{"type": "EmitEvent"}]).to_string(),
+                duration_hours: 48,
+            };
+            let _: Record = conductor
+                .call(&cell.zome("execution"), "create_timelock", input)
+                .await;
+        }
+
+        let pending: Vec<Record> = conductor
+            .call(&cell.zome("execution"), "get_pending_timelocks", ())
+            .await;
+
+        assert!(pending.len() >= 2, "Should have at least 2 pending timelocks, got {}", pending.len());
+        println!("  Pending timelocks: {}", pending.len());
+
+        println!("=== test_get_pending_timelocks PASSED ===\n");
+    }
+}
+
+// ============================================================================
+// Quadratic Voting E2E Tests
+// ============================================================================
+
+#[cfg(test)]
+mod quadratic_voting_tests {
+    use super::*;
+
+    /// Full quadratic voting lifecycle: allocate credits → cast votes → tally
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle + Holochain conductor
+    async fn test_quadratic_voting_lifecycle() {
+        println!("=== test_quadratic_voting_lifecycle ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app1 = conductor.setup_app("qv-a1", &[dna.clone()]).await.unwrap();
+        let app2 = conductor.setup_app("qv-a2", &[dna.clone()]).await.unwrap();
+        let app3 = conductor.setup_app("qv-a3", &[dna.clone()]).await.unwrap();
+
+        let cells = [
+            app1.cells()[0].clone(),
+            app2.cells()[0].clone(),
+            app3.cells()[0].clone(),
+        ];
+        let dids: Vec<String> = [app1.agent(), app2.agent(), app3.agent()]
+            .iter()
+            .map(|a| format!("did:mycelix:{}", a))
+            .collect();
+
+        // 1. Create a proposal for quadratic voting
+        let proposal = make_proposal("MIP-QV-01", &dids[0], ProposalType::Standard);
+        let _: Record = conductor
+            .call(&cells[0].zome("proposals"), "create_proposal", proposal)
+            .await;
+        println!("  1. Proposal MIP-QV-01 created");
+
+        // 2. Allocate voice credits to each voter
+        let one_month_micros: i64 = 30 * 86400 * 1_000_000;
+        let period_end = Timestamp::from_micros(
+            chrono::Utc::now().timestamp_micros() + one_month_micros,
+        );
+
+        let credit_amounts = [100u64, 100, 100];
+        for (i, (cell, did)) in cells.iter().zip(dids.iter()).enumerate() {
+            let alloc_input = AllocateCreditsInput {
+                owner_did: did.clone(),
+                amount: credit_amounts[i],
+                period_end,
+            };
+            let _: Record = conductor
+                .call(&cell.zome("voting"), "allocate_voice_credits", alloc_input)
+                .await;
+        }
+        println!("  2. Voice credits allocated: 100 each to 3 voters");
+
+        // 3. Cast quadratic votes with different credit spends
+        //    Agent 1: 25 credits For  → weight = √25 = 5.0
+        //    Agent 2: 9 credits For   → weight = √9  = 3.0
+        //    Agent 3: 16 credits Against → weight = √16 = 4.0
+        let vote_configs = [
+            (VoteChoice::For, 25u64),
+            (VoteChoice::For, 9),
+            (VoteChoice::Against, 16),
+        ];
+
+        for (i, (cell, did)) in cells.iter().zip(dids.iter()).enumerate() {
+            let (choice, credits) = &vote_configs[i];
+            let qv_input = CastQuadraticVoteInput {
+                proposal_id: "MIP-QV-01".to_string(),
+                voter_did: did.clone(),
+                choice: choice.clone(),
+                credits_to_spend: *credits,
+                reason: Some(format!("QV test vote spending {} credits", credits)),
+            };
+            let _: Record = conductor
+                .call(&cell.zome("voting"), "cast_quadratic_vote", qv_input)
+                .await;
+        }
+        println!("  3. Quadratic votes cast: 25 For, 9 For, 16 Against");
+
+        // 4. Verify remaining credits for agent 1 (should be 100-25=75)
+        let credits: VoiceCredits = conductor
+            .call(&cells[0].zome("voting"), "query_voice_credits", dids[0].clone())
+            .await;
+        assert_eq!(credits.remaining, 75, "Agent 1 should have 75 credits remaining");
+        assert_eq!(credits.spent, 25, "Agent 1 should have spent 25 credits");
+        println!("  4. Agent 1 credits verified: {}/{} remaining", credits.remaining, credits.allocated);
+
+        // 5. Tally quadratic votes
+        let tally_input = TallyQuadraticVotesInput {
+            proposal_id: "MIP-QV-01".to_string(),
+            min_voters: None,
+        };
+        let tally_record: Record = conductor
+            .call(&cells[0].zome("voting"), "tally_quadratic_votes", tally_input)
+            .await;
+
+        let tally: QuadraticTally = decode_entry(&tally_record)
+            .expect("Failed to decode QuadraticTally");
+        assert_eq!(tally.proposal_id, "MIP-QV-01");
+        assert_eq!(tally.voter_count, 3);
+        assert_eq!(tally.total_credits_spent, 50); // 25+9+16
+        // QV For = √25+√9 = 5+3 = 8.0, QV Against = √16 = 4.0
+        assert!(tally.qv_for > tally.qv_against, "For weight should exceed Against");
+        assert!(tally.approved, "Should be approved (8.0 For > 4.0 Against)");
+        println!(
+            "  5. Quadratic tally: For={:.1}, Against={:.1}, approved={}, credits_spent={}",
+            tally.qv_for, tally.qv_against, tally.approved, tally.total_credits_spent
+        );
+
+        println!("=== test_quadratic_voting_lifecycle PASSED ===\n");
+    }
+}
+
+// ============================================================================
+// Council Decision & Reflection E2E Tests
+// ============================================================================
+
+#[cfg(test)]
+mod council_decision_tests {
+    use super::*;
+
+    /// Council decision lifecycle: create → join → record decision → reflect
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle + Holochain conductor
+    async fn test_council_decision_and_reflection() {
+        println!("=== test_council_decision_and_reflection ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("council-dec", &[dna.clone()]).await.unwrap();
+        let cell = app.cells()[0].clone();
+        let agent_did = format!("did:mycelix:{}", app.agent_pubkey());
+
+        // 1. Create council
+        let council_input = CreateCouncilInput {
+            name: "Resource Allocation Council".to_string(),
+            purpose: "Manage community resource distribution".to_string(),
+            council_type: CouncilType::Domain { domain: "resources".to_string() },
+            parent_council_id: None,
+            phi_threshold: 0.3,
+            quorum: 0.5,
+            supermajority: 0.67,
+            can_spawn_children: true,
+            max_delegation_depth: 2,
+            signing_committee_id: None,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("councils"), "create_council", council_input)
+            .await;
+
+        let councils: Vec<Record> = conductor
+            .call(&cell.zome("councils"), "get_all_councils", ())
+            .await;
+        let council: Council = decode_entry(&councils[0]).unwrap();
+        println!("  1. Council created: {}", council.name);
+
+        // 2. Join council as member
+        let join_input = JoinCouncilInput {
+            council_id: council.id.clone(),
+            member_did: agent_did.clone(),
+            role: MemberRole::Facilitator,
+            phi_score: 0.75,
+        };
+        let _: Record = conductor
+            .call(&cell.zome("councils"), "join_council", join_input)
+            .await;
+        println!("  2. Joined council as Facilitator");
+
+        // 3. Record an operational decision (passed)
+        let decision_input = RecordDecisionInput {
+            council_id: council.id.clone(),
+            proposal_id: Some("MIP-RESOURCE-01".to_string()),
+            title: "Allocate 500 credits to education fund".to_string(),
+            content: "The council unanimously agrees to allocate community credits to support educational initiatives.".to_string(),
+            decision_type: DecisionType::Resource,
+            votes_for: 5,
+            votes_against: 1,
+            abstentions: 0,
+            phi_weighted_result: 0.82,
+        };
+        let decision_record: Record = conductor
+            .call(&cell.zome("councils"), "record_decision", decision_input)
+            .await;
+
+        let decision: CouncilDecision = decode_entry(&decision_record)
+            .expect("decode decision");
+        assert_eq!(decision.council_id, council.id);
+        assert!(decision.passed, "Decision should pass (0.82 > 0.5 threshold)");
+        assert_eq!(decision.status, DecisionStatus::Approved);
+        assert_eq!(decision.decision_type, DecisionType::Resource);
+        println!("  3. Decision recorded: passed={}, status={:?}", decision.passed, decision.status);
+
+        // 4. Record a constitutional decision (requires supermajority - should fail)
+        let constitutional_input = RecordDecisionInput {
+            council_id: council.id.clone(),
+            proposal_id: None,
+            title: "Amend council charter".to_string(),
+            content: "Proposed amendment to governance process.".to_string(),
+            decision_type: DecisionType::Constitutional,
+            votes_for: 3,
+            votes_against: 2,
+            abstentions: 1,
+            phi_weighted_result: 0.55, // Below supermajority of 0.67
+        };
+        let const_record: Record = conductor
+            .call(&cell.zome("councils"), "record_decision", constitutional_input)
+            .await;
+
+        let const_decision: CouncilDecision = decode_entry(&const_record)
+            .expect("decode constitutional decision");
+        assert!(!const_decision.passed, "Constitutional decision should fail (0.55 < 0.67 supermajority)");
+        assert_eq!(const_decision.status, DecisionStatus::Rejected);
+        println!("  4. Constitutional decision: passed={} (correctly rejected)", const_decision.passed);
+
+        // 5. Retrieve all council decisions
+        let decisions: Vec<Record> = conductor
+            .call(&cell.zome("councils"), "get_council_decisions", council.id.clone())
+            .await;
+        assert_eq!(decisions.len(), 2, "Should have 2 decisions");
+        println!("  5. Retrieved {} council decisions", decisions.len());
+
+        // 6. Generate holonic reflection
+        let reflection_record: Record = conductor
+            .call(&cell.zome("councils"), "reflect_on_council", council.id.clone())
+            .await;
+
+        // We don't decode the full HolonicReflection (complex nested types),
+        // but verify the record was created
+        assert!(reflection_record.entry().as_option().is_some(), "Reflection should have entry data");
+        println!("  6. Holonic reflection generated");
+
+        // 7. Retrieve council reflections
+        let reflections: Vec<Record> = conductor
+            .call(&cell.zome("councils"), "get_council_reflections", council.id.clone())
+            .await;
+        assert!(!reflections.is_empty(), "Should have at least 1 reflection");
+        println!("  7. Retrieved {} reflections", reflections.len());
+
+        println!("=== test_council_decision_and_reflection PASSED ===\n");
     }
 }

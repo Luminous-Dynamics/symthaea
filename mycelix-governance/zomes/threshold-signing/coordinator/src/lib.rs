@@ -15,6 +15,45 @@ use hdk::prelude::*;
 use k256::ecdsa::signature::Verifier;
 use threshold_signing_integrity::*;
 
+// ============================================================================
+// REAL-TIME SIGNALS
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "payload")]
+pub enum ThresholdSigningSignal {
+    CommitteeCreated {
+        committee_id: String,
+        threshold: u32,
+        member_count: u32,
+    },
+    MemberRegistered {
+        committee_id: String,
+        member_did: String,
+    },
+    DKGDealSubmitted {
+        committee_id: String,
+        participant_id: u32,
+    },
+    DKGFinalized {
+        committee_id: String,
+        qualified_count: usize,
+    },
+    SignatureShareSubmitted {
+        signature_id: String,
+        participant_id: u32,
+    },
+    ThresholdSignatureCreated {
+        signature_id: String,
+        committee_id: String,
+        verified: bool,
+    },
+    CommitteeKeyRotated {
+        committee_id: String,
+        new_epoch: u32,
+    },
+}
+
 /// Verify the caller is a registered member of the committee.
 /// Returns the caller's AgentPubKey on success.
 fn require_committee_member(committee_id: &str) -> ExternResult<AgentPubKey> {
@@ -86,6 +125,12 @@ pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::SigningCommittee(committee))?;
+
+    let _ = emit_signal(&ThresholdSigningSignal::CommitteeCreated {
+        committee_id: committee_id.clone(),
+        threshold: input.threshold,
+        member_count: input.member_count,
+    });
 
     // Create anchor and link for committee lookup
     let committee_anchor = format!("committee:{}", committee_id);
@@ -200,6 +245,8 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
         }
     }
 
+    let signal_member_did = input.member_did.clone();
+
     let member = CommitteeMember {
         committee_id: input.committee_id.clone(),
         participant_id: input.participant_id,
@@ -214,6 +261,11 @@ pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::CommitteeMember(member))?;
+
+    let _ = emit_signal(&ThresholdSigningSignal::MemberRegistered {
+        committee_id: input.committee_id.clone(),
+        member_did: signal_member_did,
+    });
 
     // Link committee to member
     let committee_anchor = format!("committee:{}", input.committee_id);
@@ -326,10 +378,16 @@ pub fn submit_dkg_deal(input: SubmitDkgDealInput) -> ExternResult<Record> {
     }
 
     // Update member with deal info
+    let signal_participant_id = member.participant_id;
     member.vss_commitment = Some(input.vss_commitment);
     member.deal_submitted = true;
 
     let action_hash = update_entry(original_hash, &EntryTypes::CommitteeMember(member))?;
+
+    let _ = emit_signal(&ThresholdSigningSignal::DKGDealSubmitted {
+        committee_id: input.committee_id.clone(),
+        participant_id: signal_participant_id,
+    });
 
     // Auto-advance phase: check if all registered members have submitted deals
     let all_member_links = get_links(
@@ -513,7 +571,14 @@ pub fn finalize_dkg(input: FinalizeDkgInput) -> ExternResult<Record> {
         }
     }
 
+    let qualified_count = input.qualified_members.len();
+
     let action_hash = update_entry(committee_hash, &EntryTypes::SigningCommittee(committee))?;
+
+    let _ = emit_signal(&ThresholdSigningSignal::DKGFinalized {
+        committee_id: input.committee_id.clone(),
+        qualified_count,
+    });
 
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated committee".into())))
@@ -597,6 +662,11 @@ pub fn submit_signature_share(input: SubmitSignatureShareInput) -> ExternResult<
 
     let action_hash = create_entry(&EntryTypes::SignatureShare(share))?;
 
+    let _ = emit_signal(&ThresholdSigningSignal::SignatureShareSubmitted {
+        signature_id: input.signature_id.clone(),
+        participant_id: input.participant_id,
+    });
+
     // Link to signature
     let sig_anchor = format!("signature:{}", input.signature_id);
     create_entry(&EntryTypes::Anchor(Anchor(sig_anchor.clone())))?;
@@ -679,6 +749,12 @@ pub fn combine_signatures(input: CombineSignaturesInput) -> ExternResult<Record>
     };
 
     let action_hash = create_entry(&EntryTypes::ThresholdSignature(signature))?;
+
+    let _ = emit_signal(&ThresholdSigningSignal::ThresholdSignatureCreated {
+        signature_id: sig_id.clone(),
+        committee_id: input.committee_id.clone(),
+        verified,
+    });
 
     // Link committee to signature
     let committee_anchor = format!("committee:{}", input.committee_id);
@@ -878,7 +954,14 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
         min_phi: current_committee.min_phi,
     };
 
+    let new_epoch = current_committee.epoch + 1;
+
     let action_hash = create_entry(&EntryTypes::SigningCommittee(new_committee.clone()))?;
+
+    let _ = emit_signal(&ThresholdSigningSignal::CommitteeKeyRotated {
+        committee_id: committee_id.clone(),
+        new_epoch,
+    });
 
     // Link to committee ID
     create_link(

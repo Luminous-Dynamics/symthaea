@@ -32,6 +32,7 @@ uuid = { version = "1.6", features = ["v4"] }
 feldman-dkg = { path = "../../mycelix-core/libs/feldman-dkg" }
 k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa"] }
 rand = "0.8"
+blake3 = "1.5"
 
 [[test]]
 name = "sweettest_integration"

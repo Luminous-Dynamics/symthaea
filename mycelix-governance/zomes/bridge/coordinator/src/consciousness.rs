@@ -32,6 +32,11 @@ pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult
 
     let action_hash = create_entry(&EntryTypes::ConsciousnessSnapshot(snapshot.clone()))?;
 
+    let _ = emit_signal(&BridgeSignal::ConsciousnessSnapshotRecorded {
+        agent_did: agent_did.clone(),
+        phi: input.phi,
+    });
+
     // Link from agent to snapshot
     let agent_anchor = format!("agent:{}", agent_did);
     create_entry(&EntryTypes::Anchor(Anchor(agent_anchor.clone())))?;
@@ -134,6 +139,7 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
     };
 
     // Create gate verification record
+    let action_type_str = format!("{:?}", input.action_type);
     let gate = ConsciousnessGate {
         id: format!("gate:{}:{}", agent_did, now.as_micros()),
         agent_did: agent_did.clone(),
@@ -148,6 +154,12 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
     };
 
     let action_hash = create_entry(&EntryTypes::ConsciousnessGate(gate.clone()))?;
+
+    let _ = emit_signal(&BridgeSignal::ConsciousnessGateVerified {
+        agent_did: agent_did.clone(),
+        passed,
+        action_type: action_type_str,
+    });
 
     // Link from agent to gate
     let agent_anchor = format!("agent:{}", agent_did);
@@ -232,6 +244,7 @@ pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Recor
 
     // Determine recommendation
     let recommendation = determine_recommendation(overall_alignment, authenticity, &violations);
+    let recommendation_str = format!("{:?}", recommendation);
 
     // Create assessment entry
     let assessment = ValueAlignmentAssessment {
@@ -248,6 +261,12 @@ pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Recor
     };
 
     let action_hash = create_entry(&EntryTypes::ValueAlignmentAssessment(assessment))?;
+
+    let _ = emit_signal(&BridgeSignal::ValueAlignmentAssessed {
+        proposal_id: input.proposal_id.clone(),
+        agent_did: agent_did.clone(),
+        recommendation: recommendation_str,
+    });
 
     // Link from proposal to alignment
     let proposal_anchor = format!("proposal:{}", input.proposal_id);
