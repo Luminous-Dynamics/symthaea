@@ -191,7 +191,14 @@ mod tests {
         }
     }
 
-    fn make_test_input(n_states: usize) -> (Vec<ContinuousHV>, Vec<ContinuousHV>, RelationalAssessment, HumanPartnerModel) {
+    fn make_test_input(
+        n_states: usize,
+    ) -> (
+        Vec<ContinuousHV>,
+        Vec<ContinuousHV>,
+        RelationalAssessment,
+        HumanPartnerModel,
+    ) {
         let ai_states: Vec<ContinuousHV> = (0..n_states)
             .map(|i| ContinuousHV::random(HDC_DIMENSION, 100 + i as u64))
             .collect();
@@ -279,7 +286,10 @@ mod tests {
         let r1 = calc.compute(&input);
         let r2 = calc.compute(&input);
 
-        assert_eq!(r1.phi_dyad, r2.phi_dyad, "Same inputs should give same Phi_dyad");
+        assert_eq!(
+            r1.phi_dyad, r2.phi_dyad,
+            "Same inputs should give same Phi_dyad"
+        );
         assert_eq!(r1.phi_ai, r2.phi_ai);
         assert_eq!(r1.phi_human, r2.phi_human);
     }
@@ -297,7 +307,11 @@ mod tests {
             weights: DyadWeights::default(),
         };
         let joint = calc.build_joint_states(&input, &relational_hv);
-        assert!(joint.len() <= 8, "Joint states should be capped at 8, got {}", joint.len());
+        assert!(
+            joint.len() <= 8,
+            "Joint states should be capped at 8, got {}",
+            joint.len()
+        );
     }
 
     #[test]

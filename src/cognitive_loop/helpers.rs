@@ -196,10 +196,12 @@ impl CognitiveLoopService {
                     let train_input = Array1::from_vec(prev_state.clone());
                     let train_target = Array1::from_vec(compressed_state.clone());
                     let lr = self.config.cfc_config.learning_rate;
-                    match self
-                        .temporal_network
-                        .train_step_bptt(&train_input, &train_target, delta_t, lr)
-                    {
+                    match self.temporal_network.train_step_bptt(
+                        &train_input,
+                        &train_target,
+                        delta_t,
+                        lr,
+                    ) {
                         Ok(loss) => {
                             self.update_loss_stats(loss);
                             (true, Some(loss))
@@ -552,6 +554,22 @@ impl CognitiveLoopService {
         }
         if let Some(ref mut bridge) = self.affective_bridge {
             *bridge = crate::brain::affective_bridge::AffectiveBridge::default();
+        }
+        if let Some(ref mut thermo) = self.consciousness_thermodynamics {
+            *thermo = crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer::new(
+                crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),
+            );
+        }
+        if let Some(ref mut binding) = self.phenomenal_binding {
+            *binding =
+                crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
+                    crate::consciousness::phenomenal_binding::BindingConfig::default(),
+                );
+        }
+        if let Some(ref mut hfe) = self.hierarchical_free_energy {
+            *hfe = crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
+                crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
+            );
         }
         self.prev_predictive_phi_modulation = 1.0;
         self.prev_cross_modal_phi = 0.0;

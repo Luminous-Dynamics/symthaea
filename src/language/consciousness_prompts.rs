@@ -450,10 +450,7 @@ mod tests {
 
     #[test]
     fn test_harmony_names() {
-        assert_eq!(
-            Harmony::ResonantCoherence.name(),
-            "Resonant Coherence"
-        );
+        assert_eq!(Harmony::ResonantCoherence.name(), "Resonant Coherence");
         assert_eq!(Harmony::InfinitePlay.name(), "Infinite Play");
     }
 

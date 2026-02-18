@@ -21,19 +21,47 @@ fn main() {
 
     // Full system (HDC encoder + CfC temporal)
     println!("Running Full HDC+CfC system ({} cycles)...", n_cycles);
-    let full_result = run_ablation("Full (HDC+CfC)", &words, n_cycles, warmup, window, AblationMode::Full);
+    let full_result = run_ablation(
+        "Full (HDC+CfC)",
+        &words,
+        n_cycles,
+        warmup,
+        window,
+        AblationMode::Full,
+    );
 
     // HDC-only (no temporal learning — high learning threshold disables CfC training)
     println!("Running HDC-only ({} cycles)...", n_cycles);
-    let hdc_result = run_ablation("HDC-only", &words, n_cycles, warmup, window, AblationMode::HdcOnly);
+    let hdc_result = run_ablation(
+        "HDC-only",
+        &words,
+        n_cycles,
+        warmup,
+        window,
+        AblationMode::HdcOnly,
+    );
 
     // Minimal CfC (reduced HDC contribution via minimal encoder)
     println!("Running Minimal-HDC+CfC ({} cycles)...", n_cycles);
-    let cfc_result = run_ablation("Minimal-HDC+CfC", &words, n_cycles, warmup, window, AblationMode::MinimalHdc);
+    let cfc_result = run_ablation(
+        "Minimal-HDC+CfC",
+        &words,
+        n_cycles,
+        warmup,
+        window,
+        AblationMode::MinimalHdc,
+    );
 
     // HdcLtcUnified backend
     println!("Running HDC-LTC Unified ({} cycles)...", n_cycles);
-    let unified_result = run_ablation("HDC-LTC Unified", &words, n_cycles, warmup, window, AblationMode::HdcLtc);
+    let unified_result = run_ablation(
+        "HDC-LTC Unified",
+        &words,
+        n_cycles,
+        warmup,
+        window,
+        AblationMode::HdcLtc,
+    );
 
     // Print comparison table
     println!("\n── Comparison Table ─────────────────────────────────────────");
@@ -54,18 +82,9 @@ fn main() {
     let full_reduction = full_result.reduction_pct;
     let hdc_only_reduction = hdc_result.reduction_pct;
     let synergy = full_reduction - hdc_only_reduction;
-    println!(
-        "  Full system reduction:  {:.1}%",
-        full_reduction
-    );
-    println!(
-        "  HDC-only reduction:     {:.1}%",
-        hdc_only_reduction
-    );
-    println!(
-        "  CfC temporal synergy:   {:+.1}pp",
-        synergy
-    );
+    println!("  Full system reduction:  {:.1}%", full_reduction);
+    println!("  HDC-only reduction:     {:.1}%", hdc_only_reduction);
+    println!("  CfC temporal synergy:   {:+.1}pp", synergy);
     println!(
         "  Conclusion: {}",
         if synergy > 0.0 {
@@ -137,13 +156,15 @@ fn run_ablation(
     let initial_start = warmup;
     let initial_end = (warmup + window).min(errors.len());
     let initial_error = if initial_end > initial_start {
-        errors[initial_start..initial_end].iter().sum::<f32>() / (initial_end - initial_start) as f32
+        errors[initial_start..initial_end].iter().sum::<f32>()
+            / (initial_end - initial_start) as f32
     } else {
         1.0
     };
 
     let final_start = errors.len().saturating_sub(window);
-    let final_error = errors[final_start..].iter().sum::<f32>() / (errors.len() - final_start) as f32;
+    let final_error =
+        errors[final_start..].iter().sum::<f32>() / (errors.len() - final_start) as f32;
 
     let reduction_pct = if initial_error > 0.0 {
         ((initial_error - final_error) / initial_error) * 100.0

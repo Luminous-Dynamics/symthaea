@@ -51,11 +51,11 @@
 //! println!("Mode: {:?}", state.resonance_mode);
 //! ```
 
-use symthaea_core::hdc::BinaryHV;
-use symthaea_core::hdc::PrimitiveSystem;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::f64::consts::PI;
+use symthaea_core::hdc::BinaryHV;
+use symthaea_core::hdc::PrimitiveSystem;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // NSM PRIMITIVE GROUNDING FOR CONSCIOUSNESS RESONANCE

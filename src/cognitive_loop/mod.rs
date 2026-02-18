@@ -135,38 +135,40 @@ mod prediction;
 pub mod virtual_body;
 
 // ── Imports (only what the struct definitions below require) ─────────────────
-use crate::causal::CausalLoopEnhancer;
-use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
-use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
-use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
+use crate::brain::affective_bridge::AffectiveBridge;
 use crate::brain::prefrontal::PrefrontalCortex;
+use crate::causal::CausalLoopEnhancer;
 use crate::consciousness::attention_schema::AttentionSchema;
-use crate::consciousness::consciousness_resonance::ResonanceAnalyzer;
-use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
-use crate::consciousness::narrative_self::NarrativeSelfModel;
-use crate::consciousness::predictive_self::PredictiveSelfModel;
-use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
-use crate::consciousness::temporal_consciousness::TemporalConsciousnessAnalyzer;
-use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
-use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::autopoietic_consciousness::AutopoieticConsciousness;
+use crate::consciousness::consciousness_resonance::ResonanceAnalyzer;
+use crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer;
+use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
+use crate::consciousness::cross_modal_binding::CrossModalBinder;
+use crate::consciousness::dream::DreamEngine;
+use crate::consciousness::embodied_cognition::EmbodiedConsciousnessAnalyzer;
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
-#[cfg(feature = "full_consciousness")]
-use crate::consciousness::unified_living_mind::UnifiedLivingMind;
-use crate::consciousness::dream::DreamEngine;
+use crate::consciousness::fep_active_inference::{ActiveInferenceAgent, EnhancedFEPBridge};
+use crate::consciousness::gwt_integration::UnifiedGlobalWorkspace;
+use crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy;
+use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
+use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
+use crate::consciousness::narrative_self::NarrativeSelfModel;
+use crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer;
 use crate::consciousness::predictive_processing::PredictiveMind;
-use crate::consciousness::cross_modal_binding::CrossModalBinder;
-use crate::brain::affective_bridge::AffectiveBridge;
-use crate::exploration::SurpriseExplorationBridge;
-use crate::wisdom::meta_cognition::MetaCognitiveLayer;
+use crate::consciousness::predictive_self::PredictiveSelfModel;
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_consciousness::PrimitiveConsciousnessState;
 use crate::consciousness::primitive_discovery::PrimitiveDiscoveryService;
+use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
+use crate::consciousness::temporal_consciousness::TemporalConsciousnessAnalyzer;
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::dynamics::cfc_coherence::CfCCoherenceBridge;
 use crate::dynamics::temporal_signatures::TemporalSignatureEncoder;
+use crate::exploration::SurpriseExplorationBridge;
 use crate::hdc::moral_algebra::MoralAlgebra;
 use crate::hdc::moral_parser::MoralParser;
 use crate::memory::coherence_tracker::ConversationCoherenceTracker;
@@ -175,6 +177,7 @@ use crate::memory::semantic_memory::SemanticMemory;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 use crate::voice::voice_feedback::VoiceFeedbackBridge;
+use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use std::collections::VecDeque;
 use std::time::Instant;
 use symthaea_core::hdc::predictive_encoder::PredictiveHdcEncoder;
@@ -472,6 +475,21 @@ pub struct CognitiveLoopService {
     /// Affective bridge for emotion-cognition coupling.
     /// When enabled, evaluates somatic marker signals from cognitive loop state.
     affective_bridge: Option<AffectiveBridge>,
+
+    /// Consciousness thermodynamics analyzer.
+    /// When enabled, analyzes entropy, free energy, and phase transitions
+    /// from the 7 consciousness dimensions [Φ, B, W, A, R, E, K].
+    consciousness_thermodynamics: Option<ConsciousnessThermodynamicsAnalyzer>,
+
+    /// Phenomenal binding analyzer (temporal synchronization).
+    /// When enabled, tracks phase coherence across consciousness dimensions
+    /// to measure unified experience quality.
+    phenomenal_binding: Option<TemporalSynchronizationAnalyzer>,
+
+    /// Hierarchical free energy engine.
+    /// When enabled, maintains a multi-level variational free energy hierarchy
+    /// with precision-weighted prediction errors at each level.
+    hierarchical_free_energy: Option<HierarchicalFreeEnergy>,
 
     /// Previous cycle's predictive processing phi modulation (fed back into LR)
     prev_predictive_phi_modulation: f64,

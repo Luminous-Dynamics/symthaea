@@ -359,9 +359,12 @@ pub fn run_t_maze(config: TMazeConfig) -> TMazeBenchmarkResult {
 }
 
 /// Run the T-Maze benchmark with a custom cognitive loop config.
-pub fn run_t_maze_with_loop_config(config: TMazeConfig, loop_config: CognitiveLoopConfig) -> TMazeBenchmarkResult {
-    let mut service = CognitiveLoopService::new(loop_config)
-        .expect("Failed to create CognitiveLoopService");
+pub fn run_t_maze_with_loop_config(
+    config: TMazeConfig,
+    loop_config: CognitiveLoopConfig,
+) -> TMazeBenchmarkResult {
+    let mut service =
+        CognitiveLoopService::new(loop_config).expect("Failed to create CognitiveLoopService");
 
     let mut successes: Vec<bool> = Vec::with_capacity(config.num_episodes);
     let mut total_steps: usize = 0;
@@ -408,11 +411,7 @@ pub fn run_t_maze_with_loop_config(config: TMazeConfig, loop_config: CognitiveLo
 
     let quarter = n_eval / 4;
     let early_accuracy = if quarter > 0 {
-        eval_successes[..quarter]
-            .iter()
-            .filter(|&&s| s)
-            .count() as f32
-            / quarter as f32
+        eval_successes[..quarter].iter().filter(|&&s| s).count() as f32 / quarter as f32
     } else {
         0.0
     };
@@ -569,7 +568,10 @@ mod tests {
         );
         // Verify all episodes completed (3 steps each: start→corridor→junction→arm)
         assert_eq!(result.episode_successes.len(), 30);
-        assert!(result.avg_steps >= 3.0, "Each episode needs at least 3 steps");
+        assert!(
+            result.avg_steps >= 3.0,
+            "Each episode needs at least 3 steps"
+        );
         assert!(result.avg_steps <= 50.0, "Should not hit max_steps");
     }
 

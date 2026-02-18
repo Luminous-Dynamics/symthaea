@@ -121,12 +121,8 @@ impl Harmony {
             Harmony::PanSentientFlourishing => "Does this serve the flourishing of all beings?",
             Harmony::IntegralWisdom => "Does this arise from and cultivate wisdom?",
             Harmony::InfinitePlay => "Does this celebrate creativity and joy?",
-            Harmony::UniversalInterconnectedness => {
-                "Does this honor our fundamental connection?"
-            }
-            Harmony::SacredReciprocity => {
-                "Does this participate in the generous flow of giving?"
-            }
+            Harmony::UniversalInterconnectedness => "Does this honor our fundamental connection?",
+            Harmony::SacredReciprocity => "Does this participate in the generous flow of giving?",
             Harmony::EvolutionaryProgression => "Does this contribute to wise evolution?",
         }
     }

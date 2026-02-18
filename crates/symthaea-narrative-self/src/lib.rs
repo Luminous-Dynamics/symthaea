@@ -792,6 +792,14 @@ impl NarrativeSelfModel {
         self.self_phi
     }
 
+    /// Boost self-Phi by a small amount (clamped to [0, 1])
+    ///
+    /// Used by temporal consciousness to strengthen narrative coherence when
+    /// temporal continuity is high.
+    pub fn boost_coherence(&mut self, amount: f64) {
+        self.self_phi = (self.self_phi + amount).clamp(0.0, 1.0);
+    }
+
     /// Get unified self encoding
     pub fn unified_encoding(&self) -> &BinaryHV {
         &self.unified_self

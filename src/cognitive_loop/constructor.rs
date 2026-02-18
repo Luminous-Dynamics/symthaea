@@ -1,37 +1,40 @@
 //! Constructor and backend selection for CognitiveLoopService.
 
+use crate::brain::prefrontal::PrefrontalCortex;
 use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
-use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
-use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
+use crate::consciousness::attention_schema::AttentionSchema;
 #[cfg(feature = "full_consciousness")]
-use crate::consciousness::autopoietic_consciousness::{AutopoieticConfig, AutopoieticConsciousness};
+use crate::consciousness::autopoietic_consciousness::{
+    AutopoieticConfig, AutopoieticConsciousness,
+};
+use crate::consciousness::consciousness_resonance::{ResonanceAnalyzer, ResonanceConfig};
+use crate::consciousness::consciousness_unification::ConsciousnessUnificationEngine;
+use crate::consciousness::embodied_cognition::{EmbodiedConfig, EmbodiedConsciousnessAnalyzer};
 #[cfg(feature = "full_consciousness")]
 use crate::consciousness::enactive_cognition::EnactiveCognition;
-#[cfg(feature = "full_consciousness")]
-use crate::consciousness::unified_living_mind::UnifiedLivingMind;
-use crate::brain::prefrontal::PrefrontalCortex;
-use crate::consciousness::attention_schema::AttentionSchema;
-use crate::consciousness::consciousness_resonance::{ResonanceAnalyzer, ResonanceConfig};
-use crate::consciousness::gwt_integration::{UnifiedGWTConfig, UnifiedGlobalWorkspace};
-use crate::consciousness::narrative_self::{NarrativeSelfConfig, NarrativeSelfModel};
-use crate::consciousness::predictive_self::{PredictiveSelfConfig, PredictiveSelfModel};
-use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
-use crate::consciousness::temporal_consciousness::{TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig};
-use crate::consciousness::embodied_cognition::{EmbodiedConfig, EmbodiedConsciousnessAnalyzer};
-use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
-use crate::exploration::SurpriseExplorationBridge;
-use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use crate::consciousness::fep_active_inference::{
     ActiveInferenceAgent, ActiveInferenceAgentConfig, EnhancedFEPBridge,
 };
+use crate::consciousness::gwt_integration::{UnifiedGWTConfig, UnifiedGlobalWorkspace};
+use crate::consciousness::master_consciousness_equation::MasterConsciousnessEquation;
+use crate::consciousness::narrative_gwt_integration::NarrativeGWTIntegration;
+use crate::consciousness::narrative_self::{NarrativeSelfConfig, NarrativeSelfModel};
+use crate::consciousness::predictive_self::{PredictiveSelfConfig, PredictiveSelfModel};
 use crate::consciousness::primitive_belief_bridge::PrimitiveBeliefBridge;
 use crate::consciousness::primitive_discovery::{
     DiscoveryServiceConfig, PrimitiveDiscoveryService,
 };
+use crate::consciousness::quantum_coherence::QuantumCoherenceAnalyzer;
 use crate::consciousness::stability_regime::StabilityRegimeProcessor;
+use crate::consciousness::temporal_consciousness::{
+    TemporalConsciousnessAnalyzer, TemporalConsciousnessConfig,
+};
+#[cfg(feature = "full_consciousness")]
+use crate::consciousness::unified_living_mind::UnifiedLivingMind;
 use crate::dynamics::cfc::CfCNetwork;
 use crate::dynamics::cfc_coherence::{CfCCoherenceBridge, CoherenceConfig};
 use crate::dynamics::temporal_signatures::{SignatureConfig, TemporalSignatureEncoder};
+use crate::exploration::SurpriseExplorationBridge;
 use crate::hdc::moral_algebra::MoralAlgebra;
 use crate::hdc::moral_parser::MoralParser;
 use crate::hdc_ltc_bridge::HdcLtcBridge;
@@ -41,6 +44,7 @@ use crate::memory::semantic_memory::SemanticMemory;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
 use crate::voice::voice_feedback::{VoiceFeedbackBridge, VoiceFeedbackConfig};
+use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use anyhow::Result;
 use rand::Rng;
 use std::collections::VecDeque;
@@ -225,7 +229,9 @@ impl CognitiveLoopService {
 
         // Build optional temporal consciousness analyzer
         let temporal_consciousness = if config.enable_temporal_consciousness {
-            Some(TemporalConsciousnessAnalyzer::new(TemporalConsciousnessConfig::default()))
+            Some(TemporalConsciousnessAnalyzer::new(
+                TemporalConsciousnessConfig::default(),
+            ))
         } else {
             None
         };
@@ -256,18 +262,22 @@ impl CognitiveLoopService {
 
         // Build optional predictive processing mind
         let predictive_mind = if config.enable_predictive_processing {
-            Some(crate::consciousness::predictive_processing::PredictiveMind::new(
-                crate::consciousness::predictive_processing::PredictiveConfig::default(),
-            ))
+            Some(
+                crate::consciousness::predictive_processing::PredictiveMind::new(
+                    crate::consciousness::predictive_processing::PredictiveConfig::default(),
+                ),
+            )
         } else {
             None
         };
 
         // Build optional cross-modal binder
         let cross_modal_binder = if config.enable_cross_modal_binding {
-            Some(crate::consciousness::cross_modal_binding::CrossModalBinder::new(
-                crate::consciousness::cross_modal_binding::BindingConfig::default(),
-            ))
+            Some(
+                crate::consciousness::cross_modal_binding::CrossModalBinder::new(
+                    crate::consciousness::cross_modal_binding::BindingConfig::default(),
+                ),
+            )
         } else {
             None
         };
@@ -275,6 +285,39 @@ impl CognitiveLoopService {
         // Build optional affective bridge
         let affective_bridge = if config.enable_affective_bridge {
             Some(crate::brain::affective_bridge::AffectiveBridge::default())
+        } else {
+            None
+        };
+
+        // Build optional consciousness thermodynamics analyzer
+        let consciousness_thermodynamics = if config.enable_consciousness_thermodynamics {
+            Some(
+                crate::consciousness::consciousness_thermodynamics::ConsciousnessThermodynamicsAnalyzer::new(
+                    crate::consciousness::consciousness_thermodynamics::ThermodynamicsConfig::default(),
+                ),
+            )
+        } else {
+            None
+        };
+
+        // Build optional phenomenal binding analyzer
+        let phenomenal_binding = if config.enable_phenomenal_binding {
+            Some(
+                crate::consciousness::phenomenal_binding::TemporalSynchronizationAnalyzer::new(
+                    crate::consciousness::phenomenal_binding::BindingConfig::default(),
+                ),
+            )
+        } else {
+            None
+        };
+
+        // Build optional hierarchical free energy engine
+        let hierarchical_free_energy = if config.enable_hierarchical_free_energy {
+            Some(
+                crate::consciousness::hierarchical_free_energy::HierarchicalFreeEnergy::new(
+                    crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
+                ),
+            )
         } else {
             None
         };
@@ -400,6 +443,9 @@ impl CognitiveLoopService {
             predictive_mind,
             cross_modal_binder,
             affective_bridge,
+            consciousness_thermodynamics,
+            phenomenal_binding,
+            hierarchical_free_energy,
             prev_predictive_phi_modulation: 1.0,
             prev_cross_modal_phi: 0.0,
             surprise_bridge,

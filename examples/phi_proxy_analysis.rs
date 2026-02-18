@@ -19,8 +19,8 @@
 //! followed by the Spearman rho correlation coefficient.
 
 use symthaea::hdc::consciousness_topology_generators::ConsciousnessTopology;
-use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::hdc::spectral_connectivity::ConnectivityCalculator;
+use symthaea::hdc::unified_hv::ContinuousHV;
 use symthaea::phi_engine::PhiEngine;
 
 fn to_continuous(topology: &ConsciousnessTopology) -> Vec<ContinuousHV> {
@@ -52,11 +52,7 @@ fn spearman_rho(x: &[f64], y: &[f64]) -> f64 {
     let rx = rank(x);
     let ry = rank(y);
 
-    let d_sq_sum: f64 = rx
-        .iter()
-        .zip(ry.iter())
-        .map(|(a, b)| (a - b).powi(2))
-        .sum();
+    let d_sq_sum: f64 = rx.iter().zip(ry.iter()).map(|(a, b)| (a - b).powi(2)).sum();
 
     1.0 - (6.0 * d_sq_sum) / (n * (n * n - 1.0))
 }

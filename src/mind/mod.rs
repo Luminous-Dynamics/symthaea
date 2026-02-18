@@ -892,7 +892,10 @@ mod tests {
         let sc = mind.social_coherence().unwrap();
         let rel = sc.get_relationship("ally_1");
         assert!(rel.is_some(), "Relationship should be created");
-        assert!(rel.unwrap().trust > 0.5, "Trust should increase from cooperation");
+        assert!(
+            rel.unwrap().trust > 0.5,
+            "Trust should increase from cooperation"
+        );
     }
 
     #[test]
@@ -909,7 +912,10 @@ mod tests {
         }
 
         let outbox = mind.drain_social_outbox();
-        assert!(!outbox.is_empty(), "Outbox should have messages after 5 ticks");
+        assert!(
+            !outbox.is_empty(),
+            "Outbox should have messages after 5 ticks"
+        );
         assert_eq!(outbox[0].agent_id, "self");
     }
 

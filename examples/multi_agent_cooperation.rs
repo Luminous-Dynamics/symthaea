@@ -177,9 +177,29 @@ async fn main() {
         let noise_a = ContinuousHV::random(dim, 10000 + i);
         let noise_b = ContinuousHV::random(dim, 20000 + i);
         let noise_c = ContinuousHV::random(dim, 30000 + i);
-        alice.perceive(ContinuousHV::bundle(&[&domain_perception, &domain_perception, &domain_perception, &noise_a])).await;
-        bob.perceive(ContinuousHV::bundle(&[&domain_reasoning, &domain_reasoning, &domain_reasoning, &noise_b])).await;
-        charlie.perceive(ContinuousHV::bundle(&[&domain_memory, &domain_memory, &domain_memory, &noise_c])).await;
+        alice
+            .perceive(ContinuousHV::bundle(&[
+                &domain_perception,
+                &domain_perception,
+                &domain_perception,
+                &noise_a,
+            ]))
+            .await;
+        bob.perceive(ContinuousHV::bundle(&[
+            &domain_reasoning,
+            &domain_reasoning,
+            &domain_reasoning,
+            &noise_b,
+        ]))
+        .await;
+        charlie
+            .perceive(ContinuousHV::bundle(&[
+                &domain_memory,
+                &domain_memory,
+                &domain_memory,
+                &noise_c,
+            ]))
+            .await;
 
         alice.tick().await;
         bob.tick().await;
@@ -194,7 +214,11 @@ async fn main() {
 
             // With specialization, consciousness profiles should differ
             let consciousness_spread = {
-                let levels = [a.consciousness_level, b.consciousness_level, c.consciousness_level];
+                let levels = [
+                    a.consciousness_level,
+                    b.consciousness_level,
+                    c.consciousness_level,
+                ];
                 let mean = levels.iter().sum::<f64>() / 3.0;
                 let var = levels.iter().map(|l| (l - mean).powi(2)).sum::<f64>() / 3.0;
                 var.sqrt()
@@ -222,7 +246,8 @@ async fn main() {
     for i in 0..10u64 {
         // Stable signal with slight per-tick variation (75% stable, 25% noise)
         let noise = ContinuousHV::random(dim, 40000 + i);
-        let varied = ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
+        let varied =
+            ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
         alice.perceive(varied.clone()).await;
         bob.perceive(varied.clone()).await;
         charlie.perceive(varied).await;
@@ -244,7 +269,8 @@ async fn main() {
     // Sub-phase B: disrupt Bob (10 ticks)
     for i in 0..10u64 {
         let noise = ContinuousHV::random(dim, 50000 + i);
-        let varied = ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
+        let varied =
+            ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
         alice.perceive(varied.clone()).await;
         bob.perceive(ContinuousHV::random(dim, 99000 + i)).await; // Bob gets pure noise
         charlie.perceive(varied).await;
@@ -266,7 +292,8 @@ async fn main() {
     // Sub-phase C: recovery (10 ticks — Bob returns to shared signal)
     for i in 0..10u64 {
         let noise = ContinuousHV::random(dim, 60000 + i);
-        let varied = ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
+        let varied =
+            ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
         alice.perceive(varied.clone()).await;
         bob.perceive(varied.clone()).await;
         charlie.perceive(varied).await;
@@ -284,7 +311,9 @@ async fn main() {
             println!(
                 "  Recovery  (tick {:>3}): consciousness [A={:.3}, B={:.3}, C={:.3}]",
                 150 + i + 1,
-                a.consciousness_level, b.consciousness_level, c.consciousness_level,
+                a.consciousness_level,
+                b.consciousness_level,
+                c.consciousness_level,
             );
         }
     }
@@ -336,10 +365,7 @@ async fn main() {
     let std_dev = variance.sqrt();
 
     println!("\nFinal state:");
-    println!(
-        "  Consciousness: mean={:.4}, std_dev={:.4}",
-        mean, std_dev
-    );
+    println!("  Consciousness: mean={:.4}, std_dev={:.4}", mean, std_dev);
     if std_dev < 0.05 {
         println!("  => Strong convergence: agents synchronized through social relay");
     } else if std_dev < 0.15 {

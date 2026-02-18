@@ -19,10 +19,10 @@ pub mod dark_spot_actor;
 
 // Re-export key types
 pub use actor_model::{Actor, ActorId, ActorMessage, ActorRole, ActorSystem, MessageType};
+pub use affective_bridge::{AffectiveBridge, AffectiveBridgeConfig};
 pub use prefrontal::{
     ExecutiveDecision, PlannedAction, PrefrontalConfig, PrefrontalCortex, WorkingMemoryItem,
 };
 pub use social_coherence::{
     MentalModel, Relationship, RelationshipType, SocialCoherence, SocialCoherenceConfig,
 };
-pub use affective_bridge::{AffectiveBridge, AffectiveBridgeConfig};

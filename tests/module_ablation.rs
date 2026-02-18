@@ -54,6 +54,9 @@ fn baseline_config() -> CognitiveLoopConfig {
         enable_predictive_processing: false,
         enable_cross_modal_binding: false,
         enable_affective_bridge: false,
+        enable_consciousness_thermodynamics: false,
+        enable_phenomenal_binding: false,
+        enable_hierarchical_free_energy: false,
         ..Default::default()
     }
 }
@@ -241,6 +244,45 @@ fn test_ablation_affective_bridge() {
     );
 }
 
+#[test]
+fn test_ablation_consciousness_thermodynamics() {
+    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let mut config = baseline_config();
+    config.enable_consciousness_thermodynamics = true;
+    let (error, _) = run_config(config, ABLATION_CYCLES);
+    println!("Consciousness thermodynamics: error={error:.4}, baseline={baseline:.4}");
+    assert!(
+        error <= baseline * 1.05,
+        "Consciousness thermodynamics module should not degrade baseline by >5%: {error:.4} vs {baseline:.4}"
+    );
+}
+
+#[test]
+fn test_ablation_phenomenal_binding() {
+    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let mut config = baseline_config();
+    config.enable_phenomenal_binding = true;
+    let (error, _) = run_config(config, ABLATION_CYCLES);
+    println!("Phenomenal binding: error={error:.4}, baseline={baseline:.4}");
+    assert!(
+        error <= baseline * 1.05,
+        "Phenomenal binding module should not degrade baseline by >5%: {error:.4} vs {baseline:.4}"
+    );
+}
+
+#[test]
+fn test_ablation_hierarchical_free_energy() {
+    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let mut config = baseline_config();
+    config.enable_hierarchical_free_energy = true;
+    let (error, _) = run_config(config, ABLATION_CYCLES);
+    println!("Hierarchical free energy: error={error:.4}, baseline={baseline:.4}");
+    assert!(
+        error <= baseline * 1.05,
+        "Hierarchical free energy module should not degrade baseline by >5%: {error:.4} vs {baseline:.4}"
+    );
+}
+
 // ── Convergence Test: Feedback loops improve convergence ─────────
 
 #[test]
@@ -266,6 +308,9 @@ fn test_feedback_loops_improve_convergence() {
         enable_predictive_processing: true,
         enable_cross_modal_binding: true,
         enable_affective_bridge: true,
+        enable_consciousness_thermodynamics: true,
+        enable_phenomenal_binding: true,
+        enable_hierarchical_free_energy: true,
         ..Default::default()
     };
 
@@ -326,6 +371,9 @@ fn test_all_modules_synergy() {
         enable_predictive_processing: true,
         enable_cross_modal_binding: true,
         enable_affective_bridge: true,
+        enable_consciousness_thermodynamics: true,
+        enable_phenomenal_binding: true,
+        enable_hierarchical_free_energy: true,
         ..Default::default()
     };
 
@@ -374,7 +422,10 @@ fn test_all_modules_synergy() {
         "All modules: final_error={final_10_avg:.4}, baseline_error={:.4}",
         baseline.0
     );
-    println!("Consciousness levels computed: {}", consciousness_levels.len());
+    println!(
+        "Consciousness levels computed: {}",
+        consciousness_levels.len()
+    );
     println!("Metadata populated bits: {metadata_populated:#010b}");
 
     // Assert: consciousness_level > 0 (MCE produces meaningful output)

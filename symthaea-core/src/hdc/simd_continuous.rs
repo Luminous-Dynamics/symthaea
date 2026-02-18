@@ -345,7 +345,7 @@ fn dot_product_scalar(a: &[f32], b: &[f32]) -> f32 {
 /// In HDC, binding creates associations between concepts.
 ///
 /// # Returns
-/// A new Vec<f32> containing the element-wise product.
+/// A new `Vec<f32>` containing the element-wise product.
 #[cfg(feature = "simd")]
 #[inline]
 pub fn bind_simd(a: &[f32], b: &[f32]) -> Vec<f32> {
@@ -479,7 +479,7 @@ fn bind_scalar(a: &[f32], b: &[f32], result: &mut [f32]) {
 /// * `weights` - Weight for each hypervector
 ///
 /// # Returns
-/// A new Vec<f32> containing the weighted superposition.
+/// A new `Vec<f32>` containing the weighted superposition.
 #[cfg(feature = "simd")]
 #[inline]
 pub fn bundle_simd(hvs: &[&[f32]], weights: &[f32]) -> Vec<f32> {

@@ -55,10 +55,7 @@ impl IrohBridgeHandle {
     ///
     /// - `outbound_capacity`: Bounded channel from Mind → Actor (64 = ~3.2s at 20 msg/s)
     /// - `inbound_capacity`: Bounded channel from Actor → Mind (128 = burst buffer)
-    pub fn new(
-        outbound_capacity: usize,
-        inbound_capacity: usize,
-    ) -> (Self, IrohBridgeActor) {
+    pub fn new(outbound_capacity: usize, inbound_capacity: usize) -> (Self, IrohBridgeActor) {
         let (outbound_tx, outbound_rx) = mpsc::channel(outbound_capacity);
         let (inbound_tx, inbound_rx) = mpsc::channel(inbound_capacity);
         let alive = Arc::new(AtomicBool::new(true));
@@ -324,13 +321,12 @@ mod tests {
         drop(handle);
 
         // Actor should finish within a reasonable time
-        let result = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            actor_task,
-        )
-        .await;
+        let result = tokio::time::timeout(std::time::Duration::from_secs(2), actor_task).await;
 
-        assert!(result.is_ok(), "Actor should have stopped after handle drop");
+        assert!(
+            result.is_ok(),
+            "Actor should have stopped after handle drop"
+        );
     }
 
     #[tokio::test]

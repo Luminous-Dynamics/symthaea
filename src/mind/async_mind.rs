@@ -79,7 +79,10 @@ impl AsyncMindHandle {
 
     /// Add a text perception.
     pub async fn perceive_text(&self, text: String, embedding: ContinuousHV) {
-        let _ = self.tx.send(MindCommand::PerceiveText(text, embedding)).await;
+        let _ = self
+            .tx
+            .send(MindCommand::PerceiveText(text, embedding))
+            .await;
     }
 
     /// Add a raw input.

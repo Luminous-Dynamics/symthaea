@@ -238,7 +238,6 @@ impl Resolution {
     }
 }
 
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // RISK TIER
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -495,7 +494,6 @@ pub enum ResourceExpectation {
     /// Resource was modified after a time
     ModifiedAfter(#[serde(skip)] Option<Instant>),
 }
-
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // RESOLUTION CONTRACT (UPGRADE A)

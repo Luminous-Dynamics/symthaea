@@ -178,8 +178,7 @@ impl VirtualBody {
         self.state.fatigue = self.state.fatigue * (1.0 - alpha) + raw.fatigue * alpha;
         self.state.hunger = self.state.hunger * (1.0 - alpha) + raw.hunger * alpha;
         self.state.thirst = self.state.thirst * (1.0 - alpha) + raw.thirst * alpha;
-        self.state.temperature =
-            self.state.temperature * (1.0 - alpha) + raw.temperature * alpha;
+        self.state.temperature = self.state.temperature * (1.0 - alpha) + raw.temperature * alpha;
         self.state.gut_state = self.state.gut_state * (1.0 - alpha) + raw.gut_state * alpha;
         self.state.visceral_arousal =
             self.state.visceral_arousal * (1.0 - alpha) + raw.visceral_arousal * alpha;
