@@ -435,11 +435,18 @@ fn test_reasoning_bridge_creation() {
 
     // New bridge starts empty; generate an assertion to confirm it works
     let assertions = bridge.assertions();
-    assert!(assertions.is_empty(), "New bridge starts with no assertions");
+    assert!(
+        assertions.is_empty(),
+        "New bridge starts with no assertions"
+    );
 
     // After asserting, it should have one
     bridge.assert_equality(2, 3, "add");
-    assert_eq!(bridge.assertions().len(), 1, "Should have one assertion after assert_equality");
+    assert_eq!(
+        bridge.assertions().len(),
+        1,
+        "Should have one assertion after assert_equality"
+    );
 }
 
 #[test]
