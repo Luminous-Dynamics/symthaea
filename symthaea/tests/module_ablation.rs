@@ -51,6 +51,9 @@ fn baseline_config() -> CognitiveLoopConfig {
         enable_temporal_consciousness: false,
         enable_embodied_cognition: false,
         enable_narrative_gwt: false,
+        enable_predictive_processing: false,
+        enable_cross_modal_binding: false,
+        enable_affective_bridge: false,
         ..Default::default()
     }
 }
@@ -199,11 +202,50 @@ fn test_ablation_narrative_gwt() {
     );
 }
 
+#[test]
+fn test_ablation_predictive_processing() {
+    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let mut config = baseline_config();
+    config.enable_predictive_processing = true;
+    let (error, _) = run_config(config, ABLATION_CYCLES);
+    println!("Predictive processing: error={error:.4}, baseline={baseline:.4}");
+    assert!(
+        error <= baseline * 1.05,
+        "Predictive processing module should not degrade baseline by >5%: {error:.4} vs {baseline:.4}"
+    );
+}
+
+#[test]
+fn test_ablation_cross_modal_binding() {
+    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let mut config = baseline_config();
+    config.enable_cross_modal_binding = true;
+    let (error, _) = run_config(config, ABLATION_CYCLES);
+    println!("Cross-modal binding: error={error:.4}, baseline={baseline:.4}");
+    assert!(
+        error <= baseline * 1.05,
+        "Cross-modal binding module should not degrade baseline by >5%: {error:.4} vs {baseline:.4}"
+    );
+}
+
+#[test]
+fn test_ablation_affective_bridge() {
+    let baseline = run_config(baseline_config(), ABLATION_CYCLES).0;
+    let mut config = baseline_config();
+    config.enable_affective_bridge = true;
+    let (error, _) = run_config(config, ABLATION_CYCLES);
+    println!("Affective bridge: error={error:.4}, baseline={baseline:.4}");
+    assert!(
+        error <= baseline * 1.05,
+        "Affective bridge module should not degrade baseline by >5%: {error:.4} vs {baseline:.4}"
+    );
+}
+
 // ── Convergence Test: Feedback loops improve convergence ─────────
 
 #[test]
 fn test_feedback_loops_improve_convergence() {
-    // Config A: All 13 modules ON (feedbacks active), 500 cycles
+    // Config A: All 16 modules ON (feedbacks active), 500 cycles
     let all_on = CognitiveLoopConfig {
         genesis_phrase: Some(GENESIS_SEED.to_string()),
         learning_threshold: 0.0,
@@ -221,6 +263,9 @@ fn test_feedback_loops_improve_convergence() {
         enable_temporal_consciousness: true,
         enable_embodied_cognition: true,
         enable_narrative_gwt: true,
+        enable_predictive_processing: true,
+        enable_cross_modal_binding: true,
+        enable_affective_bridge: true,
         ..Default::default()
     };
 
@@ -278,6 +323,9 @@ fn test_all_modules_synergy() {
         enable_temporal_consciousness: true,
         enable_embodied_cognition: true,
         enable_narrative_gwt: true,
+        enable_predictive_processing: true,
+        enable_cross_modal_binding: true,
+        enable_affective_bridge: true,
         ..Default::default()
     };
 

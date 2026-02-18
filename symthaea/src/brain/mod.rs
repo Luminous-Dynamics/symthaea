@@ -11,8 +11,7 @@ pub mod actor_model;
 pub mod prefrontal;
 pub mod social_coherence;
 
-// Bridge modules (affective_bridge, consciousness_bridge, hippocampus_bridge)
-// were removed — they targeted an earlier API version with incompatible types.
+pub mod affective_bridge;
 
 // Dark spot actor needs mycelix DHT
 #[cfg(feature = "mycelix_module")]
@@ -26,3 +25,4 @@ pub use prefrontal::{
 pub use social_coherence::{
     MentalModel, Relationship, RelationshipType, SocialCoherence, SocialCoherenceConfig,
 };
+pub use affective_bridge::{AffectiveBridge, AffectiveBridgeConfig};

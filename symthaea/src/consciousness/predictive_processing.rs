@@ -923,19 +923,25 @@ impl PredictiveMind {
     }
 
     /// Calculate how predictive processing modulates Φ
+    ///
+    /// Returns a value in [0.5, 1.5] where:
+    /// - < 0.8: predictions unreliable → reduce learning rate (precision-weighting)
+    /// - 0.8-1.0: neutral zone
+    /// - > 1.0: predictions accurate → boost learning rate (Friston 2010)
     pub fn calculate_phi_modulation(&self) -> f64 {
-        // The "controlled hallucination" that is consciousness
-        // emerges from integration of prediction and error
-
         let prediction_quality = self.perception.calculate_phi_modulation();
         let precision_stability = self.precision.stability();
         let model_evidence = self.model_evidence;
 
         // Consciousness is brightest when predictions are accurate
-        // but there's still something to predict (not boring)
-        let optimal_surprise = 1.0 - (self.perception.free_energy - 0.3).abs() * 2.0;
+        // but there's still something to predict (not boring).
+        // Clamp to >= 0 so the product stays positive.
+        let optimal_surprise =
+            (1.0 - (self.perception.free_energy - 0.3).abs() * 2.0).max(0.0);
 
-        prediction_quality * precision_stability * model_evidence * optimal_surprise
+        // Scale raw product [0, ~0.5] into useful modulation range [0.5, 1.5]
+        let raw = prediction_quality * precision_stability * model_evidence * optimal_surprise;
+        0.5 + raw.clamp(0.0, 1.0)
     }
 }
 

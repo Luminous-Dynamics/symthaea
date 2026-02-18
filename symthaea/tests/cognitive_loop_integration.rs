@@ -510,6 +510,113 @@ fn test_feedback_loop_overhead_quick_check() {
     );
 }
 
+// ── Predictive + Affective + Cross-Modal Synergy ─────────────────
+
+#[test]
+fn test_predictive_affective_crossmodal_synergy() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        async_training: false,
+        enable_virtual_body: true,
+        enable_predictive_processing: true,
+        enable_cross_modal_binding: true,
+        enable_affective_bridge: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "alpha beta gamma",
+        "delta epsilon zeta",
+        "eta theta iota",
+        "kappa lambda mu",
+    ];
+
+    let mut saw_affective = false;
+    let mut saw_predictive = false;
+    let mut saw_binding = false;
+
+    for i in 0..100 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+
+        // All values must be finite
+        assert!(
+            result.metadata.affective_valence.is_finite(),
+            "Affective valence must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.affective_arousal.is_finite(),
+            "Affective arousal must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.predictive_free_energy.is_finite(),
+            "Predictive free energy must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.predictive_phi_modulation.is_finite(),
+            "Predictive phi modulation must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.cross_modal_binding_strength.is_finite(),
+            "Cross-modal binding strength must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.cross_modal_phi.is_finite(),
+            "Cross-modal phi must be finite at cycle {i}"
+        );
+
+        // Bounds checks
+        assert!(
+            result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0,
+            "Valence out of bounds at cycle {i}: {}",
+            result.metadata.affective_valence
+        );
+        assert!(
+            result.metadata.affective_arousal >= 0.0 && result.metadata.affective_arousal <= 1.0,
+            "Arousal out of bounds at cycle {i}: {}",
+            result.metadata.affective_arousal
+        );
+        assert!(
+            result.metadata.predictive_phi_modulation.is_finite(),
+            "Phi modulation must be finite at cycle {i}: {}",
+            result.metadata.predictive_phi_modulation
+        );
+        assert!(
+            result.metadata.cross_modal_phi >= 0.0,
+            "Cross-modal phi must be non-negative at cycle {i}: {}",
+            result.metadata.cross_modal_phi
+        );
+
+        // Track non-default values
+        if result.metadata.affective_valence.abs() > 0.001
+            || (result.metadata.affective_arousal - 0.5).abs() > 0.001
+        {
+            saw_affective = true;
+        }
+        if result.metadata.predictive_free_energy.abs() > 0.001 {
+            saw_predictive = true;
+        }
+        if result.metadata.cross_modal_binding_strength > 0.0 {
+            saw_binding = true;
+        }
+    }
+
+    println!("Synergy check: affective={saw_affective}, predictive={saw_predictive}, binding={saw_binding}");
+
+    // Over 100 cycles, all three modules should have produced non-default output
+    assert!(saw_affective, "Affective bridge should produce non-default values over 100 cycles");
+    assert!(saw_predictive, "Predictive processing should produce non-default values over 100 cycles");
+    // Cross-modal binding requires modality data; may or may not bind depending on input
+    // Just verify stability
+    assert_eq!(service.stats().total_cycles, 100);
+
+    let avg_error = service.stats().avg_prediction_error;
+    assert!(
+        avg_error < 1.0,
+        "Average error with synergy modules should be bounded: got {avg_error:.4}"
+    );
+}
+
 // ── Dream Replay Integration ──────────────────────────────────────
 
 #[test]

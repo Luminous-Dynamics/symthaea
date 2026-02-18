@@ -91,6 +91,23 @@ impl CoreAffect {
             EmotionCategory::Neutral
         }
     }
+
+    /// Alias for `closest_emotion()` (used by AffectiveBridge)
+    pub fn to_emotion_category(&self) -> EmotionCategory {
+        self.closest_emotion()
+    }
+
+    /// Emotional intensity (Euclidean magnitude in VAD space)
+    pub fn intensity(&self) -> f64 {
+        ((self.valence * self.valence + self.arousal * self.arousal
+            + self.dominance * self.dominance) as f64)
+            .sqrt()
+    }
+
+    /// Decay toward neutral by the given rate (0.0 = no decay, 1.0 = instant neutral)
+    pub fn decay(&mut self, rate: f64) {
+        *self = self.blend(&CoreAffect::neutral(), rate as f32);
+    }
 }
 
 impl Default for CoreAffect {
