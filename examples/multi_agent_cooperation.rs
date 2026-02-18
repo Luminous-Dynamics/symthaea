@@ -5,17 +5,17 @@
 //!
 //! ## Architecture
 //! ```text
-//!   Alice ←──relay──→ Bob ←──relay──→ Charlie
-//!     ↑                                   ↑
-//!     └───────────relay───────────────────┘
+//!   Alice ──relay──→ Bob ←──relay── Charlie
+//!     ↑                                 ↑
+//!     └──────────relay─────────────────┘
 //! ```
 //!
-//! Each agent perceives different stimuli, ticks at 10Hz, and broadcasts social
-//! signals. The demo shows:
-//! - Concurrent mind execution
-//! - Social message exchange
-//! - Consciousness level convergence (or divergence) over time
-//! - Working memory utilization across agents
+//! ## Phases
+//! 1. **Independent Perception** — each agent perceives different stimuli
+//! 2. **Shared Experience** — all agents perceive the same stimulus
+//! 3. **Leader-Follower** — Alice leads, others follow via social relay
+//! 4. **Specialization** — each agent focuses on different features
+//! 5. **Disruption Recovery** — one agent disrupted, social network aids recovery
 //!
 //! ## Run
 //! ```bash
@@ -52,13 +52,15 @@ async fn main() {
     let relay_ab = connect_social(&alice, &bob, relay_interval);
     let relay_bc = connect_social(&bob, &charlie, relay_interval);
     let relay_ac = connect_social(&alice, &charlie, relay_interval);
-    println!("Social relays connected: Alice↔Bob, Bob↔Charlie, Alice↔Charlie\n");
+    println!("Social relays connected: Alice<->Bob, Bob<->Charlie, Alice<->Charlie\n");
 
-    // ── Phase 1: Independent perception ─────────────────────────────────────
-    println!("━━━ Phase 1: Independent Perception (50 ticks each) ━━━");
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase 1: Independent Perception — divergence
+    // ══════════════════════════════════════════════════════════════════════════
+    println!("━━━ Phase 1: Independent Perception (30 ticks) ━━━");
+    println!("  Each agent perceives different random stimuli.\n");
 
-    for i in 0..50u64 {
-        // Each agent perceives different stimuli
+    for i in 0..30u64 {
         alice.perceive(ContinuousHV::random(dim, 1000 + i)).await;
         bob.perceive(ContinuousHV::random(dim, 2000 + i)).await;
         charlie.perceive(ContinuousHV::random(dim, 3000 + i)).await;
@@ -67,7 +69,6 @@ async fn main() {
         bob.tick().await;
         charlie.tick().await;
 
-        // Let relay run
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         if (i + 1) % 10 == 0 {
@@ -77,20 +78,19 @@ async fn main() {
             println!(
                 "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | memory [A={:.0}%, B={:.0}%, C={:.0}%]",
                 i + 1,
-                a.consciousness_level,
-                b.consciousness_level,
-                c.consciousness_level,
-                a.memory_utilization * 100.0,
-                b.memory_utilization * 100.0,
-                c.memory_utilization * 100.0,
+                a.consciousness_level, b.consciousness_level, c.consciousness_level,
+                a.memory_utilization * 100.0, b.memory_utilization * 100.0, c.memory_utilization * 100.0,
             );
         }
     }
 
-    // ── Phase 2: Shared experience ──────────────────────────────────────────
-    println!("\n━━━ Phase 2: Shared Experience (all agents perceive same stimuli, 50 ticks) ━━━");
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase 2: Shared Experience — convergence
+    // ══════════════════════════════════════════════════════════════════════════
+    println!("\n━━━ Phase 2: Shared Experience (30 ticks) ━━━");
+    println!("  All agents perceive the SAME stimulus. Consciousness should converge.\n");
 
-    for i in 0..50u64 {
+    for i in 0..30u64 {
         let shared = ContinuousHV::random(dim, 5000 + i);
         alice.perceive(shared.clone()).await;
         bob.perceive(shared.clone()).await;
@@ -108,18 +108,179 @@ async fn main() {
             let c = charlie.snapshot().await;
             println!(
                 "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | memory [A={:.0}%, B={:.0}%, C={:.0}%]",
-                50 + i + 1,
-                a.consciousness_level,
-                b.consciousness_level,
-                c.consciousness_level,
-                a.memory_utilization * 100.0,
-                b.memory_utilization * 100.0,
-                c.memory_utilization * 100.0,
+                30 + i + 1,
+                a.consciousness_level, b.consciousness_level, c.consciousness_level,
+                a.memory_utilization * 100.0, b.memory_utilization * 100.0, c.memory_utilization * 100.0,
             );
         }
     }
 
-    // ── Summary ─────────────────────────────────────────────────────────────
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase 3: Leader-Follower — Alice leads with stable signal
+    // ══════════════════════════════════════════════════════════════════════════
+    println!("\n━━━ Phase 3: Leader-Follower (30 ticks) ━━━");
+    println!("  Alice perceives a consistent target signal. Bob and Charlie see noise.");
+    println!("  Social relay carries Alice's cognitive state to the group.\n");
+
+    let target = ContinuousHV::random(dim, 9999);
+
+    for i in 0..30u64 {
+        // Leader: Alice sees the target (sometimes blended with slight variation)
+        let alice_input = if i % 5 == 0 {
+            // Pure target every 5th tick
+            target.clone()
+        } else {
+            // Target blended with small noise (75% target weight)
+            let noise = ContinuousHV::random(dim, 7000 + i);
+            ContinuousHV::bundle(&[&target, &target, &target, &noise])
+        };
+        alice.perceive(alice_input).await;
+
+        // Followers: receive noise (must rely on social relay for coordination)
+        bob.perceive(ContinuousHV::random(dim, 8000 + i)).await;
+        charlie.perceive(ContinuousHV::random(dim, 8500 + i)).await;
+
+        alice.tick().await;
+        bob.tick().await;
+        charlie.tick().await;
+
+        tokio::time::sleep(Duration::from_millis(15)).await;
+
+        if (i + 1) % 10 == 0 {
+            let a = alice.snapshot().await;
+            let b = bob.snapshot().await;
+            let c = charlie.snapshot().await;
+            println!(
+                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | load [A={:.1}%, B={:.1}%, C={:.1}%]",
+                60 + i + 1,
+                a.consciousness_level, b.consciousness_level, c.consciousness_level,
+                a.cognitive_load * 100.0, b.cognitive_load * 100.0, c.cognitive_load * 100.0,
+            );
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase 4: Specialization — division of labor
+    // ══════════════════════════════════════════════════════════════════════════
+    println!("\n━━━ Phase 4: Specialization (40 ticks) ━━━");
+    println!("  Each agent becomes an expert in a different domain.");
+    println!("  Social relay shares insights between specialists.\n");
+
+    // Three distinct "domain" signals — each agent specializes
+    let domain_perception = ContinuousHV::random(dim, 100);
+    let domain_reasoning = ContinuousHV::random(dim, 200);
+    let domain_memory = ContinuousHV::random(dim, 300);
+
+    for i in 0..40u64 {
+        // Each agent focuses on its specialty
+        alice.perceive(domain_perception.clone()).await;
+        bob.perceive(domain_reasoning.clone()).await;
+        charlie.perceive(domain_memory.clone()).await;
+
+        alice.tick().await;
+        bob.tick().await;
+        charlie.tick().await;
+
+        tokio::time::sleep(Duration::from_millis(15)).await;
+
+        if (i + 1) % 10 == 0 {
+            let a = alice.snapshot().await;
+            let b = bob.snapshot().await;
+            let c = charlie.snapshot().await;
+
+            // With specialization, consciousness profiles should differ
+            let consciousness_spread = {
+                let levels = [a.consciousness_level, b.consciousness_level, c.consciousness_level];
+                let mean = levels.iter().sum::<f64>() / 3.0;
+                let var = levels.iter().map(|l| (l - mean).powi(2)).sum::<f64>() / 3.0;
+                var.sqrt()
+            };
+
+            println!(
+                "  Tick {:>3}: consciousness [A={:.3}, B={:.3}, C={:.3}] | spread={:.4} | valence [A={:.2}, B={:.2}, C={:.2}]",
+                90 + i + 1,
+                a.consciousness_level, b.consciousness_level, c.consciousness_level,
+                consciousness_spread,
+                a.emotional_valence, b.emotional_valence, c.emotional_valence,
+            );
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Phase 5: Disruption Recovery — resilience through social bonds
+    // ══════════════════════════════════════════════════════════════════════════
+    println!("\n━━━ Phase 5: Disruption Recovery (30 ticks) ━━━");
+    println!("  [A] Baseline: all on shared signal. [B] Bob disrupted. [C] Recovery.\n");
+
+    let stable_signal = ContinuousHV::random(dim, 42000);
+
+    // Sub-phase A: establish baseline (10 ticks)
+    for _i in 0..10u64 {
+        alice.perceive(stable_signal.clone()).await;
+        bob.perceive(stable_signal.clone()).await;
+        charlie.perceive(stable_signal.clone()).await;
+
+        alice.tick().await;
+        bob.tick().await;
+        charlie.tick().await;
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let a = alice.snapshot().await;
+    let b = bob.snapshot().await;
+    let c = charlie.snapshot().await;
+    println!(
+        "  Baseline (tick 140): consciousness [A={:.3}, B={:.3}, C={:.3}]",
+        a.consciousness_level, b.consciousness_level, c.consciousness_level,
+    );
+
+    // Sub-phase B: disrupt Bob (10 ticks)
+    for i in 0..10u64 {
+        alice.perceive(stable_signal.clone()).await;
+        bob.perceive(ContinuousHV::random(dim, 99000 + i)).await;
+        charlie.perceive(stable_signal.clone()).await;
+
+        alice.tick().await;
+        bob.tick().await;
+        charlie.tick().await;
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let a = alice.snapshot().await;
+    let b = bob.snapshot().await;
+    let c = charlie.snapshot().await;
+    println!(
+        "  Disrupted (tick 150): consciousness [A={:.3}, B={:.3}, C={:.3}]  (Bob gets noise)",
+        a.consciousness_level, b.consciousness_level, c.consciousness_level,
+    );
+
+    // Sub-phase C: recovery (10 ticks — Bob returns to shared signal)
+    for i in 0..10u64 {
+        alice.perceive(stable_signal.clone()).await;
+        bob.perceive(stable_signal.clone()).await;
+        charlie.perceive(stable_signal.clone()).await;
+
+        alice.tick().await;
+        bob.tick().await;
+        charlie.tick().await;
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        if (i + 1) % 5 == 0 {
+            let a = alice.snapshot().await;
+            let b = bob.snapshot().await;
+            let c = charlie.snapshot().await;
+            println!(
+                "  Recovery  (tick {:>3}): consciousness [A={:.3}, B={:.3}, C={:.3}]",
+                150 + i + 1,
+                a.consciousness_level, b.consciousness_level, c.consciousness_level,
+            );
+        }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // SUMMARY
+    // ══════════════════════════════════════════════════════════════════════════
     let a = alice.stats().await;
     let b = bob.stats().await;
     let c = charlie.stats().await;
@@ -131,21 +292,29 @@ async fn main() {
     println!("\n╔═══════════════════════════════════════════════════════════════════════╗");
     println!("║                          AGENT SUMMARY                              ║");
     println!("╠═══════════════════════════════════════════════════════════════════════╣");
-    println!("║ {:10} │ {:>6} │ {:>6} │ {:>6} │ {:>12} │ {:>8} ║",
-        "Agent", "Ticks", "In", "Out", "Consciousness", "Peak Φ");
+    println!(
+        "║ {:10} │ {:>6} │ {:>6} │ {:>6} │ {:>12} │ {:>8} ║",
+        "Agent", "Ticks", "In", "Out", "Consciousness", "Peak Phi"
+    );
     println!("╟────────────┼────────┼────────┼────────┼──────────────┼──────────╢");
-    println!("║ {:10} │ {:>6} │ {:>6} │ {:>6} │ {:>12.4} │ {:>8.4} ║",
-        "Alice", a.total_ticks, a.inputs_processed, a.outputs_generated,
-        a_state.consciousness_level, a.peak_consciousness);
-    println!("║ {:10} │ {:>6} │ {:>6} │ {:>6} │ {:>12.4} │ {:>8.4} ║",
-        "Bob", b.total_ticks, b.inputs_processed, b.outputs_generated,
-        b_state.consciousness_level, b.peak_consciousness);
-    println!("║ {:10} │ {:>6} │ {:>6} │ {:>6} │ {:>12.4} │ {:>8.4} ║",
-        "Charlie", c.total_ticks, c.inputs_processed, c.outputs_generated,
-        c_state.consciousness_level, c.peak_consciousness);
+    for (name, stats, state) in [
+        ("Alice", &a, &a_state),
+        ("Bob", &b, &b_state),
+        ("Charlie", &c, &c_state),
+    ] {
+        println!(
+            "║ {:10} │ {:>6} │ {:>6} │ {:>6} │ {:>12.4} │ {:>8.4} ║",
+            name,
+            stats.total_ticks,
+            stats.inputs_processed,
+            stats.outputs_generated,
+            state.consciousness_level,
+            stats.peak_consciousness,
+        );
+    }
     println!("╚═══════════════════════════════════════════════════════════════════════╝");
 
-    // Consciousness convergence check
+    // Final convergence analysis
     let levels = [
         a_state.consciousness_level,
         b_state.consciousness_level,
@@ -155,11 +324,17 @@ async fn main() {
     let variance = levels.iter().map(|l| (l - mean).powi(2)).sum::<f64>() / 3.0;
     let std_dev = variance.sqrt();
 
-    println!("\nConsciousness convergence: mean={:.4}, std_dev={:.4}", mean, std_dev);
-    if std_dev < 0.1 {
-        println!("  → Agents converged to similar consciousness levels");
+    println!("\nFinal state:");
+    println!(
+        "  Consciousness: mean={:.4}, std_dev={:.4}",
+        mean, std_dev
+    );
+    if std_dev < 0.05 {
+        println!("  => Strong convergence: agents synchronized through social relay");
+    } else if std_dev < 0.15 {
+        println!("  => Moderate convergence: agents partially synchronized");
     } else {
-        println!("  → Agents maintained distinct consciousness levels");
+        println!("  => Divergent: agents maintained distinct consciousness profiles");
     }
 
     // ── Shutdown ─────────────────────────────────────────────────────────────
