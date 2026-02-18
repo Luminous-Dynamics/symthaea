@@ -431,11 +431,15 @@ fn test_multi_path_best_path_selection() {
 
 #[test]
 fn test_reasoning_bridge_creation() {
-    let bridge = MathReasoningBridge::new();
+    let mut bridge = MathReasoningBridge::new();
 
-    // Should have base primitives loaded
+    // New bridge starts empty; generate an assertion to confirm it works
     let assertions = bridge.assertions();
-    assert!(!assertions.is_empty(), "Should have assertions available");
+    assert!(assertions.is_empty(), "New bridge starts with no assertions");
+
+    // After asserting, it should have one
+    bridge.assert_equality(2, 3, "add");
+    assert_eq!(bridge.assertions().len(), 1, "Should have one assertion after assert_equality");
 }
 
 #[test]
