@@ -9,7 +9,8 @@ crate-type = ["cdylib"]
 [dependencies]
 hdk = "0.6.0-dev.17"
 serde = { version = "1.0", features = ["derive"] }
-getrandom = { version = "0.2", features = ["wasm-bindgen"] }
+# Do NOT use "wasm-bindgen"/"js" - Holochain's WASM runtime rejects wasm-bindgen imports
+getrandom = { version = "0.2", features = ["custom"] }
 
 [profile.release]
 opt-level = "z"

@@ -16,9 +16,10 @@ holochain_serialized_bytes = "0.0.56"
 # Local integrity zome
 dkg_integrity = { path = "../integrity" }
 
-# Enable wasm support for getrandom (transitive dependencies)
-getrandom_02 = { package = "getrandom", version = "0.2", features = ["js"] }
-getrandom = { version = "0.3", features = ["wasm_js"] }
+# WASM compatibility for getrandom (transitive dependencies)
+# Do NOT use "js"/"wasm_js" - they pull wasm-bindgen which Holochain's WASM runtime rejects
+getrandom_02 = { package = "getrandom", version = "0.2", features = ["custom"] }
+getrandom_03 = { package = "getrandom", version = "0.3" }
 
 # Pin rmp and rmp-serde to compatible versions
 rmp = "=0.8.14"
