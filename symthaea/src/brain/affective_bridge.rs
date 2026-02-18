@@ -317,6 +317,42 @@ impl AffectiveBridge {
         &self.global_affect
     }
 
+    /// Evaluate affect from cognitive + social signals (Damasio + social somatic markers).
+    /// Science: Decety & Chaminade (2003) — social context modulates affective processing
+    pub fn evaluate_from_signals_with_social(
+        &mut self,
+        prediction_error: f32,
+        surprise_triggered: bool,
+        consciousness_proxy: f64,
+        moral_score: f32,
+        social_trust: f32,
+        social_cooperation_rate: f32,
+        peer_valence: f32,
+    ) -> &CoreAffect {
+        // Base affect from cognitive signals
+        let mut valence = ((0.5 - prediction_error) + moral_score * 0.3).clamp(-1.0, 1.0);
+        let mut arousal = (0.3
+            + if surprise_triggered { 0.3 } else { 0.0 }
+            + (consciousness_proxy * 0.4) as f32
+            + (prediction_error * 0.3).min(0.3))
+        .clamp(0.0, 1.0);
+        let mut dominance = ((consciousness_proxy * 0.6) as f32 - 0.3).clamp(-1.0, 1.0);
+
+        // Social modulation: emotional contagion (peer valence bleeds into self valence)
+        valence = (valence + peer_valence * 0.15).clamp(-1.0, 1.0);
+
+        // Social modulation: cooperation boosts arousal (social engagement)
+        arousal = (arousal + social_cooperation_rate * 0.1).clamp(0.0, 1.0);
+
+        // Social modulation: trust increases dominance (sense of control/safety)
+        dominance = (dominance + (social_trust - 0.5) * 0.2).clamp(-1.0, 1.0);
+
+        let new_affect = CoreAffect::new(valence, arousal, dominance);
+        self.global_affect = self.global_affect.blend(&new_affect, 0.3);
+        self.global_affect.decay(self.config.global_affect_decay);
+        &self.global_affect
+    }
+
     /// Get affect history for a specific concept
     pub fn concept_history(&self, concept_uid: &str) -> Option<&VecDeque<ConceptAffect>> {
         self.concept_affects.get(concept_uid)

@@ -635,6 +635,17 @@ impl CrossModalBinder {
         }
     }
 
+    /// Set attention weight for ALL modalities (global precision gating).
+    /// Science: Talsma (2015) — high free energy reduces binding precision
+    pub fn set_attention_weight(&mut self, weight: f32) {
+        let w = weight.clamp(0.0, 1.0);
+        for reps in self.representations.values_mut() {
+            for rep in reps.iter_mut() {
+                rep.attention = w;
+            }
+        }
+    }
+
     /// Compute a cross-modal integration metric (analogous to Φ).
     ///
     /// Measures how much information is integrated across modalities by computing

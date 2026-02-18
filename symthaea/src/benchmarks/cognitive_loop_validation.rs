@@ -241,19 +241,8 @@ impl CognitiveLoopValidation {
             if i >= self.config.warmup_cycles {
                 prediction_errors.push(result.prediction_error);
 
-                // Calculate variance of attention weights
-                let attention_values: Vec<f32> = result.attention_state.values().copied().collect();
-                let attention_variance = if attention_values.is_empty() {
-                    0.0
-                } else {
-                    let mean = attention_values.iter().sum::<f32>() / attention_values.len() as f32;
-                    attention_values
-                        .iter()
-                        .map(|x| (x - mean).powi(2))
-                        .sum::<f32>()
-                        / attention_values.len() as f32
-                };
-                attention_variances.push(attention_variance);
+                // Track peak attention as attention metric
+                attention_variances.push(result.peak_attention);
             }
         }
 

@@ -491,6 +491,14 @@ pub struct CognitiveLoopService {
     /// Resets to 0.0 after consumption.
     external_reward: f32,
 
+    /// Social trust level injected by Mind module's SocialCoherence (0.0–1.0, default 0.5).
+    /// Fed into AffectiveBridge for social modulation of affect (Decety & Chaminade 2003).
+    social_trust: f32,
+
+    /// Social cooperation rate injected by Mind module's SocialCoherence (0.0–1.0, default 0.0).
+    /// Fed into AffectiveBridge arousal modulation.
+    social_cooperation_rate: f32,
+
     /// Virtual body adapter for embodied cognition.
     /// When enabled, maps cognitive signals to interoceptive states and produces
     /// a phi_modulation factor that scales consciousness from somatic feedback.

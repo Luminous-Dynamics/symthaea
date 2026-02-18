@@ -91,8 +91,8 @@ pub struct EncodingResult {
     /// Primitives that were detected in input
     pub detected_primitives: Vec<String>,
 
-    /// Current attention weights (for monitoring)
-    pub attention_snapshot: HashMap<String, f32>,
+    /// Peak attention weight this cycle (for MCE consciousness calculation)
+    pub peak_attention: f32,
 }
 
 /// Statistics for monitoring the encoder
@@ -142,6 +142,12 @@ pub struct PredictiveHdcEncoder {
 
     /// Primitive name cache for fast lookup
     primitive_names: Vec<String>,
+
+    /// Pre-lowercased primitive names (avoids 200x .to_lowercase() per cycle)
+    primitive_names_lower: Vec<String>,
+
+    /// Peak attention weight (cached to avoid HashMap iteration)
+    peak_attention: f32,
 }
 
 impl PredictiveHdcEncoder {
@@ -176,6 +182,10 @@ impl PredictiveHdcEncoder {
             }
         }
 
+        let primitive_names_lower: Vec<String> =
+            primitive_names.iter().map(|n| n.to_lowercase()).collect();
+        let initial_attention = config.initial_attention;
+
         Self {
             config,
             primitive_system,
@@ -185,6 +195,8 @@ impl PredictiveHdcEncoder {
             error_history: VecDeque::with_capacity(50),
             stats: EncoderStats::default(),
             primitive_names,
+            primitive_names_lower,
+            peak_attention: initial_attention,
         }
     }
 
@@ -228,8 +240,18 @@ impl PredictiveHdcEncoder {
             hdv: attended_hdv,
             prediction_error,
             detected_primitives,
-            attention_snapshot: self.attention_weights.clone(),
+            peak_attention: self.peak_attention,
         }
+    }
+
+    /// Get the full attention weights map (expensive clone — use only for debugging/monitoring).
+    pub fn attention_weights_snapshot(&self) -> HashMap<String, f32> {
+        self.attention_weights.clone()
+    }
+
+    /// Get the peak attention weight (cheap — cached per cycle).
+    pub fn peak_attention(&self) -> f32 {
+        self.peak_attention
     }
 
     /// Receive prediction from LTC for next cycle
@@ -265,14 +287,13 @@ impl PredictiveHdcEncoder {
 
     /// Convert bipolar encoding to ContinuousHV
     fn bipolar_to_real(&self, bipolar: &[i8]) -> ContinuousHV {
-        let values: Vec<f32> = bipolar.iter().map(|&b| b as f32).collect();
-
-        // Pad or truncate to match dimension
-        let mut result = vec![0.0f32; self.config.dimension];
-        let len = values.len().min(self.config.dimension);
-        result[..len].copy_from_slice(&values[..len]);
-
-        ContinuousHV { values: result }
+        let dim = self.config.dimension;
+        let len = bipolar.len().min(dim);
+        let mut values = vec![0.0f32; dim];
+        for (dst, &src) in values[..len].iter_mut().zip(bipolar[..len].iter()) {
+            *dst = src as f32;
+        }
+        ContinuousHV { values }
     }
 
     /// Detect which primitives are relevant to the input
@@ -281,10 +302,10 @@ impl PredictiveHdcEncoder {
         let mut detected = Vec::new();
 
         // Check each primitive for presence in input
-        for name in &self.primitive_names {
-            // Simple heuristic: check if primitive name is in input
-            // In production, this would use semantic similarity
-            if input_lower.contains(&name.to_lowercase()) {
+        // Uses pre-lowercased names (computed once at construction, not 200x per cycle)
+        for (name, name_lower) in self.primitive_names.iter().zip(self.primitive_names_lower.iter())
+        {
+            if input_lower.contains(name_lower.as_str()) {
                 detected.push(name.clone());
             }
         }
@@ -451,6 +472,13 @@ impl PredictiveHdcEncoder {
                 }
             }
         }
+
+        // Update cached peak attention (avoids HashMap iteration in hot path)
+        self.peak_attention = self
+            .attention_weights
+            .values()
+            .copied()
+            .fold(0.0_f32, f32::max);
     }
 
     /// Update statistics
@@ -466,17 +494,24 @@ impl PredictiveHdcEncoder {
         self.stats.avg_prediction_error =
             self.stats.avg_prediction_error * (1.0 - alpha) + error * alpha;
 
-        // Compute attention variance (emergence metric)
-        let weights: Vec<f32> = self.attention_weights.values().cloned().collect();
-        let mean: f32 = weights.iter().sum::<f32>() / weights.len() as f32;
-        let variance: f32 =
-            weights.iter().map(|w| (w - mean).powi(2)).sum::<f32>() / weights.len() as f32;
+        // Compute attention variance (emergence metric) — iterate in-place, no Vec allocation
+        let n = self.attention_weights.len() as f32;
+        let sum: f32 = self.attention_weights.values().sum();
+        let mean = sum / n;
+        let variance: f32 = self
+            .attention_weights
+            .values()
+            .map(|w| (w - mean).powi(2))
+            .sum::<f32>()
+            / n;
         self.stats.attention_variance = variance;
 
         // Count diverged primitives
-        self.stats.diverged_primitives = weights
-            .iter()
-            .filter(|&&w| (w - self.config.initial_attention).abs() > 0.1)
+        let initial = self.config.initial_attention;
+        self.stats.diverged_primitives = self
+            .attention_weights
+            .values()
+            .filter(|&&w| (w - initial).abs() > 0.1)
             .count();
 
         // Update cumulative and high-error counts

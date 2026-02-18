@@ -274,6 +274,13 @@ impl CognitiveLoopService {
         self.external_reward = reward.clamp(-1.0, 1.0);
     }
 
+    /// Inject social signals from Mind module's SocialCoherence.
+    /// Called by the Symthaea facade after Mind.tick() computes social stats.
+    pub fn set_social_signals(&mut self, trust: f32, cooperation_rate: f32) {
+        self.social_trust = trust.clamp(0.0, 1.0);
+        self.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
+    }
+
     // ========== Flow State Methods ==========
 
     /// Check if currently in flow state
