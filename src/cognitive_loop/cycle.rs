@@ -1252,26 +1252,22 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // AFFECTIVE BRIDGE: Evaluate somatic markers from cognitive signals
-        // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
+        // Runs every cycle (lightweight: ~5 arithmetic ops + blend)
         // ═══════════════════════════════════════════════════════════════════════
         let (affective_valence, affective_arousal) =
-            if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
-                if let Some(ref mut bridge) = self.affective_bridge {
-                    let moral_score = self
-                        .last_moral_judgment
-                        .as_ref()
-                        .map(|j| j.moral_score)
-                        .unwrap_or(0.0);
-                    let affect = bridge.evaluate_from_signals(
-                        prediction_error,
-                        surprise_triggered,
-                        unified_phi,
-                        moral_score,
-                    );
-                    (affect.valence, affect.arousal)
-                } else {
-                    (0.0, 0.5)
-                }
+            if let Some(ref mut bridge) = self.affective_bridge {
+                let moral_score = self
+                    .last_moral_judgment
+                    .as_ref()
+                    .map(|j| j.moral_score)
+                    .unwrap_or(0.0);
+                let affect = bridge.evaluate_from_signals(
+                    prediction_error,
+                    surprise_triggered,
+                    unified_phi,
+                    moral_score,
+                );
+                (affect.valence, affect.arousal)
             } else {
                 (0.0, 0.5)
             };
@@ -1317,25 +1313,21 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // PREDICTIVE PROCESSING: Hierarchical predictive coding + precision
-        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
+        // Runs every cycle (lightweight: BinaryHV → prediction → free energy)
         // ═══════════════════════════════════════════════════════════════════════
         let (predictive_free_energy, predictive_phi_modulation) =
-            if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut mind) = self.predictive_mind {
-                    if self.affective_bridge.is_some() {
-                        mind.precision.apply_affective_modulation(
-                            affective_arousal as f64,
-                            affective_valence as f64,
-                        );
-                    }
-                    let state = mind.process(&hv16_cached);
-                    self.prev_predictive_phi_modulation = state.phi_modulation;
-                    (state.free_energy, state.phi_modulation)
-                } else {
-                    (0.0, 1.0)
+            if let Some(ref mut mind) = self.predictive_mind {
+                if self.affective_bridge.is_some() {
+                    mind.precision.apply_affective_modulation(
+                        affective_arousal as f64,
+                        affective_valence as f64,
+                    );
                 }
+                let state = mind.process(&hv16_cached);
+                self.prev_predictive_phi_modulation = state.phi_modulation;
+                (state.free_energy, state.phi_modulation)
             } else {
-                (0.0, self.prev_predictive_phi_modulation)
+                (0.0, 1.0)
             };
 
         // FEEDBACK: Predictive phi modulation gates plasticity (Friston 2010)
@@ -1425,35 +1417,33 @@ impl CognitiveLoopService {
 
         // ═══════════════════════════════════════════════════════════════════════
         // CROSS-MODAL BINDING: Bind HDC encodings across modalities
-        // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
+        // Runs every cycle (lightweight: 2 HV ops + similarity)
         // ═══════════════════════════════════════════════════════════════════════
         let (cross_modal_binding_strength, cross_modal_phi) =
-            if urgency.should_run(self.stats.total_cycles, 1, 2, 4) {
-                if let Some(ref mut binder) = self.cross_modal_binder {
-                    use symthaea_core::hdc::unified_hv::ContinuousHV;
-                    // Use hv16_cached (BinaryHV→bipolar) for consistent 16,384 dims
-                    let linguistic_repr = ModalRepresentation::new(
-                        Modality::Linguistic,
-                        ContinuousHV::from_vec(hv16_cached.to_bipolar()),
-                        0.8,
-                        "encoder",
-                    );
-                    binder.add_representation(linguistic_repr);
-                    if self.affective_bridge.is_some() {
-                        let affect_seed = (affective_valence * 1000.0) as u64;
-                        let affective_hv =
-                            symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
-                        binder.update_modality(Modality::Affective, affective_hv);
-                    }
-                    let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);
-                    let phi = binder.cross_modal_phi();
-                    self.prev_cross_modal_phi = phi;
-                    (strength, phi)
-                } else {
-                    (0.0, 0.0)
+            if let Some(ref mut binder) = self.cross_modal_binder {
+                use symthaea_core::hdc::unified_hv::ContinuousHV;
+                // Clear stale representations from previous cycle
+                binder.clear();
+                // Use hv16_cached (BinaryHV→bipolar) for consistent 16,384 dims
+                let linguistic_repr = ModalRepresentation::new(
+                    Modality::Linguistic,
+                    ContinuousHV::from_vec(hv16_cached.to_bipolar()),
+                    0.8,
+                    "encoder",
+                );
+                binder.add_representation(linguistic_repr);
+                if self.affective_bridge.is_some() {
+                    let affect_seed = (affective_valence * 1000.0) as u64;
+                    let affective_hv =
+                        symthaea_core::hdc::binary_hv::BinaryHV::random(affect_seed);
+                    binder.update_modality(Modality::Affective, affective_hv);
                 }
+                let strength = binder.bind().map(|r| r.strength).unwrap_or(0.0);
+                let phi = binder.cross_modal_phi();
+                self.prev_cross_modal_phi = phi;
+                (strength, phi)
             } else {
-                (0.0, self.prev_cross_modal_phi)
+                (0.0, 0.0)
             };
 
         // FEEDBACK: High cross-modal Phi boosts confidence (binding integration)

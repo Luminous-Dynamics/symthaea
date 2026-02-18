@@ -34,13 +34,14 @@
 //! 3. **Valence Tagging**: Concept gets tagged with valence/arousal/dominance
 //! 4. **History Tracking**: Emotional trajectory of concepts over time
 
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 use crate::consciousness::recursive_improvement::{
     ConsciousnessWorldModel, WorldModelStats,
 };
 use crate::consciousness::affective_consciousness::{
-    CoreAffect, EmotionCategory, AffectiveConfig, AffectiveConsciousnessAnalyzer,
+    CoreAffect, EmotionCategory,
 };
-use symthaea_core::hdc::binary_hv::BinaryHV;
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 use crate::dynamics::CrystalizedConcept;
 use std::collections::{HashMap, VecDeque};
 
@@ -77,7 +78,8 @@ pub struct AffectiveBridge {
     /// Concept affect history (keyed by concept UID)
     concept_affects: HashMap<String, VecDeque<ConceptAffect>>,
 
-    /// Last known concept count
+    /// Last known concept count (used by sync() which requires full_consciousness)
+    #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
     last_concept_count: usize,
 
     /// Global affect state (mood influenced by concepts)
@@ -157,12 +159,14 @@ impl AffectiveBridge {
             config,
             stats: AffectiveBridgeStats::default(),
             concept_affects: HashMap::new(),
+            #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
             last_concept_count: 0,
             global_affect: CoreAffect::neutral(),
         }
     }
 
     /// Sync with world model and evaluate affect for new concepts
+    #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
     pub fn sync(&mut self, world_model: &ConsciousnessWorldModel) -> Vec<ConceptAffect> {
         let stats = world_model.stats();
         let current_count = world_model.pending_concepts.len();
@@ -192,13 +196,14 @@ impl AffectiveBridge {
     }
 
     /// Evaluate the affective significance of a crystallized concept
+    #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
     fn evaluate_concept_affect(
         &mut self,
         concept: &CrystalizedConcept,
         stats: &WorldModelStats,
     ) -> ConceptAffect {
         let is_novel = concept.activation_count <= 1;
-        let is_named = concept.name.is_some();
+        let is_named = !concept.name.is_empty();
 
         // Calculate valence
         let mut valence = if is_novel {
@@ -213,7 +218,7 @@ impl AffectiveBridge {
         };
 
         // Modulate by consciousness level (high consciousness = more intense affect)
-        valence *= (0.5 + stats.consciousness_level * 0.5);
+        valence *= 0.5 + stats.consciousness_level * 0.5;
 
         // Calculate arousal
         let mut arousal = if is_novel {
@@ -224,7 +229,7 @@ impl AffectiveBridge {
             -0.1 + (concept.activation_count as f64 * 0.05).min(0.3)
         };
 
-        arousal *= (0.5 + stats.consciousness_level * 0.5);
+        arousal *= 0.5 + stats.consciousness_level * 0.5;
 
         // Calculate dominance (sense of control)
         let dominance = if is_named {
@@ -237,17 +242,17 @@ impl AffectiveBridge {
             0.0
         };
 
-        let affect = CoreAffect::new(valence, arousal, dominance);
+        let affect = CoreAffect::new(valence as f32, arousal as f32, dominance as f32);
         let category = affect.to_emotion_category();
         let intensity = affect.intensity();
 
         // Update statistics
         self.stats.concepts_evaluated += 1;
         match category {
-            EmotionCategory::Excited | EmotionCategory::Content |
-            EmotionCategory::Pleasant => self.stats.positive_concepts += 1,
-            EmotionCategory::Angry | EmotionCategory::Afraid |
-            EmotionCategory::Sad | EmotionCategory::Unpleasant => self.stats.negative_concepts += 1,
+            EmotionCategory::Joy | EmotionCategory::Contentment |
+            EmotionCategory::Serenity => self.stats.positive_concepts += 1,
+            EmotionCategory::Anger | EmotionCategory::Fear |
+            EmotionCategory::Sadness | EmotionCategory::Disgust => self.stats.negative_concepts += 1,
             _ => self.stats.neutral_concepts += 1,
         }
 
@@ -287,6 +292,28 @@ impl AffectiveBridge {
 
     /// Get current global affect (mood influenced by all concepts)
     pub fn global_affect(&self) -> &CoreAffect {
+        &self.global_affect
+    }
+
+    /// Evaluate affect from cognitive loop signals (no world model dependency).
+    /// Science: Damasio (1994) — somatic markers guide cognition via affective signals
+    pub fn evaluate_from_signals(
+        &mut self,
+        prediction_error: f32,
+        surprise_triggered: bool,
+        consciousness_proxy: f64,
+        moral_score: f32,
+    ) -> &CoreAffect {
+        let valence = ((0.5 - prediction_error) + moral_score * 0.3).clamp(-1.0, 1.0);
+        let arousal = (0.3
+            + if surprise_triggered { 0.3 } else { 0.0 }
+            + (consciousness_proxy * 0.4) as f32
+            + (prediction_error * 0.3).min(0.3))
+        .clamp(0.0, 1.0);
+        let dominance = ((consciousness_proxy * 0.6) as f32 - 0.3).clamp(-1.0, 1.0);
+        let new_affect = CoreAffect::new(valence, arousal, dominance);
+        self.global_affect = self.global_affect.blend(&new_affect, 0.3);
+        self.global_affect.decay(self.config.global_affect_decay);
         &self.global_affect
     }
 
@@ -339,18 +366,20 @@ impl AffectiveBridge {
 }
 
 /// Extension trait for ConsciousnessWorldModel to get affect for concepts
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 pub trait ConceptAffectEvaluator {
     /// Evaluate affect for the latest crystallized concept
     fn evaluate_latest_affect(&self) -> Option<ConceptAffect>;
 }
 
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 impl ConceptAffectEvaluator for ConsciousnessWorldModel {
     fn evaluate_latest_affect(&self) -> Option<ConceptAffect> {
         let concept = self.pending_concepts.last()?;
         let stats = self.stats();
 
         let is_novel = concept.activation_count <= 1;
-        let is_named = concept.name.is_some();
+        let is_named = !concept.name.is_empty();
 
         let valence = if is_novel {
             0.4 * (0.5 + stats.consciousness_level * 0.5)
@@ -368,11 +397,11 @@ impl ConceptAffectEvaluator for ConsciousnessWorldModel {
 
         let dominance = if is_named { 0.3 } else if concept.activation_count > 5 { -0.2 } else { 0.0 };
 
-        let affect = CoreAffect::new(valence, arousal, dominance);
+        let affect = CoreAffect::new(valence as f32, arousal as f32, dominance as f32);
 
         Some(ConceptAffect {
             concept_uid: concept.uid.clone(),
-            affect: affect.clone(),
+            affect,
             category: affect.to_emotion_category(),
             intensity: affect.intensity(),
             is_novel,
@@ -382,6 +411,7 @@ impl ConceptAffectEvaluator for ConsciousnessWorldModel {
 }
 
 #[cfg(test)]
+#[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
 mod tests {
     use super::*;
 
