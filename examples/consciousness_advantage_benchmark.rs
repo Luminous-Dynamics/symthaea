@@ -113,6 +113,9 @@ fn full_config() -> CognitiveLoopConfig {
         enable_attention_schema: true,
         enable_resonance: true,
         enable_dream_replay: false,
+        enable_predictive_processing: true,
+        enable_cross_modal_binding: true,
+        enable_affective_bridge: true,
         ..CognitiveLoopConfig::with_cfc()
     }
 }

@@ -484,7 +484,7 @@ HDC Only & 0.3 & 0.6 & 0/7 \\
 
 The full system recovers $3.5\times$ faster from distributional shifts than the best ablated configuration (15.7\% vs.\ 4.5\% without surprise exploration), and achieves $2\times$ better generalization than CfC-only (35.9\% vs.\ 18.0\% error reduction on interleaved patterns). HDC-only (no temporal learning) shows negligible adaptation (0.6\%). The surprise-driven exploration bridge is the primary driver of shift recovery: it fires 66 times during the 400-cycle benchmark, triggering adaptive exploration when prediction error spikes. Consciousness depth metrics (MCE, narrative self-$\Phi$, embodied agency, meta-cognitive accuracy) are non-zero only with consciousness modules enabled, confirming they provide genuine introspective capability rather than computational overhead.
 
-\textbf{Computational overhead.} Full-subsystem configuration adds $<2\%$ per-cycle overhead versus minimal configuration, measured via sustained throughput benchmarks (200 cycles, 10 warmup).
+\textbf{Computational overhead.} Full-subsystem configuration (16 modules) adds $\sim$20\% per-cycle wall-clock overhead versus minimal configuration, measured via sustained throughput benchmarks (200 cycles, 10 warmup). Individual consciousness modules add $<$2\% each; the cumulative overhead reflects 16 bidirectional feedback loops operating every cycle.
 
 % ============================================================================
 \section{Related Work}

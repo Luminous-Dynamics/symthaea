@@ -106,6 +106,10 @@ pub struct TextEncoder {
 
     /// Statistics
     stats: TextEncoderStats,
+
+    /// Pre-allocated i32 accumulation buffer for bundle/majority-vote operations.
+    /// Avoids allocating 64KB per bundle call on the hot path.
+    bundle_accum: Vec<i32>,
 }
 
 /// Encoder statistics
@@ -124,6 +128,7 @@ impl TextEncoder {
         let position_vectors = Self::generate_position_vectors(config.dimension, config.max_length);
         let special_tokens = Self::generate_special_tokens(config.dimension);
 
+        let dim = config.dimension;
         Ok(Self {
             config,
             word_embeddings: HashMap::new(),
@@ -131,6 +136,7 @@ impl TextEncoder {
             position_vectors,
             special_tokens,
             stats: TextEncoderStats::default(),
+            bundle_accum: vec![0i32; dim],
         })
     }
 
@@ -299,31 +305,36 @@ impl TextEncoder {
             return Ok(self.special_tokens["[PAD]"].clone());
         }
 
-        let mut word_vectors: Vec<Vec<i8>> = Vec::new();
+        let dim = self.config.dimension;
+
+        // Zero the pre-allocated accumulation buffer
+        self.bundle_accum[..dim].fill(0);
 
         for (pos, word) in words.iter().enumerate().take(self.config.max_length) {
             let word_vec = self.encode_word(word)?;
 
+            // Fused bind + accumulate in single pass
             if self.config.use_positional && pos < self.position_vectors.len() {
-                // Bind word with position
                 let pos_vec = &self.position_vectors[pos];
-                let positioned = self.bind_vectors(&word_vec, pos_vec);
-                word_vectors.push(positioned);
+                for i in 0..dim {
+                    self.bundle_accum[i] += (word_vec[i] * pos_vec[i]) as i32;
+                }
             } else {
-                word_vectors.push(word_vec);
+                for i in 0..dim {
+                    self.bundle_accum[i] += word_vec[i] as i32;
+                }
             }
         }
 
-        // Bundle all positioned words
-        let result = self.bundle_vectors(&word_vectors);
+        // Majority vote
+        let result = self.bundle_accum[..dim]
+            .iter()
+            .map(|&s| if s > 0 { 1i8 } else { -1i8 })
+            .collect();
 
         self.stats.sentences_encoded += 1;
 
-        if self.config.normalize {
-            Ok(self.normalize_vector(&result))
-        } else {
-            Ok(result)
-        }
+        Ok(result)
     }
 
     /// Encode text using primitive system when available
@@ -349,15 +360,16 @@ impl TextEncoder {
             return Ok(self.special_tokens["[PAD]"].clone());
         }
 
-        let mut word_vectors: Vec<Vec<i8>> = Vec::new();
-        let mut primitive_hits = 0;
+        let dim = self.config.dimension;
+
+        // Zero the pre-allocated accumulation buffer (avoids 64KB alloc per call)
+        self.bundle_accum[..dim].fill(0);
 
         for (pos, word) in words.iter().enumerate().take(self.config.max_length) {
             let normalized = word.to_lowercase();
 
-            // Try primitive first (canonical encoding)
+            // Encode word — returns owned Vec<i8>
             let word_vec = if let Some(prim) = primitives.get(&normalized) {
-                primitive_hits += 1;
                 // Convert BinaryHV (f32 bipolar) to i8 bipolar
                 let f32_vec = prim.encoding.to_bipolar();
                 f32_vec
@@ -369,25 +381,28 @@ impl TextEncoder {
                 self.encode_word(word)?
             };
 
-            // Add positional encoding
+            // Fused bind + accumulate in single pass (better cache locality)
             if self.config.use_positional && pos < self.position_vectors.len() {
-                let positioned = self.bind_vectors(&word_vec, &self.position_vectors[pos]);
-                word_vectors.push(positioned);
+                let pos_vec = &self.position_vectors[pos];
+                for i in 0..dim {
+                    self.bundle_accum[i] += (word_vec[i] * pos_vec[i]) as i32;
+                }
             } else {
-                word_vectors.push(word_vec);
+                for i in 0..dim {
+                    self.bundle_accum[i] += word_vec[i] as i32;
+                }
             }
         }
 
-        // Bundle all positioned words
-        let result = self.bundle_vectors(&word_vectors);
+        // Majority vote — single output allocation
+        let result = self.bundle_accum[..dim]
+            .iter()
+            .map(|&s| if s > 0 { 1i8 } else { -1i8 })
+            .collect();
 
         self.stats.sentences_encoded += 1;
 
-        if self.config.normalize {
-            Ok(self.normalize_vector(&result))
-        } else {
-            Ok(result)
-        }
+        Ok(result)
     }
 
     /// Encode with explicit semantic role marking

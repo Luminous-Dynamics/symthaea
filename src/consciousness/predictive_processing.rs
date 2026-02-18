@@ -811,6 +811,14 @@ impl PrecisionDynamics {
         }
     }
 
+    /// Boost all precision channels (cross-modal binding confirms alignment)
+    /// Science: Talsma (2015) — multisensory alignment increases precision
+    pub fn boost_precision(&mut self, amount: f64) {
+        let boost = amount.clamp(0.0, 0.2);
+        self.sensory_precision = (self.sensory_precision + boost).min(1.0);
+        self.prior_precision = (self.prior_precision + boost).min(1.0);
+    }
+
     /// Get effective precision for a level
     pub fn effective_precision(&self, level: u32) -> f64 {
         // Lower levels use more sensory precision

@@ -1261,11 +1261,16 @@ impl CognitiveLoopService {
                     .as_ref()
                     .map(|j| j.moral_score)
                     .unwrap_or(0.0);
-                let affect = bridge.evaluate_from_signals(
+                // Social modulation: feed ToM signals into affect (Decety & Chaminade 2003)
+                // Social trust/cooperation injected by Mind module via set_social_signals()
+                let affect = bridge.evaluate_from_signals_with_social(
                     prediction_error,
                     surprise_triggered,
                     unified_phi,
                     moral_score,
+                    self.social_trust,
+                    self.social_cooperation_rate,
+                    0.0, // peer_valence: future — aggregate from social inbox
                 );
                 (affect.valence, affect.arousal)
             } else {
@@ -1453,6 +1458,23 @@ impl CognitiveLoopService {
             self.prediction_confidence = (self.prediction_confidence + boost).clamp(0.0, 1.0);
         }
 
+        // FEEDBACK: Predictive ↔ Cross-Modal bidirectional coupling (Talsma 2015)
+        // High binding strength → increase precision (confident multi-modal alignment)
+        // High free energy → decrease binding attention (uncertain states need looser integration)
+        if let Some(ref mut mind) = self.predictive_mind {
+            if cross_modal_binding_strength > 0.5 {
+                let precision_boost = (cross_modal_binding_strength - 0.5) as f64 * 0.1;
+                mind.precision.boost_precision(precision_boost);
+            }
+        }
+        if let Some(ref mut binder) = self.cross_modal_binder {
+            if predictive_free_energy > 0.6 {
+                // High uncertainty → reduce attention weight (looser binding)
+                let dampen = (1.0 - (predictive_free_energy - 0.6) * 0.3).max(0.5) as f32;
+                binder.set_attention_weight(dampen);
+            }
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS MONITORS: Skip in Cruise mode (measurement-only, no feedback)
         // ═══════════════════════════════════════════════════════════════════════
@@ -1635,10 +1657,7 @@ impl CognitiveLoopService {
                     .as_ref()
                     .map(|p| p.stats().avg_memory_utilization as f64)
                     .unwrap_or(0.5),
-                attention: encoding_result.attention_snapshot
-                    .values()
-                    .copied()
-                    .fold(0.0_f32, f32::max) as f64, // peak attention
+                attention: encoding_result.peak_attention as f64,
                 recurrence: (self.stats.total_cycles.min(100) as f64 / 100.0), // ramp up over 100 cycles
                 embodiment: body_phi_modulation, // virtual body provides embodiment
                 knowledge: self.prediction_confidence as f64,
@@ -1719,7 +1738,7 @@ impl CognitiveLoopService {
         CycleResult {
             output: output.clone(),
             prediction_error,
-            attention_state: encoding_result.attention_snapshot,
+            peak_attention: encoding_result.peak_attention,
             detected_primitives: encoding_result.detected_primitives,
             learning_occurred,
             training_loss,

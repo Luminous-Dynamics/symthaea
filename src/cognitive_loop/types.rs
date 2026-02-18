@@ -3,7 +3,6 @@
 //! Extracted from `mod.rs` to reduce file size while preserving all public APIs.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CYCLE URGENCY — adaptive subsystem scheduling
@@ -228,8 +227,8 @@ pub struct CycleResult {
     /// Prediction error for this cycle
     pub prediction_error: f32,
 
-    /// Current attention state
-    pub attention_state: HashMap<String, f32>,
+    /// Peak attention value from encoder
+    pub peak_attention: f32,
 
     /// Detected primitives in input
     pub detected_primitives: Vec<String>,

@@ -109,7 +109,7 @@ impl CognitiveLoopService {
         Ok(CycleResult {
             output: output.clone(),
             prediction_error,
-            attention_state: std::collections::HashMap::new(), // No text-based attention for embedding input
+            peak_attention: 0.0, // No text-based attention for embedding input
             detected_primitives: Vec::new(), // No text primitives for embedding input
             learning_occurred,
             training_loss,
@@ -220,7 +220,7 @@ impl CognitiveLoopService {
         super::CycleResult {
             output,
             prediction_error,
-            attention_state: std::collections::HashMap::new(),
+            peak_attention: 0.0,
             detected_primitives: Vec::new(),
             learning_occurred,
             training_loss,
@@ -531,6 +531,8 @@ impl CognitiveLoopService {
         self.fep_agent = ActiveInferenceAgent::new(self.fep_agent.config.clone());
         self.coherence_tracker.reset();
         self.external_reward = 0.0;
+        self.social_trust = 0.5;
+        self.social_cooperation_rate = 0.0;
         self.prev_body_phi_modulation = 1.0;
         self.prev_embodied_phi_modulation = 1.0;
         self.prev_resonance_frequency = 0.0;

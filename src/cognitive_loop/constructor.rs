@@ -411,6 +411,8 @@ impl CognitiveLoopService {
             narrative_gwt,
             relational_phi: 0.0,
             external_reward: 0.0,
+            social_trust: 0.5,
+            social_cooperation_rate: 0.0,
             virtual_body,
             prev_body_phi_modulation: 1.0,
             prev_embodied_phi_modulation: 1.0,

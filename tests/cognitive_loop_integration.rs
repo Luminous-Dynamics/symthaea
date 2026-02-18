@@ -176,7 +176,7 @@ fn test_primitives_detected_from_input() {
     // The encoder should detect at least some primitives
     // (exact primitives depend on the HDC encoder's dictionary)
     assert!(result.detected_primitives.len() >= 0); // Non-panicking access
-    assert!(result.attention_state.len() >= 0); // Attention state populated
+    assert!(result.peak_attention >= 0.0); // Attention state populated
 }
 
 // ── Long Running Stability ──────────────────────────────────────────

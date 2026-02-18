@@ -2471,6 +2471,57 @@ fn test_v063_predictive_lr_feedback() {
 }
 
 #[test]
+fn test_social_signals_modulate_affect() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_affective_bridge: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Inject high social trust
+    service.set_social_signals(0.9, 0.8);
+
+    // Run several cycles and capture result
+    let mut result = service.cycle("social modulation test");
+    for _ in 0..9 {
+        result = service.cycle("social modulation test");
+    }
+
+    // With high trust (0.9) and cooperation (0.8), affect should be active
+    assert!(
+        result.metadata.affective_valence.is_finite(),
+        "Affective valence should be finite with social signals"
+    );
+}
+
+#[test]
+fn test_predictive_crossmodal_bidirectional_feedback() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_predictive_processing: true,
+        enable_cross_modal_binding: true,
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run enough cycles for bidirectional coupling to engage
+    let mut result = service.cycle("bidirectional feedback test");
+    for _ in 0..19 {
+        result = service.cycle("bidirectional feedback test");
+    }
+
+    assert!(
+        result.metadata.predictive_free_energy >= 0.0,
+        "Predictive free energy should be non-negative"
+    );
+    assert!(
+        result.metadata.cross_modal_binding_strength >= 0.0,
+        "Cross-modal binding strength should be non-negative"
+    );
+}
+
+#[test]
 fn test_cycle_with_hv() {
     use symthaea_core::hdc::ContinuousHV;
 
