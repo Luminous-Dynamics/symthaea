@@ -196,6 +196,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_TOOLCHAIN }}
+      - name: Sanitize feature name for cache key
+        id: feat
+        shell: bash
+        run: echo "name=$(echo '${{ matrix.features }}' | tr ',' '-')" >> "$GITHUB_OUTPUT"
       - name: Cache cargo registry & build
         uses: actions/cache@v4
         with:
@@ -203,9 +207,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             symthaea/target
-          key: ${{ runner.os }}-cargo-feat-${{ matrix.features }}-${{ hashFiles('symthaea/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-feat-${{ steps.feat.outputs.name }}-${{ hashFiles('symthaea/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-feat-${{ matrix.features }}-
+            ${{ runner.os }}-cargo-feat-${{ steps.feat.outputs.name }}-
       - name: Check feature (${{ matrix.features }})
         run: cargo check --lib --features ${{ matrix.features }}
       - name: Test feature (${{ matrix.features }})
@@ -237,7 +241,7 @@ jobs:
             ${{ runner.os }}-cargo-subcrates-
       - name: Test sub-crates (fast path)
         run: |
-          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies symthaea-consciousness-resonance symthaea-embeddings symthaea-observability symthaea-dynamics symthaea-sentinel symthaea-perception symthaea-stt; do
+          for crate in symthaea-dream symthaea-phi-search symthaea-narrative-self symthaea-fep symthaea-causal-reasoning symthaea-field-dynamics symthaea-hodge symthaea-factor-graph symthaea-enactive symthaea-sensorimotor symthaea-consciousness-topology symthaea-exploration symthaea-wisdom symthaea-types symthaea-seven-harmonies symthaea-consciousness-resonance symthaea-embeddings symthaea-observability symthaea-dynamics symthaea-sentinel symthaea-perception symthaea-stt symthaea-mycelix-bridge; do
             echo "::group::$crate"
             cargo clippy -p $crate --lib -- -D warnings
             cargo test -p $crate --lib
