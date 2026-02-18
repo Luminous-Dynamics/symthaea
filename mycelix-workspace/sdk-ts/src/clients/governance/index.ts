@@ -50,20 +50,21 @@
  * ```
  */
 
-import { AppClient, AppWebsocket } from '@holochain/client';
+import { type AppClient, AppWebsocket } from '@holochain/client';
 
 // Import all zome clients
-import { DAOClient } from './dao';
-import { ProposalsClient } from './proposals';
-import { VotingClient } from './voting';
-import { DelegationClient } from './delegation';
-import { TreasuryClient } from './treasury';
-import { ExecutionClient } from './execution';
 import { BridgeClient } from './bridge';
-import { CouncilsClient } from './councils';
 import { ConstitutionClient } from './constitution';
+import { CouncilsClient } from './councils';
+import { DAOClient } from './dao';
+import { DelegationClient } from './delegation';
+import { ExecutionClient } from './execution';
+import { ProposalsClient } from './proposals';
 import { ThresholdSigningClient } from './threshold-signing';
+import { TreasuryClient } from './treasury';
 import { GovernanceError } from './types';
+import { VotingClient } from './voting';
+
 // Note: Client config types are exported via re-exports below
 import type { ActionHash } from '../../generated/common';
 

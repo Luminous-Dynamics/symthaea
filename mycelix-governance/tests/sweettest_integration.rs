@@ -516,6 +516,49 @@ pub struct RegisterMemberInput {
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SubmitDkgDealInput {
+    pub committee_id: String,
+    pub vss_commitment: Vec<u8>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct FinalizeDkgInput {
+    pub committee_id: String,
+    pub combined_public_key: Vec<u8>,
+    pub public_commitments: Vec<Vec<u8>>,
+    pub qualified_members: Vec<u32>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SubmitSignatureShareInput {
+    pub signature_id: String,
+    pub participant_id: u32,
+    pub share: Vec<u8>,
+    pub content_hash: Vec<u8>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CombineSignaturesInput {
+    pub committee_id: String,
+    pub content_hash: Vec<u8>,
+    pub content_description: String,
+    pub combined_signature: Vec<u8>,
+    pub signers: Vec<u32>,
+    pub verified: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct SignatureShare {
+    pub id: String,
+    pub signature_id: String,
+    pub participant_id: u32,
+    pub agent: String,
+    pub share: Vec<u8>,
+    pub content_hash: Vec<u8>,
+    pub submitted_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct MarkTimelockReadyInput {
     pub timelock_id: String,
 }
@@ -1887,6 +1930,460 @@ mod execution_tests {
         assert_eq!(members.len(), 1);
 
         println!("=== test_threshold_signing_e2e_flow PASSED ===\n");
+    }
+}
+
+// ============================================================================
+// Threshold-Signing DKG Ceremony E2E Tests
+// ============================================================================
+
+#[cfg(test)]
+mod threshold_signing_dkg_tests {
+    use super::*;
+    use feldman_dkg::{Dealer, ParticipantId, DkgConfig, DkgCeremony};
+    use k256::ecdsa::{SigningKey, signature::Signer};
+    use rand::rngs::OsRng;
+
+    /// Run a local feldman-dkg 2-of-3 ceremony and return crypto data for zome calls.
+    ///
+    /// Returns: (combined_public_key_bytes, vss_commitment_bytes_per_dealer, signing_key)
+    fn run_local_dkg() -> (Vec<u8>, Vec<Vec<u8>>, SigningKey) {
+        let config = DkgConfig::new(2, 3).unwrap();
+        let mut ceremony = DkgCeremony::new(config, 0);
+        for i in 1..=3u32 {
+            ceremony.add_participant(ParticipantId(i), 0).unwrap();
+        }
+
+        let dealers: Vec<Dealer> = (1..=3)
+            .map(|i| Dealer::new(ParticipantId(i as u32), 2, 3, &mut OsRng).unwrap())
+            .collect();
+        let deals: Vec<_> = dealers.iter().map(|d| d.generate_deal()).collect();
+
+        let commitment_bytes: Vec<Vec<u8>> = deals.iter()
+            .map(|d| d.commitments.to_bytes())
+            .collect();
+
+        for (i, deal) in deals.iter().enumerate() {
+            ceremony.submit_deal(ParticipantId((i + 1) as u32), deal.clone(), 0).unwrap();
+        }
+
+        let result = ceremony.finalize().unwrap();
+        let combined_pk_bytes = result.public_key.to_bytes();
+
+        // Reconstruct combined secret for ECDSA signing
+        let shares: Vec<_> = (1..=3)
+            .map(|i| ceremony.get_combined_share(ParticipantId(i as u32)).unwrap())
+            .collect();
+        let combined_secret = ceremony.reconstruct_secret(&shares[..2]).unwrap();
+        let secret_bytes = combined_secret.to_bytes();
+        let signing_key = SigningKey::from_bytes(&secret_bytes.into()).unwrap();
+
+        (combined_pk_bytes, commitment_bytes, signing_key)
+    }
+
+    /// Helper: set up 3 agents and complete a full DKG ceremony via zome calls.
+    /// Returns (conductor, cells, committee_id, signing_key).
+    async fn setup_completed_dkg(dna: &DnaFile) -> (
+        SweetConductor,
+        Vec<SweetCell>,
+        String,
+        SigningKey,
+    ) {
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let app1 = conductor.setup_app("dkg-a1", &[dna.clone()]).await.unwrap();
+        let app2 = conductor.setup_app("dkg-a2", &[dna.clone()]).await.unwrap();
+        let app3 = conductor.setup_app("dkg-a3", &[dna.clone()]).await.unwrap();
+
+        let cells = vec![
+            app1.cells()[0].clone(),
+            app2.cells()[0].clone(),
+            app3.cells()[0].clone(),
+        ];
+        let agents: Vec<_> = vec![app1.agent(), app2.agent(), app3.agent()]
+            .into_iter().cloned().collect();
+
+        // Create committee
+        let record: Record = conductor
+            .call(&cells[0].zome("threshold_signing"), "create_committee", CreateCommitteeInput {
+                name: "E2E DKG Committee".to_string(),
+                threshold: 2,
+                member_count: 3,
+                scope: CommitteeScope::All,
+                min_phi: None,
+            })
+            .await;
+        let committee: SigningCommittee = decode_entry(&record).unwrap();
+
+        // Register members
+        for (i, (cell, agent)) in cells.iter().zip(agents.iter()).enumerate() {
+            let _: Record = conductor.call(
+                &cell.zome("threshold_signing"),
+                "register_member",
+                RegisterMemberInput {
+                    committee_id: committee.id.clone(),
+                    participant_id: (i + 1) as u32,
+                    member_did: format!("did:mycelix:{}", agent),
+                    trust_score: 0.9,
+                },
+            ).await;
+        }
+
+        // Generate real DKG data and submit deals
+        let (combined_pk, commitments, signing_key) = run_local_dkg();
+        for (i, cell) in cells.iter().enumerate() {
+            let _: Record = conductor.call(
+                &cell.zome("threshold_signing"),
+                "submit_dkg_deal",
+                SubmitDkgDealInput {
+                    committee_id: committee.id.clone(),
+                    vss_commitment: commitments[i].clone(),
+                },
+            ).await;
+        }
+
+        // Finalize
+        let _: Record = conductor.call(
+            &cells[0].zome("threshold_signing"),
+            "finalize_dkg",
+            FinalizeDkgInput {
+                committee_id: committee.id.clone(),
+                combined_public_key: combined_pk,
+                public_commitments: commitments,
+                qualified_members: vec![1, 2, 3],
+            },
+        ).await;
+
+        (conductor, cells, committee.id, signing_key)
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore] // Requires pre-built governance DNA bundle
+    async fn test_full_dkg_ceremony_multi_agent() {
+        println!("=== test_full_dkg_ceremony_multi_agent ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+
+        let app1 = conductor.setup_app("dkg-agent1", &[dna.clone()]).await.unwrap();
+        let app2 = conductor.setup_app("dkg-agent2", &[dna.clone()]).await.unwrap();
+        let app3 = conductor.setup_app("dkg-agent3", &[dna.clone()]).await.unwrap();
+
+        let cell1 = app1.cells()[0].clone();
+        let cell2 = app2.cells()[0].clone();
+        let cell3 = app3.cells()[0].clone();
+        let cells = [&cell1, &cell2, &cell3];
+        let apps = [&app1, &app2, &app3];
+
+        // Step 1: Create a 2-of-3 committee
+        let committee_input = CreateCommitteeInput {
+            name: "DKG E2E Committee".to_string(),
+            threshold: 2,
+            member_count: 3,
+            scope: CommitteeScope::Treasury,
+            min_phi: None,
+        };
+        let committee_record: Record = conductor
+            .call(&cell1.zome("threshold_signing"), "create_committee", committee_input)
+            .await;
+        let committee: SigningCommittee = decode_entry(&committee_record).unwrap();
+        assert_eq!(committee.phase, DkgPhase::Registration);
+        println!("  1. Committee created: {}", committee.id);
+
+        // Step 2: All 3 agents register
+        for (i, (cell, app)) in cells.iter().zip(apps.iter()).enumerate() {
+            let member_input = RegisterMemberInput {
+                committee_id: committee.id.clone(),
+                participant_id: (i + 1) as u32,
+                member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+                trust_score: 0.85,
+            };
+            let member_record: Record = conductor
+                .call(&cell.zome("threshold_signing"), "register_member", member_input)
+                .await;
+            let member: CommitteeMember = decode_entry(&member_record).unwrap();
+            assert_eq!(member.participant_id, (i + 1) as u32);
+            assert!(!member.deal_submitted);
+        }
+        println!("  2. All 3 members registered");
+
+        let members: Vec<Record> = conductor
+            .call(&cell1.zome("threshold_signing"), "get_committee_members", committee.id.clone())
+            .await;
+        assert_eq!(members.len(), 3, "Should have 3 registered members");
+
+        // Step 3: Submit real VSS commitments
+        let (combined_pk_bytes, commitment_bytes, _signing_key) = run_local_dkg();
+
+        for (i, cell) in cells.iter().enumerate() {
+            let deal_input = SubmitDkgDealInput {
+                committee_id: committee.id.clone(),
+                vss_commitment: commitment_bytes[i].clone(),
+            };
+            let updated_member: Record = conductor
+                .call(&cell.zome("threshold_signing"), "submit_dkg_deal", deal_input)
+                .await;
+            let member: CommitteeMember = decode_entry(&updated_member).unwrap();
+            assert!(member.deal_submitted, "Member {} deal_submitted=true", i + 1);
+            assert!(member.vss_commitment.is_some(), "VSS commitment stored");
+        }
+        println!("  3. All 3 deals submitted with real VSS commitments");
+
+        // Step 4: Finalize DKG
+        let finalize_input = FinalizeDkgInput {
+            committee_id: committee.id.clone(),
+            combined_public_key: combined_pk_bytes.clone(),
+            public_commitments: commitment_bytes.clone(),
+            qualified_members: vec![1, 2, 3],
+        };
+        let finalized_record: Record = conductor
+            .call(&cell1.zome("threshold_signing"), "finalize_dkg", finalize_input)
+            .await;
+        let finalized: SigningCommittee = decode_entry(&finalized_record).unwrap();
+        assert_eq!(finalized.phase, DkgPhase::Complete);
+        assert!(finalized.public_key.is_some());
+        assert_eq!(finalized.public_key.unwrap(), combined_pk_bytes);
+        assert!(finalized.active);
+        println!("  4. DKG finalized — committee in Complete phase");
+
+        // Step 5: Verify members are qualified
+        let final_members: Vec<Record> = conductor
+            .call(&cell1.zome("threshold_signing"), "get_committee_members", committee.id.clone())
+            .await;
+        let qualified_count = final_members.iter()
+            .filter_map(|r| decode_entry::<CommitteeMember>(r))
+            .filter(|m| m.qualified)
+            .count();
+        assert_eq!(qualified_count, 3, "All 3 members should be qualified");
+        println!("  5. All 3 members qualified");
+
+        println!("=== test_full_dkg_ceremony_multi_agent PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_combine_signatures_with_ecdsa() {
+        println!("=== test_combine_signatures_with_ecdsa ===");
+
+        let dna = load_dna().await;
+        let (mut conductor, cells, committee_id, signing_key) =
+            setup_completed_dkg(&dna).await;
+
+        // Sign a governance proposal
+        let content = b"MIP-42 constitutional amendment approved by governance".to_vec();
+        let signature: k256::ecdsa::Signature = signing_key.sign(&content);
+        let sig_bytes = signature.to_bytes().to_vec();
+
+        let combine_input = CombineSignaturesInput {
+            committee_id: committee_id.clone(),
+            content_hash: content.clone(),
+            content_description: "MIP-42".to_string(),
+            combined_signature: sig_bytes,
+            signers: vec![1, 2],
+            verified: false, // Will be overridden by actual ECDSA verification
+        };
+        let sig_record: Record = conductor
+            .call(&cells[0].zome("threshold_signing"), "combine_signatures", combine_input)
+            .await;
+        let threshold_sig: ThresholdSignature = decode_entry(&sig_record).unwrap();
+
+        assert!(threshold_sig.verified, "ECDSA signature must be verified on-chain");
+        assert_eq!(threshold_sig.signer_count, 2);
+        assert_eq!(threshold_sig.signers, vec![1, 2]);
+        assert_eq!(threshold_sig.committee_id, committee_id);
+        println!("  ECDSA verification confirmed on-chain");
+
+        // Verify proposal linking (MIP-42 prefix triggers automatic linking)
+        let proposal_sig: Option<Record> = conductor
+            .call(&cells[0].zome("threshold_signing"), "get_proposal_signature", "MIP-42".to_string())
+            .await;
+        assert!(proposal_sig.is_some(), "Signature should be linked to MIP-42");
+        println!("  Proposal signature linking verified");
+
+        println!("=== test_combine_signatures_with_ecdsa PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_key_rotation_full_flow() {
+        println!("=== test_key_rotation_full_flow ===");
+
+        let dna = load_dna().await;
+        let (mut conductor, cells, committee_id, _signing_key) =
+            setup_completed_dkg(&dna).await;
+
+        // Verify epoch 1 is complete
+        let current: Option<Record> = conductor
+            .call(&cells[0].zome("threshold_signing"), "get_committee", committee_id.clone())
+            .await;
+        let before: SigningCommittee = decode_entry(&current.unwrap()).unwrap();
+        assert_eq!(before.epoch, 1);
+        assert_eq!(before.phase, DkgPhase::Complete);
+
+        // Rotate keys
+        let new_record: Record = conductor
+            .call(&cells[0].zome("threshold_signing"), "rotate_committee_keys", committee_id.clone())
+            .await;
+        let new_committee: SigningCommittee = decode_entry(&new_record).unwrap();
+        assert_eq!(new_committee.epoch, 2, "Epoch should increment");
+        assert_eq!(new_committee.phase, DkgPhase::Registration, "Phase should reset");
+        assert!(new_committee.active, "New committee should be active");
+        assert!(new_committee.public_key.is_none(), "No public key yet");
+        assert!(new_committee.commitments.is_empty(), "No commitments yet");
+        println!("  Key rotation: epoch 1 → 2, phase reset to Registration");
+
+        // Verify committee history
+        let history: Vec<Record> = conductor
+            .call(&cells[0].zome("threshold_signing"), "get_committee_history", committee_id.clone())
+            .await;
+        assert!(history.len() >= 2, "Should have at least 2 epochs");
+        let epochs: Vec<u32> = history.iter()
+            .filter_map(|r| decode_entry::<SigningCommittee>(r))
+            .map(|c| c.epoch)
+            .collect();
+        assert!(epochs.contains(&1), "History should include epoch 1");
+        assert!(epochs.contains(&2), "History should include epoch 2");
+        println!("  Committee history: {} epochs", history.len());
+
+        // Verify qualified members re-registered with reset DKG state
+        let new_members: Vec<Record> = conductor
+            .call(&cells[0].zome("threshold_signing"), "get_committee_members", committee_id.clone())
+            .await;
+        let reset_members: Vec<CommitteeMember> = new_members.iter()
+            .filter_map(|r| decode_entry::<CommitteeMember>(r))
+            .filter(|m| !m.qualified && !m.deal_submitted)
+            .collect();
+        assert!(!reset_members.is_empty(), "Should have re-registered members with reset DKG state");
+        println!("  Re-registered members: {} (DKG state reset)", reset_members.len());
+
+        println!("=== test_key_rotation_full_flow PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_invalid_vss_commitment_rejected() {
+        println!("=== test_invalid_vss_commitment_rejected ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app = conductor.setup_app("invalid-vss", &[dna.clone()]).await.unwrap();
+        let cell = app.cells()[0].clone();
+
+        // Create committee and register
+        let record: Record = conductor
+            .call(&cell.zome("threshold_signing"), "create_committee", CreateCommitteeInput {
+                name: "VSS Reject Test".to_string(),
+                threshold: 2,
+                member_count: 3,
+                scope: CommitteeScope::All,
+                min_phi: None,
+            })
+            .await;
+        let committee: SigningCommittee = decode_entry(&record).unwrap();
+
+        let _: Record = conductor.call(
+            &cell.zome("threshold_signing"),
+            "register_member",
+            RegisterMemberInput {
+                committee_id: committee.id.clone(),
+                participant_id: 1,
+                member_did: format!("did:mycelix:{}", app.agent_pubkey()),
+                trust_score: 0.9,
+            },
+        ).await;
+
+        // Submit garbage VSS commitment — should be rejected
+        let garbage_vss = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0xFF, 0xFF];
+        let result: Result<Record, _> = conductor.call_fallible(
+            &cell.zome("threshold_signing"),
+            "submit_dkg_deal",
+            SubmitDkgDealInput {
+                committee_id: committee.id.clone(),
+                vss_commitment: garbage_vss,
+            },
+        ).await;
+        assert!(result.is_err(), "Garbage VSS commitment should be rejected");
+        println!("  Garbage VSS correctly rejected");
+
+        println!("=== test_invalid_vss_commitment_rejected PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_double_finalize_prevented() {
+        println!("=== test_double_finalize_prevented ===");
+
+        let dna = load_dna().await;
+        let (mut conductor, cells, committee_id, _signing_key) =
+            setup_completed_dkg(&dna).await;
+
+        // Try to finalize again — should fail because phase is already Complete
+        let (combined_pk, commitments, _) = run_local_dkg();
+        let result: Result<Record, _> = conductor.call_fallible(
+            &cells[0].zome("threshold_signing"),
+            "finalize_dkg",
+            FinalizeDkgInput {
+                committee_id: committee_id.clone(),
+                combined_public_key: combined_pk,
+                public_commitments: commitments,
+                qualified_members: vec![1, 2, 3],
+            },
+        ).await;
+        assert!(result.is_err(), "Double finalize should be prevented");
+        println!("  Double finalize correctly rejected");
+
+        println!("=== test_double_finalize_prevented PASSED ===\n");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
+    async fn test_signature_shares_flow() {
+        println!("=== test_signature_shares_flow ===");
+
+        let mut conductor = SweetConductor::from_standard_config().await;
+        let dna = load_dna().await;
+        let app1 = conductor.setup_app("share-a1", &[dna.clone()]).await.unwrap();
+        let app2 = conductor.setup_app("share-a2", &[dna.clone()]).await.unwrap();
+        let cell1 = app1.cells()[0].clone();
+        let cell2 = app2.cells()[0].clone();
+
+        let content_hash = vec![0u8; 32];
+        let sig_id = "sig-share-test-001".to_string();
+
+        // Agent 1 submits a share
+        let share1_record: Record = conductor.call(
+            &cell1.zome("threshold_signing"),
+            "submit_signature_share",
+            SubmitSignatureShareInput {
+                signature_id: sig_id.clone(),
+                participant_id: 1,
+                share: vec![1u8; 64],
+                content_hash: content_hash.clone(),
+            },
+        ).await;
+        let share1: SignatureShare = decode_entry(&share1_record).unwrap();
+        assert_eq!(share1.participant_id, 1);
+        assert_eq!(share1.signature_id, sig_id);
+
+        // Agent 2 submits a share
+        let _: Record = conductor.call(
+            &cell2.zome("threshold_signing"),
+            "submit_signature_share",
+            SubmitSignatureShareInput {
+                signature_id: sig_id.clone(),
+                participant_id: 2,
+                share: vec![2u8; 64],
+                content_hash: content_hash.clone(),
+            },
+        ).await;
+
+        // Retrieve all shares
+        let shares: Vec<Record> = conductor
+            .call(&cell1.zome("threshold_signing"), "get_signature_shares", sig_id.clone())
+            .await;
+        assert_eq!(shares.len(), 2, "Should have 2 signature shares");
+        println!("  2 signature shares submitted and retrieved");
+
+        println!("=== test_signature_shares_flow PASSED ===\n");
     }
 }
 

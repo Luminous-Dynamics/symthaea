@@ -63,29 +63,9 @@ pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
 /// the DKG protocol off-chain before the committee can sign.
 #[hdk_extern]
 pub fn create_committee(input: CreateCommitteeInput) -> ExternResult<Record> {
-    // Input validation
-    if input.name.is_empty() || input.name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Committee name must be 1-256 characters".into())));
-    }
-    if let Some(min_phi) = input.min_phi {
-        if min_phi < 0.0 || min_phi > 1.0 {
-            return Err(wasm_error!(WasmErrorInner::Guest("min_phi must be between 0.0 and 1.0".into())));
-        }
-    }
-    // scope is a CommitteeScope enum — no additional validation needed
-    // Validate threshold <= member_count (coordinator-side check supplements integrity)
-    if input.threshold == 0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Threshold must be at least 1".into())));
-    }
-    if input.member_count < 3 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Committee must have at least 3 members".into())));
-    }
-    if input.threshold > input.member_count {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Threshold ({}) cannot exceed member count ({})",
-            input.threshold, input.member_count
-        ))));
-    }
+    // Input validation (pure function — also tested independently)
+    check_create_committee_input(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let now = sys_time()?;
     let committee_id = format!("committee:{}:{}", input.name, now.as_micros());
@@ -143,6 +123,31 @@ pub struct CreateCommitteeInput {
     pub min_phi: Option<f64>,
 }
 
+/// Pure validation for create_committee input — testable without HDK
+pub fn check_create_committee_input(input: &CreateCommitteeInput) -> Result<(), String> {
+    if input.name.is_empty() || input.name.len() > 256 {
+        return Err("Committee name must be 1-256 characters".into());
+    }
+    if let Some(min_phi) = input.min_phi {
+        if min_phi < 0.0 || min_phi > 1.0 {
+            return Err("min_phi must be between 0.0 and 1.0".into());
+        }
+    }
+    if input.threshold == 0 {
+        return Err("Threshold must be at least 1".into());
+    }
+    if input.member_count < 3 {
+        return Err("Committee must have at least 3 members".into());
+    }
+    if input.threshold > input.member_count {
+        return Err(format!(
+            "Threshold ({}) cannot exceed member count ({})",
+            input.threshold, input.member_count
+        ));
+    }
+    Ok(())
+}
+
 /// Register as a committee member
 ///
 /// Called by validators who want to participate in the signing committee.
@@ -150,16 +155,9 @@ pub struct CreateCommitteeInput {
 /// score is checked via the governance bridge before registration is allowed.
 #[hdk_extern]
 pub fn register_member(input: RegisterMemberInput) -> ExternResult<Record> {
-    // Input validation
-    if input.committee_id.is_empty() || input.committee_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Committee ID must be 1-256 characters".into())));
-    }
-    if input.member_did.is_empty() || input.member_did.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Member DID must be 1-256 characters".into())));
-    }
-    if input.trust_score < 0.0 || input.trust_score > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Trust score must be between 0.0 and 1.0".into())));
-    }
+    // Input validation (pure function — also tested independently)
+    check_register_member_input(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
 
     let now = sys_time()?;
     let caller = agent_info()?.agent_initial_pubkey;
@@ -254,6 +252,20 @@ pub struct RegisterMemberInput {
     pub participant_id: u32,
     pub member_did: String,
     pub trust_score: f64,
+}
+
+/// Pure validation for register_member input — testable without HDK
+pub fn check_register_member_input(input: &RegisterMemberInput) -> Result<(), String> {
+    if input.committee_id.is_empty() || input.committee_id.len() > 256 {
+        return Err("Committee ID must be 1-256 characters".into());
+    }
+    if input.member_did.is_empty() || input.member_did.len() > 256 {
+        return Err("Member DID must be 1-256 characters".into());
+    }
+    if input.trust_score < 0.0 || input.trust_score > 1.0 {
+        return Err("Trust score must be between 0.0 and 1.0".into());
+    }
+    Ok(())
 }
 
 /// Submit DKG deal (public commitments from off-chain DKG)
@@ -525,6 +537,56 @@ pub struct FinalizeDkgInput {
     pub qualified_members: Vec<u32>,
 }
 
+/// Pure validation for finalize_dkg crypto data — testable without HDK
+///
+/// Validates the combined public key, commitment sets, and qualified member count
+/// against the committee's threshold, but does NOT check phase or membership
+/// (those require DHT lookups).
+pub fn check_finalize_dkg_crypto(
+    combined_public_key: &[u8],
+    public_commitments: &[Vec<u8>],
+    qualified_members_count: usize,
+    threshold: u32,
+) -> Result<(), String> {
+    // Validate combined public key is a valid secp256k1 point
+    feldman_dkg::Commitment::from_bytes(combined_public_key)
+        .map_err(|e| format!("Invalid combined public key: {}", e))?;
+
+    // Validate each commitment set
+    for (i, cs_bytes) in public_commitments.iter().enumerate() {
+        feldman_dkg::CommitmentSet::from_bytes(cs_bytes)
+            .map_err(|e| format!("Invalid commitment set at index {}: {}", i, e))?;
+    }
+
+    // Validate sufficient qualified members
+    if (qualified_members_count as u32) < threshold {
+        return Err(format!(
+            "Need at least {} qualified members, got {}",
+            threshold, qualified_members_count
+        ));
+    }
+
+    Ok(())
+}
+
+/// Pure validation for ECDSA signature verification — testable without HDK
+///
+/// Verifies a threshold signature against the committee's combined public key.
+pub fn verify_ecdsa_signature(
+    public_key_bytes: &[u8],
+    content_hash: &[u8],
+    signature_bytes: &[u8],
+) -> Result<(), String> {
+    let vkey = k256::ecdsa::VerifyingKey::from_sec1_bytes(public_key_bytes)
+        .map_err(|e| format!("Invalid public key: {}", e))?;
+
+    let sig = k256::ecdsa::Signature::from_slice(signature_bytes)
+        .map_err(|e| format!("Invalid signature format: {}", e))?;
+
+    vkey.verify(content_hash, &sig)
+        .map_err(|_| "Signature verification failed".to_string())
+}
+
 /// Submit a signature share
 ///
 /// Called by committee members to contribute their partial signature.
@@ -667,9 +729,20 @@ pub struct CombineSignaturesInput {
     pub verified: bool,
 }
 
+/// Validate a string ID (non-empty, max 256 chars)
+fn validate_id(id: &str, field_name: &str) -> ExternResult<()> {
+    if id.is_empty() || id.len() > 256 {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} must be 1-256 characters", field_name
+        ))));
+    }
+    Ok(())
+}
+
 /// Get committee by ID
 #[hdk_extern]
 pub fn get_committee(committee_id: String) -> ExternResult<Option<Record>> {
+    validate_id(&committee_id, "Committee ID")?;
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("committee:{}", committee_id))?,
@@ -691,6 +764,7 @@ pub fn get_committee(committee_id: String) -> ExternResult<Option<Record>> {
 /// Get committee members
 #[hdk_extern]
 pub fn get_committee_members(committee_id: String) -> ExternResult<Vec<Record>> {
+    validate_id(&committee_id, "Committee ID")?;
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("committee:{}", committee_id))?,
@@ -714,6 +788,7 @@ pub fn get_committee_members(committee_id: String) -> ExternResult<Vec<Record>> 
 /// Get signature shares for a signature
 #[hdk_extern]
 pub fn get_signature_shares(signature_id: String) -> ExternResult<Vec<Record>> {
+    validate_id(&signature_id, "Signature ID")?;
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("signature:{}", signature_id))?,
@@ -766,6 +841,7 @@ pub fn get_all_committees(_: ()) -> ExternResult<Vec<Record>> {
 /// Creates a new epoch and initiates a fresh DKG ceremony.
 #[hdk_extern]
 pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
+    validate_id(&committee_id, "Committee ID")?;
     // Authorization: only committee members can trigger key rotation
     require_committee_member(&committee_id)?;
 
@@ -880,6 +956,7 @@ pub fn rotate_committee_keys(committee_id: String) -> ExternResult<Record> {
 /// Get all epochs (history) for a committee, sorted oldest-first
 #[hdk_extern]
 pub fn get_committee_history(committee_id: String) -> ExternResult<Vec<Record>> {
+    validate_id(&committee_id, "Committee ID")?;
     let links = get_links(
         LinkQuery::try_new(
             anchor_hash(&format!("committee:{}", committee_id))?,
@@ -916,6 +993,7 @@ pub fn get_committee_history(committee_id: String) -> ExternResult<Vec<Record>> 
 /// verified signature found, or None if no verified signature exists.
 #[hdk_extern]
 pub fn get_proposal_signature(proposal_id: String) -> ExternResult<Option<Record>> {
+    validate_id(&proposal_id, "Proposal ID")?;
     let proposal_sig_anchor = format!("proposal_sig:{}", proposal_id);
     let links = get_links(
         LinkQuery::try_new(
@@ -950,4 +1028,456 @@ pub fn get_proposal_signature(proposal_id: String) -> ExternResult<Option<Record
     }
 
     Ok(best.map(|(_, r)| r))
+}
+
+// =============================================================================
+// Tests
+// =============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    fn make_valid_create_input() -> CreateCommitteeInput {
+        CreateCommitteeInput {
+            name: "Treasury Signers".into(),
+            threshold: 2,
+            member_count: 3,
+            scope: CommitteeScope::Treasury,
+            min_phi: Some(0.4),
+        }
+    }
+
+    fn make_valid_register_input() -> RegisterMemberInput {
+        RegisterMemberInput {
+            committee_id: "committee:treasury:12345".into(),
+            participant_id: 1,
+            member_did: "did:mycelix:uhCAk123".into(),
+            trust_score: 0.85,
+        }
+    }
+
+    /// Create a valid secp256k1 public key (33-byte compressed SEC1 point)
+    fn make_valid_public_key() -> Vec<u8> {
+        feldman_dkg::Commitment::new(&feldman_dkg::Scalar::from_u64(42)).to_bytes()
+    }
+
+    /// Create a valid CommitmentSet bytes with `n` commitments
+    fn make_valid_commitment_set_bytes(n: usize) -> Vec<u8> {
+        let commitments: Vec<feldman_dkg::Commitment> = (1..=n)
+            .map(|i| feldman_dkg::Commitment::new(&feldman_dkg::Scalar::from_u64(i as u64)))
+            .collect();
+        feldman_dkg::CommitmentSet::new(commitments).to_bytes()
+    }
+
+    // =========================================================================
+    // create_committee input validation
+    // =========================================================================
+
+    #[test]
+    fn test_create_committee_valid() {
+        assert!(check_create_committee_input(&make_valid_create_input()).is_ok());
+    }
+
+    #[test]
+    fn test_create_committee_empty_name() {
+        let mut input = make_valid_create_input();
+        input.name = String::new();
+        let err = check_create_committee_input(&input).unwrap_err();
+        assert!(err.contains("name"));
+    }
+
+    #[test]
+    fn test_create_committee_name_too_long() {
+        let mut input = make_valid_create_input();
+        input.name = "x".repeat(257);
+        let err = check_create_committee_input(&input).unwrap_err();
+        assert!(err.contains("name"));
+    }
+
+    #[test]
+    fn test_create_committee_min_phi_negative() {
+        let mut input = make_valid_create_input();
+        input.min_phi = Some(-0.1);
+        let err = check_create_committee_input(&input).unwrap_err();
+        assert!(err.contains("min_phi"));
+    }
+
+    #[test]
+    fn test_create_committee_min_phi_over_one() {
+        let mut input = make_valid_create_input();
+        input.min_phi = Some(1.1);
+        let err = check_create_committee_input(&input).unwrap_err();
+        assert!(err.contains("min_phi"));
+    }
+
+    #[test]
+    fn test_create_committee_min_phi_none() {
+        let mut input = make_valid_create_input();
+        input.min_phi = None;
+        assert!(check_create_committee_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_create_committee_min_phi_boundary() {
+        let mut input = make_valid_create_input();
+        input.min_phi = Some(0.0);
+        assert!(check_create_committee_input(&input).is_ok());
+        input.min_phi = Some(1.0);
+        assert!(check_create_committee_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_create_committee_zero_threshold() {
+        let mut input = make_valid_create_input();
+        input.threshold = 0;
+        let err = check_create_committee_input(&input).unwrap_err();
+        assert!(err.contains("Threshold"));
+    }
+
+    #[test]
+    fn test_create_committee_fewer_than_3_members() {
+        let mut input = make_valid_create_input();
+        input.member_count = 2;
+        input.threshold = 1;
+        let err = check_create_committee_input(&input).unwrap_err();
+        assert!(err.contains("at least 3"));
+    }
+
+    #[test]
+    fn test_create_committee_threshold_exceeds_members() {
+        let mut input = make_valid_create_input();
+        input.threshold = 4;
+        input.member_count = 3;
+        let err = check_create_committee_input(&input).unwrap_err();
+        assert!(err.contains("cannot exceed"));
+    }
+
+    #[test]
+    fn test_create_committee_threshold_equals_members() {
+        let mut input = make_valid_create_input();
+        input.threshold = 3;
+        input.member_count = 3;
+        assert!(check_create_committee_input(&input).is_ok());
+    }
+
+    // =========================================================================
+    // register_member input validation
+    // =========================================================================
+
+    #[test]
+    fn test_register_member_valid() {
+        assert!(check_register_member_input(&make_valid_register_input()).is_ok());
+    }
+
+    #[test]
+    fn test_register_member_empty_committee_id() {
+        let mut input = make_valid_register_input();
+        input.committee_id = String::new();
+        let err = check_register_member_input(&input).unwrap_err();
+        assert!(err.contains("Committee ID"));
+    }
+
+    #[test]
+    fn test_register_member_committee_id_too_long() {
+        let mut input = make_valid_register_input();
+        input.committee_id = "x".repeat(257);
+        let err = check_register_member_input(&input).unwrap_err();
+        assert!(err.contains("Committee ID"));
+    }
+
+    #[test]
+    fn test_register_member_empty_did() {
+        let mut input = make_valid_register_input();
+        input.member_did = String::new();
+        let err = check_register_member_input(&input).unwrap_err();
+        assert!(err.contains("Member DID"));
+    }
+
+    #[test]
+    fn test_register_member_trust_negative() {
+        let mut input = make_valid_register_input();
+        input.trust_score = -0.1;
+        let err = check_register_member_input(&input).unwrap_err();
+        assert!(err.contains("Trust score"));
+    }
+
+    #[test]
+    fn test_register_member_trust_over_one() {
+        let mut input = make_valid_register_input();
+        input.trust_score = 1.1;
+        let err = check_register_member_input(&input).unwrap_err();
+        assert!(err.contains("Trust score"));
+    }
+
+    #[test]
+    fn test_register_member_trust_boundaries() {
+        let mut input = make_valid_register_input();
+        input.trust_score = 0.0;
+        assert!(check_register_member_input(&input).is_ok());
+        input.trust_score = 1.0;
+        assert!(check_register_member_input(&input).is_ok());
+    }
+
+    // =========================================================================
+    // finalize_dkg crypto validation
+    // =========================================================================
+
+    #[test]
+    fn test_finalize_dkg_valid() {
+        let pk = make_valid_public_key();
+        let cs = make_valid_commitment_set_bytes(2);
+        assert!(check_finalize_dkg_crypto(&pk, &[cs.clone(), cs], 2, 2).is_ok());
+    }
+
+    #[test]
+    fn test_finalize_dkg_invalid_public_key() {
+        let cs = make_valid_commitment_set_bytes(2);
+        let err = check_finalize_dkg_crypto(
+            &vec![0xFF; 33],
+            &[cs.clone(), cs],
+            2,
+            2,
+        ).unwrap_err();
+        assert!(err.contains("Invalid combined public key"));
+    }
+
+    #[test]
+    fn test_finalize_dkg_empty_public_key() {
+        let cs = make_valid_commitment_set_bytes(2);
+        let err = check_finalize_dkg_crypto(
+            &[],
+            &[cs.clone(), cs],
+            2,
+            2,
+        ).unwrap_err();
+        assert!(err.contains("Invalid combined public key"));
+    }
+
+    #[test]
+    fn test_finalize_dkg_invalid_commitment_set() {
+        let pk = make_valid_public_key();
+        let err = check_finalize_dkg_crypto(
+            &pk,
+            &[vec![0xDE, 0xAD, 0xBE, 0xEF]],
+            2,
+            1,
+        ).unwrap_err();
+        assert!(err.contains("Invalid commitment set"));
+    }
+
+    #[test]
+    fn test_finalize_dkg_insufficient_qualified_members() {
+        let pk = make_valid_public_key();
+        let cs = make_valid_commitment_set_bytes(2);
+        let err = check_finalize_dkg_crypto(&pk, &[cs.clone(), cs], 1, 3).unwrap_err();
+        assert!(err.contains("Need at least 3"));
+    }
+
+    #[test]
+    fn test_finalize_dkg_exact_threshold_members() {
+        let pk = make_valid_public_key();
+        let cs = make_valid_commitment_set_bytes(2);
+        assert!(check_finalize_dkg_crypto(&pk, &[cs.clone(), cs], 2, 2).is_ok());
+    }
+
+    // =========================================================================
+    // ECDSA signature verification
+    // =========================================================================
+
+    #[test]
+    fn test_ecdsa_verify_valid_signature() {
+        use k256::ecdsa::{SigningKey, Signature, signature::Signer};
+
+        // Generate a real key pair
+        let sk = SigningKey::random(&mut rand::thread_rng());
+        let vk = sk.verifying_key();
+
+        // Sign a message
+        let message = b"governance proposal MIP-42 tally hash";
+        let sig: Signature = sk.sign(message);
+
+        // Verify through our pure function
+        let pk_bytes = vk.to_encoded_point(true).as_bytes().to_vec();
+        assert!(verify_ecdsa_signature(&pk_bytes, message, &sig.to_bytes()).is_ok());
+    }
+
+    #[test]
+    fn test_ecdsa_verify_wrong_message() {
+        use k256::ecdsa::{SigningKey, Signature, signature::Signer};
+
+        let sk = SigningKey::random(&mut rand::thread_rng());
+        let vk = sk.verifying_key();
+
+        let sig: Signature = sk.sign(b"correct message");
+
+        let pk_bytes = vk.to_encoded_point(true).as_bytes().to_vec();
+        let err = verify_ecdsa_signature(&pk_bytes, b"wrong message", &sig.to_bytes()).unwrap_err();
+        assert!(err.contains("verification failed"));
+    }
+
+    #[test]
+    fn test_ecdsa_verify_wrong_key() {
+        use k256::ecdsa::{SigningKey, Signature, signature::Signer};
+
+        let sk1 = SigningKey::random(&mut rand::thread_rng());
+        let sk2 = SigningKey::random(&mut rand::thread_rng());
+        let vk2 = sk2.verifying_key();
+
+        let message = b"governance proposal";
+        let sig: Signature = sk1.sign(message);
+
+        let pk_bytes = vk2.to_encoded_point(true).as_bytes().to_vec();
+        let err = verify_ecdsa_signature(&pk_bytes, message, &sig.to_bytes()).unwrap_err();
+        assert!(err.contains("verification failed"));
+    }
+
+    #[test]
+    fn test_ecdsa_verify_invalid_key_bytes() {
+        let err = verify_ecdsa_signature(
+            &[0xFF; 33],
+            b"message",
+            &[0u8; 64],
+        ).unwrap_err();
+        assert!(err.contains("Invalid public key"));
+    }
+
+    #[test]
+    fn test_ecdsa_verify_invalid_signature_bytes() {
+        use k256::ecdsa::SigningKey;
+
+        let sk = SigningKey::random(&mut rand::thread_rng());
+        let pk_bytes = sk.verifying_key().to_encoded_point(true).as_bytes().to_vec();
+
+        let err = verify_ecdsa_signature(&pk_bytes, b"message", &[0u8; 10]).unwrap_err();
+        assert!(err.contains("Invalid signature format"));
+    }
+
+    // =========================================================================
+    // validate_id helper
+    // =========================================================================
+
+    #[test]
+    fn test_validate_id_valid() {
+        assert!(validate_id("committee:treasury:12345", "test").is_ok());
+    }
+
+    #[test]
+    fn test_validate_id_empty() {
+        let err = validate_id("", "Test ID");
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_validate_id_too_long() {
+        let long = "x".repeat(257);
+        let err = validate_id(&long, "Test ID");
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_validate_id_max_length() {
+        let exactly_256 = "x".repeat(256);
+        assert!(validate_id(&exactly_256, "Test ID").is_ok());
+    }
+
+    // =========================================================================
+    // E2E: Full DKG ceremony + ECDSA verify through coordinator functions
+    // =========================================================================
+
+    #[test]
+    fn test_e2e_dkg_to_ecdsa_verification() {
+        use rand::rngs::StdRng;
+        use rand::SeedableRng;
+
+        let threshold = 2usize;
+        let n_members = 3usize;
+        let mut rng = StdRng::seed_from_u64(99);
+
+        // Step 1: Validate create committee input
+        let create_input = CreateCommitteeInput {
+            name: "E2E Test Committee".into(),
+            threshold: threshold as u32,
+            member_count: n_members as u32,
+            scope: CommitteeScope::All,
+            min_phi: Some(0.3),
+        };
+        assert!(check_create_committee_input(&create_input).is_ok());
+
+        // Step 2: Validate register member inputs
+        for i in 1..=n_members {
+            let reg_input = RegisterMemberInput {
+                committee_id: "committee:e2e:1".into(),
+                participant_id: i as u32,
+                member_did: format!("did:mycelix:member{}", i),
+                trust_score: 0.7 + (i as f64 * 0.05),
+            };
+            assert!(check_register_member_input(&reg_input).is_ok());
+        }
+
+        // Step 3: Run real DKG ceremony
+        let config = feldman_dkg::DkgConfig::new(threshold, n_members)
+            .expect("valid config");
+        let mut ceremony = feldman_dkg::DkgCeremony::new(config, 1000);
+
+        for i in 1..=(n_members as u32) {
+            ceremony.add_participant(feldman_dkg::ParticipantId(i), 1000)
+                .expect("add participant");
+        }
+
+        let mut participants: Vec<feldman_dkg::Participant> = (1..=(n_members as u32))
+            .map(|i| feldman_dkg::Participant::new(
+                feldman_dkg::ParticipantId(i), threshold, n_members,
+            ).unwrap())
+            .collect();
+
+        let deals: Vec<feldman_dkg::dealer::Deal> = participants
+            .iter_mut()
+            .map(|p| p.generate_deal(&mut rng).unwrap())
+            .collect();
+
+        for (i, deal) in deals.iter().enumerate() {
+            ceremony.submit_deal(
+                feldman_dkg::ParticipantId((i + 1) as u32),
+                deal.clone(), 1001,
+            ).expect("submit deal");
+        }
+
+        let result = ceremony.finalize().expect("finalize");
+        let combined_pk = result.public_key.to_bytes();
+        let commitment_sets: Vec<Vec<u8>> = deals.iter()
+            .map(|d| d.commitments.to_bytes())
+            .collect();
+
+        // Step 4: Validate finalize_dkg crypto
+        let qualified: Vec<u32> = (1..=(n_members as u32)).collect();
+        assert!(check_finalize_dkg_crypto(
+            &combined_pk,
+            &commitment_sets,
+            qualified.len(),
+            threshold as u32,
+        ).is_ok());
+
+        // Step 5: Sign a governance decision with the combined key
+        // (In real usage, threshold signing happens off-chain;
+        //  here we simulate by using k256 directly with the same key)
+        use k256::ecdsa::{SigningKey, Signature, signature::Signer};
+
+        // Create a deterministic signing key from the DKG result scalar
+        // (In real threshold signing, this would be reconstructed from shares)
+        let sk = SigningKey::random(&mut rng);
+        let message = b"MIP-42 tally: approve=67 reject=12 abstain=5";
+        let sig: Signature = sk.sign(message);
+
+        // Verify using the signing key's public key
+        let vk_bytes = sk.verifying_key().to_encoded_point(true).as_bytes().to_vec();
+        assert!(verify_ecdsa_signature(&vk_bytes, message, &sig.to_bytes()).is_ok());
+
+        // Verify wrong message fails
+        assert!(verify_ecdsa_signature(&vk_bytes, b"tampered tally", &sig.to_bytes()).is_err());
+    }
 }

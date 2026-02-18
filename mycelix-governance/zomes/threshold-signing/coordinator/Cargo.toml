@@ -17,5 +17,8 @@ thiserror = { workspace = true }
 feldman-dkg = { workspace = true }
 k256 = { workspace = true }
 
+[dev-dependencies]
+rand = "0.8"
+
 [features]
 default = []

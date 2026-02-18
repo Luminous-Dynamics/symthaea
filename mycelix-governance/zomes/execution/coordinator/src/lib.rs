@@ -928,3 +928,191 @@ pub fn get_pending_timelocks(_: ()) -> ExternResult<Vec<Record>> {
 
     Ok(timelocks)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // =========================================================================
+    // GovernanceAction::validate() — pure method tests
+    // =========================================================================
+
+    // --- TransferCredits ---
+
+    #[test]
+    fn test_transfer_credits_valid() {
+        let action = GovernanceAction::TransferCredits {
+            from: "treasury".into(),
+            to: "project-fund".into(),
+            amount: 1000.0,
+        };
+        assert!(action.validate().is_ok());
+    }
+
+    #[test]
+    fn test_transfer_credits_empty_from() {
+        let action = GovernanceAction::TransferCredits {
+            from: "".into(),
+            to: "project-fund".into(),
+            amount: 100.0,
+        };
+        let err = action.validate().unwrap_err();
+        assert!(err.contains("'from' is required"));
+    }
+
+    #[test]
+    fn test_transfer_credits_empty_to() {
+        let action = GovernanceAction::TransferCredits {
+            from: "treasury".into(),
+            to: "".into(),
+            amount: 100.0,
+        };
+        let err = action.validate().unwrap_err();
+        assert!(err.contains("'to' is required"));
+    }
+
+    #[test]
+    fn test_transfer_credits_zero_amount() {
+        let action = GovernanceAction::TransferCredits {
+            from: "treasury".into(),
+            to: "project".into(),
+            amount: 0.0,
+        };
+        let err = action.validate().unwrap_err();
+        assert!(err.contains("must be positive"));
+    }
+
+    #[test]
+    fn test_transfer_credits_negative_amount() {
+        let action = GovernanceAction::TransferCredits {
+            from: "treasury".into(),
+            to: "project".into(),
+            amount: -50.0,
+        };
+        let err = action.validate().unwrap_err();
+        assert!(err.contains("must be positive"));
+    }
+
+    #[test]
+    fn test_transfer_credits_infinite_amount() {
+        let action = GovernanceAction::TransferCredits {
+            from: "treasury".into(),
+            to: "project".into(),
+            amount: f64::INFINITY,
+        };
+        let err = action.validate().unwrap_err();
+        assert!(err.contains("must be finite"));
+    }
+
+    #[test]
+    fn test_transfer_credits_nan_amount() {
+        let action = GovernanceAction::TransferCredits {
+            from: "treasury".into(),
+            to: "project".into(),
+            amount: f64::NAN,
+        };
+        // NaN is neither positive nor finite — hits the <= 0.0 check
+        assert!(action.validate().is_err());
+    }
+
+    // --- UpdateParameter ---
+
+    #[test]
+    fn test_update_parameter_valid() {
+        let action = GovernanceAction::UpdateParameter {
+            parameter: "quorum_threshold".into(),
+            value: "0.67".into(),
+        };
+        assert!(action.validate().is_ok());
+    }
+
+    #[test]
+    fn test_update_parameter_empty_name() {
+        let action = GovernanceAction::UpdateParameter {
+            parameter: "".into(),
+            value: "0.67".into(),
+        };
+        let err = action.validate().unwrap_err();
+        assert!(err.contains("'parameter' name is required"));
+    }
+
+    // --- EmitEvent ---
+
+    #[test]
+    fn test_emit_event_always_valid() {
+        let action = GovernanceAction::EmitEvent {
+            event: "treasury_disbursement".into(),
+            payload: serde_json::json!({"amount": 500}),
+        };
+        assert!(action.validate().is_ok());
+
+        // Even empty event is valid (no validation on event name)
+        let empty = GovernanceAction::EmitEvent {
+            event: "".into(),
+            payload: serde_json::Value::Null,
+        };
+        assert!(empty.validate().is_ok());
+    }
+
+    // =========================================================================
+    // GovernanceAction serde — JSON round-trip and tagged enum format
+    // =========================================================================
+
+    #[test]
+    fn test_governance_action_serde_transfer() {
+        let json = r#"{"type":"TransferCredits","from":"treasury","to":"dev-fund","amount":250.5}"#;
+        let action: GovernanceAction = serde_json::from_str(json).unwrap();
+        match action {
+            GovernanceAction::TransferCredits { from, to, amount } => {
+                assert_eq!(from, "treasury");
+                assert_eq!(to, "dev-fund");
+                assert!((amount - 250.5).abs() < f64::EPSILON);
+            }
+            _ => panic!("Expected TransferCredits"),
+        }
+    }
+
+    #[test]
+    fn test_governance_action_serde_update() {
+        let json = r#"{"type":"UpdateParameter","parameter":"phi_threshold","value":"0.5"}"#;
+        let action: GovernanceAction = serde_json::from_str(json).unwrap();
+        match action {
+            GovernanceAction::UpdateParameter { parameter, value } => {
+                assert_eq!(parameter, "phi_threshold");
+                assert_eq!(value, "0.5");
+            }
+            _ => panic!("Expected UpdateParameter"),
+        }
+    }
+
+    #[test]
+    fn test_governance_action_serde_emit() {
+        let json = r#"{"type":"EmitEvent","event":"proposal_executed"}"#;
+        let action: GovernanceAction = serde_json::from_str(json).unwrap();
+        match action {
+            GovernanceAction::EmitEvent { event, payload } => {
+                assert_eq!(event, "proposal_executed");
+                assert_eq!(payload, serde_json::Value::Null); // default
+            }
+            _ => panic!("Expected EmitEvent"),
+        }
+    }
+
+    #[test]
+    fn test_governance_action_array_parse() {
+        let json = r#"[
+            {"type":"TransferCredits","from":"a","to":"b","amount":100},
+            {"type":"EmitEvent","event":"done"}
+        ]"#;
+        let actions: Vec<GovernanceAction> = serde_json::from_str(json).unwrap();
+        assert_eq!(actions.len(), 2);
+        assert!(actions[0].validate().is_ok());
+        assert!(actions[1].validate().is_ok());
+    }
+
+    #[test]
+    fn test_governance_action_invalid_json() {
+        let json = "not valid json at all {{{";
+        assert!(serde_json::from_str::<GovernanceAction>(json).is_err());
+    }
+}

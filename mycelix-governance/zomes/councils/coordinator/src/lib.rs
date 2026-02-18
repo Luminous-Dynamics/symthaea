@@ -1198,3 +1198,311 @@ pub fn get_council_decisions(council_id: String) -> ExternResult<Vec<Record>> {
 
     Ok(decisions)
 }
+
+/// Get councils that a member belongs to (for cross-zome guardian verification)
+#[hdk_extern]
+pub fn get_member_councils(member_did: String) -> ExternResult<Vec<Record>> {
+    let member_anchor = Anchor(format!("member_{}", member_did));
+    let member_hash = hash_entry(&member_anchor)?;
+
+    let links = get_links(
+        LinkQuery::try_new(member_hash, LinkTypes::MemberToCouncil)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut councils = Vec::new();
+    for link in links {
+        if let Some(target) = link.target.into_action_hash() {
+            if let Some(record) = get(target, GetOptions::default())? {
+                councils.push(record);
+            }
+        }
+    }
+
+    Ok(councils)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    // =========================================================================
+    // calculate_phi_distribution — statistical distribution of phi scores
+    // =========================================================================
+
+    #[test]
+    fn test_phi_distribution_empty() {
+        let dist = calculate_phi_distribution(&[]);
+        assert_eq!(dist.min, 0.0);
+        assert_eq!(dist.max, 0.0);
+        assert_eq!(dist.median, 0.0);
+        assert_eq!(dist.p25, 0.0);
+        assert_eq!(dist.p75, 0.0);
+    }
+
+    #[test]
+    fn test_phi_distribution_single() {
+        let dist = calculate_phi_distribution(&[0.7]);
+        assert_eq!(dist.min, 0.7);
+        assert_eq!(dist.max, 0.7);
+        assert_eq!(dist.median, 0.7);
+    }
+
+    #[test]
+    fn test_phi_distribution_odd_count() {
+        // 5 values: [0.1, 0.3, 0.5, 0.7, 0.9]
+        let dist = calculate_phi_distribution(&[0.5, 0.1, 0.9, 0.3, 0.7]);
+        assert!((dist.min - 0.1).abs() < f64::EPSILON);
+        assert!((dist.max - 0.9).abs() < f64::EPSILON);
+        assert!((dist.median - 0.5).abs() < f64::EPSILON);
+        assert!((dist.p25 - 0.3).abs() < f64::EPSILON); // index 1
+        assert!((dist.p75 - 0.7).abs() < f64::EPSILON); // index 3
+    }
+
+    #[test]
+    fn test_phi_distribution_even_count() {
+        // 4 values: [0.2, 0.4, 0.6, 0.8]
+        let dist = calculate_phi_distribution(&[0.4, 0.8, 0.2, 0.6]);
+        assert!((dist.min - 0.2).abs() < f64::EPSILON);
+        assert!((dist.max - 0.8).abs() < f64::EPSILON);
+        // median = (sorted[1] + sorted[2]) / 2 = (0.4 + 0.6) / 2 = 0.5
+        assert!((dist.median - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_phi_distribution_all_same() {
+        let dist = calculate_phi_distribution(&[0.5, 0.5, 0.5, 0.5]);
+        assert_eq!(dist.min, 0.5);
+        assert_eq!(dist.max, 0.5);
+        assert_eq!(dist.median, 0.5);
+        assert_eq!(dist.p25, 0.5);
+        assert_eq!(dist.p75, 0.5);
+    }
+
+    // =========================================================================
+    // calculate_holon_depth — root vs child councils
+    // =========================================================================
+
+    #[test]
+    fn test_holon_depth_root() {
+        let council = Council {
+            id: "root".into(),
+            name: "Root".into(),
+            purpose: "Top-level".into(),
+            council_type: CouncilType::Root,
+            parent_council_id: None,
+            phi_threshold: 0.5,
+            quorum: 0.6,
+            supermajority: 0.67,
+            can_spawn_children: true,
+            max_delegation_depth: 3,
+            signing_committee_id: None,
+            status: CouncilStatus::Active,
+            created_at: ts(1000),
+            last_activity: ts(2000),
+        };
+        assert_eq!(calculate_holon_depth(&council), 0);
+    }
+
+    #[test]
+    fn test_holon_depth_child() {
+        let council = Council {
+            id: "child".into(),
+            name: "Child".into(),
+            purpose: "Sub-council".into(),
+            council_type: CouncilType::Domain { domain: "treasury".into() },
+            parent_council_id: Some("root".into()),
+            phi_threshold: 0.5,
+            quorum: 0.6,
+            supermajority: 0.67,
+            can_spawn_children: false,
+            max_delegation_depth: 2,
+            signing_committee_id: None,
+            status: CouncilStatus::Active,
+            created_at: ts(1000),
+            last_activity: ts(2000),
+        };
+        assert_eq!(calculate_holon_depth(&council), 1);
+    }
+
+    // =========================================================================
+    // calculate_health_score — composite health metric
+    // =========================================================================
+
+    #[test]
+    fn test_health_score_no_children() {
+        // participation=0.8, phi=0.6, harmony=0.5, no children, no risks
+        let score = calculate_health_score(0.8, 0.6, 0.5, &None, &[]);
+        // base = (0.8 * 0.25) + (0.6 * 0.25) + (0.5 * 0.25) = 0.2 + 0.15 + 0.125 = 0.475
+        // child_contribution = 0.25 (no children → full points)
+        // total = 0.475 + 0.25 = 0.725
+        assert!((score - 0.725).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_health_score_with_children() {
+        let child_health = AggregateChildHealth {
+            healthy_count: 3,
+            struggling_count: 0,
+            dormant_count: 0,
+            average_health: 0.6,
+            children_needing_attention: vec![],
+        };
+        let score = calculate_health_score(0.8, 0.6, 0.5, &Some(child_health), &[]);
+        // base = 0.475 (same as above)
+        // child_contribution = 0.6 * 0.25 = 0.15
+        // total = 0.475 + 0.15 = 0.625
+        assert!((score - 0.625).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_health_score_risk_penalty() {
+        let risks = vec![
+            RiskFactor {
+                category: RiskCategory::Participation,
+                severity: 0.6,
+                description: "Low participation".into(),
+            },
+            RiskFactor {
+                category: RiskCategory::Consciousness,
+                severity: 0.3,
+                description: "Low phi".into(),
+            },
+        ];
+        let score = calculate_health_score(0.8, 0.6, 0.5, &None, &risks);
+        // base + child = 0.725
+        // risk penalty = (0.6 * 0.05) + (0.3 * 0.05) = 0.03 + 0.015 = 0.045
+        // final = 0.725 - 0.045 = 0.680
+        assert!((score - 0.680).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_health_score_clamped_to_01() {
+        // Extreme risk penalty that could push below 0
+        let risks = vec![RiskFactor {
+            category: RiskCategory::Participation,
+            severity: 100.0, // extreme
+            description: "Catastrophic".into(),
+        }];
+        let score = calculate_health_score(0.1, 0.1, 0.1, &None, &risks);
+        assert!(score >= 0.0);
+        assert!(score <= 1.0);
+    }
+
+    // =========================================================================
+    // identify_opportunities — suggestions based on gaps
+    // =========================================================================
+
+    #[test]
+    fn test_opportunities_absent_harmonies() {
+        let absent = vec!["InfinitePlay".to_string(), "SacredReciprocity".to_string()];
+        let opps = identify_opportunities(&[], &absent, &None, 0.9);
+        assert_eq!(opps.len(), 1);
+        assert!(opps[0].contains("2 harmonies"));
+        assert!(opps[0].contains("InfinitePlay"));
+    }
+
+    #[test]
+    fn test_opportunities_low_participation() {
+        let opps = identify_opportunities(&[], &[], &None, 0.5);
+        assert_eq!(opps.len(), 1);
+        assert!(opps[0].contains("engagement"));
+    }
+
+    #[test]
+    fn test_opportunities_dormant_children() {
+        let child_health = AggregateChildHealth {
+            healthy_count: 2,
+            struggling_count: 0,
+            dormant_count: 3,
+            average_health: 0.5,
+            children_needing_attention: vec!["child-1".into()],
+        };
+        let opps = identify_opportunities(&[], &[], &Some(child_health), 0.9);
+        assert_eq!(opps.len(), 1);
+        assert!(opps[0].contains("3 dormant"));
+    }
+
+    #[test]
+    fn test_opportunities_none_when_healthy() {
+        let opps = identify_opportunities(&[], &[], &None, 0.9);
+        assert!(opps.is_empty());
+    }
+
+    // =========================================================================
+    // generate_reflection_summary — human-readable summaries
+    // =========================================================================
+
+    fn make_council() -> Council {
+        Council {
+            id: "council-1".into(),
+            name: "Community Council".into(),
+            purpose: "Governance".into(),
+            council_type: CouncilType::Domain { domain: "general".into() },
+            parent_council_id: None,
+            phi_threshold: 0.5,
+            quorum: 0.6,
+            supermajority: 0.67,
+            can_spawn_children: true,
+            max_delegation_depth: 3,
+            signing_committee_id: None,
+            status: CouncilStatus::Active,
+            created_at: ts(1000),
+            last_activity: ts(2000),
+        }
+    }
+
+    #[test]
+    fn test_summary_thriving() {
+        let council = make_council();
+        let summary = generate_reflection_summary(
+            &council, 15, 0.85, &VitalityTrend::Thriving, &[],
+        );
+        assert!(summary.contains("Community Council"));
+        assert!(summary.contains("15 members"));
+        assert!(summary.contains("thriving"));
+        assert!(summary.contains("85%"));
+        assert!(summary.contains("No significant risk"));
+    }
+
+    #[test]
+    fn test_summary_critical_with_risks() {
+        let council = make_council();
+        let risks = vec![
+            RiskFactor {
+                category: RiskCategory::Participation,
+                severity: 0.8,
+                description: "Very low participation".into(),
+            },
+        ];
+        let summary = generate_reflection_summary(
+            &council, 3, 0.25, &VitalityTrend::Critical, &risks,
+        );
+        assert!(summary.contains("critical"));
+        assert!(summary.contains("25%"));
+        assert!(summary.contains("1 risk factors"));
+        assert!(summary.contains("Very low participation"));
+    }
+
+    #[test]
+    fn test_summary_declining() {
+        let council = make_council();
+        let summary = generate_reflection_summary(
+            &council, 8, 0.55, &VitalityTrend::Declining, &[],
+        );
+        assert!(summary.contains("decline"));
+    }
+
+    #[test]
+    fn test_summary_stable() {
+        let council = make_council();
+        let summary = generate_reflection_summary(
+            &council, 10, 0.70, &VitalityTrend::Stable, &[],
+        );
+        assert!(summary.contains("stable"));
+    }
+}

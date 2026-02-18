@@ -7,9 +7,10 @@
  * @module @mycelix/sdk/clients/governance/councils
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 // ============================================================================
 // Types
@@ -122,7 +123,8 @@ export interface CreateCouncilInput {
 export interface JoinCouncilInput {
   councilId: string;
   memberDid: string;
-  role?: MemberRole;
+  role: MemberRole;
+  phiScore: number;
 }
 
 export interface ReflectOnCouncilInput {
@@ -139,6 +141,10 @@ export interface RecordDecisionInput {
   title: string;
   content: string;
   decisionType: DecisionType;
+  votesFor: number;
+  votesAgainst: number;
+  abstentions: number;
+  phiWeightedResult: number;
 }
 
 // ============================================================================
@@ -232,6 +238,7 @@ export class CouncilsClient extends ZomeClient {
       council_id: input.councilId,
       member_did: input.memberDid,
       role: input.role,
+      phi_score: input.phiScore,
     });
     return this.mapMembership(record);
   }
@@ -282,6 +289,10 @@ export class CouncilsClient extends ZomeClient {
       title: input.title,
       content: input.content,
       decision_type: input.decisionType,
+      votes_for: input.votesFor,
+      votes_against: input.votesAgainst,
+      abstentions: input.abstentions,
+      phi_weighted_result: input.phiWeightedResult,
     });
     return this.mapDecision(record);
   }

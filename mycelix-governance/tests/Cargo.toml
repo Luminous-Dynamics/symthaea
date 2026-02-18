@@ -28,6 +28,11 @@ rmp-serde = "1.1"
 chrono = "0.4"
 uuid = { version = "1.6", features = ["v4"] }
 
+# Crypto for DKG ceremony E2E tests
+feldman-dkg = { path = "../../mycelix-core/libs/feldman-dkg" }
+k256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdsa"] }
+rand = "0.8"
+
 [[test]]
 name = "sweettest_integration"
 path = "sweettest_integration.rs"

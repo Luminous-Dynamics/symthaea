@@ -7,8 +7,8 @@
  * @module @mycelix/sdk/clients/governance/dao
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   DAO,
   CreateDAOInput,
@@ -20,6 +20,7 @@ import type {
 } from './types';
 // GovernanceError removed (unused)
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for the DAO client

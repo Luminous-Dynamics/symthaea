@@ -7,8 +7,9 @@
  * @module @mycelix/sdk/clients/governance/threshold-signing
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 // ============================================================================
 // Types
@@ -18,7 +19,8 @@ export type DkgPhase =
   | 'Registration'
   | 'Dealing'
   | 'Verification'
-  | 'Complete';
+  | 'Complete'
+  | 'Disbanded';
 
 export type CommitteeScope =
   | 'All'

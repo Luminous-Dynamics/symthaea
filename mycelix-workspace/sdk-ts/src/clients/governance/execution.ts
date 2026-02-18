@@ -7,8 +7,8 @@
  * @module @mycelix/sdk/clients/governance/execution
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   Timelock,
   FundAllocation,
@@ -17,6 +17,7 @@ import type {
   ExecuteTimelockInput,
   VetoTimelockInput,
 } from './types';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for the Execution client

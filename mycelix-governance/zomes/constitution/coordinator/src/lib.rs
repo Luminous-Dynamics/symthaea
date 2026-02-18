@@ -341,54 +341,44 @@ pub fn ratify_amendment(amendment_id: String) -> ExternResult<Record> {
         )))
 }
 
-/// Apply an amendment to the charter
-fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
-    // Get current charter
-    let current_charter = get_current_charter(())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No charter found".into())))?;
-
-    let charter: Charter = current_charter
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invalid charter entry".into()
-        )))?;
-
-    let now = sys_time()?;
-
-    // Create new charter version with amendment applied
-    let new_charter = match amendment.amendment_type {
-        AmendmentType::ModifyPreamble => Charter {
+/// Apply an amendment to a charter (pure logic — no HDK calls).
+///
+/// Takes the current charter, the amendment to apply, and the current timestamp.
+/// Returns the new charter with the amendment applied, or an error message.
+fn apply_amendment_pure(
+    charter: &Charter,
+    amendment: &Amendment,
+    now: Timestamp,
+) -> Result<Charter, String> {
+    match amendment.amendment_type {
+        AmendmentType::ModifyPreamble => Ok(Charter {
             version: charter.version + 1,
             preamble: amendment.new_text.clone(),
             last_amended: Some(now),
-            ..charter
-        },
-        AmendmentType::ModifyProcess => Charter {
+            ..charter.clone()
+        }),
+        AmendmentType::ModifyProcess => Ok(Charter {
             version: charter.version + 1,
             amendment_process: amendment.new_text.clone(),
             last_amended: Some(now),
-            ..charter
-        },
+            ..charter.clone()
+        }),
         AmendmentType::AddArticle => {
-            // Parse articles JSON, append new article
             let mut articles: Vec<serde_json::Value> =
                 serde_json::from_str(&charter.articles).unwrap_or_default();
             articles.push(serde_json::json!({
                 "title": amendment.article.as_deref().unwrap_or("New Article"),
                 "content": amendment.new_text,
             }));
-            Charter {
+            Ok(Charter {
                 version: charter.version + 1,
                 articles: serde_json::to_string(&articles)
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize articles: {}", e))))?,
+                    .map_err(|e| format!("Failed to serialize articles: {}", e))?,
                 last_amended: Some(now),
-                ..charter
-            }
+                ..charter.clone()
+            })
         }
         AmendmentType::ModifyArticle => {
-            // Find and replace article by title match
             let mut articles: Vec<serde_json::Value> =
                 serde_json::from_str(&charter.articles).unwrap_or_default();
             if let Some(ref target_article) = amendment.article {
@@ -399,16 +389,15 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
                     }
                 }
             }
-            Charter {
+            Ok(Charter {
                 version: charter.version + 1,
                 articles: serde_json::to_string(&articles)
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize articles: {}", e))))?,
+                    .map_err(|e| format!("Failed to serialize articles: {}", e))?,
                 last_amended: Some(now),
-                ..charter
-            }
+                ..charter.clone()
+            })
         }
         AmendmentType::RemoveArticle => {
-            // Remove article by title match
             let mut articles: Vec<serde_json::Value> =
                 serde_json::from_str(&charter.articles).unwrap_or_default();
             if let Some(ref target_article) = amendment.article {
@@ -416,26 +405,25 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
                     art.get("title").and_then(|t| t.as_str()) != Some(target_article)
                 });
             }
-            Charter {
+            Ok(Charter {
                 version: charter.version + 1,
                 articles: serde_json::to_string(&articles)
-                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!("Failed to serialize articles: {}", e))))?,
+                    .map_err(|e| format!("Failed to serialize articles: {}", e))?,
                 last_amended: Some(now),
-                ..charter
-            }
+                ..charter.clone()
+            })
         }
         AmendmentType::AddRight => {
             let mut rights = charter.rights.clone();
             rights.push(amendment.new_text.clone());
-            Charter {
+            Ok(Charter {
                 version: charter.version + 1,
                 rights,
                 last_amended: Some(now),
-                ..charter
-            }
+                ..charter.clone()
+            })
         }
         AmendmentType::ModifyRight => {
-            // Replace right matching original_text with new_text
             let rights: Vec<String> = charter.rights.iter().map(|r| {
                 if amendment.original_text.as_deref() == Some(r.as_str()) {
                     amendment.new_text.clone()
@@ -443,32 +431,44 @@ fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
                     r.clone()
                 }
             }).collect();
-            Charter {
+            Ok(Charter {
                 version: charter.version + 1,
                 rights,
                 last_amended: Some(now),
-                ..charter
-            }
+                ..charter.clone()
+            })
         }
         AmendmentType::RemoveRight => {
-            // Remove right matching original_text or new_text
             let target = amendment.original_text.as_deref()
                 .unwrap_or(&amendment.new_text);
-            let rights: Vec<String> = charter.rights.into_iter()
+            let rights: Vec<String> = charter.rights.clone().into_iter()
                 .filter(|r| r != target)
                 .collect();
-            Charter {
+            Ok(Charter {
                 version: charter.version + 1,
                 rights,
                 last_amended: Some(now),
-                ..charter
-            }
+                ..charter.clone()
+            })
         }
-    };
+    }
+}
 
-    // Create new charter version
+/// Apply an amendment to the charter (HDK wrapper)
+fn apply_amendment_to_charter(amendment: &Amendment) -> ExternResult<()> {
+    let current_charter = get_current_charter(())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("No charter found".into())))?;
+    let charter: Charter = current_charter
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid charter entry".into()
+        )))?;
+    let now = sys_time()?;
+    let new_charter = apply_amendment_pure(&charter, amendment, now)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e)))?;
     create_charter(new_charter)?;
-
     Ok(())
 }
 
@@ -632,4 +632,244 @@ pub fn list_parameters(_: ()) -> ExternResult<Vec<Record>> {
         .include_entries(true);
 
     query(filter)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ts(micros: i64) -> Timestamp {
+        Timestamp::from_micros(micros)
+    }
+
+    fn base_charter() -> Charter {
+        Charter {
+            id: "charter-1".into(),
+            version: 1,
+            preamble: "We the people".into(),
+            articles: r#"[{"title":"Article I","content":"Governance structure"}]"#.into(),
+            rights: vec!["Right to dignity".into(), "Right to privacy".into()],
+            amendment_process: "2/3 supermajority".into(),
+            adopted: ts(1_000_000),
+            last_amended: None,
+        }
+    }
+
+    fn make_amendment(amendment_type: AmendmentType) -> Amendment {
+        Amendment {
+            id: "amend-1".into(),
+            charter_version: 1,
+            amendment_type,
+            article: None,
+            original_text: None,
+            new_text: "new text".into(),
+            rationale: "test rationale".into(),
+            proposer: "did:key:z6Mk".into(),
+            proposal_id: "prop-1".into(),
+            status: AmendmentStatus::Ratified,
+            created: ts(2_000_000),
+            ratified: Some(ts(3_000_000)),
+        }
+    }
+
+    // === ModifyPreamble ===
+
+    #[test]
+    fn test_modify_preamble() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::ModifyPreamble);
+        amendment.new_text = "A new preamble for the ages".into();
+        amendment.original_text = Some(charter.preamble.clone());
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.version, 2);
+        assert_eq!(result.preamble, "A new preamble for the ages");
+        assert_eq!(result.last_amended, Some(ts(4_000_000)));
+        // Other fields unchanged
+        assert_eq!(result.id, charter.id);
+        assert_eq!(result.articles, charter.articles);
+        assert_eq!(result.rights, charter.rights);
+    }
+
+    // === ModifyProcess ===
+
+    #[test]
+    fn test_modify_process() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::ModifyProcess);
+        amendment.new_text = "3/4 supermajority with 30-day cooling".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.version, 2);
+        assert_eq!(result.amendment_process, "3/4 supermajority with 30-day cooling");
+        assert_eq!(result.preamble, charter.preamble); // unchanged
+    }
+
+    // === AddArticle ===
+
+    #[test]
+    fn test_add_article_with_title() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::AddArticle);
+        amendment.article = Some("Article II".into());
+        amendment.new_text = "Treasury management".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.version, 2);
+
+        let articles: Vec<serde_json::Value> = serde_json::from_str(&result.articles).unwrap();
+        assert_eq!(articles.len(), 2);
+        assert_eq!(articles[1]["title"], "Article II");
+        assert_eq!(articles[1]["content"], "Treasury management");
+    }
+
+    #[test]
+    fn test_add_article_default_title() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::AddArticle);
+        amendment.article = None; // no explicit title
+        amendment.new_text = "Default content".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        let articles: Vec<serde_json::Value> = serde_json::from_str(&result.articles).unwrap();
+        assert_eq!(articles[1]["title"], "New Article");
+    }
+
+    // === ModifyArticle ===
+
+    #[test]
+    fn test_modify_article() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::ModifyArticle);
+        amendment.article = Some("Article I".into());
+        amendment.new_text = "Updated governance structure".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        let articles: Vec<serde_json::Value> = serde_json::from_str(&result.articles).unwrap();
+        assert_eq!(articles.len(), 1);
+        assert_eq!(articles[0]["title"], "Article I");
+        assert_eq!(articles[0]["content"], "Updated governance structure");
+    }
+
+    #[test]
+    fn test_modify_article_no_match() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::ModifyArticle);
+        amendment.article = Some("Nonexistent Article".into());
+        amendment.new_text = "Should not appear".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        // Articles unchanged except version/timestamp
+        let articles: Vec<serde_json::Value> = serde_json::from_str(&result.articles).unwrap();
+        assert_eq!(articles[0]["content"], "Governance structure");
+    }
+
+    // === RemoveArticle ===
+
+    #[test]
+    fn test_remove_article() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::RemoveArticle);
+        amendment.article = Some("Article I".into());
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        let articles: Vec<serde_json::Value> = serde_json::from_str(&result.articles).unwrap();
+        assert!(articles.is_empty());
+    }
+
+    #[test]
+    fn test_remove_article_no_match() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::RemoveArticle);
+        amendment.article = Some("Nonexistent".into());
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        let articles: Vec<serde_json::Value> = serde_json::from_str(&result.articles).unwrap();
+        assert_eq!(articles.len(), 1); // unchanged
+    }
+
+    // === AddRight ===
+
+    #[test]
+    fn test_add_right() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::AddRight);
+        amendment.new_text = "Right to participation".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.rights.len(), 3);
+        assert_eq!(result.rights[2], "Right to participation");
+    }
+
+    // === ModifyRight ===
+
+    #[test]
+    fn test_modify_right() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::ModifyRight);
+        amendment.original_text = Some("Right to privacy".into());
+        amendment.new_text = "Right to data sovereignty".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.rights.len(), 2);
+        assert_eq!(result.rights[0], "Right to dignity"); // unchanged
+        assert_eq!(result.rights[1], "Right to data sovereignty"); // modified
+    }
+
+    #[test]
+    fn test_modify_right_no_match() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::ModifyRight);
+        amendment.original_text = Some("Nonexistent right".into());
+        amendment.new_text = "Should not appear".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.rights, charter.rights); // unchanged
+    }
+
+    // === RemoveRight ===
+
+    #[test]
+    fn test_remove_right_via_original_text() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::RemoveRight);
+        amendment.original_text = Some("Right to privacy".into());
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.rights.len(), 1);
+        assert_eq!(result.rights[0], "Right to dignity");
+    }
+
+    #[test]
+    fn test_remove_right_via_new_text_fallback() {
+        let charter = base_charter();
+        let mut amendment = make_amendment(AmendmentType::RemoveRight);
+        amendment.original_text = None; // falls back to new_text
+        amendment.new_text = "Right to dignity".into();
+
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.rights.len(), 1);
+        assert_eq!(result.rights[0], "Right to privacy");
+    }
+
+    // === Cross-cutting ===
+
+    #[test]
+    fn test_version_always_increments() {
+        let charter = Charter {
+            version: 5,
+            ..base_charter()
+        };
+        let amendment = make_amendment(AmendmentType::ModifyPreamble);
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.version, 6);
+    }
+
+    #[test]
+    fn test_adopted_date_preserved() {
+        let charter = base_charter();
+        let amendment = make_amendment(AmendmentType::AddRight);
+        let result = apply_amendment_pure(&charter, &amendment, ts(4_000_000)).unwrap();
+        assert_eq!(result.adopted, charter.adopted); // immutable
+    }
 }

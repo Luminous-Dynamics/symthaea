@@ -7,8 +7,8 @@
  * @module @mycelix/sdk/clients/governance/treasury
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   Treasury,
   TreasuryBalance,
@@ -18,6 +18,7 @@ import type {
   AllocationStatus,
 } from './types';
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 // Note: GovernanceError removed as unused
 
 /**

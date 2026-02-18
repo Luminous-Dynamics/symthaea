@@ -671,7 +671,11 @@ export class ExecutionClient {
 // ============================================================================
 
 /**
- * Create all Governance hApp clients
+ * Create all Governance hApp clients (ZomeCallable pattern)
+ *
+ * For the full 9-client factory (including Constitution, Councils,
+ * ThresholdSigning, Bridge), use the clients/governance/ module
+ * exported from the main SDK barrel.
  *
  * @example
  * ```typescript

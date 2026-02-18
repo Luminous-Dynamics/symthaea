@@ -350,7 +350,11 @@ export class ValidatedExecutionClient {
 // ============================================================================
 
 /**
- * Create all validated Governance hApp clients
+ * Create all validated Governance hApp clients (ZomeCallable pattern)
+ *
+ * For the full 9-client factory (including Constitution, Councils,
+ * ThresholdSigning, Bridge), use the clients/governance/ module
+ * exported from the main SDK barrel.
  */
 export function createValidatedGovernanceClients(client: ZomeCallable) {
   return {
