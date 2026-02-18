@@ -13,9 +13,21 @@ use std::time::{Duration, Instant};
 
 use symthaea_core::hdc::ContinuousHV;
 
+use crate::action::generation_manager::GenerationManager;
 use crate::encoding::{NixCodebook, SystemStateEncoder, SystemStateSnapshot};
 use crate::observe::SystemObserver;
 use crate::support::health_check::{HealthAssessor, HealthCheck, HealthStatus};
+
+/// Controls how aggressively the watchdog responds to degradation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutonomyLevel {
+    /// Only report degradation, never take action (default).
+    ReportOnly,
+    /// Report degradation and include the rollback command, but don't execute.
+    DryRun,
+    /// Automatically execute rollback when degradation is detected.
+    FullAutonomous,
+}
 
 /// Watchdog configuration.
 #[derive(Debug, Clone)]
@@ -28,6 +40,8 @@ pub struct WatchdogConfig {
     pub surprise_threshold: f64,
     /// Number of consecutive failures before reverting.
     pub consecutive_failures_to_revert: u32,
+    /// Controls rollback behavior: report-only, dry-run, or fully autonomous.
+    pub autonomy_level: AutonomyLevel,
 }
 
 impl Default for WatchdogConfig {
@@ -37,6 +51,7 @@ impl Default for WatchdogConfig {
             check_interval: Duration::from_secs(10), // every 10 seconds
             surprise_threshold: 0.3,
             consecutive_failures_to_revert: 3,
+            autonomy_level: AutonomyLevel::ReportOnly,
         }
     }
 }
@@ -89,7 +104,7 @@ impl Watchdog {
     /// # Arguments
     /// * `codebook` — shared codebook for encoding system state as HDC vectors
     /// * `baseline_hv` — the HDC-encoded system state *before* the rebuild
-    /// * `_pre_gen` — the NixOS generation number before the rebuild (used for rollback)
+    /// * `pre_gen` — the NixOS generation number before the rebuild (used for rollback)
     ///
     /// # Returns
     /// A [`WatchdogVerdict`] indicating whether the system stabilized, degraded,
@@ -98,7 +113,7 @@ impl Watchdog {
         &self,
         codebook: &mut NixCodebook,
         baseline_hv: &ContinuousHV,
-        _pre_gen: u64,
+        pre_gen: u64,
     ) -> WatchdogVerdict {
         let start = Instant::now();
         let mut consecutive_failures: u32 = 0;
@@ -159,15 +174,69 @@ impl Watchdog {
             if is_degraded {
                 consecutive_failures += 1;
                 if consecutive_failures >= self.config.consecutive_failures_to_revert {
-                    return WatchdogVerdict::Degraded {
-                        reason: format!(
-                            "System degraded: surprise={:.3}, health={}, {} consecutive failures",
-                            surprise, overall, consecutive_failures
-                        ),
-                        surprise: last_surprise,
-                        health: last_health,
-                        checks_performed,
-                    };
+                    let reason = format!(
+                        "System degraded: surprise={:.3}, health={}, {} consecutive failures",
+                        surprise, overall, consecutive_failures
+                    );
+
+                    match self.config.autonomy_level {
+                        AutonomyLevel::ReportOnly => {
+                            return WatchdogVerdict::Degraded {
+                                reason,
+                                surprise: last_surprise,
+                                health: last_health,
+                                checks_performed,
+                            };
+                        }
+                        AutonomyLevel::DryRun => {
+                            let cmd = GenerationManager::switch_to(pre_gen as u32);
+                            let (bin, args) = cmd.to_command();
+                            let cmd_str = format!("{} {}", bin, args.join(" "));
+                            return WatchdogVerdict::Degraded {
+                                reason: format!("{}; would run: {}", reason, cmd_str),
+                                surprise: last_surprise,
+                                health: last_health,
+                                checks_performed,
+                            };
+                        }
+                        AutonomyLevel::FullAutonomous => {
+                            let cmd = GenerationManager::switch_to(pre_gen as u32);
+                            let (bin, args) = cmd.to_command();
+                            let result =
+                                std::process::Command::new(&bin).args(&args).status();
+                            match result {
+                                Ok(status) if status.success() => {
+                                    return WatchdogVerdict::Reverted {
+                                        reason,
+                                        pre_gen,
+                                    };
+                                }
+                                Ok(status) => {
+                                    return WatchdogVerdict::Degraded {
+                                        reason: format!(
+                                            "{}; rollback failed (exit {})",
+                                            reason,
+                                            status.code().unwrap_or(-1)
+                                        ),
+                                        surprise: last_surprise,
+                                        health: last_health,
+                                        checks_performed,
+                                    };
+                                }
+                                Err(e) => {
+                                    return WatchdogVerdict::Degraded {
+                                        reason: format!(
+                                            "{}; rollback exec error: {}",
+                                            reason, e
+                                        ),
+                                        surprise: last_surprise,
+                                        health: last_health,
+                                        checks_performed,
+                                    };
+                                }
+                            }
+                        }
+                    }
                 }
             } else {
                 // Reset consecutive failure counter on a good check
@@ -222,10 +291,12 @@ mod tests {
             check_interval: Duration::from_secs(5),
             surprise_threshold: 0.5,
             consecutive_failures_to_revert: 5,
+            autonomy_level: AutonomyLevel::DryRun,
         };
         let watchdog = Watchdog::new(config);
         assert_eq!(watchdog.config().timeout, Duration::from_secs(60));
         assert_eq!(watchdog.config().consecutive_failures_to_revert, 5);
+        assert_eq!(watchdog.config().autonomy_level, AutonomyLevel::DryRun);
     }
 
     #[test]
@@ -369,5 +440,48 @@ mod tests {
             checks_performed: 3,
         };
         assert!(matches!(verdict, WatchdogVerdict::Degraded { .. }));
+    }
+
+    #[test]
+    fn test_default_autonomy_is_report_only() {
+        let config = WatchdogConfig::default();
+        assert_eq!(config.autonomy_level, AutonomyLevel::ReportOnly);
+    }
+
+    #[test]
+    fn test_config_with_autonomy_level() {
+        let config = WatchdogConfig {
+            autonomy_level: AutonomyLevel::FullAutonomous,
+            ..Default::default()
+        };
+        assert_eq!(config.autonomy_level, AutonomyLevel::FullAutonomous);
+    }
+
+    #[test]
+    fn test_reverted_verdict_construction() {
+        let verdict = WatchdogVerdict::Reverted {
+            reason: "degradation detected".to_string(),
+            pre_gen: 42,
+        };
+        match verdict {
+            WatchdogVerdict::Reverted { pre_gen, .. } => assert_eq!(pre_gen, 42),
+            _ => panic!("Expected Reverted"),
+        }
+    }
+
+    #[test]
+    fn test_dryrun_includes_command() {
+        // Verify that DryRun mode produces a degraded verdict with the rollback command
+        let config = WatchdogConfig {
+            autonomy_level: AutonomyLevel::DryRun,
+            ..Default::default()
+        };
+        // We can't easily run the full monitor in tests, but we can verify
+        // the GenerationManager produces the expected command
+        let cmd = crate::action::generation_manager::GenerationManager::switch_to(42);
+        let (bin, args) = cmd.to_command();
+        let cmd_str = format!("{} {}", bin, args.join(" "));
+        assert!(cmd_str.contains("42"), "Command should reference generation 42");
+        assert_eq!(config.autonomy_level, AutonomyLevel::DryRun);
     }
 }

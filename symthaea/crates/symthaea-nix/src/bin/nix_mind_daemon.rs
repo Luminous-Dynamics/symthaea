@@ -23,7 +23,9 @@ use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
 use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::observe::SystemObserver;
 use symthaea_nix::support::health_check::{HealthAssessor, HealthStatus};
-use symthaea_nix::support::predictive::{PredictiveMonitor, SystemTelemetry};
+use symthaea_nix::support::predictive::{
+    AlertThresholds, PredictiveMonitor, SavedPredictiveState, SystemTelemetry,
+};
 
 // DaemonConfig is now imported from symthaea_nix::ipc
 
@@ -263,6 +265,8 @@ impl DaemonState {
             recent_anomalies: self.recent_anomalies.clone(),
             daemon_running: true,
             daemon_pid: std::process::id(),
+            support_status: None,
+            recommendation_count: 0,
         }
     }
 }
@@ -347,6 +351,19 @@ fn main() -> ! {
         }
     }
 
+    // Restore persisted predictive history if available
+    let pred_path = snapshot_path.with_file_name("predictive_history.json");
+    if let Ok(json) = std::fs::read_to_string(&pred_path) {
+        if let Ok(saved) = serde_json::from_str::<SavedPredictiveState>(&json) {
+            let sample_count = saved.samples.len();
+            state.predictive_monitor = PredictiveMonitor::load(saved, AlertThresholds::default());
+            eprintln!(
+                "nix-mind-daemon: restored {} predictive samples",
+                sample_count
+            );
+        }
+    }
+
     eprintln!(
         "nix-mind-daemon: starting continuous awareness (pid {})",
         std::process::id()
@@ -403,6 +420,13 @@ fn main() -> ! {
             let saved = state.working_memory.save();
             if let Ok(json) = serde_json::to_string_pretty(&saved) {
                 let _ = std::fs::write(&wm_path, json);
+            }
+
+            // Persist predictive history
+            let pred_path = snapshot_path.with_file_name("predictive_history.json");
+            let pred_saved = state.predictive_monitor.save();
+            if let Ok(json) = serde_json::to_string_pretty(&pred_saved) {
+                let _ = std::fs::write(&pred_path, json);
             }
         }
 

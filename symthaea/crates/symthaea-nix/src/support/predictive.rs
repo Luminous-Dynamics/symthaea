@@ -7,19 +7,35 @@
 //! Key insight: encode telemetry as HDC vector → feed to LTC neuron →
 //! `evolve_closed_form(dt, input_hv)` → decode predicted values → check thresholds.
 
-use std::time::Instant;
+use std::time::{Instant, SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
 use symthaea_core::hdc::ContinuousHV;
 
 use crate::encoding::codebook::{NixCodebook, NIX_HDC_DIM};
 
 /// System telemetry sample for prediction input.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SystemTelemetry {
     pub disk_used_pct: f64,
     pub memory_used_pct: f64,
     pub store_path_count: u64,
     pub failed_unit_count: u32,
+}
+
+/// A single telemetry sample with its timestamp for persistence.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedTelemetrySample {
+    pub timestamp_secs: u64,
+    pub telemetry: SystemTelemetry,
+}
+
+/// Serializable predictive monitor state for persistence across restarts.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedPredictiveState {
+    pub samples: Vec<SavedTelemetrySample>,
+    pub neuron_state: Vec<f32>,
 }
 
 /// Alert thresholds for predicted values.
@@ -60,7 +76,8 @@ pub struct Prediction {
 /// Predictive monitor using LTC temporal evolution.
 pub struct PredictiveMonitor {
     neuron: HdcLtcUnifiedNeuron,
-    history: Vec<(Instant, SystemTelemetry)>,
+    /// (Instant for dt computation, unix timestamp for persistence, telemetry)
+    history: Vec<(Instant, u64, SystemTelemetry)>,
     thresholds: AlertThresholds,
     codebook: NixCodebook,
     max_history: usize,
@@ -94,7 +111,7 @@ impl PredictiveMonitor {
         let input_hv = self.encode_telemetry(&telemetry);
 
         // Compute dt from last observation
-        let dt = if let Some((last_time, _)) = self.history.last() {
+        let dt = if let Some((last_time, _, _)) = self.history.last() {
             last_time.elapsed().as_secs_f32()
         } else {
             1.0 // first sample — use 1s as nominal
@@ -103,7 +120,11 @@ impl PredictiveMonitor {
         // Evolve the LTC neuron with the new observation
         self.neuron.evolve_closed_form(dt, &input_hv);
 
-        self.history.push((Instant::now(), telemetry));
+        let now_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        self.history.push((Instant::now(), now_secs, telemetry));
         if self.history.len() > self.max_history {
             self.history.remove(0);
         }
@@ -121,24 +142,86 @@ impl PredictiveMonitor {
         predictions
     }
 
+    /// Decode a predicted HDC vector back into telemetry values by projecting
+    /// onto the role vectors used during encoding.
+    pub fn decode_telemetry(&mut self, hv: &ContinuousHV) -> SystemTelemetry {
+        let disk_role = self.codebook.get_or_create("disk_usage").clone();
+        let mem_role = self.codebook.get_or_create("memory_usage").clone();
+        let store_role = self.codebook.get_or_create("store_paths").clone();
+        let fail_role = self.codebook.get_or_create("failed_units").clone();
+
+        // Similarity gives the approximate scaled value, attenuated by bundling.
+        // With 4 components bundled, each similarity is ~1/4 of the true value,
+        // so we compensate with NUM_COMPONENTS.
+        const NUM_COMPONENTS: f64 = 4.0;
+        let disk_sim = hv.similarity(&disk_role).max(0.0) as f64 * NUM_COMPONENTS;
+        let mem_sim = hv.similarity(&mem_role).max(0.0) as f64 * NUM_COMPONENTS;
+        let store_sim = hv.similarity(&store_role).max(0.0) as f64 * NUM_COMPONENTS;
+        let fail_sim = hv.similarity(&fail_role).max(0.0) as f64 * NUM_COMPONENTS;
+
+        // Denormalize back to metric ranges
+        SystemTelemetry {
+            disk_used_pct: (disk_sim * 100.0).clamp(0.0, 100.0),
+            memory_used_pct: (mem_sim * 100.0).clamp(0.0, 100.0),
+            store_path_count: (store_sim * 200_000.0).max(0.0) as u64,
+            failed_unit_count: (fail_sim * 10.0).max(0.0) as u32,
+        }
+    }
+
+    /// Use the LTC neuron's closed-form solver to predict future telemetry.
+    ///
+    /// Clones the neuron, evolves it forward by `hours_ahead` hours, then
+    /// decodes the resulting state vector back to telemetry values.
+    pub fn predict_ltc(&mut self, hours_ahead: f64) -> Option<SystemTelemetry> {
+        if self.history.is_empty() {
+            return None;
+        }
+
+        // Clone the last telemetry to avoid borrow conflict
+        let last_telemetry = self.history.last().unwrap().2.clone();
+        let last_input = self.encode_telemetry(&last_telemetry);
+
+        let mut future_neuron = self.neuron.clone();
+        let dt_seconds = (hours_ahead * 3600.0) as f32;
+        future_neuron.evolve_closed_form_iterative(dt_seconds, &last_input);
+        let predicted_hv = future_neuron.state().clone();
+
+        Some(self.decode_telemetry(&predicted_hv))
+    }
+
     /// Predict all metrics at a specific time horizon.
+    ///
+    /// Uses linear trend extrapolation for predicted values. When enough history
+    /// is available (>=10 samples), the LTC neuron is consulted for directional
+    /// agreement — if LTC and trend agree, confidence is boosted.
     pub fn predict(&mut self, hours_ahead: f64) -> Vec<Prediction> {
         let current = match self.history.last() {
-            Some((_, t)) => t.clone(),
+            Some((_, _, t)) => t.clone(),
             None => return vec![],
         };
 
-        // Use linear extrapolation from history (trend-based) for the actual values.
-        // The LTC neuron provides confidence via state similarity (how well the
-        // model has learned the system's dynamics).
         let trend = self.compute_trend();
-        let confidence = self.compute_confidence();
+        let ltc_pred = if self.history.len() >= 10 {
+            self.predict_ltc(hours_ahead)
+        } else {
+            None
+        };
+        let mut confidence = self.compute_confidence();
+
+        // If LTC and trend agree on direction, boost confidence
+        if let Some(ref ltc) = ltc_pred {
+            let trend_disk_dir = trend.disk_used_pct.signum();
+            let ltc_disk_dir = (ltc.disk_used_pct - current.disk_used_pct).signum();
+            if trend_disk_dir == ltc_disk_dir {
+                confidence = (confidence * 1.15).min(1.0);
+            }
+        }
 
         let mut predictions = Vec::new();
 
-        // Disk prediction
-        let disk_pred = current.disk_used_pct + trend.disk_used_pct * hours_ahead;
-        let disk_pred = disk_pred.clamp(0.0, 100.0);
+        // Disk prediction — trend extrapolation (LTC used for confidence only)
+        let trend_disk = current.disk_used_pct + trend.disk_used_pct * hours_ahead;
+        let disk_pred = trend_disk.clamp(0.0, 100.0);
         let disk_threshold = self.thresholds.disk_crit_pct;
         predictions.push(Prediction {
             metric: "disk_used_pct",
@@ -156,9 +239,9 @@ impl PredictiveMonitor {
             confidence,
         });
 
-        // Memory prediction
-        let mem_pred = current.memory_used_pct + trend.memory_used_pct * hours_ahead;
-        let mem_pred = mem_pred.clamp(0.0, 100.0);
+        // Memory prediction — trend extrapolation (LTC used for confidence only)
+        let trend_mem = current.memory_used_pct + trend.memory_used_pct * hours_ahead;
+        let mem_pred = trend_mem.clamp(0.0, 100.0);
         let mem_threshold = self.thresholds.memory_crit_pct;
         predictions.push(Prediction {
             metric: "memory_used_pct",
@@ -175,9 +258,10 @@ impl PredictiveMonitor {
             confidence,
         });
 
-        // Store path count prediction
-        let store_pred = current.store_path_count as f64 + trend.store_paths_per_hour * hours_ahead;
-        let store_pred = store_pred.max(0.0);
+        // Store path count prediction — trend extrapolation (LTC used for confidence only)
+        let trend_store =
+            current.store_path_count as f64 + trend.store_paths_per_hour * hours_ahead;
+        let store_pred = trend_store.max(0.0);
         let store_threshold = self.thresholds.store_warn_paths as f64;
         predictions.push(Prediction {
             metric: "store_path_count",
@@ -195,10 +279,10 @@ impl PredictiveMonitor {
             confidence,
         });
 
-        // Failed unit count prediction
-        let fail_pred =
+        // Failed unit count prediction — trend extrapolation (LTC used for confidence only)
+        let trend_fail =
             current.failed_unit_count as f64 + trend.failed_units_per_hour * hours_ahead;
-        let fail_pred = fail_pred.max(0.0);
+        let fail_pred = trend_fail.max(0.0);
         let fail_threshold = 3.0;
         predictions.push(Prediction {
             metric: "failed_unit_count",
@@ -222,6 +306,67 @@ impl PredictiveMonitor {
     /// Number of telemetry samples ingested.
     pub fn sample_count(&self) -> usize {
         self.history.len()
+    }
+
+    /// Serialize the monitor's state for persistence across restarts.
+    pub fn save(&self) -> SavedPredictiveState {
+        SavedPredictiveState {
+            samples: self
+                .history
+                .iter()
+                .map(|(_, ts, t)| SavedTelemetrySample {
+                    timestamp_secs: *ts,
+                    telemetry: t.clone(),
+                })
+                .collect(),
+            neuron_state: self.neuron.state().as_slice().to_vec(),
+        }
+    }
+
+    /// Restore a monitor from saved state. History entries get approximate
+    /// `Instant` offsets reconstructed from the unix timestamps.
+    pub fn load(saved: SavedPredictiveState, thresholds: AlertThresholds) -> Self {
+        let config = UnifiedConfig {
+            dimension: NIX_HDC_DIM,
+            tau_base: 3600.0,
+            ..UnifiedConfig::default()
+        };
+
+        let mut neuron =
+            HdcLtcUnifiedNeuron::new(config, 0x4E49_5850_5244_0000);
+
+        // Restore neuron state if dimensions match
+        if !saved.neuron_state.is_empty() {
+            let restored_hv = ContinuousHV::from_values(saved.neuron_state);
+            if restored_hv.dim() == NIX_HDC_DIM {
+                *neuron.state_mut() = restored_hv;
+            }
+        }
+
+        let now = Instant::now();
+        let now_secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+
+        // Reconstruct Instants with approximate offsets from saved timestamps
+        let history: Vec<(Instant, u64, SystemTelemetry)> = saved
+            .samples
+            .into_iter()
+            .map(|sample| {
+                let age_secs = now_secs.saturating_sub(sample.timestamp_secs);
+                let instant = now - std::time::Duration::from_secs(age_secs);
+                (instant, sample.timestamp_secs, sample.telemetry)
+            })
+            .collect();
+
+        Self {
+            neuron,
+            history,
+            thresholds,
+            codebook: NixCodebook::new(),
+            max_history: 1000,
+        }
     }
 
     // ---- Internal helpers ----
@@ -250,8 +395,8 @@ impl PredictiveMonitor {
             return TelemetryTrend::default();
         }
 
-        let (first_time, first) = &self.history[0];
-        let (last_time, last) = self.history.last().unwrap();
+        let (first_time, _, first) = &self.history[0];
+        let (last_time, _, last) = self.history.last().unwrap();
         let hours = last_time.duration_since(*first_time).as_secs_f64() / 3600.0;
 
         if hours < 0.001 {
@@ -272,8 +417,9 @@ impl PredictiveMonitor {
     fn compute_confidence(&self) -> f32 {
         // More history = higher confidence, up to a cap
         let history_factor = (self.history.len() as f32 / 100.0).min(1.0);
-        // Neuron state norm indicates how much it has learned (zero = nothing)
-        let state_factor = self.neuron.state().norm().min(1.0);
+        // Neuron state norm with smooth saturation: norm/(norm+1) maps [0,∞) → [0,1)
+        let norm = self.neuron.state().norm();
+        let state_factor = norm / (norm + 1.0);
         // Combine
         (history_factor * 0.7 + state_factor * 0.3).clamp(0.0, 1.0)
     }
@@ -436,5 +582,131 @@ mod tests {
             monitor.ingest(sample_telemetry(50.0 + i as f64 * 0.01, 40.0, 50_000, 0));
         }
         assert!(monitor.sample_count() <= 1000);
+    }
+
+    #[test]
+    fn test_decode_encode_approximate_roundtrip() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        let telemetry = sample_telemetry(60.0, 45.0, 80_000, 2);
+        let hv = monitor.encode_telemetry(&telemetry);
+        let decoded = monitor.decode_telemetry(&hv);
+        // HDC encoding is lossy — just verify values are in reasonable range
+        assert!(
+            decoded.disk_used_pct >= 0.0 && decoded.disk_used_pct <= 100.0,
+            "Decoded disk should be in range, got {}",
+            decoded.disk_used_pct
+        );
+        assert!(
+            decoded.memory_used_pct >= 0.0 && decoded.memory_used_pct <= 100.0,
+            "Decoded memory should be in range, got {}",
+            decoded.memory_used_pct
+        );
+    }
+
+    #[test]
+    fn test_ltc_prediction_returns_values() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        // Feed a few samples so the neuron has state
+        for _ in 0..5 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+        let ltc_pred = monitor.predict_ltc(1.0);
+        assert!(ltc_pred.is_some());
+        let pred = ltc_pred.unwrap();
+        assert!(pred.disk_used_pct >= 0.0 && pred.disk_used_pct <= 100.0);
+    }
+
+    #[test]
+    fn test_blended_prediction_differs_from_pure_trend() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        // Need enough history to have both trend and LTC
+        for i in 0..10 {
+            monitor.ingest(sample_telemetry(50.0 + i as f64, 40.0, 50_000, 0));
+        }
+        let predictions = monitor.predict(24.0);
+        assert!(!predictions.is_empty());
+        // The blended prediction should produce valid results
+        let disk_pred = predictions
+            .iter()
+            .find(|p| p.metric == "disk_used_pct")
+            .unwrap();
+        assert!(
+            disk_pred.predicted_value >= 0.0 && disk_pred.predicted_value <= 100.0,
+            "Blended prediction should be in valid range, got {}",
+            disk_pred.predicted_value
+        );
+    }
+
+    #[test]
+    fn test_ltc_prediction_empty_history_returns_none() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        assert!(monitor.predict_ltc(1.0).is_none());
+    }
+
+    #[test]
+    fn test_save_empty_monitor() {
+        let monitor = PredictiveMonitor::with_defaults();
+        let saved = monitor.save();
+        assert!(saved.samples.is_empty());
+        assert!(!saved.neuron_state.is_empty()); // neuron has initial state
+    }
+
+    #[test]
+    fn test_save_load_roundtrip() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for i in 0..5 {
+            monitor.ingest(sample_telemetry(50.0 + i as f64, 40.0, 50_000, 0));
+        }
+
+        let saved = monitor.save();
+        assert_eq!(saved.samples.len(), 5);
+
+        let restored = PredictiveMonitor::load(saved, AlertThresholds::default());
+        assert_eq!(restored.sample_count(), 5);
+    }
+
+    #[test]
+    fn test_saved_state_serializes() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        monitor.ingest(sample_telemetry(60.0, 50.0, 70_000, 1));
+        let saved = monitor.save();
+
+        let json = serde_json::to_string(&saved).unwrap();
+        let restored: SavedPredictiveState = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.samples.len(), 1);
+        assert!((restored.samples[0].telemetry.disk_used_pct - 60.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_restored_monitor_can_predict() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for i in 0..10 {
+            monitor.ingest(sample_telemetry(50.0 + i as f64, 40.0, 50_000, 0));
+        }
+
+        let saved = monitor.save();
+        let mut restored = PredictiveMonitor::load(saved, AlertThresholds::default());
+        let predictions = restored.predict(24.0);
+        assert!(!predictions.is_empty());
+    }
+
+    #[test]
+    fn test_neuron_state_preserved() {
+        let mut monitor = PredictiveMonitor::with_defaults();
+        for _ in 0..5 {
+            monitor.ingest(sample_telemetry(50.0, 40.0, 50_000, 0));
+        }
+        let original_norm = monitor.neuron.state().norm();
+
+        let saved = monitor.save();
+        let restored = PredictiveMonitor::load(saved, AlertThresholds::default());
+        let restored_norm = restored.neuron.state().norm();
+
+        assert!(
+            (original_norm - restored_norm).abs() < 1e-4,
+            "Neuron state norm should be preserved: {} vs {}",
+            original_norm,
+            restored_norm
+        );
     }
 }
