@@ -469,26 +469,28 @@ mod tests {
     #[test]
     fn test_novel_concept_positive_valence() {
         let concept = CrystalizedConcept {
+            id: 1,
             uid: "test-1".to_string(),
-            hypervector: vec![0.5; 32],
-            name: None,
+            name: String::new(),
             description: None,
-            crystallized_at: 12345,
-            activation_count: 1, // Novel!
+            embedding: vec![0.5; 32],
             attractor_signature: vec![0.3; 16],
-            primitive_birth: Vec::new(),
+            associations: HashMap::new(),
+            confidence: 0.5,
+            activation_count: 1, // Novel!
+            last_activated: 12345,
+            source_memories: Vec::new(),
+            abstraction_level: 0,
+            emotional_valence: 0.0,
+            tags: Vec::new(),
         };
 
         let stats = WorldModelStats {
             consciousness_level: 0.7,
-            accumulated_surprise: 1.5,
-            transitions_observed: 100,
-            transitions_imagined: 50,
-            counterfactuals_analyzed: 10,
-            dreams_completed: 5,
-            average_prediction_error: 0.3,
+            total_transitions: 100,
+            total_predictions: 50,
+            avg_prediction_error: 0.3,
             concepts_crystallized: 5,
-            episodes_stored: 20,
         };
 
         let mut bridge = AffectiveBridge::default();
@@ -508,26 +510,28 @@ mod tests {
     #[test]
     fn test_named_concept_neutral() {
         let concept = CrystalizedConcept {
+            id: 2,
             uid: "test-2".to_string(),
-            hypervector: vec![0.5; 32],
-            name: Some("FamiliarConcept".to_string()),
+            name: "FamiliarConcept".to_string(),
             description: None,
-            crystallized_at: 12345,
-            activation_count: 10,
+            embedding: vec![0.5; 32],
             attractor_signature: vec![0.3; 16],
-            primitive_birth: Vec::new(),
+            associations: HashMap::new(),
+            confidence: 0.5,
+            activation_count: 10,
+            last_activated: 12345,
+            source_memories: Vec::new(),
+            abstraction_level: 0,
+            emotional_valence: 0.0,
+            tags: Vec::new(),
         };
 
         let stats = WorldModelStats {
             consciousness_level: 0.5,
-            accumulated_surprise: 1.0,
-            transitions_observed: 50,
-            transitions_imagined: 25,
-            counterfactuals_analyzed: 5,
-            dreams_completed: 2,
-            average_prediction_error: 0.5,
+            total_transitions: 50,
+            total_predictions: 25,
+            avg_prediction_error: 0.5,
             concepts_crystallized: 3,
-            episodes_stored: 10,
         };
 
         let mut bridge = AffectiveBridge::default();
@@ -545,35 +549,42 @@ mod tests {
         let mut bridge = AffectiveBridge::default();
 
         let concept = CrystalizedConcept {
+            id: 3,
             uid: "test-3".to_string(),
-            hypervector: vec![0.5; 32],
-            name: None,
+            name: String::new(),
             description: None,
-            crystallized_at: 12345,
-            activation_count: 1,
+            embedding: vec![0.5; 32],
             attractor_signature: vec![0.3; 16],
-            primitive_birth: Vec::new(),
+            associations: HashMap::new(),
+            confidence: 0.5,
+            activation_count: 1,
+            last_activated: 12345,
+            source_memories: Vec::new(),
+            abstraction_level: 0,
+            emotional_valence: 0.0,
+            tags: Vec::new(),
         };
 
         let stats = WorldModelStats {
             consciousness_level: 0.8,
-            accumulated_surprise: 1.5,
-            transitions_observed: 100,
-            transitions_imagined: 50,
-            counterfactuals_analyzed: 10,
-            dreams_completed: 5,
-            average_prediction_error: 0.3,
+            total_transitions: 100,
+            total_predictions: 50,
+            avg_prediction_error: 0.3,
             concepts_crystallized: 5,
-            episodes_stored: 20,
         };
 
-        // Initial global affect is neutral
-        assert!(bridge.global_affect().intensity() < 0.01);
+        // Record initial global affect intensity (neutral has arousal=0.5, so
+        // intensity is ~0.5 — not zero. We just need to confirm processing shifts it.)
+        let initial_intensity = bridge.global_affect().intensity();
 
         // Process a concept
         bridge.evaluate_concept_affect(&concept, &stats);
 
-        // Global affect should now be non-neutral
-        assert!(bridge.global_affect().intensity() > 0.01);
+        // Global affect should have shifted from the neutral baseline
+        let post_intensity = bridge.global_affect().intensity();
+        assert!(
+            (post_intensity - initial_intensity).abs() > 0.001,
+            "Affect should shift after evaluating concept: initial={initial_intensity}, post={post_intensity}"
+        );
     }
 }
