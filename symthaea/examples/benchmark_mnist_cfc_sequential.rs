@@ -309,12 +309,7 @@ impl LinearClassifier {
 
     /// Train one epoch with SGD using softmax cross-entropy loss.
     /// Returns average loss.
-    fn train_epoch(
-        &mut self,
-        features: &[Vec<f32>],
-        labels: &[u8],
-        lr: f32,
-    ) -> f32 {
+    fn train_epoch(&mut self, features: &[Vec<f32>], labels: &[u8], lr: f32) -> f32 {
         let mut total_loss = 0.0f32;
 
         for (feat, &label) in features.iter().zip(labels.iter()) {
@@ -526,9 +521,7 @@ fn main() {
 
     // Extract CfC features for training set (subset for speed)
     let reservoir_train_size = 10_000;
-    println!(
-        "  Extracting CfC features ({reservoir_train_size} train samples, {hidden_dim}D)..."
-    );
+    println!("  Extracting CfC features ({reservoir_train_size} train samples, {hidden_dim}D)...");
     let reservoir_start = Instant::now();
 
     let train_cfc_features: Vec<Vec<f32>> = train_images[..reservoir_train_size]
@@ -633,8 +626,7 @@ fn main() {
         })
         .count();
     let linear_accuracy = linear_correct as f64 / test_images.len() as f64;
-    let linear_ms =
-        linear_test_start.elapsed().as_secs_f64() / test_images.len() as f64 * 1000.0;
+    let linear_ms = linear_test_start.elapsed().as_secs_f64() / test_images.len() as f64 * 1000.0;
     println!(
         "\n  CfC + linear: {:.2}% ({linear_correct}/{}) [{:.3}ms/sample]\n",
         linear_accuracy * 100.0,
@@ -760,9 +752,7 @@ fn main() {
     let mut combined_net = CfCNetwork::new(combined_config);
 
     let combined_train_size = 10_000;
-    println!(
-        "  Extracting HDC+CfC features ({combined_train_size} train samples)..."
-    );
+    println!("  Extracting HDC+CfC features ({combined_train_size} train samples)...");
     let combined_start = Instant::now();
 
     let train_combined_features: Vec<Vec<f32>> = train_images[..combined_train_size]
@@ -854,18 +844,11 @@ fn main() {
     println!("╔═══════════════════════════════════════════════════════════════════════╗");
     println!("║                         COMPARISON SUMMARY                          ║");
     println!("╠═══════════════════════════════════════════════════════════════════════╣");
-    println!(
-        "║ {:44} │ {:>8} │ {:>7} ║",
-        "Method", "Accuracy", "ms/img"
-    );
+    println!("║ {:44} │ {:>8} │ {:>7} ║", "Method", "Accuracy", "ms/img");
     println!("╟──────────────────────────────────────────────┼──────────┼─────────╢");
 
     let results = [
-        (
-            "A. HDC-only (4K, 32L, 5 retrain)",
-            hdc_accuracy,
-            hdc_ms,
-        ),
+        ("A. HDC-only (4K, 32L, 5 retrain)", hdc_accuracy, hdc_ms),
         (
             "B. CfC reservoir (row-by-row, prototypes)",
             reservoir_accuracy,
@@ -889,12 +872,7 @@ fn main() {
     ];
 
     for (name, acc, ms) in &results {
-        println!(
-            "║ {:44} │ {:>7.2}% │ {:>6.3} ║",
-            name,
-            acc * 100.0,
-            ms
-        );
+        println!("║ {:44} │ {:>7.2}% │ {:>6.3} ║", name, acc * 100.0, ms);
     }
     println!("╚═══════════════════════════════════════════════════════════════════════╝");
 
