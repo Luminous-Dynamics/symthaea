@@ -346,6 +346,7 @@ pub fn t_maze_fast_loop_config() -> CognitiveLoopConfig {
         learning_threshold: 0.0,
         async_training: false,
         enable_virtual_body: false,
+        genesis_phrase: Some("t_maze_benchmark_deterministic_2026".to_string()),
         ..Default::default()
     };
     config.cfc_config.num_neurons = 64;
