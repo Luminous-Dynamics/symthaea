@@ -241,7 +241,7 @@ fn cmd_search(query: &str, options: bool, limit: usize, format: OutputFormat) {
             "nix.gc.automatic",
             "nix.settings.experimental-features",
         ];
-        let path_refs: Vec<&str> = known_paths.iter().copied().collect();
+        let path_refs: Vec<&str> = known_paths.to_vec();
 
         let results = search_options(query, &mut codebook, &path_refs, limit);
 
@@ -480,20 +480,53 @@ fn cmd_observe(domain: Option<ObserveDomain>, format: OutputFormat) {
 }
 
 fn cmd_doctor(format: OutputFormat) {
-    // Collect all diagnostic data
-    let failed_services: Vec<serde_json::Value> =
-        match symthaea_nix::observe::systemd::SystemdObserver::list_units() {
-            Ok(units) => units
-                .iter()
-                .filter(|u| u.active_state == "failed")
-                .map(|u| serde_json::json!({"name": u.name, "sub_state": u.sub_state}))
-                .collect(),
-            Err(_) => Vec::new(),
-        };
+    // 1. Take system snapshot + hardware probe
+    let snapshot = match symthaea_nix::observe::SystemObserver::snapshot() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("  Failed to snapshot system: {}", e);
+            return;
+        }
+    };
+    let hw = symthaea_nix::observe::hardware::HardwareObserver::probe().ok();
 
-    let store_info = GcManager::analyze().ok();
-    let gen_count = GenerationManager::list().map(|g| g.len()).unwrap_or(0);
+    // 2. Run unified support assessment
+    let mut codebook = symthaea_nix::encoding::NixCodebook::new();
+    let mut assessor = symthaea_nix::support::SupportAssessor::new(&mut codebook);
 
+    // Create a predictive monitor with a single sample for baseline predictions
+    let mut monitor = symthaea_nix::support::PredictiveMonitor::with_defaults();
+    let telemetry = symthaea_nix::support::SystemTelemetry {
+        disk_used_pct: hw.as_ref().map_or(0.0, |h| {
+            h.disks.first().map_or(0.0, |d| {
+                if d.total_bytes > 0 {
+                    d.used_bytes as f64 / d.total_bytes as f64 * 100.0
+                } else {
+                    0.0
+                }
+            })
+        }),
+        memory_used_pct: hw.as_ref().map_or(0.0, |h| {
+            if h.memory_total_mb > 0 {
+                let used = h.memory_total_mb.saturating_sub(h.memory_available_mb);
+                used as f64 / h.memory_total_mb as f64 * 100.0
+            } else {
+                0.0
+            }
+        }),
+        store_path_count: snapshot.store_path_count.unwrap_or(0) as u64,
+        failed_unit_count: snapshot
+            .services
+            .iter()
+            .filter(|(_, s)| *s == symthaea_nix::encoding::ServiceState::Failed)
+            .count() as u32,
+    };
+    monitor.ingest(telemetry);
+
+    let assessment =
+        assessor.assess(&snapshot, hw.as_ref(), Some(&mut monitor), &mut codebook);
+
+    // 3. Doctor-specific checks: journal anomalies
     let journal_anomalies: Vec<serde_json::Value> =
         match symthaea_nix::observe::journal::JournalObserver::recent_entries(50) {
             Ok(entries) => {
@@ -513,7 +546,7 @@ fn cmd_doctor(format: OutputFormat) {
             Err(_) => Vec::new(),
         };
 
-    // Analyze configuration module structure if available
+    // 4. Module structure analysis
     let module_info = {
         let config_path = std::path::Path::new("/etc/nixos/configuration.nix");
         if config_path.exists() {
@@ -524,14 +557,44 @@ fn cmd_doctor(format: OutputFormat) {
         }
     };
 
+    // 5. Generation count
+    let gen_count = GenerationManager::list().map(|g| g.len()).unwrap_or(0);
+
     match format {
         OutputFormat::Json => {
+            let checks_json: Vec<serde_json::Value> = assessment
+                .health_checks
+                .iter()
+                .map(|c| {
+                    serde_json::json!({
+                        "name": c.name,
+                        "status": format!("{:?}", c.status),
+                        "message": c.message,
+                        "category": c.category.to_string(),
+                        "recommendations": c.recommendations,
+                    })
+                })
+                .collect();
+            let recs_json: Vec<serde_json::Value> = assessment
+                .recommendations
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "urgency": format!("{:?}", r.urgency),
+                        "trigger": r.trigger,
+                        "category": r.category,
+                        "actions": r.actions,
+                        "knowledge_articles": r.knowledge_article_ids,
+                        "prediction_context": r.prediction_context,
+                    })
+                })
+                .collect();
             let json = serde_json::json!({
-                "failed_services": failed_services,
-                "store": store_info.as_ref().map(|a| serde_json::json!({
-                    "total": a.total_store_human(),
-                    "reclaimable": a.reclaimable_human(),
-                })),
+                "overall_status": format!("{:?}", assessment.overall_status),
+                "health_checks": checks_json,
+                "recommendations": recs_json,
+                "active_alerts": assessment.active_alerts.len(),
+                "knowledge_matches": assessment.knowledge_matches_found,
                 "generation_count": gen_count,
                 "journal_anomalies": journal_anomalies,
                 "module_info": module_info.as_ref().map(|m| serde_json::json!({
@@ -550,38 +613,53 @@ fn cmd_doctor(format: OutputFormat) {
             println!("  Running system diagnostics...");
             println!();
 
-            if failed_services.is_empty() {
-                println!("  Services: All OK");
-            } else {
-                println!("  Services: {} FAILED", failed_services.len());
-                for svc in &failed_services {
-                    println!(
-                        "    - {} ({})",
-                        svc["name"].as_str().unwrap_or("?"),
-                        svc["sub_state"].as_str().unwrap_or("?")
-                    );
-                }
+            // Display health checks
+            println!(
+                "  Overall Health: {}",
+                assessment.overall_status
+            );
+            println!();
+            for check in &assessment.health_checks {
+                println!("  [{:?}] {}: {}", check.status, check.name, check.message);
             }
 
-            if let Some(ref analysis) = store_info {
-                let rec = GcManager::recommend(analysis);
+            // Display unified recommendations
+            if !assessment.recommendations.is_empty() {
+                println!();
                 println!(
-                    "  Store: {} total, {} reclaimable",
-                    analysis.total_store_human(),
-                    analysis.reclaimable_human()
+                    "  Recommendations ({}):",
+                    assessment.recommendations.len()
                 );
-                if rec.recommended {
-                    println!("    Recommendation: {}", rec.reason);
+                for (i, rec) in assessment.recommendations.iter().enumerate() {
+                    println!(
+                        "    {}. [{}] {}",
+                        i + 1,
+                        rec.urgency,
+                        rec.trigger
+                    );
+                    for action in &rec.actions {
+                        println!("       -> {}", action);
+                    }
+                    if !rec.knowledge_article_ids.is_empty() {
+                        println!(
+                            "       KB: {}",
+                            rec.knowledge_article_ids.join(", ")
+                        );
+                    }
+                    if let Some(ref ctx) = rec.prediction_context {
+                        println!("       Prediction: {}", ctx);
+                    }
                 }
-            } else {
-                println!("  Store: Could not analyze");
             }
 
+            // Doctor-specific: generation count
+            println!();
             println!("  Generations: {} total", gen_count);
             if gen_count > 20 {
                 println!("    Consider cleaning up old generations");
             }
 
+            // Doctor-specific: journal anomalies
             if journal_anomalies.is_empty() {
                 println!("  Journal: No anomalies in recent entries");
             } else {
@@ -595,6 +673,7 @@ fn cmd_doctor(format: OutputFormat) {
                 }
             }
 
+            // Doctor-specific: module structure
             if let Some(ref mi) = module_info {
                 println!(
                     "  Config: {} imports, {} option decls, {} settings",

@@ -39,6 +39,12 @@ pub struct DaemonSnapshot {
     pub daemon_running: bool,
     /// Daemon PID for liveness check.
     pub daemon_pid: u32,
+    /// Summary of latest support assessment status.
+    #[serde(default)]
+    pub support_status: Option<String>,
+    /// Number of active support recommendations.
+    #[serde(default)]
+    pub recommendation_count: usize,
 }
 
 /// A concern tracked in working memory.
@@ -255,6 +261,8 @@ mod tests {
             }],
             daemon_running: true,
             daemon_pid: 12345,
+            support_status: None,
+            recommendation_count: 0,
         }
     }
 

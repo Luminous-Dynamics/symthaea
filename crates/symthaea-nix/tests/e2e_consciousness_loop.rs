@@ -414,6 +414,8 @@ fn test_daemon_ipc_snapshot_roundtrip() {
         recent_anomalies: anomalies,
         daemon_running: true,
         daemon_pid: 99999,
+        support_status: None,
+        recommendation_count: 0,
     };
 
     // Write atomically
@@ -572,6 +574,8 @@ fn test_cognitive_to_ipc_pipeline() {
         recent_anomalies: vec![],
         daemon_running: true,
         daemon_pid: std::process::id(),
+        support_status: None,
+        recommendation_count: 0,
     };
 
     // 6. Write to disk and read back
@@ -622,6 +626,8 @@ fn test_stale_snapshot_detection() {
         recent_anomalies: vec![],
         daemon_running: true,
         daemon_pid: 1, // PID 1 (init) is always alive
+        support_status: None,
+        recommendation_count: 0,
     };
 
     assert!(

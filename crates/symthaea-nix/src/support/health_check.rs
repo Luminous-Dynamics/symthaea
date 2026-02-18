@@ -7,6 +7,7 @@
 //! configurable thresholds and produces a prioritized list of health checks.
 
 use crate::encoding::{ServiceState, SystemStateSnapshot};
+use crate::observe::flake_registry::FlakeInfo;
 use crate::observe::hardware::HardwareInfo;
 use serde::{Deserialize, Serialize};
 
@@ -69,6 +70,12 @@ pub struct HealthAssessor {
     pub memory_crit_pct: f32,
     pub store_warn_paths: u64,
     pub max_failed_services: usize,
+    /// Directories to search for flake.nix files.
+    pub flake_search_paths: Vec<String>,
+    /// Days before flake.lock age triggers a warning.
+    pub flake_warn_age_days: u32,
+    /// Days before flake.lock age triggers a critical alert.
+    pub flake_crit_age_days: u32,
 }
 
 impl Default for HealthAssessor {
@@ -80,6 +87,9 @@ impl Default for HealthAssessor {
             memory_crit_pct: 95.0,
             store_warn_paths: 100_000,
             max_failed_services: 0,
+            flake_search_paths: vec!["/etc/nixos".to_string()],
+            flake_warn_age_days: 30,
+            flake_crit_age_days: 90,
         }
     }
 }
@@ -99,6 +109,7 @@ impl HealthAssessor {
         }
         checks.push(self.check_services(snapshot));
         checks.push(self.check_store(snapshot));
+        checks.push(self.check_flake_freshness());
 
         let overall = checks
             .iter()
@@ -267,6 +278,86 @@ impl HealthAssessor {
             status,
             message,
             category: IssueCategory::Services,
+            recommendations: recs,
+        }
+    }
+
+    /// Check flake.lock freshness by discovering flakes and comparing lock age.
+    pub fn check_flake_freshness(&self) -> HealthCheck {
+        let search_refs: Vec<&str> = self.flake_search_paths.iter().map(|s| s.as_str()).collect();
+        let flakes = crate::observe::flake_registry::FlakeRegistry::discover(&search_refs)
+            .unwrap_or_default();
+        self.check_flake_freshness_from_infos(&flakes)
+    }
+
+    /// Testable helper: check flake freshness from pre-collected FlakeInfo.
+    pub fn check_flake_freshness_from_infos(&self, flakes: &[FlakeInfo]) -> HealthCheck {
+        if flakes.is_empty() {
+            return HealthCheck {
+                name: "flake_freshness",
+                status: HealthStatus::Healthy,
+                message: "No flakes discovered".to_string(),
+                category: IssueCategory::Flake,
+                recommendations: vec![],
+            };
+        }
+
+        let now = chrono::Utc::now();
+        let mut worst_age_days: i64 = 0;
+        let mut worst_path = String::new();
+
+        for flake in flakes {
+            if let Some(ref modified_str) = flake.last_modified {
+                if let Ok(modified) =
+                    chrono::NaiveDateTime::parse_from_str(modified_str, "%Y-%m-%d %H:%M:%S UTC")
+                {
+                    let modified_utc = modified.and_utc();
+                    let age_days = (now - modified_utc).num_days();
+                    if age_days > worst_age_days {
+                        worst_age_days = age_days;
+                        worst_path = flake.path.clone();
+                    }
+                }
+            }
+        }
+
+        let (status, message, recs) = if worst_age_days >= self.flake_crit_age_days as i64 {
+            (
+                HealthStatus::Critical,
+                format!(
+                    "Flake lock at {} is {} days old — severely outdated",
+                    worst_path, worst_age_days
+                ),
+                vec![
+                    format!("Run: nix flake update --flake {}", worst_path),
+                    "Review changelogs before updating".to_string(),
+                ],
+            )
+        } else if worst_age_days >= self.flake_warn_age_days as i64 {
+            (
+                HealthStatus::Warning,
+                format!(
+                    "Flake lock at {} is {} days old — consider updating",
+                    worst_path, worst_age_days
+                ),
+                vec![format!("Run: nix flake update --flake {}", worst_path)],
+            )
+        } else {
+            (
+                HealthStatus::Healthy,
+                format!(
+                    "All flake locks fresh (worst: {} days at {})",
+                    worst_age_days, worst_path
+                ),
+                vec![],
+            )
+        };
+
+        HealthCheck {
+            name: "flake_freshness",
+            status,
+            message,
+            category: IssueCategory::Flake,
             recommendations: recs,
         }
     }
@@ -488,9 +579,9 @@ mod tests {
         let snapshot = make_snapshot(vec![], Some(1000));
         let (overall, checks) = assessor.assess_all(&snapshot, None);
 
-        // Should still produce service and store checks
+        // Should still produce service, store, and flake checks
         assert_eq!(overall, HealthStatus::Healthy);
-        assert_eq!(checks.len(), 2); // services + store only
+        assert_eq!(checks.len(), 3); // services + store + flake
     }
 
     #[test]
@@ -504,5 +595,60 @@ mod tests {
         let check = assessor.check_disk(&hw);
 
         assert_eq!(check.status, HealthStatus::Warning);
+    }
+
+    #[test]
+    fn test_flake_freshness_no_flakes() {
+        let assessor = HealthAssessor::default();
+        let check = assessor.check_flake_freshness_from_infos(&[]);
+        assert_eq!(check.status, HealthStatus::Healthy);
+        assert_eq!(check.name, "flake_freshness");
+    }
+
+    #[test]
+    fn test_flake_freshness_fresh_lock() {
+        let assessor = HealthAssessor::default();
+        let now = chrono::Utc::now();
+        let fresh_ts = now.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+        let flakes = vec![FlakeInfo {
+            path: "/etc/nixos".to_string(),
+            description: None,
+            inputs: vec![],
+            last_modified: Some(fresh_ts),
+        }];
+        let check = assessor.check_flake_freshness_from_infos(&flakes);
+        assert_eq!(check.status, HealthStatus::Healthy);
+    }
+
+    #[test]
+    fn test_flake_freshness_stale_lock_warning() {
+        let assessor = HealthAssessor::default();
+        let stale = chrono::Utc::now() - chrono::Duration::days(45);
+        let stale_ts = stale.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+        let flakes = vec![FlakeInfo {
+            path: "/etc/nixos".to_string(),
+            description: None,
+            inputs: vec![],
+            last_modified: Some(stale_ts),
+        }];
+        let check = assessor.check_flake_freshness_from_infos(&flakes);
+        assert_eq!(check.status, HealthStatus::Warning);
+        assert!(!check.recommendations.is_empty());
+    }
+
+    #[test]
+    fn test_flake_freshness_very_stale_critical() {
+        let assessor = HealthAssessor::default();
+        let old = chrono::Utc::now() - chrono::Duration::days(100);
+        let old_ts = old.format("%Y-%m-%d %H:%M:%S UTC").to_string();
+        let flakes = vec![FlakeInfo {
+            path: "/etc/nixos".to_string(),
+            description: None,
+            inputs: vec![],
+            last_modified: Some(old_ts),
+        }];
+        let check = assessor.check_flake_freshness_from_infos(&flakes);
+        assert_eq!(check.status, HealthStatus::Critical);
+        assert!(check.message.contains("100"));
     }
 }
