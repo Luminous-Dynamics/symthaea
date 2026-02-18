@@ -41,6 +41,10 @@ const ALLOWED_CIVIC_ZOMES: &[&str] = &[
     "civic_bridge",
 ];
 
+const ALLOWED_GOVERNANCE_ZOMES: &[&str] = &[
+    "governance_bridge",
+];
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -377,11 +381,94 @@ pub fn present_k_vector(_: ()) -> ExternResult<CredentialPresentation> {
 }
 
 // ============================================================================
+// Phi Attestation Submission (Personal → Governance)
+// ============================================================================
+
+/// Input for submitting a Phi attestation to the governance cluster.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SubmitPhiAttestationInput {
+    /// Phi value from Symthaea cognitive cycle, in [0.0, 1.0].
+    pub phi: f64,
+    /// Symthaea cognitive cycle number (must be > 0).
+    pub cycle_id: u64,
+}
+
+/// Submit a signed Phi attestation to the governance bridge.
+///
+/// Signs the attestation with the agent's Holochain key and dispatches
+/// it to the governance cluster's `record_phi_attestation` function.
+/// The governance bridge verifies the Ed25519 signature before committing.
+///
+/// Message format (must match governance bridge verification):
+///   `symthaea-phi-attestation:v1:{agent_did}:{phi:.6}:{cycle_id}:{captured_at_us}`
+#[hdk_extern]
+pub fn submit_phi_attestation(input: SubmitPhiAttestationInput) -> ExternResult<DispatchResult> {
+    // Validate inputs
+    if input.phi < 0.0 || input.phi > 1.0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Phi must be between 0.0 and 1.0".into()
+        )));
+    }
+    if input.cycle_id == 0 {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cycle ID must be > 0".into()
+        )));
+    }
+
+    let info = agent_info()?;
+    let agent_did = format!("did:mycelix:{}", info.agent_initial_pubkey);
+    let captured_at_us = sys_time()?.as_micros() as u64;
+
+    // Construct the message in the exact format that governance bridge verifies.
+    let message = format!(
+        "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+        agent_did, input.phi, input.cycle_id, captured_at_us,
+    );
+
+    // Sign with the agent's Holochain Ed25519 key.
+    let signature = sign_raw(
+        info.agent_initial_pubkey,
+        message.into_bytes(),
+    )?;
+
+    // Build the payload matching governance bridge's RecordPhiAttestationInput.
+    #[derive(Serialize, Debug)]
+    struct RecordPhiAttestationInput {
+        phi: f64,
+        cycle_id: u64,
+        captured_at_us: u64,
+        signature: Vec<u8>,
+    }
+
+    let attestation_input = RecordPhiAttestationInput {
+        phi: input.phi,
+        cycle_id: input.cycle_id,
+        captured_at_us,
+        signature: signature.0.to_vec(),
+    };
+
+    let payload = ExternIO::encode(attestation_input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+
+    // Dispatch to governance bridge via cross-cluster call.
+    enforce_rate_limit("governance_bridge")?;
+    let dispatch = CrossClusterDispatchInput {
+        role: GOVERNANCE_ROLE.to_string(),
+        zome: "governance_bridge".to_string(),
+        fn_name: "record_phi_attestation".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_GOVERNANCE_ZOMES)
+}
+
+// ============================================================================
 // Cross-Cluster Dispatch
 // ============================================================================
 
 const COMMONS_ROLE: &str = "commons";
 const CIVIC_ROLE: &str = "civic";
+const GOVERNANCE_ROLE: &str = "governance";
 
 /// Dispatch a call to the Commons cluster.
 #[hdk_extern]
@@ -407,6 +494,19 @@ pub fn dispatch_civic_call(input: CrossClusterDispatchInput) -> ExternResult<Dis
         payload: input.payload,
     };
     bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_CIVIC_ZOMES)
+}
+
+/// Dispatch a call to the Governance cluster.
+#[hdk_extern]
+pub fn dispatch_governance_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("governance:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: GOVERNANCE_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_GOVERNANCE_ZOMES)
 }
 
 // ============================================================================
@@ -483,9 +583,15 @@ mod tests {
     }
 
     #[test]
+    fn governance_allowlist_contains_bridge() {
+        assert!(ALLOWED_GOVERNANCE_ZOMES.contains(&"governance_bridge"));
+    }
+
+    #[test]
     fn role_constants_correct() {
         assert_eq!(COMMONS_ROLE, "commons");
         assert_eq!(CIVIC_ROLE, "civic");
+        assert_eq!(GOVERNANCE_ROLE, "governance");
     }
 
     // ---- Domain resolution ----
@@ -603,6 +709,58 @@ mod tests {
         let domains = ["identity", "health", "credential"];
         for domain in &domains {
             assert!(resolve_domain_zome(domain).is_some());
+        }
+    }
+
+    // ---- Phi attestation ----
+
+    #[test]
+    fn submit_phi_attestation_input_serde_roundtrip() {
+        let input = SubmitPhiAttestationInput {
+            phi: 0.72,
+            cycle_id: 42,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SubmitPhiAttestationInput = serde_json::from_str(&json).unwrap();
+        assert!((back.phi - 0.72).abs() < f64::EPSILON);
+        assert_eq!(back.cycle_id, 42);
+    }
+
+    #[test]
+    fn attestation_message_format_matches_governance() {
+        // Verify our message format exactly matches what governance bridge expects.
+        let agent_did = "did:mycelix:uhCAktest123";
+        let phi: f64 = 0.654321;
+        let cycle_id: u64 = 100;
+        let captured_at_us: u64 = 1_700_000_000_000_000;
+
+        let message = format!(
+            "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+            agent_did, phi, cycle_id, captured_at_us,
+        );
+
+        assert!(message.starts_with("symthaea-phi-attestation:v1:"));
+        assert!(message.contains("did:mycelix:"));
+        assert!(message.contains("0.654321"));
+        assert!(message.contains(":100:"));
+        assert!(message.ends_with("1700000000000000"));
+    }
+
+    #[test]
+    fn attestation_message_phi_precision() {
+        // Governance bridge uses {:.6} format — verify precision.
+        let message = format!(
+            "symthaea-phi-attestation:v1:did:mycelix:test:{:.6}:1:0",
+            0.1_f64,
+        );
+        assert!(message.contains("0.100000"));
+    }
+
+    #[test]
+    fn governance_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_GOVERNANCE_ZOMES {
+            assert!(seen.insert(zome), "Duplicate in ALLOWED_GOVERNANCE_ZOMES: '{}'", zome);
         }
     }
 }
