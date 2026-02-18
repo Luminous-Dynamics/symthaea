@@ -411,6 +411,7 @@ impl ProverIntegration {
     }
 
     /// Prove using external HTTP service
+    #[cfg(any(feature = "simulation", feature = "risc0"))]
     fn prove_external(
         &self,
         _url: &str,
@@ -517,7 +518,7 @@ impl ProverIntegration {
     }
 
     /// Prove using external HTTP service with fallback
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", any(feature = "simulation", feature = "risc0")))]
     pub fn prove_external_with_fallback(
         &self,
         url: &str,
@@ -541,6 +542,7 @@ impl ProverIntegration {
     }
 
     /// Prove using Bonsai cloud service
+    #[cfg(any(feature = "simulation", feature = "risc0"))]
     fn prove_bonsai(
         &self,
         api_key: &str,
@@ -623,6 +625,7 @@ impl ProverIntegration {
     }
 
     /// Verify a proof receipt
+    #[cfg(any(feature = "simulation", feature = "risc0"))]
     pub fn verify(&self, receipt: &GradientProofReceipt) -> bool {
         receipt.is_valid()
     }
