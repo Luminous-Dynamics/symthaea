@@ -918,6 +918,10 @@ jobs:
         run: cargo clippy --all -- -D warnings
         working-directory: mycelix-governance
 
+      - name: Check formatting
+        run: cargo fmt --all --check
+        working-directory: mycelix-governance
+
       - name: Build WASM
         run: cargo build --release --target wasm32-unknown-unknown
         working-directory: mycelix-governance
@@ -1004,6 +1008,14 @@ jobs:
 
       - name: Run tests
         run: cargo test --all
+        working-directory: mycelix-personal
+
+      - name: Clippy
+        run: cargo clippy --all -- -D warnings
+        working-directory: mycelix-personal
+
+      - name: Check formatting
+        run: cargo fmt --all --check
         working-directory: mycelix-personal
 
       - name: Build WASM

@@ -98,3 +98,7 @@ path = "tests/supplychain_workflow.rs"
 [[test]]
 name = "personal_workflow"
 path = "tests/personal_workflow.rs"
+
+[[test]]
+name = "phi_attestation_e2e"
+path = "tests/phi_attestation_e2e.rs"

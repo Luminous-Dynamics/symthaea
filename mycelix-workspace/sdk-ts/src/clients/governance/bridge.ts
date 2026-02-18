@@ -623,6 +623,7 @@ export class BridgeClient extends ZomeClient {
     return this.callZomeOnce<HolochainRecord>('record_phi_attestation', {
       phi: input.phi,
       cycle_id: input.cycleId,
+      captured_at_us: input.capturedAtUs,
       signature: input.signature,
     });
   }

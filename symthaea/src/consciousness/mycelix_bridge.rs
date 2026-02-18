@@ -43,6 +43,24 @@
 //!
 //! Without the feature, fallback implementations maintain API compatibility.
 
+// Canonical Phi threshold constants — must match mycelix_bridge_common::phi_thresholds::PhiThresholds::default().
+// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
+const GOV_BASIC: f64 = 0.2;
+const GOV_PROPOSAL: f64 = 0.3;
+const GOV_VOTING: f64 = 0.4;
+const GOV_CONSTITUTIONAL: f64 = 0.6;
+
+// Reputation thresholds — intentionally higher than consciousness thresholds
+// because they combine consciousness (60%) + hApp reputation (40%).
+#[allow(dead_code)]
+const REP_BASIC: f64 = 0.3;
+#[allow(dead_code)]
+const REP_GOVERNANCE: f64 = 0.5;
+#[allow(dead_code)]
+const REP_VOTING: f64 = 0.6;
+#[allow(dead_code)]
+const REP_CONSTITUTIONAL: f64 = 0.8;
+
 use super::affective_consciousness::CoreAffect;
 use super::seven_harmonies::Harmony;
 use super::unified_value_evaluator::{
@@ -122,10 +140,10 @@ impl ConsciousnessSnapshot {
     /// Check if consciousness is adequate for action type
     pub fn is_adequate_for(&self, action_type: ActionType) -> bool {
         let required = match action_type {
-            ActionType::Basic => 0.2,
-            ActionType::Governance => 0.3,
-            ActionType::Voting => 0.4,
-            ActionType::Constitutional => 0.6,
+            ActionType::Basic => GOV_BASIC,
+            ActionType::Governance => GOV_PROPOSAL,
+            ActionType::Voting => GOV_VOTING,
+            ActionType::Constitutional => GOV_CONSTITUTIONAL,
         };
         self.phi >= required
     }
@@ -319,11 +337,11 @@ pub struct BridgeConfig {
 impl Default for BridgeConfig {
     fn default() -> Self {
         Self {
-            min_phi_proposal: 0.3,
-            min_phi_voting: 0.4,
-            min_phi_constitutional: 0.6,
+            min_phi_proposal: GOV_PROPOSAL,
+            min_phi_voting: GOV_VOTING,
+            min_phi_constitutional: GOV_CONSTITUTIONAL,
             require_care_for_others: true,
-            min_care_activation: 0.3,
+            min_care_activation: GOV_PROPOSAL,
             enable_federated_learning: true,
             fl_batch_size: 10,
             fl_sync_interval_secs: 300, // 5 minutes
@@ -917,10 +935,10 @@ impl EnhancedMycelixBridge {
     /// Check if an agent is trustworthy for a given action type
     pub fn is_agent_trustworthy(&self, agent: &str, action_type: ActionType) -> bool {
         let threshold = match action_type {
-            ActionType::Basic => 0.3,
-            ActionType::Governance => 0.5,
-            ActionType::Voting => 0.6,
-            ActionType::Constitutional => 0.8,
+            ActionType::Basic => REP_BASIC,
+            ActionType::Governance => REP_GOVERNANCE,
+            ActionType::Voting => REP_VOTING,
+            ActionType::Constitutional => REP_CONSTITUTIONAL,
         };
 
         let rep = self.query_reputation(agent);
@@ -1022,10 +1040,10 @@ impl ConsciousnessReputation {
     /// Check if agent meets threshold for action type
     pub fn meets_threshold(&self, action_type: ActionType) -> bool {
         let threshold = match action_type {
-            ActionType::Basic => 0.3,
-            ActionType::Governance => 0.5,
-            ActionType::Voting => 0.6,
-            ActionType::Constitutional => 0.8,
+            ActionType::Basic => REP_BASIC,
+            ActionType::Governance => REP_GOVERNANCE,
+            ActionType::Voting => REP_VOTING,
+            ActionType::Constitutional => REP_CONSTITUTIONAL,
         };
         self.combined_score >= threshold
     }

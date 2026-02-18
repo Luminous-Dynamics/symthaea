@@ -1610,7 +1610,9 @@ export interface RecordPhiAttestationInput {
   phi: number;
   /** Symthaea cognitive cycle number */
   cycleId: number;
-  /** Agent-signed hash of attestation data */
+  /** Microseconds since Unix epoch when the Phi was captured */
+  capturedAtUs: number;
+  /** Ed25519 signature (64 bytes) over the attestation message */
   signature: number[];
 }
 

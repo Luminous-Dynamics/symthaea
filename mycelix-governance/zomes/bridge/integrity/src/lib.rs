@@ -19,6 +19,16 @@
 
 use hdi::prelude::*;
 
+// Canonical Phi threshold constants — must match mycelix_bridge_common::phi_thresholds::PhiThresholds::default().
+// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
+const GOV_BASIC: f64 = 0.2;
+const GOV_PROPOSAL: f64 = 0.3;
+const GOV_VOTING: f64 = 0.4;
+const GOV_CONSTITUTIONAL: f64 = 0.6;
+/// Voter Phi for constitutional proposals (stricter than gov_voting).
+/// Not in canonical set — governance-specific.
+const GOV_VOTER_CONSTITUTIONAL: f64 = 0.5;
+
 /// Anchor entry for deterministic link bases
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -212,10 +222,10 @@ pub enum GovernanceActionType {
 impl GovernanceActionType {
     pub fn phi_threshold(&self) -> f64 {
         match self {
-            Self::Basic => 0.2,
-            Self::ProposalSubmission => 0.3,
-            Self::Voting => 0.4,
-            Self::Constitutional => 0.6,
+            Self::Basic => GOV_BASIC,
+            Self::ProposalSubmission => GOV_PROPOSAL,
+            Self::Voting => GOV_VOTING,
+            Self::Constitutional => GOV_CONSTITUTIONAL,
         }
     }
 
@@ -673,21 +683,21 @@ impl AdaptiveThreshold {
         match proposal_type {
             ProposalType::Standard => Self {
                 base_threshold: 0.51,      // Simple majority
-                min_voter_phi: 0.2,        // Basic consciousness
+                min_voter_phi: GOV_BASIC,  // Basic consciousness
                 min_participation: 5,      // At least 5 voters
                 quorum: 0.20,              // 20% of eligible must vote
                 max_extension_secs: 86400, // 1 day extension max
             },
             ProposalType::Emergency => Self {
                 base_threshold: 0.60,      // Higher bar for emergency
-                min_voter_phi: 0.3,        // Proposal-level consciousness
+                min_voter_phi: GOV_PROPOSAL, // Proposal-level consciousness
                 min_participation: 3,      // Faster with fewer
                 quorum: 0.10,              // Lower quorum for speed
                 max_extension_secs: 3600,  // 1 hour max
             },
             ProposalType::Constitutional => Self {
                 base_threshold: 0.67,      // Supermajority required
-                min_voter_phi: 0.5,        // High consciousness required
+                min_voter_phi: GOV_VOTER_CONSTITUTIONAL, // High consciousness required
                 min_participation: 10,     // Significant participation
                 quorum: 0.40,              // 40% must participate
                 max_extension_secs: 604800, // 1 week extension allowed
@@ -1228,13 +1238,13 @@ impl GovernancePhiConfig {
     /// Default configuration matching hardcoded values
     pub fn defaults(now: Timestamp) -> Self {
         Self {
-            phi_basic: 0.2,
-            phi_proposal_submission: 0.3,
-            phi_voting: 0.4,
-            phi_constitutional: 0.6,
-            min_voter_phi_standard: 0.2,
-            min_voter_phi_emergency: 0.3,
-            min_voter_phi_constitutional: 0.5,
+            phi_basic: GOV_BASIC,
+            phi_proposal_submission: GOV_PROPOSAL,
+            phi_voting: GOV_VOTING,
+            phi_constitutional: GOV_CONSTITUTIONAL,
+            min_voter_phi_standard: GOV_BASIC,
+            min_voter_phi_emergency: GOV_PROPOSAL,
+            min_voter_phi_constitutional: GOV_VOTER_CONSTITUTIONAL,
             max_voting_weight: 1.5,
             updated_at: now,
             changed_by_proposal: None,
