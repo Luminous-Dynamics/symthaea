@@ -523,8 +523,7 @@ fn cmd_doctor(format: OutputFormat) {
     };
     monitor.ingest(telemetry);
 
-    let assessment =
-        assessor.assess(&snapshot, hw.as_ref(), Some(&mut monitor), &mut codebook);
+    let assessment = assessor.assess(&snapshot, hw.as_ref(), Some(&mut monitor), &mut codebook);
 
     // 3. Doctor-specific checks: journal anomalies
     let journal_anomalies: Vec<serde_json::Value> =
@@ -614,10 +613,7 @@ fn cmd_doctor(format: OutputFormat) {
             println!();
 
             // Display health checks
-            println!(
-                "  Overall Health: {}",
-                assessment.overall_status
-            );
+            println!("  Overall Health: {}", assessment.overall_status);
             println!();
             for check in &assessment.health_checks {
                 println!("  [{:?}] {}: {}", check.status, check.name, check.message);
@@ -626,25 +622,14 @@ fn cmd_doctor(format: OutputFormat) {
             // Display unified recommendations
             if !assessment.recommendations.is_empty() {
                 println!();
-                println!(
-                    "  Recommendations ({}):",
-                    assessment.recommendations.len()
-                );
+                println!("  Recommendations ({}):", assessment.recommendations.len());
                 for (i, rec) in assessment.recommendations.iter().enumerate() {
-                    println!(
-                        "    {}. [{}] {}",
-                        i + 1,
-                        rec.urgency,
-                        rec.trigger
-                    );
+                    println!("    {}. [{}] {}", i + 1, rec.urgency, rec.trigger);
                     for action in &rec.actions {
                         println!("       -> {}", action);
                     }
                     if !rec.knowledge_article_ids.is_empty() {
-                        println!(
-                            "       KB: {}",
-                            rec.knowledge_article_ids.join(", ")
-                        );
+                        println!("       KB: {}", rec.knowledge_article_ids.join(", "));
                     }
                     if let Some(ref ctx) = rec.prediction_context {
                         println!("       Prediction: {}", ctx);

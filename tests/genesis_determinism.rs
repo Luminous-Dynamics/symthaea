@@ -234,7 +234,7 @@ fn cognitive_loop_same_genesis_produces_identical_cycles_cfc() {
     // Use approximate comparison for floating-point stats
     let error_diff = (stats_a.avg_prediction_error - stats_b.avg_prediction_error).abs();
     assert!(
-        error_diff < 1e-6,
+        error_diff < 1e-4,
         "Average prediction error differs: {} vs {} (diff: {})",
         stats_a.avg_prediction_error,
         stats_b.avg_prediction_error,

@@ -202,14 +202,10 @@ impl Watchdog {
                         AutonomyLevel::FullAutonomous => {
                             let cmd = GenerationManager::switch_to(pre_gen as u32);
                             let (bin, args) = cmd.to_command();
-                            let result =
-                                std::process::Command::new(&bin).args(&args).status();
+                            let result = std::process::Command::new(&bin).args(&args).status();
                             match result {
                                 Ok(status) if status.success() => {
-                                    return WatchdogVerdict::Reverted {
-                                        reason,
-                                        pre_gen,
-                                    };
+                                    return WatchdogVerdict::Reverted { reason, pre_gen };
                                 }
                                 Ok(status) => {
                                     return WatchdogVerdict::Degraded {
@@ -225,10 +221,7 @@ impl Watchdog {
                                 }
                                 Err(e) => {
                                     return WatchdogVerdict::Degraded {
-                                        reason: format!(
-                                            "{}; rollback exec error: {}",
-                                            reason, e
-                                        ),
+                                        reason: format!("{}; rollback exec error: {}", reason, e),
                                         surprise: last_surprise,
                                         health: last_health,
                                         checks_performed,
@@ -481,7 +474,10 @@ mod tests {
         let cmd = crate::action::generation_manager::GenerationManager::switch_to(42);
         let (bin, args) = cmd.to_command();
         let cmd_str = format!("{} {}", bin, args.join(" "));
-        assert!(cmd_str.contains("42"), "Command should reference generation 42");
+        assert!(
+            cmd_str.contains("42"),
+            "Command should reference generation 42"
+        );
         assert_eq!(config.autonomy_level, AutonomyLevel::DryRun);
     }
 }

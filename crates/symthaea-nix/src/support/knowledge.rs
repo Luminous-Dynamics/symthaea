@@ -204,11 +204,7 @@ impl KnowledgeBase {
         }
 
         // Score dynamic articles
-        for (article, hv) in self
-            .dynamic_articles
-            .iter()
-            .zip(self.dynamic_hvs.iter())
-        {
+        for (article, hv) in self.dynamic_articles.iter().zip(self.dynamic_hvs.iter()) {
             scored.push(AnyKnowledgeMatch::Dynamic {
                 article: article.clone(),
                 similarity: query_hv.similarity(hv).max(0.0),
