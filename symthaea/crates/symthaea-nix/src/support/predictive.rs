@@ -332,8 +332,7 @@ impl PredictiveMonitor {
             ..UnifiedConfig::default()
         };
 
-        let mut neuron =
-            HdcLtcUnifiedNeuron::new(config, 0x4E49_5850_5244_0000);
+        let mut neuron = HdcLtcUnifiedNeuron::new(config, 0x4E49_5850_5244_0000);
 
         // Restore neuron state if dimensions match
         if !saved.neuron_state.is_empty() {

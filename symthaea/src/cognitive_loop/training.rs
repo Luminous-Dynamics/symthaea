@@ -85,7 +85,7 @@ impl AsyncTrainerHandle {
                     }
                 }
             })
-            .expect("failed to spawn trainer thread");
+            .unwrap_or_else(|e| panic!("failed to spawn trainer thread: {e}"));
 
         Self {
             sample_tx,
@@ -96,10 +96,10 @@ impl AsyncTrainerHandle {
 
     pub fn apply_latest_weights(&mut self, network: &mut CfCNetwork) -> bool {
         let mut latest: Option<Vec<f32>> = None;
-        let rx = self
-            .weights_rx
-            .get_mut()
-            .expect("weights_rx mutex poisoned");
+        let rx = match self.weights_rx.get_mut() {
+            Ok(rx) => rx,
+            Err(_) => return false, // mutex poisoned — skip weight update
+        };
         while let Ok(w) = rx.try_recv() {
             latest = Some(w);
         }

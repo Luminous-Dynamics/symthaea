@@ -77,8 +77,7 @@ impl SupportAssessor {
         codebook: &mut NixCodebook,
     ) -> SupportAssessment {
         // 1. Run health checks
-        let (overall_status, health_checks) =
-            self.health_assessor.assess_all(snapshot, hardware);
+        let (overall_status, health_checks) = self.health_assessor.assess_all(snapshot, hardware);
 
         let mut recommendations = Vec::new();
         let mut knowledge_matches_found = 0;
@@ -90,8 +89,7 @@ impl SupportAssessor {
             }
 
             // Search knowledge base for matching articles
-            let kb_results =
-                self.knowledge_base.search(&check.message, codebook, 3);
+            let kb_results = self.knowledge_base.search(&check.message, codebook, 3);
             let article_ids: Vec<String> = kb_results
                 .iter()
                 .filter(|r| r.similarity > 0.1)
@@ -118,10 +116,7 @@ impl SupportAssessor {
                     // Augment matching recommendations with prediction context
                     let context = format!(
                         "Predicted to reach {:.1} in {:.0}h (current: {:.1}, threshold: {:.1})",
-                        pred.predicted_value,
-                        pred.hours_ahead,
-                        pred.current_value,
-                        pred.threshold,
+                        pred.predicted_value, pred.hours_ahead, pred.current_value, pred.threshold,
                     );
 
                     // Try to find an existing recommendation for this metric's category
@@ -133,9 +128,7 @@ impl SupportAssessor {
                         _ => "unknown",
                     };
 
-                    let augmented = recommendations
-                        .iter_mut()
-                        .find(|r| r.category == category);
+                    let augmented = recommendations.iter_mut().find(|r| r.category == category);
 
                     if let Some(rec) = augmented {
                         rec.prediction_context = Some(context);
@@ -143,16 +136,9 @@ impl SupportAssessor {
                         // Create a new recommendation from the prediction
                         recommendations.push(SupportRecommendation {
                             urgency: HealthStatus::Warning,
-                            trigger: format!(
-                                "{} predicted to cross threshold",
-                                pred.metric
-                            ),
+                            trigger: format!("{} predicted to cross threshold", pred.metric),
                             category: category.to_string(),
-                            actions: pred
-                                .recommended_action
-                                .iter()
-                                .cloned()
-                                .collect(),
+                            actions: pred.recommended_action.iter().cloned().collect(),
                             knowledge_article_ids: vec![],
                             prediction_context: Some(format!(
                                 "Predicted to reach {:.1} in {:.0}h",
@@ -225,10 +211,7 @@ mod tests {
     fn test_healthy_system_no_recommendations() {
         let mut codebook = NixCodebook::new();
         let mut assessor = SupportAssessor::new(&mut codebook);
-        let snapshot = make_snapshot(
-            vec![("nginx.service", ServiceState::Running)],
-            Some(50_000),
-        );
+        let snapshot = make_snapshot(vec![("nginx.service", ServiceState::Running)], Some(50_000));
         let hw = make_hardware(50.0, 40.0);
 
         let result = assessor.assess(&snapshot, Some(&hw), None, &mut codebook);
@@ -253,8 +236,7 @@ mod tests {
         assert!(!result.recommendations.is_empty());
         // Should find knowledge articles for failed services
         assert!(
-            result.knowledge_matches_found > 0
-                || !result.recommendations.is_empty(),
+            result.knowledge_matches_found > 0 || !result.recommendations.is_empty(),
             "Warning should trigger recommendations"
         );
     }
@@ -283,10 +265,7 @@ mod tests {
     fn test_predictions_augment_context() {
         let mut codebook = NixCodebook::new();
         let mut assessor = SupportAssessor::new(&mut codebook);
-        let snapshot = make_snapshot(
-            vec![("nginx.service", ServiceState::Running)],
-            Some(50_000),
-        );
+        let snapshot = make_snapshot(vec![("nginx.service", ServiceState::Running)], Some(50_000));
         let hw = make_hardware(85.0, 40.0); // Warning-level disk
 
         let mut monitor = PredictiveMonitor::with_defaults();
@@ -300,13 +279,9 @@ mod tests {
             });
         }
 
-        let result =
-            assessor.assess(&snapshot, Some(&hw), Some(&mut monitor), &mut codebook);
+        let result = assessor.assess(&snapshot, Some(&hw), Some(&mut monitor), &mut codebook);
         // Should have disk warning recommendation
-        let disk_rec = result
-            .recommendations
-            .iter()
-            .find(|r| r.category == "disk");
+        let disk_rec = result.recommendations.iter().find(|r| r.category == "disk");
         assert!(disk_rec.is_some(), "Should have disk recommendation");
     }
 
@@ -354,8 +329,7 @@ mod tests {
         let snapshot = make_snapshot(vec![], Some(50_000));
         let mut monitor = PredictiveMonitor::with_defaults();
 
-        let result =
-            assessor.assess(&snapshot, None, Some(&mut monitor), &mut codebook);
+        let result = assessor.assess(&snapshot, None, Some(&mut monitor), &mut codebook);
         assert!(result.active_alerts.is_empty());
     }
 
@@ -363,10 +337,7 @@ mod tests {
     fn test_assessment_includes_all_checks() {
         let mut codebook = NixCodebook::new();
         let mut assessor = SupportAssessor::new(&mut codebook);
-        let snapshot = make_snapshot(
-            vec![("nginx.service", ServiceState::Running)],
-            Some(50_000),
-        );
+        let snapshot = make_snapshot(vec![("nginx.service", ServiceState::Running)], Some(50_000));
         let hw = make_hardware(50.0, 40.0);
 
         let result = assessor.assess(&snapshot, Some(&hw), None, &mut codebook);
