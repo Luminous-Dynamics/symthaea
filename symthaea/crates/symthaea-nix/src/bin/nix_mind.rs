@@ -171,6 +171,26 @@ fn main() {
         Command::Completions { shell } => {
             completions::generate_completions(shell);
         }
+
+        Command::Health { json } => {
+            cmd_health(if json { OutputFormat::Json } else { cli.format });
+        }
+
+        Command::Predict { horizons } => {
+            cmd_predict(&horizons, cli.format);
+        }
+
+        Command::Watch { timeout, interval } => {
+            cmd_watch(timeout, interval, cli.format);
+        }
+
+        Command::Scrub { file } => {
+            cmd_scrub(file.as_deref());
+        }
+
+        Command::Knowledge { query, limit } => {
+            cmd_knowledge(&query, limit, cli.format);
+        }
     }
 }
 
@@ -854,5 +874,372 @@ fn cmd_service_failed(format: OutputFormat) {
             }
         },
         Err(e) => eprintln!("  Failed to list failed services: {}", e),
+    }
+}
+
+fn cmd_health(format: OutputFormat) {
+    use symthaea_nix::support::health_check::HealthAssessor;
+
+    let snapshot = match symthaea_nix::observe::SystemObserver::snapshot() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("  Failed to snapshot system: {}", e);
+            return;
+        }
+    };
+
+    let hw = symthaea_nix::observe::hardware::HardwareObserver::probe().ok();
+    let assessor = HealthAssessor::default();
+    let (overall, checks) = assessor.assess_all(&snapshot, hw.as_ref());
+
+    match format {
+        OutputFormat::Json => {
+            let json_checks: Vec<serde_json::Value> = checks
+                .iter()
+                .map(|c| {
+                    serde_json::json!({
+                        "name": c.name,
+                        "status": format!("{:?}", c.status),
+                        "message": c.message,
+                        "recommendations": c.recommendations,
+                    })
+                })
+                .collect();
+            let json = serde_json::json!({
+                "overall": format!("{:?}", overall),
+                "checks": json_checks,
+            });
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json).unwrap_or_default()
+            );
+        }
+        _ => {
+            println!("  System Health: {:?}", overall);
+            println!();
+            for check in &checks {
+                println!("  [{:?}] {}: {}", check.status, check.name, check.message);
+                for rec in &check.recommendations {
+                    println!("    -> {}", rec);
+                }
+            }
+        }
+    }
+}
+
+fn cmd_predict(horizons_str: &str, format: OutputFormat) {
+    use symthaea_nix::encoding::ServiceState;
+    use symthaea_nix::support::predictive::{PredictiveMonitor, SystemTelemetry};
+
+    let snapshot = match symthaea_nix::observe::SystemObserver::snapshot() {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!("  Failed to snapshot system: {}", e);
+            return;
+        }
+    };
+
+    let hw = symthaea_nix::observe::hardware::HardwareObserver::probe().ok();
+
+    let telemetry = SystemTelemetry {
+        disk_used_pct: hw.as_ref().map_or(0.0, |h| {
+            h.disks.first().map_or(0.0, |d| {
+                if d.total_bytes > 0 {
+                    d.used_bytes as f64 / d.total_bytes as f64 * 100.0
+                } else {
+                    0.0
+                }
+            })
+        }),
+        memory_used_pct: hw.as_ref().map_or(0.0, |h| {
+            if h.memory_total_mb > 0 {
+                let used = h.memory_total_mb.saturating_sub(h.memory_available_mb);
+                used as f64 / h.memory_total_mb as f64 * 100.0
+            } else {
+                0.0
+            }
+        }),
+        store_path_count: snapshot.store_path_count.unwrap_or(0) as u64,
+        failed_unit_count: snapshot
+            .services
+            .iter()
+            .filter(|(_, s)| *s == ServiceState::Failed)
+            .count() as u32,
+    };
+
+    let mut monitor = PredictiveMonitor::with_defaults();
+    monitor.ingest(telemetry);
+
+    let horizons: Vec<f64> = horizons_str
+        .split(',')
+        .filter_map(|s| s.trim().parse().ok())
+        .collect();
+
+    let mut all_predictions = Vec::new();
+    for hours in &horizons {
+        all_predictions.extend(monitor.predict(*hours));
+    }
+
+    match format {
+        OutputFormat::Json => {
+            let json_preds: Vec<serde_json::Value> = all_predictions
+                .iter()
+                .map(|p| {
+                    serde_json::json!({
+                        "metric": p.metric,
+                        "current": p.current_value,
+                        "predicted": p.predicted_value,
+                        "hours_ahead": p.hours_ahead,
+                        "crosses_threshold": p.crosses_threshold,
+                        "threshold": p.threshold,
+                        "confidence": p.confidence,
+                        "action": p.recommended_action,
+                    })
+                })
+                .collect();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json_preds).unwrap_or_default()
+            );
+        }
+        _ => {
+            println!("  Predictive Analysis (single-sample baseline)");
+            println!();
+            for p in &all_predictions {
+                let alert = if p.crosses_threshold { " ALERT" } else { "" };
+                println!(
+                    "  [+{}h] {}: {:.1} -> {:.1} (threshold: {:.1}, conf: {:.2}){}",
+                    p.hours_ahead,
+                    p.metric,
+                    p.current_value,
+                    p.predicted_value,
+                    p.threshold,
+                    p.confidence,
+                    alert
+                );
+                if let Some(ref action) = p.recommended_action {
+                    println!("    -> {}", action);
+                }
+            }
+            println!();
+            println!("  Note: predictions improve with continuous monitoring via the daemon.");
+        }
+    }
+}
+
+fn cmd_watch(timeout: u64, interval: u64, format: OutputFormat) {
+    use std::time::Duration;
+    use symthaea_nix::encoding::NixCodebook;
+    use symthaea_nix::support::watchdog::{Watchdog, WatchdogConfig};
+
+    let config = WatchdogConfig {
+        timeout: Duration::from_secs(timeout),
+        check_interval: Duration::from_secs(interval),
+        ..WatchdogConfig::default()
+    };
+
+    let mut codebook = NixCodebook::new();
+
+    // Capture baseline before monitoring
+    let (baseline_hv, _baseline_snap) = match Watchdog::capture_baseline(&mut codebook) {
+        Some(b) => b,
+        None => {
+            eprintln!("  Failed to capture baseline snapshot.");
+            return;
+        }
+    };
+
+    let current_gen =
+        symthaea_nix::action::generation_manager::GenerationManager::current_generation()
+            .unwrap_or(0) as u64;
+
+    match format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&serde_json::json!({
+                    "status": "monitoring",
+                    "timeout_secs": timeout,
+                    "interval_secs": interval,
+                    "baseline_gen": current_gen,
+                }))
+                .unwrap_or_default()
+            );
+        }
+        _ => {
+            println!("  Watchdog monitoring started.");
+            println!(
+                "  Timeout: {}s, interval: {}s, gen: {}",
+                timeout, interval, current_gen
+            );
+            println!("  Watching for system degradation...");
+            println!();
+        }
+    }
+
+    let watchdog = Watchdog::new(config);
+    let verdict = watchdog.monitor(&mut codebook, &baseline_hv, current_gen);
+
+    match format {
+        OutputFormat::Json => {
+            let json = match &verdict {
+                symthaea_nix::support::watchdog::WatchdogVerdict::Stabilized {
+                    duration,
+                    checks_performed,
+                    ..
+                } => serde_json::json!({
+                    "verdict": "stabilized",
+                    "duration_secs": duration.as_secs(),
+                    "checks": checks_performed,
+                }),
+                symthaea_nix::support::watchdog::WatchdogVerdict::Degraded {
+                    reason,
+                    surprise,
+                    checks_performed,
+                    ..
+                } => serde_json::json!({
+                    "verdict": "degraded",
+                    "reason": reason,
+                    "surprise": surprise,
+                    "checks": checks_performed,
+                }),
+                symthaea_nix::support::watchdog::WatchdogVerdict::Reverted {
+                    reason,
+                    pre_gen,
+                    ..
+                } => serde_json::json!({
+                    "verdict": "reverted",
+                    "reason": reason,
+                    "pre_gen": pre_gen,
+                }),
+                symthaea_nix::support::watchdog::WatchdogVerdict::Error { message } => {
+                    serde_json::json!({
+                        "verdict": "error",
+                        "message": message,
+                    })
+                }
+            };
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json).unwrap_or_default()
+            );
+        }
+        _ => match verdict {
+            symthaea_nix::support::watchdog::WatchdogVerdict::Stabilized {
+                duration,
+                checks_performed,
+                ..
+            } => {
+                println!(
+                    "  STABILIZED after {}s ({} checks). Safe to promote.",
+                    duration.as_secs(),
+                    checks_performed
+                );
+            }
+            symthaea_nix::support::watchdog::WatchdogVerdict::Degraded {
+                reason,
+                surprise,
+                checks_performed,
+                ..
+            } => {
+                eprintln!(
+                    "  DEGRADED: {} (surprise: {:.3}, {} checks)",
+                    reason, surprise, checks_performed
+                );
+            }
+            symthaea_nix::support::watchdog::WatchdogVerdict::Reverted {
+                reason, pre_gen, ..
+            } => {
+                eprintln!("  REVERTED to gen {}: {}", pre_gen, reason);
+            }
+            symthaea_nix::support::watchdog::WatchdogVerdict::Error { message } => {
+                eprintln!("  ERROR: {}", message);
+            }
+        },
+    }
+}
+
+fn cmd_scrub(file: Option<&str>) {
+    use symthaea_nix::support::scrubber::Scrubber;
+
+    let input = match file {
+        Some(path) => match std::fs::read_to_string(path) {
+            Ok(content) => content,
+            Err(e) => {
+                eprintln!("  Failed to read {}: {}", path, e);
+                return;
+            }
+        },
+        None => {
+            use std::io::Read;
+            let mut buf = String::new();
+            if let Err(e) = std::io::stdin().read_to_string(&mut buf) {
+                eprintln!("  Failed to read stdin: {}", e);
+                return;
+            }
+            buf
+        }
+    };
+
+    let scrubber = Scrubber::new();
+    let result = scrubber.scrub(&input);
+    print!("{}", result.scrubbed_text);
+
+    eprintln!("  --- {} redactions applied ---", result.redaction_count);
+}
+
+fn cmd_knowledge(query: &str, limit: usize, format: OutputFormat) {
+    use symthaea_nix::encoding::NixCodebook;
+    use symthaea_nix::support::knowledge::KnowledgeBase;
+
+    let mut codebook = NixCodebook::new();
+    let kb = KnowledgeBase::new(&mut codebook);
+    let results = kb.search(query, &mut codebook, limit);
+
+    match format {
+        OutputFormat::Json => {
+            let json_results: Vec<serde_json::Value> = results
+                .iter()
+                .map(|r| {
+                    serde_json::json!({
+                        "id": r.article.id,
+                        "title": r.article.title,
+                        "category": format!("{:?}", r.article.category),
+                        "similarity": r.similarity,
+                        "solution": r.article.solution,
+                        "commands": r.article.commands,
+                    })
+                })
+                .collect();
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json_results).unwrap_or_default()
+            );
+        }
+        _ => {
+            println!("  Knowledge Base: \"{}\"", query);
+            println!();
+            if results.is_empty() {
+                println!("  No matching articles found.");
+            } else {
+                for (i, r) in results.iter().enumerate() {
+                    println!(
+                        "  {}. {} (similarity: {:.3})",
+                        i + 1,
+                        r.article.title,
+                        r.similarity
+                    );
+                    println!("     Category: {:?}", r.article.category);
+                    println!("     Solution: {}", r.article.solution);
+                    if !r.article.commands.is_empty() {
+                        println!("     Commands:");
+                        for cmd in r.article.commands {
+                            println!("       $ {}", cmd);
+                        }
+                    }
+                    println!();
+                }
+            }
+        }
     }
 }

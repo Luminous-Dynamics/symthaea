@@ -47,6 +47,52 @@ in {
       default = "nix-mind";
       description = "Group under which the daemon runs.";
     };
+
+    support = {
+      watchdog = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable post-rebuild watchdog monitoring.";
+        };
+
+        timeout = lib.mkOption {
+          type = lib.types.str;
+          default = "5m";
+          description = "Maximum monitoring duration before declaring stable.";
+        };
+
+        consecutiveFailures = lib.mkOption {
+          type = lib.types.int;
+          default = 3;
+          description = "Number of consecutive degraded checks before reverting.";
+        };
+      };
+
+      predictive = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable LTC-based predictive failure monitoring.";
+        };
+
+        horizons = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [ "1h" "6h" "24h" "7d" ];
+          description = "Time horizons for predictions.";
+        };
+      };
+
+      autonomyLevel = lib.mkOption {
+        type = lib.types.enum [ "advisory" "semi-autonomous" "full-autonomous" ];
+        default = "advisory";
+        description = ''
+          advisory: suggest only, never execute.
+          semi-autonomous: auto-execute safe operations (GC, optimise).
+          full-autonomous: auto-execute all except switch (still requires watchdog approval).
+        '';
+      };
+    };
   };
 
   config = lib.mkIf cfg.enable {
@@ -70,6 +116,18 @@ in {
       poll_interval = cfg.pollInterval;
       surprise_threshold = cfg.surpriseThreshold;
       state_dir = cfg.stateDir;
+      support = {
+        watchdog = {
+          enable = cfg.support.watchdog.enable;
+          timeout = cfg.support.watchdog.timeout;
+          consecutive_failures = cfg.support.watchdog.consecutiveFailures;
+        };
+        predictive = {
+          enable = cfg.support.predictive.enable;
+          horizons = cfg.support.predictive.horizons;
+        };
+        autonomy_level = cfg.support.autonomyLevel;
+      };
     };
 
     # Systemd service
