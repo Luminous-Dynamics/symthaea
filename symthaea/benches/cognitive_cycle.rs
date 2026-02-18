@@ -291,6 +291,139 @@ fn bench_sustained_throughput(c: &mut Criterion) {
     group.finish();
 }
 
+// =============================================================================
+// URGENCY MODE DISTRIBUTION: measure natural urgency mode transitions
+// =============================================================================
+
+fn bench_urgency_natural(c: &mut Criterion) {
+    let mut group = c.benchmark_group("cognitive_cycle_urgency");
+    group.sample_size(10);
+    group.measurement_time(std::time::Duration::from_secs(5));
+
+    // Repeated same input drives error down → system should transition to Cruise
+    group.bench_function("same_input_500cycles", |b| {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            async_training: false,
+            enable_surprise_exploration: true,
+            enable_prefrontal: true,
+            enable_meta_cognition: true,
+            enable_predictive_processing: true,
+            enable_cross_modal_binding: true,
+            enable_affective_bridge: true,
+            enable_embodied_cognition: true,
+            enable_narrative_gwt: true,
+            causal_enhancement: true,
+            ..Default::default()
+        })
+        .unwrap();
+        warm_up(&mut service, 50); // let it stabilize into Cruise
+
+        b.iter(|| {
+            for _ in 0..500 {
+                black_box(service.cycle("stable predictable input"));
+            }
+        })
+    });
+
+    // Varied input keeps error high → system stays in Normal/Critical
+    group.bench_function("varied_input_500cycles", |b| {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            async_training: false,
+            enable_surprise_exploration: true,
+            enable_prefrontal: true,
+            enable_meta_cognition: true,
+            enable_predictive_processing: true,
+            enable_cross_modal_binding: true,
+            enable_affective_bridge: true,
+            enable_embodied_cognition: true,
+            enable_narrative_gwt: true,
+            causal_enhancement: true,
+            ..Default::default()
+        })
+        .unwrap();
+        warm_up(&mut service, 10);
+
+        let inputs = [
+            "alpha cognition learning",
+            "beta temporal dynamics",
+            "gamma oscillation binding",
+            "delta sleep consolidation",
+            "theta memory encoding",
+            "epsilon exploration novelty",
+            "zeta moral reasoning",
+            "eta causal inference",
+            "iota consciousness integration",
+            "kappa prediction error",
+        ];
+
+        b.iter(|| {
+            for i in 0..500 {
+                black_box(service.cycle(inputs[i % inputs.len()]));
+            }
+        })
+    });
+
+    group.finish();
+}
+
+// =============================================================================
+// CYCLE_WITH_HV: direct HV injection (bypasses text encoder)
+// =============================================================================
+
+fn bench_cycle_with_hv(c: &mut Criterion) {
+    use symthaea_core::hdc::{ContinuousHV, HDC_DIMENSION};
+
+    let mut group = c.benchmark_group("cognitive_cycle_hv");
+    group.sample_size(30);
+
+    // Single cycle with pre-encoded HV
+    group.bench_function("single_hv", |b| {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            async_training: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let hdv = ContinuousHV::random(HDC_DIMENSION, 42);
+        warm_up(&mut service, 5);
+
+        b.iter(|| black_box(service.cycle_with_hv(&hdv)))
+    });
+
+    // Compare text vs HV cycle (same service, isolates encoder cost)
+    group.bench_function("100_text_cycles", |b| {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            async_training: false,
+            ..Default::default()
+        })
+        .unwrap();
+        warm_up(&mut service, 5);
+
+        b.iter(|| {
+            for _ in 0..100 {
+                black_box(service.cycle("benchmark comparison input"));
+            }
+        })
+    });
+
+    group.bench_function("100_hv_cycles", |b| {
+        let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+            async_training: false,
+            ..Default::default()
+        })
+        .unwrap();
+        let hdv = ContinuousHV::random(HDC_DIMENSION, 42);
+        warm_up(&mut service, 5);
+
+        b.iter(|| {
+            for _ in 0..100 {
+                black_box(service.cycle_with_hv(&hdv));
+            }
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_single_cycle,
@@ -299,5 +432,7 @@ criterion_group!(
     bench_throughput,
     bench_input_scaling,
     bench_sustained_throughput,
+    bench_urgency_natural,
+    bench_cycle_with_hv,
 );
 criterion_main!(benches);
