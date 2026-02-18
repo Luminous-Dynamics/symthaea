@@ -10,8 +10,31 @@
  */
 
 // ============================================================================
-// Cluster Integrations (Commons + Civic)
+// Cluster Integrations (Personal + Identity + Commons + Civic)
 // ============================================================================
+
+export {
+  PersonalBridgeClient,
+  createPersonalBridgeClient,
+  isPersonalBridgeSignal,
+  PERSONAL_DOMAINS,
+  PERSONAL_ZOMES,
+} from './personal/index.js';
+
+export type {
+  PersonalQueryInput,
+  PersonalEventInput,
+  PersonalBridgeEventSignal,
+  PersonalBridgeSignalHandler,
+  CrossClusterDispatchInput as PersonalCrossClusterInput,
+  CredentialType,
+  DisclosureScope,
+  CredentialPresentation,
+  SubmitPhiAttestationInput,
+  QueryIdentityInput,
+  CreatePresentationInput,
+} from './personal/index.js';
+
 
 export {
   CommonsBridgeClient,

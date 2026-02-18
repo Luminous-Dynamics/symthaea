@@ -936,6 +936,71 @@ pub fn check_factcheck_status(input: FactcheckStatusQuery) -> ExternResult<Factc
 }
 
 // ============================================================================
+// Cross-Cluster Dispatch (Civic → Identity)
+// ============================================================================
+
+/// Identity-side zomes that civic-bridge is allowed to call cross-cluster.
+const ALLOWED_IDENTITY_ZOMES: &[&str] = &[
+    "identity_bridge",
+    "did_registry",
+];
+
+/// The hApp role name for the Identity DNA.
+const IDENTITY_ROLE: &str = "identity";
+
+/// Dispatch a cross-cluster call to any allowed zome in the Identity DNA.
+#[hdk_extern]
+pub fn dispatch_identity_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("identity:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Verify an agent's DID is active before sensitive operations.
+///
+/// Cross-cluster call: civic-bridge → identity did_registry.
+/// Used by justice-cases and emergency-coordination to verify agent identity
+/// before allowing sensitive civic actions (filing cases, declaring emergencies).
+#[hdk_extern]
+pub fn verify_agent_did(did: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:did_registry")?;
+    let payload = ExternIO::encode(did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "did_registry".to_string(),
+        fn_name: "is_did_active".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Get an agent's trust score from the identity bridge.
+///
+/// Returns MATL composite score (0.0-1.0) combining MFA assurance and reputation.
+/// Used for trust-gated operations in civic domains.
+#[hdk_extern]
+pub fn get_agent_trust_score(did: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:identity_bridge")?;
+    let payload = ExternIO::encode(did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "get_matl_score".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -1706,5 +1771,46 @@ mod tests {
         assert_eq!(water_count, 5, "Expected 5 water zomes in ALLOWED_COMMONS_ZOMES");
         assert_eq!(food_count, 4, "Expected 4 food zomes in ALLOWED_COMMONS_ZOMES");
         assert_eq!(transport_count, 3, "Expected 3 transport zomes in ALLOWED_COMMONS_ZOMES");
+    }
+
+    // ---- Identity cross-cluster allowlist ----
+
+    #[test]
+    fn identity_allowlist_contains_bridge() {
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"identity_bridge"));
+    }
+
+    #[test]
+    fn identity_allowlist_contains_did_registry() {
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"did_registry"));
+    }
+
+    #[test]
+    fn identity_role_constant_correct() {
+        assert_eq!(IDENTITY_ROLE, "identity");
+    }
+
+    #[test]
+    fn identity_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_IDENTITY_ZOMES {
+            assert!(
+                seen.insert(zome),
+                "Duplicate zome in ALLOWED_IDENTITY_ZOMES: '{}'",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn identity_allowlist_entries_are_non_empty() {
+        for zome in ALLOWED_IDENTITY_ZOMES {
+            assert!(!zome.is_empty(), "ALLOWED_IDENTITY_ZOMES contains an empty string");
+            assert!(
+                !zome.contains(' '),
+                "ALLOWED_IDENTITY_ZOMES entry '{}' contains whitespace",
+                zome
+            );
+        }
     }
 }

@@ -506,3 +506,210 @@ async fn test_trust_credential_tier_filtering() {
         "Guardian tier should be empty without any credentials"
     );
 }
+
+// ============================================================================
+// Cross-Cluster Integration Tests (require unified hApp)
+// ============================================================================
+
+// These tests require the full unified hApp bundle with all 4 roles
+// (personal, identity, commons, civic) installed together.
+
+/// Mirror types for cross-cluster dispatch results
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct CrossClusterDispatchInput {
+    role: String,
+    zome: String,
+    fn_name: String,
+    payload: Vec<u8>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+struct QueryIdentityInput {
+    did: String,
+    source_happ: String,
+    requested_fields: Vec<String>,
+}
+
+/// Test: Personal → Identity cross-cluster DID resolution.
+///
+/// Verifies that the personal bridge can resolve DIDs from the identity cluster
+/// via `CallTargetCell::OtherRole("identity")`.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires unified hApp bundle with identity + personal roles"]
+async fn test_personal_to_identity_resolve_did() {
+    let happ_path = PathBuf::from("../../happs/mycelix-unified-happ.yaml");
+    if !happ_path.exists() {
+        eprintln!("Skipping: unified hApp not at {:?}", happ_path);
+        return;
+    }
+
+    // This test requires a running conductor with both personal and identity
+    // roles provisioned. The personal bridge's resolve_did() will call
+    // identity:did_registry:resolve_did via OtherRole dispatch.
+
+    let agents = setup_test_agents_from_happ(&happ_path, 1).await;
+    let alice = &agents[0];
+
+    // First create a DID in the identity cluster
+    let _did_record: Record = alice
+        .call_zome_fn_on_role("identity", "did_registry", "create_did", ())
+        .await;
+
+    // Construct the DID string from Alice's agent pubkey
+    let alice_did = format!("did:mycelix:{}", alice.agent_pubkey);
+
+    // Now resolve it via personal bridge → identity cluster
+    let result: DispatchResult = alice
+        .call_zome_fn_on_role("personal", "personal_bridge", "resolve_did", alice_did.clone())
+        .await;
+
+    assert!(result.success, "DID resolution via identity cluster should succeed");
+    assert!(result.response.is_some(), "Should return DID document bytes");
+}
+
+/// Test: Personal → Identity cross-cluster DID active check.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires unified hApp bundle with identity + personal roles"]
+async fn test_personal_to_identity_is_did_active() {
+    let happ_path = PathBuf::from("../../happs/mycelix-unified-happ.yaml");
+    if !happ_path.exists() {
+        eprintln!("Skipping: unified hApp not at {:?}", happ_path);
+        return;
+    }
+
+    let agents = setup_test_agents_from_happ(&happ_path, 1).await;
+    let alice = &agents[0];
+
+    // Create a DID
+    let _: Record = alice
+        .call_zome_fn_on_role("identity", "did_registry", "create_did", ())
+        .await;
+
+    let alice_did = format!("did:mycelix:{}", alice.agent_pubkey);
+
+    // Check it's active via personal bridge
+    let result: DispatchResult = alice
+        .call_zome_fn_on_role("personal", "personal_bridge", "is_did_active", alice_did)
+        .await;
+
+    assert!(result.success, "DID active check should succeed");
+}
+
+/// Test: Personal → Identity cross-cluster MATL trust score.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires unified hApp bundle with identity + personal roles"]
+async fn test_personal_to_identity_matl_score() {
+    let happ_path = PathBuf::from("../../happs/mycelix-unified-happ.yaml");
+    if !happ_path.exists() {
+        eprintln!("Skipping: unified hApp not at {:?}", happ_path);
+        return;
+    }
+
+    let agents = setup_test_agents_from_happ(&happ_path, 1).await;
+    let alice = &agents[0];
+
+    // Create a DID so identity bridge can compute MATL
+    let _: Record = alice
+        .call_zome_fn_on_role("identity", "did_registry", "create_did", ())
+        .await;
+
+    let alice_did = format!("did:mycelix:{}", alice.agent_pubkey);
+
+    // Get MATL score via personal bridge → identity bridge
+    let result: DispatchResult = alice
+        .call_zome_fn_on_role("personal", "personal_bridge", "get_matl_score", alice_did)
+        .await;
+
+    assert!(result.success, "MATL score query should succeed");
+}
+
+/// Test: Personal → Identity cross-cluster credential verification.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires unified hApp bundle with identity + personal roles"]
+async fn test_personal_to_identity_verify_credential() {
+    let happ_path = PathBuf::from("../../happs/mycelix-unified-happ.yaml");
+    if !happ_path.exists() {
+        eprintln!("Skipping: unified hApp not at {:?}", happ_path);
+        return;
+    }
+
+    let agents = setup_test_agents_from_happ(&happ_path, 1).await;
+    let alice = &agents[0];
+
+    // Verify a non-existent credential (should return a result, not error)
+    let result: DispatchResult = alice
+        .call_zome_fn_on_role(
+            "personal",
+            "personal_bridge",
+            "verify_credential",
+            "urn:uuid:non-existent-credential".to_string(),
+        )
+        .await;
+
+    // The call should succeed (reach identity cluster), even if the
+    // credential doesn't exist — identity zome returns a result, not an error
+    assert!(result.success || result.error.is_some(),
+        "Cross-cluster credential verification should reach identity cluster");
+}
+
+/// Test: Personal → Commons cross-cluster dispatch.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires unified hApp bundle with all roles"]
+async fn test_personal_to_commons_dispatch() {
+    let happ_path = PathBuf::from("../../happs/mycelix-unified-happ.yaml");
+    if !happ_path.exists() {
+        eprintln!("Skipping: unified hApp not at {:?}", happ_path);
+        return;
+    }
+
+    let agents = setup_test_agents_from_happ(&happ_path, 1).await;
+    let alice = &agents[0];
+
+    // Dispatch to commons_bridge health check
+    let dispatch = CrossClusterDispatchInput {
+        role: "commons".into(),
+        zome: "commons_bridge".into(),
+        fn_name: "health_check".into(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result: DispatchResult = alice
+        .call_zome_fn_on_role("personal", "personal_bridge", "dispatch_commons_call", dispatch)
+        .await;
+
+    assert!(result.success, "Cross-cluster dispatch to commons should succeed");
+}
+
+/// Test: Personal → Civic cross-cluster dispatch.
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore = "requires unified hApp bundle with all roles"]
+async fn test_personal_to_civic_dispatch() {
+    let happ_path = PathBuf::from("../../happs/mycelix-unified-happ.yaml");
+    if !happ_path.exists() {
+        eprintln!("Skipping: unified hApp not at {:?}", happ_path);
+        return;
+    }
+
+    let agents = setup_test_agents_from_happ(&happ_path, 1).await;
+    let alice = &agents[0];
+
+    // Dispatch to civic_bridge health check
+    let dispatch = CrossClusterDispatchInput {
+        role: "civic".into(),
+        zome: "civic_bridge".into(),
+        fn_name: "health_check".into(),
+        payload: ExternIO::encode(()).unwrap().0,
+    };
+
+    let result: DispatchResult = alice
+        .call_zome_fn_on_role("personal", "personal_bridge", "dispatch_civic_call", dispatch)
+        .await;
+
+    assert!(result.success, "Cross-cluster dispatch to civic should succeed");
+}

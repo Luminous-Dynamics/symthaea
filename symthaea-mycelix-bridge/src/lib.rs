@@ -9,19 +9,235 @@
 //! - Φ-based anomaly detection hooks
 //! - Mapping results into `mycelix_sdk::epistemic` classifications
 
+pub mod fl_plugin;
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use std::collections::HashMap;
 
 use mycelix_sdk::hyperfeel::{HyperGradient, HV16_BYTES};
-use mycelix_sdk::epistemic::{EpistemicClaim, ClaimBuilder, EmpiricalLevel, NormativeLevel, MaterialityLevel};
+use mycelix_sdk::epistemic::{EpistemicClaim, ClaimBuilder};
 use mycelix_sdk::matl::ProofOfGradientQuality;
 
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
-use symthaea_core::hdc::HebbianAssociativeMemory;
 use symthaea_core::phi_engine::{PhiEngine, PhiMethod};
-use symthaea_core::mycelix::mapper::PhiToEpistemicMapper;
-use symthaea_core::mycelix::types::{WorkspaceScope, EpistemicClassification as SymEpistemicClassification};
+
+// ============================================================================
+// LOCAL TYPES — Inlined from symthaea::mycelix::{mapper, types} to avoid
+// depending on the full symthaea crate (which would pull in burn, etc.).
+// ============================================================================
+
+/// Workspace scope for normative level mapping.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+enum WorkspaceScope {
+    Internal,
+    Local,
+    Network,
+    Universal,
+}
+
+/// Local E/N/M classification (mirrors symthaea::mycelix::types).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LocalEpistemicClassification {
+    empirical: LocalEmpiricalLevel,
+    normative: LocalNormativeLevel,
+    materiality: LocalMaterialityLevel,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LocalEmpiricalLevel {
+    Subjective,
+    Testimonial,
+    PrivatelyVerifiable,
+    CryptographicallyVerifiable,
+    PubliclyReproducible,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LocalNormativeLevel {
+    Internal,
+    Agent,
+    Network,
+    Foundational,
+}
+
+impl LocalNormativeLevel {
+    fn from_scope(scope: WorkspaceScope) -> Self {
+        match scope {
+            WorkspaceScope::Internal => Self::Internal,
+            WorkspaceScope::Local => Self::Agent,
+            WorkspaceScope::Network => Self::Network,
+            WorkspaceScope::Universal => Self::Foundational,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LocalMaterialityLevel {
+    Ephemeral,
+    ShortTerm,
+    MediumTerm,
+    Permanent,
+}
+
+impl LocalMaterialityLevel {
+    fn from_importance(importance: f32) -> Self {
+        if importance >= 0.75 {
+            Self::Permanent
+        } else if importance >= 0.50 {
+            Self::MediumTerm
+        } else if importance >= 0.25 {
+            Self::ShortTerm
+        } else {
+            Self::Ephemeral
+        }
+    }
+}
+
+/// Convert local classification to SDK classification for claim building.
+impl LocalEpistemicClassification {
+    fn to_sdk(
+        &self,
+    ) -> (
+        mycelix_sdk::epistemic::EmpiricalLevel,
+        mycelix_sdk::epistemic::NormativeLevel,
+        mycelix_sdk::epistemic::MaterialityLevel,
+    ) {
+        let empirical = match self.empirical {
+            LocalEmpiricalLevel::Subjective => mycelix_sdk::epistemic::EmpiricalLevel::E0Null,
+            LocalEmpiricalLevel::Testimonial => mycelix_sdk::epistemic::EmpiricalLevel::E1Testimonial,
+            LocalEmpiricalLevel::PrivatelyVerifiable => mycelix_sdk::epistemic::EmpiricalLevel::E2PrivateVerify,
+            LocalEmpiricalLevel::CryptographicallyVerifiable => mycelix_sdk::epistemic::EmpiricalLevel::E3Cryptographic,
+            LocalEmpiricalLevel::PubliclyReproducible => mycelix_sdk::epistemic::EmpiricalLevel::E4PublicRepro,
+        };
+        let normative = match self.normative {
+            LocalNormativeLevel::Internal => mycelix_sdk::epistemic::NormativeLevel::N0Personal,
+            LocalNormativeLevel::Agent => mycelix_sdk::epistemic::NormativeLevel::N1Communal,
+            LocalNormativeLevel::Network => mycelix_sdk::epistemic::NormativeLevel::N2Network,
+            LocalNormativeLevel::Foundational => mycelix_sdk::epistemic::NormativeLevel::N3Axiomatic,
+        };
+        let materiality = match self.materiality {
+            LocalMaterialityLevel::Ephemeral => mycelix_sdk::epistemic::MaterialityLevel::M0Ephemeral,
+            LocalMaterialityLevel::ShortTerm => mycelix_sdk::epistemic::MaterialityLevel::M1Temporal,
+            LocalMaterialityLevel::MediumTerm => mycelix_sdk::epistemic::MaterialityLevel::M2Persistent,
+            LocalMaterialityLevel::Permanent => mycelix_sdk::epistemic::MaterialityLevel::M3Foundational,
+        };
+        (empirical, normative, materiality)
+    }
+}
+
+/// Simplified Phi→E/N/M mapper (inlined from symthaea::mycelix::mapper).
+struct PhiToEpistemicMapper {
+    e1_threshold: f32,
+    e2_threshold: f32,
+    e3_threshold: f32,
+    e4_threshold: f32,
+}
+
+impl PhiToEpistemicMapper {
+    fn new() -> Self {
+        Self {
+            e1_threshold: 0.1,
+            e2_threshold: 0.2,
+            e3_threshold: 0.3,
+            e4_threshold: 0.4,
+        }
+    }
+
+    fn classify(
+        &self,
+        phi: f32,
+        scope: WorkspaceScope,
+        importance: f32,
+        is_reproducible: bool,
+    ) -> LocalEpistemicClassification {
+        let empirical = if phi >= self.e4_threshold && is_reproducible {
+            LocalEmpiricalLevel::PubliclyReproducible
+        } else if phi >= self.e3_threshold {
+            LocalEmpiricalLevel::CryptographicallyVerifiable
+        } else if phi >= self.e2_threshold {
+            LocalEmpiricalLevel::PrivatelyVerifiable
+        } else if phi >= self.e1_threshold {
+            LocalEmpiricalLevel::Testimonial
+        } else {
+            LocalEmpiricalLevel::Subjective
+        };
+        LocalEpistemicClassification {
+            empirical,
+            normative: LocalNormativeLevel::from_scope(scope),
+            materiality: LocalMaterialityLevel::from_importance(importance),
+        }
+    }
+}
+
+// ============================================================================
+// VECTOR STORE — Simple content-addressable memory with cosine similarity
+// recall. Replaces HebbianAssociativeMemory for the bridge's use case.
+// ============================================================================
+
+/// Simple vector store for gradient prototype recall.
+struct VectorStore {
+    concepts: Vec<(String, Vec<f32>)>,
+}
+
+/// Stats for the vector store.
+struct VectorStoreStats {
+    num_concepts: usize,
+}
+
+impl VectorStore {
+    fn new() -> Self {
+        Self { concepts: Vec::new() }
+    }
+
+    fn store(&mut self, id: &str, vector: Vec<f32>) {
+        // Update existing or append new
+        if let Some(entry) = self.concepts.iter_mut().find(|(k, _)| k == id) {
+            entry.1 = vector;
+        } else {
+            self.concepts.push((id.to_string(), vector));
+        }
+    }
+
+    /// Recall the most similar stored vector by cosine similarity.
+    /// Returns (id, vector, similarity) or None if empty.
+    fn recall_by_vector(&self, query: &[f32]) -> Option<(String, Vec<f32>, f32)> {
+        if self.concepts.is_empty() {
+            return None;
+        }
+        let q_norm = dot_norm(query);
+        if q_norm < 1e-12 {
+            return None;
+        }
+        let mut best: Option<(usize, f32)> = None;
+        for (i, (_id, vec)) in self.concepts.iter().enumerate() {
+            let v_norm = dot_norm(vec);
+            if v_norm < 1e-12 {
+                continue;
+            }
+            let dot: f32 = query.iter().zip(vec.iter()).map(|(a, b)| a * b).sum();
+            let sim = dot / (q_norm * v_norm);
+            if best.map_or(true, |(_, s)| sim > s) {
+                best = Some((i, sim));
+            }
+        }
+        best.map(|(i, sim)| {
+            let (id, vec) = &self.concepts[i];
+            (id.clone(), vec.clone(), sim)
+        })
+    }
+
+    fn stats(&self) -> VectorStoreStats {
+        VectorStoreStats {
+            num_concepts: self.concepts.len(),
+        }
+    }
+}
+
+fn dot_norm(v: &[f32]) -> f32 {
+    v.iter().map(|x| x * x).sum::<f32>().sqrt()
+}
 
 /// Error type for bridge operations.
 #[derive(Debug, Error)]
@@ -131,7 +347,7 @@ pub struct QualityScore {
     pub severity: ConsciousAnomalySeverity,
     /// Machine-readable reasons for anomaly classification (if any).
     /// Example: ["phi_drop", "gray_zone"].
-    pub causes: Vec<&'static str>,
+    pub causes: Vec<String>,
 }
 
 /// Severity classification for conscious anomaly detection.
@@ -194,8 +410,8 @@ pub struct SymthaeaBackend {
     config: SymthaeaBackendConfig,
     phi_engine: PhiEngine,
     mapper: PhiToEpistemicMapper,
-    /// Associative memory for gradient prototypes (content-addressable).
-    memory: HebbianAssociativeMemory,
+    /// Vector store for gradient prototypes (content-addressable cosine recall).
+    memory: VectorStore,
     /// Per-node state for trend-aware Φ tracking and anomaly counts.
     node_states: HashMap<String, NodeState>,
     /// Shared sparse projector for HyperGradient → ContinuousHV.
@@ -332,13 +548,13 @@ impl SymthaeaBackend {
 
     /// Create a new backend with an explicit configuration.
     pub fn with_config(config: SymthaeaBackendConfig) -> Self {
-        let phi_engine = PhiEngine::new(PhiMethod::Continuous);
+        let phi_engine = PhiEngine::new(PhiMethod::SpectralConnectivity);
         let mapper = PhiToEpistemicMapper::new();
         Self {
             config,
             phi_engine,
             mapper,
-            memory: HebbianAssociativeMemory::new(),
+            memory: VectorStore::new(),
             node_states: HashMap::new(),
             projector: SparseProjector::new(8, HDC_DIMENSION),
         }
@@ -352,7 +568,7 @@ impl SymthaeaBackend {
     /// Reset all backend state, including node histories and associative memory.
     pub fn reset_all(&mut self) {
         self.node_states.clear();
-        self.memory = HebbianAssociativeMemory::new();
+        self.memory = VectorStore::new();
     }
 
     /// Get a lightweight snapshot of a node's state (last Φ, anomaly count).
@@ -436,7 +652,7 @@ impl SymthaeaBackend {
         &self,
         phi: f32,
         update: &HyperGradient,
-    ) -> SymEpistemicClassification {
+    ) -> LocalEpistemicClassification {
         // WorkspaceScope is not directly known here; treat FL updates as
         // network-level by default.
         let scope = WorkspaceScope::Network;
@@ -459,7 +675,7 @@ impl SymthaeaBackend {
         &self,
         phi: f32,
         snapshot: &dyn ModelSnapshot,
-        classification: &SymEpistemicClassification,
+        classification: &LocalEpistemicClassification,
     ) -> EpistemicClaim {
         let acc_before = snapshot.current_accuracy().unwrap_or(0.0);
         let content = format!(
@@ -467,14 +683,7 @@ impl SymthaeaBackend {
             phi, acc_before
         );
 
-        let canonical: mycelix_sdk::epistemic::EpistemicClassification =
-            classification.clone().into();
-
-        let (empirical, normative, materiality) = (
-            canonical.empirical,
-            canonical.normative,
-            canonical.materiality,
-        );
+        let (empirical, normative, materiality) = classification.to_sdk();
 
         ClaimBuilder::new(content)
             .empirical(empirical)
@@ -496,18 +705,18 @@ impl ConsciousnessBackend for SymthaeaBackend {
         snapshot: &dyn ModelSnapshot,
         update: &HyperGradient,
     ) -> Result<QualityScore> {
-        // 1. Identify node and load prior state
-        let node_id = update.node_id.as_str();
-        let state = self
+        // 1. Identify node and load prior state (extract phi_before, drop borrow)
+        let node_id = update.node_id.to_string();
+        let phi_before = self
             .node_states
-            .entry(node_id.to_string())
-            .or_insert_with(NodeState::default);
-        let phi_before = state.last_phi;
+            .entry(node_id.clone())
+            .or_insert_with(NodeState::default)
+            .last_phi;
 
-        // 2. Convert HyperGradient → ContinuousHV, with recall-or-project semantics.
+        // 2. Convert HyperGradient -> ContinuousHV, with recall-or-project semantics.
         let (hv, similarity) = self.recall_or_project(update)?;
 
-        // 3. Compute Φ for this node
+        // 3. Compute Phi for this node
         let phi_result = self.phi_engine.compute(&[hv]);
         let phi_after = phi_result.phi as f32;
         let phi_assessment = PhiAssessment::new(phi_before, phi_after);
@@ -515,7 +724,7 @@ impl ConsciousnessBackend for SymthaeaBackend {
         // 4. Evaluate validation metrics on the updated snapshot
         let (accuracy, loss) = snapshot.evaluate()?;
 
-        // 5. Map Φ to epistemic classification
+        // 5. Map Phi to epistemic classification
         let classification = self.classify_from_phi(phi_after, update);
 
         // 6. Build a canonical EpistemicClaim (currently unused, but ready
@@ -523,11 +732,11 @@ impl ConsciousnessBackend for SymthaeaBackend {
         let claim = self.build_claim(phi_after, snapshot, &classification);
         let _claim_code = claim.code(); // exercise the claim for now
 
-        // 7. Epistemic confidence: scaled combination of Φ and accuracy
+        // 7. Epistemic confidence: scaled combination of Phi and accuracy
         let epistemic_confidence = ((phi_after + accuracy) / 2.0).clamp(0.0, 1.0);
 
         // 8. Anomaly heuristic:
-        //    - strong negative Φ gain
+        //    - strong negative Phi gain
         //    - or gray-zone similarity (uncanny valley)
         //    - or very low epistemic confidence
         let phi_gain = phi_assessment.phi_gain;
@@ -541,10 +750,12 @@ impl ConsciousnessBackend for SymthaeaBackend {
 
         let is_anomalous = is_drop || is_ambiguous || low_confidence;
 
-        // 9. Update node state
-        state.last_phi = phi_after;
-        if is_anomalous {
-            state.anomaly_count = state.anomaly_count.saturating_add(1);
+        // 9. Update node state (re-borrow now that other methods are done)
+        if let Some(state) = self.node_states.get_mut(&node_id) {
+            state.last_phi = phi_after;
+            if is_anomalous {
+                state.anomaly_count = state.anomaly_count.saturating_add(1);
+            }
         }
 
         // 10. Classify severity
@@ -560,15 +771,15 @@ impl ConsciousnessBackend for SymthaeaBackend {
         };
 
         // 11. Capture explicit causes for explainability.
-        let mut causes = Vec::new();
+        let mut causes: Vec<String> = Vec::new();
         if is_drop {
-            causes.push("phi_drop");
+            causes.push("phi_drop".into());
         }
         if is_ambiguous {
-            causes.push("gray_zone");
+            causes.push("gray_zone".into());
         }
         if low_confidence {
-            causes.push("low_confidence");
+            causes.push("low_confidence".into());
         }
 
         Ok(QualityScore {
@@ -841,12 +1052,12 @@ mod tests {
     }
 
     // ============================================================================
-    // HebbianAssociativeMemory tests
+    // VectorStore tests
     // ============================================================================
 
     #[test]
-    fn hebbian_memory_store_and_recall() {
-        let mut mem = HebbianAssociativeMemory::new();
+    fn vector_store_and_recall() {
+        let mut mem = VectorStore::new();
         let concept = vec![0.1f32; HDC_DIMENSION];
         mem.store("test_concept", concept.clone());
         let (id, _proto_vec, sim) = mem.recall_by_vector(&concept).expect("should recall stored concept");
@@ -855,15 +1066,15 @@ mod tests {
     }
 
     #[test]
-    fn hebbian_memory_recall_missing_returns_none() {
-        let mem = HebbianAssociativeMemory::new();
+    fn vector_store_recall_missing_returns_none() {
+        let mem = VectorStore::new();
         let query = vec![0.5f32; HDC_DIMENSION];
         assert!(mem.recall_by_vector(&query).is_none(), "Empty memory should return None");
     }
 
     #[test]
-    fn hebbian_memory_distinct_concepts_recalled_correctly() {
-        let mut mem = HebbianAssociativeMemory::new();
+    fn vector_store_distinct_concepts_recalled_correctly() {
+        let mut mem = VectorStore::new();
         let concept_a = vec![1.0f32; HDC_DIMENSION];
         let concept_b = vec![-1.0f32; HDC_DIMENSION];
         mem.store("a", concept_a.clone());
@@ -876,8 +1087,8 @@ mod tests {
     }
 
     #[test]
-    fn hebbian_memory_stats_count_concepts() {
-        let mut mem = HebbianAssociativeMemory::new();
+    fn vector_store_stats_count_concepts() {
+        let mut mem = VectorStore::new();
         assert_eq!(mem.stats().num_concepts, 0);
         mem.store("c1", vec![0.1f32; HDC_DIMENSION]);
         assert_eq!(mem.stats().num_concepts, 1);
@@ -1068,7 +1279,7 @@ mod tests {
             similarity: Some(0.2),
             is_ambiguous: true,
             severity: ConsciousAnomalySeverity::Severe,
-            causes: vec!["phi_drop", "low_confidence"],
+            causes: vec!["phi_drop".into(), "low_confidence".into()],
         };
 
         let pogq_bad = pogq_from_quality_score(&bad);

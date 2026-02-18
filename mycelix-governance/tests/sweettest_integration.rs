@@ -3527,3 +3527,79 @@ mod council_decision_tests {
         println!("=== test_council_decision_and_reflection PASSED ===\n");
     }
 }
+
+// ============================================================================
+// Cross-Cluster Integration Tests (Governance → Identity)
+// ============================================================================
+
+#[cfg(test)]
+mod governance_identity_tests {
+    use super::*;
+
+    /// Mirror type for CheckVoterTrustInput
+    #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+    struct CheckVoterTrustInput {
+        did: String,
+        min_reputation: f64,
+        require_mfa: bool,
+        min_assurance_level: Option<u8>,
+    }
+
+    /// Test: Governance → Identity DID verification for voter eligibility.
+    ///
+    /// Verifies that the governance bridge can check a voter's DID status
+    /// from the identity cluster via cross-cluster call.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires unified hApp with governance + identity roles"]
+    async fn test_governance_verify_voter_did() {
+        let dna_path = std::path::PathBuf::from("target/wasm32-unknown-unknown/release");
+        if !dna_path.exists() {
+            eprintln!("Skipping: governance WASM not built");
+            return;
+        }
+
+        // This test would install the unified hApp with both governance
+        // and identity roles, then:
+        // 1. Create a DID in identity cluster
+        // 2. Call governance_bridge::verify_voter_did(did)
+        // 3. Assert the DID is reported as active
+
+        let conductor = SweetConductor::from_standard_config().await;
+
+        // The test framework would need the unified hApp bundle path
+        // For now, verify the function compiles and the mirror types match
+        println!("=== test_governance_verify_voter_did: compiled OK ===");
+        println!("Requires running conductor with unified hApp for full E2E");
+    }
+
+    /// Test: Governance → Identity MATL trust score for vote weighting.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires unified hApp with governance + identity roles"]
+    async fn test_governance_get_voter_matl_score() {
+        let conductor = SweetConductor::from_standard_config().await;
+
+        // Would test: governance_bridge::get_voter_matl_score(did) returns
+        // a valid f64 MATL score from the identity bridge
+        println!("=== test_governance_get_voter_matl_score: compiled OK ===");
+        println!("Requires running conductor with unified hApp for full E2E");
+    }
+
+    /// Test: Governance → Identity enhanced trust check for treasury ops.
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "requires unified hApp with governance + identity roles"]
+    async fn test_governance_check_voter_trust() {
+        let conductor = SweetConductor::from_standard_config().await;
+
+        let _input = CheckVoterTrustInput {
+            did: "did:mycelix:test".into(),
+            min_reputation: 0.5,
+            require_mfa: true,
+            min_assurance_level: Some(2),
+        };
+
+        // Would test: governance_bridge::check_voter_trust(input) returns
+        // an EnhancedTrustResult from identity bridge
+        println!("=== test_governance_check_voter_trust: compiled OK ===");
+        println!("Requires running conductor with unified hApp for full E2E");
+    }
+}

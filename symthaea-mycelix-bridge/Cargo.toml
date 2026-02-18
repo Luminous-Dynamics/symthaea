@@ -12,5 +12,9 @@ categories = ["science", "cryptography"]
 [dependencies]
 symthaea-core = { path = "../symthaea/symthaea-core" }
 mycelix-sdk = { path = "../mycelix-workspace/sdk", default-features = false, features = ["standalone"] }
+mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core" }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
