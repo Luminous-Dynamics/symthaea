@@ -22,6 +22,8 @@ use symthaea_nix::mind::working_memory::{MemorySource, WorkingMemory};
 use symthaea_nix::mind::{JournalAnomalyDetector, NixWorldModel};
 use symthaea_nix::observe::journal::JournalObserver;
 use symthaea_nix::observe::SystemObserver;
+use symthaea_nix::support::health_check::{HealthAssessor, HealthStatus};
+use symthaea_nix::support::predictive::{PredictiveMonitor, SystemTelemetry};
 
 // DaemonConfig is now imported from symthaea_nix::ipc
 
@@ -33,6 +35,8 @@ struct DaemonState {
     episodic_memory: NixEpisodicMemory,
     working_memory: WorkingMemory,
     anomaly_detector: JournalAnomalyDetector,
+    health_assessor: HealthAssessor,
+    predictive_monitor: PredictiveMonitor,
     prev_snapshot: Option<SystemStateSnapshot>,
     prev_state_hv: Option<ContinuousHV>,
     observation_count: u64,
@@ -54,6 +58,8 @@ impl DaemonState {
             episodic_memory: NixEpisodicMemory::new(),
             working_memory: WorkingMemory::new(),
             anomaly_detector: JournalAnomalyDetector::new(),
+            health_assessor: HealthAssessor::default(),
+            predictive_monitor: PredictiveMonitor::with_defaults(),
             prev_snapshot: None,
             prev_state_hv: None,
             observation_count: 0,
@@ -124,6 +130,44 @@ impl DaemonState {
         if wm_pushes > 0 {
             self.graduate_evicted(free_energy);
         }
+
+        // Run health assessment
+        let hw = symthaea_nix::observe::hardware::HardwareObserver::probe().ok();
+        let (overall, _checks) = self.health_assessor.assess_all(&snapshot, hw.as_ref());
+        if overall == HealthStatus::Critical {
+            eprintln!(
+                "nix-mind-daemon: CRITICAL health detected, cycle {}",
+                self.observation_count
+            );
+        }
+
+        // Feed predictive monitor
+        let telemetry = SystemTelemetry {
+            disk_used_pct: hw.as_ref().map_or(0.0, |h| {
+                h.disks.first().map_or(0.0, |d| {
+                    if d.total_bytes > 0 {
+                        d.used_bytes as f64 / d.total_bytes as f64 * 100.0
+                    } else {
+                        0.0
+                    }
+                })
+            }),
+            memory_used_pct: hw.as_ref().map_or(0.0, |h| {
+                if h.memory_total_mb > 0 {
+                    let used = h.memory_total_mb.saturating_sub(h.memory_available_mb);
+                    used as f64 / h.memory_total_mb as f64 * 100.0
+                } else {
+                    0.0
+                }
+            }),
+            store_path_count: snapshot.store_path_count.unwrap_or(0) as u64,
+            failed_unit_count: snapshot
+                .services
+                .iter()
+                .filter(|(_, s)| *s == ServiceState::Failed)
+                .count() as u32,
+        };
+        self.predictive_monitor.ingest(telemetry);
 
         self.prev_snapshot = Some(snapshot);
         self.prev_state_hv = Some(state_hv);

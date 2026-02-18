@@ -158,6 +158,45 @@ pub enum Command {
         #[arg(value_enum)]
         shell: clap_complete::Shell,
     },
+
+    /// Run health assessment on the system.
+    Health {
+        /// Output as JSON.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Predict future system state using LTC temporal model.
+    Predict {
+        /// Time horizons to predict (hours).
+        #[arg(long, default_value = "1,6,24,168")]
+        horizons: String,
+    },
+
+    /// Start post-rebuild watchdog monitor.
+    Watch {
+        /// Monitoring timeout in seconds.
+        #[arg(long, default_value = "300")]
+        timeout: u64,
+        /// Check interval in seconds.
+        #[arg(long, default_value = "10")]
+        interval: u64,
+    },
+
+    /// Privacy-scrub a log file or stdin.
+    Scrub {
+        /// File to scrub (reads stdin if omitted).
+        file: Option<String>,
+    },
+
+    /// Search NixOS knowledge base for solutions.
+    Knowledge {
+        /// Search query (error message or description).
+        query: String,
+        /// Maximum results to show.
+        #[arg(short = 'n', long, default_value = "5")]
+        limit: usize,
+    },
 }
 
 /// Rebuild modes.
@@ -330,5 +369,55 @@ mod tests {
     fn test_output_format_json() {
         let cli = Cli::parse_from(["nix-mind", "--format", "json", "search", "vim"]);
         assert_eq!(cli.format, OutputFormat::Json);
+    }
+
+    #[test]
+    fn test_parse_health() {
+        let cli = Cli::parse_from(["nix-mind", "health"]);
+        assert!(matches!(cli.command, Some(Command::Health { json: false })));
+
+        let cli = Cli::parse_from(["nix-mind", "health", "--json"]);
+        assert!(matches!(cli.command, Some(Command::Health { json: true })));
+    }
+
+    #[test]
+    fn test_parse_predict() {
+        let cli = Cli::parse_from(["nix-mind", "predict"]);
+        assert!(matches!(cli.command, Some(Command::Predict { .. })));
+    }
+
+    #[test]
+    fn test_parse_watch() {
+        let cli = Cli::parse_from(["nix-mind", "watch", "--timeout", "60", "--interval", "5"]);
+        if let Some(Command::Watch {
+            timeout, interval, ..
+        }) = cli.command
+        {
+            assert_eq!(timeout, 60);
+            assert_eq!(interval, 5);
+        } else {
+            panic!("Expected Watch command");
+        }
+    }
+
+    #[test]
+    fn test_parse_scrub() {
+        let cli = Cli::parse_from(["nix-mind", "scrub", "/var/log/syslog"]);
+        if let Some(Command::Scrub { file }) = cli.command {
+            assert_eq!(file, Some("/var/log/syslog".to_string()));
+        } else {
+            panic!("Expected Scrub command");
+        }
+    }
+
+    #[test]
+    fn test_parse_knowledge() {
+        let cli = Cli::parse_from(["nix-mind", "knowledge", "hash mismatch"]);
+        if let Some(Command::Knowledge { query, limit }) = cli.command {
+            assert_eq!(query, "hash mismatch");
+            assert_eq!(limit, 5);
+        } else {
+            panic!("Expected Knowledge command");
+        }
     }
 }

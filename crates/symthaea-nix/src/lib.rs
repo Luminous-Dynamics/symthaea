@@ -44,6 +44,9 @@ pub mod action;
 /// Layer 6: Integration with full Symthaea brain
 pub mod plugin;
 
+/// Proactive NixOS support: health checks, watchdog, predictions, knowledge base
+pub mod support;
+
 /// Daemon ↔ TUI inter-process communication
 pub mod ipc;
 
