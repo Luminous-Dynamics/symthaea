@@ -172,10 +172,14 @@ async fn main() {
     let domain_memory = ContinuousHV::random(dim, 300);
 
     for i in 0..40u64 {
-        // Each agent focuses on its specialty
-        alice.perceive(domain_perception.clone()).await;
-        bob.perceive(domain_reasoning.clone()).await;
-        charlie.perceive(domain_memory.clone()).await;
+        // Each agent focuses on its specialty (with slight per-tick variation
+        // to keep working memory diverse enough for consciousness > 0)
+        let noise_a = ContinuousHV::random(dim, 10000 + i);
+        let noise_b = ContinuousHV::random(dim, 20000 + i);
+        let noise_c = ContinuousHV::random(dim, 30000 + i);
+        alice.perceive(ContinuousHV::bundle(&[&domain_perception, &domain_perception, &domain_perception, &noise_a])).await;
+        bob.perceive(ContinuousHV::bundle(&[&domain_reasoning, &domain_reasoning, &domain_reasoning, &noise_b])).await;
+        charlie.perceive(ContinuousHV::bundle(&[&domain_memory, &domain_memory, &domain_memory, &noise_c])).await;
 
         alice.tick().await;
         bob.tick().await;
@@ -215,10 +219,13 @@ async fn main() {
     let stable_signal = ContinuousHV::random(dim, 42000);
 
     // Sub-phase A: establish baseline (10 ticks)
-    for _i in 0..10u64 {
-        alice.perceive(stable_signal.clone()).await;
-        bob.perceive(stable_signal.clone()).await;
-        charlie.perceive(stable_signal.clone()).await;
+    for i in 0..10u64 {
+        // Stable signal with slight per-tick variation (75% stable, 25% noise)
+        let noise = ContinuousHV::random(dim, 40000 + i);
+        let varied = ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
+        alice.perceive(varied.clone()).await;
+        bob.perceive(varied.clone()).await;
+        charlie.perceive(varied).await;
 
         alice.tick().await;
         bob.tick().await;
@@ -236,9 +243,11 @@ async fn main() {
 
     // Sub-phase B: disrupt Bob (10 ticks)
     for i in 0..10u64 {
-        alice.perceive(stable_signal.clone()).await;
-        bob.perceive(ContinuousHV::random(dim, 99000 + i)).await;
-        charlie.perceive(stable_signal.clone()).await;
+        let noise = ContinuousHV::random(dim, 50000 + i);
+        let varied = ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
+        alice.perceive(varied.clone()).await;
+        bob.perceive(ContinuousHV::random(dim, 99000 + i)).await; // Bob gets pure noise
+        charlie.perceive(varied).await;
 
         alice.tick().await;
         bob.tick().await;
@@ -256,9 +265,11 @@ async fn main() {
 
     // Sub-phase C: recovery (10 ticks — Bob returns to shared signal)
     for i in 0..10u64 {
-        alice.perceive(stable_signal.clone()).await;
-        bob.perceive(stable_signal.clone()).await;
-        charlie.perceive(stable_signal.clone()).await;
+        let noise = ContinuousHV::random(dim, 60000 + i);
+        let varied = ContinuousHV::bundle(&[&stable_signal, &stable_signal, &stable_signal, &noise]);
+        alice.perceive(varied.clone()).await;
+        bob.perceive(varied.clone()).await;
+        charlie.perceive(varied).await;
 
         alice.tick().await;
         bob.tick().await;

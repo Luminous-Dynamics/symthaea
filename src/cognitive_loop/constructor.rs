@@ -244,6 +244,9 @@ impl CognitiveLoopService {
             None
         };
 
+        // Capture attestation buffer capacity before config is moved into struct
+        let attestation_buf_cap = config.attestation_buffer_capacity.min(256);
+
         // Build optional dream engine for counterfactual learning
         let dream_engine = if config.enable_dream_replay {
             Some(crate::consciousness::dream::DreamEngine::with_defaults())
@@ -284,6 +287,8 @@ impl CognitiveLoopService {
         } else {
             None
         };
+
+        let enable_user_state = config.enable_user_state_inference;
 
         Ok(Self {
             config,
@@ -413,7 +418,13 @@ impl CognitiveLoopService {
             external_reward: 0.0,
             social_trust: 0.5,
             social_cooperation_rate: 0.0,
+            user_state: if enable_user_state {
+                Some(crate::user_state_inference::UserStateInference::new())
+            } else {
+                None
+            },
             virtual_body,
+            phi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             prev_body_phi_modulation: 1.0,
             prev_embodied_phi_modulation: 1.0,
             consecutive_low_error: 0,

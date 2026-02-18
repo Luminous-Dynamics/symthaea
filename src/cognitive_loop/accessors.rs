@@ -281,6 +281,11 @@ impl CognitiveLoopService {
         self.social_cooperation_rate = cooperation_rate.clamp(0.0, 1.0);
     }
 
+    /// Get the current inferred user state (if user state inference is enabled).
+    pub fn user_state(&self) -> Option<&crate::user_state_inference::UserState> {
+        self.user_state.as_ref().map(|usi| usi.state())
+    }
+
     // ========== Flow State Methods ==========
 
     /// Check if currently in flow state
@@ -841,5 +846,25 @@ impl CognitiveLoopService {
     /// Get the prediction dimension (CfC neurons)
     pub fn prediction_dim(&self) -> usize {
         self.config.cfc_config.num_neurons
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // PHI ATTESTATION ACCESSORS
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Get the number of buffered PhiAttestationRecords.
+    pub fn phi_attestation_count(&self) -> usize {
+        self.phi_attestation_buffer.len()
+    }
+
+    /// Drain all buffered PhiAttestationRecords for submission to the governance bridge.
+    /// Returns the records and clears the buffer.
+    pub fn drain_phi_attestations(&mut self) -> Vec<super::PhiAttestationRecord> {
+        self.phi_attestation_buffer.drain(..).collect()
+    }
+
+    /// Peek at the most recent PhiAttestationRecord without consuming it.
+    pub fn latest_phi_attestation(&self) -> Option<&super::PhiAttestationRecord> {
+        self.phi_attestation_buffer.back()
     }
 }

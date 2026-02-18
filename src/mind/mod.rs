@@ -1011,4 +1011,61 @@ mod tests {
         // Suppress unused variable warning
         drop(actor);
     }
+
+    // ====================================================================
+    // Current Thought EMA Tests
+    // ====================================================================
+
+    #[test]
+    fn test_current_thought_nonzero_after_perception() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // Before any perception, current_thought is zero
+        assert!(
+            mind.state.current_thought.norm() < f32::EPSILON,
+            "current_thought should start as zero"
+        );
+
+        mind.perceive(ContinuousHV::random(512, 42));
+        mind.tick();
+
+        // After perception, current_thought should be non-zero
+        assert!(
+            mind.state.current_thought.norm() > 0.1,
+            "current_thought should be non-zero after perception: norm={}",
+            mind.state.current_thought.norm()
+        );
+    }
+
+    #[test]
+    fn test_current_thought_evolves_with_ema() {
+        let mut mind = ContinuousMind::default();
+        mind.activate();
+
+        // First perception: adopt directly
+        mind.perceive(ContinuousHV::random(512, 100));
+        mind.tick();
+        let after_first = mind.state.current_thought.clone();
+
+        // Second perception: EMA blend
+        mind.perceive(ContinuousHV::random(512, 200));
+        mind.tick();
+        let after_second = mind.state.current_thought.clone();
+
+        // Thought should have changed
+        let sim = after_first.similarity(&after_second);
+        assert!(
+            sim < 0.99,
+            "current_thought should evolve after new perception: sim={}",
+            sim
+        );
+
+        // But should retain some of the first thought (70% weight)
+        assert!(
+            sim > 0.1,
+            "current_thought should retain prior context: sim={}",
+            sim
+        );
+    }
 }

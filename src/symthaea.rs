@@ -1113,6 +1113,24 @@ impl Symthaea {
         &self.mind
     }
 
+    /// Extract current social signals (trust, cooperation_rate) from Mind's SocialCoherence.
+    /// Returns (0.5, 0.0) if social coherence is disabled.
+    ///
+    /// Consumers should call this after `process()` and inject into the cognitive loop:
+    /// ```ignore
+    /// let (trust, coop) = symthaea.social_signals();
+    /// loop_service.set_social_signals(trust, coop);
+    /// ```
+    pub fn social_signals(&self) -> (f32, f32) {
+        self.mind
+            .social_coherence()
+            .map(|sc| {
+                let stats = sc.stats();
+                (stats.avg_trust, stats.cooperation_rate)
+            })
+            .unwrap_or((0.5, 0.0))
+    }
+
     // ========================================================================
     // Calibration (Brier Score Integration)
     // ========================================================================

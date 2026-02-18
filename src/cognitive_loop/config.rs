@@ -250,6 +250,27 @@ pub struct CognitiveLoopConfig {
     /// moral score. Positive affect broadens exploration (Fredrickson 2001).
     /// Science: Damasio (1994) — somatic marker hypothesis
     pub enable_affective_bridge: bool,
+
+    /// Enable user state inference for adaptive response generation.
+    /// When true, the cognitive loop infers user context (cognitive load, frustration,
+    /// engagement) from input text each cycle. Downstream resonant_speech uses these
+    /// signals for empathic response formatting.
+    pub enable_user_state_inference: bool,
+
+    /// Enable PhiAttestation generation for governance bridge.
+    /// When true, the cognitive loop buffers PhiAttestationRecords after each cycle
+    /// for the personal cluster to sign and submit to governance as authenticated
+    /// consciousness data. Without this, governance falls back to reputation-only voting.
+    pub enable_phi_attestation: bool,
+
+    /// Agent DID for attestation signing (e.g., "did:key:z6Mk...").
+    /// Required when `enable_phi_attestation` is true. If None, attestation generation
+    /// is silently skipped even when enabled.
+    pub agent_did: Option<String>,
+
+    /// Maximum PhiAttestationRecords to buffer before evicting oldest.
+    /// The personal cluster should drain the buffer periodically.
+    pub attestation_buffer_capacity: usize,
 }
 
 impl Default for CognitiveLoopConfig {
@@ -293,6 +314,10 @@ impl Default for CognitiveLoopConfig {
             enable_predictive_processing: false,
             enable_cross_modal_binding: false,
             enable_affective_bridge: false,
+            enable_user_state_inference: false,
+            enable_phi_attestation: false,
+            agent_did: None,
+            attestation_buffer_capacity: 64,
         }
     }
 }
