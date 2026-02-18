@@ -78,6 +78,12 @@
   // Vote breakdown for visualization
   let voteBreakdown: { type: ValidationVoteType; count: number; percentage: number }[] = [];
 
+  // Phi coverage — fraction of votes backed by verified consciousness data
+  // Will be sourced from governance PhiWeightedTally when bridge is wired
+  let phiCoverage = 0;
+  let phiEnhancedCount = 0;
+  let reputationOnlyCount = 0;
+
   // ============================================================================
   // COMPUTED
   // ============================================================================
@@ -110,8 +116,18 @@
         count: counts.get(type) || 0,
         percentage: ((counts.get(type) || 0) / votes.length) * 100,
       }));
+
+      // Simulate phi coverage from voter weights:
+      // Voters with weight >= 0.7 are treated as having attested Phi
+      // TODO: Replace with real PhiWeightedTally.phiCoverage from governance bridge
+      phiEnhancedCount = votes.filter(v => v.voter_weight >= 0.7).length;
+      reputationOnlyCount = votes.length - phiEnhancedCount;
+      phiCoverage = phiEnhancedCount / votes.length;
     } else {
       voteBreakdown = [];
+      phiCoverage = 0;
+      phiEnhancedCount = 0;
+      reputationOnlyCount = 0;
     }
   }
 
@@ -594,6 +610,31 @@
             <span class="validator-count">{consensus.validator_count} validators</span>
           </div>
         </div>
+
+        <!-- Phi Coverage indicator -->
+        {#if votes.length > 0 && !showTimeline}
+          <div class="phi-coverage">
+            <div class="phi-coverage-header">
+              <span class="phi-coverage-label">Consciousness Coverage</span>
+              <span class="phi-coverage-value" class:high={phiCoverage >= 0.7} class:medium={phiCoverage >= 0.4 && phiCoverage < 0.7} class:low={phiCoverage < 0.4}>
+                {Math.round(phiCoverage * 100)}%
+              </span>
+            </div>
+            <div class="phi-coverage-bar">
+              <div
+                class="phi-coverage-fill"
+                class:high={phiCoverage >= 0.7}
+                class:medium={phiCoverage >= 0.4 && phiCoverage < 0.7}
+                class:low={phiCoverage < 0.4}
+                style="width: {phiCoverage * 100}%"
+              ></div>
+            </div>
+            <div class="phi-coverage-detail">
+              <span>{phiEnhancedCount} attested</span>
+              <span>{reputationOnlyCount} reputation-only</span>
+            </div>
+          </div>
+        {/if}
 
         <!-- Vote breakdown chart -->
         {#if voteBreakdown.length > 0 && !showTimeline}
@@ -1107,6 +1148,61 @@
   .validator-count {
     font-size: 12px;
     color: var(--text-muted, #94a3b8);
+  }
+
+  /* Phi coverage */
+  .phi-coverage {
+    padding: 10px 0;
+    border-top: 1px solid var(--border, #334155);
+    margin-bottom: 4px;
+  }
+
+  .phi-coverage-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+
+  .phi-coverage-label {
+    font-size: 11px;
+    color: var(--text-muted, #94a3b8);
+    font-weight: 500;
+  }
+
+  .phi-coverage-value {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .phi-coverage-value.high { color: #22c55e; }
+  .phi-coverage-value.medium { color: #f59e0b; }
+  .phi-coverage-value.low { color: #94a3b8; }
+
+  .phi-coverage-bar {
+    height: 4px;
+    background: var(--bg-secondary, #1e293b);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+
+  .phi-coverage-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.3s ease;
+    background: #94a3b8;
+  }
+
+  .phi-coverage-fill.high { background: #22c55e; }
+  .phi-coverage-fill.medium { background: #f59e0b; }
+
+  .phi-coverage-detail {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--text-muted, #94a3b8);
+    opacity: 0.8;
   }
 
   /* Vote breakdown */
