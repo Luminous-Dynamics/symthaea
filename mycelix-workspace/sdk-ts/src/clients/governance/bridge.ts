@@ -7,21 +7,25 @@
  * @module @mycelix/sdk/clients/governance/bridge
  */
 
-import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 import { ZomeClient, type ZomeClientConfig } from '../../core/zome-client';
+
 import type {
   GovernanceBridgeEvent,
   GovernanceBridgeEventType,
   GovernanceQuery,
   CrossHappProposal,
   BroadcastEventInput,
+  BridgeProposalType,
   ParticipationScore,
   RecordSnapshotInput,
+  RecordPhiAttestationInput,
   VerifyGateInput,
   GateVerificationResult,
+  GateVerificationResultV2,
   AssessAlignmentInput,
   GetAgentSnapshotsInput,
   PhiThresholds,
+  PhiProvenance,
   CalculateWeightInput,
   HolisticVotingWeight,
   CastWeightedVoteInput,
@@ -36,6 +40,7 @@ import type {
 } from './types';
 // GovernanceError removed (unused)
 import type { ActionHash } from '../../generated/common';
+import type { AppClient, Record as HolochainRecord } from '@holochain/client';
 
 /**
  * Configuration for the Bridge client
@@ -573,36 +578,77 @@ export class BridgeClient extends ZomeClient {
    */
   async recordConsciousnessSnapshot(input: RecordSnapshotInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('record_consciousness_snapshot', {
-      agent_did: input.agentDid,
-      phi_score: input.phiScore,
-      coherence_score: input.coherenceScore,
-      integration_level: input.integrationLevel,
-      harmonic_alignment: input.harmonicAlignment,
-      metadata: input.metadata,
+      phi: input.phi,
+      meta_awareness: input.metaAwareness,
+      self_model_accuracy: input.selfModelAccuracy,
+      coherence: input.coherence,
+      affective_valence: input.affectiveValence,
+      care_activation: input.careActivation,
+      source: input.source ?? null,
     });
   }
 
   /**
-   * Verify consciousness gate for a governance action
+   * Verify consciousness gate for a governance action (legacy v1)
    *
    * @param input - Gate verification parameters
    * @returns Gate verification result
    */
   async verifyConsciousnessGate(input: VerifyGateInput): Promise<GateVerificationResult> {
     const result = await this.callZome<any>('verify_consciousness_gate', {
-      agent_did: input.agentDid,
-      required_phi: input.requiredPhi,
-      required_coherence: input.requiredCoherence,
       action_type: input.actionType,
+      action_id: input.actionId ?? null,
     });
     return {
       passed: result.passed,
-      agentDid: result.agent_did,
-      currentPhi: result.current_phi,
+      phi: result.phi,
       requiredPhi: result.required_phi,
-      currentCoherence: result.current_coherence,
-      requiredCoherence: result.required_coherence,
-      reason: result.reason,
+      actionType: result.action_type,
+      failureReason: result.failure_reason ?? undefined,
+      gateId: result.gate_id,
+    };
+  }
+
+  /**
+   * Record an authenticated Phi attestation (preferred over consciousness snapshot)
+   *
+   * Creates a signed attestation linking an agent's Symthaea Phi value
+   * to their governance identity. Preferred over `recordConsciousnessSnapshot`
+   * because attestations include cryptographic signatures.
+   *
+   * @param input - Attestation parameters (phi, cycleId, signature)
+   * @returns The attestation record
+   */
+  async recordPhiAttestation(input: RecordPhiAttestationInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('record_phi_attestation', {
+      phi: input.phi,
+      cycle_id: input.cycleId,
+      signature: input.signature,
+    });
+  }
+
+  /**
+   * Verify consciousness gate with provenance tracking (v2)
+   *
+   * Returns the Phi value along with how it was obtained (Attested, Snapshot,
+   * or Unavailable). Preferred over `verifyConsciousnessGate` because it
+   * honestly reports when no real Phi data is available.
+   *
+   * @param input - Gate verification parameters
+   * @returns Gate verification result with provenance
+   */
+  async verifyConsciousnessGateV2(input: VerifyGateInput): Promise<GateVerificationResultV2> {
+    const result = await this.callZome<any>('verify_consciousness_gate_v2', {
+      action_type: input.actionType,
+      action_id: input.actionId ?? null,
+    });
+    return {
+      passed: result.passed,
+      phi: result.phi ?? null,
+      requiredPhi: result.required_phi,
+      provenance: result.provenance as PhiProvenance,
+      actionType: result.action_type,
+      failureReason: result.failure_reason ?? undefined,
     };
   }
 
@@ -614,9 +660,8 @@ export class BridgeClient extends ZomeClient {
    */
   async assessValueAlignment(input: AssessAlignmentInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('assess_value_alignment', {
-      agent_did: input.agentDid,
       proposal_id: input.proposalId,
-      harmony_weights: input.harmonyWeights,
+      proposal_content: input.proposalContent,
     });
   }
 
@@ -659,7 +704,13 @@ export class BridgeClient extends ZomeClient {
    * @returns Phi thresholds for each proposal tier
    */
   async getPhiThresholds(): Promise<PhiThresholds> {
-    return this.callZome<PhiThresholds>('get_phi_thresholds', null);
+    const result = await this.callZome<any>('get_phi_thresholds', null);
+    return {
+      basic: result.basic,
+      proposalSubmission: result.proposal_submission,
+      voting: result.voting,
+      constitutional: result.constitutional,
+    };
   }
 
   // ============================================================================
@@ -685,16 +736,19 @@ export class BridgeClient extends ZomeClient {
    */
   async calculateHolisticVoteWeight(input: CalculateWeightInput): Promise<HolisticVotingWeight> {
     const result = await this.callZome<any>('calculate_holistic_vote_weight', {
-      agent_did: input.agentDid,
-      proposal_type: input.proposalType,
+      harmonic_alignment: input.harmonicAlignment ?? null,
     });
     return {
-      agentDid: result.agent_did,
-      baseReputation: result.base_reputation,
-      phiMultiplier: result.phi_multiplier,
+      reputation: result.reputation,
+      reputationSquared: result.reputation_squared,
+      phi: result.phi,
+      consciousnessMultiplier: result.consciousness_multiplier,
       harmonicAlignment: result.harmonic_alignment,
+      harmonicBonus: result.harmonic_bonus,
       finalWeight: result.final_weight,
-      components: result.components,
+      wasCapped: result.was_capped,
+      uncappedWeight: result.uncapped_weight,
+      calculationBreakdown: result.calculation_breakdown,
     };
   }
 
@@ -707,25 +761,20 @@ export class BridgeClient extends ZomeClient {
   async castWeightedVote(input: CastWeightedVoteInput): Promise<WeightedVoteResult> {
     const result = await this.callZome<any>('cast_weighted_vote', {
       proposal_id: input.proposalId,
-      round_id: input.roundId,
-      choice: input.choice,
-      confidence: input.confidence,
-      rationale: input.rationale,
+      proposal_type: input.proposalType,
+      round: input.round,
+      decision: input.decision,
+      harmonic_alignment: input.harmonicAlignment ?? null,
+      reason: input.reason ?? null,
     });
     return {
-      accepted: result.accepted,
-      effectiveWeight: result.effective_weight,
-      gateResult: {
-        passed: result.gate_result.passed,
-        agentDid: result.gate_result.agent_did,
-        currentPhi: result.gate_result.current_phi,
-        requiredPhi: result.gate_result.required_phi,
-        currentCoherence: result.gate_result.current_coherence,
-        requiredCoherence: result.gate_result.required_coherence,
-        reason: result.gate_result.reason,
-      },
-      voteHash: result.vote_hash,
-      reason: result.reason,
+      voteId: result.vote_id,
+      weight: result.weight,
+      weightBreakdown: result.weight_breakdown,
+      decision: result.decision,
+      phiAtVote: result.phi_at_vote,
+      proposalType: result.proposal_type,
+      thresholdRequired: result.threshold_required,
     };
   }
 
@@ -735,14 +784,14 @@ export class BridgeClient extends ZomeClient {
    * @param proposalType - Proposal type
    * @returns Adaptive threshold
    */
-  async getAdaptiveThreshold(proposalType: string): Promise<AdaptiveThreshold> {
+  async getAdaptiveThreshold(proposalType: BridgeProposalType): Promise<AdaptiveThreshold> {
     const result = await this.callZome<any>('get_adaptive_threshold', proposalType);
     return {
-      proposalType: result.proposal_type,
       baseThreshold: result.base_threshold,
-      adjustedThreshold: result.adjusted_threshold,
-      participationFactor: result.participation_factor,
-      historicalApproval: result.historical_approval,
+      minVoterPhi: result.min_voter_phi,
+      minParticipation: result.min_participation,
+      quorum: result.quorum,
+      maxExtensionSecs: result.max_extension_secs,
     };
   }
 
@@ -755,13 +804,21 @@ export class BridgeClient extends ZomeClient {
     const result = await this.callZome<any>('get_participant_status', null);
     return {
       agentDid: result.agent_did,
-      registered: result.registered,
-      reputation: result.reputation,
+      isActive: result.is_active,
+      baseReputation: result.base_reputation,
       effectiveReputation: result.effective_reputation,
-      participationStreak: result.participation_streak,
-      cooldownRemaining: result.cooldown_remaining,
-      totalVotes: result.total_votes,
+      streakCount: result.streak_count,
+      streakBonus: result.streak_bonus,
+      inCooldown: result.in_cooldown,
+      currentPhi: result.current_phi,
+      federatedScore: result.federated_score,
       roundsParticipated: result.rounds_participated,
+      successfulVotes: result.successful_votes,
+      successRate: result.success_rate,
+      slashingEvents: result.slashing_events,
+      canVoteStandard: result.can_vote_standard,
+      canVoteEmergency: result.can_vote_emergency,
+      canVoteConstitutional: result.can_vote_constitutional,
     };
   }
 
@@ -773,10 +830,21 @@ export class BridgeClient extends ZomeClient {
    */
   async updateFederatedReputation(input: UpdateFederatedReputationInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('update_federated_reputation', {
-      agent_did: input.agentDid,
-      source_happ: input.sourceHapp,
-      reputation_delta: input.reputationDelta,
-      evidence: input.evidence,
+      identity_verification: input.identityVerification ?? null,
+      credential_count: input.credentialCount ?? null,
+      credential_quality: input.credentialQuality ?? null,
+      epistemic_contributions: input.epistemicContributions ?? null,
+      factcheck_accuracy: input.factcheckAccuracy ?? null,
+      dark_spots_resolved: input.darkSpotsResolved ?? null,
+      stake_weight: input.stakeWeight ?? null,
+      payment_reliability: input.paymentReliability ?? null,
+      escrow_completion_rate: input.escrowCompletionRate ?? null,
+      pogq_score: input.pogqScore ?? null,
+      fl_contributions: input.flContributions ?? null,
+      byzantine_clean_rate: input.byzantineCleanRate ?? null,
+      voting_participation: input.votingParticipation ?? null,
+      proposal_success_rate: input.proposalSuccessRate ?? null,
+      consensus_alignment: input.consensusAlignment ?? null,
     });
   }
 
@@ -789,7 +857,7 @@ export class BridgeClient extends ZomeClient {
   async getRoundVotes(input: GetRoundVotesInput): Promise<HolochainRecord[]> {
     return this.callZome<HolochainRecord[]>('get_round_votes', {
       proposal_id: input.proposalId,
-      round_id: input.roundId,
+      round: input.round,
     });
   }
 
@@ -802,20 +870,24 @@ export class BridgeClient extends ZomeClient {
   async calculateRoundResult(input: CalculateRoundResultInput): Promise<RoundResult> {
     const result = await this.callZome<any>('calculate_round_result', {
       proposal_id: input.proposalId,
-      round_id: input.roundId,
-      quorum_threshold: input.quorumThreshold,
+      round: input.round,
+      proposal_type: input.proposalType,
+      eligible_voters: input.eligibleVoters,
     });
     return {
       proposalId: result.proposal_id,
-      roundId: result.round_id,
-      votesFor: result.votes_for,
-      votesAgainst: result.votes_against,
-      abstentions: result.abstentions,
+      round: result.round,
+      proposalType: result.proposal_type,
       totalWeight: result.total_weight,
-      voterCount: result.voter_count,
+      weightedApprovals: result.weighted_approvals,
+      weightedRejections: result.weighted_rejections,
+      voteCount: result.vote_count,
+      requiredThreshold: result.required_threshold,
+      approvalPercentage: result.approval_percentage,
       quorumMet: result.quorum_met,
-      approved: result.approved,
-      averageConfidence: result.average_confidence,
+      consensusReached: result.consensus_reached,
+      rejected: result.rejected,
+      result: result.result,
     };
   }
 

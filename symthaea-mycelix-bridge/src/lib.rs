@@ -585,6 +585,85 @@ impl ConsciousnessBackend for SymthaeaBackend {
     }
 }
 
+// ============================================================================
+// PHI ATTESTATION GENERATION
+// ============================================================================
+
+/// Data for an authenticated Phi attestation, ready to be signed and
+/// submitted to the governance bridge via `record_phi_attestation()`.
+///
+/// The `signature` field must be filled by the caller using their agent's
+/// signing key (e.g., Holochain agent key or Ed25519 key).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhiAttestationData {
+    /// Agent's DID identifier.
+    pub agent_did: String,
+    /// Phi value from Symthaea's PhiEngine, in [0.0, 1.0].
+    pub phi: f64,
+    /// Symthaea cognitive cycle number that produced this Phi.
+    pub cycle_id: u64,
+    /// Unix timestamp (microseconds) when the Phi was captured.
+    pub captured_at_us: u64,
+    /// Signature over the canonical sign message (filled by caller).
+    pub signature: Vec<u8>,
+    /// Source system identifier (always "symthaea").
+    pub source: String,
+}
+
+impl PhiAttestationData {
+    /// Compute the canonical message bytes to sign for this attestation.
+    ///
+    /// Format: `"symthaea-phi-attestation:v1:{agent_did}:{phi}:{cycle_id}:{captured_at_us}"`
+    ///
+    /// The caller should sign these bytes with their agent key and store the
+    /// result in the `signature` field before submitting to governance.
+    pub fn sign_message(&self) -> Vec<u8> {
+        format!(
+            "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+            self.agent_did, self.phi, self.cycle_id, self.captured_at_us,
+        )
+        .into_bytes()
+    }
+}
+
+/// Create an unsigned `PhiAttestationData` from a `QualityScore`.
+///
+/// The `phi` value is taken from `quality.phi.phi_after` (the post-update Phi).
+/// The caller must:
+/// 1. Call `.sign_message()` to get the canonical bytes
+/// 2. Sign those bytes with their agent key
+/// 3. Set `attestation.signature = signature_bytes`
+/// 4. Submit to governance via `record_phi_attestation()`
+///
+/// # Example
+///
+/// ```ignore
+/// let quality = backend.assess_update(&snapshot, &gradient)?;
+/// let mut attestation = create_phi_attestation_data(&quality, "did:key:z6Mk...", 42);
+/// let message = attestation.sign_message();
+/// attestation.signature = my_sign_fn(&message);
+/// // Submit to Holochain governance bridge...
+/// ```
+pub fn create_phi_attestation_data(
+    quality: &QualityScore,
+    agent_did: &str,
+    cycle_id: u64,
+) -> PhiAttestationData {
+    let now_us = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_micros() as u64)
+        .unwrap_or(0);
+
+    PhiAttestationData {
+        agent_did: agent_did.to_string(),
+        phi: (quality.phi.phi_after as f64).clamp(0.0, 1.0),
+        cycle_id,
+        captured_at_us: now_us,
+        signature: Vec::new(), // Caller must fill this
+        source: "symthaea".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -857,6 +936,95 @@ mod tests {
         let c1 = backend.classify_from_phi(0.5, &hg);
         let c2 = backend.classify_from_phi(0.5, &hg);
         assert_eq!(format!("{:?}", c1), format!("{:?}", c2));
+    }
+
+    // ============================================================================
+    // PhiAttestationData tests
+    // ============================================================================
+
+    #[test]
+    fn test_create_phi_attestation_data_from_quality() {
+        let quality = QualityScore {
+            accuracy: 0.9,
+            loss: 0.1,
+            phi: PhiAssessment::new(0.4, 0.7),
+            epistemic_confidence: 0.85,
+            is_anomalous: false,
+            similarity: None,
+            is_ambiguous: false,
+            severity: ConsciousAnomalySeverity::None,
+            causes: Vec::new(),
+        };
+
+        let attestation = create_phi_attestation_data(&quality, "did:key:z6MkTest", 42);
+
+        assert_eq!(attestation.agent_did, "did:key:z6MkTest");
+        assert!((attestation.phi - 0.7).abs() < 1e-6, "phi should be phi_after");
+        assert_eq!(attestation.cycle_id, 42);
+        assert_eq!(attestation.source, "symthaea");
+        assert!(attestation.signature.is_empty(), "signature should be empty until caller signs");
+        assert!(attestation.captured_at_us > 0, "timestamp should be populated");
+    }
+
+    #[test]
+    fn test_attestation_phi_clamped_to_unit() {
+        let quality = QualityScore {
+            accuracy: 0.9,
+            loss: 0.1,
+            phi: PhiAssessment::new(0.0, 1.5), // phi_after > 1.0
+            epistemic_confidence: 0.85,
+            is_anomalous: false,
+            similarity: None,
+            is_ambiguous: false,
+            severity: ConsciousAnomalySeverity::None,
+            causes: Vec::new(),
+        };
+
+        let attestation = create_phi_attestation_data(&quality, "did:key:z6MkTest", 1);
+        assert!((attestation.phi - 1.0).abs() < 1e-6, "phi should be clamped to 1.0");
+    }
+
+    #[test]
+    fn test_attestation_sign_message_is_deterministic() {
+        let mut attestation = PhiAttestationData {
+            agent_did: "did:key:z6MkABC".to_string(),
+            phi: 0.654321,
+            cycle_id: 100,
+            captured_at_us: 1708000000_000000,
+            signature: Vec::new(),
+            source: "symthaea".to_string(),
+        };
+
+        let msg1 = attestation.sign_message();
+        let msg2 = attestation.sign_message();
+        assert_eq!(msg1, msg2, "Sign message should be deterministic");
+
+        let msg_str = String::from_utf8(msg1).unwrap();
+        assert!(msg_str.starts_with("symthaea-phi-attestation:v1:did:key:z6MkABC:"));
+        assert!(msg_str.contains(":100:"));
+
+        // Changing phi changes the message
+        attestation.phi = 0.999;
+        let msg3 = attestation.sign_message();
+        assert_ne!(msg2, msg3);
+    }
+
+    #[test]
+    fn test_attestation_data_serializable() {
+        let attestation = PhiAttestationData {
+            agent_did: "did:key:z6MkTest".to_string(),
+            phi: 0.5,
+            cycle_id: 1,
+            captured_at_us: 1708000000_000000,
+            signature: vec![1, 2, 3],
+            source: "symthaea".to_string(),
+        };
+
+        let json = serde_json::to_string(&attestation).unwrap();
+        let decoded: PhiAttestationData = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.agent_did, attestation.agent_did);
+        assert!((decoded.phi - attestation.phi).abs() < 1e-10);
+        assert_eq!(decoded.signature, vec![1, 2, 3]);
     }
 
     // ============================================================================

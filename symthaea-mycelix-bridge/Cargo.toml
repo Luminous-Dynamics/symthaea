@@ -10,7 +10,7 @@ keywords = ["consciousness", "federated-learning", "byzantine", "epistemic"]
 categories = ["science", "cryptography"]
 
 [dependencies]
-symthaea-core = { path = "../symthaea-core" }
+symthaea-core = { path = "../symthaea/symthaea-core" }
 mycelix-sdk = { path = "../mycelix-workspace/sdk", default-features = false, features = ["standalone"] }
 serde = { version = "1.0", features = ["derive"] }
 thiserror = "1.0"

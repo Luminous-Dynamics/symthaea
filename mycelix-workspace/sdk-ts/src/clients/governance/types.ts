@@ -976,11 +976,19 @@ export type ProposalTier = 'Basic' | 'Major' | 'Constitutional';
 export type PhiVoteChoice = 'For' | 'Against' | 'Abstain';
 
 /**
+ * How the Phi value in a governance decision was obtained.
+ * Matches Rust `PhiProvenance` enum.
+ */
+export type PhiProvenance = 'Attested' | 'Snapshot' | 'Unavailable';
+
+/**
  * Φ weight components for consciousness-integrated governance
  */
 export interface PhiWeight {
   /** Base Φ score from consciousness metrics (0.0-1.0) */
   phiScore: number;
+  /** How the phiScore was obtained */
+  phiProvenance: PhiProvenance;
   /** K-vector derived trust score (0.0-1.0) */
   kTrust: number;
   /** Stake-based weight */
@@ -1238,6 +1246,12 @@ export interface PhiWeightedTally {
   talliedAt: Timestamp;
   finalTally: boolean;
   phiTierBreakdown: PhiTierBreakdown;
+  /** Votes with real Phi data (Attested or Snapshot) */
+  phiEnhancedCount: number;
+  /** Votes without Phi data (reputation-only) */
+  reputationOnlyCount: number;
+  /** Fraction of votes with verified consciousness data (0.0-1.0) */
+  phiCoverage: number;
 }
 
 /**
@@ -1512,47 +1526,103 @@ export interface DiscussionReadiness {
 // ============================================================================
 
 /**
- * Input for recording a consciousness snapshot
+ * Input for recording a consciousness snapshot.
+ * Matches Rust `RecordSnapshotInput` struct.
  */
 export interface RecordSnapshotInput {
-  agentDid: string;
-  phiScore: number;
-  coherenceScore: number;
-  integrationLevel: number;
-  harmonicAlignment: number;
-  metadata?: string;
+  /** Φ measurement (0.0-1.0) */
+  phi: number;
+  /** Meta-awareness score (0.0-1.0) */
+  metaAwareness: number;
+  /** Self-model accuracy (0.0-1.0) */
+  selfModelAccuracy: number;
+  /** Coherence score (0.0-1.0) */
+  coherence: number;
+  /** Affective valence (-1.0 to 1.0) */
+  affectiveValence: number;
+  /** CARE activation (0.0-1.0) */
+  careActivation: number;
+  /** Source system (default: "symthaea") */
+  source?: string;
 }
 
 /**
- * Input for verifying consciousness gate
+ * Type of governance action with associated Phi thresholds.
+ * Matches Rust `GovernanceActionType` enum.
+ */
+export type GovernanceActionType = 'Basic' | 'ProposalSubmission' | 'Voting' | 'Constitutional';
+
+/**
+ * Vote decision in consensus rounds.
+ * Matches Rust `VoteDecision` enum.
+ */
+export type VoteDecision = 'Approve' | 'Reject' | 'Abstain';
+
+/**
+ * Bridge ProposalType (3-variant, distinct from the 5-variant types.ts ProposalType)
+ * Matches Rust bridge integrity `ProposalType` enum.
+ */
+export type BridgeProposalType = 'Standard' | 'Emergency' | 'Constitutional';
+
+/**
+ * Input for verifying consciousness gate.
+ * Matches Rust `VerifyGateInput` struct.
  */
 export interface VerifyGateInput {
-  agentDid: string;
-  requiredPhi: number;
-  requiredCoherence?: number;
-  actionType: string;
+  actionType: GovernanceActionType;
+  actionId?: string;
 }
 
 /**
- * Gate verification result
+ * Gate verification result (legacy v1).
+ * Matches Rust `GateVerificationResult` struct.
  */
 export interface GateVerificationResult {
   passed: boolean;
-  agentDid: string;
-  currentPhi: number;
+  phi: number;
   requiredPhi: number;
-  currentCoherence: number;
-  requiredCoherence: number;
-  reason: string;
+  actionType: GovernanceActionType;
+  failureReason?: string;
+  gateId: string;
 }
 
 /**
- * Input for assessing value alignment
+ * Gate verification result with provenance tracking (v2).
+ * Matches Rust `GateVerificationResultV2` struct.
+ */
+export interface GateVerificationResultV2 {
+  passed: boolean;
+  /** Phi value, or null if unavailable */
+  phi: number | null;
+  requiredPhi: number;
+  /** How the Phi was obtained */
+  provenance: PhiProvenance;
+  actionType: GovernanceActionType;
+  failureReason?: string;
+}
+
+/**
+ * Input for recording an authenticated Phi attestation.
+ * Matches Rust `RecordPhiAttestationInput` struct.
+ */
+export interface RecordPhiAttestationInput {
+  /** Phi value (0.0-1.0) */
+  phi: number;
+  /** Symthaea cognitive cycle number */
+  cycleId: number;
+  /** Agent-signed hash of attestation data */
+  signature: number[];
+}
+
+/**
+ * Input for assessing value alignment.
+ * Matches Rust `AssessAlignmentInput` struct.
  */
 export interface AssessAlignmentInput {
-  agentDid: string;
+  /** Proposal identifier */
   proposalId: string;
-  harmonyWeights?: Record<string, number>;
+  /** Proposal content to assess (1-4096 chars) */
+  proposalContent: string;
 }
 
 /**
@@ -1564,123 +1634,174 @@ export interface GetAgentSnapshotsInput {
 }
 
 /**
- * Phi threshold requirements
+ * Phi threshold requirements.
+ * Matches Rust `PhiThresholds` struct.
  */
 export interface PhiThresholds {
   basic: number;
-  major: number;
+  proposalSubmission: number;
+  voting: number;
   constitutional: number;
-  emergency: number;
 }
 
 /**
- * Input for calculating holistic vote weight
+ * Input for calculating holistic vote weight.
+ * Matches Rust `CalculateWeightInput` struct.
  */
 export interface CalculateWeightInput {
-  agentDid: string;
-  proposalType: string;
+  harmonicAlignment?: number;
 }
 
 /**
- * Holistic voting weight result
+ * Holistic voting weight result.
+ * Matches Rust `HolisticVotingWeight` struct.
  */
 export interface HolisticVotingWeight {
-  agentDid: string;
-  baseReputation: number;
-  phiMultiplier: number;
+  reputation: number;
+  reputationSquared: number;
+  phi: number;
+  consciousnessMultiplier: number;
   harmonicAlignment: number;
+  harmonicBonus: number;
   finalWeight: number;
-  components: Record<string, number>;
+  wasCapped: boolean;
+  uncappedWeight: number;
+  calculationBreakdown: string;
 }
 
 /**
- * Input for casting a weighted consensus vote
+ * Input for casting a weighted consensus vote.
+ * Matches Rust `CastWeightedVoteInput` struct.
  */
 export interface CastWeightedVoteInput {
   proposalId: string;
-  roundId: string;
-  choice: PhiVoteChoice;
-  confidence: number;
-  rationale?: string;
-}
-
-/**
- * Weighted vote result
- */
-export interface WeightedVoteResult {
-  accepted: boolean;
-  effectiveWeight: number;
-  gateResult: GateVerificationResult;
-  voteHash?: ActionHash;
+  proposalType: BridgeProposalType;
+  round: number;
+  decision: VoteDecision;
+  harmonicAlignment?: number;
   reason?: string;
 }
 
 /**
- * Adaptive threshold for a proposal type
+ * Weighted vote result.
+ * Matches Rust `WeightedVoteResult` struct.
  */
-export interface AdaptiveThreshold {
-  proposalType: string;
-  baseThreshold: number;
-  adjustedThreshold: number;
-  participationFactor: number;
-  historicalApproval: number;
+export interface WeightedVoteResult {
+  voteId: string;
+  weight: number;
+  weightBreakdown: string;
+  decision: VoteDecision;
+  phiAtVote: number;
+  proposalType: BridgeProposalType;
+  thresholdRequired: number;
 }
 
 /**
- * Participant status including streak and cooldown
+ * Adaptive threshold for a proposal type.
+ * Matches Rust `AdaptiveThreshold` struct.
+ */
+export interface AdaptiveThreshold {
+  /** Base threshold percentage (0.0-1.0) */
+  baseThreshold: number;
+  /** Minimum Φ required for voters */
+  minVoterPhi: number;
+  /** Minimum participation (number of voters) */
+  minParticipation: number;
+  /** Quorum percentage (minimum % of eligible voters) */
+  quorum: number;
+  /** Time extension allowed (in seconds) */
+  maxExtensionSecs: number;
+}
+
+/**
+ * Participant status including streak and cooldown.
+ * Matches Rust `ParticipantStatus` struct.
  */
 export interface ParticipantStatus {
   agentDid: string;
-  registered: boolean;
-  reputation: number;
+  isActive: boolean;
+  baseReputation: number;
   effectiveReputation: number;
-  participationStreak: number;
-  cooldownRemaining: number;
-  totalVotes: number;
+  streakCount: number;
+  streakBonus: number;
+  inCooldown: boolean;
+  currentPhi: number;
+  federatedScore: number;
   roundsParticipated: number;
+  successfulVotes: number;
+  successRate: number;
+  slashingEvents: number;
+  canVoteStandard: boolean;
+  canVoteEmergency: boolean;
+  canVoteConstitutional: boolean;
 }
 
 /**
- * Input for updating federated reputation
+ * Input for updating federated reputation signals.
+ * All fields are optional — only provided fields are updated.
+ * Matches Rust `UpdateFederatedReputationInput` struct.
  */
 export interface UpdateFederatedReputationInput {
-  agentDid: string;
-  sourceHapp: string;
-  reputationDelta: number;
-  evidence?: string;
+  // Identity domain signals
+  identityVerification?: number;
+  credentialCount?: number;
+  credentialQuality?: number;
+  // Knowledge domain signals
+  epistemicContributions?: number;
+  factcheckAccuracy?: number;
+  darkSpotsResolved?: number;
+  // Finance domain signals (max 5% of final score)
+  stakeWeight?: number;
+  paymentReliability?: number;
+  escrowCompletionRate?: number;
+  // FL domain signals
+  pogqScore?: number;
+  flContributions?: number;
+  byzantineCleanRate?: number;
+  // Governance domain signals
+  votingParticipation?: number;
+  proposalSuccessRate?: number;
+  consensusAlignment?: number;
 }
 
 /**
- * Input for getting round votes
+ * Input for getting round votes.
+ * Matches Rust `GetRoundVotesInput` struct.
  */
 export interface GetRoundVotesInput {
   proposalId: string;
-  roundId: string;
+  round: number;
 }
 
 /**
- * Input for calculating round result
+ * Input for calculating round result.
+ * Matches Rust `CalculateRoundResultInput` struct.
  */
 export interface CalculateRoundResultInput {
   proposalId: string;
-  roundId: string;
-  quorumThreshold?: number;
+  round: number;
+  proposalType: BridgeProposalType;
+  eligibleVoters: number;
 }
 
 /**
- * Consensus round result
+ * Consensus round result.
+ * Matches Rust `RoundResult` struct.
  */
 export interface RoundResult {
   proposalId: string;
-  roundId: string;
-  votesFor: number;
-  votesAgainst: number;
-  abstentions: number;
+  round: number;
+  proposalType: BridgeProposalType;
   totalWeight: number;
-  voterCount: number;
+  weightedApprovals: number;
+  weightedRejections: number;
+  voteCount: number;
+  requiredThreshold: number;
+  approvalPercentage: number;
   quorumMet: boolean;
-  approved: boolean;
-  averageConfidence: number;
+  consensusReached: boolean;
+  rejected: boolean;
+  result: string;
 }
 
 /**

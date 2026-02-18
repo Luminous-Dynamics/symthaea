@@ -18,6 +18,22 @@
 use hdk::prelude::*;
 use governance_bridge_integrity::*;
 
+mod query;
+mod consciousness;
+mod attestation;
+mod consensus;
+mod cross_cluster;
+mod phi_config;
+mod validation;
+
+pub use query::*;
+pub use consciousness::*;
+pub use attestation::*;
+pub use consensus::*;
+pub use cross_cluster::*;
+pub use phi_config::*;
+pub use validation::*;
+
 const GOVERNANCE_HAPP_ID: &str = "mycelix-governance";
 const SYMTHAEA_SOURCE: &str = "symthaea";
 
@@ -27,1002 +43,51 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     hash_entry(&EntryTypes::Anchor(anchor))
 }
 
-#[hdk_extern]
-pub fn init(_: ()) -> ExternResult<InitCallbackResult> {
-    Ok(InitCallbackResult::Pass)
-}
-
-/// Query governance from another hApp
-#[hdk_extern]
-pub fn query_governance(input: QueryGovernanceInput) -> ExternResult<QueryGovernanceResult> {
-    if input.source_happ.is_empty() || input.source_happ.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Source hApp must be 1-256 characters".into())));
-    }
-
-    let now = sys_time()?;
-
-    let query = GovernanceQuery {
-        id: format!("query:{}:{}", input.source_happ, now.as_micros()),
-        query_type: input.query_type.clone(),
-        source_happ: input.source_happ.clone(),
-        parameters: serde_json::to_string(&input.parameters).unwrap_or_default(),
-        queried_at: now,
-    };
-    create_entry(&EntryTypes::GovernanceQuery(query))?;
-
-    match input.query_type {
-        GovernanceQueryType::ActiveProposals => get_active_proposals_internal(),
-        GovernanceQueryType::ProposalById => {
-            let id = input.parameters.get("proposal_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            get_proposal_by_id_internal(id)
-        }
-        GovernanceQueryType::VotingEligibility => {
-            let did = input.parameters.get("did")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-            check_voting_eligibility_internal(did)
-        }
-        _ => Ok(QueryGovernanceResult {
-            success: false,
-            data: None,
-            error: Some("Query type not implemented".into()),
-        }),
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryGovernanceInput {
-    pub source_happ: String,
-    pub query_type: GovernanceQueryType,
-    pub parameters: serde_json::Value,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct QueryGovernanceResult {
-    pub success: bool,
-    pub data: Option<serde_json::Value>,
-    pub error: Option<String>,
-}
-
-fn get_active_proposals_internal() -> ExternResult<QueryGovernanceResult> {
-    // Query active proposals via anchor
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash("active_proposals")?, LinkTypes::ActiveProposals)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut proposals = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            if let Some(proposal_ref) = record
-                .entry()
-                .to_app_option::<ProposalReference>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            {
-                proposals.push(serde_json::json!({
-                    "proposal_id": proposal_ref.proposal_id,
-                    "title": proposal_ref.title,
-                    "status": format!("{:?}", proposal_ref.status),
-                    "votes_for": proposal_ref.votes_for,
-                    "votes_against": proposal_ref.votes_against,
-                }));
-            }
-        }
-    }
-
-    Ok(QueryGovernanceResult {
-        success: true,
-        data: Some(serde_json::json!({ "proposals": proposals })),
-        error: None,
-    })
-}
-
-fn get_proposal_by_id_internal(id: &str) -> ExternResult<QueryGovernanceResult> {
-    // Cross-zome call to proposals coordinator
-    let call_result = call(
-        CallTargetCell::Local,
-        ZomeName::from("proposals"),
-        FunctionName::from("get_proposal"),
-        None,
-        ExternIO::encode(id.to_string())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match call_result {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            if let Ok(maybe_record) = extern_io.decode::<Option<Record>>() {
-                Ok(QueryGovernanceResult {
-                    success: true,
-                    data: Some(serde_json::json!({
-                        "proposal_id": id,
-                        "found": maybe_record.is_some(),
-                    })),
-                    error: None,
-                })
-            } else {
-                Ok(QueryGovernanceResult {
-                    success: true,
-                    data: Some(serde_json::json!({"proposal_id": id, "found": false})),
-                    error: Some("Failed to decode proposal response".into()),
-                })
-            }
-        }
-        Ok(ZomeCallResponse::NetworkError(e)) => Ok(QueryGovernanceResult {
-            success: false,
-            data: None,
-            error: Some(format!("Network error querying proposal: {}", e)),
-        }),
-        _ => Ok(QueryGovernanceResult {
-            success: true,
-            data: Some(serde_json::json!({"proposal_id": id, "found": false})),
-            error: Some("Proposals zome unavailable".into()),
-        }),
-    }
-}
-
-fn check_voting_eligibility_internal(did: &str) -> ExternResult<QueryGovernanceResult> {
-    // Cross-zome call to councils coordinator to check membership
-    let call_result = call(
-        CallTargetCell::Local,
-        ZomeName::from("councils"),
-        FunctionName::from("get_member_councils"),
-        None,
-        ExternIO::encode(did.to_string())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    );
-
-    match call_result {
-        Ok(ZomeCallResponse::Ok(extern_io)) => {
-            if let Ok(councils) = extern_io.decode::<Vec<Record>>() {
-                let eligible = !councils.is_empty();
-                Ok(QueryGovernanceResult {
-                    success: true,
-                    data: Some(serde_json::json!({
-                        "did": did,
-                        "eligible": eligible,
-                        "council_count": councils.len(),
-                        "voting_power": if eligible { 1.0 } else { 0.0 },
-                    })),
-                    error: None,
-                })
-            } else {
-                // Couldn't decode response — fail closed (not eligible)
-                Ok(QueryGovernanceResult {
-                    success: false,
-                    data: Some(serde_json::json!({
-                        "did": did,
-                        "eligible": false,
-                        "voting_power": 0.0,
-                    })),
-                    error: Some("Could not decode council membership response".into()),
-                })
-            }
-        }
-        Ok(ZomeCallResponse::NetworkError(e)) => Ok(QueryGovernanceResult {
-            success: false,
-            data: None,
-            error: Some(format!("Network error checking eligibility: {}", e)),
-        }),
-        _ => {
-            // Councils zome unavailable — fail closed (not eligible)
-            Ok(QueryGovernanceResult {
-                success: false,
-                data: Some(serde_json::json!({
-                    "did": did,
-                    "eligible": false,
-                    "voting_power": 0.0,
-                })),
-                error: Some("Councils zome unavailable — cannot verify eligibility".into()),
-            })
-        }
-    }
-}
-
-/// Request execution from governance to another hApp
-#[hdk_extern]
-pub fn request_execution(input: RequestExecutionInput) -> ExternResult<Record> {
-    // Input validation
-    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
-    }
-    if input.target_happ.is_empty() || input.target_happ.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Target hApp must be 1-256 characters".into())));
-    }
-    if input.action.is_empty() || input.action.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Action must be 1-256 characters".into())));
-    }
-
-    let now = sys_time()?;
-
-    let request = ExecutionRequest {
-        id: format!("exec:{}:{}:{}", input.proposal_id, input.target_happ, now.as_micros()),
-        proposal_id: input.proposal_id.clone(),
-        target_happ: input.target_happ.clone(),
-        action: input.action.clone(),
-        parameters: serde_json::to_string(&input.parameters).unwrap_or_default(),
-        status: ExecutionStatus::Pending,
-        requested_at: now,
-        executed_at: None,
-    };
-
-    let action_hash = create_entry(&EntryTypes::ExecutionRequest(request.clone()))?;
-
-    // Create anchor and link for O(1) lookup by execution ID
-    let eid_anchor = format!("eid:{}", request.id);
-    create_entry(&EntryTypes::Anchor(Anchor(eid_anchor.clone())))?;
-    create_link(
-        anchor_hash(&eid_anchor)?,
-        action_hash.clone(),
-        LinkTypes::ExecutionById,
-        (),
-    )?;
-
-    // Create anchor and link hApp to execution
-    let happ_anchor = format!("happ:{}", input.target_happ);
-    create_entry(&EntryTypes::Anchor(Anchor(happ_anchor.clone())))?;
-    create_link(
-        anchor_hash(&happ_anchor)?,
-        action_hash.clone(),
-        LinkTypes::HappToExecutions,
-        (),
-    )?;
-
-    // Create anchor and link proposal to execution
-    let proposal_anchor = format!("proposal_exec:{}", input.proposal_id);
-    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
-    create_link(
-        anchor_hash(&proposal_anchor)?,
-        action_hash.clone(),
-        LinkTypes::ProposalToExecutions,
-        (),
-    )?;
-
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Execution not found".into())))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RequestExecutionInput {
-    pub proposal_id: String,
-    pub target_happ: String,
-    pub action: String,
-    pub parameters: serde_json::Value,
-}
-
-/// Broadcast governance event
-#[hdk_extern]
-pub fn broadcast_governance_event(input: BroadcastGovernanceEventInput) -> ExternResult<Record> {
-    // Input validation
-    if input.subject.is_empty() || input.subject.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Subject must be 1-256 characters".into())));
-    }
-    if input.payload.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Payload must be at most 4096 characters".into())));
-    }
-    if let Some(ref proposal_id) = input.proposal_id {
-        if proposal_id.is_empty() || proposal_id.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
-        }
-    }
-
-    let now = sys_time()?;
-
-    let event = GovernanceBridgeEvent {
-        id: format!("event:{:?}:{}", input.event_type, now.as_micros()),
-        event_type: input.event_type,
-        proposal_id: input.proposal_id,
-        subject: input.subject,
-        payload: input.payload,
-        source_happ: GOVERNANCE_HAPP_ID.to_string(),
-        timestamp: now,
-    };
-
-    let action_hash = create_entry(&EntryTypes::GovernanceBridgeEvent(event))?;
-
-    // Create anchor and link to recent events
-    create_entry(&EntryTypes::Anchor(Anchor("recent_events".to_string())))?;
-    create_link(
-        anchor_hash("recent_events")?,
-        action_hash.clone(),
-        LinkTypes::RecentEvents,
-        (),
-    )?;
-
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Event not found".into())))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct BroadcastGovernanceEventInput {
-    pub event_type: GovernanceEventType,
-    pub proposal_id: Option<String>,
-    pub subject: String,
-    pub payload: String,
-}
-
-/// Get pending executions for a hApp
-#[hdk_extern]
-pub fn get_pending_executions(target_happ: String) -> ExternResult<Vec<Record>> {
-    let happ_anchor = format!("happ:{}", target_happ);
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash(&happ_anchor)?, LinkTypes::HappToExecutions)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut executions = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            // Filter to only pending executions
-            if let Some(exec) = record
-                .entry()
-                .to_app_option::<ExecutionRequest>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            {
-                if exec.status == ExecutionStatus::Pending {
-                    executions.push(record);
-                }
-            }
-        }
-    }
-
-    Ok(executions)
-}
-
-/// Get recent governance events
-#[hdk_extern]
-pub fn get_recent_events(_: ()) -> ExternResult<Vec<Record>> {
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash("recent_events")?, LinkTypes::RecentEvents)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut events = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            events.push(record);
-        }
-    }
-
-    // Sort by timestamp (most recent first)
-    events.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
-
-    // Return last 50 events
-    Ok(events.into_iter().take(50).collect())
-}
-
-/// Acknowledge execution (called by target hApp)
-#[hdk_extern]
-pub fn acknowledge_execution(input: AcknowledgeExecutionInput) -> ExternResult<bool> {
-    // Input validation
-    if input.execution_id.is_empty() || input.execution_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Execution ID must be 1-256 characters".into())));
-    }
-    if let Some(ref result) = input.result {
-        if result.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Result must be at most 4096 characters".into())));
-        }
-    }
-
-    // Find the execution request by ID via O(1) link-based lookup
-    let eid_anchor = format!("eid:{}", input.execution_id);
-    let mut found = false;
-
-    if let Ok(entry_hash) = anchor_hash(&eid_anchor) {
-        if let Ok(links) = get_links(
-            LinkQuery::try_new(entry_hash, LinkTypes::ExecutionById)?,
-            GetStrategy::default(),
-        ) {
-            if let Some(link) = links.into_iter().max_by_key(|l| l.timestamp) {
-                if let Ok(ah) = ActionHash::try_from(link.target) {
-                    if let Some(record) = get(ah, GetOptions::default())? {
-                        if let Some(exec) = record
-                            .entry()
-                            .to_app_option::<ExecutionRequest>()
-                            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-                        {
-                            let updated_exec = ExecutionRequest {
-                                status: input.status.clone(),
-                                executed_at: Some(sys_time()?),
-                                ..exec
-                            };
-                            update_entry(
-                                record.action_address().clone(),
-                                &EntryTypes::ExecutionRequest(updated_exec),
-                            )?;
-                            found = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    // Fallback: O(n) chain scan for execution requests created before the link was added
-    if !found {
-        let filter = ChainQueryFilter::new()
-            .entry_type(EntryType::App(AppEntryDef::try_from(
-                UnitEntryTypes::ExecutionRequest,
-            )?))
-            .include_entries(true);
-
-        let records = query(filter)?;
-
-        for record in records {
-            if let Some(exec) = record
-                .entry()
-                .to_app_option::<ExecutionRequest>()
-                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-            {
-                if exec.id == input.execution_id {
-                    let updated_exec = ExecutionRequest {
-                        status: input.status.clone(),
-                        executed_at: Some(sys_time()?),
-                        ..exec
-                    };
-                    update_entry(
-                        record.action_address().clone(),
-                        &EntryTypes::ExecutionRequest(updated_exec),
-                    )?;
-                    found = true;
-                    break;
-                }
-            }
-        }
-    }
-
-    Ok(found)
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AcknowledgeExecutionInput {
-    pub execution_id: String,
-    pub status: ExecutionStatus,
-    pub result: Option<String>,
-}
-
-/// Publish a proposal reference for cross-hApp visibility
-#[hdk_extern]
-pub fn publish_proposal_reference(input: PublishProposalReferenceInput) -> ExternResult<Record> {
-    // Input validation
-    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
-    }
-    if input.title.is_empty() || input.title.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Title must be 1-256 characters".into())));
-    }
-
-    // Check status before moving into struct
-    let is_active = input.status == ProposalStatus::Active;
-
-    let proposal_ref = ProposalReference {
-        proposal_id: input.proposal_id.clone(),
-        title: input.title,
-        proposal_type: input.proposal_type,
-        status: input.status,
-        votes_for: input.votes_for,
-        votes_against: input.votes_against,
-        ends_at: input.ends_at,
-        created_at: sys_time()?,
-    };
-
-    let action_hash = create_entry(&EntryTypes::ProposalReference(proposal_ref))?;
-
-    // Link to active proposals if status is Active
-    if is_active {
-        create_entry(&EntryTypes::Anchor(Anchor("active_proposals".to_string())))?;
-        create_link(
-            anchor_hash("active_proposals")?,
-            action_hash.clone(),
-            LinkTypes::ActiveProposals,
-            (),
-        )?;
-    }
-
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Could not find proposal reference".into()
-        )))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PublishProposalReferenceInput {
-    pub proposal_id: String,
-    pub title: String,
-    pub proposal_type: ProposalType,
-    pub status: ProposalStatus,
-    pub votes_for: u64,
-    pub votes_against: u64,
-    pub ends_at: Timestamp,
-}
-
-/// Transfer credits between accounts (cross-zome entry point)
-///
-/// Called by the execution zome's `GovernanceAction::TransferCredits` dispatch.
-/// Records the transfer as a governance event. Actual fund movement is handled
-/// by the fund allocation system in the execution zome.
-#[hdk_extern]
-pub fn transfer_credits(input: TransferCreditsInput) -> ExternResult<Record> {
-    if input.from.is_empty() || input.from.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("From account must be 1-256 characters".into())));
-    }
-    if input.to.is_empty() || input.to.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("To account must be 1-256 characters".into())));
-    }
-    if input.amount <= 0.0 || !input.amount.is_finite() {
-        return Err(wasm_error!(WasmErrorInner::Guest("Amount must be positive and finite".into())));
-    }
-
-    // Record the transfer as a governance event
-    broadcast_governance_event(BroadcastGovernanceEventInput {
-        event_type: GovernanceEventType::ProposalExecuted,
-        proposal_id: None,
-        subject: format!("Credit transfer: {} -> {} ({} credits)", input.from, input.to, input.amount),
-        payload: serde_json::to_string(&serde_json::json!({
-            "type": "transfer_credits",
-            "from": input.from,
-            "to": input.to,
-            "amount": input.amount,
-        })).unwrap_or_default(),
-    })
-}
-
-/// Input for credit transfers via cross-zome call
-#[derive(Serialize, Deserialize, Debug)]
-pub struct TransferCreditsInput {
-    pub from: String,
-    pub to: String,
-    pub amount: f64,
-}
-
-/// Get events by proposal ID - for filtering events related to a specific proposal
-#[hdk_extern]
-pub fn get_events_by_proposal(proposal_id: String) -> ExternResult<Vec<Record>> {
-    // Get all recent events and filter by proposal_id
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash("recent_events")?, LinkTypes::RecentEvents)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut events = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            // Check if event relates to this proposal
-            if let Some(event) = record
-                .entry()
-                .to_app_option::<GovernanceBridgeEvent>()
-                .ok()
-                .flatten()
-            {
-                if event.proposal_id.as_ref() == Some(&proposal_id) {
-                    events.push(record);
-                }
-            }
-        }
-
-        if events.len() >= 50 {
-            break;
-        }
-    }
-
-    Ok(events)
-}
-
 // =============================================================================
-// CONSCIOUSNESS METRICS COORDINATOR FUNCTIONS
+// HELPER FUNCTIONS
 // =============================================================================
 
-/// Record a consciousness snapshot from Symthaea
-///
-/// Stores the Φ measurement and related metrics for an agent at a point in time.
-/// Used to establish consciousness state before governance actions.
-#[hdk_extern]
-pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult<Record> {
-    // Input validation
-    if input.phi < 0.0 || input.phi > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Phi must be between 0.0 and 1.0".into())));
-    }
-    if input.meta_awareness < 0.0 || input.meta_awareness > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Meta awareness must be between 0.0 and 1.0".into())));
-    }
-    if input.self_model_accuracy < 0.0 || input.self_model_accuracy > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Self model accuracy must be between 0.0 and 1.0".into())));
-    }
-    if input.coherence < 0.0 || input.coherence > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Coherence must be between 0.0 and 1.0".into())));
-    }
-    if input.affective_valence < -1.0 || input.affective_valence > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Affective valence must be between -1.0 and 1.0".into())));
-    }
-    if input.care_activation < 0.0 || input.care_activation > 1.0 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Care activation must be between 0.0 and 1.0".into())));
-    }
-    if let Some(ref source) = input.source {
-        if source.is_empty() || source.len() > 256 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Source must be 1-256 characters".into())));
-        }
-    }
-
-    let now = sys_time()?;
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    let snapshot = ConsciousnessSnapshot {
-        id: format!("snapshot:{}:{}", agent_did, now.as_micros()),
-        agent_did: agent_did.clone(),
-        phi: input.phi,
-        meta_awareness: input.meta_awareness,
-        self_model_accuracy: input.self_model_accuracy,
-        coherence: input.coherence,
-        affective_valence: input.affective_valence,
-        care_activation: input.care_activation,
-        captured_at: now,
-        source: input.source.unwrap_or_else(|| SYMTHAEA_SOURCE.to_string()),
-    };
-
-    let action_hash = create_entry(&EntryTypes::ConsciousnessSnapshot(snapshot.clone()))?;
-
-    // Link from agent to snapshot
+/// Get the latest PhiAttestation for an agent
+fn get_latest_agent_attestation(
+    agent_did: &str,
+) -> ExternResult<Option<(f64, Record)>> {
     let agent_anchor = format!("agent:{}", agent_did);
-    create_entry(&EntryTypes::Anchor(Anchor(agent_anchor.clone())))?;
-    create_link(
-        anchor_hash(&agent_anchor)?,
-        action_hash.clone(),
-        LinkTypes::AgentToSnapshots,
-        (),
-    )?;
-
-    // Link to recent snapshots
-    create_entry(&EntryTypes::Anchor(Anchor("recent_snapshots".to_string())))?;
-    create_link(
-        anchor_hash("recent_snapshots")?,
-        action_hash.clone(),
-        LinkTypes::RecentSnapshots,
-        (),
-    )?;
-
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Snapshot not found".into())))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RecordSnapshotInput {
-    pub phi: f64,
-    pub meta_awareness: f64,
-    pub self_model_accuracy: f64,
-    pub coherence: f64,
-    pub affective_valence: f64,
-    pub care_activation: f64,
-    pub source: Option<String>,
-}
-
-/// Verify consciousness gate for a governance action
-///
-/// Checks if the agent's current Φ meets the threshold for the requested action type.
-/// Returns a gate verification record that can be referenced by governance actions.
-#[hdk_extern]
-pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVerificationResult> {
-    let now = sys_time()?;
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    // Get the latest snapshot for this agent
-    let latest_snapshot = get_latest_agent_snapshot(&agent_did)?;
-
-    let (_snapshot, snapshot_id, phi) = match latest_snapshot {
-        Some((_record, snap)) => (Some(snap.clone()), snap.id.clone(), snap.phi),
-        None => {
-            // No snapshot available - gate fails
-            let gate = ConsciousnessGate {
-                id: format!("gate:{}:{}", agent_did, now.as_micros()),
-                agent_did: agent_did.clone(),
-                action_type: input.action_type,
-                snapshot_id: "none".to_string(),
-                phi_at_verification: 0.0,
-                required_phi: input.action_type.phi_threshold(),
-                passed: false,
-                failure_reason: Some("No consciousness snapshot available".to_string()),
-                action_id: input.action_id.clone(),
-                verified_at: now,
-            };
-
-            let action_hash = create_entry(&EntryTypes::ConsciousnessGate(gate.clone()))?;
-
-            // Link from agent to gate
-            let agent_anchor = format!("agent:{}", agent_did);
-            create_entry(&EntryTypes::Anchor(Anchor(agent_anchor.clone())))?;
-            create_link(
-                anchor_hash(&agent_anchor)?,
-                action_hash,
-                LinkTypes::AgentToGates,
-                (),
-            )?;
-
-            return Ok(GateVerificationResult {
-                passed: false,
-                phi: 0.0,
-                required_phi: input.action_type.phi_threshold(),
-                action_type: input.action_type,
-                failure_reason: Some("No consciousness snapshot available".to_string()),
-                gate_id: gate.id,
-            });
-        }
-    };
-
-    let required_phi = input.action_type.phi_threshold();
-    let passed = phi >= required_phi;
-    let failure_reason = if passed {
-        None
-    } else {
-        Some(format!(
-            "Φ {} below threshold {} for {:?}",
-            phi, required_phi, input.action_type
-        ))
-    };
-
-    // Create gate verification record
-    let gate = ConsciousnessGate {
-        id: format!("gate:{}:{}", agent_did, now.as_micros()),
-        agent_did: agent_did.clone(),
-        action_type: input.action_type,
-        snapshot_id,
-        phi_at_verification: phi,
-        required_phi,
-        passed,
-        failure_reason: failure_reason.clone(),
-        action_id: input.action_id,
-        verified_at: now,
-    };
-
-    let action_hash = create_entry(&EntryTypes::ConsciousnessGate(gate.clone()))?;
-
-    // Link from agent to gate
-    let agent_anchor = format!("agent:{}", agent_did);
-    create_entry(&EntryTypes::Anchor(Anchor(agent_anchor.clone())))?;
-    create_link(
-        anchor_hash(&agent_anchor)?,
-        action_hash,
-        LinkTypes::AgentToGates,
-        (),
-    )?;
-
-    Ok(GateVerificationResult {
-        passed,
-        phi,
-        required_phi,
-        action_type: input.action_type,
-        failure_reason,
-        gate_id: gate.id,
-    })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct VerifyGateInput {
-    pub action_type: GovernanceActionType,
-    pub action_id: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GateVerificationResult {
-    pub passed: bool,
-    pub phi: f64,
-    pub required_phi: f64,
-    pub action_type: GovernanceActionType,
-    pub failure_reason: Option<String>,
-    pub gate_id: String,
-}
-
-/// Assess value alignment of a proposal
-///
-/// Evaluates how well a proposal aligns with the Seven Harmonies,
-/// using the agent's current consciousness state.
-#[hdk_extern]
-pub fn assess_value_alignment(input: AssessAlignmentInput) -> ExternResult<Record> {
-    // Input validation
-    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
-    }
-    if input.proposal_content.is_empty() || input.proposal_content.len() > 4096 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal content must be 1-4096 characters".into())));
-    }
-
-    let now = sys_time()?;
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    // Get the latest snapshot for this agent
-    let latest_snapshot = get_latest_agent_snapshot(&agent_did)?;
-
-    let snapshot_id = match &latest_snapshot {
-        Some((_, snap)) => snap.id.clone(),
-        None => {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                "No consciousness snapshot available for alignment assessment".into()
-            )));
-        }
-    };
-
-    // Calculate harmony scores (in production, this would analyze the proposal content)
-    let harmony_scores = calculate_harmony_scores(&input.proposal_content);
-
-    // Calculate overall alignment
-    let overall_alignment: f64 = harmony_scores.iter().map(|h| h.score).sum::<f64>()
-        / harmony_scores.len() as f64;
-
-    // Detect violations (scores below threshold)
-    let violations: Vec<String> = harmony_scores
-        .iter()
-        .filter(|h| h.score < -0.3)
-        .map(|h| format!("{}: severe misalignment ({:.2})", h.harmony, h.score))
-        .collect();
-
-    // Calculate authenticity (based on CARE activation if available)
-    let authenticity = match &latest_snapshot {
-        Some((_, snap)) => snap.care_activation,
-        None => 0.5,
-    };
-
-    // Determine recommendation
-    let recommendation = determine_recommendation(overall_alignment, authenticity, &violations);
-
-    // Create assessment entry
-    let assessment = ValueAlignmentAssessment {
-        id: format!("alignment:{}:{}:{}", agent_did, input.proposal_id, now.as_micros()),
-        agent_did: agent_did.clone(),
-        proposal_id: input.proposal_id.clone(),
-        overall_alignment,
-        harmony_scores,
-        authenticity,
-        violations,
-        recommendation,
-        snapshot_id,
-        assessed_at: now,
-    };
-
-    let action_hash = create_entry(&EntryTypes::ValueAlignmentAssessment(assessment))?;
-
-    // Link from proposal to alignment
-    let proposal_anchor = format!("proposal:{}", input.proposal_id);
-    create_entry(&EntryTypes::Anchor(Anchor(proposal_anchor.clone())))?;
-    create_link(
-        anchor_hash(&proposal_anchor)?,
-        action_hash.clone(),
-        LinkTypes::ProposalToAlignments,
-        (),
-    )?;
-
-    get(action_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Assessment not found".into())))
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct AssessAlignmentInput {
-    pub proposal_id: String,
-    pub proposal_content: String,
-}
-
-/// Get agent's consciousness history
-#[hdk_extern]
-pub fn get_agent_consciousness_history(agent_did: String) -> ExternResult<Option<Record>> {
-    let agent_anchor = format!("agent:history:{}", agent_did);
     let anchor = match anchor_hash(&agent_anchor) {
         Ok(h) => h,
         Err(_) => return Ok(None),
     };
 
     let links = get_links(
-        LinkQuery::try_new(anchor, LinkTypes::AgentToHistory)?,
+        LinkQuery::try_new(anchor, LinkTypes::AgentToAttestations)?,
         GetStrategy::default(),
     )?;
 
-    if let Some(link) = links.last() {
-        let action_hash = ActionHash::try_from(link.target.clone())
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        return get(action_hash, GetOptions::default());
-    }
+    let mut latest: Option<(f64, Record, Timestamp)> = None;
 
-    Ok(None)
-}
-
-/// Get recent consciousness snapshots for an agent
-#[hdk_extern]
-pub fn get_agent_snapshots(input: GetAgentSnapshotsInput) -> ExternResult<Vec<Record>> {
-    let agent_anchor = format!("agent:{}", input.agent_did);
-    let anchor = match anchor_hash(&agent_anchor) {
-        Ok(h) => h,
-        Err(_) => return Ok(vec![]),
-    };
-
-    let links = get_links(
-        LinkQuery::try_new(anchor, LinkTypes::AgentToSnapshots)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut snapshots = Vec::new();
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
             .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
 
         if let Some(record) = get(action_hash, GetOptions::default())? {
-            snapshots.push(record);
-        }
-
-        if snapshots.len() >= input.limit.unwrap_or(50) as usize {
-            break;
-        }
-    }
-
-    // Sort by timestamp (most recent first)
-    snapshots.sort_by(|a, b| b.action().timestamp().cmp(&a.action().timestamp()));
-
-    Ok(snapshots)
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetAgentSnapshotsInput {
-    pub agent_did: String,
-    pub limit: Option<u32>,
-}
-
-/// Get value alignments for a proposal
-#[hdk_extern]
-pub fn get_proposal_alignments(proposal_id: String) -> ExternResult<Vec<Record>> {
-    let proposal_anchor = format!("proposal:{}", proposal_id);
-    let anchor = match anchor_hash(&proposal_anchor) {
-        Ok(h) => h,
-        Err(_) => return Ok(vec![]),
-    };
-
-    let links = get_links(
-        LinkQuery::try_new(anchor, LinkTypes::ProposalToAlignments)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut alignments = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            alignments.push(record);
+            if let Some(attestation) = record
+                .entry()
+                .to_app_option::<PhiAttestation>()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            {
+                let ts = record.action().timestamp();
+                match &latest {
+                    None => latest = Some((attestation.phi, record, ts)),
+                    Some((_, _, prev_ts)) if ts > *prev_ts => {
+                        latest = Some((attestation.phi, record, ts));
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
-    Ok(alignments)
+    Ok(latest.map(|(phi, record, _)| (phi, record)))
 }
-
-/// Get current Φ threshold requirements
-#[hdk_extern]
-pub fn get_phi_thresholds(_: ()) -> ExternResult<PhiThresholds> {
-    Ok(PhiThresholds {
-        basic: GovernanceActionType::Basic.phi_threshold(),
-        proposal_submission: GovernanceActionType::ProposalSubmission.phi_threshold(),
-        voting: GovernanceActionType::Voting.phi_threshold(),
-        constitutional: GovernanceActionType::Constitutional.phi_threshold(),
-    })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct PhiThresholds {
-    pub basic: f64,
-    pub proposal_submission: f64,
-    pub voting: f64,
-    pub constitutional: f64,
-}
-
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
 
 /// Get the latest consciousness snapshot for an agent
 fn get_latest_agent_snapshot(
@@ -1138,700 +203,6 @@ fn determine_recommendation(
         c if c > -0.3 => GovernanceRecommendation::Neutral,
         c if c > -0.7 => GovernanceRecommendation::Oppose,
         _ => GovernanceRecommendation::StrongOppose,
-    }
-}
-
-// =============================================================================
-// WEIGHTED CONSENSUS COORDINATOR FUNCTIONS
-// =============================================================================
-
-/// Register as a consensus participant
-///
-/// Creates K-Vector and FederatedReputation entries for the calling agent,
-/// establishing them as a participant in weighted consensus voting.
-#[hdk_extern]
-pub fn register_consensus_participant(_: ()) -> ExternResult<Record> {
-    let now = sys_time()?;
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    // Create initial K-Vector
-    let k_vector = KVector::new_participant(agent_did.clone(), now);
-    let k_vector_hash = create_entry(&EntryTypes::KVector(k_vector.clone()))?;
-
-    // Link agent to K-Vector
-    let agent_anchor = format!("agent:{}", agent_did);
-    create_entry(&EntryTypes::Anchor(Anchor(agent_anchor.clone())))?;
-    create_link(
-        anchor_hash(&agent_anchor)?,
-        k_vector_hash.clone(),
-        LinkTypes::AgentToKVector,
-        (),
-    )?;
-
-    // Create initial FederatedReputation
-    let fed_rep = FederatedReputation::new_participant(agent_did.clone(), now);
-    let fed_rep_hash = create_entry(&EntryTypes::FederatedReputation(fed_rep.clone()))?;
-
-    // Link agent to FederatedReputation
-    create_link(
-        anchor_hash(&agent_anchor)?,
-        fed_rep_hash.clone(),
-        LinkTypes::AgentToFederatedRep,
-        (),
-    )?;
-
-    // Get latest consciousness snapshot (if any) for initial phi
-    let phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
-        None => 0.3, // Default for new participants
-    };
-
-    // Create ConsensusParticipant
-    let participant = ConsensusParticipant {
-        agent_did: agent_did.clone(),
-        k_vector_id: format!("kvec:{}:{}", agent_did, now.as_micros()),
-        federated_rep_id: Some(format!("fedrep:{}:{}", agent_did, now.as_micros())),
-        reputation: k_vector.k_r,
-        voting_weight: k_vector.voting_weight(),
-        matl_score: 0.5, // Initial MATL score
-        phi,
-        federated_score: fed_rep.aggregated_score,
-        is_active: true,
-        rounds_participated: 0,
-        successful_votes: 0,
-        slashing_events: 0,
-        last_slashing_at: None,
-        streak_count: 0,
-        registered_at: now,
-        last_active_at: now,
-    };
-
-    let participant_hash = create_entry(&EntryTypes::ConsensusParticipant(participant))?;
-
-    // Link agent to participant
-    create_link(
-        anchor_hash(&agent_anchor)?,
-        participant_hash.clone(),
-        LinkTypes::AgentToParticipant,
-        (),
-    )?;
-
-    // Link to active participants
-    create_entry(&EntryTypes::Anchor(Anchor("active_participants".to_string())))?;
-    create_link(
-        anchor_hash("active_participants")?,
-        participant_hash.clone(),
-        LinkTypes::ActiveParticipants,
-        (),
-    )?;
-
-    get(participant_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Participant not found".into())))
-}
-
-/// Calculate holistic vote weight for a proposal
-///
-/// Computes the full holistic weight: Reputation² × (0.7 + 0.3 × Φ) × (1 + 0.2 × HarmonicAlignment)
-#[hdk_extern]
-pub fn calculate_holistic_vote_weight(input: CalculateWeightInput) -> ExternResult<HolisticVotingWeight> {
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    // Get participant's current state
-    let participant = get_agent_participant(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not registered as participant".into())))?;
-
-    // Get latest consciousness Φ
-    let phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
-        None => participant.phi,
-    };
-
-    // Calculate weight with harmonic alignment
-    let weight = HolisticVotingWeight::calculate(
-        participant.reputation,
-        phi,
-        input.harmonic_alignment.unwrap_or(0.0),
-    );
-
-    Ok(weight)
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CalculateWeightInput {
-    pub harmonic_alignment: Option<f64>,
-}
-
-/// Cast a weighted vote on a proposal
-///
-/// Creates a WeightedVote entry with full holistic weight calculation.
-/// Verifies consciousness gate before allowing the vote.
-#[hdk_extern]
-pub fn cast_weighted_vote(input: CastWeightedVoteInput) -> ExternResult<WeightedVoteResult> {
-    // Input validation
-    if input.proposal_id.is_empty() || input.proposal_id.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest("Proposal ID must be 1-256 characters".into())));
-    }
-    if let Some(ref reason) = input.reason {
-        if reason.len() > 4096 {
-            return Err(wasm_error!(WasmErrorInner::Guest("Reason must be at most 4096 characters".into())));
-        }
-    }
-
-    let now = sys_time()?;
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    // Get participant's current state
-    let participant = get_agent_participant(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not registered as participant".into())))?;
-
-    // Check if participant can vote
-    if !participant.can_vote() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Participant cannot vote (inactive or low reputation)".into()
-        )));
-    }
-
-    // Get adaptive threshold for proposal type
-    let threshold = AdaptiveThreshold::for_proposal_type(&input.proposal_type);
-
-    // Get latest consciousness Φ
-    let phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
-        None => participant.phi,
-    };
-
-    // Verify consciousness gate for this proposal type
-    if !threshold.voter_meets_phi_requirement(phi) {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Consciousness Φ ({:.2}) below threshold ({:.2}) for {:?} proposals",
-            phi, threshold.min_voter_phi, input.proposal_type
-        ))));
-    }
-
-    // Check cooldown
-    if participant.in_cooldown(now) {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Participant in cooldown period after slashing".into()
-        )));
-    }
-
-    // Calculate holistic weight
-    let holistic_weight = HolisticVotingWeight::calculate(
-        participant.effective_reputation(now),
-        phi,
-        input.harmonic_alignment.unwrap_or(0.0),
-    );
-
-    // Create the vote
-    let vote = WeightedVote {
-        id: format!("vote:{}:{}:{}", agent_did, input.proposal_id, now.as_micros()),
-        proposal_id: input.proposal_id.clone(),
-        round: input.round,
-        voter_did: agent_did.clone(),
-        decision: input.decision,
-        reputation: participant.effective_reputation(now),
-        weight: holistic_weight.final_weight,
-        phi,
-        reason: input.reason,
-        voted_at: now,
-        signature: format!("sig:{}:{}", agent_did, now.as_micros()),
-    };
-
-    let vote_hash = create_entry(&EntryTypes::WeightedVote(vote.clone()))?;
-
-    // Link vote to proposal round
-    let round_anchor = format!("round:{}:{}", input.proposal_id, input.round);
-    create_entry(&EntryTypes::Anchor(Anchor(round_anchor.clone())))?;
-    create_link(
-        anchor_hash(&round_anchor)?,
-        vote_hash.clone(),
-        LinkTypes::RoundToVotes,
-        (),
-    )?;
-
-    // Link vote to agent
-    let agent_anchor = format!("agent:{}", agent_did);
-    create_link(
-        anchor_hash(&agent_anchor)?,
-        vote_hash,
-        LinkTypes::AgentToVotes,
-        (),
-    )?;
-
-    Ok(WeightedVoteResult {
-        vote_id: vote.id,
-        weight: holistic_weight.final_weight,
-        weight_breakdown: holistic_weight.calculation_breakdown,
-        decision: input.decision,
-        phi_at_vote: phi,
-        proposal_type: input.proposal_type,
-        threshold_required: threshold.base_threshold,
-    })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CastWeightedVoteInput {
-    pub proposal_id: String,
-    pub proposal_type: ProposalType,
-    pub round: u64,
-    pub decision: VoteDecision,
-    pub harmonic_alignment: Option<f64>,
-    pub reason: Option<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct WeightedVoteResult {
-    pub vote_id: String,
-    pub weight: f64,
-    pub weight_breakdown: String,
-    pub decision: VoteDecision,
-    pub phi_at_vote: f64,
-    pub proposal_type: ProposalType,
-    pub threshold_required: f64,
-}
-
-/// Get adaptive threshold for a proposal type
-#[hdk_extern]
-pub fn get_adaptive_threshold(proposal_type: ProposalType) -> ExternResult<AdaptiveThreshold> {
-    Ok(AdaptiveThreshold::for_proposal_type(&proposal_type))
-}
-
-/// Get participant's current status including streak, cooldown, and effective reputation
-#[hdk_extern]
-pub fn get_participant_status(_: ()) -> ExternResult<ParticipantStatus> {
-    let now = sys_time()?;
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    let participant = get_agent_participant(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Not registered as participant".into())))?;
-
-    // Get latest consciousness Φ
-    let current_phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
-        None => participant.phi,
-    };
-
-    let effective_rep = participant.effective_reputation(now);
-    let in_cooldown = participant.in_cooldown(now);
-    let streak_bonus = participant.streak_bonus();
-
-    // Check voting eligibility for each proposal type
-    let can_vote_standard = participant.can_vote() &&
-        AdaptiveThreshold::for_proposal_type(&ProposalType::Standard)
-            .voter_meets_phi_requirement(current_phi);
-
-    let can_vote_emergency = participant.can_vote() &&
-        AdaptiveThreshold::for_proposal_type(&ProposalType::Emergency)
-            .voter_meets_phi_requirement(current_phi);
-
-    let can_vote_constitutional = participant.can_vote() &&
-        AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional)
-            .voter_meets_phi_requirement(current_phi);
-
-    Ok(ParticipantStatus {
-        agent_did,
-        is_active: participant.is_active,
-        base_reputation: participant.reputation,
-        effective_reputation: effective_rep,
-        streak_count: participant.streak_count,
-        streak_bonus,
-        in_cooldown,
-        current_phi,
-        federated_score: participant.federated_score,
-        rounds_participated: participant.rounds_participated,
-        successful_votes: participant.successful_votes,
-        success_rate: participant.success_rate(),
-        slashing_events: participant.slashing_events,
-        can_vote_standard,
-        can_vote_emergency,
-        can_vote_constitutional,
-    })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct ParticipantStatus {
-    pub agent_did: String,
-    pub is_active: bool,
-    pub base_reputation: f64,
-    pub effective_reputation: f64,
-    pub streak_count: u64,
-    pub streak_bonus: f64,
-    pub in_cooldown: bool,
-    pub current_phi: f64,
-    pub federated_score: f64,
-    pub rounds_participated: u64,
-    pub successful_votes: u64,
-    pub success_rate: f64,
-    pub slashing_events: u64,
-    pub can_vote_standard: bool,
-    pub can_vote_emergency: bool,
-    pub can_vote_constitutional: bool,
-}
-
-/// Update federated reputation signals from external modules
-///
-/// ## Domain Boundary Enforcement
-///
-/// All input values are clamped to valid ranges [0.0, 1.0] for scores.
-/// Per Commons Charter v1.0 Article II:
-/// - Finance domain signals (stake, payments, escrow) can contribute at most 5% to aggregated score
-/// - This is enforced in FederatedReputation.calculate_aggregated(), not here
-/// - All normalized values are clamped to prevent manipulation
-#[hdk_extern]
-pub fn update_federated_reputation(input: UpdateFederatedReputationInput) -> ExternResult<Record> {
-    let now = sys_time()?;
-    let agent_info = agent_info()?;
-    let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
-
-    // Get current federated reputation
-    let (current_record, mut fed_rep) = get_agent_federated_reputation(&agent_did)?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("No federated reputation found".into())))?;
-
-    // Update only the fields that are provided, with domain boundary clamping
-    // All f64 scores are clamped to [0.0, 1.0] to prevent manipulation
-
-    // Identity domain signals
-    if let Some(v) = input.identity_verification {
-        fed_rep.identity_verification = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.credential_count {
-        fed_rep.credential_count = v.min(100); // Cap at 100 credentials
-    }
-    if let Some(v) = input.credential_quality {
-        fed_rep.credential_quality = v.clamp(0.0, 1.0);
-    }
-
-    // Knowledge domain signals
-    if let Some(v) = input.epistemic_contributions {
-        fed_rep.epistemic_contributions = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.factcheck_accuracy {
-        fed_rep.factcheck_accuracy = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.dark_spots_resolved {
-        fed_rep.dark_spots_resolved = v.min(1000); // Cap at 1000
-    }
-
-    // Finance domain signals (these contribute max 5% to final score)
-    if let Some(v) = input.stake_weight {
-        fed_rep.stake_weight = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.payment_reliability {
-        fed_rep.payment_reliability = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.escrow_completion_rate {
-        fed_rep.escrow_completion_rate = v.clamp(0.0, 1.0);
-    }
-
-    // FL domain signals
-    if let Some(v) = input.pogq_score {
-        fed_rep.pogq_score = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.fl_contributions {
-        fed_rep.fl_contributions = v.min(10000); // Cap at 10000
-    }
-    if let Some(v) = input.byzantine_clean_rate {
-        fed_rep.byzantine_clean_rate = v.clamp(0.0, 1.0);
-    }
-
-    // Governance domain signals
-    if let Some(v) = input.voting_participation {
-        fed_rep.voting_participation = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.proposal_success_rate {
-        fed_rep.proposal_success_rate = v.clamp(0.0, 1.0);
-    }
-    if let Some(v) = input.consensus_alignment {
-        fed_rep.consensus_alignment = v.clamp(0.0, 1.0);
-    }
-
-    // Recalculate aggregated score (domain boundaries enforced in calculate_aggregated)
-    fed_rep.refresh_aggregation(now);
-
-    // Update the entry
-    let updated_hash = update_entry(
-        current_record.action_address().clone(),
-        &EntryTypes::FederatedReputation(fed_rep),
-    )?;
-
-    get(updated_hash, GetOptions::default())?
-        .ok_or(wasm_error!(WasmErrorInner::Guest("Updated reputation not found".into())))
-}
-
-#[derive(Serialize, Deserialize, Debug, Default)]
-pub struct UpdateFederatedReputationInput {
-    pub identity_verification: Option<f64>,
-    pub credential_count: Option<u64>,
-    pub credential_quality: Option<f64>,
-    pub epistemic_contributions: Option<f64>,
-    pub factcheck_accuracy: Option<f64>,
-    pub dark_spots_resolved: Option<u64>,
-    pub stake_weight: Option<f64>,
-    pub payment_reliability: Option<f64>,
-    pub escrow_completion_rate: Option<f64>,
-    pub pogq_score: Option<f64>,
-    pub fl_contributions: Option<u64>,
-    pub byzantine_clean_rate: Option<f64>,
-    pub voting_participation: Option<f64>,
-    pub proposal_success_rate: Option<f64>,
-    pub consensus_alignment: Option<f64>,
-}
-
-/// Get votes for a consensus round
-#[hdk_extern]
-pub fn get_round_votes(input: GetRoundVotesInput) -> ExternResult<Vec<Record>> {
-    let round_anchor = format!("round:{}:{}", input.proposal_id, input.round);
-    let anchor = match anchor_hash(&round_anchor) {
-        Ok(h) => h,
-        Err(_) => return Ok(vec![]),
-    };
-
-    let links = get_links(
-        LinkQuery::try_new(anchor, LinkTypes::RoundToVotes)?,
-        GetStrategy::default(),
-    )?;
-
-    let mut votes = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            votes.push(record);
-        }
-    }
-
-    Ok(votes)
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GetRoundVotesInput {
-    pub proposal_id: String,
-    pub round: u64,
-}
-
-/// Calculate consensus round result
-#[hdk_extern]
-pub fn calculate_round_result(input: CalculateRoundResultInput) -> ExternResult<RoundResult> {
-    let votes = get_round_votes(GetRoundVotesInput {
-        proposal_id: input.proposal_id.clone(),
-        round: input.round,
-    })?;
-
-    let threshold = AdaptiveThreshold::for_proposal_type(&input.proposal_type);
-
-    let mut total_weight = 0.0;
-    let mut weighted_approvals = 0.0;
-    let mut weighted_rejections = 0.0;
-    let mut vote_count = 0u64;
-
-    for record in &votes {
-        if let Some(vote) = record
-            .entry()
-            .to_app_option::<WeightedVote>()
-            .ok()
-            .flatten()
-        {
-            total_weight += vote.weight;
-            vote_count += 1;
-
-            match vote.decision {
-                VoteDecision::Approve => weighted_approvals += vote.weight,
-                VoteDecision::Reject => weighted_rejections += vote.weight,
-                VoteDecision::Abstain => {} // Abstains add to total but not to either side
-            }
-        }
-    }
-
-    let required_threshold = threshold.calculate_threshold(total_weight);
-    let consensus_reached = weighted_approvals > required_threshold;
-    let rejected = weighted_rejections > required_threshold;
-
-    let approval_percentage = if total_weight > 0.0 {
-        (weighted_approvals / total_weight) * 100.0
-    } else {
-        0.0
-    };
-
-    let quorum_met = threshold.quorum_met(vote_count, input.eligible_voters);
-
-    let result = if !quorum_met {
-        "quorum_not_met"
-    } else if consensus_reached {
-        "approved"
-    } else if rejected {
-        "rejected"
-    } else {
-        "pending"
-    };
-
-    Ok(RoundResult {
-        proposal_id: input.proposal_id,
-        round: input.round,
-        proposal_type: input.proposal_type,
-        total_weight,
-        weighted_approvals,
-        weighted_rejections,
-        vote_count,
-        required_threshold,
-        approval_percentage,
-        quorum_met,
-        consensus_reached,
-        rejected,
-        result: result.to_string(),
-    })
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct CalculateRoundResultInput {
-    pub proposal_id: String,
-    pub round: u64,
-    pub proposal_type: ProposalType,
-    pub eligible_voters: u64,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RoundResult {
-    pub proposal_id: String,
-    pub round: u64,
-    pub proposal_type: ProposalType,
-    pub total_weight: f64,
-    pub weighted_approvals: f64,
-    pub weighted_rejections: f64,
-    pub vote_count: u64,
-    pub required_threshold: f64,
-    pub approval_percentage: f64,
-    pub quorum_met: bool,
-    pub consensus_reached: bool,
-    pub rejected: bool,
-    pub result: String,
-}
-
-// =============================================================================
-// CROSS-CLUSTER DISPATCH TO PERSONAL
-// =============================================================================
-
-/// Allowed zomes in the personal cluster that governance can call
-const ALLOWED_PERSONAL_ZOMES: &[&str] = &["personal_bridge"];
-
-/// Dispatch a call to the personal cluster via OtherRole
-///
-/// Used by governance to request credential presentations (Phi, K-vector,
-/// identity proofs) from the agent's personal vault via the personal bridge.
-#[hdk_extern]
-pub fn dispatch_personal_call(input: DispatchPersonalCallInput) -> ExternResult<ExternIO> {
-    // Validate zome is in allowlist
-    if !ALLOWED_PERSONAL_ZOMES.contains(&input.zome_name.as_str()) {
-        return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Zome '{}' not in ALLOWED_PERSONAL_ZOMES",
-            input.zome_name
-        ))));
-    }
-
-    // Validate function name length
-    if input.fn_name.is_empty() || input.fn_name.len() > 256 {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Function name must be 1-256 characters".into()
-        )));
-    }
-
-    // Call the personal cluster via OtherRole
-    match call(
-        CallTargetCell::OtherRole("personal".into()),
-        ZomeName::from(input.zome_name),
-        FunctionName::from(input.fn_name),
-        None,
-        input.payload,
-    )? {
-        ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling personal cluster: {}", e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Personal cluster call failed: {:?}", other)
-        ))),
-    }
-}
-
-/// Input for dispatching a call to the personal cluster
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DispatchPersonalCallInput {
-    pub zome_name: String,
-    pub fn_name: String,
-    pub payload: ExternIO,
-}
-
-/// Request Phi credential from agent's personal vault
-///
-/// Convenience wrapper around dispatch_personal_call for the common case
-/// of requesting a Phi attestation for consciousness-gated governance.
-#[hdk_extern]
-pub fn request_phi_credential(_: ()) -> ExternResult<ExternIO> {
-    match call(
-        CallTargetCell::OtherRole("personal".into()),
-        ZomeName::from("personal_bridge"),
-        FunctionName::from("present_phi_credential"),
-        None,
-        ExternIO::encode(())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    )? {
-        ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling personal cluster: {}", e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Personal cluster call failed: {:?}", other)
-        ))),
-    }
-}
-
-/// Request K-vector trust credential from agent's personal vault
-///
-/// Convenience wrapper for requesting K-vector trust data for weighted voting.
-#[hdk_extern]
-pub fn request_k_vector(_: ()) -> ExternResult<ExternIO> {
-    match call(
-        CallTargetCell::OtherRole("personal".into()),
-        ZomeName::from("personal_bridge"),
-        FunctionName::from("present_k_vector"),
-        None,
-        ExternIO::encode(())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    )? {
-        ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling personal cluster: {}", e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Personal cluster call failed: {:?}", other)
-        ))),
-    }
-}
-
-/// Request identity proof from agent's personal vault
-///
-/// Convenience wrapper for requesting ZK identity proof without full profile disclosure.
-#[hdk_extern]
-pub fn request_identity_proof(_: ()) -> ExternResult<ExternIO> {
-    match call(
-        CallTargetCell::OtherRole("personal".into()),
-        ZomeName::from("personal_bridge"),
-        FunctionName::from("present_identity_proof"),
-        None,
-        ExternIO::encode(())
-            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?,
-    )? {
-        ZomeCallResponse::Ok(io) => Ok(io),
-        ZomeCallResponse::NetworkError(e) => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Network error calling personal cluster: {}", e)
-        ))),
-        other => Err(wasm_error!(WasmErrorInner::Guest(
-            format!("Personal cluster call failed: {:?}", other)
-        ))),
     }
 }
 
@@ -2020,5 +391,749 @@ mod tests {
         let rec = determine_recommendation(0.5, 0.2, &[]);
         assert_ne!(rec, GovernanceRecommendation::CannotEvaluate,
             "Authenticity exactly 0.2 should be evaluated");
+    }
+
+    // --- check_snapshot_input ---
+
+    fn valid_snapshot_input() -> RecordSnapshotInput {
+        RecordSnapshotInput {
+            phi: 0.7,
+            meta_awareness: 0.6,
+            self_model_accuracy: 0.8,
+            coherence: 0.9,
+            affective_valence: 0.3,
+            care_activation: 0.5,
+            source: None,
+        }
+    }
+
+    #[test]
+    fn test_snapshot_valid_input() {
+        assert!(check_snapshot_input(&valid_snapshot_input()).is_ok());
+    }
+
+    #[test]
+    fn test_snapshot_phi_out_of_range() {
+        let mut input = valid_snapshot_input();
+        input.phi = 1.1;
+        assert!(check_snapshot_input(&input).is_err());
+        input.phi = -0.1;
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_meta_awareness_out_of_range() {
+        let mut input = valid_snapshot_input();
+        input.meta_awareness = 1.5;
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_self_model_accuracy_out_of_range() {
+        let mut input = valid_snapshot_input();
+        input.self_model_accuracy = -0.01;
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_coherence_out_of_range() {
+        let mut input = valid_snapshot_input();
+        input.coherence = 2.0;
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_valence_out_of_range() {
+        let mut input = valid_snapshot_input();
+        input.affective_valence = -1.1;
+        assert!(check_snapshot_input(&input).is_err());
+        input.affective_valence = 1.1;
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_valence_valid_negative() {
+        let mut input = valid_snapshot_input();
+        input.affective_valence = -1.0;
+        assert!(check_snapshot_input(&input).is_ok());
+        input.affective_valence = -0.5;
+        assert!(check_snapshot_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_snapshot_care_activation_out_of_range() {
+        let mut input = valid_snapshot_input();
+        input.care_activation = 1.01;
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_source_empty() {
+        let mut input = valid_snapshot_input();
+        input.source = Some("".into());
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_source_too_long() {
+        let mut input = valid_snapshot_input();
+        input.source = Some("x".repeat(257));
+        assert!(check_snapshot_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_snapshot_source_valid() {
+        let mut input = valid_snapshot_input();
+        input.source = Some("symthaea".into());
+        assert!(check_snapshot_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_snapshot_boundary_values() {
+        // All at exact boundaries should pass
+        let input = RecordSnapshotInput {
+            phi: 0.0,
+            meta_awareness: 1.0,
+            self_model_accuracy: 0.0,
+            coherence: 1.0,
+            affective_valence: -1.0,
+            care_activation: 0.0,
+            source: None,
+        };
+        assert!(check_snapshot_input(&input).is_ok());
+    }
+
+    // --- check_broadcast_event_input ---
+
+    #[test]
+    fn test_broadcast_valid_input() {
+        let input = BroadcastGovernanceEventInput {
+            event_type: GovernanceEventType::ProposalCreated,
+            proposal_id: Some("prop-123".into()),
+            subject: "New proposal".into(),
+            payload: "{}".into(),
+        };
+        assert!(check_broadcast_event_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_broadcast_empty_subject() {
+        let input = BroadcastGovernanceEventInput {
+            event_type: GovernanceEventType::VoteReceived,
+            proposal_id: None,
+            subject: "".into(),
+            payload: "{}".into(),
+        };
+        assert!(check_broadcast_event_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_broadcast_subject_too_long() {
+        let input = BroadcastGovernanceEventInput {
+            event_type: GovernanceEventType::VoteReceived,
+            proposal_id: None,
+            subject: "x".repeat(257),
+            payload: "{}".into(),
+        };
+        assert!(check_broadcast_event_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_broadcast_payload_too_long() {
+        let input = BroadcastGovernanceEventInput {
+            event_type: GovernanceEventType::ProposalExecuted,
+            proposal_id: None,
+            subject: "test".into(),
+            payload: "x".repeat(4097),
+        };
+        assert!(check_broadcast_event_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_broadcast_empty_proposal_id() {
+        let input = BroadcastGovernanceEventInput {
+            event_type: GovernanceEventType::ProposalCreated,
+            proposal_id: Some("".into()),
+            subject: "test".into(),
+            payload: "{}".into(),
+        };
+        assert!(check_broadcast_event_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_broadcast_none_proposal_id_ok() {
+        let input = BroadcastGovernanceEventInput {
+            event_type: GovernanceEventType::ConstitutionAmended,
+            proposal_id: None,
+            subject: "test".into(),
+            payload: "{}".into(),
+        };
+        assert!(check_broadcast_event_input(&input).is_ok());
+    }
+
+    // --- check_execution_request_input ---
+
+    #[test]
+    fn test_execution_valid_input() {
+        let input = RequestExecutionInput {
+            proposal_id: "prop-1".into(),
+            target_happ: "finance".into(),
+            action: "transfer".into(),
+            parameters: serde_json::json!({}),
+        };
+        assert!(check_execution_request_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_execution_empty_proposal_id() {
+        let input = RequestExecutionInput {
+            proposal_id: "".into(),
+            target_happ: "finance".into(),
+            action: "transfer".into(),
+            parameters: serde_json::json!({}),
+        };
+        assert!(check_execution_request_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_execution_empty_target_happ() {
+        let input = RequestExecutionInput {
+            proposal_id: "prop-1".into(),
+            target_happ: "".into(),
+            action: "transfer".into(),
+            parameters: serde_json::json!({}),
+        };
+        assert!(check_execution_request_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_execution_empty_action() {
+        let input = RequestExecutionInput {
+            proposal_id: "prop-1".into(),
+            target_happ: "finance".into(),
+            action: "".into(),
+            parameters: serde_json::json!({}),
+        };
+        assert!(check_execution_request_input(&input).is_err());
+    }
+
+    // --- check_alignment_input ---
+
+    #[test]
+    fn test_alignment_valid_input() {
+        let input = AssessAlignmentInput {
+            proposal_id: "prop-1".into(),
+            proposal_content: "A flourishing community project".into(),
+        };
+        assert!(check_alignment_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_alignment_empty_proposal_id() {
+        let input = AssessAlignmentInput {
+            proposal_id: "".into(),
+            proposal_content: "content".into(),
+        };
+        assert!(check_alignment_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_alignment_empty_content() {
+        let input = AssessAlignmentInput {
+            proposal_id: "prop-1".into(),
+            proposal_content: "".into(),
+        };
+        assert!(check_alignment_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_alignment_content_too_long() {
+        let input = AssessAlignmentInput {
+            proposal_id: "prop-1".into(),
+            proposal_content: "x".repeat(4097),
+        };
+        assert!(check_alignment_input(&input).is_err());
+    }
+
+    // --- check_weighted_vote_input ---
+
+    #[test]
+    fn test_weighted_vote_valid_input() {
+        let input = CastWeightedVoteInput {
+            proposal_id: "prop-1".into(),
+            proposal_type: ProposalType::Standard,
+            round: 1,
+            decision: VoteDecision::Approve,
+            harmonic_alignment: Some(0.8),
+            reason: Some("Good proposal".into()),
+        };
+        assert!(check_weighted_vote_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_weighted_vote_empty_proposal_id() {
+        let input = CastWeightedVoteInput {
+            proposal_id: "".into(),
+            proposal_type: ProposalType::Standard,
+            round: 1,
+            decision: VoteDecision::Approve,
+            harmonic_alignment: None,
+            reason: None,
+        };
+        assert!(check_weighted_vote_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_weighted_vote_reason_too_long() {
+        let input = CastWeightedVoteInput {
+            proposal_id: "prop-1".into(),
+            proposal_type: ProposalType::Constitutional,
+            round: 1,
+            decision: VoteDecision::Reject,
+            harmonic_alignment: None,
+            reason: Some("x".repeat(4097)),
+        };
+        assert!(check_weighted_vote_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_weighted_vote_none_reason_ok() {
+        let input = CastWeightedVoteInput {
+            proposal_id: "prop-1".into(),
+            proposal_type: ProposalType::Emergency,
+            round: 1,
+            decision: VoteDecision::Abstain,
+            harmonic_alignment: None,
+            reason: None,
+        };
+        assert!(check_weighted_vote_input(&input).is_ok());
+    }
+
+    // --- check_transfer_credits_input ---
+
+    #[test]
+    fn test_transfer_valid_input() {
+        let input = TransferCreditsInput {
+            from: "treasury-main".into(),
+            to: "recipient-1".into(),
+            amount: 100.0,
+        };
+        assert!(check_transfer_credits_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_transfer_empty_from() {
+        let input = TransferCreditsInput {
+            from: "".into(),
+            to: "recipient-1".into(),
+            amount: 100.0,
+        };
+        assert!(check_transfer_credits_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_transfer_empty_to() {
+        let input = TransferCreditsInput {
+            from: "treasury".into(),
+            to: "".into(),
+            amount: 100.0,
+        };
+        assert!(check_transfer_credits_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_transfer_zero_amount() {
+        let input = TransferCreditsInput {
+            from: "a".into(),
+            to: "b".into(),
+            amount: 0.0,
+        };
+        assert!(check_transfer_credits_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_transfer_negative_amount() {
+        let input = TransferCreditsInput {
+            from: "a".into(),
+            to: "b".into(),
+            amount: -50.0,
+        };
+        assert!(check_transfer_credits_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_transfer_infinity() {
+        let input = TransferCreditsInput {
+            from: "a".into(),
+            to: "b".into(),
+            amount: f64::INFINITY,
+        };
+        assert!(check_transfer_credits_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_transfer_nan() {
+        let input = TransferCreditsInput {
+            from: "a".into(),
+            to: "b".into(),
+            amount: f64::NAN,
+        };
+        assert!(check_transfer_credits_input(&input).is_err());
+    }
+
+    // --- check_federated_reputation_input ---
+
+    #[test]
+    fn test_federated_rep_empty_input_valid() {
+        let input = UpdateFederatedReputationInput::default();
+        assert!(check_federated_reputation_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_federated_rep_valid_partial() {
+        let input = UpdateFederatedReputationInput {
+            identity_verification: Some(0.9),
+            credential_count: Some(5),
+            voting_participation: Some(0.7),
+            ..Default::default()
+        };
+        assert!(check_federated_reputation_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_federated_rep_identity_verification_out_of_range() {
+        let input = UpdateFederatedReputationInput {
+            identity_verification: Some(1.5),
+            ..Default::default()
+        };
+        assert!(check_federated_reputation_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_federated_rep_negative_score() {
+        let input = UpdateFederatedReputationInput {
+            pogq_score: Some(-0.1),
+            ..Default::default()
+        };
+        assert!(check_federated_reputation_input(&input).is_err());
+    }
+
+    #[test]
+    fn test_federated_rep_all_at_boundary() {
+        let input = UpdateFederatedReputationInput {
+            identity_verification: Some(0.0),
+            credential_quality: Some(1.0),
+            epistemic_contributions: Some(0.0),
+            factcheck_accuracy: Some(1.0),
+            stake_weight: Some(0.0),
+            payment_reliability: Some(1.0),
+            escrow_completion_rate: Some(0.5),
+            pogq_score: Some(0.0),
+            byzantine_clean_rate: Some(1.0),
+            voting_participation: Some(0.0),
+            proposal_success_rate: Some(1.0),
+            consensus_alignment: Some(0.5),
+            ..Default::default()
+        };
+        assert!(check_federated_reputation_input(&input).is_ok());
+    }
+
+    #[test]
+    fn test_federated_rep_byzantine_rate_too_high() {
+        let input = UpdateFederatedReputationInput {
+            byzantine_clean_rate: Some(1.001),
+            ..Default::default()
+        };
+        assert!(check_federated_reputation_input(&input).is_err());
+    }
+
+    // --- GovernanceActionType thresholds ---
+
+    #[test]
+    fn test_action_type_thresholds() {
+        assert!((GovernanceActionType::Basic.phi_threshold() - 0.2).abs() < f64::EPSILON);
+        assert!((GovernanceActionType::ProposalSubmission.phi_threshold() - 0.3).abs() < f64::EPSILON);
+        assert!((GovernanceActionType::Voting.phi_threshold() - 0.4).abs() < f64::EPSILON);
+        assert!((GovernanceActionType::Constitutional.phi_threshold() - 0.6).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_action_type_ordering() {
+        // Thresholds must be monotonically increasing
+        assert!(GovernanceActionType::Basic.phi_threshold()
+            < GovernanceActionType::ProposalSubmission.phi_threshold());
+        assert!(GovernanceActionType::ProposalSubmission.phi_threshold()
+            < GovernanceActionType::Voting.phi_threshold());
+        assert!(GovernanceActionType::Voting.phi_threshold()
+            < GovernanceActionType::Constitutional.phi_threshold());
+    }
+
+    // --- ConsciousnessSnapshot quality_score ---
+
+    #[test]
+    fn test_quality_score_perfect() {
+        let snap = ConsciousnessSnapshot {
+            id: "s1".into(),
+            agent_did: "did:test:1".into(),
+            phi: 1.0,
+            meta_awareness: 1.0,
+            self_model_accuracy: 1.0,
+            coherence: 1.0,
+            affective_valence: 1.0,
+            care_activation: 1.0,
+            captured_at: Timestamp::from_micros(0),
+            source: "test".into(),
+        };
+        // 1.0*0.4 + 1.0*0.2 + 1.0*0.2 + 1.0*0.2 = 1.0
+        assert!((snap.quality_score() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_quality_score_zero() {
+        let snap = ConsciousnessSnapshot {
+            id: "s2".into(),
+            agent_did: "did:test:2".into(),
+            phi: 0.0,
+            meta_awareness: 0.0,
+            self_model_accuracy: 0.0,
+            coherence: 0.0,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            captured_at: Timestamp::from_micros(0),
+            source: "test".into(),
+        };
+        assert!((snap.quality_score() - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_quality_score_phi_dominates() {
+        // Phi has 0.4 weight, all others 0.2
+        let snap = ConsciousnessSnapshot {
+            id: "s3".into(),
+            agent_did: "did:test:3".into(),
+            phi: 1.0,
+            meta_awareness: 0.0,
+            self_model_accuracy: 0.0,
+            coherence: 0.0,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            captured_at: Timestamp::from_micros(0),
+            source: "test".into(),
+        };
+        assert!((snap.quality_score() - 0.4).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_quality_score_does_not_include_valence_or_care() {
+        // affective_valence and care_activation are NOT in quality_score
+        let base = ConsciousnessSnapshot {
+            id: "s4".into(),
+            agent_did: "did:test:4".into(),
+            phi: 0.5,
+            meta_awareness: 0.5,
+            self_model_accuracy: 0.5,
+            coherence: 0.5,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            captured_at: Timestamp::from_micros(0),
+            source: "test".into(),
+        };
+        let with_extras = ConsciousnessSnapshot {
+            affective_valence: 1.0,
+            care_activation: 1.0,
+            ..base.clone()
+        };
+        assert!((base.quality_score() - with_extras.quality_score()).abs() < 1e-10,
+            "Valence and care should not affect quality score");
+    }
+
+    #[test]
+    fn test_snapshot_meets_threshold() {
+        let snap = ConsciousnessSnapshot {
+            id: "s5".into(),
+            agent_did: "did:test:5".into(),
+            phi: 0.5,
+            meta_awareness: 0.5,
+            self_model_accuracy: 0.5,
+            coherence: 0.5,
+            affective_valence: 0.0,
+            care_activation: 0.0,
+            captured_at: Timestamp::from_micros(0),
+            source: "test".into(),
+        };
+        assert!(snap.meets_threshold(&GovernanceActionType::Basic));       // 0.5 >= 0.2
+        assert!(snap.meets_threshold(&GovernanceActionType::ProposalSubmission)); // 0.5 >= 0.3
+        assert!(snap.meets_threshold(&GovernanceActionType::Voting));      // 0.5 >= 0.4
+        assert!(!snap.meets_threshold(&GovernanceActionType::Constitutional)); // 0.5 < 0.6
+    }
+
+    // --- HolisticVotingWeight ---
+
+    #[test]
+    fn test_holistic_weight_perfect_inputs() {
+        let w = HolisticVotingWeight::calculate(1.0, 1.0, 1.0);
+        // 1.0² × (0.7 + 0.3×1.0) × (1 + 0.2×1.0) = 1.0 × 1.0 × 1.2 = 1.2
+        assert!((w.final_weight - 1.2).abs() < 1e-10);
+        assert!(!w.was_capped);
+    }
+
+    #[test]
+    fn test_holistic_weight_zero_phi() {
+        let w = HolisticVotingWeight::calculate(1.0, 0.0, 0.0);
+        // 1.0² × (0.7 + 0.0) × 1.0 = 0.7
+        assert!((w.final_weight - 0.7).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_holistic_weight_zero_reputation() {
+        let w = HolisticVotingWeight::calculate(0.0, 1.0, 1.0);
+        // 0.0² × anything = 0.0
+        assert!((w.final_weight - 0.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_holistic_weight_negative_alignment_no_penalty() {
+        let w_neg = HolisticVotingWeight::calculate(0.8, 0.5, -1.0);
+        let w_zero = HolisticVotingWeight::calculate(0.8, 0.5, 0.0);
+        // Negative alignment is clamped to 0 in bonus, so both should be equal
+        assert!((w_neg.final_weight - w_zero.final_weight).abs() < 1e-10,
+            "Negative alignment should give same weight as zero alignment");
+    }
+
+    #[test]
+    fn test_holistic_weight_capping() {
+        // With extreme reputation > 1.0 (gets clamped to 1.0), so can't exceed cap
+        // But let's verify the cap constant is 1.5
+        assert!((HolisticVotingWeight::max_weight() - 1.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_holistic_weight_calculate_base() {
+        let w = HolisticVotingWeight::calculate_base(0.8, 0.6);
+        let w_manual = HolisticVotingWeight::calculate(0.8, 0.6, 0.0);
+        assert!((w.final_weight - w_manual.final_weight).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_holistic_weight_consciousness_multiplier_range() {
+        // Phi = 0 → multiplier = 0.7
+        let w0 = HolisticVotingWeight::calculate(1.0, 0.0, 0.0);
+        assert!((w0.consciousness_multiplier - 0.7).abs() < 1e-10);
+
+        // Phi = 1 → multiplier = 1.0
+        let w1 = HolisticVotingWeight::calculate(1.0, 1.0, 0.0);
+        assert!((w1.consciousness_multiplier - 1.0).abs() < 1e-10);
+
+        // Phi = 0.5 → multiplier = 0.85
+        let w5 = HolisticVotingWeight::calculate(1.0, 0.5, 0.0);
+        assert!((w5.consciousness_multiplier - 0.85).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_holistic_weight_harmonic_bonus_range() {
+        // alignment = 0 → bonus = 1.0
+        let w0 = HolisticVotingWeight::calculate(1.0, 0.5, 0.0);
+        assert!((w0.harmonic_bonus - 1.0).abs() < 1e-10);
+
+        // alignment = 1.0 → bonus = 1.2
+        let w1 = HolisticVotingWeight::calculate(1.0, 0.5, 1.0);
+        assert!((w1.harmonic_bonus - 1.2).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_holistic_weight_mid_reputation() {
+        let w = HolisticVotingWeight::calculate(0.5, 0.5, 0.0);
+        // 0.5² × (0.7 + 0.3×0.5) × 1.0 = 0.25 × 0.85 × 1.0 = 0.2125
+        assert!((w.final_weight - 0.2125).abs() < 1e-10);
+    }
+
+    #[test]
+    fn test_holistic_weight_breakdown_not_empty() {
+        let w = HolisticVotingWeight::calculate(0.8, 0.6, 0.3);
+        assert!(!w.calculation_breakdown.is_empty());
+        // Breakdown should contain the constant values
+        assert!(w.calculation_breakdown.contains("0.7"), "Should reference consciousness base");
+        assert!(w.calculation_breakdown.contains("0.3"), "Should reference phi factor");
+    }
+
+    // --- AdaptiveThreshold ---
+
+    #[test]
+    fn test_adaptive_threshold_standard() {
+        let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
+        assert!((t.base_threshold - 0.51).abs() < 1e-10);
+        assert!((t.min_voter_phi - 0.2).abs() < 1e-10);
+        assert_eq!(t.min_participation, 5);
+        assert!((t.quorum - 0.20).abs() < 1e-10);
+        assert_eq!(t.max_extension_secs, 86400);
+    }
+
+    #[test]
+    fn test_adaptive_threshold_emergency() {
+        let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Emergency);
+        assert!((t.base_threshold - 0.60).abs() < 1e-10);
+        assert!((t.min_voter_phi - 0.3).abs() < 1e-10);
+        assert_eq!(t.min_participation, 3);
+        assert!((t.quorum - 0.10).abs() < 1e-10);
+        assert_eq!(t.max_extension_secs, 3600);
+    }
+
+    #[test]
+    fn test_adaptive_threshold_constitutional() {
+        let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
+        assert!((t.base_threshold - 0.67).abs() < 1e-10);
+        assert!((t.min_voter_phi - 0.5).abs() < 1e-10);
+        assert_eq!(t.min_participation, 10);
+        assert!((t.quorum - 0.40).abs() < 1e-10);
+        assert_eq!(t.max_extension_secs, 604800);
+    }
+
+    #[test]
+    fn test_adaptive_threshold_phi_ordering() {
+        let standard = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
+        let emergency = AdaptiveThreshold::for_proposal_type(&ProposalType::Emergency);
+        let constitutional = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
+        assert!(standard.min_voter_phi < emergency.min_voter_phi);
+        assert!(emergency.min_voter_phi < constitutional.min_voter_phi);
+    }
+
+    #[test]
+    fn test_adaptive_threshold_quorum_check() {
+        let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
+        // 20% quorum, min 5 participants
+        assert!(!t.quorum_met(4, 100), "4 voters < 5 min_participation");
+        assert!(t.quorum_met(20, 100), "20/100 = 20% meets quorum");
+        assert!(!t.quorum_met(19, 100), "19/100 = 19% below 20%");
+        assert!(!t.quorum_met(5, 0), "0 eligible → never meets quorum");
+    }
+
+    #[test]
+    fn test_adaptive_threshold_voter_phi_check() {
+        let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
+        assert!(!t.voter_meets_phi_requirement(0.49), "0.49 < 0.5");
+        assert!(t.voter_meets_phi_requirement(0.50), "0.50 = 0.5");
+        assert!(t.voter_meets_phi_requirement(0.80), "0.80 > 0.5");
+    }
+
+    #[test]
+    fn test_adaptive_threshold_calculate_threshold() {
+        let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
+        // base_threshold = 0.51, so for total_weight = 10.0: 5.1
+        assert!((t.calculate_threshold(10.0) - 5.1).abs() < 1e-10);
+    }
+
+    // --- Threshold hierarchy documentation test ---
+
+    #[test]
+    fn test_threshold_hierarchy_voter_bar_below_proposer_bar() {
+        // For Constitutional proposals:
+        // - Proposer needs GovernanceActionType::Constitutional = 0.6
+        // - Voter needs AdaptiveThreshold(Constitutional).min_voter_phi = 0.5
+        // This is intentional: lower bar for voting than proposing
+        let proposer_bar = GovernanceActionType::Constitutional.phi_threshold();
+        let voter_bar = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional).min_voter_phi;
+        assert!(voter_bar < proposer_bar,
+            "Constitutional voter bar ({}) should be lower than proposer bar ({})",
+            voter_bar, proposer_bar);
     }
 }

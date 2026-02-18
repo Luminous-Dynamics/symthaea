@@ -4,6 +4,15 @@
 //! Commons and Civic cluster bridge zomes. Each cluster's bridge
 //! coordinator imports these types and calls `dispatch_call_checked()`
 //! with its own allowlist.
+//!
+//! ## Phi Thresholds (always available)
+//!
+//! The `phi_thresholds` module is the canonical source of truth for all
+//! Phi-related thresholds across the Mycelix ecosystem. It does not
+//! depend on HDK and can be used by any Rust crate.
+
+pub mod phi_thresholds;
+pub use phi_thresholds::{phi_thresholds, PhiThresholds};
 
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};

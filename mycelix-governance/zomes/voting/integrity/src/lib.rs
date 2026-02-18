@@ -16,6 +16,20 @@
 
 use hdi::prelude::*;
 
+/// How the Phi value in a governance decision was obtained.
+///
+/// Mirrors `bridge_integrity::PhiProvenance` — defined here to avoid
+/// cross-zome integrity dependencies (which cause duplicate HDI symbols in WASM).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PhiProvenance {
+    /// Signed attestation from agent's Symthaea instance
+    Attested,
+    /// Legacy unsigned ConsciousnessSnapshot
+    Snapshot,
+    /// No Phi data available — reputation-only voting
+    Unavailable,
+}
+
 /// Anchor entry for deterministic link bases
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
@@ -71,6 +85,9 @@ impl ProposalTier {
 pub struct PhiWeight {
     /// Base Φ score from consciousness metrics (0.0-1.0)
     pub phi_score: f64,
+    /// How the phi_score was obtained (Attested, Snapshot, or Unavailable)
+    #[serde(default = "default_provenance")]
+    pub phi_provenance: PhiProvenance,
     /// K-vector derived trust score (0.0-1.0)
     pub k_trust: f64,
     /// Stake-based weight (from staking position)
@@ -79,6 +96,10 @@ pub struct PhiWeight {
     pub participation_score: f64,
     /// Reputation in relevant domain (0.0-1.0)
     pub domain_reputation: f64,
+}
+
+fn default_provenance() -> PhiProvenance {
+    PhiProvenance::Unavailable
 }
 
 impl PhiWeight {
@@ -101,6 +122,7 @@ impl PhiWeight {
     pub fn default_participant() -> Self {
         Self {
             phi_score: 0.1,
+            phi_provenance: PhiProvenance::Unavailable,
             k_trust: 0.1,
             stake_weight: 0.0,
             participation_score: 0.0,
@@ -389,6 +411,15 @@ pub struct PhiWeightedTally {
     pub final_tally: bool,
     /// Breakdown by Φ tier (for analysis)
     pub phi_tier_breakdown: PhiTierBreakdown,
+    /// Votes with real Phi data (Attested or Snapshot)
+    #[serde(default)]
+    pub phi_enhanced_count: u64,
+    /// Votes without Phi data (reputation-only)
+    #[serde(default)]
+    pub reputation_only_count: u64,
+    /// Fraction of votes with verified consciousness data (phi_enhanced / total)
+    #[serde(default)]
+    pub phi_coverage: f64,
 }
 
 /// Breakdown of votes by voter Φ tier
@@ -1688,6 +1719,7 @@ mod tests {
     fn test_composite_weight_all_ones() {
         let pw = PhiWeight {
             phi_score: 1.0,
+            phi_provenance: PhiProvenance::Attested,
             k_trust: 1.0,
             stake_weight: 1.0,
             participation_score: 1.0,
@@ -1701,6 +1733,7 @@ mod tests {
     fn test_composite_weight_all_zeros() {
         let pw = PhiWeight {
             phi_score: 0.0,
+            phi_provenance: PhiProvenance::Attested,
             k_trust: 0.0,
             stake_weight: 0.0,
             participation_score: 0.0,
@@ -1713,6 +1746,7 @@ mod tests {
     fn test_composite_weight_mixed() {
         let pw = PhiWeight {
             phi_score: 0.8,
+            phi_provenance: PhiProvenance::Attested,
             k_trust: 0.6,
             stake_weight: 0.5,
             participation_score: 0.4,
@@ -1727,6 +1761,7 @@ mod tests {
     fn test_composite_weight_stake_capped_at_one() {
         let pw = PhiWeight {
             phi_score: 0.5,
+            phi_provenance: PhiProvenance::Attested,
             k_trust: 0.5,
             stake_weight: 5.0, // should be capped to 1.0
             participation_score: 0.5,
@@ -1744,6 +1779,7 @@ mod tests {
         // Exactly at threshold
         let pw = PhiWeight {
             phi_score: 0.3,
+            phi_provenance: PhiProvenance::Attested,
             k_trust: 0.0,
             stake_weight: 0.0,
             participation_score: 0.0,
@@ -1758,6 +1794,7 @@ mod tests {
     fn test_meets_threshold_just_below() {
         let pw = PhiWeight {
             phi_score: 0.299,
+            phi_provenance: PhiProvenance::Attested,
             k_trust: 1.0,
             stake_weight: 1.0,
             participation_score: 1.0,

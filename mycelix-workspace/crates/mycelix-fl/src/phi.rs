@@ -1,50 +1,68 @@
-//! Phi (Φ) coherence gating for federated learning.
+//! Gradient coherence gating for federated learning.
 //!
-//! Uses Integrated Information Theory (IIT) Phi as a coherence measure to
+//! **This is NOT IIT Phi.** This module computes a lightweight gradient
+//! coherence score from gradient statistics (L2 norm + entropy proxy) to
 //! gate gradient submissions. Only participants whose local model state
-//! achieves sufficient integrated information are permitted to submit.
+//! achieves sufficient coherence are permitted to submit.
 //!
-//! In the Mycelix context, Phi serves as a proxy for model coherence:
-//! a high Phi score indicates the model's representations are well-integrated
-//! (not fragmented), which correlates with honest, useful updates.
+//! For true IIT Phi computation, see the Symthaea PhiEngine.
 //!
-//! # Status
-//! Stub implementation — Phi proxy via cosine coherence is functional.
-//! Full IIT Phi computation requires the Symthaea engine (not WASM-compatible).
+//! # Naming Disambiguation
+//!
+//! | Concept | Module | Description |
+//! |---------|--------|-------------|
+//! | **IIT Phi** | `symthaea_core::phi_engine` | True integrated information |
+//! | **Gradient Coherence** | this module | Proxy from gradient statistics |
+//! | **Governance Phi** | governance bridge | Agent's attested consciousness |
+//!
+//! # Canonical Thresholds
+//!
+//! See `mycelix_bridge_common::phi_thresholds` for the single source of truth.
+//! Default values: veto=0.1, dampen=0.3, boost=0.6.
 
 use serde::{Deserialize, Serialize};
 
-/// Configuration for Phi coherence gating
+/// Configuration for gradient coherence gating.
+///
+/// Thresholds should align with `mycelix_bridge_common::phi_thresholds::PhiThresholds`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiGateConfig {
-    /// Minimum Phi score required to submit a gradient (default: 0.1)
-    pub min_phi: f32,
-    /// Phi boost threshold — participants above this get a trust bonus (default: 0.6)
+pub struct GradientCoherenceConfig {
+    /// Minimum coherence score required to submit a gradient (default: 0.1)
+    pub min_coherence: f32,
+    /// Coherence boost threshold — participants above this get a trust bonus (default: 0.6)
     pub boost_threshold: f32,
-    /// Phi veto threshold — participants below this are vetoed (default: 0.05)
+    /// Coherence veto threshold — participants below this are vetoed (default: 0.1)
     pub veto_threshold: f32,
 }
 
-impl Default for PhiGateConfig {
+impl Default for GradientCoherenceConfig {
     fn default() -> Self {
         Self {
-            min_phi: 0.1,
+            min_coherence: 0.1,
             boost_threshold: 0.6,
-            veto_threshold: 0.05,
+            veto_threshold: 0.1,
         }
     }
 }
 
-/// Phi coherence score for a gradient submission.
+/// Backward-compatible alias.
+#[deprecated(note = "Renamed to GradientCoherenceConfig — this is gradient coherence, not IIT Phi")]
+pub type PhiGateConfig = GradientCoherenceConfig;
+
+/// Gradient coherence score for a submission.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiScore {
-    /// Estimated Phi value in [0.0, 1.0]
-    pub phi: f32,
+pub struct CoherenceScore {
+    /// Estimated coherence value in [0.0, 1.0]
+    pub coherence: f32,
     /// Whether this submission passes the gate
     pub passes_gate: bool,
-    /// Trust multiplier derived from Phi (0.5 for veto, 1.0 for normal, 1.2 for boost)
+    /// Trust multiplier derived from coherence (0.5 for veto, 1.0 for normal, 1.2 for boost)
     pub trust_multiplier: f32,
 }
+
+/// Backward-compatible alias.
+#[deprecated(note = "Renamed to CoherenceScore — this is gradient coherence, not IIT Phi")]
+pub type PhiScore = CoherenceScore;
 
 /// Gate decision for a gradient submission
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,29 +77,36 @@ pub enum GateDecision {
     Veto,
 }
 
-/// Phi coherence gate for gradient submissions.
+/// Gradient coherence gate for gradient submissions.
 ///
-/// Computes a proxy Phi score from gradient statistics and applies
+/// Computes a coherence score from gradient statistics and applies
 /// a gating decision based on the configured thresholds.
-pub struct PhiGate {
-    config: PhiGateConfig,
+///
+/// **This is NOT IIT Phi.** It is a lightweight proxy based on
+/// gradient L2 norm and entropy.
+pub struct GradientCoherenceGate {
+    config: GradientCoherenceConfig,
 }
 
-impl PhiGate {
-    pub fn new(config: PhiGateConfig) -> Self {
+/// Backward-compatible alias.
+#[deprecated(note = "Renamed to GradientCoherenceGate — this is gradient coherence, not IIT Phi")]
+pub type PhiGate = GradientCoherenceGate;
+
+impl GradientCoherenceGate {
+    pub fn new(config: GradientCoherenceConfig) -> Self {
         Self { config }
     }
 
     pub fn with_defaults() -> Self {
-        Self::new(PhiGateConfig::default())
+        Self::new(GradientCoherenceConfig::default())
     }
 
-    /// Compute a proxy Phi score from gradient data.
+    /// Compute a gradient coherence score from gradient data.
     ///
     /// Uses gradient entropy and L2 norm coherence as a lightweight proxy
-    /// for Integrated Information. Full IIT Phi computation is deferred to
-    /// the Symthaea engine which is not available in WASM context.
-    pub fn compute_phi_proxy(&self, gradient: &[f32]) -> f32 {
+    /// for model integration quality. This is NOT IIT Phi — full Phi
+    /// computation requires the Symthaea PhiEngine.
+    pub fn compute_gradient_coherence(&self, gradient: &[f32]) -> f32 {
         if gradient.is_empty() {
             return 0.0;
         }
@@ -100,43 +125,49 @@ impl PhiGate {
         // Normalize std_dev to [0, 1] via sigmoid-like mapping
         let entropy_proxy = 1.0 - (-std_dev).exp();
 
-        // Phi proxy: geometric mean of L2 coherence and entropy
+        // Coherence: geometric mean of L2 coherence and entropy
         (l2_norm * entropy_proxy).sqrt().clamp(0.0, 1.0)
     }
 
-    /// Evaluate a Phi score and determine the gate decision.
-    pub fn evaluate(&self, phi: f32) -> PhiScore {
-        let decision = self.gate_decision(phi);
+    /// Backward-compatible alias for `compute_gradient_coherence`.
+    #[deprecated(note = "Renamed to compute_gradient_coherence — this is not IIT Phi")]
+    pub fn compute_phi_proxy(&self, gradient: &[f32]) -> f32 {
+        self.compute_gradient_coherence(gradient)
+    }
+
+    /// Evaluate a coherence score and determine the gate decision.
+    pub fn evaluate(&self, coherence: f32) -> CoherenceScore {
+        let decision = self.gate_decision(coherence);
         let (passes_gate, trust_multiplier) = match decision {
             GateDecision::Veto => (false, 0.5),
             GateDecision::Dampen => (true, 0.7),
             GateDecision::Pass => (true, 1.0),
             GateDecision::Boost => (true, 1.2),
         };
-        PhiScore {
-            phi,
+        CoherenceScore {
+            coherence,
             passes_gate,
             trust_multiplier,
         }
     }
 
-    /// Compute gate decision from Phi score.
-    pub fn gate_decision(&self, phi: f32) -> GateDecision {
-        if phi < self.config.veto_threshold {
+    /// Compute gate decision from coherence score.
+    pub fn gate_decision(&self, coherence: f32) -> GateDecision {
+        if coherence < self.config.veto_threshold {
             GateDecision::Veto
-        } else if phi < self.config.min_phi {
+        } else if coherence < self.config.min_coherence {
             GateDecision::Dampen
-        } else if phi >= self.config.boost_threshold {
+        } else if coherence >= self.config.boost_threshold {
             GateDecision::Boost
         } else {
             GateDecision::Pass
         }
     }
 
-    /// Compute Phi proxy and gate a gradient in one step.
-    pub fn gate_gradient(&self, gradient: &[f32]) -> PhiScore {
-        let phi = self.compute_phi_proxy(gradient);
-        self.evaluate(phi)
+    /// Compute gradient coherence and gate a gradient in one step.
+    pub fn gate_gradient(&self, gradient: &[f32]) -> CoherenceScore {
+        let coherence = self.compute_gradient_coherence(gradient);
+        self.evaluate(coherence)
     }
 }
 
@@ -145,16 +176,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_empty_gradient_phi_zero() {
-        let gate = PhiGate::with_defaults();
-        let phi = gate.compute_phi_proxy(&[]);
-        assert_eq!(phi, 0.0);
+    fn test_empty_gradient_zero() {
+        let gate = GradientCoherenceGate::with_defaults();
+        let coherence = gate.compute_gradient_coherence(&[]);
+        assert_eq!(coherence, 0.0);
     }
 
     #[test]
     fn test_high_quality_gradient_passes() {
-        let gate = PhiGate::with_defaults();
-        // A gradient with good structure should pass
+        let gate = GradientCoherenceGate::with_defaults();
         let gradient: Vec<f32> = (0..100).map(|i| (i as f32) * 0.01 - 0.5).collect();
         let score = gate.gate_gradient(&gradient);
         assert!(score.passes_gate);
@@ -162,33 +192,51 @@ mod tests {
 
     #[test]
     fn test_zero_gradient_vetoed() {
-        let gate = PhiGate::with_defaults();
-        // All-zeros gradient has zero entropy → very low Phi
+        let gate = GradientCoherenceGate::with_defaults();
         let gradient = vec![0.0_f32; 100];
-        let phi = gate.compute_phi_proxy(&gradient);
-        assert!(phi < gate.config.min_phi);
+        let coherence = gate.compute_gradient_coherence(&gradient);
+        assert!(coherence < gate.config.min_coherence);
     }
 
     #[test]
     fn test_gate_decision_veto() {
-        let gate = PhiGate::with_defaults();
+        let gate = GradientCoherenceGate::with_defaults();
         assert_eq!(gate.gate_decision(0.01), GateDecision::Veto);
     }
 
     #[test]
     fn test_gate_decision_boost() {
-        let gate = PhiGate::with_defaults();
+        let gate = GradientCoherenceGate::with_defaults();
         assert_eq!(gate.gate_decision(0.8), GateDecision::Boost);
     }
 
     #[test]
-    fn test_phi_score_range() {
-        let gate = PhiGate::with_defaults();
+    fn test_coherence_score_range() {
+        let gate = GradientCoherenceGate::with_defaults();
         for i in 0..=10 {
             let gradient: Vec<f32> = vec![i as f32 * 0.1; 50];
-            let phi = gate.compute_phi_proxy(&gradient);
-            assert!(phi >= 0.0);
-            assert!(phi <= 1.0);
+            let coherence = gate.compute_gradient_coherence(&gradient);
+            assert!(coherence >= 0.0);
+            assert!(coherence <= 1.0);
         }
+    }
+
+    #[test]
+    fn test_veto_threshold_aligned_with_canonical() {
+        // Verify our defaults match the canonical thresholds from phi_thresholds.rs
+        let config = GradientCoherenceConfig::default();
+        assert_eq!(config.veto_threshold, 0.1, "veto should match canonical fl_veto");
+        assert_eq!(config.boost_threshold, 0.6, "boost should match canonical fl_boost");
+    }
+
+    #[allow(deprecated)]
+    #[test]
+    fn test_deprecated_aliases_work() {
+        let config = PhiGateConfig::default();
+        let gate = PhiGate::new(config);
+        let gradient: Vec<f32> = (0..100).map(|i| (i as f32) * 0.01 - 0.5).collect();
+        let phi = gate.compute_phi_proxy(&gradient);
+        let coherence = gate.compute_gradient_coherence(&gradient);
+        assert_eq!(phi, coherence);
     }
 }

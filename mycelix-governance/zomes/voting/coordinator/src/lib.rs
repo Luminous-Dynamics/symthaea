@@ -315,7 +315,12 @@ const MAX_VOTING_WEIGHT: f64 = 1.5;
 
 /// Pure computation of vote weight from Φ components — testable without HDK.
 ///
-/// Formula: Reputation² × (0.7 + 0.3 × Φ) × (1 + 0.1 × Participation) × StakeModifier × DomainModifier
+/// When `phi_provenance == Unavailable`, the consciousness multiplier is neutral (1.0)
+/// instead of using `(0.7 + 0.3 × Φ)`. This means the voter gets reputation-only
+/// weight rather than a fabricated Phi bonus/penalty.
+///
+/// Formula (with Phi): Reputation² × (0.7 + 0.3 × Φ) × (1 + 0.1 × Participation) × StakeModifier × DomainModifier
+/// Formula (without Phi): Reputation² × 1.0 × (1 + 0.1 × Participation) × StakeModifier × DomainModifier
 ///
 /// All inputs are clamped to [0.0, 1.0]. Output is clamped to [0.1, MAX_VOTING_WEIGHT].
 /// Stake contributes at most 5% bonus per Commons Charter anti-plutocracy rule.
@@ -323,7 +328,13 @@ pub fn compute_vote_weight(phi_weight: &PhiWeight) -> f64 {
     let reputation = phi_weight.k_trust.clamp(0.0, 1.0);
     let reputation_squared = reputation * reputation;
 
-    let consciousness_multiplier = 0.7 + 0.3 * phi_weight.phi_score.clamp(0.0, 1.0);
+    // When Phi is unavailable, use neutral multiplier (1.0) — don't fake it
+    let consciousness_multiplier = if phi_weight.phi_provenance == PhiProvenance::Unavailable {
+        1.0
+    } else {
+        0.7 + 0.3 * phi_weight.phi_score.clamp(0.0, 1.0)
+    };
+
     let participation_bonus = 1.0 + 0.1 * phi_weight.participation_score.clamp(0.0, 1.0);
 
     // Domain boundary enforcement: stake contributes at most 5% per Commons Charter
@@ -433,11 +444,14 @@ pub fn cast_phi_weighted_vote(input: CastPhiVoteInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let vote_id = format!("phi_vote:{}:{}:{}", input.proposal_id, input.voter_did, now.as_micros());
 
-    // Get voter's Φ weight (would integrate with consciousness metrics in production)
+    // Get voter's Φ weight (integrates with consciousness metrics bridge)
     let phi_weight = get_voter_phi_weight(&input.voter_did)?;
 
-    // Check if voter meets threshold for this tier
-    if !phi_weight.meets_threshold(&input.tier) {
+    // Check if voter meets threshold for this tier.
+    // When Phi is unavailable, don't gate on consciousness — allow reputation-only voting.
+    if phi_weight.phi_provenance != PhiProvenance::Unavailable
+        && !phi_weight.meets_threshold(&input.tier)
+    {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Voter Φ score ({:.2}) does not meet threshold ({:.2}) for {:?} tier",
             phi_weight.phi_score,
@@ -517,10 +531,18 @@ pub struct CastPhiVoteInput {
     pub reason: Option<String>,
 }
 
-/// Get voter's Φ weight - integrated with consciousness metrics bridge
+/// Get voter's Φ weight - integrated with consciousness metrics bridge.
+///
+/// When real Phi data is unavailable (`PhiProvenance::Unavailable`),
+/// `phi_score` is set to 0.0 and `phi_provenance` tracks the gap.
+/// The voting weight formula then uses a neutral consciousness multiplier (1.0)
+/// instead of fabricating a Phi value.
 fn get_voter_phi_weight(voter_did: &str) -> ExternResult<PhiWeight> {
-    // Query the governance bridge for consciousness snapshot
-    let phi_score = query_consciousness_phi(voter_did)?;
+    // Query the governance bridge for consciousness data with provenance
+    let (phi_score_opt, phi_provenance) = query_consciousness_phi(voter_did)?;
+
+    // When unavailable, phi_score = 0.0 (neutral in weight formula)
+    let phi_score = phi_score_opt.unwrap_or(0.0);
 
     // Query K-vector trust score from local chain or bridge
     let k_trust = query_k_vector_trust(voter_did)?;
@@ -536,6 +558,7 @@ fn get_voter_phi_weight(voter_did: &str) -> ExternResult<PhiWeight> {
 
     Ok(PhiWeight {
         phi_score,
+        phi_provenance,
         k_trust,
         stake_weight,
         participation_score,
@@ -543,14 +566,17 @@ fn get_voter_phi_weight(voter_did: &str) -> ExternResult<PhiWeight> {
     })
 }
 
-/// Query consciousness Φ via personal_bridge credential presentation.
+/// Query consciousness Φ with provenance tracking.
+///
+/// Returns `(phi_value, provenance)` — NEVER fakes a Phi score.
 ///
 /// Under Fractal CivOS, governance asks the agent's Personal cluster to
 /// **prove** their Phi score via credential presentation rather than
 /// looking up a database directly.
 ///
-/// Fallback: if personal cluster is unavailable, use participation-based proxy.
-fn query_consciousness_phi(voter_did: &str) -> ExternResult<f64> {
+/// When no real Phi is available, returns `(None, Unavailable)` honestly
+/// instead of fabricating a participation-based proxy.
+fn query_consciousness_phi(voter_did: &str) -> ExternResult<(Option<f64>, PhiProvenance)> {
     // Phase A: Try cross-cluster call to personal_bridge for Phi credential
     let personal_result = call(
         CallTargetCell::OtherRole("personal".into()),
@@ -567,34 +593,46 @@ fn query_consciousness_phi(voter_did: &str) -> ExternResult<f64> {
                 if let Some(data_str) = presentation.get("disclosed_data").and_then(|d| d.as_str()) {
                     if let Ok(data) = serde_json::from_str::<serde_json::Value>(data_str) {
                         if let Some(phi) = data.get("phi").and_then(|p| p.as_f64()) {
-                            return Ok(phi.clamp(0.0, 1.0));
+                            return Ok((Some(phi.clamp(0.0, 1.0)), PhiProvenance::Attested));
                         }
                     }
                 }
             }
         }
         _ => {
-            // Personal cluster unavailable — fall through to proxy
+            // Personal cluster unavailable — try governance bridge
         }
     }
 
-    // Fallback: participation-based Φ proxy (pre-Fractal CivOS behavior)
-    let voter_anchor = format!("consciousness:{}", voter_did);
-    let anchor_hash = anchor_hash(&voter_anchor)?;
+    // Phase B: Try local governance bridge for attestation/snapshot
+    let gate_result = call(
+        CallTargetCell::Local,
+        ZomeName::from("governance_bridge"),
+        FunctionName::from("verify_consciousness_gate_v2"),
+        None,
+        serde_json::json!({
+            "agent_did": voter_did,
+            "action_type": "Voting",
+        }),
+    );
 
-    let links = get_links(
-        LinkQuery::try_new(anchor_hash, LinkTypes::VoterToVote)?,
-        GetStrategy::default(),
-    )?;
-
-    if links.is_empty() {
-        return Ok(0.3);
+    if let Ok(ZomeCallResponse::Ok(extern_io)) = &gate_result {
+        if let Ok(gate) = extern_io.decode::<serde_json::Value>() {
+            if let Some(phi) = gate.get("phi").and_then(|p| p.as_f64()) {
+                let provenance = match gate.get("provenance").and_then(|p| p.as_str()) {
+                    Some("Attested") => PhiProvenance::Attested,
+                    Some("Snapshot") => PhiProvenance::Snapshot,
+                    _ => PhiProvenance::Unavailable,
+                };
+                if provenance != PhiProvenance::Unavailable {
+                    return Ok((Some(phi.clamp(0.0, 1.0)), provenance));
+                }
+            }
+        }
     }
 
-    let vote_count = links.len() as f64;
-    let phi_proxy = (0.3 + (vote_count / 100.0).min(0.5)).min(0.8);
-
-    Ok(phi_proxy)
+    // Phase C: No data available — return honestly
+    Ok((None, PhiProvenance::Unavailable))
 }
 
 /// Query K-vector trust score via personal_bridge credential presentation.
@@ -1504,6 +1542,8 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
     let mut raw_abstain = 0u64;
     let mut total_phi = 0.0;
     let mut voter_count = 0u64;
+    let mut phi_enhanced_count = 0u64;
+    let mut reputation_only_count = 0u64;
 
     // Breakdown by Φ tier
     let mut high_for = 0.0;
@@ -1531,6 +1571,13 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
             {
                 let weight = vote.effective_weight;
                 let phi = vote.phi_weight.phi_score;
+
+                // Track Phi data provenance
+                if vote.phi_weight.phi_provenance == PhiProvenance::Unavailable {
+                    reputation_only_count += 1;
+                } else {
+                    phi_enhanced_count += 1;
+                }
 
                 match vote.choice {
                     VoteChoice::For => {
@@ -1600,6 +1647,12 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
 
     let now = sys_time()?;
 
+    let phi_coverage = if voter_count > 0 {
+        phi_enhanced_count as f64 / voter_count as f64
+    } else {
+        0.0
+    };
+
     let tally = PhiWeightedTally {
         proposal_id: input.proposal_id.clone(),
         tier: input.tier.clone(),
@@ -1638,6 +1691,9 @@ pub fn tally_phi_votes(input: TallyPhiVotesInput) -> ExternResult<Record> {
                 voter_count: low_count,
             },
         },
+        phi_enhanced_count,
+        reputation_only_count,
+        phi_coverage,
     };
 
     let action_hash = create_entry(&EntryTypes::PhiWeightedTally(tally))?;
@@ -3122,6 +3178,18 @@ mod tests {
     fn make_phi_weight(phi: f64, k: f64, stake: f64, participation: f64, domain: f64) -> PhiWeight {
         PhiWeight {
             phi_score: phi,
+            phi_provenance: PhiProvenance::Attested,
+            k_trust: k,
+            stake_weight: stake,
+            participation_score: participation,
+            domain_reputation: domain,
+        }
+    }
+
+    fn make_phi_weight_unavailable(k: f64, stake: f64, participation: f64, domain: f64) -> PhiWeight {
+        PhiWeight {
+            phi_score: 0.0,
+            phi_provenance: PhiProvenance::Unavailable,
             k_trust: k,
             stake_weight: stake,
             participation_score: participation,
@@ -3132,8 +3200,8 @@ mod tests {
     #[test]
     fn test_compute_vote_weight_default_participant() {
         let w = compute_vote_weight(&PhiWeight::default_participant());
-        // phi=0.1, k=0.1, stake=0, participation=0, domain=0
-        // 0.1² × (0.7 + 0.3×0.1) × 1.0 × 1.0 × 1.0 = 0.01 × 0.73 = 0.0073
+        // phi=0.1, provenance=Unavailable, k=0.1, stake=0, participation=0, domain=0
+        // 0.1² × 1.0 (neutral — Unavailable) × 1.0 × 1.0 × 1.0 = 0.01
         // Floored to 0.1 by minimum clamp
         assert!((w - 0.1).abs() < 1e-10, "Default participant should get minimum weight 0.1, got {}", w);
     }
@@ -3182,6 +3250,27 @@ mod tests {
         let ratio = high_stake / low_stake;
         // Stake modifier ranges from 1.0 to 1.05 — max 5% increase
         assert!(ratio <= 1.06, "Stake should contribute at most ~5% bonus, ratio was {}", ratio);
+    }
+
+    #[test]
+    fn test_compute_vote_weight_unavailable_phi_uses_neutral() {
+        // When Phi is unavailable, consciousness_multiplier = 1.0 (neutral)
+        let w = compute_vote_weight(&make_phi_weight_unavailable(0.8, 0.5, 0.7, 0.6));
+        // reputation²=0.64, consciousness=1.0, participation=1.07, stake=1.025, domain=1.06
+        // 0.64 × 1.0 × 1.07 × 1.025 × 1.06 ≈ 0.7443...
+        assert!(w > 0.7 && w < 0.8, "Unavailable phi should get ~0.74 (neutral consciousness), got {}", w);
+    }
+
+    #[test]
+    fn test_compute_vote_weight_unavailable_vs_attested_difference() {
+        // Voter with attested Phi=0.9 should get DIFFERENT weight than unavailable
+        let attested = compute_vote_weight(&make_phi_weight(0.9, 0.8, 0.5, 0.7, 0.6));
+        let unavailable = compute_vote_weight(&make_phi_weight_unavailable(0.8, 0.5, 0.7, 0.6));
+        // Attested: consciousness_multiplier = 0.7 + 0.3×0.9 = 0.97
+        // Unavailable: consciousness_multiplier = 1.0
+        // Both are reasonable weights; unavailable is actually slightly higher because 1.0 > 0.97
+        assert!((attested - unavailable).abs() > 0.001,
+            "Attested and unavailable should produce different weights");
     }
 
     // ========================================================================

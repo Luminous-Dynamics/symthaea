@@ -24,17 +24,22 @@ use crate::plugins::ByzantinePlugin;
 use crate::types::GradientUpdate;
 
 /// Configuration for consciousness-aware Byzantine detection.
+///
+/// Default values are aligned with the canonical thresholds in
+/// `mycelix_bridge_common::phi_thresholds::PhiThresholds`. If you
+/// need to override per-instance, construct with custom values;
+/// otherwise prefer `Default::default()` to stay aligned.
 #[derive(Debug, Clone)]
 pub struct ConsciousnessConfig {
-    /// Below this phi: dampen weight (default 0.3)
+    /// Below this phi: dampen weight (default 0.3, canonical: fl_dampen)
     pub phi_threshold: f32,
-    /// Above this phi: boost weight (default 0.6)
+    /// Above this phi: boost weight (default 0.6, canonical: fl_boost)
     pub phi_boost_threshold: f32,
-    /// Weight multiplier for low-phi participants (default 0.3)
+    /// Weight multiplier for low-phi participants (default 0.3, canonical: fl_dampen_factor)
     pub dampen_factor: f32,
-    /// Weight multiplier for high-phi participants (default 1.5)
+    /// Weight multiplier for high-phi participants (default 1.5, canonical: fl_boost_factor)
     pub boost_factor: f32,
-    /// Below this phi: veto entirely (default 0.1)
+    /// Below this phi: veto entirely (default 0.1, canonical: fl_veto)
     pub veto_threshold: f32,
     /// Default phi for participants without a score (default 0.5 = neutral)
     pub default_phi: f32,
