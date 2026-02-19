@@ -14,7 +14,7 @@
 //! - k_h = 0.5 (no history)
 //! - k_topo = 0.0 (not connected yet)
 //! - k_v = 0.5 (verification status)
-//! - k_phi = 0.5 (coherence)
+//! - k_coherence = 0.5 (coherence)
 //!
 //! ## GIS Integration
 //!
@@ -283,10 +283,10 @@ pub fn reset_epoch(agent: &mut InstrumentalActor, new_cap: u64) {
 /// High-stakes actions require sufficient coherence. Returns error if
 /// coherence is too low.
 pub fn gate_action_on_coherence(
-    coherence_state: super::phi_bridge::CoherenceState,
+    coherence_state: super::coherence_bridge::CoherenceState,
     is_high_stakes: bool,
 ) -> Result<(), AgentError> {
-    use super::phi_bridge::{check_coherence_for_action, CoherenceCheckResult};
+    use super::coherence_bridge::{check_coherence_for_action, CoherenceCheckResult};
 
     match check_coherence_for_action(coherence_state, is_high_stakes) {
         CoherenceCheckResult::Allowed => Ok(()),
@@ -475,7 +475,7 @@ pub fn check_action_readiness(
     action: &str,
     is_high_stakes: bool,
 ) -> Result<ActionReadiness, ActionGatingError> {
-    use super::phi_bridge::{check_agent_coherence_gating, CoherenceCheckResult};
+    use super::coherence_bridge::{check_agent_coherence_gating, CoherenceCheckResult};
 
     // Step 1: Check coherence (Phi)
     let coherence_check = check_agent_coherence_gating(agent, is_high_stakes);

@@ -258,7 +258,7 @@ export class VerificationEngine {
     // K-Vector dimension bounds (for each dimension)
     const dimensions = [
       'k_r', 'k_a', 'k_i', 'k_p', 'k_m',
-      'k_s', 'k_h', 'k_topo', 'k_v', 'k_phi'
+      'k_s', 'k_h', 'k_topo', 'k_v', 'k_coherence'
     ];
     for (const dim of dimensions) {
       engine.addInvariant({

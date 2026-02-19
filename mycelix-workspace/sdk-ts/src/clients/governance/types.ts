@@ -971,24 +971,24 @@ export type ProposalTier = 'Basic' | 'Major' | 'Constitutional';
  *
  * Note: The Rust integrity zome uses For/Against/Abstain.
  * The legacy VoteChoice type above uses Approve/Reject/Abstain.
- * New Φ-weighted, quadratic, and verified voting methods use this type.
+ * New consciousness-weighted, quadratic, and verified voting methods use this type.
  */
-export type PhiVoteChoice = 'For' | 'Against' | 'Abstain';
+export type ConsciousnessVoteChoice = 'For' | 'Against' | 'Abstain';
 
 /**
- * How the Phi value in a governance decision was obtained.
- * Matches Rust `PhiProvenance` enum.
+ * How the consciousness value in a governance decision was obtained.
+ * Matches Rust `ConsciousnessProvenance` enum.
  */
-export type PhiProvenance = 'Attested' | 'Snapshot' | 'Unavailable';
+export type ConsciousnessProvenance = 'Attested' | 'Snapshot' | 'Unavailable';
 
 /**
- * Φ weight components for consciousness-integrated governance
+ * Consciousness weight components for consciousness-integrated governance
  */
-export interface PhiWeight {
-  /** Base Φ score from consciousness metrics (0.0-1.0) */
+export interface ConsciousnessWeight {
+  /** Base consciousness score from consciousness metrics (0.0-1.0) */
   phiScore: number;
-  /** How the phiScore was obtained */
-  phiProvenance: PhiProvenance;
+  /** How the consciousness score was obtained */
+  phiProvenance: ConsciousnessProvenance;
   /** K-vector derived trust score (0.0-1.0) */
   kTrust: number;
   /** Stake-based weight */
@@ -1000,15 +1000,15 @@ export interface PhiWeight {
 }
 
 /**
- * Φ-weighted vote with full consciousness integration
+ * Consciousness-weighted vote with full consciousness integration
  */
-export interface PhiWeightedVote {
+export interface ConsciousnessWeightedVote {
   id: string;
   proposalId: string;
   proposalTier: ProposalTier;
   voter: string;
-  choice: PhiVoteChoice;
-  phiWeight: PhiWeight;
+  choice: ConsciousnessVoteChoice;
+  consciousnessWeight: ConsciousnessWeight;
   effectiveWeight: number;
   reason?: string;
   delegated: boolean;
@@ -1018,24 +1018,24 @@ export interface PhiWeightedVote {
 }
 
 /**
- * Input for casting a Φ-weighted vote
+ * Input for casting a consciousness-weighted vote
  */
-export interface CastPhiVoteInput {
+export interface CastConsciousnessVoteInput {
   proposalId: string;
   voterDid: string;
   tier: ProposalTier;
-  choice: PhiVoteChoice;
+  choice: ConsciousnessVoteChoice;
   reason?: string;
 }
 
 /**
- * Input for casting a delegated Φ-weighted vote
+ * Input for casting a delegated consciousness-weighted vote
  */
-export interface CastDelegatedPhiVoteInput {
+export interface CastDelegatedConsciousnessVoteInput {
   proposalId: string;
   delegateDid: string;
   tier: ProposalTier;
-  choice: PhiVoteChoice;
+  choice: ConsciousnessVoteChoice;
   reason?: string;
 }
 
@@ -1050,7 +1050,7 @@ export interface QuadraticVoteRecord {
   id: string;
   proposalId: string;
   voter: string;
-  choice: PhiVoteChoice;
+  choice: ConsciousnessVoteChoice;
   creditsSpent: number;
   effectiveWeight: number;
   reason?: string;
@@ -1063,7 +1063,7 @@ export interface QuadraticVoteRecord {
 export interface CastQuadraticVoteInput {
   proposalId: string;
   voterDid: string;
-  choice: PhiVoteChoice;
+  choice: ConsciousnessVoteChoice;
   creditsToSpend: number;
   reason?: string;
 }
@@ -1196,9 +1196,9 @@ export interface VoteTally {
 }
 
 /**
- * Input for tallying Φ-weighted votes
+ * Input for tallying consciousness-weighted votes
  */
-export interface TallyPhiVotesInput {
+export interface TallyConsciousnessVotesInput {
   proposalId: string;
   tier: ProposalTier;
   eligibleVoters?: number;
@@ -1216,28 +1216,28 @@ export interface TallySegment {
 }
 
 /**
- * Breakdown by voter Φ tier
+ * Breakdown by voter consciousness tier
  */
-export interface PhiTierBreakdown {
-  highPhiVotes: TallySegment;
-  mediumPhiVotes: TallySegment;
-  lowPhiVotes: TallySegment;
+export interface ConsciousnessTierBreakdown {
+  highConsciousnessVotes: TallySegment;
+  mediumConsciousnessVotes: TallySegment;
+  lowConsciousnessVotes: TallySegment;
 }
 
 /**
- * Φ-weighted vote tally with full breakdown
+ * Consciousness-weighted vote tally with full breakdown
  */
-export interface PhiWeightedTally {
+export interface ConsciousnessWeightedTally {
   proposalId: string;
   tier: ProposalTier;
-  phiVotesFor: number;
-  phiVotesAgainst: number;
-  phiAbstentions: number;
+  consciousnessVotesFor: number;
+  consciousnessVotesAgainst: number;
+  consciousnessAbstentions: number;
   rawVotesFor: number;
   rawVotesAgainst: number;
   rawAbstentions: number;
-  averagePhi: number;
-  totalPhiWeight: number;
+  averageConsciousness: number;
+  totalConsciousnessWeight: number;
   eligibleVoters: number;
   quorumRequirement: number;
   quorumReached: boolean;
@@ -1245,13 +1245,13 @@ export interface PhiWeightedTally {
   approved: boolean;
   talliedAt: Timestamp;
   finalTally: boolean;
-  phiTierBreakdown: PhiTierBreakdown;
-  /** Votes with real Phi data (Attested or Snapshot) */
-  phiEnhancedCount: number;
-  /** Votes without Phi data (reputation-only) */
+  consciousnessTierBreakdown: ConsciousnessTierBreakdown;
+  /** Votes with real consciousness data (Attested or Snapshot) */
+  consciousnessEnhancedCount: number;
+  /** Votes without consciousness data (reputation-only) */
   reputationOnlyCount: number;
   /** Fraction of votes with verified consciousness data (0.0-1.0) */
-  phiCoverage: number;
+  consciousnessCoverage: number;
 }
 
 /**
@@ -1330,7 +1330,7 @@ export interface CastVerifiedVoteInput {
   proposalId: string;
   voterDid: string;
   tier: ProposalTier;
-  choice: PhiVoteChoice;
+  choice: ConsciousnessVoteChoice;
   eligibilityProofHash: ActionHash;
   voterCommitment: number[];
   reason?: string;
@@ -1344,7 +1344,7 @@ export interface VerifiedVote {
   proposalId: string;
   proposalTier: ProposalTier;
   voter: string;
-  choice: PhiVoteChoice;
+  choice: ConsciousnessVoteChoice;
   eligibilityProofHash: ActionHash;
   voterCommitment: number[];
   effectiveWeight: number;
@@ -1425,7 +1425,7 @@ export interface CastAttestedVoteInput {
   proposalId: string;
   voterDid: string;
   tier: ProposalTier;
-  choice: PhiVoteChoice;
+  choice: ConsciousnessVoteChoice;
   eligibilityProofHash: ActionHash;
   voterCommitment: number[];
   reason?: string;
@@ -1530,8 +1530,8 @@ export interface DiscussionReadiness {
  * Matches Rust `RecordSnapshotInput` struct.
  */
 export interface RecordSnapshotInput {
-  /** Φ measurement (0.0-1.0) */
-  phi: number;
+  /** Consciousness level measurement (0.0-1.0) */
+  consciousnessLevel: number;
   /** Meta-awareness score (0.0-1.0) */
   metaAwareness: number;
   /** Self-model accuracy (0.0-1.0) */
@@ -1547,7 +1547,7 @@ export interface RecordSnapshotInput {
 }
 
 /**
- * Type of governance action with associated Phi thresholds.
+ * Type of governance action with associated consciousness thresholds.
  * Matches Rust `GovernanceActionType` enum.
  */
 export type GovernanceActionType = 'Basic' | 'ProposalSubmission' | 'Voting' | 'Constitutional';
@@ -1579,8 +1579,8 @@ export interface VerifyGateInput {
  */
 export interface GateVerificationResult {
   passed: boolean;
-  phi: number;
-  requiredPhi: number;
+  consciousnessLevel: number;
+  requiredConsciousness: number;
   actionType: GovernanceActionType;
   failureReason?: string;
   gateId: string;
@@ -1592,25 +1592,25 @@ export interface GateVerificationResult {
  */
 export interface GateVerificationResultV2 {
   passed: boolean;
-  /** Phi value, or null if unavailable */
-  phi: number | null;
-  requiredPhi: number;
-  /** How the Phi was obtained */
-  provenance: PhiProvenance;
+  /** Consciousness level, or null if unavailable */
+  consciousnessLevel: number | null;
+  requiredConsciousness: number;
+  /** How the consciousness value was obtained */
+  provenance: ConsciousnessProvenance;
   actionType: GovernanceActionType;
   failureReason?: string;
 }
 
 /**
- * Input for recording an authenticated Phi attestation.
- * Matches Rust `RecordPhiAttestationInput` struct.
+ * Input for recording an authenticated consciousness attestation.
+ * Matches Rust `RecordConsciousnessAttestationInput` struct.
  */
-export interface RecordPhiAttestationInput {
-  /** Phi value (0.0-1.0) */
-  phi: number;
+export interface RecordConsciousnessAttestationInput {
+  /** Consciousness level (0.0-1.0) */
+  consciousnessLevel: number;
   /** Symthaea cognitive cycle number */
   cycleId: number;
-  /** Microseconds since Unix epoch when the Phi was captured */
+  /** Microseconds since Unix epoch when the consciousness level was captured */
   capturedAtUs: number;
   /** Ed25519 signature (64 bytes) over the attestation message */
   signature: number[];
@@ -1636,10 +1636,10 @@ export interface GetAgentSnapshotsInput {
 }
 
 /**
- * Phi threshold requirements.
- * Matches Rust `PhiThresholds` struct.
+ * Consciousness threshold requirements.
+ * Matches Rust `ConsciousnessThresholdSummary` struct.
  */
-export interface PhiThresholds {
+export interface ConsciousnessThresholds {
   basic: number;
   proposalSubmission: number;
   voting: number;
@@ -1661,7 +1661,7 @@ export interface CalculateWeightInput {
 export interface HolisticVotingWeight {
   reputation: number;
   reputationSquared: number;
-  phi: number;
+  consciousnessLevel: number;
   consciousnessMultiplier: number;
   harmonicAlignment: number;
   harmonicBonus: number;
@@ -1693,7 +1693,7 @@ export interface WeightedVoteResult {
   weight: number;
   weightBreakdown: string;
   decision: VoteDecision;
-  phiAtVote: number;
+  consciousnessAtVote: number;
   proposalType: BridgeProposalType;
   thresholdRequired: number;
 }
@@ -1705,8 +1705,8 @@ export interface WeightedVoteResult {
 export interface AdaptiveThreshold {
   /** Base threshold percentage (0.0-1.0) */
   baseThreshold: number;
-  /** Minimum Φ required for voters */
-  minVoterPhi: number;
+  /** Minimum consciousness level required for voters */
+  minVoterConsciousness: number;
   /** Minimum participation (number of voters) */
   minParticipation: number;
   /** Quorum percentage (minimum % of eligible voters) */
@@ -1727,7 +1727,7 @@ export interface ParticipantStatus {
   streakCount: number;
   streakBonus: number;
   inCooldown: boolean;
-  currentPhi: number;
+  currentConsciousness: number;
   federatedScore: number;
   roundsParticipated: number;
   successfulVotes: number;

@@ -82,7 +82,7 @@ export function createIntegrationAgent(
     k_h: 0.5,
     k_topo: 0.0,
     k_v: 0.0,
-    k_phi: 0.5,
+    k_coherence: 0.5,
   };
 
   const trustScore = computeTrustScore(kVector);

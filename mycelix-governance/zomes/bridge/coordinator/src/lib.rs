@@ -23,7 +23,7 @@ mod consciousness;
 mod attestation;
 mod consensus;
 mod cross_cluster;
-mod phi_config;
+mod consciousness_config;
 mod validation;
 
 pub use query::*;
@@ -31,7 +31,7 @@ pub use consciousness::*;
 pub use attestation::*;
 pub use consensus::*;
 pub use cross_cluster::*;
-pub use phi_config::*;
+pub use consciousness_config::*;
 pub use validation::*;
 
 const GOVERNANCE_HAPP_ID: &str = "mycelix-governance";
@@ -46,7 +46,7 @@ const SYMTHAEA_SOURCE: &str = "symthaea";
 pub enum BridgeSignal {
     ConsciousnessSnapshotRecorded {
         agent_did: String,
-        phi: f64,
+        consciousness_level: f64,
     },
     ConsciousnessGateVerified {
         agent_did: String,
@@ -70,7 +70,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 // HELPER FUNCTIONS
 // =============================================================================
 
-/// Get the latest PhiAttestation for an agent
+/// Get the latest ConsciousnessAttestation for an agent
 fn get_latest_agent_attestation(
     agent_did: &str,
 ) -> ExternResult<Option<(f64, Record)>> {
@@ -94,14 +94,14 @@ fn get_latest_agent_attestation(
         if let Some(record) = get(action_hash, GetOptions::default())? {
             if let Some(attestation) = record
                 .entry()
-                .to_app_option::<PhiAttestation>()
+                .to_app_option::<ConsciousnessAttestation>()
                 .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             {
                 let ts = record.action().timestamp();
                 match &latest {
-                    None => latest = Some((attestation.phi, record, ts)),
+                    None => latest = Some((attestation.consciousness_level, record, ts)),
                     Some((_, _, prev_ts)) if ts > *prev_ts => {
-                        latest = Some((attestation.phi, record, ts));
+                        latest = Some((attestation.consciousness_level, record, ts));
                     }
                     _ => {}
                 }
@@ -109,7 +109,7 @@ fn get_latest_agent_attestation(
         }
     }
 
-    Ok(latest.map(|(phi, record, _)| (phi, record)))
+    Ok(latest.map(|(consciousness_level, record, _)| (consciousness_level, record)))
 }
 
 /// Get the latest consciousness snapshot for an agent
@@ -420,7 +420,7 @@ mod tests {
 
     fn valid_snapshot_input() -> RecordSnapshotInput {
         RecordSnapshotInput {
-            phi: 0.7,
+            consciousness_level: 0.7,
             meta_awareness: 0.6,
             self_model_accuracy: 0.8,
             coherence: 0.9,
@@ -436,11 +436,11 @@ mod tests {
     }
 
     #[test]
-    fn test_snapshot_phi_out_of_range() {
+    fn test_snapshot_consciousness_out_of_range() {
         let mut input = valid_snapshot_input();
-        input.phi = 1.1;
+        input.consciousness_level = 1.1;
         assert!(check_snapshot_input(&input).is_err());
-        input.phi = -0.1;
+        input.consciousness_level = -0.1;
         assert!(check_snapshot_input(&input).is_err());
     }
 
@@ -515,7 +515,7 @@ mod tests {
     fn test_snapshot_boundary_values() {
         // All at exact boundaries should pass
         let input = RecordSnapshotInput {
-            phi: 0.0,
+            consciousness_level: 0.0,
             meta_awareness: 1.0,
             self_model_accuracy: 0.0,
             coherence: 1.0,
@@ -874,21 +874,21 @@ mod tests {
 
     #[test]
     fn test_action_type_thresholds() {
-        assert!((GovernanceActionType::Basic.phi_threshold() - 0.2).abs() < f64::EPSILON);
-        assert!((GovernanceActionType::ProposalSubmission.phi_threshold() - 0.3).abs() < f64::EPSILON);
-        assert!((GovernanceActionType::Voting.phi_threshold() - 0.4).abs() < f64::EPSILON);
-        assert!((GovernanceActionType::Constitutional.phi_threshold() - 0.6).abs() < f64::EPSILON);
+        assert!((GovernanceActionType::Basic.consciousness_gate() - 0.2).abs() < f64::EPSILON);
+        assert!((GovernanceActionType::ProposalSubmission.consciousness_gate() - 0.3).abs() < f64::EPSILON);
+        assert!((GovernanceActionType::Voting.consciousness_gate() - 0.4).abs() < f64::EPSILON);
+        assert!((GovernanceActionType::Constitutional.consciousness_gate() - 0.6).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_action_type_ordering() {
         // Thresholds must be monotonically increasing
-        assert!(GovernanceActionType::Basic.phi_threshold()
-            < GovernanceActionType::ProposalSubmission.phi_threshold());
-        assert!(GovernanceActionType::ProposalSubmission.phi_threshold()
-            < GovernanceActionType::Voting.phi_threshold());
-        assert!(GovernanceActionType::Voting.phi_threshold()
-            < GovernanceActionType::Constitutional.phi_threshold());
+        assert!(GovernanceActionType::Basic.consciousness_gate()
+            < GovernanceActionType::ProposalSubmission.consciousness_gate());
+        assert!(GovernanceActionType::ProposalSubmission.consciousness_gate()
+            < GovernanceActionType::Voting.consciousness_gate());
+        assert!(GovernanceActionType::Voting.consciousness_gate()
+            < GovernanceActionType::Constitutional.consciousness_gate());
     }
 
     // --- ConsciousnessSnapshot quality_score ---
@@ -898,7 +898,7 @@ mod tests {
         let snap = ConsciousnessSnapshot {
             id: "s1".into(),
             agent_did: "did:test:1".into(),
-            phi: 1.0,
+            consciousness_level: 1.0,
             meta_awareness: 1.0,
             self_model_accuracy: 1.0,
             coherence: 1.0,
@@ -916,7 +916,7 @@ mod tests {
         let snap = ConsciousnessSnapshot {
             id: "s2".into(),
             agent_did: "did:test:2".into(),
-            phi: 0.0,
+            consciousness_level: 0.0,
             meta_awareness: 0.0,
             self_model_accuracy: 0.0,
             coherence: 0.0,
@@ -929,12 +929,12 @@ mod tests {
     }
 
     #[test]
-    fn test_quality_score_phi_dominates() {
-        // Phi has 0.4 weight, all others 0.2
+    fn test_quality_score_consciousness_dominates() {
+        // Consciousness has 0.4 weight, all others 0.2
         let snap = ConsciousnessSnapshot {
             id: "s3".into(),
             agent_did: "did:test:3".into(),
-            phi: 1.0,
+            consciousness_level: 1.0,
             meta_awareness: 0.0,
             self_model_accuracy: 0.0,
             coherence: 0.0,
@@ -952,7 +952,7 @@ mod tests {
         let base = ConsciousnessSnapshot {
             id: "s4".into(),
             agent_did: "did:test:4".into(),
-            phi: 0.5,
+            consciousness_level: 0.5,
             meta_awareness: 0.5,
             self_model_accuracy: 0.5,
             coherence: 0.5,
@@ -975,7 +975,7 @@ mod tests {
         let snap = ConsciousnessSnapshot {
             id: "s5".into(),
             agent_did: "did:test:5".into(),
-            phi: 0.5,
+            consciousness_level: 0.5,
             meta_awareness: 0.5,
             self_model_accuracy: 0.5,
             coherence: 0.5,
@@ -1001,7 +1001,7 @@ mod tests {
     }
 
     #[test]
-    fn test_holistic_weight_zero_phi() {
+    fn test_holistic_weight_zero_consciousness() {
         let w = HolisticVotingWeight::calculate(1.0, 0.0, 0.0);
         // 1.0² × (0.7 + 0.0) × 1.0 = 0.7
         assert!((w.final_weight - 0.7).abs() < 1e-10);
@@ -1085,7 +1085,7 @@ mod tests {
     fn test_adaptive_threshold_standard() {
         let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
         assert!((t.base_threshold - 0.51).abs() < 1e-10);
-        assert!((t.min_voter_phi - 0.2).abs() < 1e-10);
+        assert!((t.min_voter_consciousness - 0.2).abs() < 1e-10);
         assert_eq!(t.min_participation, 5);
         assert!((t.quorum - 0.20).abs() < 1e-10);
         assert_eq!(t.max_extension_secs, 86400);
@@ -1095,7 +1095,7 @@ mod tests {
     fn test_adaptive_threshold_emergency() {
         let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Emergency);
         assert!((t.base_threshold - 0.60).abs() < 1e-10);
-        assert!((t.min_voter_phi - 0.3).abs() < 1e-10);
+        assert!((t.min_voter_consciousness - 0.3).abs() < 1e-10);
         assert_eq!(t.min_participation, 3);
         assert!((t.quorum - 0.10).abs() < 1e-10);
         assert_eq!(t.max_extension_secs, 3600);
@@ -1105,19 +1105,19 @@ mod tests {
     fn test_adaptive_threshold_constitutional() {
         let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
         assert!((t.base_threshold - 0.67).abs() < 1e-10);
-        assert!((t.min_voter_phi - 0.5).abs() < 1e-10);
+        assert!((t.min_voter_consciousness - 0.5).abs() < 1e-10);
         assert_eq!(t.min_participation, 10);
         assert!((t.quorum - 0.40).abs() < 1e-10);
         assert_eq!(t.max_extension_secs, 604800);
     }
 
     #[test]
-    fn test_adaptive_threshold_phi_ordering() {
+    fn test_adaptive_threshold_consciousness_ordering() {
         let standard = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
         let emergency = AdaptiveThreshold::for_proposal_type(&ProposalType::Emergency);
         let constitutional = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
-        assert!(standard.min_voter_phi < emergency.min_voter_phi);
-        assert!(emergency.min_voter_phi < constitutional.min_voter_phi);
+        assert!(standard.min_voter_consciousness < emergency.min_voter_consciousness);
+        assert!(emergency.min_voter_consciousness < constitutional.min_voter_consciousness);
     }
 
     #[test]
@@ -1131,7 +1131,7 @@ mod tests {
     }
 
     #[test]
-    fn test_adaptive_threshold_voter_phi_check() {
+    fn test_adaptive_threshold_voter_consciousness_check() {
         let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
         assert!(!t.voter_meets_phi_requirement(0.49), "0.49 < 0.5");
         assert!(t.voter_meets_phi_requirement(0.50), "0.50 = 0.5");
@@ -1151,10 +1151,10 @@ mod tests {
     fn test_threshold_hierarchy_voter_bar_below_proposer_bar() {
         // For Constitutional proposals:
         // - Proposer needs GovernanceActionType::Constitutional = 0.6
-        // - Voter needs AdaptiveThreshold(Constitutional).min_voter_phi = 0.5
+        // - Voter needs AdaptiveThreshold(Constitutional).min_voter_consciousness = 0.5
         // This is intentional: lower bar for voting than proposing
-        let proposer_bar = GovernanceActionType::Constitutional.phi_threshold();
-        let voter_bar = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional).min_voter_phi;
+        let proposer_bar = GovernanceActionType::Constitutional.consciousness_gate();
+        let voter_bar = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional).min_voter_consciousness;
         assert!(voter_bar < proposer_bar,
             "Constitutional voter bar ({}) should be lower than proposer bar ({})",
             voter_bar, proposer_bar);

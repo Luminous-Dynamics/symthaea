@@ -1,0 +1,31 @@
+{
+  "__type": "Map",
+  "entries": [
+    [
+      "short-ttl:expiring",
+      {
+        "data": {
+          "test": true
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 0
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516501716,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:6fd977db9b2afe87a9ceee48432881299a6aaf83d935fbbe83007660287f9c2e",
+          "sizeBytes": 13
+        },
+        "expiresAt": 1771516501777
+      }
+    ]
+  ]
+}

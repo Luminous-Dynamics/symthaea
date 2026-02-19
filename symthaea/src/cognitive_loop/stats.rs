@@ -164,7 +164,7 @@ pub struct LoopStats {
     pub cognitive_depth: String,
 
     /// Unified Φ from the unification engine
-    pub unified_phi: f32,
+    pub unified_psi: f32,
 
     /// Unified emotional valence (VAD-based, from EmotionalBridge)
     pub unified_emotional_valence: f32,

@@ -1,0 +1,13 @@
+[package]
+name = "symthaea-signal-processing"
+version = "0.1.0"
+edition = "2021"
+description = "Signal processing and numerical analysis for Symthaea: ODE solvers, spectral analysis, stability analysis, stochastic dynamics, HMM, wavelets, and phase-amplitude coupling."
+license = "MIT"
+rust-version = "1.82"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1"

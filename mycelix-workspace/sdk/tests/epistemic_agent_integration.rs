@@ -20,8 +20,8 @@ use mycelix_sdk::agentic::{
     compute_kvector_update,
     compute_trust_score,
     maybe_escalate,
-    measure_phi_simple,
-    phi_to_kvector_dimension,
+    measure_coherence,
+    coherence_to_kvector_dimension,
 
     should_proceed,
     update_agent_kvector,
@@ -47,7 +47,7 @@ use mycelix_sdk::agentic::{
     // Phase 4: GIS Integration
     MoralUncertainty,
     OutputContent,
-    PhiMeasurementConfig,
+    CoherenceMeasurementConfig,
     RelevanceDuration,
 
     UncertainOutput,
@@ -168,8 +168,8 @@ fn test_full_agent_lifecycle() {
     // =========================================================================
     // STEP 3: Measure Phi (coherence) for the output sequence
     // =========================================================================
-    let phi_config = PhiMeasurementConfig::default();
-    let phi_result = measure_phi_simple(&outputs, &phi_config).unwrap();
+    let phi_config = CoherenceMeasurementConfig::default();
+    let phi_result = measure_coherence(&outputs, &phi_config).unwrap();
 
     println!("Phi measurement: {:.4}", phi_result.phi);
     println!("Coherence state: {:?}", phi_result.coherence_state);
@@ -261,7 +261,7 @@ fn test_full_agent_lifecycle() {
 
     // Simulate more measurements over time
     for _ in 0..5 {
-        let similar_result = mycelix_sdk::agentic::AgentPhiResult {
+        let similar_result = mycelix_sdk::agentic::AgentCoherenceResult {
             phi: phi_result.phi * 0.98, // Slightly varying
             coherence_state: CoherenceState::Coherent,
             sample_size: 10,
@@ -441,7 +441,7 @@ fn test_diverse_outputs_lower_coherence() {
     ];
 
     let phi_result =
-        measure_phi_simple(&diverse_outputs, &PhiMeasurementConfig::default()).unwrap();
+        measure_coherence(&diverse_outputs, &CoherenceMeasurementConfig::default()).unwrap();
 
     println!("Diverse outputs Phi: {:.4}", phi_result.phi);
     println!("Coherence state: {:?}", phi_result.coherence_state);

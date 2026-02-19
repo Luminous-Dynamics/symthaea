@@ -17,8 +17,8 @@ import type {
   QuorumStatus,
   VotingStats,
   VoteChoice,
-  CastPhiVoteInput,
-  CastDelegatedPhiVoteInput,
+  CastConsciousnessVoteInput,
+  CastDelegatedConsciousnessVoteInput,
   CastQuadraticVoteInput,
   AllocateCreditsInput,
   VoiceCredits,
@@ -27,7 +27,7 @@ import type {
   RevokeDelegationInput,
   EffectiveDelegation,
   TallyVotesInput,
-  TallyPhiVotesInput,
+  TallyConsciousnessVotesInput,
   TallyQuadraticVotesInput,
   StoreEligibilityProofInput,
   CastVerifiedVoteInput,
@@ -393,10 +393,10 @@ export class VotingClient extends ZomeClient {
    * - Major: Φ ≥ 0.4
    * - Constitutional: Φ ≥ 0.6
    *
-   * @param input - Phi vote parameters
-   * @returns The cast Φ-weighted vote record
+   * @param input - Consciousness vote parameters
+   * @returns The cast consciousness-weighted vote record
    */
-  async castPhiWeightedVote(input: CastPhiVoteInput): Promise<HolochainRecord> {
+  async castConsciousnessWeightedVote(input: CastConsciousnessVoteInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('cast_phi_weighted_vote', {
       proposal_id: input.proposalId,
       voter_did: input.voterDid,
@@ -407,14 +407,14 @@ export class VotingClient extends ZomeClient {
   }
 
   /**
-   * Cast a delegated Φ-weighted vote
+   * Cast a delegated consciousness-weighted vote
    *
    * Resolves the delegation chain and applies transitive weight with decay.
    *
-   * @param input - Delegated phi vote parameters
+   * @param input - Delegated consciousness vote parameters
    * @returns The cast delegated vote record
    */
-  async castDelegatedPhiVote(input: CastDelegatedPhiVoteInput): Promise<HolochainRecord> {
+  async castDelegatedConsciousnessVote(input: CastDelegatedConsciousnessVoteInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('cast_delegated_phi_vote', {
       proposal_id: input.proposalId,
       delegate_did: input.delegateDid,
@@ -584,15 +584,15 @@ export class VotingClient extends ZomeClient {
   }
 
   /**
-   * Tally Φ-weighted votes for a proposal
+   * Tally consciousness-weighted votes for a proposal
    *
    * Automatically advances proposal to Approved if threshold met.
    * Optionally generates a collective mirror reflection.
    *
-   * @param input - Phi tally parameters
-   * @returns The Φ-weighted tally record
+   * @param input - Consciousness tally parameters
+   * @returns The consciousness-weighted tally record
    */
-  async tallyPhiVotes(input: TallyPhiVotesInput): Promise<HolochainRecord> {
+  async tallyConsciousnessVotes(input: TallyConsciousnessVotesInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('tally_phi_votes', {
       proposal_id: input.proposalId,
       tier: input.tier,
@@ -625,12 +625,12 @@ export class VotingClient extends ZomeClient {
   }
 
   /**
-   * Get the Φ-weighted tally for a proposal
+   * Get the consciousness-weighted tally for a proposal
    *
    * @param proposalId - Proposal identifier
-   * @returns The Φ-weighted tally record or null
+   * @returns The consciousness-weighted tally record or null
    */
-  async getPhiTally(proposalId: string): Promise<HolochainRecord | null> {
+  async getConsciousnessTally(proposalId: string): Promise<HolochainRecord | null> {
     return this.callZomeOrNull<HolochainRecord>('get_phi_tally', proposalId);
   }
 

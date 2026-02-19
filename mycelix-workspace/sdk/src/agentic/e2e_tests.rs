@@ -12,7 +12,7 @@
 //! - AI agents have verifiable K-Vector profiles that evolve from behavior
 //! - Trust can be proven without revealing underlying values (ZK)
 //! - Trust translates across different domains with appropriate damping
-//! - k_phi (coherence) dimension based on Integrated Information Theory
+//! - k_coherence (coherence) dimension based on Integrated Information Theory
 
 #[cfg(test)]
 mod tests {
@@ -82,7 +82,7 @@ mod tests {
     #[test]
     fn test_phase1_agent_creation_with_kvector() {
         // Create agent with initial 10-dimensional K-Vector
-        // Including the new k_phi (coherence) dimension
+        // Including the new k_coherence (coherence) dimension
         let initial_kvector = KVector::new(
             0.7, // k_r: Reputation
             0.5, // k_a: Activity
@@ -93,7 +93,7 @@ mod tests {
             0.5, // k_h: Historical
             0.3, // k_topo: Topology
             0.6, // k_v: Verification
-            0.5, // k_phi: Coherence (NEW)
+            0.5, // k_coherence: Coherence (NEW)
         );
 
         let agent = create_test_agent("agent-phi-1", initial_kvector);
@@ -104,8 +104,8 @@ mod tests {
 
         // Verify coherence dimension
         assert!(
-            (agent.k_vector.k_phi - 0.5).abs() < 0.01,
-            "k_phi should be 0.5"
+            (agent.k_vector.k_coherence - 0.5).abs() < 0.01,
+            "k_coherence should be 0.5"
         );
 
         // Verify trust score calculation includes all dimensions
@@ -122,7 +122,7 @@ mod tests {
         println!("✓ Phase 1: Agent created with 10D K-Vector");
         println!("  Trust score: {:.3}", trust_score);
         println!("  Derived KREDIT cap: {}", derived_kredit);
-        println!("  k_phi (coherence): {:.2}", agent.k_vector.k_phi);
+        println!("  k_coherence (coherence): {:.2}", agent.k_vector.k_coherence);
     }
 
     // ========================================================================
@@ -197,7 +197,7 @@ mod tests {
             "Commitment should not be zero"
         );
 
-        // Prove coherence without revealing k_phi value
+        // Prove coherence without revealing k_coherence value
         let coherence_proof = prover
             .prove_is_coherent(&agent.k_vector, agent.agent_id.as_str())
             .expect("Coherence proof should succeed");
@@ -273,7 +273,7 @@ mod tests {
 
     #[test]
     fn test_phase5_coherence_dimension() {
-        // Test the new k_phi dimension
+        // Test the new k_coherence dimension
         let high_coherence = KVector::new(0.7, 0.6, 0.8, 0.7, 0.5, 0.4, 0.6, 0.5, 0.7, 0.85);
         let low_coherence = KVector::new(0.7, 0.6, 0.8, 0.7, 0.5, 0.4, 0.6, 0.5, 0.7, 0.2);
 
@@ -305,9 +305,9 @@ mod tests {
         );
 
         println!("✓ Phase 5: Coherence dimension validated");
-        println!("  High coherence k_phi: {:.2}", high_coherence.k_phi);
-        println!("  Low coherence k_phi: {:.2}", low_coherence.k_phi);
-        println!("  Updated k_phi: {:.2}", updated.k_phi);
+        println!("  High coherence k_coherence: {:.2}", high_coherence.k_coherence);
+        println!("  Low coherence k_coherence: {:.2}", low_coherence.k_coherence);
+        println!("  Updated k_coherence: {:.2}", updated.k_coherence);
     }
 
     // ========================================================================
@@ -326,7 +326,7 @@ mod tests {
         let mut agent = create_test_agent("epistemic-agent-001", initial_kvector);
         println!("  Created agent: {}", agent.agent_id.as_str());
         println!("  Initial trust: {:.3}", agent.k_vector.trust_score());
-        println!("  Initial coherence (k_phi): {:.2}", agent.k_vector.k_phi);
+        println!("  Initial coherence (k_coherence): {:.2}", agent.k_vector.k_coherence);
 
         // === STEP 2: Record Behavior & Update K-Vector ===
         println!("\n─── Step 2: Behavior → K-Vector ───");
@@ -354,11 +354,11 @@ mod tests {
 
         // === STEP 3: Update Coherence Based on Output Consistency ===
         println!("\n─── Step 3: Coherence Update ───");
-        // Simulate measuring phi and updating k_phi
-        let measured_phi = 0.75f32; // Would come from phi_bridge::measure_agent_phi
+        // Simulate measuring phi and updating k_coherence
+        let measured_phi = 0.75f32; // Would come from coherence_bridge::measure_agent_coherence
         agent.k_vector = agent.k_vector.with_coherence(measured_phi);
         println!("  Measured Phi: {:.3}", measured_phi);
-        println!("  Updated k_phi: {:.3}", agent.k_vector.k_phi);
+        println!("  Updated k_coherence: {:.3}", agent.k_vector.k_coherence);
 
         // === STEP 4: Generate ZK Attestation ===
         println!("\n─── Step 4: ZK Trust Attestation ───");
@@ -415,8 +415,8 @@ mod tests {
             agent.k_vector.trust_score()
         );
         println!(
-            "║  Coherence (k_phi): {:.3}                                    ║",
-            agent.k_vector.k_phi
+            "║  Coherence (k_coherence): {:.3}                                    ║",
+            agent.k_vector.k_coherence
         );
         println!(
             "║  Behaviors Logged: {}                                        ║",
@@ -428,7 +428,7 @@ mod tests {
 
         // Assertions for test validity
         assert!(agent.k_vector.trust_score() > 0.0);
-        assert!(agent.k_vector.k_phi > 0.0);
+        assert!(agent.k_vector.k_coherence > 0.0);
         assert!(trust_proof.output.statement_valid);
         assert_eq!(translation.dimension_translations.len(), 10);
     }
@@ -650,7 +650,7 @@ mod tests {
         println!("  KREDIT Cap: {}", agent.kredit_cap);
         println!("  k_r (Reputation): {:.2}", agent.k_vector.k_r);
         println!("  k_p (Performance): {:.2}", agent.k_vector.k_p);
-        println!("  k_phi (Coherence): {:.2}", agent.k_vector.k_phi);
+        println!("  k_coherence (Coherence): {:.2}", agent.k_vector.k_coherence);
 
         // Verify improvement
         let final_cap = agent.kredit_cap;

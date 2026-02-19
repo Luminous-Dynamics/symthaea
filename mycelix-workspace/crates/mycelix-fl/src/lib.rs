@@ -40,7 +40,7 @@ pub mod aggregation;
 pub mod detection;
 pub mod trust;
 pub mod epistemic;
-pub mod phi;
+pub mod coherence;
 pub mod privacy;
 pub mod pipeline;
 pub mod holochain;
@@ -50,12 +50,12 @@ pub mod attacks;
 
 pub mod hdc_aggregation;
 
-#[cfg(feature = "phi-series")]
-pub mod phi_series;
+#[cfg(any(feature = "coherence-series", feature = "phi-series"))]
+pub mod coherence_series;
 
 #[cfg(feature = "pogq")]
 pub mod pogq;
 
 pub use types::*;
 pub use pipeline::DecentralizedPipeline;
-pub use phi::{GradientCoherenceConfig, GradientCoherenceGate, CoherenceScore};
+pub use coherence::{GradientCoherenceConfig, GradientCoherenceGate, CoherenceScore};

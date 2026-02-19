@@ -381,6 +381,9 @@ impl CognitiveLoopService {
         };
 
         let enable_user_state = config.enable_user_state_inference;
+        let enable_resonator_recall = config.enable_resonator_recall;
+        let resonator_cfc_input_dim = config.cfc_config.input_dim;
+        let resonator_genesis_phrase = config.genesis_phrase.clone();
 
         Ok(Self {
             config,
@@ -441,6 +444,61 @@ impl CognitiveLoopService {
             semantic_memory: SemanticMemory::with_threshold(1000, 0.3),
             // Memory coordinator: cross-tier signal broadcaster
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
+            // Resonator Memory: factorized episodic recall with 3 codebooks
+            resonator_memory: if enable_resonator_recall {
+                let dim = resonator_cfc_input_dim; // matches compressed_state
+                let res_config = crate::dynamics::resonator::ResonatorConfig {
+                    dim,
+                    max_iters: 50,               // Real-time budget (default 100 too slow)
+                    convergence_threshold: 0.995, // Slightly relaxed for speed
+                    temperature: 0.1,
+                    bipolar: true,
+                };
+                let mut mem = crate::dynamics::resonator::ResonatorMemory::new(res_config, 500);
+
+                // Helper: generate deterministic random bipolar HV from seed
+                let make_hv = |seed: u64, d: usize| -> Vec<f32> {
+                    let mut state = seed ^ 0x9E3779B97F4A7C15; // xorshift64 seed-0 fix
+                    (0..d).map(|_| {
+                        state ^= state << 13;
+                        state ^= state >> 7;
+                        state ^= state << 17;
+                        if state % 2 == 0 { 1.0 } else { -1.0 }
+                    }).collect()
+                };
+
+                let seed_base: u64 = resonator_genesis_phrase.as_ref()
+                    .map(|p| {
+                        let genesis = symthaea_core::genesis::GenesisSeed::from_phrase(p);
+                        genesis.domain("resonator_memory").gen::<u64>()
+                    })
+                    .unwrap_or(0xBE50_0A70_0000_5EED);
+
+                // Codebook 1: "semantic" — 8 proto-symbols, grows dynamically
+                let mut semantic_cb = crate::dynamics::Codebook::new("semantic");
+                for i in 0..8u64 {
+                    semantic_cb.add(&format!("proto_{i}"), make_hv(seed_base.wrapping_add(i), dim));
+                }
+                mem.add_codebook(semantic_cb);
+
+                // Codebook 2: "valence" — 3 fixed emotional poles
+                let mut valence_cb = crate::dynamics::Codebook::new("valence");
+                valence_cb.add("positive", make_hv(seed_base.wrapping_add(100), dim));
+                valence_cb.add("neutral",  make_hv(seed_base.wrapping_add(101), dim));
+                valence_cb.add("negative", make_hv(seed_base.wrapping_add(102), dim));
+                mem.add_codebook(valence_cb);
+
+                // Codebook 3: "phi_level" — 3 consciousness tiers
+                let mut phi_cb = crate::dynamics::Codebook::new("phi_level");
+                phi_cb.add("low",    make_hv(seed_base.wrapping_add(200), dim));
+                phi_cb.add("medium", make_hv(seed_base.wrapping_add(201), dim));
+                phi_cb.add("high",   make_hv(seed_base.wrapping_add(202), dim));
+                mem.add_codebook(phi_cb);
+
+                Some(mem)
+            } else {
+                None
+            },
             #[cfg(feature = "neural-bridge")]
             neural_bridge: {
                 let probe_path = std::path::Path::new("models/neural_bridge/probe_weights.npy");
@@ -503,12 +561,17 @@ impl CognitiveLoopService {
             phi_attention,
             negation_detector,
             primitive_processor,
+            value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop::default(),
             #[cfg(feature = "support")]
             support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),
             #[cfg(feature = "support")]
             support_knowledge_manager: Some(symthaea_support::knowledge::KnowledgeManager::new()),
             #[cfg(feature = "support")]
             support_triage_engine: Some(symthaea_support::triage::TriageEngine::new()),
+            #[cfg(feature = "support")]
+            support_privacy_manager: Some(symthaea_support::privacy::PrivacyManager::default()),
+            #[cfg(feature = "support")]
+            support_action_engine: Some(symthaea_support::actions::ActionEngine::new()),
             #[cfg(feature = "support")]
             support_cycle_counter: 0,
             carryover: CycleCarryover::default(),
@@ -524,7 +587,7 @@ impl CognitiveLoopService {
             temporal_consciousness,
             embodied_cognition,
             narrative_gwt,
-            relational_phi: 0.0,
+            relational_psi: 0.0,
             external_reward: 0.0,
             social_trust: 0.5,
             social_cooperation_rate: 0.0,

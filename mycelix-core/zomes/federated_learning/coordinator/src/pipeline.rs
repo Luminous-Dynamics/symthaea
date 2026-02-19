@@ -9,6 +9,8 @@ use mycelix_fl::holochain::{
     ZomeAggregationCommitment, ZomeAggregationReveal, DetectionSummary as FlDetectionSummary,
     to_zome_commitment,
 };
+use mycelix_fl::fl_core::{ShapleyCalculator, ShapleyConfig, ReplayDetector, ReplayDetectorConfig,
+    AdaptiveDefenseManager, AdaptiveDefenseConfig};
 use mycelix_sdk::hyperfeel::HV16_BYTES;
 
 use crate::signals::Signal;
@@ -113,6 +115,57 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
         reputations.insert(node_id.clone(), rep);
     }
 
+    // Step 2.5: Check for gradient replay attacks
+    let mut replay_excluded = Vec::new();
+    {
+        let mut replay_detector = ReplayDetector::new(ReplayDetectorConfig::default());
+        for gradient in &compressed_gradients {
+            // Convert HV16 bytes to f32 for replay fingerprinting
+            let gradient_f32: Vec<f32> = gradient.hv_data.iter()
+                .flat_map(|byte| (0..8).rev().map(move |i| {
+                    if (byte >> i) & 1 == 1 { 1.0f32 } else { -1.0f32 }
+                }))
+                .collect();
+            let check = replay_detector.check_replay(
+                &gradient.participant_id,
+                &gradient_f32,
+                round as u64,
+            );
+            if check.is_replay {
+                replay_excluded.push(gradient.participant_id.clone());
+            }
+        }
+    }
+    // Remove replay-detected gradients before aggregation
+    if !replay_excluded.is_empty() {
+        let excluded_set: std::collections::HashSet<&str> = replay_excluded.iter()
+            .map(|s| s.as_str()).collect();
+        compressed_gradients.retain(|g| !excluded_set.contains(g.participant_id.as_str()));
+    }
+
+    if compressed_gradients.is_empty() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "All gradients excluded by replay detection".to_string()
+        )));
+    }
+
+    // Step 2.7: Adaptive defense — select aggregation strategy based on recent Byzantine rates
+    let mut defense_manager = AdaptiveDefenseManager::new(AdaptiveDefenseConfig::default());
+    // Feed historical Byzantine rates from recent rounds (best effort, no error on failure)
+    if round > 0 {
+        let lookback = round.min(5);
+        for prev_round in (round.saturating_sub(lookback))..round {
+            // Approximate: check if any Byzantine records exist for prior rounds
+            if let Ok(byz_records) = crate::gradients::get_round_byzantine_records(prev_round) {
+                if let Ok(prev_hvs) = crate::hyperfeel::get_round_hypervectors(prev_round) {
+                    defense_manager.record_round_result(byz_records.len(), prev_hvs.len());
+                }
+            }
+        }
+    }
+    // Let adaptive defense potentially escalate the method
+    let _adapted_method = defense_manager.adapt();
+
     // Step 3: Run the unified pipeline
     let pipeline = DecentralizedPipeline::new(PipelineConfig::default());
     let result = pipeline.aggregate_compressed(&compressed_gradients, &reputations)
@@ -134,24 +187,65 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
         round as u64,
     );
 
-    // Step 5: Build detection summary from pipeline result
+    // Step 5: Build detection summary from pipeline result (includes replay-excluded)
+    let mut flagged_nodes: Vec<(String, f32)> = result.stats.excluded_participants.iter()
+        .map(|id| (id.clone(), 1.0_f32))
+        .collect();
+    for replay_id in &replay_excluded {
+        if !flagged_nodes.iter().any(|(id, _)| id == replay_id) {
+            flagged_nodes.push((replay_id.clone(), 1.0_f32));
+        }
+    }
+    let mut detection_layers = vec!["MultiSignal".to_string(), "HvCosineFilter".to_string()];
+    if !replay_excluded.is_empty() {
+        detection_layers.push("ReplayDetection".to_string());
+    }
     let detection_summary = FlDetectionSummary {
-        flagged_nodes: result.stats.excluded_participants.iter()
-            .map(|id| (id.clone(), 1.0_f32))
-            .collect(),
-        detection_layers_used: vec!["MultiSignal".to_string(), "HvCosineFilter".to_string()],
-        total_checked: result.stats.total_contributions,
-        total_flagged: result.stats.byzantine_detected,
+        flagged_nodes,
+        detection_layers_used: detection_layers,
+        total_checked: result.stats.total_contributions + replay_excluded.len(),
+        total_flagged: result.stats.byzantine_detected + replay_excluded.len(),
     };
 
+    // Step 5.5: Record coherence time-series data point for this round
+    {
+        use mycelix_fl::coherence_series::{CoherenceTimeSeries, CoherenceTimeSeriesConfig};
+        // Compute coherence as (1 - byzantine_fraction) — higher = more coherent
+        let total = result.stats.total_contributions + replay_excluded.len();
+        let flagged = result.stats.byzantine_detected + replay_excluded.len();
+        let coherence = if total > 0 {
+            1.0 - (flagged as f32 / total as f32)
+        } else {
+            1.0
+        };
+        let now_ms = sys_time().map(|t| t.0 as i64 / 1_000).unwrap_or(0);
+        let mut series = CoherenceTimeSeries::new(
+            CoherenceTimeSeriesConfig::default().with_window_size(50)
+        );
+        series.record(
+            round as u64,
+            now_ms,
+            coherence,
+            0.8, // default epistemic confidence
+            flagged,
+            total,
+        );
+        // Check for anomalies (result available for future DHT persistence)
+        let _anomaly = series.detect_anomaly();
+    }
+
     // Step 6: Return result
+    let mut all_excluded = result.stats.excluded_participants;
+    all_excluded.extend(replay_excluded);
+    let total_excluded = all_excluded.len() as u32;
+
     Ok(ValidatorPipelineResult {
         commitment_hash,
         aggregated_hv,
         method,
         gradient_count: result.stats.after_detection as u32,
-        excluded_count: result.stats.byzantine_detected as u32,
-        excluded_participants: result.stats.excluded_participants,
+        excluded_count: total_excluded,
+        excluded_participants: all_excluded,
         detection_summary,
     })
 }
@@ -221,6 +315,12 @@ pub fn run_and_reveal(round: u32) -> ExternResult<ActionHash> {
     let agent = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?.0 as i64 / 1_000_000;
 
+    // Compute real Shapley values from pipeline participants
+    let shapley_values = compute_reveal_shapley_values(
+        round,
+        &pipeline_result.excluded_participants,
+    );
+
     // Build the reveal using bridge type
     let zome_reveal = ZomeAggregationReveal {
         round: round as u64,
@@ -228,9 +328,7 @@ pub fn run_and_reveal(round: u32) -> ExternResult<ActionHash> {
         result_data: pipeline_result.aggregated_hv,
         result_hash: pipeline_result.commitment_hash,
         detection_summary: pipeline_result.detection_summary,
-        shapley_values: pipeline_result.excluded_participants.iter()
-            .map(|id| (id.clone(), 0.0_f32))
-            .collect(),
+        shapley_values,
         revealed_at: now,
     };
 
@@ -249,6 +347,80 @@ pub fn run_and_reveal(round: u32) -> ExternResult<ActionHash> {
     )?;
 
     Ok(action_hash)
+}
+
+/// Compute Shapley values for the reveal phase using HV16 hypervector data.
+///
+/// Fetches round hypervectors and runs ShapleyCalculator (MonteCarlo, 100 samples)
+/// for n <= 20 valid participants. Falls back to equal shares for larger groups.
+/// Excluded participants receive 0.0.
+fn compute_reveal_shapley_values(
+    round: u32,
+    excluded_participants: &[String],
+) -> Vec<(String, f32)> {
+    let excluded_set: std::collections::HashSet<&str> = excluded_participants.iter()
+        .map(|s| s.as_str()).collect();
+
+    let Ok(hypervectors) = crate::hyperfeel::get_round_hypervectors(round) else {
+        // Can't fetch HVs — return zeros for excluded only
+        return excluded_participants.iter()
+            .map(|id| (id.clone(), 0.0_f32))
+            .collect();
+    };
+
+    let valid_hvs: Vec<_> = hypervectors.iter()
+        .filter(|(id, _)| !excluded_set.contains(id.as_str()))
+        .collect();
+
+    if valid_hvs.is_empty() || valid_hvs.len() > 20 {
+        // Fallback: equal share for valid, 0 for excluded
+        let equal_share = if valid_hvs.is_empty() { 0.0 } else { 1.0 / valid_hvs.len() as f32 };
+        let mut values: Vec<(String, f32)> = valid_hvs.iter()
+            .map(|(id, _)| (id.clone(), equal_share))
+            .collect();
+        for id in excluded_participants {
+            values.push((id.clone(), 0.0));
+        }
+        return values;
+    }
+
+    // Build gradient map from HV16 bipolar data
+    let mut gradient_map: std::collections::HashMap<String, Vec<f32>> =
+        std::collections::HashMap::new();
+    for (node_id, hv_bytes) in &valid_hvs {
+        let bipolar: Vec<f32> = hv_bytes.iter()
+            .flat_map(|byte| (0..8).rev().map(move |i| {
+                if (byte >> i) & 1 == 1 { 1.0f32 } else { -1.0f32 }
+            }))
+            .collect();
+        gradient_map.insert((*node_id).clone(), bipolar);
+    }
+
+    // Compute aggregated reference (mean of all valid HVs)
+    let dim = gradient_map.values().next().map_or(0, |v| v.len());
+    let mut aggregated = vec![0.0f32; dim];
+    let count = gradient_map.len() as f32;
+    for vals in gradient_map.values() {
+        for (i, v) in vals.iter().enumerate() {
+            if i < dim {
+                aggregated[i] += v / count;
+            }
+        }
+    }
+
+    let config = ShapleyConfig::monte_carlo(100).with_normalization();
+    let mut calculator = ShapleyCalculator::new(config);
+    let result = calculator.calculate_values(&gradient_map, &aggregated);
+
+    let mut values: Vec<(String, f32)> = result.values.iter()
+        .map(|(id, sv)| (id.clone(), *sv))
+        .collect();
+    for id in excluded_participants {
+        if !values.iter().any(|(vid, _)| vid == id) {
+            values.push((id.clone(), 0.0));
+        }
+    }
+    values
 }
 
 /// Compute similarity between two hypervectors

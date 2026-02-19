@@ -225,7 +225,7 @@ impl CognitiveLoopService {
         self.stats.temporal_coherence = coherence;
 
         // 11. Buffer PhiAttestation record if enabled (mirrors cycle.rs step 10h.0)
-        // For the HV path, unified_phi is derived from temporal coherence since
+        // For the HV path, unified_psi is derived from temporal coherence since
         // we don't run the full consciousness subsystems.
         let urgency = self.carryover.urgency;
         if self.config.enable_phi_attestation && self.config.agent_did.is_some() {
@@ -458,7 +458,7 @@ impl CognitiveLoopService {
         self.stats.cognitive_depth = format!("{:?}", self.cognitive_depth);
 
         // Unified Phi from the unification engine
-        self.stats.unified_phi = self.unification_engine.phi as f32;
+        self.stats.unified_psi = self.unification_engine.psi as f32;
 
         // Unified emotional state (VAD)
         let unified_state = self.unification_engine.emotional.state();

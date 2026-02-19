@@ -102,7 +102,7 @@ function renderUpdate(update: AgentUpdate): void {
   console.log(`  ${colors.dim}K-Vector:${colors.reset}`);
   const kv = agent.kVector;
   console.log(`    r=${kv.k_r.toFixed(2)} a=${kv.k_a.toFixed(2)} i=${kv.k_i.toFixed(2)} p=${kv.k_p.toFixed(2)} m=${kv.k_m.toFixed(2)}`);
-  console.log(`    s=${kv.k_s.toFixed(2)} h=${kv.k_h.toFixed(2)} t=${kv.k_topo.toFixed(2)} v=${(kv.k_v ?? 0).toFixed(2)} φ=${(kv.k_phi ?? 0).toFixed(2)}`);
+  console.log(`    s=${kv.k_s.toFixed(2)} h=${kv.k_h.toFixed(2)} t=${kv.k_topo.toFixed(2)} v=${(kv.k_v ?? 0).toFixed(2)} φ=${(kv.k_coherence ?? 0).toFixed(2)}`);
 
   // Changes
   if (changes.length > 0 && changes[0] !== 'subscribed') {

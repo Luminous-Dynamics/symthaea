@@ -86,7 +86,7 @@ impl ZkKVector {
             50_000,  // k_h: historical
             40_000,  // k_topo: topology
             90_000,  // k_v: verification
-            50_000,  // k_phi: coherence
+            50_000,  // k_coherence: coherence
         ];
 
         let mut weighted_sum: u128 = 0;
@@ -128,7 +128,7 @@ pub enum ZkTrustStatement {
     IsVerified = 5,
     /// Agent is strongly verified (k_v >= 0.7)
     IsStronglyVerified = 6,
-    /// Agent is highly coherent (k_phi >= 0.7)
+    /// Agent is highly coherent (k_coherence >= 0.7)
     IsHighlyCoherent = 7,
 }
 
@@ -319,7 +319,7 @@ pub fn evaluate_statement(
         }
 
         ZkTrustStatement::IsHighlyCoherent => {
-            // k_phi (index 9) >= 0.7
+            // k_coherence (index 9) >= 0.7
             kvector.values[9] >= (SCALE * 7) / 10
         }
     }
@@ -948,7 +948,7 @@ mod tests {
     #[test]
     fn test_prove_is_coherent() {
         let prover = TrustRisc0Prover::new_simulation();
-        let kv = test_kvector(); // k_phi = 0.7
+        let kv = test_kvector(); // k_coherence = 0.7
 
         let proof = prover.prove_is_coherent(&kv, "agent-1").unwrap();
         assert!(proof.output.statement_valid);

@@ -10,6 +10,7 @@
 //! - Mapping results into `mycelix_sdk::epistemic` classifications
 
 pub mod fl_plugin;
+pub mod support;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -267,15 +268,15 @@ pub fn pogq_from_quality_score(q: &QualityScore) -> ProofOfGradientQuality {
     // Treat epistemic confidence as the primary quality signal.
     let quality = q.epistemic_confidence as f64;
 
-    // Consistency captures both Φ trend and similarity to prior behavior.
-    let phi_trend = if q.phi.phi_gain >= 0.0 {
+    // Consistency captures both integration trend and similarity to prior behavior.
+    let integration_trend = if q.integration.integration_gain >= 0.0 {
         1.0
     } else {
-        (1.0 - (-q.phi.phi_gain as f64)).clamp(0.0, 1.0)
+        (1.0 - (-q.integration.integration_gain as f64)).clamp(0.0, 1.0)
     };
 
     let sim_component = q.similarity.unwrap_or(0.0) as f64;
-    let consistency = 0.5 * phi_trend + 0.5 * sim_component;
+    let consistency = 0.5 * integration_trend + 0.5 * sim_component;
 
     // Entropy: ambiguous or anomalous updates have higher "uncertainty".
     let entropy = if q.is_anomalous {
@@ -304,24 +305,28 @@ fn gradient_id_from_hash(hash: &[u8; 32]) -> String {
     s
 }
 
-/// Summary of Φ (integrated information) assessment around an update.
+/// Integration assessment from Symthaea's PhiEngine.
+///
+/// NOTE: Currently uses SpectralConnectivity (algebraic connectivity / Fiedler value),
+/// NOT true IIT Phi. Correlation with IIT Phi is r=0.097 (near zero).
+/// See symthaea-core/src/physics/true_phi/ for the real IIT Phi calculator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiAssessment {
-    /// Φ before applying the update.
-    pub phi_before: f32,
-    /// Φ after applying the update.
-    pub phi_after: f32,
+pub struct IntegrationAssessment {
+    /// Integration score before applying the update.
+    pub integration_before: f32,
+    /// Integration score after applying the update.
+    pub integration_after: f32,
     /// Difference (positive = more integration/coherence).
-    pub phi_gain: f32,
+    pub integration_gain: f32,
 }
 
-impl PhiAssessment {
+impl IntegrationAssessment {
     /// Construct a new assessment from before/after values.
-    pub fn new(phi_before: f32, phi_after: f32) -> Self {
+    pub fn new(integration_before: f32, integration_after: f32) -> Self {
         Self {
-            phi_before,
-            phi_after,
-            phi_gain: phi_after - phi_before,
+            integration_before,
+            integration_after,
+            integration_gain: integration_after - integration_before,
         }
     }
 }
@@ -333,8 +338,8 @@ pub struct QualityScore {
     pub accuracy: f32,
     /// Validation loss after applying the update.
     pub loss: f32,
-    /// Φ assessment (before/after/gain).
-    pub phi: PhiAssessment,
+    /// Integration assessment (before/after/gain).
+    pub integration: IntegrationAssessment,
     /// Epistemic confidence in the quality claim [0, 1].
     pub epistemic_confidence: f32,
     /// Whether the update appears anomalous (potentially Byzantine).
@@ -425,8 +430,8 @@ pub struct SymthaeaBackendConfig {
     pub recall_threshold: f32,
     /// Lower bound of the "gray zone" where updates are considered ambiguous.
     pub ambiguity_threshold: f32,
-    /// Minimum Φ drop (before → after) to consider suspicious.
-    pub phi_drop_threshold: f32,
+    /// Minimum integration drop (before → after) to consider suspicious.
+    pub integration_drop_threshold: f32,
     /// Optional cap on number of concepts stored in associative memory.
     /// `None` = unbounded (not recommended for long-running deployments).
     pub max_concepts: Option<usize>,
@@ -437,7 +442,7 @@ impl Default for SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.9,
             ambiguity_threshold: 0.75,
-            phi_drop_threshold: 0.1,
+            integration_drop_threshold: 0.1,
             max_concepts: Some(10_000),
         }
     }
@@ -449,7 +454,7 @@ impl SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.92,
             ambiguity_threshold: 0.8,
-            phi_drop_threshold: 0.05,
+            integration_drop_threshold: 0.05,
             max_concepts: Some(5_000),
         }
     }
@@ -459,7 +464,7 @@ impl SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.88,
             ambiguity_threshold: 0.7,
-            phi_drop_threshold: 0.15,
+            integration_drop_threshold: 0.15,
             max_concepts: Some(20_000),
         }
     }
@@ -469,7 +474,7 @@ impl SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.9,
             ambiguity_threshold: 0.6,
-            phi_drop_threshold: 0.05,
+            integration_drop_threshold: 0.05,
             max_concepts: Some(2_000),
         }
     }
@@ -478,8 +483,8 @@ impl SymthaeaBackendConfig {
 /// Per-node consciousness state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NodeState {
-    /// Last observed Φ for this node.
-    last_phi: f32,
+    /// Last observed integration score for this node.
+    last_integration: f32,
     /// Number of anomalous updates detected so far.
     anomaly_count: u32,
 }
@@ -487,7 +492,7 @@ struct NodeState {
 impl Default for NodeState {
     fn default() -> Self {
         Self {
-            last_phi: 0.5, // Neutral starting point
+            last_integration: 0.5, // Neutral starting point
             anomaly_count: 0,
         }
     }
@@ -575,7 +580,7 @@ impl SymthaeaBackend {
     pub fn node_state_snapshot(&self, node_id: &str) -> Option<(f32, u32)> {
         self.node_states
             .get(node_id)
-            .map(|s| (s.last_phi, s.anomaly_count))
+            .map(|s| (s.last_integration, s.anomaly_count))
     }
 
     /// Access the current configuration.
@@ -648,7 +653,7 @@ impl SymthaeaBackend {
     }
 
     /// Helper: derive an epistemic classification from Φ and Mycelix context.
-    fn classify_from_phi(
+    fn classify_from_integration(
         &self,
         phi: f32,
         update: &HyperGradient,
@@ -705,54 +710,54 @@ impl ConsciousnessBackend for SymthaeaBackend {
         snapshot: &dyn ModelSnapshot,
         update: &HyperGradient,
     ) -> Result<QualityScore> {
-        // 1. Identify node and load prior state (extract phi_before, drop borrow)
+        // 1. Identify node and load prior state (extract integration_before, drop borrow)
         let node_id = update.node_id.to_string();
-        let phi_before = self
+        let integration_before = self
             .node_states
             .entry(node_id.clone())
             .or_insert_with(NodeState::default)
-            .last_phi;
+            .last_integration;
 
         // 2. Convert HyperGradient -> ContinuousHV, with recall-or-project semantics.
         let (hv, similarity) = self.recall_or_project(update)?;
 
-        // 3. Compute Phi for this node
+        // 3. Compute integration score for this node
         let phi_result = self.phi_engine.compute(&[hv]);
-        let phi_after = phi_result.phi as f32;
-        let phi_assessment = PhiAssessment::new(phi_before, phi_after);
+        let integration_after = phi_result.phi as f32;
+        let integration_assessment = IntegrationAssessment::new(integration_before, integration_after);
 
         // 4. Evaluate validation metrics on the updated snapshot
         let (accuracy, loss) = snapshot.evaluate()?;
 
-        // 5. Map Phi to epistemic classification
-        let classification = self.classify_from_phi(phi_after, update);
+        // 5. Map integration to epistemic classification
+        let classification = self.classify_from_integration(integration_after, update);
 
         // 6. Build a canonical EpistemicClaim (currently unused, but ready
         //    for callers that want to store it in Mycelix UESS)
-        let claim = self.build_claim(phi_after, snapshot, &classification);
+        let claim = self.build_claim(integration_after, snapshot, &classification);
         let _claim_code = claim.code(); // exercise the claim for now
 
-        // 7. Epistemic confidence: scaled combination of Phi and accuracy
-        let epistemic_confidence = ((phi_after + accuracy) / 2.0).clamp(0.0, 1.0);
+        // 7. Epistemic confidence: scaled combination of integration and accuracy
+        let epistemic_confidence = ((integration_after + accuracy) / 2.0).clamp(0.0, 1.0);
 
         // 8. Anomaly heuristic:
-        //    - strong negative Phi gain
+        //    - strong negative integration gain
         //    - or gray-zone similarity (uncanny valley)
         //    - or very low epistemic confidence
-        let phi_gain = phi_assessment.phi_gain;
+        let integration_gain = integration_assessment.integration_gain;
 
         let is_ambiguous = similarity.map_or(false, |sim| {
             sim >= self.config.ambiguity_threshold && sim < self.config.recall_threshold
         });
 
-        let is_drop = phi_gain < -self.config.phi_drop_threshold;
+        let is_drop = integration_gain < -self.config.integration_drop_threshold;
         let low_confidence = epistemic_confidence < 0.2;
 
         let is_anomalous = is_drop || is_ambiguous || low_confidence;
 
         // 9. Update node state (re-borrow now that other methods are done)
         if let Some(state) = self.node_states.get_mut(&node_id) {
-            state.last_phi = phi_after;
+            state.last_integration = integration_after;
             if is_anomalous {
                 state.anomaly_count = state.anomaly_count.saturating_add(1);
             }
@@ -761,7 +766,7 @@ impl ConsciousnessBackend for SymthaeaBackend {
         // 10. Classify severity
         let severity = if !is_anomalous {
             ConsciousAnomalySeverity::None
-        } else if is_drop && (phi_gain < -2.0 * self.config.phi_drop_threshold || low_confidence) {
+        } else if is_drop && (integration_gain < -2.0 * self.config.integration_drop_threshold || low_confidence) {
             ConsciousAnomalySeverity::Severe
         } else if is_drop || is_ambiguous || low_confidence {
             // Any single signal without the stronger criteria above.
@@ -785,7 +790,7 @@ impl ConsciousnessBackend for SymthaeaBackend {
         Ok(QualityScore {
             accuracy,
             loss,
-            phi: phi_assessment,
+            integration: integration_assessment,
             epistemic_confidence,
             is_anomalous,
             similarity,
@@ -797,23 +802,78 @@ impl ConsciousnessBackend for SymthaeaBackend {
 }
 
 // ============================================================================
-// PHI ATTESTATION GENERATION
+// SUPPORT BRIDGE METHODS
 // ============================================================================
 
-/// Data for an authenticated Phi attestation, ready to be signed and
-/// submitted to the governance bridge via `record_phi_attestation()`.
+impl SymthaeaBackend {
+    /// Triage an incoming support request and produce ticket field suggestions.
+    pub fn assess_support_triage(
+        &self,
+        title: &str,
+        description: &str,
+    ) -> support::TicketFieldSuggestions {
+        let engine = symthaea_support::triage::TriageEngine::new();
+        let result = engine.triage(title, description);
+        support::triage_to_ticket_fields(
+            &format!("{:?}", result.suggested_priority),
+            &format!("{:?}", result.suggested_category),
+            result.confidence,
+            result.suggested_articles.clone(),
+            &format!("{:?}", result.epistemic_status),
+        )
+    }
+
+    /// Run a diagnostic step and package the result for DHT storage.
+    pub fn assess_diagnostic(
+        &self,
+        diagnostic_type: &str,
+        findings: &str,
+        severity: &str,
+        recommendations: Vec<String>,
+        scrubbed: bool,
+    ) -> support::DiagnosticEntryData {
+        support::step_to_diagnostic_entry(
+            diagnostic_type,
+            findings,
+            severity,
+            recommendations,
+            scrubbed,
+        )
+    }
+
+    /// Package a BinaryHV encoding as a cognitive update for DHT sharing.
+    pub fn package_cognitive_update(
+        &self,
+        encoding: Vec<u8>,
+        phi: f64,
+        category: &str,
+        pattern: &str,
+    ) -> support::CognitiveUpdatePackage {
+        support::memory_to_cognitive_update(encoding, phi, category, pattern)
+    }
+}
+
+// ============================================================================
+// CONSCIOUSNESS ATTESTATION GENERATION
+// ============================================================================
+
+/// Data for an authenticated consciousness attestation, ready to be signed and
+/// submitted to the governance bridge via `record_consciousness_attestation()`.
+///
+/// NOTE: The `consciousness_level` is derived from SpectralConnectivity (Fiedler value),
+/// NOT true IIT Phi. See `IntegrationAssessment` for details.
 ///
 /// The `signature` field must be filled by the caller using their agent's
 /// signing key (e.g., Holochain agent key or Ed25519 key).
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiAttestationData {
+pub struct ConsciousnessAttestationData {
     /// Agent's DID identifier.
     pub agent_did: String,
-    /// Phi value from Symthaea's PhiEngine, in [0.0, 1.0].
-    pub phi: f64,
-    /// Symthaea cognitive cycle number that produced this Phi.
+    /// Consciousness level from Symthaea's integration assessment, in [0.0, 1.0].
+    pub consciousness_level: f64,
+    /// Symthaea cognitive cycle number that produced this assessment.
     pub cycle_id: u64,
-    /// Unix timestamp (microseconds) when the Phi was captured.
+    /// Unix timestamp (microseconds) when the assessment was captured.
     pub captured_at_us: u64,
     /// Signature over the canonical sign message (filled by caller).
     pub signature: Vec<u8>,
@@ -821,53 +881,54 @@ pub struct PhiAttestationData {
     pub source: String,
 }
 
-impl PhiAttestationData {
+impl ConsciousnessAttestationData {
     /// Compute the canonical message bytes to sign for this attestation.
     ///
-    /// Format: `"symthaea-phi-attestation:v1:{agent_did}:{phi}:{cycle_id}:{captured_at_us}"`
+    /// Format: `"symthaea-consciousness-attestation:v1:{agent_did}:{consciousness_level}:{cycle_id}:{captured_at_us}"`
     ///
     /// The caller should sign these bytes with their agent key and store the
     /// result in the `signature` field before submitting to governance.
     pub fn sign_message(&self) -> Vec<u8> {
         format!(
-            "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
-            self.agent_did, self.phi, self.cycle_id, self.captured_at_us,
+            "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
+            self.agent_did, self.consciousness_level, self.cycle_id, self.captured_at_us,
         )
         .into_bytes()
     }
 }
 
-/// Create an unsigned `PhiAttestationData` from a `QualityScore`.
+/// Create an unsigned `ConsciousnessAttestationData` from a `QualityScore`.
 ///
-/// The `phi` value is taken from `quality.phi.phi_after` (the post-update Phi).
+/// The `consciousness_level` is taken from `quality.integration.integration_after`
+/// (the post-update integration score).
 /// The caller must:
 /// 1. Call `.sign_message()` to get the canonical bytes
 /// 2. Sign those bytes with their agent key
 /// 3. Set `attestation.signature = signature_bytes`
-/// 4. Submit to governance via `record_phi_attestation()`
+/// 4. Submit to governance via `record_consciousness_attestation()`
 ///
 /// # Example
 ///
 /// ```ignore
 /// let quality = backend.assess_update(&snapshot, &gradient)?;
-/// let mut attestation = create_phi_attestation_data(&quality, "did:key:z6Mk...", 42);
+/// let mut attestation = create_consciousness_attestation_data(&quality, "did:key:z6Mk...", 42);
 /// let message = attestation.sign_message();
 /// attestation.signature = my_sign_fn(&message);
 /// // Submit to Holochain governance bridge...
 /// ```
-pub fn create_phi_attestation_data(
+pub fn create_consciousness_attestation_data(
     quality: &QualityScore,
     agent_did: &str,
     cycle_id: u64,
-) -> PhiAttestationData {
+) -> ConsciousnessAttestationData {
     let now_us = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_micros() as u64)
         .unwrap_or(0);
 
-    PhiAttestationData {
+    ConsciousnessAttestationData {
         agent_did: agent_did.to_string(),
-        phi: (quality.phi.phi_after as f64).clamp(0.0, 1.0),
+        consciousness_level: (quality.integration.integration_after as f64).clamp(0.0, 1.0),
         cycle_id,
         captured_at_us: now_us,
         signature: Vec::new(), // Caller must fill this
@@ -907,11 +968,11 @@ mod tests {
             _update: &HyperGradient,
         ) -> Result<QualityScore> {
             let (accuracy, loss) = snapshot.evaluate()?;
-            let phi = PhiAssessment::new(0.0, 0.0);
+            let integration = IntegrationAssessment::new(0.0, 0.0);
             Ok(QualityScore {
                 accuracy,
                 loss,
-                phi,
+                integration,
                 epistemic_confidence: 0.0,
                 is_anomalous: false,
                 similarity: None,
@@ -958,7 +1019,7 @@ mod tests {
         );
 
         let result = backend.assess_update(&snapshot, &hg).unwrap();
-        assert!(result.phi.phi_after >= 0.0 && result.phi.phi_after <= 1.0);
+        assert!(result.integration.integration_after >= 0.0 && result.integration.integration_after <= 1.0);
         assert!(result.epistemic_confidence >= 0.0 && result.epistemic_confidence <= 1.0);
     }
 
@@ -970,7 +1031,7 @@ mod tests {
         // Strict mode should use a smaller Φ drop threshold and stricter
         // ambiguity handling than lenient mode.
         assert!(
-            strict.phi_drop_threshold < lenient.phi_drop_threshold,
+            strict.integration_drop_threshold < lenient.integration_drop_threshold,
             "strict mode should be more sensitive to Φ drops"
         );
         assert!(
@@ -1097,11 +1158,11 @@ mod tests {
     }
 
     // ============================================================================
-    // classify_from_phi tests
+    // classify_from_integration tests
     // ============================================================================
 
     #[test]
-    fn classify_from_phi_produces_valid_classification() {
+    fn classify_from_integration_produces_valid_classification() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-1".to_string(),
@@ -1112,13 +1173,13 @@ mod tests {
             10.0,
             [0u8; 32],
         );
-        let classification = backend.classify_from_phi(0.9, &hg);
+        let classification = backend.classify_from_integration(0.9, &hg);
         // Must produce a classification without panicking
         let _ = classification;
     }
 
     #[test]
-    fn classify_from_phi_low_phi_does_not_panic() {
+    fn classify_from_integration_low_phi_does_not_panic() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-2".to_string(),
@@ -1129,11 +1190,11 @@ mod tests {
             1.0,
             [0u8; 32],
         );
-        let _classification = backend.classify_from_phi(0.05, &hg);
+        let _classification = backend.classify_from_integration(0.05, &hg);
     }
 
     #[test]
-    fn classify_from_phi_reproducible_for_same_inputs() {
+    fn classify_from_integration_reproducible_for_same_inputs() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-3".to_string(),
@@ -1144,21 +1205,21 @@ mod tests {
             5.0,
             [1u8; 32],
         );
-        let c1 = backend.classify_from_phi(0.5, &hg);
-        let c2 = backend.classify_from_phi(0.5, &hg);
+        let c1 = backend.classify_from_integration(0.5, &hg);
+        let c2 = backend.classify_from_integration(0.5, &hg);
         assert_eq!(format!("{:?}", c1), format!("{:?}", c2));
     }
 
     // ============================================================================
-    // PhiAttestationData tests
+    // ConsciousnessAttestationData tests
     // ============================================================================
 
     #[test]
-    fn test_create_phi_attestation_data_from_quality() {
+    fn test_create_consciousness_attestation_data_from_quality() {
         let quality = QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            phi: PhiAssessment::new(0.4, 0.7),
+            integration: IntegrationAssessment::new(0.4, 0.7),
             epistemic_confidence: 0.85,
             is_anomalous: false,
             similarity: None,
@@ -1167,10 +1228,10 @@ mod tests {
             causes: Vec::new(),
         };
 
-        let attestation = create_phi_attestation_data(&quality, "did:key:z6MkTest", 42);
+        let attestation = create_consciousness_attestation_data(&quality, "did:key:z6MkTest", 42);
 
         assert_eq!(attestation.agent_did, "did:key:z6MkTest");
-        assert!((attestation.phi - 0.7).abs() < 1e-6, "phi should be phi_after");
+        assert!((attestation.consciousness_level - 0.7).abs() < 1e-6, "should be integration_after");
         assert_eq!(attestation.cycle_id, 42);
         assert_eq!(attestation.source, "symthaea");
         assert!(attestation.signature.is_empty(), "signature should be empty until caller signs");
@@ -1178,11 +1239,11 @@ mod tests {
     }
 
     #[test]
-    fn test_attestation_phi_clamped_to_unit() {
+    fn test_attestation_consciousness_clamped_to_unit() {
         let quality = QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            phi: PhiAssessment::new(0.0, 1.5), // phi_after > 1.0
+            integration: IntegrationAssessment::new(0.0, 1.5), // integration_after > 1.0
             epistemic_confidence: 0.85,
             is_anomalous: false,
             similarity: None,
@@ -1191,15 +1252,15 @@ mod tests {
             causes: Vec::new(),
         };
 
-        let attestation = create_phi_attestation_data(&quality, "did:key:z6MkTest", 1);
-        assert!((attestation.phi - 1.0).abs() < 1e-6, "phi should be clamped to 1.0");
+        let attestation = create_consciousness_attestation_data(&quality, "did:key:z6MkTest", 1);
+        assert!((attestation.consciousness_level - 1.0).abs() < 1e-6, "should be clamped to 1.0");
     }
 
     #[test]
     fn test_attestation_sign_message_is_deterministic() {
-        let mut attestation = PhiAttestationData {
+        let mut attestation = ConsciousnessAttestationData {
             agent_did: "did:key:z6MkABC".to_string(),
-            phi: 0.654321,
+            consciousness_level: 0.654321,
             cycle_id: 100,
             captured_at_us: 1708000000_000000,
             signature: Vec::new(),
@@ -1211,20 +1272,20 @@ mod tests {
         assert_eq!(msg1, msg2, "Sign message should be deterministic");
 
         let msg_str = String::from_utf8(msg1).unwrap();
-        assert!(msg_str.starts_with("symthaea-phi-attestation:v1:did:key:z6MkABC:"));
+        assert!(msg_str.starts_with("symthaea-consciousness-attestation:v1:did:key:z6MkABC:"));
         assert!(msg_str.contains(":100:"));
 
-        // Changing phi changes the message
-        attestation.phi = 0.999;
+        // Changing consciousness_level changes the message
+        attestation.consciousness_level = 0.999;
         let msg3 = attestation.sign_message();
         assert_ne!(msg2, msg3);
     }
 
     #[test]
     fn test_attestation_data_serializable() {
-        let attestation = PhiAttestationData {
+        let attestation = ConsciousnessAttestationData {
             agent_did: "did:key:z6MkTest".to_string(),
-            phi: 0.5,
+            consciousness_level: 0.5,
             cycle_id: 1,
             captured_at_us: 1708000000_000000,
             signature: vec![1, 2, 3],
@@ -1232,9 +1293,9 @@ mod tests {
         };
 
         let json = serde_json::to_string(&attestation).unwrap();
-        let decoded: PhiAttestationData = serde_json::from_str(&json).unwrap();
+        let decoded: ConsciousnessAttestationData = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.agent_did, attestation.agent_did);
-        assert!((decoded.phi - attestation.phi).abs() < 1e-10);
+        assert!((decoded.consciousness_level - attestation.consciousness_level).abs() < 1e-10);
         assert_eq!(decoded.signature, vec![1, 2, 3]);
     }
 
@@ -1249,7 +1310,7 @@ mod tests {
         let high = QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            phi: PhiAssessment::new(0.4, 0.6),
+            integration: IntegrationAssessment::new(0.4, 0.6),
             epistemic_confidence: 0.95,
             is_anomalous: false,
             similarity: Some(0.9),
@@ -1273,13 +1334,13 @@ mod tests {
         let bad = QualityScore {
             accuracy: 0.4,
             loss: 1.5,
-            phi: PhiAssessment::new(0.6, 0.2),
+            integration: IntegrationAssessment::new(0.6, 0.2),
             epistemic_confidence: 0.1,
             is_anomalous: true,
             similarity: Some(0.2),
             is_ambiguous: true,
             severity: ConsciousAnomalySeverity::Severe,
-            causes: vec!["phi_drop".into(), "low_confidence".into()],
+            causes: vec!["integration_drop".into(), "low_confidence".into()],
         };
 
         let pogq_bad = pogq_from_quality_score(&bad);

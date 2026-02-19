@@ -49,7 +49,7 @@
 //! // Process input
 //! let result = session.process("Hello, Symthaea")?;
 //! println!("Response: {}", result.response);
-//! println!("Phi: {:.4}", result.consciousness.unified_phi);
+//! println!("Phi: {:.4}", result.consciousness.unified_psi);
 //! ```
 //!
 //! ### Full REPL with Orchestrator
@@ -180,7 +180,7 @@
 //!         println!("[TRACE] Input: {}", input);
 //!     }
 //!     fn on_output(&mut self, output: &str, consciousness: &ConsciousnessSnapshot) {
-//!         println!("[TRACE] Phi at output: {:.4}", consciousness.unified_phi);
+//!         println!("[TRACE] Phi at output: {:.4}", consciousness.unified_psi);
 //!     }
 //!     fn on_action(&mut self, command: &str, executed: bool) {
 //!         println!("[TRACE] Action '{}': {}", command, if executed { "OK" } else { "BLOCKED" });
@@ -271,7 +271,7 @@ pub use crate::cognitive_loop::ConsciousnessSnapshot as ConsciousnessState;
 /// // Process user input
 /// let result = session.process("Hello, Symthaea")?;
 /// println!("Response: {}", result.response);
-/// println!("Phi: {:.4}", result.consciousness.unified_phi);
+/// println!("Phi: {:.4}", result.consciousness.unified_psi);
 ///
 /// // Check if in flow state
 /// if session.in_flow() {
@@ -366,7 +366,7 @@ pub struct TurnConsciousness {
 impl From<&ConsciousnessSnapshot> for TurnConsciousness {
     fn from(s: &ConsciousnessSnapshot) -> Self {
         Self {
-            phi: s.unified_phi,
+            phi: s.unified_psi,
             coherence: s.temporal_coherence,
             pattern: format!("{:?}", s.pattern),
             depth: format!("{:?}", s.cognitive_depth),
@@ -668,7 +668,7 @@ impl ReplSession {
     /// ```rust,ignore
     /// let result = session.process("What is consciousness?")?;
     /// println!("Response: {}", result.response);
-    /// println!("Phi: {:.4}", result.consciousness.unified_phi);
+    /// println!("Phi: {:.4}", result.consciousness.unified_psi);
     /// println!("Time: {:?}", result.elapsed);
     ///
     /// // Execute a command (if phi >= threshold)
@@ -715,7 +715,7 @@ impl ReplSession {
 
         // Update average phi (exponential moving average)
         let alpha = 0.1;
-        self.stats.avg_phi = self.stats.avg_phi * (1.0 - alpha) + snapshot.unified_phi * alpha;
+        self.stats.avg_phi = self.stats.avg_phi * (1.0 - alpha) + snapshot.unified_psi * alpha;
 
         // Check if this is an action command
         let action_result = if self.is_action_command(input) {
@@ -844,7 +844,7 @@ impl ReplSession {
         let risk = action.risk_tier();
 
         // Check phi gate
-        if consciousness.unified_phi < self.config.execution_phi_threshold {
+        if consciousness.unified_psi < self.config.execution_phi_threshold {
             self.stats.actions_blocked += 1;
             return Ok(ActionResult {
                 command: command.clone(),
@@ -853,13 +853,13 @@ impl ReplSession {
                 output: None,
                 blocked_reason: Some(format!(
                     "Phi {:.2} below threshold {:.2}. Center yourself before executing.",
-                    consciousness.unified_phi, self.config.execution_phi_threshold
+                    consciousness.unified_psi, self.config.execution_phi_threshold
                 )),
                 display_output: format!(
                     "[PHI GATE] Blocked: Phi {:.2} < {:.2}\n\
                      Command: {}\n\
                      Raise consciousness level before executing.",
-                    consciousness.unified_phi, self.config.execution_phi_threshold, command
+                    consciousness.unified_psi, self.config.execution_phi_threshold, command
                 ),
             });
         }
@@ -1053,9 +1053,9 @@ impl ReplSession {
             - self.stats.start_time_ms;
 
         MetricsSnapshot {
-            phi: snapshot.unified_phi as f64,
+            phi: snapshot.unified_psi as f64,
             coherence: snapshot.temporal_coherence as f64,
-            is_conscious: snapshot.unified_phi > 0.5,
+            is_conscious: snapshot.unified_psi > 0.5,
             cognitive_depth: format!("{:?}", snapshot.cognitive_depth),
             strategy: stats.current_strategy.clone(),
             in_flow: snapshot.in_flow,
@@ -1072,7 +1072,7 @@ impl ReplSession {
 
     /// Get Phi value
     pub fn phi(&self) -> f64 {
-        self.consciousness_state().unified_phi as f64
+        self.consciousness_state().unified_psi as f64
     }
 
     /// Get coherence value
@@ -1082,7 +1082,7 @@ impl ReplSession {
 
     /// Check if conscious (Phi > 0.5)
     pub fn is_conscious(&self) -> bool {
-        self.consciousness_state().unified_phi > 0.5
+        self.consciousness_state().unified_psi > 0.5
     }
 
     /// Get current cognitive depth

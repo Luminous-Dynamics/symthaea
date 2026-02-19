@@ -160,7 +160,7 @@ pub use agentic::{
     // GIS integration (Graceful Ignorance System)
     MoralUncertainty,
     MoralUncertaintyType,
-    PhiMeasurementConfig,
+    CoherenceMeasurementConfig,
     // Quarantine
     QuarantineManager,
     QuarantineReason,

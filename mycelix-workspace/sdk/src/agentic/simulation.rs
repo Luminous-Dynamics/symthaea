@@ -139,7 +139,7 @@ impl AgentArchetype {
     }
 
     /// Get initial K-Vector for archetype
-    /// The k_phi (coherence) dimension reflects expected output coherence for each archetype
+    /// The k_coherence (coherence) dimension reflects expected output coherence for each archetype
     pub fn initial_kvector(&self) -> KVector {
         match self {
             // Honest agents have moderate coherence

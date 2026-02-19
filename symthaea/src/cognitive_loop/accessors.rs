@@ -148,7 +148,7 @@ impl CognitiveLoopService {
                     return Some(crate::memory::episodic_replay::ReplaySessionResult {
                         episodes_replayed: 0,
                         average_loss: 0.0,
-                        average_phi: 0.0,
+                        average_psi: 0.0,
                         skipped: true,
                     });
                 }
@@ -164,14 +164,14 @@ impl CognitiveLoopService {
                         self.config.episodic_replay_config.replay_dt,
                     );
                     total_loss += loss;
-                    total_phi += episode.phi;
+                    total_phi += episode.psi;
                 }
 
                 let n = batch.len();
                 return Some(crate::memory::episodic_replay::ReplaySessionResult {
                     episodes_replayed: n,
                     average_loss: total_loss / n as f32,
-                    average_phi: total_phi / n as f64,
+                    average_psi: total_phi / n as f64,
                     skipped: false,
                 });
             }
@@ -267,10 +267,10 @@ impl CognitiveLoopService {
         self.prediction_confidence > 0.4
     }
 
-    /// Set the relational Phi from an external dyad computation.
+    /// Set the relational Psi from an external dyad computation.
     /// This is called by the Symthaea facade after computing Phi_dyad.
-    pub fn set_relational_phi(&mut self, phi: f64) {
-        self.relational_phi = phi;
+    pub fn set_relational_psi(&mut self, psi: f64) {
+        self.relational_psi = psi;
     }
 
     /// Inject external reward signal for the next cycle.
@@ -494,7 +494,7 @@ impl CognitiveLoopService {
             tau_mean: temporal_summary.features.mean,
             tau_trend: temporal_summary.features.trend,
             cognitive_depth: self.cognitive_depth,
-            unified_phi: self.unification_engine.phi as f32,
+            unified_psi: self.unification_engine.psi as f32,
             unified_valence: self.unification_engine.emotional.state().valence as f32,
             unified_arousal: self.unification_engine.emotional.state().arousal as f32,
             unified_dominance: self.unification_engine.emotional.state().dominance as f32,
@@ -587,8 +587,8 @@ impl CognitiveLoopService {
     }
 
     /// Get the unified Phi from the ConsciousnessUnificationEngine
-    pub fn unified_phi(&self) -> f64 {
-        self.unification_engine.phi
+    pub fn unified_psi(&self) -> f64 {
+        self.unification_engine.psi
     }
 
     /// Get the ConsciousnessUnificationEngine reference

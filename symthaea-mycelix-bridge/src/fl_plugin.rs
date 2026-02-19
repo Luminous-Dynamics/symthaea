@@ -4,7 +4,7 @@
 //! `mycelix-fl-core` pipeline via the [`ByzantinePlugin`] trait. It provides
 //! richer weight adjustments than the simple Phi-threshold plugin by using
 //! the full [`QualityScore`] signal: epistemic confidence, anomaly severity,
-//! phi gain trends, and gray-zone ambiguity detection.
+//! integration gain trends, and gray-zone ambiguity detection.
 //!
 //! # Usage
 //!
@@ -37,8 +37,8 @@ pub struct QualityPluginConfig {
     pub confidence_threshold: f32,
     /// Epistemic confidence below which the update is vetoed (default: 0.1).
     pub veto_confidence: f32,
-    /// Phi gain above which the update gets a boost (default: 0.05).
-    pub phi_gain_boost_threshold: f32,
+    /// Integration gain above which the update gets a boost (default: 0.05).
+    pub integration_gain_boost_threshold: f32,
     /// Weight multiplier for boosted updates (default: 1.4).
     pub boost_factor: f32,
     /// Whether to veto on Severe anomaly regardless of confidence (default: true).
@@ -50,7 +50,7 @@ impl Default for QualityPluginConfig {
         Self {
             confidence_threshold: 0.3,
             veto_confidence: 0.1,
-            phi_gain_boost_threshold: 0.05,
+            integration_gain_boost_threshold: 0.05,
             boost_factor: 1.4,
             veto_severe: true,
         }
@@ -170,8 +170,8 @@ impl SymthaeaQualityPlugin {
             });
         }
 
-        // Rule 5: High confidence + positive phi gain -> boost
-        if q.epistemic_confidence > 0.7 && q.phi.phi_gain > self.config.phi_gain_boost_threshold {
+        // Rule 5: High confidence + positive integration gain -> boost
+        if q.epistemic_confidence > 0.7 && q.integration.integration_gain > self.config.integration_gain_boost_threshold {
             return Some(ParticipantWeightAdjustment {
                 weight_multiplier: self.config.boost_factor,
                 veto: false,
@@ -224,7 +224,7 @@ impl ByzantinePlugin for SymthaeaQualityPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::PhiAssessment;
+    use crate::IntegrationAssessment;
 
     fn make_update(id: &str) -> GradientUpdate {
         GradientUpdate::new(id.into(), 1, vec![0.5; 10], 100, 0.5)
@@ -234,7 +234,7 @@ mod tests {
         QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            phi: PhiAssessment::new(0.4, 0.6),
+            integration: IntegrationAssessment::new(0.4, 0.6),
             epistemic_confidence: 0.85,
             is_anomalous: false,
             similarity: Some(0.95),
@@ -248,7 +248,7 @@ mod tests {
         QualityScore {
             accuracy: 0.2,
             loss: 2.0,
-            phi: PhiAssessment::new(0.6, 0.1),
+            integration: IntegrationAssessment::new(0.6, 0.1),
             epistemic_confidence: 0.05,
             is_anomalous: true,
             similarity: Some(0.3),
@@ -262,7 +262,7 @@ mod tests {
         QualityScore {
             accuracy: 0.5,
             loss: 0.8,
-            phi: PhiAssessment::new(0.5, 0.35),
+            integration: IntegrationAssessment::new(0.5, 0.35),
             epistemic_confidence: 0.25,
             is_anomalous: true,
             similarity: Some(0.6),
@@ -276,7 +276,7 @@ mod tests {
         QualityScore {
             accuracy: 0.6,
             loss: 0.5,
-            phi: PhiAssessment::new(0.5, 0.52),
+            integration: IntegrationAssessment::new(0.5, 0.52),
             epistemic_confidence: 0.55,
             is_anomalous: true,
             similarity: Some(0.8),
@@ -357,7 +357,7 @@ mod tests {
     fn test_good_quality_boosted() {
         let mut plugin = SymthaeaQualityPlugin::new();
         let mut q = good_quality();
-        q.phi.phi_gain = 0.2;
+        q.integration.integration_gain = 0.2;
         q.epistemic_confidence = 0.85;
 
         let mut scores = HashMap::new();
@@ -379,7 +379,7 @@ mod tests {
         let mut plugin = SymthaeaQualityPlugin::new();
         let mut q = good_quality();
         q.epistemic_confidence = 0.5;
-        q.phi.phi_gain = 0.01;
+        q.integration.integration_gain = 0.01;
 
         let mut scores = HashMap::new();
         scores.insert("neutral".to_string(), q);
@@ -406,7 +406,7 @@ mod tests {
         let mut scores = HashMap::new();
 
         let mut boost = good_quality();
-        boost.phi.phi_gain = 0.2;
+        boost.integration.integration_gain = 0.2;
         boost.epistemic_confidence = 0.85;
         scores.insert("boost".to_string(), boost);
 
@@ -435,7 +435,7 @@ mod tests {
         let mut scores = HashMap::new();
 
         let mut boost_q = good_quality();
-        boost_q.phi.phi_gain = 0.2;
+        boost_q.integration.integration_gain = 0.2;
         boost_q.epistemic_confidence = 0.85;
         scores.insert("boost".to_string(), boost_q);
         scores.insert("veto".to_string(), bad_quality());
@@ -466,7 +466,7 @@ mod tests {
         let config = QualityPluginConfig {
             confidence_threshold: 0.5,
             veto_confidence: 0.2,
-            phi_gain_boost_threshold: 0.1,
+            integration_gain_boost_threshold: 0.1,
             boost_factor: 2.0,
             veto_severe: false,
         };

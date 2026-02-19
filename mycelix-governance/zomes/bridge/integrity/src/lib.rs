@@ -3,29 +3,29 @@
 //!
 //! Entry types for cross-hApp governance queries and voting verification.
 //! Enhanced with Symthaea Consciousness Metrics integration for:
-//! - Φ (phi) threshold verification for governance actions
+//! - Consciousness gate verification for governance actions
 //! - Consciousness-gated proposal submission and voting
 //! - Agent consciousness history tracking
 //! - Value alignment assessment
 //!
 //! ## Consciousness Gates
 //!
-//! - Basic actions: Φ ≥ 0.2
-//! - Proposal submission: Φ ≥ 0.3
-//! - Voting: Φ ≥ 0.4
-//! - Constitutional changes: Φ ≥ 0.6
+//! - Basic actions: consciousness >= 0.2
+//! - Proposal submission: consciousness >= 0.3
+//! - Voting: consciousness >= 0.4
+//! - Constitutional changes: consciousness >= 0.6
 //!
 //! Updated to use HDI 0.7 patterns
 
 use hdi::prelude::*;
 
-// Canonical Phi threshold constants — must match mycelix_bridge_common::phi_thresholds::PhiThresholds::default().
-// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
+// Canonical consciousness gate constants — must match mycelix_bridge_common::consciousness_gates defaults.
+// Source of truth: crates/mycelix-bridge-common/src/consciousness_gates.rs
 const GOV_BASIC: f64 = 0.2;
 const GOV_PROPOSAL: f64 = 0.3;
 const GOV_VOTING: f64 = 0.4;
 const GOV_CONSTITUTIONAL: f64 = 0.6;
-/// Voter Phi for constitutional proposals (stricter than gov_voting).
+/// Voter consciousness level for constitutional proposals (stricter than gov_voting).
 /// Not in canonical set — governance-specific.
 const GOV_VOTER_CONSTITUTIONAL: f64 = 0.5;
 
@@ -147,19 +147,19 @@ pub enum ExecutionStatus {
 // Three enums manage consciousness thresholds at different governance layers:
 //
 // 1. `GovernanceActionType` (this zome) — ACTION-level gate.
-//    Controls what Phi is needed to perform an action:
+//    Controls what consciousness level is needed to perform an action:
 //    Basic(0.2), ProposalSubmission(0.3), Voting(0.4), Constitutional(0.6)
 //
 // 2. `ProposalType` (this zome) — PROPOSAL-level adaptive thresholds.
 //    Controls per-proposal-type voting parameters via `AdaptiveThreshold`:
-//    Standard(min_voter_phi=0.2), Emergency(0.3), Constitutional(0.5)
+//    Standard(min_voter_consciousness=0.2), Emergency(0.3), Constitutional(0.5)
 //
 // 3. `ProposalTier` (voting integrity zome) — VALIDATION-level tier.
 //    Used by the voting integrity zome for entry validation:
 //    Basic(0.3), Major(0.4), Constitutional(0.6)
 //
-// The voter Phi requirement is the HIGHER of: GovernanceActionType::Voting (0.4)
-// and AdaptiveThreshold.min_voter_phi for the proposal type. For Constitutional
+// The voter consciousness requirement is the HIGHER of: GovernanceActionType::Voting (0.4)
+// and AdaptiveThreshold.min_voter_consciousness for the proposal type. For Constitutional
 // proposals: max(0.4, 0.5) = 0.5 (voter bar), while the proposer bar is 0.6.
 //
 
@@ -172,8 +172,8 @@ pub struct ConsciousnessSnapshot {
     pub id: String,
     /// Agent DID
     pub agent_did: String,
-    /// Integrated information (Φ) - primary consciousness measure (0.0 - 1.0)
-    pub phi: f64,
+    /// Consciousness level - primary consciousness measure (0.0 - 1.0)
+    pub consciousness_level: f64,
     /// Meta-awareness level (0.0 - 1.0)
     pub meta_awareness: f64,
     /// Self-model accuracy (0.0 - 1.0)
@@ -193,7 +193,7 @@ pub struct ConsciousnessSnapshot {
 impl ConsciousnessSnapshot {
     /// Overall consciousness quality score
     pub fn quality_score(&self) -> f64 {
-        (self.phi * QUALITY_PHI_WEIGHT
+        (self.consciousness_level * QUALITY_CONSCIOUSNESS_WEIGHT
             + self.meta_awareness * QUALITY_META_WEIGHT
             + self.self_model_accuracy * QUALITY_SELF_WEIGHT
             + self.coherence * QUALITY_COHERENCE_WEIGHT)
@@ -202,25 +202,25 @@ impl ConsciousnessSnapshot {
 
     /// Check if consciousness meets threshold for action type
     pub fn meets_threshold(&self, action_type: &GovernanceActionType) -> bool {
-        self.phi >= action_type.phi_threshold()
+        self.consciousness_level >= action_type.consciousness_gate()
     }
 }
 
-/// Type of governance action with associated Φ thresholds
+/// Type of governance action with associated consciousness gate thresholds
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GovernanceActionType {
-    /// Basic participation: Φ ≥ 0.2
+    /// Basic participation: consciousness >= 0.2
     Basic,
-    /// Proposal submission: Φ ≥ 0.3
+    /// Proposal submission: consciousness >= 0.3
     ProposalSubmission,
-    /// Voting: Φ ≥ 0.4
+    /// Voting: consciousness >= 0.4
     Voting,
-    /// Constitutional changes: Φ ≥ 0.6
+    /// Constitutional changes: consciousness >= 0.6
     Constitutional,
 }
 
 impl GovernanceActionType {
-    pub fn phi_threshold(&self) -> f64 {
+    pub fn consciousness_gate(&self) -> f64 {
         match self {
             Self::Basic => GOV_BASIC,
             Self::ProposalSubmission => GOV_PROPOSAL,
@@ -241,16 +241,16 @@ impl GovernanceActionType {
 
 /// Authenticated consciousness attestation with agent signature.
 ///
-/// Unlike `ConsciousnessSnapshot`, this proves the Phi value came from
+/// Unlike `ConsciousnessSnapshot`, this proves the consciousness level came from
 /// the agent's own Symthaea instance via a signed attestation.
 /// Governance prefers this over unsigned snapshots.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
-pub struct PhiAttestation {
+pub struct ConsciousnessAttestation {
     /// Agent DID
     pub agent_did: String,
-    /// Phi value [0.0, 1.0]
-    pub phi: f64,
+    /// Consciousness level [0.0, 1.0]
+    pub consciousness_level: f64,
     /// Symthaea cognitive cycle number
     pub cycle_id: u64,
     /// Capture timestamp
@@ -261,17 +261,17 @@ pub struct PhiAttestation {
     pub source: String,
 }
 
-/// How the Phi value in a governance decision was obtained.
+/// How the consciousness value in a governance decision was obtained.
 ///
 /// Governance tracks provenance so UIs can show transparency about
 /// which votes had verified consciousness data vs. reputation-only.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PhiProvenance {
+pub enum ConsciousnessProvenance {
     /// Signed attestation from agent's Symthaea instance
     Attested,
     /// Legacy unsigned ConsciousnessSnapshot
     Snapshot,
-    /// No Phi data available — reputation-only voting
+    /// No consciousness data available — reputation-only voting
     Unavailable,
 }
 
@@ -288,9 +288,9 @@ pub struct ConsciousnessGate {
     /// Reference to consciousness snapshot used
     pub snapshot_id: String,
     /// Φ value at verification
-    pub phi_at_verification: f64,
+    pub consciousness_at_verification: f64,
     /// Required Φ threshold
-    pub required_phi: f64,
+    pub required_consciousness: f64,
     /// Whether gate passed
     pub passed: bool,
     /// Failure reason (if not passed)
@@ -308,13 +308,13 @@ pub struct ConsciousnessHistory {
     /// Agent DID
     pub agent_did: String,
     /// Average Φ over recording period
-    pub average_phi: f64,
+    pub average_consciousness: f64,
     /// Peak Φ achieved
-    pub peak_phi: f64,
+    pub peak_consciousness: f64,
     /// Minimum Φ recorded
-    pub min_phi: f64,
+    pub min_consciousness: f64,
     /// Standard deviation of Φ
-    pub phi_std_dev: f64,
+    pub consciousness_std_dev: f64,
     /// Total snapshots recorded
     pub snapshot_count: u64,
     /// Period start
@@ -543,7 +543,7 @@ pub const HARMONIC_ALIGNMENT_FACTOR: f64 = 0.2;
 
 /// Quality score weights for ConsciousnessSnapshot.
 /// Formula: quality = PHI_WEIGHT×Φ + META_WEIGHT×meta + SELF_WEIGHT×self + COHERENCE_WEIGHT×coherence
-pub const QUALITY_PHI_WEIGHT: f64 = 0.4;
+pub const QUALITY_CONSCIOUSNESS_WEIGHT: f64 = 0.4;
 pub const QUALITY_META_WEIGHT: f64 = 0.2;
 pub const QUALITY_SELF_WEIGHT: f64 = 0.2;
 pub const QUALITY_COHERENCE_WEIGHT: f64 = 0.2;
@@ -562,9 +562,9 @@ pub struct HolisticVotingWeight {
     pub reputation: f64,
     /// Reputation squared component
     pub reputation_squared: f64,
-    /// Consciousness Φ value (0.0 - 1.0)
-    pub phi: f64,
-    /// Consciousness multiplier: 0.7 + 0.3 × Φ (range: 0.7 - 1.0)
+    /// Consciousness level (0.0 - 1.0)
+    pub consciousness_level: f64,
+    /// Consciousness multiplier: 0.7 + 0.3 x consciousness_level (range: 0.7 - 1.0)
     pub consciousness_multiplier: f64,
     /// Harmonic alignment with proposal (-1.0 to +1.0)
     pub harmonic_alignment: f64,
@@ -589,17 +589,17 @@ impl HolisticVotingWeight {
     /// The final weight is capped at MAX_VOTING_WEIGHT (1.5) to ensure no single
     /// voter can have disproportionate influence. This cap is enforced regardless
     /// of input values.
-    pub fn calculate(reputation: f64, phi: f64, harmonic_alignment: f64) -> Self {
+    pub fn calculate(reputation: f64, consciousness_level: f64, harmonic_alignment: f64) -> Self {
         let reputation = reputation.clamp(0.0, 1.0);
-        let phi = phi.clamp(0.0, 1.0);
+        let consciousness_level = consciousness_level.clamp(0.0, 1.0);
         let harmonic_alignment = harmonic_alignment.clamp(-1.0, 1.0);
 
         let reputation_squared = reputation.powi(2);
 
-        // Consciousness multiplier: ranges from CONSCIOUSNESS_BASE (Φ=0) to
-        // CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR (Φ=1)
+        // Consciousness multiplier: ranges from CONSCIOUSNESS_BASE (level=0) to
+        // CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR (level=1)
         // This gives high-consciousness voters up to 43% more influence
-        let consciousness_multiplier = CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR * phi;
+        let consciousness_multiplier = CONSCIOUSNESS_BASE + CONSCIOUSNESS_PHI_FACTOR * consciousness_level;
 
         // Harmonic bonus: only positive alignment gives bonus
         // Negative alignment gives no penalty here (handled in threshold)
@@ -622,7 +622,7 @@ impl HolisticVotingWeight {
             reputation,
             CONSCIOUSNESS_BASE,
             CONSCIOUSNESS_PHI_FACTOR,
-            phi,
+            consciousness_level,
             HARMONIC_ALIGNMENT_FACTOR,
             harmonic_alignment.max(0.0),
             reputation_squared,
@@ -635,7 +635,7 @@ impl HolisticVotingWeight {
         Self {
             reputation,
             reputation_squared,
-            phi,
+            consciousness_level,
             consciousness_multiplier,
             harmonic_alignment,
             harmonic_bonus,
@@ -647,8 +647,8 @@ impl HolisticVotingWeight {
     }
 
     /// Calculate weight without harmonic alignment (for general participation)
-    pub fn calculate_base(reputation: f64, phi: f64) -> Self {
-        Self::calculate(reputation, phi, 0.0)
+    pub fn calculate_base(reputation: f64, consciousness_level: f64) -> Self {
+        Self::calculate(reputation, consciousness_level, 0.0)
     }
 
     /// Check if a weight was capped
@@ -668,7 +668,7 @@ pub struct AdaptiveThreshold {
     /// Base threshold percentage (0.0 - 1.0)
     pub base_threshold: f64,
     /// Minimum Φ required for voters
-    pub min_voter_phi: f64,
+    pub min_voter_consciousness: f64,
     /// Minimum participation (number of voters)
     pub min_participation: u64,
     /// Quorum percentage (minimum % of eligible voters)
@@ -683,21 +683,21 @@ impl AdaptiveThreshold {
         match proposal_type {
             ProposalType::Standard => Self {
                 base_threshold: 0.51,      // Simple majority
-                min_voter_phi: GOV_BASIC,  // Basic consciousness
+                min_voter_consciousness: GOV_BASIC,  // Basic consciousness
                 min_participation: 5,      // At least 5 voters
                 quorum: 0.20,              // 20% of eligible must vote
                 max_extension_secs: 86400, // 1 day extension max
             },
             ProposalType::Emergency => Self {
                 base_threshold: 0.60,      // Higher bar for emergency
-                min_voter_phi: GOV_PROPOSAL, // Proposal-level consciousness
+                min_voter_consciousness: GOV_PROPOSAL, // Proposal-level consciousness
                 min_participation: 3,      // Faster with fewer
                 quorum: 0.10,              // Lower quorum for speed
                 max_extension_secs: 3600,  // 1 hour max
             },
             ProposalType::Constitutional => Self {
                 base_threshold: 0.67,      // Supermajority required
-                min_voter_phi: GOV_VOTER_CONSTITUTIONAL, // High consciousness required
+                min_voter_consciousness: GOV_VOTER_CONSTITUTIONAL, // High consciousness required
                 min_participation: 10,     // Significant participation
                 quorum: 0.40,              // 40% must participate
                 max_extension_secs: 604800, // 1 week extension allowed
@@ -711,8 +711,8 @@ impl AdaptiveThreshold {
     }
 
     /// Check if voter meets consciousness requirement
-    pub fn voter_meets_phi_requirement(&self, voter_phi: f64) -> bool {
-        voter_phi >= self.min_voter_phi
+    pub fn voter_meets_consciousness_requirement(&self, voter_consciousness: f64) -> bool {
+        voter_consciousness >= self.min_voter_consciousness
     }
 
     /// Check if quorum is met
@@ -950,7 +950,7 @@ impl ConsensusParticipant {
             return false;
         }
         let threshold = AdaptiveThreshold::for_proposal_type(proposal_type);
-        threshold.voter_meets_phi_requirement(self.phi)
+        threshold.voter_meets_consciousness_requirement(self.phi)
     }
 
     /// Calculate holistic voting weight for a specific proposal
@@ -1184,15 +1184,15 @@ pub enum ConsensusEventType {
     KVectorUpdated,
     /// MATL score recalculated
     MatlRecalculated,
-    /// Phi configuration updated
-    PhiConfigUpdated,
+    /// Consciousness configuration updated
+    ConsciousnessConfigUpdated,
 }
 
 // =============================================================================
 // CONFIGURABLE PHI PARAMETERS
 // =============================================================================
 
-/// Configurable Phi thresholds and voting parameters.
+/// Configurable consciousness gate thresholds and voting parameters.
 ///
 /// Stored as a DHT entry so governance proposals can adjust thresholds
 /// without code deployments. The hardcoded defaults in `GovernanceActionType`
@@ -1200,24 +1200,24 @@ pub enum ConsensusEventType {
 /// the coordinator reads this config with fallback to those defaults.
 #[hdk_entry_helper]
 #[derive(Clone, PartialEq)]
-pub struct GovernancePhiConfig {
+pub struct GovernanceConsciousnessConfig {
     // --- GovernanceActionType thresholds ---
-    /// Phi threshold for Basic participation (default 0.2)
-    pub phi_basic: f64,
-    /// Phi threshold for Proposal submission (default 0.3)
-    pub phi_proposal_submission: f64,
-    /// Phi threshold for Voting (default 0.4)
-    pub phi_voting: f64,
-    /// Phi threshold for Constitutional changes (default 0.6)
-    pub phi_constitutional: f64,
+    /// Consciousness gate for Basic participation (default 0.2)
+    pub consciousness_gate_basic: f64,
+    /// Consciousness gate for Proposal submission (default 0.3)
+    pub consciousness_gate_proposal: f64,
+    /// Consciousness gate for Voting (default 0.4)
+    pub consciousness_gate_voting: f64,
+    /// Consciousness gate for Constitutional changes (default 0.6)
+    pub consciousness_gate_constitutional: f64,
 
-    // --- AdaptiveThreshold min_voter_phi per proposal type ---
-    /// Min voter Phi for Standard proposals (default 0.2)
-    pub min_voter_phi_standard: f64,
-    /// Min voter Phi for Emergency proposals (default 0.3)
-    pub min_voter_phi_emergency: f64,
-    /// Min voter Phi for Constitutional proposals (default 0.5)
-    pub min_voter_phi_constitutional: f64,
+    // --- AdaptiveThreshold min_voter_consciousness per proposal type ---
+    /// Min voter consciousness for Standard proposals (default 0.2)
+    pub min_voter_consciousness_standard: f64,
+    /// Min voter consciousness for Emergency proposals (default 0.3)
+    pub min_voter_consciousness_emergency: f64,
+    /// Min voter consciousness for Constitutional proposals (default 0.5)
+    pub min_voter_consciousness_constitutional: f64,
 
     // --- Voting weight parameters ---
     /// Maximum voting weight cap (default 1.5) — per Governance Charter,
@@ -1234,75 +1234,75 @@ pub struct GovernancePhiConfig {
 
 fn default_max_voting_weight() -> f64 { 1.5 }
 
-impl GovernancePhiConfig {
+impl GovernanceConsciousnessConfig {
     /// Default configuration matching hardcoded values
     pub fn defaults(now: Timestamp) -> Self {
         Self {
-            phi_basic: GOV_BASIC,
-            phi_proposal_submission: GOV_PROPOSAL,
-            phi_voting: GOV_VOTING,
-            phi_constitutional: GOV_CONSTITUTIONAL,
-            min_voter_phi_standard: GOV_BASIC,
-            min_voter_phi_emergency: GOV_PROPOSAL,
-            min_voter_phi_constitutional: GOV_VOTER_CONSTITUTIONAL,
+            consciousness_gate_basic: GOV_BASIC,
+            consciousness_gate_proposal: GOV_PROPOSAL,
+            consciousness_gate_voting: GOV_VOTING,
+            consciousness_gate_constitutional: GOV_CONSTITUTIONAL,
+            min_voter_consciousness_standard: GOV_BASIC,
+            min_voter_consciousness_emergency: GOV_PROPOSAL,
+            min_voter_consciousness_constitutional: GOV_VOTER_CONSTITUTIONAL,
             max_voting_weight: 1.5,
             updated_at: now,
             changed_by_proposal: None,
         }
     }
 
-    /// Get the Phi threshold for an action type from this config
-    pub fn phi_threshold_for(&self, action_type: &GovernanceActionType) -> f64 {
+    /// Get the consciousness gate threshold for an action type from this config
+    pub fn consciousness_gate_for(&self, action_type: &GovernanceActionType) -> f64 {
         match action_type {
-            GovernanceActionType::Basic => self.phi_basic,
-            GovernanceActionType::ProposalSubmission => self.phi_proposal_submission,
-            GovernanceActionType::Voting => self.phi_voting,
-            GovernanceActionType::Constitutional => self.phi_constitutional,
+            GovernanceActionType::Basic => self.consciousness_gate_basic,
+            GovernanceActionType::ProposalSubmission => self.consciousness_gate_proposal,
+            GovernanceActionType::Voting => self.consciousness_gate_voting,
+            GovernanceActionType::Constitutional => self.consciousness_gate_constitutional,
         }
     }
 
     /// Get the min voter Phi for a proposal type from this config
-    pub fn min_voter_phi_for(&self, proposal_type: &ProposalType) -> f64 {
+    pub fn min_voter_consciousness_for(&self, proposal_type: &ProposalType) -> f64 {
         match proposal_type {
-            ProposalType::Standard => self.min_voter_phi_standard,
-            ProposalType::Emergency => self.min_voter_phi_emergency,
-            ProposalType::Constitutional => self.min_voter_phi_constitutional,
+            ProposalType::Standard => self.min_voter_consciousness_standard,
+            ProposalType::Emergency => self.min_voter_consciousness_emergency,
+            ProposalType::Constitutional => self.min_voter_consciousness_constitutional,
         }
     }
 }
 
-/// Validate GovernancePhiConfig — pure function for testing
-pub fn check_phi_config(config: &GovernancePhiConfig) -> Result<(), String> {
+/// Validate GovernanceConsciousnessConfig — pure function for testing
+pub fn check_consciousness_config(config: &GovernanceConsciousnessConfig) -> Result<(), String> {
     let fields = [
-        ("phi_basic", config.phi_basic),
-        ("phi_proposal_submission", config.phi_proposal_submission),
-        ("phi_voting", config.phi_voting),
-        ("phi_constitutional", config.phi_constitutional),
-        ("min_voter_phi_standard", config.min_voter_phi_standard),
-        ("min_voter_phi_emergency", config.min_voter_phi_emergency),
-        ("min_voter_phi_constitutional", config.min_voter_phi_constitutional),
+        ("consciousness_gate_basic", config.consciousness_gate_basic),
+        ("consciousness_gate_proposal", config.consciousness_gate_proposal),
+        ("consciousness_gate_voting", config.consciousness_gate_voting),
+        ("consciousness_gate_constitutional", config.consciousness_gate_constitutional),
+        ("min_voter_consciousness_standard", config.min_voter_consciousness_standard),
+        ("min_voter_consciousness_emergency", config.min_voter_consciousness_emergency),
+        ("min_voter_consciousness_constitutional", config.min_voter_consciousness_constitutional),
     ];
     for (name, value) in &fields {
         if *value < 0.0 || *value > 1.0 {
             return Err(format!("{} must be between 0.0 and 1.0", name));
         }
     }
-    // Phi thresholds must be monotonically non-decreasing
-    if config.phi_basic > config.phi_proposal_submission {
-        return Err("phi_basic must be <= phi_proposal_submission".into());
+    // Consciousness gate thresholds must be monotonically non-decreasing
+    if config.consciousness_gate_basic > config.consciousness_gate_proposal {
+        return Err("consciousness_gate_basic must be <= consciousness_gate_proposal".into());
     }
-    if config.phi_proposal_submission > config.phi_voting {
-        return Err("phi_proposal_submission must be <= phi_voting".into());
+    if config.consciousness_gate_proposal > config.consciousness_gate_voting {
+        return Err("consciousness_gate_proposal must be <= consciousness_gate_voting".into());
     }
-    if config.phi_voting > config.phi_constitutional {
-        return Err("phi_voting must be <= phi_constitutional".into());
+    if config.consciousness_gate_voting > config.consciousness_gate_constitutional {
+        return Err("consciousness_gate_voting must be <= consciousness_gate_constitutional".into());
     }
-    // Voter phi thresholds must be non-decreasing
-    if config.min_voter_phi_standard > config.min_voter_phi_emergency {
-        return Err("min_voter_phi_standard must be <= min_voter_phi_emergency".into());
+    // Voter consciousness thresholds must be non-decreasing
+    if config.min_voter_consciousness_standard > config.min_voter_consciousness_emergency {
+        return Err("min_voter_consciousness_standard must be <= min_voter_consciousness_emergency".into());
     }
-    if config.min_voter_phi_emergency > config.min_voter_phi_constitutional {
-        return Err("min_voter_phi_emergency must be <= min_voter_phi_constitutional".into());
+    if config.min_voter_consciousness_emergency > config.min_voter_consciousness_constitutional {
+        return Err("min_voter_consciousness_emergency must be <= min_voter_consciousness_constitutional".into());
     }
     // Max voting weight must be positive and reasonable (0.5 to 5.0)
     if config.max_voting_weight < 0.5 || config.max_voting_weight > 5.0 {
@@ -1324,8 +1324,8 @@ pub enum EntryTypes {
     ConsciousnessGate(ConsciousnessGate),
     ConsciousnessHistory(ConsciousnessHistory),
     ValueAlignmentAssessment(ValueAlignmentAssessment),
-    /// Authenticated Phi attestation from Symthaea
-    PhiAttestation(PhiAttestation),
+    /// Authenticated consciousness attestation from Symthaea
+    ConsciousnessAttestation(ConsciousnessAttestation),
     // RB-BFT Consensus entry types
     KVector(KVector),
     MatlTrustScore(MatlTrustScore),
@@ -1334,7 +1334,7 @@ pub enum EntryTypes {
     WeightedVote(WeightedVote),
     ConsensusRound(ConsensusRound),
     SlashingRecord(SlashingRecord),
-    GovernancePhiConfig(GovernancePhiConfig),
+    GovernanceConsciousnessConfig(GovernanceConsciousnessConfig),
 }
 
 #[hdk_link_types]
@@ -1349,7 +1349,7 @@ pub enum LinkTypes {
     AgentToHistory,
     ProposalToAlignments,
     RecentSnapshots,
-    /// Agent → their Phi attestations
+    /// Agent → their consciousness attestations
     AgentToAttestations,
     // RB-BFT Consensus link types
     AgentToKVector,
@@ -1364,8 +1364,8 @@ pub enum LinkTypes {
     ActiveRounds,
     /// O(1) lookup: execution ID anchor → execution request record
     ExecutionById,
-    /// Phi config anchor → config record
-    PhiConfigIndex,
+    /// Consciousness config anchor → config record
+    ConsciousnessConfigIndex,
 }
 
 /// HDI 0.7 single validation callback using FlatOp pattern
@@ -1392,8 +1392,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::ValueAlignmentAssessment(assessment) => {
                     validate_create_value_alignment(action, assessment)
                 }
-                EntryTypes::PhiAttestation(attestation) => {
-                    validate_create_phi_attestation(action, attestation)
+                EntryTypes::ConsciousnessAttestation(attestation) => {
+                    validate_create_consciousness_attestation(action, attestation)
                 }
                 // RB-BFT Consensus validations
                 EntryTypes::KVector(k_vector) => validate_create_k_vector(action, k_vector),
@@ -1407,8 +1407,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::WeightedVote(vote) => validate_create_weighted_vote(action, vote),
                 EntryTypes::ConsensusRound(round) => validate_create_consensus_round(action, round),
                 EntryTypes::SlashingRecord(record) => validate_create_slashing_record(action, record),
-                EntryTypes::GovernancePhiConfig(config) => {
-                    match check_phi_config(&config) {
+                EntryTypes::GovernanceConsciousnessConfig(config) => {
+                    match check_consciousness_config(&config) {
                         Ok(()) => Ok(ValidateCallbackResult::Valid),
                         Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
                     }
@@ -1440,8 +1440,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     "Value alignment assessments are immutable".into(),
                 )),
                 // Phi attestations are immutable (point-in-time signed proof)
-                EntryTypes::PhiAttestation(_) => Ok(ValidateCallbackResult::Invalid(
-                    "Phi attestations are immutable".into(),
+                EntryTypes::ConsciousnessAttestation(_) => Ok(ValidateCallbackResult::Invalid(
+                    "Consciousness attestations are immutable".into(),
                 )),
                 // RB-BFT Consensus update rules
                 // K-Vectors can be updated (reputation changes over time)
@@ -1462,9 +1462,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SlashingRecord(_) => Ok(ValidateCallbackResult::Invalid(
                     "Slashing records are immutable".into(),
                 )),
-                // Phi config can be updated (via governance proposal)
-                EntryTypes::GovernancePhiConfig(config) => {
-                    match check_phi_config(&config) {
+                // Consciousness config can be updated (via governance proposal)
+                EntryTypes::GovernanceConsciousnessConfig(config) => {
+                    match check_consciousness_config(&config) {
                         Ok(()) => Ok(ValidateCallbackResult::Valid),
                         Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
                     }
@@ -1502,7 +1502,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             LinkTypes::ActiveParticipants => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ActiveRounds => Ok(ValidateCallbackResult::Valid),
             LinkTypes::ExecutionById => Ok(ValidateCallbackResult::Valid),
-            LinkTypes::PhiConfigIndex => Ok(ValidateCallbackResult::Valid),
+            LinkTypes::ConsciousnessConfigIndex => Ok(ValidateCallbackResult::Valid),
         },
         FlatOp::RegisterDeleteLink {
             link_type,
@@ -1596,10 +1596,10 @@ fn validate_create_consciousness_snapshot(
         ));
     }
 
-    // Validate Φ is in range [0, 1]
-    if snapshot.phi < 0.0 || snapshot.phi > 1.0 {
+    // Validate consciousness level is in range [0, 1]
+    if snapshot.consciousness_level < 0.0 || snapshot.consciousness_level > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Phi must be between 0.0 and 1.0".into(),
+            "Consciousness level must be between 0.0 and 1.0".into(),
         ));
     }
 
@@ -1648,10 +1648,10 @@ fn validate_create_consciousness_snapshot(
     Ok(ValidateCallbackResult::Valid)
 }
 
-/// Validate PhiAttestation creation
-fn validate_create_phi_attestation(
+/// Validate consciousness attestation creation
+fn validate_create_consciousness_attestation(
     _action: Create,
-    attestation: PhiAttestation,
+    attestation: ConsciousnessAttestation,
 ) -> ExternResult<ValidateCallbackResult> {
     // Validate agent DID format
     if !attestation.agent_did.starts_with("did:") {
@@ -1660,10 +1660,10 @@ fn validate_create_phi_attestation(
         ));
     }
 
-    // Validate Phi is in range [0, 1]
-    if attestation.phi < 0.0 || attestation.phi > 1.0 {
+    // Validate consciousness level is in range [0, 1]
+    if attestation.consciousness_level < 0.0 || attestation.consciousness_level > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Phi must be between 0.0 and 1.0".into(),
+            "Consciousness level must be between 0.0 and 1.0".into(),
         ));
     }
 
@@ -1718,23 +1718,23 @@ fn validate_create_consciousness_gate(
     }
 
     // Validate Φ values are in range
-    if gate.phi_at_verification < 0.0 || gate.phi_at_verification > 1.0 {
+    if gate.consciousness_at_verification < 0.0 || gate.consciousness_at_verification > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Phi at verification must be between 0.0 and 1.0".into(),
+            "Consciousness at verification must be between 0.0 and 1.0".into(),
         ));
     }
 
-    if gate.required_phi < 0.0 || gate.required_phi > 1.0 {
+    if gate.required_consciousness < 0.0 || gate.required_consciousness > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
-            "Required phi must be between 0.0 and 1.0".into(),
+            "Required consciousness must be between 0.0 and 1.0".into(),
         ));
     }
 
     // Validate pass/fail consistency
-    let should_pass = gate.phi_at_verification >= gate.required_phi;
+    let should_pass = gate.consciousness_at_verification >= gate.required_consciousness;
     if gate.passed != should_pass {
         return Ok(ValidateCallbackResult::Invalid(
-            "Gate pass/fail inconsistent with phi values".into(),
+            "Gate pass/fail inconsistent with consciousness values".into(),
         ));
     }
 
@@ -1754,28 +1754,28 @@ fn validate_create_consciousness_history(
     }
 
     // Validate Φ statistics are in range
-    if history.average_phi < 0.0 || history.average_phi > 1.0 {
+    if history.average_consciousness < 0.0 || history.average_consciousness > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Average phi must be between 0.0 and 1.0".into(),
         ));
     }
 
-    if history.peak_phi < 0.0 || history.peak_phi > 1.0 {
+    if history.peak_consciousness < 0.0 || history.peak_consciousness > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Peak phi must be between 0.0 and 1.0".into(),
         ));
     }
 
-    if history.min_phi < 0.0 || history.min_phi > 1.0 {
+    if history.min_consciousness < 0.0 || history.min_consciousness > 1.0 {
         return Ok(ValidateCallbackResult::Invalid(
             "Minimum phi must be between 0.0 and 1.0".into(),
         ));
     }
 
     // Validate min <= avg <= peak
-    if history.min_phi > history.average_phi || history.average_phi > history.peak_phi {
+    if history.min_consciousness > history.average_consciousness || history.average_consciousness > history.peak_consciousness {
         return Ok(ValidateCallbackResult::Invalid(
-            "Phi statistics must satisfy: min <= average <= peak".into(),
+            "Consciousness statistics must satisfy: min <= average <= peak".into(),
         ));
     }
 
@@ -2237,11 +2237,11 @@ mod action_type_tests {
     use super::*;
 
     #[test]
-    fn test_phi_thresholds() {
-        assert_eq!(GovernanceActionType::Basic.phi_threshold(), 0.2);
-        assert_eq!(GovernanceActionType::ProposalSubmission.phi_threshold(), 0.3);
-        assert_eq!(GovernanceActionType::Voting.phi_threshold(), 0.4);
-        assert_eq!(GovernanceActionType::Constitutional.phi_threshold(), 0.6);
+    fn test_consciousness_gates() {
+        assert_eq!(GovernanceActionType::Basic.consciousness_gate(), 0.2);
+        assert_eq!(GovernanceActionType::ProposalSubmission.consciousness_gate(), 0.3);
+        assert_eq!(GovernanceActionType::Voting.consciousness_gate(), 0.4);
+        assert_eq!(GovernanceActionType::Constitutional.consciousness_gate(), 0.6);
     }
 
     #[test]
@@ -2254,12 +2254,12 @@ mod action_type_tests {
 
     #[test]
     fn test_threshold_ordering() {
-        assert!(GovernanceActionType::Basic.phi_threshold() <
-                GovernanceActionType::ProposalSubmission.phi_threshold());
-        assert!(GovernanceActionType::ProposalSubmission.phi_threshold() <
-                GovernanceActionType::Voting.phi_threshold());
-        assert!(GovernanceActionType::Voting.phi_threshold() <
-                GovernanceActionType::Constitutional.phi_threshold());
+        assert!(GovernanceActionType::Basic.consciousness_gate() <
+                GovernanceActionType::ProposalSubmission.consciousness_gate());
+        assert!(GovernanceActionType::ProposalSubmission.consciousness_gate() <
+                GovernanceActionType::Voting.consciousness_gate());
+        assert!(GovernanceActionType::Voting.consciousness_gate() <
+                GovernanceActionType::Constitutional.consciousness_gate());
     }
 }
 
@@ -2330,7 +2330,7 @@ mod consciousness_workflow_tests {
     fn test_gate_voting_workflow() {
         let phi = 0.45;
         let action_type = GovernanceActionType::Voting;
-        let required = action_type.phi_threshold();
+        let required = action_type.consciousness_gate();
 
         assert!(phi >= required, "Φ {} should meet voting threshold {}", phi, required);
     }
@@ -2339,7 +2339,7 @@ mod consciousness_workflow_tests {
     fn test_gate_rejection_workflow() {
         let phi = 0.35;
         let action_type = GovernanceActionType::Voting;
-        let required = action_type.phi_threshold();
+        let required = action_type.consciousness_gate();
 
         assert!(phi < required, "Φ {} should NOT meet voting threshold {}", phi, required);
     }
@@ -2349,8 +2349,8 @@ mod consciousness_workflow_tests {
         let low_phi = 0.55;
         let high_phi = 0.65;
 
-        assert!(low_phi < GovernanceActionType::Constitutional.phi_threshold());
-        assert!(high_phi >= GovernanceActionType::Constitutional.phi_threshold());
+        assert!(low_phi < GovernanceActionType::Constitutional.consciousness_gate());
+        assert!(high_phi >= GovernanceActionType::Constitutional.consciousness_gate());
     }
 }
 
@@ -2822,7 +2822,7 @@ mod holistic_voting_weight_tests {
         let weight = HolisticVotingWeight::calculate(1.5, 2.0, 3.0);
 
         assert_eq!(weight.reputation, 1.0);
-        assert_eq!(weight.phi, 1.0);
+        assert_eq!(weight.consciousness_level, 1.0);
         assert_eq!(weight.harmonic_alignment, 1.0);
     }
 
@@ -2857,7 +2857,7 @@ mod adaptive_threshold_tests {
         let threshold = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
 
         assert!((threshold.base_threshold - 0.51).abs() < 0.001);
-        assert!((threshold.min_voter_phi - 0.2).abs() < 0.001);
+        assert!((threshold.min_voter_consciousness - 0.2).abs() < 0.001);
         assert_eq!(threshold.min_participation, 5);
         assert!((threshold.quorum - 0.20).abs() < 0.001);
         assert_eq!(threshold.max_extension_secs, 86400);
@@ -2868,7 +2868,7 @@ mod adaptive_threshold_tests {
         let threshold = AdaptiveThreshold::for_proposal_type(&ProposalType::Emergency);
 
         assert!((threshold.base_threshold - 0.60).abs() < 0.001);
-        assert!((threshold.min_voter_phi - 0.3).abs() < 0.001);
+        assert!((threshold.min_voter_consciousness - 0.3).abs() < 0.001);
         assert_eq!(threshold.min_participation, 3);
         assert!((threshold.quorum - 0.10).abs() < 0.001);
         assert_eq!(threshold.max_extension_secs, 3600);
@@ -2879,7 +2879,7 @@ mod adaptive_threshold_tests {
         let threshold = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
 
         assert!((threshold.base_threshold - 0.67).abs() < 0.001);
-        assert!((threshold.min_voter_phi - 0.5).abs() < 0.001);
+        assert!((threshold.min_voter_consciousness - 0.5).abs() < 0.001);
         assert_eq!(threshold.min_participation, 10);
         assert!((threshold.quorum - 0.40).abs() < 0.001);
         assert_eq!(threshold.max_extension_secs, 604800);
@@ -2895,21 +2895,21 @@ mod adaptive_threshold_tests {
     }
 
     #[test]
-    fn test_voter_meets_phi_requirement_standard() {
+    fn test_voter_meets_consciousness_requirement_standard() {
         let threshold = AdaptiveThreshold::for_proposal_type(&ProposalType::Standard);
 
-        assert!(threshold.voter_meets_phi_requirement(0.25)); // 0.25 >= 0.2
-        assert!(threshold.voter_meets_phi_requirement(0.20)); // 0.20 >= 0.2 (boundary)
-        assert!(!threshold.voter_meets_phi_requirement(0.15)); // 0.15 < 0.2
+        assert!(threshold.voter_meets_consciousness_requirement(0.25)); // 0.25 >= 0.2
+        assert!(threshold.voter_meets_consciousness_requirement(0.20)); // 0.20 >= 0.2 (boundary)
+        assert!(!threshold.voter_meets_consciousness_requirement(0.15)); // 0.15 < 0.2
     }
 
     #[test]
-    fn test_voter_meets_phi_requirement_constitutional() {
+    fn test_voter_meets_consciousness_requirement_constitutional() {
         let threshold = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
 
-        assert!(threshold.voter_meets_phi_requirement(0.6)); // 0.6 >= 0.5
-        assert!(threshold.voter_meets_phi_requirement(0.5)); // 0.5 >= 0.5 (boundary)
-        assert!(!threshold.voter_meets_phi_requirement(0.45)); // 0.45 < 0.5
+        assert!(threshold.voter_meets_consciousness_requirement(0.6)); // 0.6 >= 0.5
+        assert!(threshold.voter_meets_consciousness_requirement(0.5)); // 0.5 >= 0.5 (boundary)
+        assert!(!threshold.voter_meets_consciousness_requirement(0.45)); // 0.45 < 0.5
     }
 
     #[test]
@@ -2953,8 +2953,8 @@ mod adaptive_threshold_tests {
         assert!(constitutional.base_threshold > emergency.base_threshold);
 
         // Constitutional requires highest Φ
-        assert!(constitutional.min_voter_phi > emergency.min_voter_phi);
-        assert!(emergency.min_voter_phi > standard.min_voter_phi);
+        assert!(constitutional.min_voter_consciousness > emergency.min_voter_consciousness);
+        assert!(emergency.min_voter_consciousness > standard.min_voter_consciousness);
     }
 }
 
@@ -3274,9 +3274,9 @@ mod enhanced_consensus_participant_tests {
         let p = create_enhanced_participant();
         let weight = p.calculate_holistic_weight(0.5);
 
-        // Should use participant's reputation and phi
+        // Should use participant's reputation and consciousness level
         assert!((weight.reputation - 0.8).abs() < 0.001);
-        assert!((weight.phi - 0.5).abs() < 0.001);
+        assert!((weight.consciousness_level - 0.5).abs() < 0.001);
         assert!((weight.harmonic_alignment - 0.5).abs() < 0.001);
     }
 
@@ -3352,8 +3352,8 @@ mod consciousness_weighted_consensus_tests {
         let low_phi_voter = 0.4;
         let high_phi_voter = 0.6;
 
-        assert!(!threshold.voter_meets_phi_requirement(low_phi_voter));
-        assert!(threshold.voter_meets_phi_requirement(high_phi_voter));
+        assert!(!threshold.voter_meets_consciousness_requirement(low_phi_voter));
+        assert!(threshold.voter_meets_consciousness_requirement(high_phi_voter));
     }
 
     #[test]
@@ -3406,13 +3406,13 @@ mod consciousness_weighted_consensus_tests {
 
         let can_vote_constitutional: Vec<&str> = agents
             .iter()
-            .filter(|(_, phi)| constitutional_threshold.voter_meets_phi_requirement(*phi))
+            .filter(|(_, phi)| constitutional_threshold.voter_meets_consciousness_requirement(*phi))
             .map(|(did, _)| *did)
             .collect();
 
         let can_vote_standard: Vec<&str> = agents
             .iter()
-            .filter(|(_, phi)| standard_threshold.voter_meets_phi_requirement(*phi))
+            .filter(|(_, phi)| standard_threshold.voter_meets_consciousness_requirement(*phi))
             .map(|(did, _)| *did)
             .collect();
 
@@ -3458,108 +3458,108 @@ mod consciousness_weighted_consensus_tests {
         assert!(reduction > 20.0, "Cooldown should reduce influence by > 20%, got {}%", reduction);
     }
 
-    // --- GovernancePhiConfig ---
+    // --- GovernanceConsciousnessConfig ---
 
-    fn default_config() -> GovernancePhiConfig {
-        GovernancePhiConfig::defaults(Timestamp::from_micros(1000000))
+    fn default_config() -> GovernanceConsciousnessConfig {
+        GovernanceConsciousnessConfig::defaults(Timestamp::from_micros(1000000))
     }
 
     #[test]
-    fn test_phi_config_defaults_valid() {
-        assert!(check_phi_config(&default_config()).is_ok());
+    fn test_consciousness_config_defaults_valid() {
+        assert!(check_consciousness_config(&default_config()).is_ok());
     }
 
     #[test]
-    fn test_phi_config_defaults_match_hardcoded() {
+    fn test_consciousness_config_defaults_match_hardcoded() {
         let config = default_config();
-        assert!((config.phi_basic - GovernanceActionType::Basic.phi_threshold()).abs() < f64::EPSILON);
-        assert!((config.phi_proposal_submission - GovernanceActionType::ProposalSubmission.phi_threshold()).abs() < f64::EPSILON);
-        assert!((config.phi_voting - GovernanceActionType::Voting.phi_threshold()).abs() < f64::EPSILON);
-        assert!((config.phi_constitutional - GovernanceActionType::Constitutional.phi_threshold()).abs() < f64::EPSILON);
+        assert!((config.consciousness_gate_basic - GovernanceActionType::Basic.consciousness_gate()).abs() < f64::EPSILON);
+        assert!((config.consciousness_gate_proposal - GovernanceActionType::ProposalSubmission.consciousness_gate()).abs() < f64::EPSILON);
+        assert!((config.consciousness_gate_voting - GovernanceActionType::Voting.consciousness_gate()).abs() < f64::EPSILON);
+        assert!((config.consciousness_gate_constitutional - GovernanceActionType::Constitutional.consciousness_gate()).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn test_phi_config_threshold_lookup() {
+    fn test_consciousness_config_threshold_lookup() {
         let config = default_config();
-        assert!((config.phi_threshold_for(&GovernanceActionType::Basic) - 0.2).abs() < f64::EPSILON);
-        assert!((config.phi_threshold_for(&GovernanceActionType::Constitutional) - 0.6).abs() < f64::EPSILON);
+        assert!((config.consciousness_gate_for(&GovernanceActionType::Basic) - 0.2).abs() < f64::EPSILON);
+        assert!((config.consciousness_gate_for(&GovernanceActionType::Constitutional) - 0.6).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn test_phi_config_voter_phi_lookup() {
+    fn test_consciousness_config_voter_consciousness_lookup() {
         let config = default_config();
-        assert!((config.min_voter_phi_for(&ProposalType::Standard) - 0.2).abs() < f64::EPSILON);
-        assert!((config.min_voter_phi_for(&ProposalType::Emergency) - 0.3).abs() < f64::EPSILON);
-        assert!((config.min_voter_phi_for(&ProposalType::Constitutional) - 0.5).abs() < f64::EPSILON);
+        assert!((config.min_voter_consciousness_for(&ProposalType::Standard) - 0.2).abs() < f64::EPSILON);
+        assert!((config.min_voter_consciousness_for(&ProposalType::Emergency) - 0.3).abs() < f64::EPSILON);
+        assert!((config.min_voter_consciousness_for(&ProposalType::Constitutional) - 0.5).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn test_phi_config_out_of_range() {
+    fn test_consciousness_config_out_of_range() {
         let mut config = default_config();
-        config.phi_basic = -0.1;
-        assert!(check_phi_config(&config).is_err());
+        config.consciousness_gate_basic = -0.1;
+        assert!(check_consciousness_config(&config).is_err());
 
         config = default_config();
-        config.phi_constitutional = 1.1;
-        assert!(check_phi_config(&config).is_err());
+        config.consciousness_gate_constitutional = 1.1;
+        assert!(check_consciousness_config(&config).is_err());
     }
 
     #[test]
-    fn test_phi_config_non_monotonic_rejected() {
+    fn test_consciousness_config_non_monotonic_rejected() {
         let mut config = default_config();
         // Basic > ProposalSubmission violates ordering
-        config.phi_basic = 0.5;
-        config.phi_proposal_submission = 0.3;
-        assert!(check_phi_config(&config).unwrap_err().contains("phi_basic"));
+        config.consciousness_gate_basic = 0.5;
+        config.consciousness_gate_proposal = 0.3;
+        assert!(check_consciousness_config(&config).unwrap_err().contains("consciousness_gate_basic"));
     }
 
     #[test]
-    fn test_phi_config_voter_phi_non_monotonic_rejected() {
+    fn test_consciousness_config_voter_consciousness_non_monotonic_rejected() {
         let mut config = default_config();
-        config.min_voter_phi_standard = 0.4;
-        config.min_voter_phi_emergency = 0.3;
-        assert!(check_phi_config(&config).unwrap_err().contains("min_voter_phi_standard"));
+        config.min_voter_consciousness_standard = 0.4;
+        config.min_voter_consciousness_emergency = 0.3;
+        assert!(check_consciousness_config(&config).unwrap_err().contains("min_voter_consciousness_standard"));
     }
 
     #[test]
-    fn test_phi_config_equal_thresholds_ok() {
+    fn test_consciousness_config_equal_thresholds_ok() {
         // Equal thresholds should be fine (non-decreasing, not strictly increasing)
         let mut config = default_config();
-        config.phi_basic = 0.3;
-        config.phi_proposal_submission = 0.3;
-        assert!(check_phi_config(&config).is_ok());
+        config.consciousness_gate_basic = 0.3;
+        config.consciousness_gate_proposal = 0.3;
+        assert!(check_consciousness_config(&config).is_ok());
     }
 
     #[test]
-    fn test_phi_config_custom_values() {
+    fn test_consciousness_config_custom_values() {
         // Governance could lower basic and raise constitutional
         let mut config = default_config();
-        config.phi_basic = 0.1;
-        config.phi_constitutional = 0.8;
-        config.min_voter_phi_constitutional = 0.7;
-        assert!(check_phi_config(&config).is_ok());
+        config.consciousness_gate_basic = 0.1;
+        config.consciousness_gate_constitutional = 0.8;
+        config.min_voter_consciousness_constitutional = 0.7;
+        assert!(check_consciousness_config(&config).is_ok());
     }
 
     #[test]
-    fn test_phi_config_max_voting_weight_default() {
+    fn test_consciousness_config_max_voting_weight_default() {
         let config = default_config();
         assert!((config.max_voting_weight - 1.5).abs() < f64::EPSILON);
     }
 
     #[test]
-    fn test_phi_config_max_voting_weight_range() {
+    fn test_consciousness_config_max_voting_weight_range() {
         let mut config = default_config();
 
         // Too low
         config.max_voting_weight = 0.3;
-        assert!(check_phi_config(&config).unwrap_err().contains("max_voting_weight"));
+        assert!(check_consciousness_config(&config).unwrap_err().contains("max_voting_weight"));
 
         // Too high
         config.max_voting_weight = 6.0;
-        assert!(check_phi_config(&config).unwrap_err().contains("max_voting_weight"));
+        assert!(check_consciousness_config(&config).unwrap_err().contains("max_voting_weight"));
 
         // Valid custom value
         config.max_voting_weight = 2.0;
-        assert!(check_phi_config(&config).is_ok());
+        assert!(check_consciousness_config(&config).is_ok());
     }
 }

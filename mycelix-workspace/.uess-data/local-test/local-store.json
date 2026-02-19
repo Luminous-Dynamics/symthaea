@@ -1,0 +1,31 @@
+{
+  "__type": "Map",
+  "entries": [
+    [
+      "test:key1",
+      {
+        "data": {
+          "data": "test"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 0
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516501888,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:476b9a271bf3fffee4c1eeaf353719f4a5437ccd4decc0a9a176dff6baf700f9",
+          "sizeBytes": 15
+        },
+        "expiresAt": 1772121301889
+      }
+    ]
+  ]
+}

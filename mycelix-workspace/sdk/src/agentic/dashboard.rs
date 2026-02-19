@@ -58,7 +58,7 @@ pub struct LiveMetrics {
     /// Active alerts count by severity
     pub alerts: AlertCounts,
     /// Phi coherence (collective) - INFORMATIONAL ONLY
-    /// Do not gate behavior based on this value. Use agent-specific k_phi for gating.
+    /// Do not gate behavior based on this value. Use agent-specific k_coherence for gating.
     pub collective_phi: f64,
     /// Byzantine threat level (0.0-1.0)
     pub byzantine_threat: f64,

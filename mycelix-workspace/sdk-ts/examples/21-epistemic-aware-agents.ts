@@ -92,7 +92,7 @@ function createInitialKVector(): KVectorValues {
     k_h: 0.5,     // Historical: neutral
     k_topo: 0.2,  // Topology: few connections
     k_v: 0.8,     // Verification: sponsor verified
-    k_phi: 0.7,   // Coherence: acceptable
+    k_coherence: 0.7,   // Coherence: acceptable
   };
 }
 
@@ -161,7 +161,7 @@ function updateKVectorFromFL(
   }
 
   // Coherence based on gradient consistency
-  updated.k_phi = flResult.gradientQuality * 0.3 + kVector.k_phi * 0.7;
+  updated.k_coherence = flResult.gradientQuality * 0.3 + kVector.k_coherence * 0.7;
 
   return updated;
 }
@@ -177,7 +177,7 @@ function formatKVector(kVector: KVectorValues): string {
     `h=${kVector.k_h.toFixed(2)}`,
     `t=${kVector.k_topo.toFixed(2)}`,
     `v=${(kVector.k_v ?? 0).toFixed(2)}`,
-    `phi=${(kVector.k_phi ?? 0).toFixed(2)}`,
+    `phi=${(kVector.k_coherence ?? 0).toFixed(2)}`,
   ];
   return `[${dims.join(', ')}]`;
 }
@@ -482,7 +482,7 @@ async function main() {
   console.log(`  Historical (k_h):  ${agent.kVector.k_h.toFixed(3)} - Behavioral consistency`);
   console.log(`  Topology (k_topo): ${agent.kVector.k_topo.toFixed(3)} - Network connections`);
   console.log(`  Verification (k_v): ${(agent.kVector.k_v ?? 0).toFixed(3)} - Identity verification`);
-  console.log(`  Coherence (k_phi): ${(agent.kVector.k_phi ?? 0).toFixed(3)} - Phi measurement`);
+  console.log(`  Coherence (k_coherence): ${(agent.kVector.k_coherence ?? 0).toFixed(3)} - Phi measurement`);
   console.log();
 
   console.log('Constitutional Constraints:');
@@ -497,7 +497,7 @@ async function main() {
   console.log(`  - Trust evolved from ${initialTrust.toFixed(3)} to ${finalTrust.toFixed(3)}`);
   console.log(`  - KREDIT cap adjusted dynamically based on trust`);
   console.log(`  - High-uncertainty actions properly escalated to sponsor`);
-  console.log(`  - FL participation improved coherence (k_phi) dimension`);
+  console.log(`  - FL participation improved coherence (k_coherence) dimension`);
   console.log(`  - Agent maintains full epistemic accountability`);
   console.log();
 

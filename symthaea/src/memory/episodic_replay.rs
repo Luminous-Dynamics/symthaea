@@ -90,9 +90,9 @@ pub struct Episode {
     /// Output hypervector (cognitive response)
     pub output: ContinuousHV,
 
-    /// Integrated information (Phi) at this moment
+    /// Psi — Consciousness estimate at this moment
     /// Range: typically 0.0 to 1.0, higher values indicate more integration
-    pub phi: f64,
+    pub psi: f64,
 
     /// Timestamp (cycle number or wall-clock time)
     pub timestamp: u64,
@@ -121,11 +121,11 @@ pub struct Episode {
 
 impl Episode {
     /// Create a new episode
-    pub fn new(input: ContinuousHV, output: ContinuousHV, phi: f64, timestamp: u64) -> Self {
+    pub fn new(input: ContinuousHV, output: ContinuousHV, psi: f64, timestamp: u64) -> Self {
         Self {
             input,
             output,
-            phi,
+            psi,
             timestamp,
             prediction_error: None,
             valence: None,
@@ -140,7 +140,7 @@ impl Episode {
     pub fn with_metadata(
         input: ContinuousHV,
         output: ContinuousHV,
-        phi: f64,
+        psi: f64,
         timestamp: u64,
         prediction_error: f32,
         valence: f32,
@@ -149,7 +149,7 @@ impl Episode {
         Self {
             input,
             output,
-            phi,
+            psi,
             timestamp,
             prediction_error: Some(prediction_error),
             valence: Some(valence),
@@ -168,7 +168,7 @@ impl Episode {
     /// - Recency (more recent = slightly higher priority)
     /// - Replay count penalty (less replayed = higher priority)
     pub fn priority_score(&self, current_timestamp: u64, recency_weight: f64) -> f64 {
-        let base_phi = self.phi;
+        let base_phi = self.psi;
 
         // Recency bonus: exponential decay based on age
         let age = current_timestamp.saturating_sub(self.timestamp) as f64;
@@ -265,8 +265,8 @@ pub struct EpisodicReplayConfig {
     /// Maximum number of episodes to store
     pub capacity: usize,
 
-    /// Phi threshold for storing an episode (episodes below this are discarded)
-    pub phi_threshold: f64,
+    /// Psi threshold for storing an episode (episodes below this are discarded)
+    pub psi_threshold: f64,
 
     /// Number of cycles between replay sessions
     pub replay_interval: usize,
@@ -284,8 +284,8 @@ pub struct EpisodicReplayConfig {
     /// Time step (dt) for replay training
     pub replay_dt: f32,
 
-    /// Whether to use Phi-weighted sampling (vs uniform)
-    pub phi_weighted_sampling: bool,
+    /// Whether to use Psi-weighted sampling (vs uniform)
+    pub psi_weighted_sampling: bool,
 
     /// Temperature for softmax sampling (higher = more uniform)
     pub sampling_temperature: f64,
@@ -298,13 +298,13 @@ impl Default for EpisodicReplayConfig {
     fn default() -> Self {
         Self {
             capacity: 1000,
-            phi_threshold: 0.3,   // Only store episodes with Phi > 0.3
+            psi_threshold: 0.3,   // Only store episodes with Psi > 0.3
             replay_interval: 100, // Replay every 100 cycles
             batch_size: 8,        // 8 episodes per replay session
             recency_weight: 0.2,  // Moderate recency preference
             replay_learning_rate_multiplier: 0.5, // Half the normal learning rate
             replay_dt: 0.02,      // Same as cognitive loop default
-            phi_weighted_sampling: true, // Sample high-Phi episodes more often
+            psi_weighted_sampling: true, // Sample high-Psi episodes more often
             sampling_temperature: 1.0, // Normal temperature
             min_episodes_for_replay: 10, // Need at least 10 episodes
         }
@@ -315,10 +315,10 @@ impl EpisodicReplayConfig {
     /// Create a config optimized for high-consciousness preservation
     pub fn high_phi_focused() -> Self {
         Self {
-            phi_threshold: 0.5,
+            psi_threshold: 0.5,
             batch_size: 4,
             replay_learning_rate_multiplier: 0.3,
-            phi_weighted_sampling: true,
+            psi_weighted_sampling: true,
             sampling_temperature: 0.5, // More focused on top episodes
             ..Default::default()
         }
@@ -328,10 +328,10 @@ impl EpisodicReplayConfig {
     pub fn broad_capture() -> Self {
         Self {
             capacity: 2000,
-            phi_threshold: 0.2,
+            psi_threshold: 0.2,
             batch_size: 16,
             replay_learning_rate_multiplier: 0.4,
-            phi_weighted_sampling: false,
+            psi_weighted_sampling: false,
             sampling_temperature: 2.0,
             ..Default::default()
         }
@@ -369,11 +369,11 @@ pub struct EpisodicMemory {
     /// Total replay training steps performed
     total_replay_steps: u64,
 
-    /// Average Phi of stored episodes
-    average_phi: f64,
+    /// Average Psi of stored episodes
+    average_psi: f64,
 
-    /// Minimum Phi in buffer (for eviction tracking)
-    min_phi_in_buffer: f64,
+    /// Minimum Psi in buffer (for eviction tracking)
+    min_psi_in_buffer: f64,
 
     /// Sum of replay losses (for tracking)
     sum_replay_loss: f64,
@@ -396,8 +396,8 @@ impl EpisodicMemory {
             total_stored: 0,
             total_evicted: 0,
             total_replay_steps: 0,
-            average_phi: 0.0,
-            min_phi_in_buffer: f64::MAX,
+            average_psi: 0.0,
+            min_psi_in_buffer: f64::MAX,
             sum_replay_loss: 0.0,
             demand_replay_triggered: false,
             demand_replay_count: 0,
@@ -412,7 +412,7 @@ impl EpisodicMemory {
         self.cycles_since_replay += 1;
 
         // Check Phi threshold
-        if episode.phi < self.config.phi_threshold {
+        if episode.psi < self.config.psi_threshold {
             return false;
         }
 
@@ -421,9 +421,9 @@ impl EpisodicMemory {
 
         // Update statistics
         let n = self.episodes.len() as f64;
-        self.average_phi = (self.average_phi * n + episode.phi) / (n + 1.0);
-        if episode.phi < self.min_phi_in_buffer {
-            self.min_phi_in_buffer = episode.phi;
+        self.average_psi = (self.average_psi * n + episode.psi) / (n + 1.0);
+        if episode.psi < self.min_psi_in_buffer {
+            self.min_psi_in_buffer = episode.psi;
         }
 
         // Store the episode
@@ -474,7 +474,7 @@ impl EpisodicMemory {
 
         let mut batch = Vec::with_capacity(batch_size);
 
-        if self.config.phi_weighted_sampling {
+        if self.config.psi_weighted_sampling {
             // Phi-weighted sampling using softmax probabilities
             let scores: Vec<f64> = all_episodes
                 .iter()
@@ -580,7 +580,7 @@ impl EpisodicMemory {
             return ReplaySessionResult {
                 episodes_replayed: 0,
                 average_loss: 0.0,
-                average_phi: 0.0,
+                average_psi: 0.0,
                 skipped: true,
             };
         }
@@ -590,7 +590,7 @@ impl EpisodicMemory {
             return ReplaySessionResult {
                 episodes_replayed: 0,
                 average_loss: 0.0,
-                average_phi: 0.0,
+                average_psi: 0.0,
                 skipped: true,
             };
         }
@@ -606,7 +606,7 @@ impl EpisodicMemory {
                 self.config.replay_dt,
             );
             total_loss += loss;
-            total_phi += episode.phi;
+            total_phi += episode.psi;
         }
 
         // Reset replay counter and demand trigger
@@ -623,7 +623,7 @@ impl EpisodicMemory {
             // Check if this episode was in the batch
             // Simple approximation: increment if Phi matches any batch episode
             for be in &batch {
-                if (pe.episode.phi - be.phi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
+                if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
                     pe.episode.replay_count += 1;
                     pe.episode.reconsolidate(current_phi);
                     break;
@@ -637,7 +637,7 @@ impl EpisodicMemory {
         ReplaySessionResult {
             episodes_replayed: n,
             average_loss: total_loss / n as f32,
-            average_phi: total_phi / n as f64,
+            average_psi: total_phi / n as f64,
             skipped: false,
         }
     }
@@ -649,13 +649,13 @@ impl EpisodicMemory {
             total_evicted: self.total_evicted,
             current_count: self.episodes.len(),
             capacity: self.config.capacity,
-            average_phi: self.average_phi,
-            min_phi_in_buffer: if self.episodes.is_empty() {
+            average_psi: self.average_psi,
+            min_psi_in_buffer: if self.episodes.is_empty() {
                 0.0
             } else {
-                self.min_phi_in_buffer
+                self.min_psi_in_buffer
             },
-            phi_threshold: self.config.phi_threshold,
+            psi_threshold: self.config.psi_threshold,
             total_replay_steps: self.total_replay_steps,
             average_replay_loss: if self.total_replay_steps > 0 {
                 self.sum_replay_loss / self.total_replay_steps as f64
@@ -671,8 +671,8 @@ impl EpisodicMemory {
     /// Clear all stored episodes
     pub fn clear(&mut self) {
         self.episodes.clear();
-        self.min_phi_in_buffer = f64::MAX;
-        self.average_phi = 0.0;
+        self.min_psi_in_buffer = f64::MAX;
+        self.average_psi = 0.0;
     }
 
     /// Get the current number of stored episodes
@@ -690,8 +690,8 @@ impl EpisodicMemory {
         let mut sorted: Vec<_> = self.episodes.iter().collect();
         sorted.sort_by(|a, b| {
             b.episode
-                .phi
-                .partial_cmp(&a.episode.phi)
+                .psi
+                .partial_cmp(&a.episode.psi)
                 .unwrap_or(Ordering::Equal)
         });
         sorted
@@ -715,8 +715,8 @@ pub struct ReplaySessionResult {
     /// Average loss over the batch
     pub average_loss: f32,
 
-    /// Average Phi of replayed episodes
-    pub average_phi: f64,
+    /// Average Psi of replayed episodes
+    pub average_psi: f64,
 
     /// Whether the session was skipped (not enough cycles or episodes)
     pub skipped: bool,
@@ -737,14 +737,14 @@ pub struct EpisodicMemoryStats {
     /// Maximum capacity
     pub capacity: usize,
 
-    /// Average Phi of stored episodes
-    pub average_phi: f64,
+    /// Average Psi of stored episodes
+    pub average_psi: f64,
 
-    /// Minimum Phi in buffer
-    pub min_phi_in_buffer: f64,
+    /// Minimum Psi in buffer
+    pub min_psi_in_buffer: f64,
 
-    /// Phi threshold for storage
-    pub phi_threshold: f64,
+    /// Psi threshold for storage
+    pub psi_threshold: f64,
 
     /// Total replay training steps
     pub total_replay_steps: u64,
@@ -770,16 +770,16 @@ pub struct EpisodicMemoryStats {
 mod tests {
     use super::*;
 
-    fn make_test_episode(phi: f64, timestamp: u64) -> Episode {
+    fn make_test_episode(psi: f64, timestamp: u64) -> Episode {
         let input = ContinuousHV::random(256, timestamp);
         let output = ContinuousHV::random(256, timestamp + 1);
-        Episode::new(input, output, phi, timestamp)
+        Episode::new(input, output, psi, timestamp)
     }
 
     #[test]
     fn test_episode_creation() {
         let episode = make_test_episode(0.5, 100);
-        assert_eq!(episode.phi, 0.5);
+        assert_eq!(episode.psi, 0.5);
         assert_eq!(episode.timestamp, 100);
         assert_eq!(episode.replay_count, 0);
     }
@@ -787,7 +787,7 @@ mod tests {
     #[test]
     fn test_store_if_significant_threshold() {
         let config = EpisodicReplayConfig {
-            phi_threshold: 0.4,
+            psi_threshold: 0.4,
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
@@ -807,7 +807,7 @@ mod tests {
     fn test_high_phi_episodes_preferentially_stored() {
         let config = EpisodicReplayConfig {
             capacity: 5,
-            phi_threshold: 0.1,
+            psi_threshold: 0.1,
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
@@ -826,7 +826,7 @@ mod tests {
         // Top episodes should have highest Phi values
         for (i, ep) in top.iter().enumerate() {
             if i > 0 {
-                assert!(ep.phi <= top[i - 1].phi);
+                assert!(ep.psi <= top[i - 1].psi);
             }
         }
     }
@@ -834,11 +834,11 @@ mod tests {
     #[test]
     fn test_sample_replay_batch() {
         let config = EpisodicReplayConfig {
-            phi_threshold: 0.1,
+            psi_threshold: 0.1,
             min_episodes_for_replay: 5,
             // Use uniform sampling for deterministic batch size behavior.
             // Phi-weighted sampling has a separate test.
-            phi_weighted_sampling: false,
+            psi_weighted_sampling: false,
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
@@ -856,15 +856,15 @@ mod tests {
 
         // All sampled episodes should have been above threshold
         for ep in &batch {
-            assert!(ep.phi >= 0.3);
+            assert!(ep.psi >= 0.3);
         }
     }
 
     #[test]
     fn test_phi_weighted_sampling_prefers_high_phi() {
         let config = EpisodicReplayConfig {
-            phi_threshold: 0.1,
-            phi_weighted_sampling: true,
+            psi_threshold: 0.1,
+            psi_weighted_sampling: true,
             sampling_temperature: 0.5, // Lower temp = more focused on high Phi
             min_episodes_for_replay: 5,
             ..Default::default()
@@ -886,7 +886,7 @@ mod tests {
             let batch = memory.sample_replay_batch(10);
             for ep in &batch {
                 total_count += 1;
-                if ep.phi > 0.7 {
+                if ep.psi > 0.7 {
                     high_phi_count += 1;
                 }
             }
@@ -906,7 +906,7 @@ mod tests {
         use crate::dynamics::cfc::CfCNetworkConfig;
 
         let config = EpisodicReplayConfig {
-            phi_threshold: 0.1,
+            psi_threshold: 0.1,
             min_episodes_for_replay: 3,
             batch_size: 3,
             replay_interval: 5,
@@ -939,14 +939,14 @@ mod tests {
         assert!(!result.skipped);
         assert!(result.episodes_replayed > 0);
         assert!(result.average_loss.is_finite());
-        assert!(result.average_phi > 0.5);
+        assert!(result.average_psi > 0.5);
     }
 
     #[test]
     fn test_statistics_tracking() {
         let config = EpisodicReplayConfig {
             capacity: 50,
-            phi_threshold: 0.3,
+            psi_threshold: 0.3,
             ..Default::default()
         };
         let mut memory = EpisodicMemory::new(config);
@@ -963,8 +963,8 @@ mod tests {
         // Should have stored only episodes above threshold
         assert!(stats.total_stored > 0);
         assert!(stats.current_count <= stats.capacity);
-        assert!(stats.average_phi >= stats.phi_threshold);
-        assert!(stats.min_phi_in_buffer >= stats.phi_threshold);
+        assert!(stats.average_psi >= stats.psi_threshold);
+        assert!(stats.min_psi_in_buffer >= stats.psi_threshold);
     }
 
     #[test]

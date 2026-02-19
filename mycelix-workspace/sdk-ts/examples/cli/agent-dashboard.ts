@@ -151,7 +151,7 @@ function renderKVector(kVector: KVectorValues): void {
   console.log(formatKVectorDimension('Historical', 'k_h', kVector.k_h, 'Behavioral consistency'));
   console.log(formatKVectorDimension('Topology', 'k_topo', kVector.k_topo, 'Network connections'));
   console.log(formatKVectorDimension('Verification', 'k_v', kVector.k_v ?? 0, 'Identity verification'));
-  console.log(formatKVectorDimension('Coherence', 'k_phi', kVector.k_phi ?? 0, 'Phi measurement'));
+  console.log(formatKVectorDimension('Coherence', 'k_coherence', kVector.k_coherence ?? 0, 'Output consistency'));
   console.log();
 }
 
@@ -239,7 +239,7 @@ function createDemoAgent(): DashboardAgent {
       k_h: 0.5,
       k_topo: 0.2,
       k_v: 0.8,
-      k_phi: 0.7,
+      k_coherence: 0.7,
     },
     kreditBalance: 5000,
     kreditCap: 10000,
@@ -278,8 +278,8 @@ function evolveAgent(agent: DashboardAgent): DashboardAgent {
   updated.kVector.k_m = Math.min(1.0, updated.kVector.k_m + 0.005);
 
   // Coherence fluctuates slightly
-  updated.kVector.k_phi = Math.max(0.3, Math.min(1.0,
-    (updated.kVector.k_phi ?? 0.7) + (Math.random() - 0.5) * 0.05
+  updated.kVector.k_coherence = Math.max(0.3, Math.min(1.0,
+    (updated.kVector.k_coherence ?? 0.7) + (Math.random() - 0.5) * 0.05
   ));
 
   // Random escalation

@@ -356,8 +356,8 @@ pub struct DomainContext {
     pub computed_answer: Option<String>,
     /// 3D epistemic classification from the Mycelix Epistemic Charter
     pub cube: Option<EpistemicCube>,
-    /// Φ (integrated information) from HDC proof, if available
-    pub phi: Option<f64>,
+    /// Ψ — Consciousness estimate from HDC proof, if available
+    pub psi: Option<f64>,
 }
 
 /// Structured data that may need to be incorporated.
@@ -412,8 +412,8 @@ pub struct StructuredThought {
     // ========================================================================
     // CONFIDENCE SIGNALS (How Sure)
     // ========================================================================
-    /// Consciousness level (Φ): integrated information measure
-    pub phi: f64,
+    /// Ψ — Consciousness estimate (composite soft signal, NOT IIT Phi)
+    pub psi: f64,
 
     /// Meta-awareness: self-monitoring/confidence level
     pub meta_awareness: f64,
@@ -506,7 +506,7 @@ impl StructuredThought {
         // Confidence metrics
         prompt.push_str(&format!(
             "CONFIDENCE: phi={:.2}, meta_awareness={:.2}, coherence={:.2}\n",
-            self.phi, self.meta_awareness, self.coherence
+            self.psi, self.meta_awareness, self.coherence
         ));
 
         // Emotional tone
@@ -663,7 +663,7 @@ impl Default for StructuredThought {
             structured_data: None,
             domain_context: None,
             code_context: None,
-            phi: 0.0,
+            psi: 0.0,
             meta_awareness: 0.0,
             coherence: 0.0,
             epistemic_status: EpistemicStatus::default(),

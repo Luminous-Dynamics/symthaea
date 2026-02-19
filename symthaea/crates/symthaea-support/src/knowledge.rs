@@ -16,6 +16,7 @@ struct StoredArticle {
     #[allow(dead_code)]
     retrieval_count: u32,
     deprecated: bool,
+    local_only: bool,
 }
 
 impl KnowledgeManager {
@@ -67,6 +68,35 @@ impl KnowledgeManager {
         matches
     }
 
+    /// Search knowledge base, optionally filtering out local-only articles.
+    ///
+    /// When `can_share` is false, articles marked `local_only` are included.
+    /// When `can_share` is true, articles marked `local_only` are excluded
+    /// (they should not appear in federated results).
+    pub fn search_filtered(&self, query: &str, k: usize, can_share: bool) -> Vec<KnowledgeMatch> {
+        let query_lower = query.to_lowercase();
+        let mut matches: Vec<KnowledgeMatch> = self
+            .articles
+            .iter()
+            .filter(|a| !a.deprecated)
+            .filter(|a| !can_share || !a.local_only)
+            .filter(|a| a.title.to_lowercase().contains(&query_lower))
+            .map(|a| KnowledgeMatch {
+                article_id: a.id.clone(),
+                title: a.title.clone(),
+                similarity: a.consolidation_strength as f32,
+                phi: a.phi,
+            })
+            .collect();
+        matches.sort_by(|a, b| {
+            b.phi
+                .partial_cmp(&a.phi)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        matches.truncate(k);
+        matches
+    }
+
     /// Add an article to the knowledge store.
     pub fn add_article(
         &mut self,
@@ -83,6 +113,27 @@ impl KnowledgeManager {
             consolidation_strength: 1.0,
             retrieval_count: 0,
             deprecated: false,
+            local_only: false,
+        });
+    }
+
+    /// Add a local-only article that will not appear in federated search results.
+    pub fn add_article_local_only(
+        &mut self,
+        id: String,
+        title: String,
+        category: SupportCategory,
+        phi: f64,
+    ) {
+        self.articles.push(StoredArticle {
+            id,
+            title,
+            category,
+            phi,
+            consolidation_strength: 1.0,
+            retrieval_count: 0,
+            deprecated: false,
+            local_only: true,
         });
     }
 
@@ -172,6 +223,22 @@ mod tests {
         let results = km.search("DNS", 10);
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].article_id, "2");
+    }
+
+    #[test]
+    fn search_filtered_excludes_local_only_when_sharing() {
+        let mut km = KnowledgeManager::new();
+        km.add_article("1".to_string(), "DNS Public Guide".to_string(), SupportCategory::Network, 0.7);
+        km.add_article_local_only("2".to_string(), "DNS Local Notes".to_string(), SupportCategory::Network, 0.8);
+
+        // When can_share=true, local-only articles are excluded
+        let shared = km.search_filtered("DNS", 10, true);
+        assert_eq!(shared.len(), 1);
+        assert_eq!(shared[0].article_id, "1");
+
+        // When can_share=false, all articles appear
+        let local = km.search_filtered("DNS", 10, false);
+        assert_eq!(local.len(), 2);
     }
 
     #[test]

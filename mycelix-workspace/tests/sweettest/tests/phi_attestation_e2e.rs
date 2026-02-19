@@ -1,8 +1,8 @@
-//! Phi Attestation E2E Sweettest Integration Tests
+//! Consciousness Attestation E2E Sweettest Integration Tests
 //!
-//! Tests the full Phi attestation flow:
-//!   1. Record a PhiAttestation via governance bridge
-//!   2. Verify consciousness gate using attested Phi (v2 API)
+//! Tests the full consciousness attestation flow:
+//!   1. Record a ConsciousnessAttestation via governance bridge
+//!   2. Verify consciousness gate using attested consciousness level (v2 API)
 //!   3. Validate provenance tracking (Attested vs Unavailable)
 //!   4. Cross-cluster: personal bridge submits attestation to governance
 //!
@@ -35,10 +35,10 @@ use serial_test::serial;
 // Mirror types — avoid WASM symbol conflicts by re-defining structs
 // ============================================================================
 
-/// Input for recording a Phi attestation (mirrors governance_bridge coordinator).
+/// Input for recording a consciousness attestation (mirrors governance_bridge coordinator).
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-struct RecordPhiAttestationInput {
-    phi: f64,
+struct RecordConsciousnessAttestationInput {
+    consciousness_level: f64,
     cycle_id: u64,
     captured_at_us: u64,
     signature: Vec<u8>,
@@ -63,16 +63,16 @@ enum GovernanceActionType {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 struct GateVerificationResultV2 {
     passed: bool,
-    phi: Option<f64>,
-    required_phi: f64,
-    provenance: PhiProvenance,
+    consciousness_level: Option<f64>,
+    required_consciousness: f64,
+    provenance: ConsciousnessProvenance,
     action_type: GovernanceActionType,
     failure_reason: Option<String>,
 }
 
-/// How the Phi value was obtained.
+/// How the consciousness value was obtained.
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize, PartialEq)]
-enum PhiProvenance {
+enum ConsciousnessProvenance {
     Attested,
     Snapshot,
     Unavailable,
@@ -92,13 +92,13 @@ async fn setup_governance_agent() -> TestAgent {
 // Dual-DNA setup (personal + governance) for cross-cluster tests
 // ============================================================================
 
-struct PhiTestAgent {
+struct ConsciousnessTestAgent {
     conductor: SweetConductor,
     personal_cell: SweetCell,
     governance_cell: SweetCell,
 }
 
-impl PhiTestAgent {
+impl ConsciousnessTestAgent {
     async fn call_personal<I, O>(&self, zome_name: &str, fn_name: &str, input: I) -> O
     where
         I: serde::Serialize + std::fmt::Debug,
@@ -118,7 +118,7 @@ impl PhiTestAgent {
     }
 }
 
-async fn setup_phi_test_conductor() -> PhiTestAgent {
+async fn setup_consciousness_test_conductor() -> ConsciousnessTestAgent {
     let personal_dna = SweetDnaFile::from_bundle(&DnaPaths::personal())
         .await
         .expect("Personal DNA required — run: hc dna pack mycelix-personal/dna/");
@@ -137,7 +137,7 @@ async fn setup_phi_test_conductor() -> PhiTestAgent {
 
     let cells = app.into_cells();
 
-    PhiTestAgent {
+    ConsciousnessTestAgent {
         conductor,
         personal_cell: cells[0].clone(),
         governance_cell: cells[1].clone(),
@@ -152,7 +152,7 @@ async fn setup_phi_test_conductor() -> PhiTestAgent {
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore] // Requires DNA bundle
-async fn test_record_phi_attestation() {
+async fn test_record_consciousness_attestation() {
     let agent = setup_governance_agent().await;
 
     // Build attestation message matching the canonical format
@@ -162,7 +162,7 @@ async fn test_record_phi_attestation() {
     let captured_at_us = 1708363200000000u64;
 
     let message = format!(
-        "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+        "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
         agent_did, phi, cycle_id, captured_at_us,
     );
 
@@ -176,20 +176,20 @@ async fn test_record_phi_attestation() {
         )
         .await;
 
-    let input = RecordPhiAttestationInput {
-        phi,
+    let input = RecordConsciousnessAttestationInput {
+        consciousness_level: phi,
         cycle_id,
         captured_at_us,
         signature: signature.0.to_vec(),
     };
 
     let result: Record = agent
-        .call_zome_fn("governance_bridge", "record_phi_attestation", input)
+        .call_zome_fn("governance_bridge", "record_consciousness_attestation", input)
         .await;
 
     assert!(
         !result.action_hashed().hash.as_ref().is_empty(),
-        "PhiAttestation record should have valid action hash"
+        "ConsciousnessAttestation record should have valid action hash"
     );
 }
 
@@ -207,7 +207,7 @@ async fn test_verify_gate_with_attestation() {
     let captured_at_us = 1708363200000000u64;
 
     let message = format!(
-        "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+        "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
         agent_did, phi, cycle_id, captured_at_us,
     );
 
@@ -223,9 +223,9 @@ async fn test_verify_gate_with_attestation() {
     let _: Record = agent
         .call_zome_fn(
             "governance_bridge",
-            "record_phi_attestation",
-            RecordPhiAttestationInput {
-                phi,
+            "record_consciousness_attestation",
+            RecordConsciousnessAttestationInput {
+                consciousness_level: phi,
                 cycle_id,
                 captured_at_us,
                 signature: signature.0.to_vec(),
@@ -247,8 +247,8 @@ async fn test_verify_gate_with_attestation() {
         .await;
 
     assert!(gate_result.passed, "Phi 0.75 should pass Voting threshold 0.4");
-    assert_eq!(gate_result.phi, Some(phi));
-    assert_eq!(gate_result.provenance, PhiProvenance::Attested);
+    assert_eq!(gate_result.consciousness_level, Some(phi));
+    assert_eq!(gate_result.provenance, ConsciousnessProvenance::Attested);
     assert!(gate_result.failure_reason.is_none());
 }
 
@@ -271,8 +271,8 @@ async fn test_verify_gate_no_attestation() {
         .await;
 
     assert!(!gate_result.passed, "Should fail without attestation data");
-    assert_eq!(gate_result.phi, None);
-    assert_eq!(gate_result.provenance, PhiProvenance::Unavailable);
+    assert_eq!(gate_result.consciousness_level, None);
+    assert_eq!(gate_result.provenance, ConsciousnessProvenance::Unavailable);
     assert!(gate_result.failure_reason.is_some());
 }
 
@@ -280,7 +280,7 @@ async fn test_verify_gate_no_attestation() {
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore] // Requires DNA bundle
-async fn test_verify_gate_insufficient_phi() {
+async fn test_verify_gate_insufficient_consciousness() {
     let agent = setup_governance_agent().await;
 
     // Record attestation with low Phi = 0.15
@@ -290,7 +290,7 @@ async fn test_verify_gate_insufficient_phi() {
     let captured_at_us = 1708363200000000u64;
 
     let message = format!(
-        "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+        "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
         agent_did, phi, cycle_id, captured_at_us,
     );
 
@@ -306,9 +306,9 @@ async fn test_verify_gate_insufficient_phi() {
     let _: Record = agent
         .call_zome_fn(
             "governance_bridge",
-            "record_phi_attestation",
-            RecordPhiAttestationInput {
-                phi,
+            "record_consciousness_attestation",
+            RecordConsciousnessAttestationInput {
+                consciousness_level: phi,
                 cycle_id,
                 captured_at_us,
                 signature: signature.0.to_vec(),
@@ -330,8 +330,8 @@ async fn test_verify_gate_insufficient_phi() {
         .await;
 
     assert!(!gate_result.passed, "Phi 0.15 should fail Voting threshold 0.4");
-    assert_eq!(gate_result.phi, Some(phi));
-    assert_eq!(gate_result.provenance, PhiProvenance::Attested);
+    assert_eq!(gate_result.consciousness_level, Some(phi));
+    assert_eq!(gate_result.provenance, ConsciousnessProvenance::Attested);
     assert!(gate_result.failure_reason.is_some());
 }
 
@@ -344,13 +344,13 @@ async fn test_verify_gate_insufficient_phi() {
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 #[ignore] // Requires both DNA bundles
-async fn test_cross_cluster_phi_attestation() {
-    let agent = setup_phi_test_conductor().await;
+async fn test_cross_cluster_consciousness_attestation() {
+    let agent = setup_consciousness_test_conductor().await;
 
-    // Input for submit_phi_attestation on personal bridge
+    // Input for submit_consciousness_attestation on personal bridge
     #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-    struct SubmitPhiAttestationInput {
-        phi: f64,
+    struct SubmitConsciousnessAttestationInput {
+        consciousness_level: f64,
         cycle_id: u64,
     }
 
@@ -362,13 +362,13 @@ async fn test_cross_cluster_phi_attestation() {
         error: Option<String>,
     }
 
-    let input = SubmitPhiAttestationInput {
-        phi: 0.82,
+    let input = SubmitConsciousnessAttestationInput {
+        consciousness_level: 0.82,
         cycle_id: 500,
     };
 
     let result: DispatchResult = agent
-        .call_personal("personal_bridge", "submit_phi_attestation", input)
+        .call_personal("personal_bridge", "submit_consciousness_attestation", input)
         .await;
 
     assert!(
@@ -394,7 +394,7 @@ async fn test_cross_cluster_phi_attestation() {
         gate_result.passed,
         "Phi 0.82 should pass Constitutional threshold 0.6"
     );
-    assert_eq!(gate_result.provenance, PhiProvenance::Attested);
+    assert_eq!(gate_result.provenance, ConsciousnessProvenance::Attested);
 }
 
 /// Test: Multi-agent attestation — two agents, different Phi values.
@@ -427,7 +427,7 @@ async fn test_multi_agent_attestation() {
     // Agent 1: high Phi
     let agent1_did = format!("did:mycelix:{}", cell1.agent_pubkey());
     let msg1 = format!(
-        "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+        "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
         agent1_did, 0.9f64, 1000u64, 1708363200000000u64,
     );
     let sig1: Signature = conductor1
@@ -437,9 +437,9 @@ async fn test_multi_agent_attestation() {
     let _: Record = conductor1
         .call(
             &cell1.zome("governance_bridge"),
-            "record_phi_attestation",
-            RecordPhiAttestationInput {
-                phi: 0.9,
+            "record_consciousness_attestation",
+            RecordConsciousnessAttestationInput {
+                consciousness_level: 0.9,
                 cycle_id: 1000,
                 captured_at_us: 1708363200000000,
                 signature: sig1.0.to_vec(),
@@ -447,10 +447,10 @@ async fn test_multi_agent_attestation() {
         )
         .await;
 
-    // Agent 2: low Phi
+    // Agent 2: low consciousness
     let agent2_did = format!("did:mycelix:{}", cell2.agent_pubkey());
     let msg2 = format!(
-        "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
+        "symthaea-consciousness-attestation:v1:{}:{:.6}:{}:{}",
         agent2_did, 0.1f64, 1001u64, 1708363200000000u64,
     );
     let sig2: Signature = conductor2
@@ -460,9 +460,9 @@ async fn test_multi_agent_attestation() {
     let _: Record = conductor2
         .call(
             &cell2.zome("governance_bridge"),
-            "record_phi_attestation",
-            RecordPhiAttestationInput {
-                phi: 0.1,
+            "record_consciousness_attestation",
+            RecordConsciousnessAttestationInput {
+                consciousness_level: 0.1,
                 cycle_id: 1001,
                 captured_at_us: 1708363200000000,
                 signature: sig2.0.to_vec(),

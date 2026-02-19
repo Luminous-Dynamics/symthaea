@@ -396,6 +396,11 @@ jobs:
           cd zomes/federated_learning && cargo test --lib --all-features -p federated_learning_integrity -p federated_learning && cd ../..
         working-directory: mycelix-core
 
+      - name: Run support zome unit tests
+        run: |
+          cargo test --lib -p support-types -p support_knowledge_integrity -p support_knowledge -p support_tickets_integrity -p support_tickets -p support_diagnostics_integrity -p support_diagnostics
+        working-directory: mycelix-commons
+
       - name: Run SDK unit tests
         run: cargo test --lib --features simulation
         working-directory: mycelix-workspace/sdk
@@ -1023,6 +1028,47 @@ jobs:
         working-directory: mycelix-personal
 
   # ============================================================================
+  # FL Feature Matrix (cargo-hack powerset testing)
+  # ============================================================================
+  fl-feature-matrix:
+    name: FL Feature Matrix
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mycelix-workspace
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-hack
+        run: cargo install cargo-hack --locked
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-fl-matrix-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Test mycelix-fl-core feature powerset
+        run: cargo hack test --feature-powerset --depth 2 -p mycelix-fl-core
+
+      - name: Test mycelix-fl feature powerset
+        run: cargo hack test --feature-powerset --depth 2 -p mycelix-fl
+
+      - name: Check mycelix-fl-proofs feature powerset
+        run: cargo hack check --feature-powerset --depth 2 -p mycelix-fl-proofs
+
+  # ============================================================================
   # CI Pass Check (ensures all required jobs succeed)
   # ============================================================================
   ci-pass:
@@ -1043,12 +1089,13 @@ jobs:
       - governance-tests
       - crypto-libs
       - personal-tests
+      - fl-feature-matrix
 
     steps:
       - name: Check all jobs passed
         uses: re-actors/alls-green@release/v1
         with:
-          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest
+          allowed-skips: smoke-tests, e2e-tests, sdk-eth, sweettest, fl-feature-matrix
           jobs: ${{ toJSON(needs) }}
 
       - name: Summary

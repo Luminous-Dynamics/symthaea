@@ -1,0 +1,135 @@
+{
+  "__type": "Map",
+  "entries": [
+    [
+      "uess:stats:local",
+      {
+        "data": {
+          "m": 1
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516453815,
+          "version": 1,
+          "createdBy": "stats-agent",
+          "tombstone": false,
+          "expiresAt": 1772121253815,
+          "cid": "cid:3227ed0614bb57255f2bde87551b9c1518eb4c8a4374cb40557d5bac62e7129f",
+          "sizeBytes": 7
+        },
+        "expiresAt": 1772121253815
+      }
+    ],
+    [
+      "uess:profile:alice",
+      {
+        "data": {
+          "name": "Alice"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 2,
+            "normative": 2,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "profile",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516518141,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:3cba1e3cf23c8ce24b7e08171d823fbd9a4929aafd9f27516e30699d3a42026a",
+          "sizeBytes": 16
+        },
+        "expiresAt": 1772121318144
+      }
+    ],
+    [
+      "uess:m1",
+      {
+        "data": {},
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "test",
+            "version": "1"
+          },
+          "storedAt": 1771516520676,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "expiresAt": 1772121320676,
+          "cid": "cid:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "sizeBytes": 2
+        },
+        "expiresAt": 1772121320676
+      }
+    ],
+    [
+      "uess:m2",
+      {
+        "data": {},
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 2
+          },
+          "schema": {
+            "id": "test",
+            "version": "1"
+          },
+          "storedAt": 1771516518199,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "sizeBytes": 2
+        },
+        "expiresAt": 1772121318203
+      }
+    ],
+    [
+      "uess:cache:user-prefs",
+      {
+        "data": {
+          "theme": "dark",
+          "language": "en"
+        },
+        "metadata": {
+          "classification": {
+            "empirical": 1,
+            "normative": 0,
+            "materiality": 1
+          },
+          "schema": {
+            "id": "preferences",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516520651,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "expiresAt": 1772121320651,
+          "cid": "cid:d000c3a62ce70f5ea240220649437c2c4852b6965200e6ff080b7b55d329ce25",
+          "sizeBytes": 32
+        },
+        "expiresAt": 1772121320651
+      }
+    ]
+  ]
+}

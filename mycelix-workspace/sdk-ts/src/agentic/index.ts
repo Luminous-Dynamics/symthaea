@@ -494,7 +494,7 @@ export function computeTrustScore(
     k_h: 0.10, // Historical
     k_topo: 0.05, // Topology
     k_v: 0.025, // Verification
-    k_phi: 0.025, // Coherence
+    k_coherence: 0.025, // Coherence
   };
 
   const mergedWeights = { ...defaultWeights, ...weights };

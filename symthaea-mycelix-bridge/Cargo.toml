@@ -11,6 +11,7 @@ categories = ["science", "cryptography"]
 
 [dependencies]
 symthaea-core = { path = "../symthaea/symthaea-core" }
+symthaea-support = { path = "../symthaea/crates/symthaea-support" }
 mycelix-sdk = { path = "../mycelix-workspace/sdk", default-features = false, features = ["standalone"] }
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core" }
 serde = { version = "1.0", features = ["derive"] }

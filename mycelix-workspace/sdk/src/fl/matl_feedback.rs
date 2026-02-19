@@ -25,7 +25,7 @@
 //! │                   ┌──────────────────┐                                          │
 //! │                   │ K-Vector Updates │                                          │
 //! │                   │ k_r, k_a, k_i,   │                                          │
-//! │                   │ k_p, k_phi       │                                          │
+//! │                   │ k_p, k_coherence       │                                          │
 //! │                   └──────────────────┘                                          │
 //! │                            │                                                     │
 //! │                            ▼                                                     │
@@ -397,7 +397,7 @@ pub struct KVectorDelta {
     pub performance_delta: f32,
     /// Delta for historical (k_h)
     pub historical_delta: f32,
-    /// Delta for coherence/phi (k_phi)
+    /// Delta for coherence/phi (k_coherence)
     pub coherence_delta: f32,
     /// Reason for this update
     pub reason: String,
@@ -525,7 +525,7 @@ impl KVectorDelta {
             (kvector.k_h + self.historical_delta).clamp(0.0, 1.0),
             kvector.k_topo, // Topology doesn't change from FL feedback
             kvector.k_v,    // Verification doesn't change from FL feedback
-            (kvector.k_phi + self.coherence_delta).clamp(0.0, 1.0),
+            (kvector.k_coherence + self.coherence_delta).clamp(0.0, 1.0),
         )
     }
 

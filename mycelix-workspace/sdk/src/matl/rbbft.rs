@@ -841,7 +841,7 @@ mod tests {
             k_h: 0.5,
             k_topo: 0.5,
             k_v: 0.5,
-            k_phi: 0.5,
+            k_coherence: 0.5,
         }
     }
 

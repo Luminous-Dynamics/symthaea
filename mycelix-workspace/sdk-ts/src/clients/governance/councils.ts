@@ -41,7 +41,7 @@ export interface Council {
   purpose: string;
   councilType: CouncilType;
   parentCouncilId?: string;
-  phiThreshold: number;
+  consciousnessThreshold: number;
   quorum: number;
   supermajority: number;
   canSpawnChildren: boolean;

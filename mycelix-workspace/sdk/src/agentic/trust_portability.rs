@@ -177,7 +177,7 @@ pub enum KVectorDimension {
     Topology,
     /// Validity dimension (k_v).
     Validity,
-    /// Composite Phi dimension (k_phi).
+    /// Composite Phi dimension (k_coherence).
     Phi,
 }
 

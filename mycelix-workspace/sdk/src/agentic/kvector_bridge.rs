@@ -205,7 +205,7 @@ pub fn compute_kvector_update(
 
     // k_v (verification) is preserved from current - it's not behavior-derived
     // Verification status comes from the Byzantine↔Identity bridge, not from behavior
-    // k_phi (coherence) is also preserved - it comes from Phi measurement
+    // k_coherence (coherence) is also preserved - it comes from Phi measurement
     KVector::new(
         new_k_r,
         new_k_a,
@@ -216,7 +216,7 @@ pub fn compute_kvector_update(
         new_k_h,
         new_k_topo,
         current.k_v,   // Preserve verification status
-        current.k_phi, // Preserve coherence (from Phi measurement)
+        current.k_coherence, // Preserve coherence (from Phi measurement)
     )
 }
 
@@ -452,7 +452,7 @@ pub fn compute_epistemic_weighted_kvector_update(
         new_k_h,
         behavior_kvector.k_topo,
         behavior_kvector.k_v,
-        behavior_kvector.k_phi, // Preserve coherence
+        behavior_kvector.k_coherence, // Preserve coherence
     )
 }
 
@@ -907,8 +907,8 @@ mod tests {
                 "k_topo out of bounds: {}", updated.k_topo);
             prop_assert!(updated.k_v >= 0.0 && updated.k_v <= 1.0,
                 "k_v out of bounds: {}", updated.k_v);
-            prop_assert!(updated.k_phi >= 0.0 && updated.k_phi <= 1.0,
-                "k_phi out of bounds: {}", updated.k_phi);
+            prop_assert!(updated.k_coherence >= 0.0 && updated.k_coherence <= 1.0,
+                "k_coherence out of bounds: {}", updated.k_coherence);
         }
 
         /// INVARIANT: Trust score is always in [0.0, 1.0]

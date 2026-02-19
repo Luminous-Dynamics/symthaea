@@ -497,7 +497,7 @@ impl Symthaea {
                     label: format!("wm_eviction_step_{interaction_count}"),
                     steps_survived: *steps_survived,
                     final_activation: 0.5,
-                    phi_at_graduation: current_phi,
+                    psi_at_graduation: current_phi,
                     coherence_at_graduation: current_coherence,
                 });
             }
@@ -535,7 +535,7 @@ impl Symthaea {
                             timestamp_ms,
                             valence: 0.0,
                             arousal: 0.0,
-                            phi: current_phi,
+                            psi: current_phi,
                             topics: vec![],
                             metadata: format!("{{\"steps_survived\":{steps}}}"),
                             consolidation_strength: 0.0,
@@ -608,13 +608,13 @@ impl Symthaea {
                             memory_type: MemoryType::Episodic,
                             encoding: ep.input.to_binary(0.0),
                             content: format!(
-                                "Episodic memory at step {interaction_count} (phi={:.3})",
-                                ep.phi
+                                "Episodic memory at step {interaction_count} (psi={:.3})",
+                                ep.psi
                             ),
                             timestamp_ms,
                             valence,
                             arousal: 0.0,
-                            phi: ep.phi,
+                            psi: ep.psi,
                             topics: vec![],
                             metadata: format!(
                                 "{{\"coherence\":{coherence},\"replay_count\":{}}}",
@@ -667,8 +667,8 @@ impl Symthaea {
                 .get(&detected_domain)
                 .and_then(|p| p.compute(content, &domain_entities));
 
-            let (computed_answer, cube, domain_phi) = match computed_result {
-                Some(cr) => (Some(cr.answer), Some(cr.cube), Some(cr.phi)),
+            let (computed_answer, cube, domain_psi) = match computed_result {
+                Some(cr) => (Some(cr.answer), Some(cr.cube), Some(cr.psi)),
                 None => (None, None, None),
             };
 
@@ -677,7 +677,7 @@ impl Symthaea {
                 entities,
                 computed_answer,
                 cube,
-                phi: domain_phi,
+                psi: domain_psi,
             });
         }
 
@@ -770,7 +770,7 @@ impl Symthaea {
         // ====================================================================
         // PHASE 7: PARTNERSHIP UPDATE
         // ====================================================================
-        let consciousness = thought.phi as f32;
+        let consciousness = thought.psi as f32;
         self.update_partnership(content, consciousness);
 
         // Track AI state for dyad computation
@@ -861,7 +861,7 @@ impl Symthaea {
             epistemic_status = ?thought.epistemic_status,
             semantic_intent = ?thought.semantic_intent,
             response_type = ?thought.response_type,
-            phi = thought.phi,
+            psi = thought.psi,
             coherence = thought.coherence,
             meta_awareness = thought.meta_awareness,
             relationship_stage = ?thought.relationship_stage,

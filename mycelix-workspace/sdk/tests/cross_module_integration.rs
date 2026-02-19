@@ -22,7 +22,7 @@ fn test_kvector_creation_and_trust_score() {
         0.6,  // k_h (historical)
         0.4,  // k_topo (topology)
         0.7,  // k_v (verification)
-        0.65, // k_phi (coherence)
+        0.65, // k_coherence (coherence)
     );
 
     let score = kv.trust_score();

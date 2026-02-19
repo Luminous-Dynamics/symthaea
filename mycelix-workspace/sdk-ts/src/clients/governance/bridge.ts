@@ -18,14 +18,14 @@ import type {
   BridgeProposalType,
   ParticipationScore,
   RecordSnapshotInput,
-  RecordPhiAttestationInput,
+  RecordConsciousnessAttestationInput,
   VerifyGateInput,
   GateVerificationResult,
   GateVerificationResultV2,
   AssessAlignmentInput,
   GetAgentSnapshotsInput,
-  PhiThresholds,
-  PhiProvenance,
+  ConsciousnessThresholds,
+  ConsciousnessProvenance,
   CalculateWeightInput,
   HolisticVotingWeight,
   CastWeightedVoteInput,
@@ -578,7 +578,7 @@ export class BridgeClient extends ZomeClient {
    */
   async recordConsciousnessSnapshot(input: RecordSnapshotInput): Promise<HolochainRecord> {
     return this.callZomeOnce<HolochainRecord>('record_consciousness_snapshot', {
-      phi: input.phi,
+      consciousness_level: input.consciousnessLevel,
       meta_awareness: input.metaAwareness,
       self_model_accuracy: input.selfModelAccuracy,
       coherence: input.coherence,
@@ -601,8 +601,8 @@ export class BridgeClient extends ZomeClient {
     });
     return {
       passed: result.passed,
-      phi: result.phi,
-      requiredPhi: result.required_phi,
+      consciousnessLevel: result.consciousness_level,
+      requiredConsciousness: result.required_consciousness,
       actionType: result.action_type,
       failureReason: result.failure_reason ?? undefined,
       gateId: result.gate_id,
@@ -610,18 +610,18 @@ export class BridgeClient extends ZomeClient {
   }
 
   /**
-   * Record an authenticated Phi attestation (preferred over consciousness snapshot)
+   * Record an authenticated consciousness attestation (preferred over consciousness snapshot)
    *
-   * Creates a signed attestation linking an agent's Symthaea Phi value
+   * Creates a signed attestation linking an agent's Symthaea consciousness level
    * to their governance identity. Preferred over `recordConsciousnessSnapshot`
    * because attestations include cryptographic signatures.
    *
-   * @param input - Attestation parameters (phi, cycleId, signature)
+   * @param input - Attestation parameters (consciousnessLevel, cycleId, signature)
    * @returns The attestation record
    */
-  async recordPhiAttestation(input: RecordPhiAttestationInput): Promise<HolochainRecord> {
-    return this.callZomeOnce<HolochainRecord>('record_phi_attestation', {
-      phi: input.phi,
+  async recordConsciousnessAttestation(input: RecordConsciousnessAttestationInput): Promise<HolochainRecord> {
+    return this.callZomeOnce<HolochainRecord>('record_consciousness_attestation', {
+      consciousness_level: input.consciousnessLevel,
       cycle_id: input.cycleId,
       captured_at_us: input.capturedAtUs,
       signature: input.signature,
@@ -631,9 +631,9 @@ export class BridgeClient extends ZomeClient {
   /**
    * Verify consciousness gate with provenance tracking (v2)
    *
-   * Returns the Phi value along with how it was obtained (Attested, Snapshot,
+   * Returns the consciousness level along with how it was obtained (Attested, Snapshot,
    * or Unavailable). Preferred over `verifyConsciousnessGate` because it
-   * honestly reports when no real Phi data is available.
+   * honestly reports when no real consciousness data is available.
    *
    * @param input - Gate verification parameters
    * @returns Gate verification result with provenance
@@ -645,9 +645,9 @@ export class BridgeClient extends ZomeClient {
     });
     return {
       passed: result.passed,
-      phi: result.phi ?? null,
-      requiredPhi: result.required_phi,
-      provenance: result.provenance as PhiProvenance,
+      consciousnessLevel: result.consciousness_level ?? null,
+      requiredConsciousness: result.required_consciousness,
+      provenance: result.provenance as ConsciousnessProvenance,
       actionType: result.action_type,
       failureReason: result.failure_reason ?? undefined,
     };
@@ -700,12 +700,12 @@ export class BridgeClient extends ZomeClient {
   }
 
   /**
-   * Get current Φ threshold requirements
+   * Get current consciousness threshold requirements
    *
-   * @returns Phi thresholds for each proposal tier
+   * @returns Consciousness thresholds for each proposal tier
    */
-  async getPhiThresholds(): Promise<PhiThresholds> {
-    const result = await this.callZome<any>('get_phi_thresholds', null);
+  async getConsciousnessThresholds(): Promise<ConsciousnessThresholds> {
+    const result = await this.callZome<any>('get_consciousness_thresholds', null);
     return {
       basic: result.basic,
       proposalSubmission: result.proposal_submission,
@@ -742,7 +742,7 @@ export class BridgeClient extends ZomeClient {
     return {
       reputation: result.reputation,
       reputationSquared: result.reputation_squared,
-      phi: result.phi,
+      consciousnessLevel: result.consciousness_level,
       consciousnessMultiplier: result.consciousness_multiplier,
       harmonicAlignment: result.harmonic_alignment,
       harmonicBonus: result.harmonic_bonus,
@@ -773,7 +773,7 @@ export class BridgeClient extends ZomeClient {
       weight: result.weight,
       weightBreakdown: result.weight_breakdown,
       decision: result.decision,
-      phiAtVote: result.phi_at_vote,
+      consciousnessAtVote: result.phi_at_vote,
       proposalType: result.proposal_type,
       thresholdRequired: result.threshold_required,
     };
@@ -789,7 +789,7 @@ export class BridgeClient extends ZomeClient {
     const result = await this.callZome<any>('get_adaptive_threshold', proposalType);
     return {
       baseThreshold: result.base_threshold,
-      minVoterPhi: result.min_voter_phi,
+      minVoterConsciousness: result.min_voter_consciousness,
       minParticipation: result.min_participation,
       quorum: result.quorum,
       maxExtensionSecs: result.max_extension_secs,
@@ -811,7 +811,7 @@ export class BridgeClient extends ZomeClient {
       streakCount: result.streak_count,
       streakBonus: result.streak_bonus,
       inCooldown: result.in_cooldown,
-      currentPhi: result.current_phi,
+      currentConsciousness: result.current_phi,
       federatedScore: result.federated_score,
       roundsParticipated: result.rounds_participated,
       successfulVotes: result.successful_votes,
@@ -911,11 +911,11 @@ export class BridgeClient extends ZomeClient {
   }
 
   /**
-   * Request a Phi credential from the personal cluster
+   * Request a consciousness credential from the personal cluster
    *
-   * @returns Phi credential presentation
+   * @returns Consciousness credential presentation
    */
-  async requestPhiCredential(): Promise<unknown> {
+  async requestConsciousnessCredential(): Promise<unknown> {
     return this.callZome('request_phi_credential', null);
   }
 

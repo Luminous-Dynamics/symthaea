@@ -146,7 +146,7 @@ pub struct ConsciousnessSnapshot {
     pub cognitive_depth: CognitiveDepth,
 
     /// Unified Φ from ConsciousnessUnificationEngine
-    pub unified_phi: f32,
+    pub unified_psi: f32,
 
     /// Unified emotional valence (VAD-based, -1.0 to 1.0)
     pub unified_valence: f32,

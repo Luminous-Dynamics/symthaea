@@ -20,7 +20,7 @@ pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult
     let snapshot = ConsciousnessSnapshot {
         id: format!("snapshot:{}:{}", agent_did, now.as_micros()),
         agent_did: agent_did.clone(),
-        phi: input.phi,
+        consciousness_level: input.consciousness_level,
         meta_awareness: input.meta_awareness,
         self_model_accuracy: input.self_model_accuracy,
         coherence: input.coherence,
@@ -34,7 +34,7 @@ pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult
 
     let _ = emit_signal(&BridgeSignal::ConsciousnessSnapshotRecorded {
         agent_did: agent_did.clone(),
-        phi: input.phi,
+        consciousness_level: input.consciousness_level,
     });
 
     // Link from agent to snapshot
@@ -62,7 +62,7 @@ pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct RecordSnapshotInput {
-    pub phi: f64,
+    pub consciousness_level: f64,
     pub meta_awareness: f64,
     pub self_model_accuracy: f64,
     pub coherence: f64,
@@ -85,10 +85,10 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
     let latest_snapshot = get_latest_agent_snapshot(&agent_did)?;
 
     // Use dynamic (configurable) threshold
-    let dynamic_threshold = get_dynamic_phi_threshold(&input.action_type)?;
+    let dynamic_threshold = get_dynamic_consciousness_gate(&input.action_type)?;
 
-    let (_snapshot, snapshot_id, phi) = match latest_snapshot {
-        Some((_record, snap)) => (Some(snap.clone()), snap.id.clone(), snap.phi),
+    let (_snapshot, snapshot_id, consciousness_level) = match latest_snapshot {
+        Some((_record, snap)) => (Some(snap.clone()), snap.id.clone(), snap.consciousness_level),
         None => {
             // No snapshot available - gate fails
             let gate = ConsciousnessGate {
@@ -96,8 +96,8 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
                 agent_did: agent_did.clone(),
                 action_type: input.action_type,
                 snapshot_id: "none".to_string(),
-                phi_at_verification: 0.0,
-                required_phi: dynamic_threshold,
+                consciousness_at_verification: 0.0,
+                required_consciousness: dynamic_threshold,
                 passed: false,
                 failure_reason: Some("No consciousness snapshot available".to_string()),
                 action_id: input.action_id.clone(),
@@ -118,8 +118,8 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
 
             return Ok(GateVerificationResult {
                 passed: false,
-                phi: 0.0,
-                required_phi: dynamic_threshold,
+                consciousness_level: 0.0,
+                required_consciousness: dynamic_threshold,
                 action_type: input.action_type,
                 failure_reason: Some("No consciousness snapshot available".to_string()),
                 gate_id: gate.id,
@@ -127,14 +127,14 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
         }
     };
 
-    let required_phi = dynamic_threshold;
-    let passed = phi >= required_phi;
+    let required_consciousness = dynamic_threshold;
+    let passed = consciousness_level >= required_consciousness;
     let failure_reason = if passed {
         None
     } else {
         Some(format!(
-            "Φ {} below threshold {} for {:?}",
-            phi, required_phi, input.action_type
+            "Consciousness {} below gate {} for {:?}",
+            consciousness_level, required_consciousness, input.action_type
         ))
     };
 
@@ -145,8 +145,8 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
         agent_did: agent_did.clone(),
         action_type: input.action_type,
         snapshot_id,
-        phi_at_verification: phi,
-        required_phi,
+        consciousness_at_verification: consciousness_level,
+        required_consciousness,
         passed,
         failure_reason: failure_reason.clone(),
         action_id: input.action_id,
@@ -173,8 +173,8 @@ pub fn verify_consciousness_gate(input: VerifyGateInput) -> ExternResult<GateVer
 
     Ok(GateVerificationResult {
         passed,
-        phi,
-        required_phi,
+        consciousness_level,
+        required_consciousness,
         action_type: input.action_type,
         failure_reason,
         gate_id: gate.id,
@@ -190,8 +190,8 @@ pub struct VerifyGateInput {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GateVerificationResult {
     pub passed: bool,
-    pub phi: f64,
-    pub required_phi: f64,
+    pub consciousness_level: f64,
+    pub required_consciousness: f64,
     pub action_type: GovernanceActionType,
     pub failure_reason: Option<String>,
     pub gate_id: String,
@@ -378,20 +378,20 @@ pub fn get_proposal_alignments(proposal_id: String) -> ExternResult<Vec<Record>>
     Ok(alignments)
 }
 
-/// Get current Φ threshold requirements (dynamic, reads from GovernancePhiConfig)
+/// Get current consciousness gate requirements (dynamic, reads from GovernanceConsciousnessConfig)
 #[hdk_extern]
-pub fn get_phi_thresholds(_: ()) -> ExternResult<PhiThresholds> {
-    let config = get_current_phi_config()?;
-    Ok(PhiThresholds {
-        basic: config.phi_basic,
-        proposal_submission: config.phi_proposal_submission,
-        voting: config.phi_voting,
-        constitutional: config.phi_constitutional,
+pub fn get_consciousness_thresholds(_: ()) -> ExternResult<ConsciousnessThresholdSummary> {
+    let config = get_current_consciousness_config()?;
+    Ok(ConsciousnessThresholdSummary {
+        basic: config.consciousness_gate_basic,
+        proposal_submission: config.consciousness_gate_proposal,
+        voting: config.consciousness_gate_voting,
+        constitutional: config.consciousness_gate_constitutional,
     })
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PhiThresholds {
+pub struct ConsciousnessThresholdSummary {
     pub basic: f64,
     pub proposal_submission: f64,
     pub voting: f64,

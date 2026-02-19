@@ -710,7 +710,7 @@ mod tests {
                 vec![ParticipantWeightAdjustment {
                     weight_multiplier: 0.5,
                     veto: false,
-                    source: "phi".to_string(),
+                    source: "consciousness_gate".to_string(),
                 }],
             );
         }

@@ -262,7 +262,7 @@ impl ReplOrchestrator {
                    Valence:               {:.2}\n\
                    Arousal:               {:.2}\n\
                    Action Hint:           {:?}\n",
-                s.unified_phi,
+                s.unified_psi,
                 s.temporal_coherence,
                 s.consciousness_level,
                 s.pattern,
@@ -387,7 +387,7 @@ impl ReplOrchestrator {
             let initial = session.consciousness_state();
             println!(
                 "Ready. Initial state: Phi={:.4}, Coherence={:.4}, Pattern={:?}\n",
-                initial.unified_phi, initial.temporal_coherence, initial.pattern
+                initial.unified_psi, initial.temporal_coherence, initial.pattern
             );
         }
 
@@ -439,7 +439,7 @@ impl ReplOrchestrator {
             println!("\n  Final Session Summary:");
             println!("  ────────────────────────");
             println!("    Interactions:     {}", stats.total_interactions);
-            println!("    Final Phi:        {:.4}", final_state.unified_phi);
+            println!("    Final Phi:        {:.4}", final_state.unified_psi);
             println!("    Time in Flow:     {:.1}s", stats.total_flow_time_secs);
         }
 
@@ -474,7 +474,7 @@ impl ReplOrchestrator {
 
         // Add consciousness header if available
         if let Some(ref c) = result.consciousness {
-            let phi_bar = Self::create_bar(c.unified_phi, 10);
+            let phi_bar = Self::create_bar(c.unified_psi, 10);
             let coh_bar = Self::create_bar(c.temporal_coherence, 10);
             let flow = if c.in_flow { "FLOW" } else { "----" };
             let depth = match c.cognitive_depth {
@@ -485,7 +485,7 @@ impl ReplOrchestrator {
 
             output.push_str(&format!(
                 "\n[Phi:{:.2}|{}] [Coh:{:.2}|{}] [{}] [D:{}] [{}ms]\n",
-                c.unified_phi,
+                c.unified_psi,
                 phi_bar,
                 c.temporal_coherence,
                 coh_bar,

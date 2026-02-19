@@ -1039,7 +1039,7 @@ pub enum PhiRecommendation {
 }
 
 /// Check if an agent can participate in FL based on Phi coherence
-pub fn check_phi_participation(phi: f64) -> PhiParticipationResult {
+pub fn check_coherence_participation(phi: f64) -> PhiParticipationResult {
     if phi < phi_thresholds::CRITICAL {
         return PhiParticipationResult {
             allowed: false,
@@ -1185,7 +1185,7 @@ pub fn phi_filter_updates(updates: &[EpistemicGradientUpdate]) -> Vec<(usize, f6
         .enumerate()
         .filter_map(|(idx, update)| {
             let phi = update.agent_phi.unwrap_or(0.5); // Default to medium
-            let check = check_phi_participation(phi);
+            let check = check_coherence_participation(phi);
             if check.allowed {
                 Some((idx, check.phi_multiplier))
             } else {

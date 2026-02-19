@@ -560,7 +560,7 @@ impl TrustProverService {
         self.client.prove(input).map_err(Into::into)
     }
 
-    /// Prove agent is highly coherent (k_phi >= 0.7)
+    /// Prove agent is highly coherent (k_coherence >= 0.7)
     pub fn prove_is_coherent(
         &self,
         kvector: &SdkKVector,

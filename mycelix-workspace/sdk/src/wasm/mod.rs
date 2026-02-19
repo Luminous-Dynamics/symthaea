@@ -49,7 +49,7 @@ pub struct WasmKVector {
     k_h: f64,
     k_topo: f64,
     k_v: f64,
-    k_phi: f64,
+    k_coherence: f64,
 }
 
 #[cfg(feature = "wasm")]
@@ -67,7 +67,7 @@ impl WasmKVector {
         k_h: f64,
         k_topo: f64,
         k_v: f64,
-        k_phi: f64,
+        k_coherence: f64,
     ) -> WasmKVector {
         WasmKVector {
             k_r: k_r.clamp(0.0, 1.0),
@@ -79,7 +79,7 @@ impl WasmKVector {
             k_h: k_h.clamp(0.0, 1.0),
             k_topo: k_topo.clamp(0.0, 1.0),
             k_v: k_v.clamp(0.0, 1.0),
-            k_phi: k_phi.clamp(0.0, 1.0),
+            k_coherence: k_coherence.clamp(0.0, 1.0),
         }
     }
 
@@ -96,7 +96,7 @@ impl WasmKVector {
             k_h: 0.5,
             k_topo: 0.5,
             k_v: 0.5,
-            k_phi: 0.5,
+            k_coherence: 0.5,
         }
     }
 
@@ -168,15 +168,15 @@ impl WasmKVector {
 
     /// Get phi/coherence dimension
     #[wasm_bindgen(getter)]
-    pub fn k_phi(&self) -> f64 {
-        self.k_phi
+    pub fn k_coherence(&self) -> f64 {
+        self.k_coherence
     }
 
     /// Convert to JSON string
     #[wasm_bindgen(js_name = toJSON)]
     pub fn to_json(&self) -> String {
         format!(
-            r#"{{"k_r":{},"k_a":{},"k_i":{},"k_p":{},"k_m":{},"k_s":{},"k_h":{},"k_topo":{},"k_v":{},"k_phi":{}}}"#,
+            r#"{{"k_r":{},"k_a":{},"k_i":{},"k_p":{},"k_m":{},"k_s":{},"k_h":{},"k_topo":{},"k_v":{},"k_coherence":{}}}"#,
             self.k_r,
             self.k_a,
             self.k_i,
@@ -186,7 +186,7 @@ impl WasmKVector {
             self.k_h,
             self.k_topo,
             self.k_v,
-            self.k_phi
+            self.k_coherence
         )
     }
 }
@@ -210,7 +210,7 @@ pub fn wasm_compute_trust_score(kvector: &WasmKVector) -> f64 {
         (kvector.k_h, 0.10),    // Historical
         (kvector.k_topo, 0.05), // Topology
         (kvector.k_v, 0.025),   // Verification
-        (kvector.k_phi, 0.025), // Coherence
+        (kvector.k_coherence, 0.025), // Coherence
     ];
 
     let total_weight: f64 = weights.iter().map(|(_, w)| w).sum();
@@ -245,7 +245,7 @@ pub fn wasm_compute_trust_score_weighted(
         (kvector.k_h, w_h),
         (kvector.k_topo, w_topo),
         (kvector.k_v, w_v),
-        (kvector.k_phi, w_phi),
+        (kvector.k_coherence, w_phi),
     ];
 
     let total_weight: f64 = weights.iter().map(|(_, w)| w).sum();

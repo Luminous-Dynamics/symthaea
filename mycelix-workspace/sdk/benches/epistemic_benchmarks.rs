@@ -11,9 +11,9 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use mycelix_sdk::agentic::{
     analyze_behavior, calculate_kredit_from_trust, compute_kvector_update, compute_trust_score,
-    measure_phi_simple, ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentOutput,
+    measure_coherence, ActionOutcome, AgentClass, AgentConstraints, AgentId, AgentOutput,
     AgentOutputBuilder, AgentStatus, InstrumentalActor, KVectorBridgeConfig, OutputContent,
-    PhiMeasurementConfig,
+    CoherenceMeasurementConfig,
 };
 use mycelix_sdk::epistemic::{
     EmpiricalLevel, EpistemicClassification, HarmonicLevel, MaterialityLevel, NormativeLevel,
@@ -90,7 +90,7 @@ fn bench_kredit_derivation(c: &mut Criterion) {
 /// Benchmark Phi coherence measurement with varying output counts
 fn bench_phi_measurement(c: &mut Criterion) {
     let mut group = c.benchmark_group("phi_measurement");
-    let config = PhiMeasurementConfig::default();
+    let config = CoherenceMeasurementConfig::default();
 
     for output_count in [5, 10, 20, 50].iter() {
         let outputs = create_test_outputs(*output_count);
@@ -98,7 +98,7 @@ fn bench_phi_measurement(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::new("outputs", output_count),
             output_count,
-            |b, _| b.iter(|| measure_phi_simple(black_box(&outputs), black_box(&config))),
+            |b, _| b.iter(|| measure_coherence(black_box(&outputs), black_box(&config))),
         );
     }
 

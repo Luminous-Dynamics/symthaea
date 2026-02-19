@@ -20,8 +20,8 @@
 //! - **Harmonic Weight**: trust × phi_contribution × epistemic_factors
 
 use super::multi_agent::{AgentVote, ConsensusConfig, ConsensusResult};
-use super::phi_integration::{
-    measure_collective_phi, CollectiveCoherenceLevel, CollectivePhiResult,
+use super::coherence_integration::{
+    measure_collective_coherence, CollectiveCoherenceLevel, CollectiveCoherenceResult,
 };
 use super::{AgentStatus, InstrumentalActor};
 use crate::matl::KVector;
@@ -45,7 +45,7 @@ pub struct PhiConsensusConfig {
 
     /// Minimum population Phi to proceed with consensus
     /// If collective coherence is below this, consensus is deferred
-    pub min_population_phi: f64,
+    pub min_population_coherence: f64,
 
     /// Weight of phi contribution in final vote weight (0.0-1.0)
     /// Higher = harmony matters more, Lower = individual trust matters more
@@ -66,7 +66,7 @@ impl Default for PhiConsensusConfig {
     fn default() -> Self {
         Self {
             base_config: ConsensusConfig::default(),
-            min_population_phi: 0.3,
+            min_population_coherence: 0.3,
             phi_contribution_weight: 0.4,
             divergence_threshold: 0.3,
             coherence_confidence_boost: 0.2,
@@ -85,7 +85,7 @@ impl PhiConsensusConfig {
                 min_participants: 5,
                 ..Default::default()
             },
-            min_population_phi: 0.6,
+            min_population_coherence: 0.6,
             phi_contribution_weight: 0.5,
             divergence_threshold: 0.4,
             coherence_confidence_boost: 0.3,
@@ -102,7 +102,7 @@ impl PhiConsensusConfig {
                 min_participants: 2,
                 ..Default::default()
             },
-            min_population_phi: 0.2,
+            min_population_coherence: 0.2,
             phi_contribution_weight: 0.2,
             divergence_threshold: 0.2,
             coherence_confidence_boost: 0.1,
@@ -141,7 +141,7 @@ pub struct PhiContribution {
 pub fn compute_phi_contributions(
     agents: &HashMap<String, InstrumentalActor>,
     config: &PhiConsensusConfig,
-) -> (CollectivePhiResult, HashMap<String, PhiContribution>) {
+) -> (CollectiveCoherenceResult, HashMap<String, PhiContribution>) {
     let active_agents: Vec<&InstrumentalActor> = agents
         .values()
         .filter(|a| a.status == AgentStatus::Active)
@@ -149,10 +149,10 @@ pub fn compute_phi_contributions(
 
     if active_agents.is_empty() {
         return (
-            CollectivePhiResult {
-                population_phi: 0.0,
-                average_individual_phi: 0.0,
-                phi_variance: 0.0,
+            CollectiveCoherenceResult {
+                population_coherence: 0.0,
+                average_individual_coherence: 0.0,
+                coherence_variance: 0.0,
                 emergent_integration: 0.0,
                 coherence_level: CollectiveCoherenceLevel::Fragmented,
                 agent_count: 0,
@@ -163,7 +163,7 @@ pub fn compute_phi_contributions(
     }
 
     // Measure collective Phi with all agents
-    let collective = measure_collective_phi(&active_agents.to_vec());
+    let collective = measure_collective_coherence(&active_agents.to_vec());
 
     // Compute centroid K-Vector
     let centroid = compute_kvector_centroid(&active_agents);
@@ -232,7 +232,7 @@ fn compute_kvector_centroid(agents: &[&InstrumentalActor]) -> KVector {
         sum[6] / n,
         sum[7] / n,
         0.0, // k_v placeholder
-        0.5, // k_phi - default moderate coherence for consensus
+        0.5, // k_coherence - default moderate coherence for consensus
     )
 }
 
@@ -304,7 +304,7 @@ pub struct PhiConsensusResult {
     pub consensus: ConsensusResult,
 
     /// Collective Phi metrics
-    pub collective_phi: CollectivePhiResult,
+    pub collective_phi: CollectiveCoherenceResult,
 
     /// Status of the phi-weighted consensus
     pub status: PhiConsensusStatus,
@@ -368,7 +368,7 @@ pub fn compute_phi_weighted_consensus(
     let (collective_phi, phi_contributions) = compute_phi_contributions(agents, config);
 
     // Step 2: Check population phi gate
-    if collective_phi.population_phi < config.min_population_phi {
+    if collective_phi.population_coherence < config.min_population_coherence {
         return PhiConsensusResult {
             consensus: empty_consensus_result(votes.len()),
             collective_phi,
@@ -389,7 +389,7 @@ pub fn compute_phi_weighted_consensus(
 
     // Step 3: Check required coherence level
     if let Some(required_level) = config.require_coherence_level {
-        if collective_phi.population_phi < required_level.threshold() {
+        if collective_phi.population_coherence < required_level.threshold() {
             return PhiConsensusResult {
                 consensus: empty_consensus_result(votes.len()),
                 collective_phi,
@@ -506,7 +506,7 @@ pub fn compute_phi_weighted_consensus(
     let base_confidence = agreement_factor * trust_factor;
 
     // Boost confidence by collective coherence
-    let coherence_boost = collective_phi.population_phi * config.coherence_confidence_boost;
+    let coherence_boost = collective_phi.population_coherence * config.coherence_confidence_boost;
     let harmonic_confidence = (base_confidence * (1.0 + coherence_boost)).min(1.0);
 
     // Step 10: Determine status
@@ -585,7 +585,7 @@ pub fn get_recommendation(result: &PhiConsensusResult) -> PhiConsensusRecommenda
         PhiConsensusStatus::DeferredLowCoherence => PhiConsensusRecommendation::Defer {
             reason: format!(
                 "Population Phi ({:.2}) below threshold ({:.2})",
-                result.collective_phi.population_phi,
+                result.collective_phi.population_coherence,
                 0.3 // Would need config here
             ),
             suggested_wait: 300, // 5 minutes
@@ -709,7 +709,7 @@ mod tests {
         let (collective, contributions) = compute_phi_contributions(&agents, &config);
 
         // Should have high population phi (similar agents)
-        assert!(collective.population_phi > 0.5);
+        assert!(collective.population_coherence > 0.5);
         assert_eq!(contributions.len(), 3);
 
         // All should have high contribution (similar to each other)
@@ -864,7 +864,7 @@ mod tests {
         // Use config with threshold we know will fail based on the divergent agents
         let config = PhiConsensusConfig {
             base_config: ConsensusConfig::default(),
-            min_population_phi: 0.95, // Very high threshold - almost impossible to reach
+            min_population_coherence: 0.95, // Very high threshold - almost impossible to reach
             phi_contribution_weight: 0.4,
             divergence_threshold: 0.3,
             coherence_confidence_boost: 0.2,
@@ -875,9 +875,9 @@ mod tests {
         // Should be deferred due to population phi below 0.95
         assert!(
             matches!(result.status, PhiConsensusStatus::DeferredLowCoherence),
-            "Expected DeferredLowCoherence, got {:?} with population_phi={:.3}",
+            "Expected DeferredLowCoherence, got {:?} with population_coherence={:.3}",
             result.status,
-            result.collective_phi.population_phi
+            result.collective_phi.population_coherence
         );
     }
 

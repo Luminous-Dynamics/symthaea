@@ -615,7 +615,7 @@ impl DomainPlugin for MathPlugin {
                     return Some(ComputedResult {
                         answer: format!("{} {} {} = {}", a, op_display, b, assertion.object),
                         cube: math_cube,
-                        phi: assertion.phi,
+                        psi: assertion.phi,
                         proof_available: assertion.proof_source.is_some(),
                     });
                 }
@@ -629,7 +629,7 @@ impl DomainPlugin for MathPlugin {
                 return Some(ComputedResult {
                     answer: format!("d/dx [{poly_str}] = {deriv_str}"),
                     cube: math_cube,
-                    phi: 0.0,
+                    psi: 0.0,
                     proof_available: false,
                 });
             }

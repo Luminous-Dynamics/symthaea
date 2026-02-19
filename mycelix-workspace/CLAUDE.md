@@ -66,9 +66,9 @@ Composite = 0.4·PoGQ + 0.3·Consistency + 0.3·Reputation
 ### FL Consciousness Plugin (`mycelix-fl-core`)
 ```
 Pipeline: Validate → DP → Gate → Detect → Trim → Aggregate
-Plugins: ConsciousnessAwareByzantinePlugin (Phi → weight), MetaLearningByzantinePlugin (EMA history)
+Plugins: ConsciousnessAwareByzantinePlugin (consciousness score → weight), MetaLearningByzantinePlugin (EMA history)
 ```
-- `consciousness_plugin.rs`: Maps Phi scores to boost/dampen/veto (thresholds: 0.1 veto, 0.3 dampen, 0.6 boost)
+- `consciousness_plugin.rs`: Maps consciousness scores to boost/dampen/veto (thresholds: 0.1 veto, 0.3 dampen, 0.6 boost)
 - Composable: multiple `ByzantinePlugin` instances via `PipelinePlugins.byzantine` vec
 
 ---

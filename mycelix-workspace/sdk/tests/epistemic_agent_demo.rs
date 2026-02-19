@@ -14,9 +14,9 @@
 use mycelix_sdk::agentic::{
     analyze_behavior, calculate_epistemic_weight, calculate_kredit_from_trust,
     check_coherence_for_action, compute_kvector_update, compute_trust_score, get_recommendations,
-    maybe_escalate, measure_phi_simple, should_proceed, ActionOutcome, AgentClass,
+    maybe_escalate, measure_coherence, should_proceed, ActionOutcome, AgentClass,
     AgentConstraints, AgentId, AgentOutput, AgentOutputBuilder, AgentStatus, InstrumentalActor,
-    KVectorBridgeConfig, MoralUncertainty, OutputContent, PhiMeasurementConfig, UncertainOutput,
+    KVectorBridgeConfig, MoralUncertainty, OutputContent, CoherenceMeasurementConfig, UncertainOutput,
 };
 use mycelix_sdk::epistemic::{
     EmpiricalLevel, EpistemicClassification, HarmonicLevel, MaterialityLevel, NormativeLevel,
@@ -199,10 +199,10 @@ fn demo_complete_epistemic_agent_flow() {
     println!("PHASE 5: Phi Coherence Measurement");
     println!("{}", "-".repeat(70));
 
-    let phi_config = PhiMeasurementConfig::default();
+    let phi_config = CoherenceMeasurementConfig::default();
 
     // Measure Phi from the outputs (need at least 3 for default config)
-    if let Some(phi_result) = measure_phi_simple(&outputs, &phi_config) {
+    if let Some(phi_result) = measure_coherence(&outputs, &phi_config) {
         println!("Phi (coherence):   {:.3}", phi_result.phi);
         println!("Coherence State:   {:?}", phi_result.coherence_state);
         println!("Sample Size:       {}", phi_result.sample_size);

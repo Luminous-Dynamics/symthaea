@@ -42,7 +42,7 @@ pub fn register_consensus_participant(_: ()) -> ExternResult<Record> {
 
     // Get latest consciousness snapshot (if any) for initial phi
     let phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
+        Some((_, snapshot)) => snapshot.consciousness_level,
         None => 0.3, // Default for new participants
     };
 
@@ -103,7 +103,7 @@ pub fn calculate_holistic_vote_weight(input: CalculateWeightInput) -> ExternResu
 
     // Get latest consciousness Φ
     let phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
+        Some((_, snapshot)) => snapshot.consciousness_level,
         None => participant.phi,
     };
 
@@ -151,16 +151,16 @@ pub fn cast_weighted_vote(input: CastWeightedVoteInput) -> ExternResult<Weighted
 
     // Get latest consciousness Φ
     let phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
+        Some((_, snapshot)) => snapshot.consciousness_level,
         None => participant.phi,
     };
 
-    // Verify consciousness gate using dynamic (configurable) min voter phi
-    let dynamic_min_phi = get_dynamic_min_voter_phi(&input.proposal_type)?;
-    if phi < dynamic_min_phi {
+    // Verify consciousness gate using dynamic (configurable) min voter consciousness
+    let dynamic_min_consciousness = get_dynamic_min_voter_consciousness(&input.proposal_type)?;
+    if phi < dynamic_min_consciousness {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Consciousness Φ ({:.2}) below threshold ({:.2}) for {:?} proposals",
-            phi, dynamic_min_phi, input.proposal_type
+            "Consciousness ({:.2}) below gate ({:.2}) for {:?} proposals",
+            phi, dynamic_min_consciousness, input.proposal_type
         ))));
     }
 
@@ -264,7 +264,7 @@ pub fn get_participant_status(_: ()) -> ExternResult<ParticipantStatus> {
 
     // Get latest consciousness Φ
     let current_phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
+        Some((_, snapshot)) => snapshot.consciousness_level,
         None => participant.phi,
     };
 
@@ -273,15 +273,15 @@ pub fn get_participant_status(_: ()) -> ExternResult<ParticipantStatus> {
     let streak_bonus = participant.streak_bonus();
 
     // Check voting eligibility using dynamic (configurable) thresholds
-    let phi_config = get_current_phi_config()?;
+    let consciousness_config = get_current_consciousness_config()?;
     let can_vote_standard = participant.can_vote() &&
-        current_phi >= phi_config.min_voter_phi_for(&ProposalType::Standard);
+        current_phi >= consciousness_config.min_voter_consciousness_for(&ProposalType::Standard);
 
     let can_vote_emergency = participant.can_vote() &&
-        current_phi >= phi_config.min_voter_phi_for(&ProposalType::Emergency);
+        current_phi >= consciousness_config.min_voter_consciousness_for(&ProposalType::Emergency);
 
     let can_vote_constitutional = participant.can_vote() &&
-        current_phi >= phi_config.min_voter_phi_for(&ProposalType::Constitutional);
+        current_phi >= consciousness_config.min_voter_consciousness_for(&ProposalType::Constitutional);
 
     Ok(ParticipantStatus {
         agent_did,

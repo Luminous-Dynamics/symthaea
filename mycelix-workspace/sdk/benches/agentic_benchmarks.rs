@@ -19,7 +19,7 @@ use mycelix_sdk::agentic::{
     update_kvector_from_behavior, ActionOutcome, AgentClass, AgentConstraints, AgentId,
     AgentOutput, AgentStatus, BehaviorLogEntry, CoherenceState, EpistemicStats, EscalationRequest,
     GamingDetectionConfig, GamingDetector, InstrumentalActor, KVectorBridgeConfig,
-    MoralActionGuidance, MoralUncertainty, MoralUncertaintyType, PhiMeasurementConfig,
+    MoralActionGuidance, MoralUncertainty, MoralUncertaintyType, CoherenceMeasurementConfig,
     UncertaintyCalibration,
 };
 use mycelix_sdk::matl::KVector;

@@ -41,9 +41,9 @@ pub mod monitoring;
 pub mod multi_agent;
 pub mod orchestration;
 pub mod persistence;
-pub mod phi_bridge;
+pub mod coherence_bridge;
+pub mod coherence_integration;
 pub mod phi_consensus;
-pub mod phi_integration;
 pub mod provenance;
 pub mod simulation;
 pub mod temporal_trust;
@@ -453,9 +453,9 @@ pub use persistence::{
     PersistenceError,
     PersistenceResult,
 };
-pub use phi_bridge::{
-    check_coherence_for_action, measure_phi_simple, output_to_vector, phi_to_kvector_dimension,
-    AgentPhiResult, CoherenceCheckResult, CoherenceHistory, CoherenceState, PhiMeasurementConfig,
+pub use coherence_bridge::{
+    check_coherence_for_action, measure_coherence, output_to_vector, coherence_to_kvector_dimension,
+    AgentCoherenceResult, CoherenceCheckResult, CoherenceHistory, CoherenceState, CoherenceMeasurementConfig,
 };
 pub use phi_consensus::{
     compute_phi_contributions,
@@ -472,28 +472,23 @@ pub use phi_consensus::{
     // Phi contribution analysis
     PhiContribution,
 };
-#[allow(deprecated)]
-pub use phi_integration::{
-    check_phi_gating,
-    cluster_agents_by_phi,
-    measure_collective_phi,
+pub use coherence_integration::{
+    check_coherence_gating,
+    cluster_agents_by_coherence,
+    measure_collective_coherence,
     CollectiveCoherenceLevel,
-    // Collective Phi
-    CollectivePhiResult,
+    // Collective Coherence
+    CollectiveCoherenceResult,
     EmergentBehavior,
-    EmergentBehaviorDetector,
     // Emergent behavior detection
     EmergentBehaviorType,
-    PhiCluster,
+    CoherenceCluster,
     // Clustering
-    PhiClusterResult,
-    PhiEvolutionSummary,
-    // Temporal analysis
-    PhiEvolutionTracker,
-    // Phi-gated actions
-    PhiGatingConfig,
-    PhiGatingRecommendation,
-    PhiGatingResult,
+    CoherenceClusterResult,
+    // Coherence-gated actions
+    CoherenceGatingConfig,
+    CoherenceGatingRecommendation,
+    CoherenceGatingResult,
     StakesLevel,
 };
 pub use provenance::{
@@ -748,7 +743,7 @@ pub struct InstrumentalActor {
     pub last_activity: u64,
     /// Actions this hour (for rate limiting)
     pub actions_this_hour: u32,
-    /// K-Vector trust profile (10 dimensions including k_phi coherence)
+    /// K-Vector trust profile (10 dimensions including k_coherence coherence)
     /// Evolves based on behavioral outcomes
     pub k_vector: KVector,
     /// Epistemic statistics tracking agent output quality

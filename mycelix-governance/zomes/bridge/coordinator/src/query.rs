@@ -163,10 +163,10 @@ pub fn request_execution(input: RequestExecutionInput) -> ExternResult<Record> {
     let agent_info = agent_info()?;
     let agent_did = format!("did:mycelix:{}", agent_info.agent_initial_pubkey);
     let phi = match get_latest_agent_snapshot(&agent_did)? {
-        Some((_, snapshot)) => snapshot.phi,
+        Some((_, snapshot)) => snapshot.consciousness_level,
         None => 0.0,
     };
-    let required = get_dynamic_phi_threshold(&GovernanceActionType::ProposalSubmission)?;
+    let required = get_dynamic_consciousness_gate(&GovernanceActionType::ProposalSubmission)?;
     if phi < required {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Consciousness Φ ({:.2}) below threshold ({:.2}) for execution requests",

@@ -512,7 +512,7 @@ impl TrustPipeline {
             (kvector.k_h + delta.historical_delta).clamp(0.0, 1.0),
             kvector.k_topo, // Topology unchanged
             kvector.k_v,    // Verification unchanged
-            kvector.k_phi,  // Coherence unchanged by trust delta
+            kvector.k_coherence,  // Coherence unchanged by trust delta
         )
     }
 
@@ -913,13 +913,13 @@ mod tests {
                     consensus_reached: true,
                     contributions: std::collections::HashMap::new(),
                 },
-                collective_phi: super::super::phi_integration::CollectivePhiResult {
-                    population_phi: 0.7,
-                    average_individual_phi: 0.65,
-                    phi_variance: 0.05,
+                collective_phi: super::super::coherence_integration::CollectiveCoherenceResult {
+                    population_coherence: 0.7,
+                    average_individual_coherence: 0.65,
+                    coherence_variance: 0.05,
                     emergent_integration: 0.1,
                     coherence_level:
-                        super::super::phi_integration::CollectiveCoherenceLevel::HighlyIntegrated,
+                        super::super::coherence_integration::CollectiveCoherenceLevel::HighlyIntegrated,
                     agent_count: 3,
                     coherence_distribution: [0, 0, 0, 3, 0],
                 },

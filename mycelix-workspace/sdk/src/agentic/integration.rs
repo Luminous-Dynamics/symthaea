@@ -40,11 +40,11 @@ use crate::agentic::{
     // Trust pipeline
     kvector_bridge::calculate_kredit_from_trust,
     lifecycle::record_uncertainty_outcome,
-    // Phi coherence
-    phi_bridge::{
-        check_zk_operation_phi, export_phi_metrics, phi_weighted_attestation,
-        update_agent_coherence, CoherenceHistory, CoherenceState, PhiCoherenceExport,
-        PhiMeasurementConfig, ZKOperationType, ZKPhiGatingResult,
+    // Coherence
+    coherence_bridge::{
+        check_zk_operation_coherence, export_coherence_metrics, coherence_weighted_attestation,
+        update_agent_coherence, CoherenceHistory, CoherenceState, CoherenceExport,
+        CoherenceMeasurementConfig, ZKOperationType, ZKCoherenceGatingResult,
     },
     // Uncertainty (GIS)
     uncertainty::{EscalationRequest, MoralActionGuidance, MoralUncertainty},
@@ -1536,7 +1536,7 @@ pub struct ZKIntegratedPipeline {
     /// Phi coherence history per agent (for tracking over time)
     coherence_histories: HashMap<String, CoherenceHistory>,
     /// Phi measurement configuration
-    phi_config: PhiMeasurementConfig,
+    coherence_config: CoherenceMeasurementConfig,
 }
 
 /// Record of a ZK proof generation/verification
@@ -1610,7 +1610,7 @@ impl ZKIntegratedPipeline {
             proof_history: Vec::new(),
             blinding_counter: 0,
             coherence_histories: HashMap::new(),
-            phi_config: PhiMeasurementConfig::default(),
+            coherence_config: CoherenceMeasurementConfig::default(),
         }
     }
 
@@ -2007,18 +2007,18 @@ impl ZKIntegratedPipeline {
     /// Check if an agent has sufficient Phi coherence for a ZK operation
     ///
     /// Returns the gating result with recommendations if the operation is not permitted.
-    pub fn check_phi_for_zk_operation(
+    pub fn check_coherence_for_zk_operation(
         &self,
         agent_id: &str,
         operation: ZKOperationType,
-    ) -> Result<ZKPhiGatingResult, IntegrationError> {
+    ) -> Result<ZKCoherenceGatingResult, IntegrationError> {
         let agent = self
             .matl_pipeline
             .trust_pipeline()
             .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
-        Ok(check_zk_operation_phi(agent, operation))
+        Ok(check_zk_operation_coherence(agent, operation))
     }
 
     /// Generate a trust proof with Phi coherence gating
@@ -2031,7 +2031,7 @@ impl ZKIntegratedPipeline {
         statement: ProofStatement,
     ) -> Result<AgentTrustProofResult, IntegrationError> {
         // Check Phi coherence first
-        let gating = self.check_phi_for_zk_operation(agent_id, ZKOperationType::GenerateProof)?;
+        let gating = self.check_coherence_for_zk_operation(agent_id, ZKOperationType::GenerateProof)?;
 
         if !gating.permitted {
             return Err(IntegrationError::PhiCoherenceError(format!(
@@ -2055,7 +2055,7 @@ impl ZKIntegratedPipeline {
         base_attestation_weight: f64,
     ) -> Result<ZKAttestationResult, IntegrationError> {
         // Check if attester has sufficient coherence
-        let gating = self.check_phi_for_zk_operation(from_agent, ZKOperationType::GenerateProof)?;
+        let gating = self.check_coherence_for_zk_operation(from_agent, ZKOperationType::GenerateProof)?;
 
         if !gating.permitted {
             return Err(IntegrationError::PhiCoherenceError(format!(
@@ -2066,7 +2066,7 @@ impl ZKIntegratedPipeline {
 
         // Apply Phi weighting to attestation
         let weighted_attestation =
-            phi_weighted_attestation(base_attestation_weight as f32, gating.current_phi);
+            coherence_weighted_attestation(base_attestation_weight as f32, gating.current_coherence);
 
         // Process with weighted attestation
         self.process_zk_attestation(from_agent, to_agent, weighted_attestation as f64)
@@ -2089,7 +2089,7 @@ impl ZKIntegratedPipeline {
                     .trust_pipeline()
                     .get_agent(&p.commitment.agent_id)
                     .map(|a| {
-                        let state = CoherenceState::from_phi(a.k_vector.k_phi as f64);
+                        let state = CoherenceState::from_phi(a.k_vector.k_coherence as f64);
                         state.allows_any_action()
                     })
                     .unwrap_or(false)
@@ -2105,7 +2105,7 @@ impl ZKIntegratedPipeline {
                     .get_agent(&p.commitment.agent_id)
                     .map(|a| {
                         let trust = a.k_vector.trust_score() as f64;
-                        let phi = a.k_vector.k_phi as f64;
+                        let phi = a.k_vector.k_coherence as f64;
                         // Combined weight: trust * phi_weight
                         trust * phi.sqrt()
                     })
@@ -2128,11 +2128,11 @@ impl ZKIntegratedPipeline {
         agent_id: &str,
     ) -> Result<bool, IntegrationError> {
         let gating =
-            self.check_phi_for_zk_operation(agent_id, ZKOperationType::ByzantineConsensus)?;
+            self.check_coherence_for_zk_operation(agent_id, ZKOperationType::ByzantineConsensus)?;
         Ok(gating.permitted)
     }
 
-    /// Update agent's Phi coherence measurement and k_phi dimension
+    /// Update agent's Phi coherence measurement and k_coherence dimension
     ///
     /// Call this periodically or after significant agent activity to update coherence.
     pub fn update_agent_phi(&mut self, agent_id: &str) -> Result<PhiUpdateInfo, IntegrationError> {
@@ -2143,7 +2143,7 @@ impl ZKIntegratedPipeline {
             .get_mut(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
-        let update_result = update_agent_coherence(agent, &self.phi_config);
+        let update_result = update_agent_coherence(agent, &self.coherence_config);
 
         // Update coherence history
         let history = self
@@ -2154,8 +2154,8 @@ impl ZKIntegratedPipeline {
 
         Ok(PhiUpdateInfo {
             agent_id: agent_id.to_string(),
-            previous_k_phi: update_result.previous_k_phi,
-            new_k_phi: update_result.new_k_phi,
+            previous_k_coherence: update_result.previous_k_coherence,
+            new_k_coherence: update_result.new_k_coherence,
             delta: update_result.delta,
             previous_state: update_result.previous_state,
             new_state: update_result.new_state,
@@ -2176,7 +2176,7 @@ impl ZKIntegratedPipeline {
             .get_agent(agent_id)
             .ok_or_else(|| IntegrationError::AgentNotFound(agent_id.to_string()))?;
 
-        Ok(CoherenceState::from_phi(agent.k_vector.k_phi as f64))
+        Ok(CoherenceState::from_phi(agent.k_vector.k_coherence as f64))
     }
 
     /// Get agent's coherence history
@@ -2188,7 +2188,7 @@ impl ZKIntegratedPipeline {
     pub fn export_agent_phi_metrics(
         &self,
         agent_id: &str,
-    ) -> Result<PhiCoherenceExport, IntegrationError> {
+    ) -> Result<CoherenceExport, IntegrationError> {
         let agent = self
             .matl_pipeline
             .trust_pipeline()
@@ -2201,7 +2201,7 @@ impl ZKIntegratedPipeline {
             .cloned()
             .unwrap_or_default();
 
-        Ok(export_phi_metrics(agent_id, agent, &history))
+        Ok(export_coherence_metrics(agent_id, agent, &history))
     }
 
     /// Get network-wide Phi health summary
@@ -2214,7 +2214,7 @@ impl ZKIntegratedPipeline {
         let mut critical_count = 0;
 
         for agent in agents.values() {
-            let phi = agent.k_vector.k_phi as f64;
+            let phi = agent.k_vector.k_coherence as f64;
             total_phi += phi;
 
             let state = CoherenceState::from_phi(phi);
@@ -2447,7 +2447,7 @@ impl ZKIntegratedPipeline {
         zk_operation: ZKOperationType,
     ) -> Result<CombinedGatingResult, IntegrationError> {
         // Check Phi coherence
-        let phi_gating = self.check_phi_for_zk_operation(agent_id, zk_operation)?;
+        let phi_gating = self.check_coherence_for_zk_operation(agent_id, zk_operation)?;
 
         // Check moral uncertainty
         let guidance = MoralActionGuidance::from_uncertainty(uncertainty);
@@ -2600,7 +2600,7 @@ pub struct CombinedGatingResult {
     /// Whether action is permitted
     pub permitted: bool,
     /// Phi gating result
-    pub phi_gating: ZKPhiGatingResult,
+    pub phi_gating: ZKCoherenceGatingResult,
     /// Uncertainty guidance
     pub uncertainty_guidance: MoralActionGuidance,
     /// Combined recommendation
@@ -2676,11 +2676,11 @@ pub struct GISNetworkHealth {
 pub struct PhiUpdateInfo {
     /// Agent ID
     pub agent_id: String,
-    /// Previous k_phi value
-    pub previous_k_phi: f32,
-    /// New k_phi value
-    pub new_k_phi: f32,
-    /// Change in k_phi
+    /// Previous k_coherence value
+    pub previous_k_coherence: f32,
+    /// New k_coherence value
+    pub new_k_coherence: f32,
+    /// Change in k_coherence
     pub delta: f32,
     /// Previous coherence state
     pub previous_state: CoherenceState,
@@ -2816,7 +2816,7 @@ impl ObservabilityExports {
     }
 
     /// Export Phi coherence metrics for an agent
-    pub fn export_phi_coherence(&mut self, metrics: &PhiCoherenceExport) {
+    pub fn export_phi_coherence(&mut self, metrics: &CoherenceExport) {
         let mut labels = HashMap::new();
         labels.insert("agent_id".to_string(), metrics.agent_id.clone());
         labels.insert(
@@ -2831,10 +2831,10 @@ impl ObservabilityExports {
             "Current Phi coherence value",
         );
         self.gauge(
-            "k_phi",
-            metrics.k_phi as f64,
+            "k_coherence",
+            metrics.k_coherence as f64,
             labels.clone(),
-            "K-Vector k_phi dimension value",
+            "K-Vector k_coherence dimension value",
         );
         self.gauge(
             "phi_rolling",
@@ -2923,7 +2923,7 @@ impl ObservabilityExports {
             "phi_update_delta",
             update.delta as f64,
             labels.clone(),
-            "Change in k_phi from update",
+            "Change in k_coherence from update",
         );
 
         if update.state_changed {
@@ -3911,13 +3911,13 @@ mod tests {
 
         // Should be able to generate proofs
         let result =
-            pipeline.check_phi_for_zk_operation("coherent-agent", ZKOperationType::GenerateProof);
+            pipeline.check_coherence_for_zk_operation("coherent-agent", ZKOperationType::GenerateProof);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
 
         // Should be able to participate in Byzantine consensus
         let result = pipeline
-            .check_phi_for_zk_operation("coherent-agent", ZKOperationType::ByzantineConsensus);
+            .check_coherence_for_zk_operation("coherent-agent", ZKOperationType::ByzantineConsensus);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
     }
@@ -3933,7 +3933,7 @@ mod tests {
 
         // Should NOT be able to generate proofs
         let result =
-            pipeline.check_phi_for_zk_operation("degraded-agent", ZKOperationType::GenerateProof);
+            pipeline.check_coherence_for_zk_operation("degraded-agent", ZKOperationType::GenerateProof);
         assert!(result.is_ok());
         let gating = result.unwrap();
         assert!(!gating.permitted);
@@ -3941,13 +3941,13 @@ mod tests {
 
         // Should NOT participate in Byzantine consensus
         let result = pipeline
-            .check_phi_for_zk_operation("degraded-agent", ZKOperationType::ByzantineConsensus);
+            .check_coherence_for_zk_operation("degraded-agent", ZKOperationType::ByzantineConsensus);
         assert!(result.is_ok());
         assert!(!result.unwrap().permitted);
 
         // CAN verify proofs (low stakes)
         let result =
-            pipeline.check_phi_for_zk_operation("degraded-agent", ZKOperationType::VerifyProof);
+            pipeline.check_coherence_for_zk_operation("degraded-agent", ZKOperationType::VerifyProof);
         assert!(result.is_ok());
         assert!(result.unwrap().permitted);
     }
@@ -3979,7 +3979,7 @@ mod tests {
     }
 
     #[test]
-    fn test_phi_weighted_attestation() {
+    fn test_coherence_weighted_attestation() {
         let config = ZKTrustConfig::default();
         let mut pipeline = ZKIntegratedPipeline::new(config);
 

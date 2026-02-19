@@ -1,0 +1,93 @@
+% Standalone TikZ figure: PoGQ vs FLTrust Comparison on FEMNIST
+% Bar chart showing TPR at each BFT ratio for both methods
+% Compile with: pdflatex fig_pogq_vs_fltrust.tex
+\documentclass[border=5pt]{standalone}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepackage{xcolor}
+
+\definecolor{pogqblue}{RGB}{31,119,180}
+\definecolor{fltrustorange}{RGB}{255,127,14}
+\definecolor{failred}{RGB}{214,39,40}
+
+\begin{document}
+\begin{tikzpicture}
+\begin{axis}[
+    ybar,
+    bar width=14pt,
+    width=12cm,
+    height=7.5cm,
+    ylabel={True Positive Rate (\%)},
+    ylabel style={font=\large},
+    xlabel={Byzantine Ratio (\%)},
+    xlabel style={font=\large},
+    symbolic x coords={20,25,30,35,40,45,50},
+    xtick=data,
+    xticklabel style={font=\normalsize},
+    ymin=0, ymax=115,
+    ytick={0,20,40,60,80,100},
+    ymajorgrids=true,
+    grid style={dashed, gray!30},
+    enlarge x limits=0.1,
+    legend style={
+        at={(0.02,0.98)},
+        anchor=north west,
+        font=\small,
+        draw=gray!50,
+        fill=white,
+        fill opacity=0.95,
+    },
+    legend cell align=left,
+    clip=false,
+    nodes near coords,
+    nodes near coords style={font=\tiny, anchor=south, rotate=0},
+    every node near coord/.append style={
+        /pgf/number format/fixed,
+        /pgf/number format/precision=1,
+    },
+]
+
+% FLTrust bars (behind)
+\addplot[fill=fltrustorange, fill opacity=0.85, draw=fltrustorange!80!black] coordinates {
+    (20, 100) (25, 100) (30, 100) (35, 100) (40, 100) (45, 100) (50, 100)
+};
+\addlegendentry{FLTrust (FEMNIST)}
+
+% PoGQ bars (in front)
+\addplot[fill=pogqblue, fill opacity=0.85, draw=pogqblue!80!black] coordinates {
+    (20, 100) (25, 100) (30, 83.3) (35, 90.5) (40, 66.7) (45, 29.6) (50, 0)
+};
+\addlegendentry{PoGQ (FEMNIST)}
+
+% Error bars for PoGQ (draw manually as annotations)
+% 30%: 83.3 +/- 28.9
+\draw[pogqblue!60!black, thick] (axis cs:30, 54.4) -- (axis cs:30, 100);
+\draw[pogqblue!60!black, thick] (axis cs:30, 54.4) +(-2pt,0) -- +(2pt,0);
+
+% 35%: 90.5 +/- 16.5
+\draw[pogqblue!60!black, thick] (axis cs:35, 74.0) -- (axis cs:35, 100);
+\draw[pogqblue!60!black, thick] (axis cs:35, 74.0) +(-2pt,0) -- +(2pt,0);
+
+% 40%: 66.7 +/- 57.7
+\draw[pogqblue!60!black, thick] (axis cs:40, 9.0) -- (axis cs:40, 100);
+\draw[pogqblue!60!black, thick] (axis cs:40, 9.0) +(-2pt,0) -- +(2pt,0);
+
+% 45%: 29.6 +/- 51.3 (clamped at 0)
+\draw[pogqblue!60!black, thick] (axis cs:45, 0) -- (axis cs:45, 80.9);
+\draw[pogqblue!60!black, thick] (axis cs:45, 80.9) +(-2pt,0) -- +(2pt,0);
+
+% Annotation: FLTrust maintains 100%
+\node[font=\scriptsize, fltrustorange!70!black, fill=white, inner sep=2pt, rounded corners=1pt, anchor=south]
+    at (axis cs:50, 103) {FLTrust: 100\% at all ratios};
+
+% Annotation: PoGQ fails
+\node[font=\scriptsize, failred, fill=white, inner sep=2pt, rounded corners=1pt, anchor=north west]
+    at (axis cs:45, 25) {PoGQ: 0\% at 50\%};
+
+% 33% barrier line
+\draw[gray!50, thick, dashed] (axis cs:30, 0) -- (axis cs:30, 115);
+\node[font=\tiny, gray!50!black, anchor=south, rotate=90] at (axis cs:30, 70) {30\% BFT: PoGQ reliability limit};
+
+\end{axis}
+\end{tikzpicture}
+\end{document}

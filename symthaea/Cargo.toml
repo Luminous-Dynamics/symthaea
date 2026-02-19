@@ -27,6 +27,7 @@ members = [
     "crates/symthaea-embeddings",
     "crates/symthaea-observability",
     "crates/symthaea-support",
+    "crates/symthaea-psych-bench",
 ]
 
 
@@ -355,7 +356,6 @@ counterfactual = ["epistemic_conflict", "symthaea-causal-reasoning/counterfactua
 #   ├── temporal_planning → epistemic_conflict + magi_loop
 #   └── counterfactual → epistemic_conflict + symthaea-causal-reasoning/counterfactual
 reasoning_engine = ["epistemic_conflict", "conscious_tool_gate", "temporal_planning", "counterfactual"]
-recursive_improvement_advanced = ["full_consciousness"]
 
 # ── Code Understanding & Generation ─────────────────────────────────
 code_understanding = ["tree-sitter-rust", "tree-sitter-python"]

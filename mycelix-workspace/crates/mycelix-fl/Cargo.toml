@@ -19,10 +19,17 @@ mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common", defaul
 default = []
 # Enable attack simulation modules (test-only, large)
 attacks = []
-# Phi time-series tracking and anomaly detection
-phi-series = []
+# Coherence time-series tracking and anomaly detection
+coherence-series = []
+# Backward-compatible alias for coherence-series
+phi-series = ["coherence-series"]
 # PoGQ-v4.1 Lite Byzantine detection (hysteresis, warm-up, probe head)
 pogq = []
+# Forward fl-core feature flags
+replay = ["mycelix-fl-core/replay"]
+shapley = ["mycelix-fl-core/shapley"]
+ensemble = ["mycelix-fl-core/ensemble"]
+compression = ["mycelix-fl-core/compression"]
 
 [dev-dependencies]
 rand = { version = "0.8", features = ["std", "std_rng"] }
@@ -30,3 +37,6 @@ proptest = "1.0"
 criterion = { version = "0.5", features = ["html_reports"] }
 sha2 = "0.10"
 
+[[bench]]
+name = "fl_bench"
+harness = false

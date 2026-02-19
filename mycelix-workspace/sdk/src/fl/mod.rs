@@ -130,7 +130,7 @@ pub use unified_zkrbbft_bridge::{
 // Epistemic-weighted FL integration (E-N-M-H classification for gradients)
 pub use epistemic_fl_bridge::{
     analyze_byzantine_with_phi,
-    check_phi_participation,
+    check_coherence_participation,
     classify_byzantine_attack,
     classify_byzantine_batch,
     classify_gradient,

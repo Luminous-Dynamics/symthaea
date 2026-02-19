@@ -443,7 +443,7 @@ impl VerificationEngine {
 
         // K-Vector bounds
         for dim in [
-            "k_r", "k_a", "k_i", "k_p", "k_m", "k_s", "k_h", "k_topo", "k_v", "k_phi",
+            "k_r", "k_a", "k_i", "k_p", "k_m", "k_s", "k_h", "k_topo", "k_v", "k_coherence",
         ] {
             self.register_invariant(Invariant {
                 invariant_id: format!("{}_bounds", dim),

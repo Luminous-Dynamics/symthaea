@@ -20,9 +20,9 @@ use mycelix_sdk::agentic::kvector_bridge::{
     analyze_behavior, calculate_kredit_from_trust, compute_kvector_update, record_and_maybe_update,
     KVectorBridgeConfig,
 };
-use mycelix_sdk::agentic::phi_bridge::{
-    check_coherence_for_action, measure_phi_simple, CoherenceCheckResult, CoherenceHistory,
-    CoherenceState, PhiMeasurementConfig,
+use mycelix_sdk::agentic::coherence_bridge::{
+    check_coherence_for_action, measure_coherence, CoherenceCheckResult, CoherenceHistory,
+    CoherenceState, CoherenceMeasurementConfig,
 };
 use mycelix_sdk::agentic::uncertainty::{
     maybe_escalate, MoralActionGuidance, MoralUncertainty, UncertainOutput, UncertaintyCalibration,
@@ -363,7 +363,7 @@ fn test_epistemic_classification_workflow() {
 fn test_phi_coherence_measurement() {
     println!("\n=== Phi Coherence Measurement ===\n");
 
-    let config = PhiMeasurementConfig::default();
+    let config = CoherenceMeasurementConfig::default();
     let mut history = CoherenceHistory::default();
 
     // Scenario 1: Coherent agent (similar outputs)
@@ -387,7 +387,7 @@ fn test_phi_coherence_measurement() {
         })
         .collect();
 
-    let phi_result = measure_phi_simple(&coherent_outputs, &config).unwrap();
+    let phi_result = measure_coherence(&coherent_outputs, &config).unwrap();
     history.add_measurement(phi_result.clone());
 
     println!("  Phi: {:.4}", phi_result.phi);
@@ -453,7 +453,7 @@ fn test_phi_coherence_measurement() {
         })
         .collect();
 
-    let incoherent_result = measure_phi_simple(&incoherent_outputs, &config).unwrap();
+    let incoherent_result = measure_coherence(&incoherent_outputs, &config).unwrap();
 
     println!("  Phi: {:.4}", incoherent_result.phi);
     println!("  Coherence State: {:?}", incoherent_result.coherence_state);
@@ -779,8 +779,8 @@ fn test_complete_integration_flow() {
     println!("│ STEP 3: Phi Coherence Measurement                               │");
     println!("└─────────────────────────────────────────────────────────────────┘");
 
-    let phi_config = PhiMeasurementConfig::default();
-    let phi_result = measure_phi_simple(&outputs, &phi_config).unwrap();
+    let phi_config = CoherenceMeasurementConfig::default();
+    let phi_result = measure_coherence(&outputs, &phi_config).unwrap();
 
     println!("  Phi Value: {:.4}", phi_result.phi);
     println!("  Coherence State: {:?}", phi_result.coherence_state);
@@ -921,7 +921,7 @@ fn test_complete_integration_flow() {
 use mycelix_sdk::agentic::integration::{
     CombinedGatingRecommendation, ObservabilityExports, ZKIntegratedPipeline, ZKTrustConfig,
 };
-use mycelix_sdk::agentic::phi_bridge::ZKOperationType;
+use mycelix_sdk::agentic::coherence_bridge::ZKOperationType;
 use mycelix_sdk::agentic::zk_trust::ProofStatement;
 
 /// Create a test agent with specific Phi coherence level
@@ -999,7 +999,7 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("\n  Agent: Alice (High-Trust, High-Coherence)");
     println!("    K-Vector Commitment: {}", alice_commit.agent_id);
     println!(
-        "    k_phi (Coherence): 0.85 ({:?})",
+        "    k_coherence (Coherence): 0.85 ({:?})",
         CoherenceState::from_phi(0.85)
     );
     println!(
@@ -1016,7 +1016,7 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("\n  Agent: Bob (Moderate-Trust, Stable-Coherence)");
     println!("    K-Vector Commitment: {}", bob_commit.agent_id);
     println!(
-        "    k_phi (Coherence): 0.65 ({:?})",
+        "    k_coherence (Coherence): 0.65 ({:?})",
         CoherenceState::from_phi(0.65)
     );
     println!(
@@ -1033,7 +1033,7 @@ fn test_zk_integrated_full_pipeline_demo() {
     println!("\n  Agent: Charlie (Lower-Trust, Degraded-Coherence)");
     println!("    K-Vector Commitment: {}", charlie_commit.agent_id);
     println!(
-        "    k_phi (Coherence): 0.25 ({:?})",
+        "    k_coherence (Coherence): 0.25 ({:?})",
         CoherenceState::from_phi(0.25)
     );
     println!(
@@ -1111,7 +1111,7 @@ fn test_zk_integrated_full_pipeline_demo() {
 
         for agent_id in &["agent-alice", "agent-bob", "agent-charlie"] {
             let gating = pipeline
-                .check_phi_for_zk_operation(agent_id, *op)
+                .check_coherence_for_zk_operation(agent_id, *op)
                 .expect("Gating check should succeed");
 
             let status = if gating.permitted {

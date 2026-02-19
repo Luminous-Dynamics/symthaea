@@ -215,38 +215,105 @@ pub fn trigger_payment_distribution(input: TriggerPaymentDistributionInput) -> E
     })
 }
 
-/// Compute Shapley values for round contributors
+/// Maximum participants for Shapley computation in WASM.
+/// Beyond this, MonteCarlo Shapley is too expensive for the instruction budget.
+const MAX_SHAPLEY_PARTICIPANTS: usize = 20;
+
+/// Compute Shapley values for round contributors using real ShapleyCalculator.
 ///
-/// Uses a simplified Shapley approximation:
-/// - Each gradient's contribution is measured by alignment with the aggregated result
-/// - Byzantine contributors receive 0 value
+/// Uses MonteCarlo sampling (100 samples) for n <= 20 participants.
+/// Falls back to equal-share for n > 20 or if HV data is unavailable.
+/// Byzantine contributors always receive 0 value.
 pub(crate) fn compute_shapley_values_from_gradients(
     gradients: &[(ActionHash, ModelGradient)],
     byzantine_nodes: &std::collections::HashSet<String>,
 ) -> ExternResult<std::collections::HashMap<String, f64>> {
+    use mycelix_fl::fl_core::{ShapleyCalculator, ShapleyConfig};
+
     let mut shapley_values = std::collections::HashMap::new();
 
     if gradients.is_empty() {
         return Ok(shapley_values);
     }
 
-    // Simple approach: equal contribution for non-Byzantine participants
-    // More sophisticated Shapley calculation happens in fl-aggregator
-    let valid_count = gradients.iter()
+    // Filter to valid (non-Byzantine) participants
+    let valid_gradients: Vec<_> = gradients.iter()
         .filter(|(_, g)| !byzantine_nodes.contains(&g.node_id))
-        .count();
+        .collect();
+    let valid_count = valid_gradients.len();
 
     if valid_count == 0 {
+        // All participants are Byzantine — assign 0 to everyone
+        for (_, gradient) in gradients {
+            shapley_values.insert(gradient.node_id.clone(), 0.0);
+        }
         return Ok(shapley_values);
     }
 
-    let equal_share = 1.0 / valid_count as f64;
+    // Attempt real Shapley computation if we can fetch HV data and n is manageable
+    let round = gradients.first().map(|(_, g)| g.round).unwrap_or(0);
+    let hv_data = crate::hyperfeel::get_round_hypervectors(round).ok();
 
+    let use_real_shapley = valid_count <= MAX_SHAPLEY_PARTICIPANTS
+        && hv_data.as_ref().map_or(false, |hvs| !hvs.is_empty());
+
+    if use_real_shapley {
+        let hvs = hv_data.unwrap();
+
+        // Build gradient_map: convert HV16 bytes to bipolar f32 for Shapley
+        let mut gradient_map: std::collections::HashMap<String, Vec<f32>> =
+            std::collections::HashMap::new();
+
+        for (node_id, hv_bytes) in &hvs {
+            if byzantine_nodes.contains(node_id) {
+                continue;
+            }
+            // Convert HV16 binary to bipolar f32: bit=1 → +1.0, bit=0 → -1.0
+            let bipolar: Vec<f32> = hv_bytes.iter()
+                .flat_map(|byte| (0..8).rev().map(move |i| {
+                    if (byte >> i) & 1 == 1 { 1.0f32 } else { -1.0f32 }
+                }))
+                .collect();
+            gradient_map.insert(node_id.clone(), bipolar);
+        }
+
+        if gradient_map.len() >= 2 {
+            // Compute aggregated reference (simple mean of all valid HVs)
+            let dim = gradient_map.values().next().map_or(0, |v| v.len());
+            let mut aggregated = vec![0.0f32; dim];
+            let count = gradient_map.len() as f32;
+            for vals in gradient_map.values() {
+                for (i, v) in vals.iter().enumerate() {
+                    if i < dim {
+                        aggregated[i] += v / count;
+                    }
+                }
+            }
+
+            // Run Shapley: MonteCarlo with 100 samples + normalization for WASM budget
+            let config = ShapleyConfig::monte_carlo(100).with_normalization();
+            let mut calculator = ShapleyCalculator::new(config);
+            let result = calculator.calculate_values(&gradient_map, &aggregated);
+
+            // Populate values: real Shapley for valid, 0 for Byzantine
+            for (_, gradient) in gradients {
+                if byzantine_nodes.contains(&gradient.node_id) {
+                    shapley_values.insert(gradient.node_id.clone(), 0.0);
+                } else {
+                    let sv = result.get(&gradient.node_id).unwrap_or(0.0) as f64;
+                    shapley_values.insert(gradient.node_id.clone(), sv);
+                }
+            }
+            return Ok(shapley_values);
+        }
+    }
+
+    // Fallback: equal-share for large rounds or missing HV data
+    let equal_share = 1.0 / valid_count as f64;
     for (_, gradient) in gradients {
         if byzantine_nodes.contains(&gradient.node_id) {
             shapley_values.insert(gradient.node_id.clone(), 0.0);
         } else {
-            // Base equal share, adjusted by quality if available
             let quality_multiplier = gradient.trust_score.unwrap_or(1.0) as f64;
             shapley_values.insert(gradient.node_id.clone(), equal_share * quality_multiplier);
         }

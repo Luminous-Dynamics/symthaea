@@ -1486,7 +1486,7 @@ impl ReplVoiceOutput {
     /// This is the key consciousness-modulation entry point.
     pub fn update_from_consciousness(
         &mut self,
-        unified_phi: f32,
+        unified_psi: f32,
         prediction_error: f32,
         emotional_valence: f32,
         emotional_arousal: f32,
@@ -1500,7 +1500,7 @@ impl ReplVoiceOutput {
         let hidden_state: Vec<f32> = (0..64)
             .map(|i| {
                 let phase = i as f32 / 64.0 * std::f32::consts::TAU;
-                let base = (phase + unified_phi * 2.0).sin() * 0.5;
+                let base = (phase + unified_psi * 2.0).sin() * 0.5;
                 let emotional = emotional_valence * 0.3 + emotional_arousal * 0.2;
                 let flow_contrib = if in_flow { 0.2 } else { 0.0 };
                 base + emotional + flow_contrib
@@ -1509,8 +1509,8 @@ impl ReplVoiceOutput {
 
         // Create attention state from consciousness metrics
         let mut attention_state = HashMap::new();
-        if unified_phi > 0.5 {
-            attention_state.insert("phi".to_string(), unified_phi);
+        if unified_psi > 0.5 {
+            attention_state.insert("phi".to_string(), unified_psi);
         }
         if in_flow {
             attention_state.insert("flow".to_string(), 1.0);

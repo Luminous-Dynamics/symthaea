@@ -348,6 +348,12 @@ pub struct CognitiveLoopService {
     /// handles graduation from working memory to episodic storage.
     memory_coordinator: MemoryCoordinator,
 
+    /// Resonator Memory for factorized episodic recall.
+    /// Stores episodes as bound (content ⊗ valence ⊗ phi_level) hypervectors
+    /// with growing semantic codebook. Factorization decomposes bundled recalls
+    /// into clean content/valence/phi components for richer context priming.
+    resonator_memory: Option<crate::dynamics::resonator::ResonatorMemory>,
+
     /// Neural bridge for projecting pre-computed embeddings (e.g. BGE-M3)
     /// directly into HDC space via a trained linear probe.
     /// Only available when the `neural-bridge` feature is enabled and
@@ -518,6 +524,11 @@ pub struct CognitiveLoopService {
     /// Primitive consciousness decomposition for explainable consciousness.
     primitive_processor: Option<crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor>,
 
+    /// Value feedback loop for TD-learning on moral alignment.
+    /// Records per-cycle moral assessments and provides a moving trend
+    /// that modulates future moral scores as a self-correcting mechanism.
+    value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop,
+
     // ═══════════════════════════════════════════════════════════════════════
     // SUPPORT INTELLIGENCE: Predictive diagnostics + knowledge federation
     // ═══════════════════════════════════════════════════════════════════════
@@ -526,16 +537,26 @@ pub struct CognitiveLoopService {
     support_predictive_engine: Option<symthaea_support::predictive::PredictiveEngine>,
 
     /// Knowledge manager for article graduation and cognitive update absorption.
-    /// Used by federation graduation checks when wired to DHT publishing.
+    /// Drives federation graduation checks and knowledge search during triage.
     #[cfg(feature = "support")]
-    #[allow(dead_code)]
     support_knowledge_manager: Option<symthaea_support::knowledge::KnowledgeManager>,
 
     /// Triage engine for ticket classification and prioritization.
-    /// Used by incoming ticket processing when wired to conductor events.
+    /// Classifies current input every cycle (lightweight keyword match).
     #[cfg(feature = "support")]
-    #[allow(dead_code)]
     support_triage_engine: Option<symthaea_support::triage::TriageEngine>,
+
+    /// Privacy manager for federation sharing tier enforcement.
+    /// Gates outbound knowledge federation based on SharingTier.
+    #[cfg(feature = "support")]
+    support_privacy_manager: Option<symthaea_support::privacy::PrivacyManager>,
+
+    /// Action engine for autonomous remediation proposals.
+    /// Proposes and gates actions based on autonomy level.
+    /// Consumed by bridge dispatch when conductor events are wired.
+    #[cfg(feature = "support")]
+    #[allow(dead_code)] // consumed by bridge dispatch, not the cognitive cycle
+    support_action_engine: Option<symthaea_support::actions::ActionEngine>,
 
     /// Cycle counter for amortizing support subsystem updates.
     #[cfg(feature = "support")]
@@ -545,9 +566,9 @@ pub struct CognitiveLoopService {
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
     carryover: CycleCarryover,
 
-    /// Relational Phi from dyad computation (set externally by Symthaea facade).
-    /// Blended into unified_phi at 15% weight when > 0.
-    relational_phi: f64,
+    /// Relational Psi from dyad computation (set externally by Symthaea facade).
+    /// Blended into unified_psi at 15% weight when > 0.
+    relational_psi: f64,
 
     /// External reward signal injected by environment (0.0 = none).
     /// Blended with internal prediction-error-based reward at 50% weight.

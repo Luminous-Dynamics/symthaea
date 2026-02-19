@@ -86,7 +86,7 @@ function createInitialKVector(): KVectorValues {
     k_h: 0.5 + Math.random() * 0.2,
     k_topo: 0.2 + Math.random() * 0.2,
     k_v: 0.8,
-    k_phi: 0.6 + Math.random() * 0.2,
+    k_coherence: 0.6 + Math.random() * 0.2,
   };
 }
 
@@ -160,8 +160,8 @@ function evolveAgent(agent: MonitoredAgent): { agent: MonitoredAgent; changes: s
   updated.kVector.k_m = Math.min(1.0, updated.kVector.k_m + 0.002);
 
   // Coherence fluctuates
-  updated.kVector.k_phi = Math.max(0.3, Math.min(1.0,
-    (updated.kVector.k_phi ?? 0.7) + (Math.random() - 0.5) * 0.03
+  updated.kVector.k_coherence = Math.max(0.3, Math.min(1.0,
+    (updated.kVector.k_coherence ?? 0.7) + (Math.random() - 0.5) * 0.03
   ));
 
   // Recalculate trust

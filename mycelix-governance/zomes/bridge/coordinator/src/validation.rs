@@ -6,8 +6,8 @@ use super::*;
 
 /// Validate consciousness snapshot input — pure function
 pub fn check_snapshot_input(input: &RecordSnapshotInput) -> Result<(), String> {
-    if input.phi < 0.0 || input.phi > 1.0 {
-        return Err("Phi must be between 0.0 and 1.0".into());
+    if input.consciousness_level < 0.0 || input.consciousness_level > 1.0 {
+        return Err("Consciousness level must be between 0.0 and 1.0".into());
     }
     if input.meta_awareness < 0.0 || input.meta_awareness > 1.0 {
         return Err("Meta awareness must be between 0.0 and 1.0".into());

@@ -237,7 +237,7 @@ impl ContinuousMind {
     /// Get a snapshot of the current mind state
     pub fn snapshot(&self) -> MindState {
         let mut state = self.state.clone();
-        state.phi = state.consciousness_level;
+        state.psi = state.consciousness_level;
         state.total_cycles = state.tick;
         state.time_awake_ms = self.awaken_time.elapsed().as_millis() as u64;
         state.meta_awareness =
@@ -498,7 +498,7 @@ impl ContinuousMind {
             },
             structured_data: None,
             domain_context: None,
-            phi: state.consciousness_level,
+            psi: state.consciousness_level,
             meta_awareness: state.meta_awareness,
             coherence,
             epistemic_status,

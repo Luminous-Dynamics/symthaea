@@ -162,8 +162,8 @@ fn test_temporal_discontinuity_resets_confidence() {
 }
 
 #[test]
-fn test_embodied_phi_modulation_affects_unified_phi() {
-    // Compare unified_phi with and without embodied cognition
+fn test_embodied_phi_modulation_affects_unified_psi() {
+    // Compare unified_psi with and without embodied cognition
     let mut baseline = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_virtual_body: true,
         enable_embodied_cognition: false,
@@ -188,9 +188,9 @@ fn test_embodied_phi_modulation_affects_unified_phi() {
         with_embodied.cycle("embodied phi comparison test input");
     }
 
-    // The embodied version feeds prev_embodied_phi_modulation into unified_phi
+    // The embodied version feeds prev_embodied_phi_modulation into unified_psi
     // Since embodied_phi_modulation != 1.0 (from EmbodiedConsciousnessAnalyzer),
-    // the unified_phi should differ between the two
+    // the unified_psi should differ between the two
     let baseline_result = baseline.cycle("final comparison");
     let embodied_result = with_embodied.cycle("final comparison");
 
@@ -689,8 +689,8 @@ fn test_phi_attestation_enabled_produces_records() {
     // Verify latest record
     let latest = service.latest_phi_attestation().unwrap();
     assert!(
-        latest.phi >= 0.0 && latest.phi <= 1.0,
-        "phi should be in [0, 1]"
+        latest.psi >= 0.0 && latest.psi <= 1.0,
+        "psi should be in [0, 1]"
     );
     assert_eq!(
         latest.cycle_id, 3,

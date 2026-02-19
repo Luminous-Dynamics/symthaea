@@ -1009,7 +1009,7 @@ fn get_dimension(kvector: &KVector, dimension: KVectorDimension) -> f32 {
         KVectorDimension::Historical => kvector.k_h,
         KVectorDimension::Topology => kvector.k_topo,
         KVectorDimension::Verification => kvector.k_v,
-        KVectorDimension::Coherence => kvector.k_phi,
+        KVectorDimension::Coherence => kvector.k_coherence,
     }
 }
 

@@ -46,8 +46,8 @@ impl Default for MindConfig {
 pub struct MindState {
     /// Current consciousness level (phi) - integrated information measure
     pub consciousness_level: f64,
-    /// Phi value (alias for consciousness_level for API compatibility)
-    pub phi: f64,
+    /// Ψ — Consciousness estimate (alias for consciousness_level)
+    pub psi: f64,
     /// Meta-awareness / self-monitoring level
     pub meta_awareness: f64,
     /// Cognitive load (0.0 = idle, 1.0 = max)
@@ -86,7 +86,7 @@ impl Default for MindState {
     fn default() -> Self {
         Self {
             consciousness_level: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             meta_awareness: 0.0,
             cognitive_load: 0.0,
             emotional_valence: 0.0,

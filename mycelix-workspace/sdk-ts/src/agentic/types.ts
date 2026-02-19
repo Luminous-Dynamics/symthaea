@@ -72,8 +72,8 @@ export interface KVectorValues {
   k_topo: number;
   /** Verification dimension (k_v): Identity verification level */
   k_v?: number;
-  /** Coherence dimension (k_phi): Phi measurement (consciousness-adjacent) */
-  k_phi?: number;
+  /** Coherence dimension (k_coherence): Output consistency metric */
+  k_coherence?: number;
 }
 
 /**

@@ -561,7 +561,7 @@ pub struct KVectorBatch {
     k_h: Vec<f32>,
     k_topo: Vec<f32>,
     k_v: Vec<f32>,
-    k_phi: Vec<f32>,
+    k_coherence: Vec<f32>,
 }
 
 impl KVectorBatch {
@@ -577,7 +577,7 @@ impl KVectorBatch {
             k_h: Vec::with_capacity(capacity),
             k_topo: Vec::with_capacity(capacity),
             k_v: Vec::with_capacity(capacity),
-            k_phi: Vec::with_capacity(capacity),
+            k_coherence: Vec::with_capacity(capacity),
         }
     }
 
@@ -592,7 +592,7 @@ impl KVectorBatch {
         self.k_h.push(kv.k_h);
         self.k_topo.push(kv.k_topo);
         self.k_v.push(kv.k_v);
-        self.k_phi.push(kv.k_phi);
+        self.k_coherence.push(kv.k_coherence);
     }
 
     /// Compute mean K-Vector
@@ -612,7 +612,7 @@ impl KVectorBatch {
             self.k_h.iter().sum::<f32>() / n,
             self.k_topo.iter().sum::<f32>() / n,
             self.k_v.iter().sum::<f32>() / n,
-            self.k_phi.iter().sum::<f32>() / n,
+            self.k_coherence.iter().sum::<f32>() / n,
         )
     }
 

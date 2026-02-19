@@ -40,7 +40,7 @@ federated_learning_integrity = { path = "../integrity" }
 mycelix-sdk = { path = "../../../../mycelix-workspace/sdk" }
 
 # Mycelix FL for decentralized aggregation pipeline
-mycelix-fl = { path = "../../../../mycelix-workspace/crates/mycelix-fl" }
+mycelix-fl = { path = "../../../../mycelix-workspace/crates/mycelix-fl", features = ["shapley", "replay", "pogq", "phi-series"] }
 
 [features]
 default = []

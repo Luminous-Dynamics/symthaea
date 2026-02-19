@@ -1,0 +1,161 @@
+{
+  "__type": "Map",
+  "entries": [
+    [
+      "e2e:m3",
+      {
+        "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+        "localCid": "cid:65de7150",
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 3,
+            "materiality": 3
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516453745,
+          "version": 1,
+          "createdBy": "e2e-agent",
+          "tombstone": false,
+          "cid": "cid:65de7150",
+          "sizeBytes": 21,
+          "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+        },
+        "addedAt": 1771516453745
+      }
+    ],
+    [
+      "stats:ipfs",
+      {
+        "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+        "localCid": "cid:554c6bb8",
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 3,
+            "materiality": 3
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516453918,
+          "version": 1,
+          "createdBy": "stats-agent",
+          "tombstone": false,
+          "cid": "cid:554c6bb8",
+          "sizeBytes": 7,
+          "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+        },
+        "addedAt": 1771516453918
+      }
+    ],
+    [
+      "constitution:v1",
+      {
+        "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+        "localCid": "cid:253b1f16",
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 3,
+            "materiality": 3
+          },
+          "schema": {
+            "id": "constitution",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516518113,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:253b1f16",
+          "sizeBytes": 44,
+          "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+        },
+        "addedAt": 1771516518113
+      }
+    ],
+    [
+      "immutable:stats-test",
+      {
+        "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+        "localCid": "cid:10f1da23",
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 3,
+            "materiality": 3
+          },
+          "schema": {
+            "id": "test",
+            "version": "1.0.0"
+          },
+          "storedAt": 1771516518162,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:10f1da23",
+          "sizeBytes": 12,
+          "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+        },
+        "addedAt": 1771516518162
+      }
+    ],
+    [
+      "m3",
+      {
+        "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+        "localCid": "cid:00000f62",
+        "metadata": {
+          "classification": {
+            "empirical": 0,
+            "normative": 0,
+            "materiality": 3
+          },
+          "schema": {
+            "id": "test",
+            "version": "1"
+          },
+          "storedAt": 1771516518208,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:00000f62",
+          "sizeBytes": 2,
+          "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+        },
+        "addedAt": 1771516518208
+      }
+    ],
+    [
+      "m3-test",
+      {
+        "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1",
+        "localCid": "cid:66bbc9fc",
+        "metadata": {
+          "classification": {
+            "empirical": 3,
+            "normative": 3,
+            "materiality": 3
+          },
+          "schema": {
+            "id": "test",
+            "version": "1"
+          },
+          "storedAt": 1771516518216,
+          "version": 1,
+          "createdBy": "test-agent",
+          "tombstone": false,
+          "cid": "cid:66bbc9fc",
+          "sizeBytes": 20,
+          "ipfsCid": "Qmaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa1"
+        },
+        "addedAt": 1771516518216
+      }
+    ]
+  ]
+}

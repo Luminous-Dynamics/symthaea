@@ -852,7 +852,7 @@ impl KVectorDelta {
             (kvector.k_h + self.k_h_delta).clamp(0.0, 1.0),
             kvector.k_topo,
             (kvector.k_v + self.k_v_delta).clamp(0.0, 1.0),
-            kvector.k_phi,
+            kvector.k_coherence,
         )
     }
 }

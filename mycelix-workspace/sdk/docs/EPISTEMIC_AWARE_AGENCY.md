@@ -87,7 +87,7 @@ The K-Vector is a 10-dimensional trust profile:
 | Historical | k_h | Long-term track record | 0.0-1.0 |
 | Topology | k_topo | Network centrality | 0.0-1.0 |
 | Verification | k_v | Identity verification | 0.0-1.0 |
-| Coherence | k_phi | Output consistency (Phi) | 0.0-1.0 |
+| Coherence | k_coherence | Output consistency | 0.0-1.0 |
 
 ### Computing Trust Score
 
@@ -181,10 +181,10 @@ println!("Weight: {:.4}", calculate_epistemic_weight(&output.classification));
 Measures consistency of agent outputs using Integrated Information Theory concepts.
 
 ```rust
-use mycelix_sdk::agentic::phi_bridge::*;
+use mycelix_sdk::agentic::coherence_bridge::*;
 
-let config = PhiMeasurementConfig::default();
-let result = measure_phi_simple(&outputs, &config)?;
+let config = CoherenceMeasurementConfig::default();
+let result = measure_coherence(&outputs, &config)?;
 
 println!("Phi: {:.4}", result.phi);
 println!("State: {:?}", result.coherence_state);
@@ -389,7 +389,7 @@ See `sdk/tests/e2e_epistemic_agent_full.rs` for a complete demonstration:
 | `mycelix_sdk::agentic` | Agent lifecycle, K-Vector, KREDIT |
 | `mycelix_sdk::agentic::kvector_bridge` | Behavior → K-Vector mapping |
 | `mycelix_sdk::agentic::epistemic_classifier` | E-N-M-H classification |
-| `mycelix_sdk::agentic::phi_bridge` | Phi coherence measurement |
+| `mycelix_sdk::agentic::coherence_bridge` | Coherence measurement |
 | `mycelix_sdk::agentic::uncertainty` | GIS uncertainty handling |
 | `mycelix_sdk::agentic::multi_agent` | Multi-agent coordination |
 | `mycelix_sdk::storage` | UESS storage routing |

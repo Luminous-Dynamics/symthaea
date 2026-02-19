@@ -14,12 +14,12 @@
 //! - `k_h` (Historical): Long-term consistency and reliability
 //! - `k_topo` (Topology): Network centrality and connectivity contribution
 //! - `k_v` (Verification): Identity verification and credential validity
-//! - `k_phi` (Coherence): Integrated information / consciousness metric (Φ)
+//! - `k_coherence` (Coherence): Output consistency / coherence metric
 //!
 //! Trust Score Formula (weighted average):
 //!   T = 0.25×k_r + 0.11×k_a + 0.20×k_i + 0.11×k_p + 0.05×k_m + 0.07×k_s + 0.05×k_h + 0.04×k_topo + 0.12×k_v
 //!
-//! Note: k_phi (Coherence) is tracked but has 0% weight in trust calculation.
+//! Note: k_coherence (Coherence) is tracked but has 0% weight in trust calculation.
 //! Phi coherence is used for gating high-stakes operations, not trust scoring.
 //!
 //! ## Performance Optimizations
@@ -88,7 +88,7 @@ pub struct KVector {
     /// - 1.0: Fully verified with ZK proofs and active attestations
     pub k_v: f32,
 
-    /// k_phi: Coherence - Output consistency metric (0.0-1.0)
+    /// k_coherence: Coherence - Output consistency metric (0.0-1.0)
     /// Weight: 0.00 (0%) - TRACKED FOR GATING ONLY, NOT USED IN TRUST SCORE
     ///
     /// Measures the agent's output coherence over time:
@@ -98,16 +98,16 @@ pub struct KVector {
     /// - 0.5-0.7: Stable - normal operations allowed
     /// - 0.7-1.0: Coherent - high-stakes operations allowed
     ///
-    /// This value is used by ZK operation gating (see phi_bridge.rs) to prevent
+    /// This value is used by ZK operation gating (see coherence_bridge.rs) to prevent
     /// incoherent agents from performing critical operations. It does NOT affect
     /// the trust score calculation.
-    pub k_phi: f32,
+    pub k_coherence: f32,
 }
 
 /// Default weights for K-Vector trust score calculation
 ///
-/// Note: k_phi weight is 0% - coherence is tracked for gating but doesn't affect trust score.
-/// The 5% that was on k_phi has been redistributed to k_r (+1%), k_i (+1%), and k_v (+3%).
+/// Note: k_coherence weight is 0% - coherence is tracked for gating but doesn't affect trust score.
+/// The 5% that was on k_coherence has been redistributed to k_r (+1%), k_i (+1%), and k_v (+3%).
 pub const KVECTOR_WEIGHTS: KVectorWeights = KVectorWeights {
     w_r: 0.25,    // Reputation (was 0.24)
     w_a: 0.11,    // Activity
@@ -122,8 +122,8 @@ pub const KVECTOR_WEIGHTS: KVectorWeights = KVectorWeights {
 };
 
 /// Pre-computed weight array for SIMD-friendly operations
-/// Order: [k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, k_phi]
-/// Note: k_phi (index 9) has 0 weight - tracked for gating, not scoring
+/// Order: [k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, k_coherence]
+/// Note: k_coherence (index 9) has 0 weight - tracked for gating, not scoring
 pub const KVECTOR_WEIGHTS_ARRAY: [f32; 10] =
     [0.25, 0.11, 0.20, 0.11, 0.05, 0.07, 0.05, 0.04, 0.12, 0.00];
 
@@ -150,7 +150,7 @@ pub struct KVectorWeights {
     pub w_topo: f32,
     /// Weight for verification dimension (k_v)
     pub w_v: f32,
-    /// Weight for coherence dimension (k_phi)
+    /// Weight for coherence dimension (k_coherence)
     pub w_phi: f32,
 }
 
@@ -212,7 +212,7 @@ impl KVector {
         k_h: f32,
         k_topo: f32,
         k_v: f32,
-        k_phi: f32,
+        k_coherence: f32,
     ) -> Self {
         Self {
             k_r: k_r.clamp(0.0, 1.0),
@@ -224,13 +224,13 @@ impl KVector {
             k_h: k_h.clamp(0.0, 1.0),
             k_topo: k_topo.clamp(0.0, 1.0),
             k_v: k_v.clamp(0.0, 1.0),
-            k_phi: k_phi.clamp(0.0, 1.0),
+            k_coherence: k_coherence.clamp(0.0, 1.0),
         }
     }
 
-    /// Create a new K-Vector without k_phi (legacy 9-dimensional compatibility)
+    /// Create a new K-Vector without k_coherence (legacy 9-dimensional compatibility)
     ///
-    /// The k_phi dimension defaults to 0.5 (neutral coherence).
+    /// The k_coherence dimension defaults to 0.5 (neutral coherence).
     #[allow(clippy::too_many_arguments)]
     pub fn new_9d(
         k_r: f32,
@@ -247,7 +247,7 @@ impl KVector {
     }
 
     /// Convert to array form for SIMD-friendly batch operations
-    /// Order: [k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, k_phi]
+    /// Order: [k_r, k_a, k_i, k_p, k_m, k_s, k_h, k_topo, k_v, k_coherence]
     #[inline]
     pub fn to_array(&self) -> [f32; 10] {
         [
@@ -260,7 +260,7 @@ impl KVector {
             self.k_h,
             self.k_topo,
             self.k_v,
-            self.k_phi,
+            self.k_coherence,
         ]
     }
 
@@ -292,7 +292,7 @@ impl KVector {
 
     /// Create a new K-Vector without verification or phi dimensions (legacy compatibility)
     ///
-    /// The k_v defaults to 0.0 (unverified), k_phi to 0.5 (neutral).
+    /// The k_v defaults to 0.0 (unverified), k_coherence to 0.5 (neutral).
     #[allow(clippy::too_many_arguments)]
     pub fn new_legacy(
         k_r: f32,
@@ -319,7 +319,7 @@ impl KVector {
             k_h: 0.0,
             k_topo: 0.0,
             k_v: 0.0,
-            k_phi: 0.0,
+            k_coherence: 0.0,
         }
     }
 
@@ -335,7 +335,7 @@ impl KVector {
             k_h: 0.5,    // No history
             k_topo: 0.0, // Not connected yet
             k_v: 0.0,    // Not verified yet
-            k_phi: 0.5,  // Neutral coherence (not yet measured)
+            k_coherence: 0.5,  // Neutral coherence (not yet measured)
         }
     }
 
@@ -353,7 +353,7 @@ impl KVector {
             k_h: 0.5,
             k_topo: 0.0,
             k_v: verification_level.clamp(0.0, 1.0),
-            k_phi: 0.5,
+            k_coherence: 0.5,
         }
     }
 
@@ -378,7 +378,7 @@ impl KVector {
             + weights.w_h * self.k_h
             + weights.w_topo * self.k_topo
             + weights.w_v * self.k_v
-            + weights.w_phi * self.k_phi
+            + weights.w_phi * self.k_coherence
     }
 
     /// Batch compute trust scores for multiple K-Vectors
@@ -431,7 +431,7 @@ impl KVector {
             (KVectorDimension::Historical, self.k_h),
             (KVectorDimension::Topology, self.k_topo),
             (KVectorDimension::Verification, self.k_v),
-            (KVectorDimension::Coherence, self.k_phi),
+            (KVectorDimension::Coherence, self.k_coherence),
         ];
         dims.into_iter()
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -450,7 +450,7 @@ impl KVector {
             (KVectorDimension::Historical, self.k_h),
             (KVectorDimension::Topology, self.k_topo),
             (KVectorDimension::Verification, self.k_v),
-            (KVectorDimension::Coherence, self.k_phi),
+            (KVectorDimension::Coherence, self.k_coherence),
         ];
         dims.into_iter()
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -501,7 +501,7 @@ impl KVector {
             self.k_h * self_weight + other.k_h * ow,
             self.k_topo * self_weight + other.k_topo * ow,
             self.k_v * self_weight + other.k_v * ow,
-            self.k_phi * self_weight + other.k_phi * ow,
+            self.k_coherence * self_weight + other.k_coherence * ow,
         )
     }
 
@@ -516,21 +516,21 @@ impl KVector {
 
     /// Update the coherence dimension based on Phi measurement
     ///
-    /// This method is used by the phi_integration module to update
+    /// This method is used by the coherence_integration module to update
     /// the coherence score based on integrated information (Φ) measurement.
-    pub fn with_coherence(mut self, k_phi: f32) -> Self {
-        self.k_phi = k_phi.clamp(0.0, 1.0);
+    pub fn with_coherence(mut self, k_coherence: f32) -> Self {
+        self.k_coherence = k_coherence.clamp(0.0, 1.0);
         self
     }
 
     /// Get the coherence level
     pub fn coherence_level(&self) -> f32 {
-        self.k_phi
+        self.k_coherence
     }
 
     /// Check if this agent has high coherence (Φ >= 0.7)
     pub fn is_highly_coherent(&self) -> bool {
-        self.k_phi >= 0.7
+        self.k_coherence >= 0.7
     }
 
     /// Calculate verification score from credential status
@@ -598,7 +598,7 @@ pub enum KVectorDimension {
     Topology,
     /// k_v: Identity verification and credential validity
     Verification,
-    /// k_phi: Integrated information / consciousness metric
+    /// k_coherence: Integrated information / consciousness metric
     Coherence,
 }
 
@@ -615,7 +615,7 @@ impl KVectorDimension {
             Self::Historical => "k_h",
             Self::Topology => "k_topo",
             Self::Verification => "k_v",
-            Self::Coherence => "k_phi",
+            Self::Coherence => "k_coherence",
         }
     }
 
@@ -647,7 +647,7 @@ impl KVectorDimension {
             Self::Historical => "Long-term consistency and reliability",
             Self::Topology => "Network centrality and connectivity contribution",
             Self::Verification => "Identity verification and credential validity",
-            Self::Coherence => "Integrated information (Φ) and behavioral coherence",
+            Self::Coherence => "Output consistency and behavioral coherence",
         }
     }
 
@@ -914,7 +914,7 @@ mod tests {
         assert!((kv.k_r - 0.6).abs() < 0.001); // Reputation decays slowly
         assert!((kv.k_i - 0.8).abs() < 0.001); // Integrity doesn't decay
         assert!((kv.k_v - 0.8).abs() < 0.001); // Verification doesn't decay (it's credential-based)
-        assert!((kv.k_phi - 0.8).abs() < 0.001); // Coherence doesn't decay (it's state-based)
+        assert!((kv.k_coherence - 0.8).abs() < 0.001); // Coherence doesn't decay (it's state-based)
     }
 
     #[test]
@@ -937,11 +937,11 @@ mod tests {
     #[test]
     fn test_coherence_dimension() {
         let neutral = KVector::new_participant();
-        assert_eq!(neutral.k_phi, 0.5); // Neutral coherence for new participants
+        assert_eq!(neutral.k_coherence, 0.5); // Neutral coherence for new participants
         assert!(!neutral.is_highly_coherent());
 
         let coherent = KVector::new_participant().with_coherence(0.8);
-        assert!((coherent.k_phi - 0.8).abs() < 0.001);
+        assert!((coherent.k_coherence - 0.8).abs() < 0.001);
         assert!(coherent.is_highly_coherent());
     }
 
@@ -977,14 +977,14 @@ mod tests {
     fn test_legacy_constructor() {
         let kv = KVector::new_legacy(0.8, 0.6, 0.9, 0.7, 0.3, 0.5, 0.6, 0.4);
         assert_eq!(kv.k_v, 0.0); // Default to unverified
-        assert_eq!(kv.k_phi, 0.5); // Default to neutral coherence
+        assert_eq!(kv.k_coherence, 0.5); // Default to neutral coherence
     }
 
     #[test]
     fn test_9d_constructor() {
         let kv = KVector::new_9d(0.8, 0.6, 0.9, 0.7, 0.3, 0.5, 0.6, 0.4, 0.8);
         assert_eq!(kv.k_v, 0.8);
-        assert_eq!(kv.k_phi, 0.5); // Default to neutral coherence
+        assert_eq!(kv.k_coherence, 0.5); // Default to neutral coherence
     }
 
     #[test]

@@ -404,7 +404,7 @@ pub fn translate_trust(
         .dimension_relevance
         .similarity(&target_domain.dimension_relevance);
 
-    // Translate each dimension (10 dimensions including k_phi)
+    // Translate each dimension (10 dimensions including k_coherence)
     let mut target_arr = [0.0f32; 10];
     let mut dimension_translations = Vec::with_capacity(10);
     let mut total_transfer = 0.0f32;
@@ -1001,7 +1001,7 @@ mod tests {
             0.7, // k_h: historical (high)
             0.2, // k_topo: topology (low - social needs this)
             0.8, // k_v: verification (high)
-            0.6, // k_phi: coherence (moderate)
+            0.6, // k_coherence: coherence (moderate)
         );
 
         let financial = DomainTemplates::financial();

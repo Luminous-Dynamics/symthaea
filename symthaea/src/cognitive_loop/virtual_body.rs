@@ -57,7 +57,7 @@ pub struct CognitiveSignals {
     pub prediction_error: f32,
     pub coherence: f32,
     pub prediction_confidence: f32,
-    pub unified_phi: f64,
+    pub unified_psi: f64,
     pub flow_intensity: f32,
     pub in_flow: bool,
     pub curiosity_boredom: f32,
@@ -157,7 +157,7 @@ impl VirtualBody {
             thirst: (1.0 - signals.prediction_confidence as f64).clamp(0.0, 1.0),
 
             // Temperature: higher consciousness = warmer
-            temperature: (signals.unified_phi * 2.0 - 1.0).clamp(-1.0, 1.0),
+            temperature: (signals.unified_psi * 2.0 - 1.0).clamp(-1.0, 1.0),
 
             // Gut state: flow feels right
             gut_state: if signals.in_flow {
@@ -232,7 +232,7 @@ mod tests {
             prediction_error: 0.1,
             coherence: 0.5,
             prediction_confidence: 0.6,
-            unified_phi: 0.4,
+            unified_psi: 0.4,
             flow_intensity: 0.0,
             in_flow: false,
             curiosity_boredom: 0.2,
