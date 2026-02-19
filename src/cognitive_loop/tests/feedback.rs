@@ -21,11 +21,12 @@ fn test_prefrontal_veto_suppresses_exploration() {
     // Run one more cycle and check if the veto was active
     let result = service.cycle("one more overload input");
     if result.metadata.prefrontal_veto {
-        // If veto triggered, exploration_urge should be 0
-        assert_eq!(
+        // If veto triggered, exploration_urge should be near-zero.
+        // Not exactly 0.0 because end-of-cycle homeostatic drift nudges it slightly toward 0.3.
+        assert!(
+            service.curiosity_drive().exploration_urge < 0.05,
+            "Prefrontal veto should suppress exploration_urge to near-zero, got: {}",
             service.curiosity_drive().exploration_urge,
-            0.0,
-            "Prefrontal veto should zero exploration_urge"
         );
     }
     // Even if veto didn't trigger this exact cycle, verify the mechanism exists

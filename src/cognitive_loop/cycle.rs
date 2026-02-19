@@ -111,6 +111,9 @@ impl CognitiveLoopService {
         self.stats.total_cycles += 1;
         let mut module_timings = super::ModuleTimings::default();
 
+        // Snapshot exploration_urge for end-of-cycle budget clamping (Task B)
+        let exploration_urge_start = self.curiosity_drive.exploration_urge;
+
         // Snapshot confidence for end-of-cycle drift clamping (Task G)
         self.carryover.prediction_confidence = self.prediction_confidence;
 
@@ -433,7 +436,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
 
         let goal_attention_bias = self.goal_system.attention_bias();
-        self.adaptive_behavior.attention_sensitivity *= goal_attention_bias;
+        // attention_sensitivity write moved to after from_consciousness_state() + strategy reset
 
         // FEEDBACK: Goal system progress tracking and priority → cognition coupling
         // Science: Anderson (1983) — goal-directed cognition modulates learning and exploration.
@@ -559,7 +562,7 @@ impl CognitiveLoopService {
                 self.fep_lr_boost = (self.fep_lr_boost + stiffness_nudge).clamp(1.0, 2.0);
             } else if wm_stiffness < 0.2 {
                 let spongy_dampen = (0.2 - wm_stiffness) * 0.15;
-                self.fep_lr_boost *= (1.0 - spongy_dampen).max(0.9);
+                self.fep_lr_boost = (self.fep_lr_boost * (1.0 - spongy_dampen)).max(1.0);
             }
         }
 
@@ -568,6 +571,7 @@ impl CognitiveLoopService {
         // need different responses. High abstract error → conceptual confusion → explore broadly;
         // High sensory but low abstract → perceptual mismatch → sharpen attention.
         let level_errors = self.world_model.level_errors();
+        let mut wm_sensory_mismatch = false;
         if level_errors.len() >= 2 && self.stats.total_cycles > 10 {
             let sensory_error = level_errors[0];
             let abstract_error = level_errors[level_errors.len() - 1];
@@ -576,10 +580,8 @@ impl CognitiveLoopService {
                 self.curiosity_drive.exploration_urge =
                     (self.curiosity_drive.exploration_urge + 0.08).clamp(0.0, 1.0);
             }
-            // Perceptual mismatch: sensory failure > 2x abstract
-            if sensory_error > abstract_error * 2.0 && sensory_error > 0.1 {
-                self.adaptive_behavior.attention_sensitivity *= 1.08;
-            }
+            // Perceptual mismatch flag — applied after from_consciousness_state() + strategy reset
+            wm_sensory_mismatch = sensory_error > abstract_error * 2.0 && sensory_error > 0.1;
         }
 
         // 7. Send prediction to encoder for next cycle
@@ -640,6 +642,13 @@ impl CognitiveLoopService {
                 self.adaptive_behavior.pause_multiplier =
                     self.adaptive_behavior.pause_multiplier.max(STRATEGY_SUPPORTIVE_PAUSE);
             }
+        }
+
+        // Re-apply goal and world-model attention biases after consciousness reset + strategy.
+        // Previously at lines 436 and 581, these were destroyed by from_consciousness_state().
+        self.adaptive_behavior.attention_sensitivity *= goal_attention_bias;
+        if wm_sensory_mismatch {
+            self.adaptive_behavior.attention_sensitivity *= 1.08;
         }
 
         // 10d. Update prediction confidence with decay during uncertain states
@@ -718,8 +727,9 @@ impl CognitiveLoopService {
                 let plan_weight = plan_confidence * 0.4;
                 match plan_action {
                     0 => {
-                        // Plan said "exploit" — nudge LR down
-                        self.fep_lr_boost *= 1.0 - plan_weight * 0.1;
+                        // Plan said "exploit" — nudge LR down (floor at 1.0)
+                        self.fep_lr_boost =
+                            (self.fep_lr_boost * (1.0 - plan_weight * 0.1)).max(1.0);
                     }
                     1 => {
                         // Plan said "consolidate" — reinforce prediction confidence
@@ -1287,6 +1297,17 @@ impl CognitiveLoopService {
             (false, None)
         };
 
+        // Goal←Cognition feedback: consistent low error during goal pursuit signals progress.
+        // Science: Anderson (1983) — prediction accuracy is evidence of task mastery.
+        // Closes the Goal→Cognition loop (goal priority boosts LR) with Cognition→Goal feedback.
+        if !learning_occurred && self.carryover.consecutive_low_error > 5 {
+            if let Some(top) = self.goal_system.top_goal() {
+                let top_id = top.id.clone();
+                let delta = 0.01 * (1.0 + self.prediction_confidence * 0.5); // 0.01 to 0.015
+                self.goal_system.update_progress(&top_id, delta);
+            }
+        }
+
         // 12. Update statistics
         self.update_stats(prediction_error, cycle_start.elapsed());
 
@@ -1584,10 +1605,16 @@ impl CognitiveLoopService {
             let dream_state: Vec<f32> = compressed_state.iter().take(64).copied().collect();
             let dream_action: Vec<f32> = output.iter().take(32).copied().collect();
             let dream_outcome: Vec<f32> = prediction.iter().take(64).copied().collect();
-            // Weight surprise by consciousness level: high-Phi moments are prioritized
+            // Weight surprise by consciousness level and narrative self-coherence:
             // Science: Tononi (2015) — consciousness = integrated information = memory salience
+            // Narrative→Dream coupling (Conway 2005): self-relevant memories encode preferentially.
+            let narrative_salience = self
+                .narrative_self
+                .as_ref()
+                .map(|n| 1.0 + n.self_phi() as f32 * 0.5) // 1.0 to 1.5x boost
+                .unwrap_or(1.0);
             let phi_weighted_surprise =
-                prediction_error * (1.0 + unified_phi as f32).clamp(1.0, 2.0);
+                prediction_error * (1.0 + unified_phi as f32).clamp(1.0, 2.0) * narrative_salience;
             dream.record(
                 &dream_state,
                 &dream_action,
@@ -1611,6 +1638,19 @@ impl CognitiveLoopService {
                             cycle = self.stats.total_cycles,
                             "Dream replay generated insights"
                         );
+
+                        // Dream→Narrative coupling: dream insights feed narrative self-model.
+                        // Science: Revonsuo (2000) — dreaming enhances threat simulation
+                        // and narrative integration of novel experiences.
+                        if let Some(ref mut narrative) = self.narrative_self {
+                            narrative.process_experience(
+                                &hv16_cached,
+                                &format!("dream_insight_{}", result.insights),
+                                true, // counterfactual-validated
+                                unified_phi,
+                                result.best_phi_improvement as f64,
+                            );
+                        }
                     }
                 }
             }
@@ -1724,7 +1764,7 @@ impl CognitiveLoopService {
         // exploration=0, learning=0. Soften both to allow partial recovery.
         if reasoning_gate_blocked && prefrontal_veto {
             self.curiosity_drive.exploration_urge = 0.3;
-            self.fep_lr_boost = self.fep_lr_boost.max(0.3); // ensure some learning survives
+            self.fep_lr_boost = self.fep_lr_boost.max(1.0); // enforce fep_lr_boost >= 1.0 invariant
             tracing::debug!(
                 cycle = self.stats.total_cycles,
                 "Dual-veto freeze detected: softening both gates for recovery"
@@ -1844,7 +1884,7 @@ impl CognitiveLoopService {
         // low arousal (rest) enhances memory consolidation (REM/slow-wave effect)
         if affective_arousal > 0.7 {
             let arousal_suppress = ((affective_arousal - 0.7) * 0.5).min(0.15);
-            self.fep_lr_boost *= (1.0 - arousal_suppress).max(0.7);
+            self.fep_lr_boost = (self.fep_lr_boost * (1.0 - arousal_suppress)).max(1.0);
 
             // Arousal trap detection (Yerkes-Dodson 1908 — inverted-U performance curve)
             // Science: Prolonged high arousal suppresses LR → error stays high → arousal stays
@@ -2452,8 +2492,9 @@ impl CognitiveLoopService {
                     // 3. High allostatic load suppresses learning (conserve resources)
                     // Science: McEwen (2004) — allostatic overload impairs plasticity
                     if response.allostatic_load > 0.7 {
-                        self.fep_lr_boost *= (1.0 - (response.allostatic_load - 0.7) as f32 * 0.5)
-                            .clamp(0.5, 1.0);
+                        self.fep_lr_boost = (self.fep_lr_boost
+                            * (1.0 - (response.allostatic_load - 0.7) as f32 * 0.5))
+                            .max(1.0);
                     }
 
                     (response.phi_modulation, response.sense_of_agency)
@@ -2659,6 +2700,12 @@ impl CognitiveLoopService {
                 .clamp(0.0, 1.0);
         }
 
+        // Clamp attention_sensitivity to [0.5, 2.0] after all modifications.
+        // 10+ subsystems multiply this field per cycle; without bounding, it can drift
+        // to extreme values. Science: Weber-Fechner law — perception has bounded dynamic range.
+        self.adaptive_behavior.attention_sensitivity =
+            self.adaptive_behavior.attention_sensitivity.clamp(0.5, 2.0);
+
         // Boredom↔confidence homeostasis (Turrigiano 2004 — homeostatic plasticity)
         // High boredom signals stagnation → dampen confidence (system shouldn't be confident
         // when stuck in repetitive states). Prevents confidence runaway from accumulated boosts.
@@ -2670,6 +2717,21 @@ impl CognitiveLoopService {
         // Boredom homeostasis: slow drift toward neutral (0.5) prevents monotonic saturation.
         // Without this, boredom accumulates asymmetrically toward 0 or 1.
         self.curiosity_drive.boredom += (0.5 - self.curiosity_drive.boredom) * 0.02;
+
+        // Exploration urge per-cycle budget: clamp total change to ±0.5.
+        // 15+ subsystems write exploration_urge per cycle; without bounding, cumulative
+        // nudges can pin it to 0.0 or 1.0. Science: Homeostatic control of exploration.
+        self.curiosity_drive.exploration_urge = self
+            .curiosity_drive
+            .exploration_urge
+            .clamp(
+                (exploration_urge_start - 0.5).max(0.0),
+                (exploration_urge_start + 0.5).min(1.0),
+            );
+
+        // Exploration urge homeostasis: slow drift toward neutral (0.3) prevents saturation.
+        self.curiosity_drive.exploration_urge +=
+            (0.3 - self.curiosity_drive.exploration_urge) * 0.03;
 
         // Store urgency for next cycle's hysteresis
         self.carryover.urgency = urgency;
