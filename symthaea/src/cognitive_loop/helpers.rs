@@ -189,9 +189,13 @@ impl CognitiveLoopService {
         self.coherence_bridge.update(&tau_refs);
         let coherence = self.coherence_bridge.smoothed_coherence();
 
+        // Effective threshold matches cycle() behavior (adaptive scaling)
+        let effective_threshold =
+            self.config.learning_threshold * self.carryover.adaptive_threshold_scale;
+
         // 9. Learn if error is significant
         let (learning_occurred, training_loss) =
-            if prediction_error > self.config.learning_threshold {
+            if prediction_error > effective_threshold {
                 self.stats.learning_cycles += 1;
                 if let Some(ref prev_state) = self.last_state.clone() {
                     let train_input = Array1::from_vec(prev_state.clone());
@@ -250,7 +254,15 @@ impl CognitiveLoopService {
             learning_occurred,
             training_loss,
             cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
-            metadata: super::CycleMetadata::default(),
+            metadata: super::CycleMetadata {
+                urgency,
+                actual_effective_lr: if learning_occurred {
+                    self.config.cfc_config.learning_rate
+                } else {
+                    0.0
+                },
+                ..super::CycleMetadata::default()
+            },
             #[cfg(feature = "identity")]
             signed_output: None,
             #[cfg(feature = "identity")]
