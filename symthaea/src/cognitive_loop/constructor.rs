@@ -1,5 +1,6 @@
 //! Constructor and backend selection for CognitiveLoopService.
 
+use super::CycleCarryover;
 use crate::brain::prefrontal::PrefrontalCortex;
 use crate::causal::{CausalEnhancerConfig, CausalLoopEnhancer};
 use crate::consciousness::attention_schema::AttentionSchema;
@@ -63,6 +64,12 @@ use super::{
 impl CognitiveLoopService {
     /// Create a new cognitive loop service
     pub fn new(config: CognitiveLoopConfig) -> Result<Self> {
+        // Validate configuration and log any dependency warnings
+        let warnings = config.validate();
+        for w in &warnings {
+            tracing::warn!(target: "cognitive_loop::config", "{w}");
+        }
+
         let encoder = PredictiveHdcEncoder::new(config.encoder_config.clone());
 
         // Create temporal network based on selected backend
@@ -322,6 +329,34 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional contextual weights
+        let contextual_weights = if config.enable_contextual_weights {
+            Some(crate::consciousness::contextual_weights::ContextualWeights::new())
+        } else {
+            None
+        };
+
+        // Build optional Phi-weighted attention
+        let phi_attention = if config.enable_phi_attention {
+            Some(crate::consciousness::phi_attention::AdaptiveThresholds::new(100))
+        } else {
+            None
+        };
+
+        // Build optional negation detector
+        let negation_detector = if config.enable_negation_detection {
+            Some(crate::consciousness::negation_detector::NegationDetector::new())
+        } else {
+            None
+        };
+
+        // Build optional primitive consciousness processor
+        let primitive_processor = if config.enable_primitive_consciousness {
+            Some(crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new())
+        } else {
+            None
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -446,8 +481,11 @@ impl CognitiveLoopService {
             consciousness_thermodynamics,
             phenomenal_binding,
             hierarchical_free_energy,
-            prev_predictive_phi_modulation: 1.0,
-            prev_cross_modal_phi: 0.0,
+            contextual_weights,
+            phi_attention,
+            negation_detector,
+            primitive_processor,
+            carryover: CycleCarryover::default(),
             surprise_bridge,
             prefrontal,
             meta_cognition,
@@ -471,13 +509,7 @@ impl CognitiveLoopService {
             },
             virtual_body,
             phi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
-            prev_body_phi_modulation: 1.0,
-            prev_embodied_phi_modulation: 1.0,
-            consecutive_low_error: 0,
-            prev_resonance_frequency: 0.0,
-            prev_quantum_coherence: 0.0,
-            mce_lr_boost: 0.0,
-            narrative_veto_active: false,
+            policy_agreement_window: std::collections::VecDeque::with_capacity(20),
             master_equation: MasterConsciousnessEquation::default(),
             // Unified Living Mind: life-mind continuity (full_consciousness only)
             #[cfg(feature = "full_consciousness")]

@@ -5,6 +5,80 @@
 use serde::{Deserialize, Serialize};
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// CYCLE CARRYOVER — state that crosses cycle boundaries
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// State carried over between consecutive cognitive cycles.
+///
+/// These fields represent the "memory" of the previous cycle that influences
+/// the next cycle's processing. All fields are reset to defaults by
+/// `CognitiveLoopService::reset()`.
+#[derive(Debug, Clone)]
+pub(crate) struct CycleCarryover {
+    /// Predictive processing phi modulation (1.0 = neutral)
+    pub(crate) predictive_phi_modulation: f64,
+    /// Cross-modal Phi (fed back into confidence)
+    pub(crate) cross_modal_phi: f64,
+    /// MCTS plan action (action_idx, confidence) for next cycle
+    pub(crate) mcts_plan: Option<(usize, f32)>,
+    /// Body phi modulation (fed back into unified_phi)
+    pub(crate) body_phi_modulation: f64,
+    /// Body arousal (fed back into CfC tau modulation)
+    pub(crate) body_arousal: f32,
+    /// Embodied cognition phi modulation (fed back into unified_phi)
+    pub(crate) embodied_phi_modulation: f64,
+    /// Resonance frequency (fed back into delta_t modulation)
+    pub(crate) resonance_frequency: f64,
+    /// Quantum coherence level (fed back into exploration boost)
+    pub(crate) quantum_coherence: f64,
+    /// Urgency level (hysteresis — prevents jitter)
+    pub(crate) urgency: CycleUrgency,
+    /// Prediction confidence snapshot at cycle start (drift clamping)
+    pub(crate) prediction_confidence: f32,
+    /// Whether narrative-GWT vetoed the previous cycle (suppresses learning)
+    pub(crate) narrative_veto_active: bool,
+    /// Consecutive cycles with error below threshold (Cruise mode trigger)
+    pub(crate) consecutive_low_error: u32,
+    /// MCE consciousness-level LR boost (decays 10%/cycle between MCE firings)
+    pub(crate) mce_lr_boost: f32,
+    /// Adaptive learning threshold multiplier (1.0 = config value as-is)
+    pub(crate) adaptive_threshold_scale: f32,
+    /// Consecutive high-arousal cycles (Yerkes-Dodson trap detection)
+    pub(crate) arousal_trap_counter: u32,
+    /// Last MCE consciousness level for learning gating
+    pub(crate) consciousness_level: f64,
+    /// Subsystem LR modulation factor (accumulated post-training, consumed next cycle).
+    /// Meta-cognition, predictive processing, predictive self, phenomenal binding,
+    /// and thermodynamics each multiply this to influence the NEXT cycle's training LR.
+    /// Default 1.0 (neutral).
+    pub(crate) subsystem_lr_factor: f32,
+}
+
+impl Default for CycleCarryover {
+    fn default() -> Self {
+        Self {
+            predictive_phi_modulation: 1.0,
+            cross_modal_phi: 0.0,
+            mcts_plan: None,
+            body_phi_modulation: 1.0,
+            body_arousal: 0.5,
+            embodied_phi_modulation: 1.0,
+            resonance_frequency: 0.0,
+            quantum_coherence: 0.0,
+            urgency: CycleUrgency::Normal,
+            prediction_confidence: 0.5,
+            narrative_veto_active: false,
+            consecutive_low_error: 0,
+            mce_lr_boost: 0.0,
+            adaptive_threshold_scale: 1.0,
+            arousal_trap_counter: 0,
+            consciousness_level: 0.0,
+            subsystem_lr_factor: 1.0,
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CYCLE URGENCY — adaptive subsystem scheduling
 // ═══════════════════════════════════════════════════════════════════════════════
 
@@ -238,8 +312,74 @@ pub struct CycleMetadata {
     /// Hierarchical total free energy (0.0 when off).
     pub hierarchical_total_free_energy: f64,
 
+    /// Rolling average of Phi observations from phi_attention (0.0 when off).
+    pub phi_attention_avg: f32,
+
+    /// Phi estimate from primitive consciousness decomposition (0.0 when off).
+    pub primitive_phi: f64,
+
+    /// Negation polarity detected in input text (0.0 = no negation, >0.5 = negated).
+    pub negation_polarity: f32,
+
+    /// Moral judgment score for this cycle (-1.0 to 1.0). 0.0 when moral evaluation was skipped.
+    pub moral_score: f32,
+
+    /// Selected response strategy for this cycle (e.g., "Exploratory", "Supportive").
+    pub selected_strategy: String,
+
+    /// Actual effective learning rate used for training this cycle (after all modulations).
+    /// 0.0 when no learning occurred.
+    pub actual_effective_lr: f32,
+
+    /// Cycle reward signal (internal + external blend, -1.0 to 1.0).
+    pub cycle_reward: f32,
+
+    /// FEP action index selected this cycle (0=exploit, 1=consolidate, 2=explore, 3=tighten).
+    pub fep_action: usize,
+
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
+}
+
+/// Compact subset of CycleMetadata with the most essential telemetry fields.
+///
+/// Use `CycleMetadata::compact()` to extract this from a full metadata struct.
+/// Useful for lightweight logging, streaming telemetry, or consumers that only
+/// need high-level consciousness state rather than per-subsystem detail.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct CycleMetadataCompact {
+    pub surprise_triggered: bool,
+    pub prefrontal_veto: bool,
+    pub reasoning_confidence: f32,
+    pub consciousness_level: f64,
+    pub gwt_broadcast: bool,
+    pub urgency: CycleUrgency,
+    pub body_phi_modulation: f64,
+    pub meta_cognitive_accuracy: f32,
+    pub narrative_self_phi: f64,
+    pub affective_valence: f32,
+    pub affective_arousal: f32,
+    pub prediction_error_trend: f32,
+}
+
+impl CycleMetadata {
+    /// Extract a compact subset of the most essential telemetry fields.
+    pub fn compact(&self) -> CycleMetadataCompact {
+        CycleMetadataCompact {
+            surprise_triggered: self.surprise_triggered,
+            prefrontal_veto: self.prefrontal_veto,
+            reasoning_confidence: self.reasoning_confidence,
+            consciousness_level: self.consciousness_level,
+            gwt_broadcast: self.gwt_broadcast,
+            urgency: self.urgency,
+            body_phi_modulation: self.body_phi_modulation,
+            meta_cognitive_accuracy: self.meta_cognitive_accuracy,
+            narrative_self_phi: self.narrative_self_phi,
+            affective_valence: self.affective_valence,
+            affective_arousal: self.affective_arousal,
+            prediction_error_trend: 0.0, // caller fills from CycleResult
+        }
+    }
 }
 
 /// Per-module execution timings in microseconds for overhead profiling.
@@ -300,6 +440,11 @@ pub struct PhiAttestationRecord {
 impl PhiAttestationRecord {
     /// Canonical message for signing: deterministic byte representation.
     /// The bridge crate signs this with the agent's Ed25519 key.
+    ///
+    /// Phi is formatted to 6 decimal places (`{:.6}`), matching the governance
+    /// bridge's reconstruction format in `record_phi_attestation`. This precision
+    /// (~0.000001) is sufficient for IIT Phi and ensures signature verification
+    /// succeeds across Symthaea → bridge → governance without floating-point drift.
     pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
         format!(
             "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",

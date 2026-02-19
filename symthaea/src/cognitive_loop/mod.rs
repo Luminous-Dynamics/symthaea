@@ -491,14 +491,21 @@ pub struct CognitiveLoopService {
     /// with precision-weighted prediction errors at each level.
     hierarchical_free_energy: Option<HierarchicalFreeEnergy>,
 
-    /// Previous cycle's predictive processing phi modulation (fed back into LR)
-    prev_predictive_phi_modulation: f64,
+    /// Contextual harmony weighting for domain-aware ethical reasoning.
+    contextual_weights: Option<crate::consciousness::contextual_weights::ContextualWeights>,
 
-    /// Previous cycle's cross-modal Phi (fed back into confidence)
-    prev_cross_modal_phi: f64,
+    /// Phi-weighted attention routing with adaptive thresholds.
+    phi_attention: Option<crate::consciousness::phi_attention::AdaptiveThresholds>,
 
-    /// Whether narrative-GWT vetoed the previous cycle (suppresses learning this cycle)
-    narrative_veto_active: bool,
+    /// Negation detector for moral/value text preprocessing.
+    negation_detector: Option<crate::consciousness::negation_detector::NegationDetector>,
+
+    /// Primitive consciousness decomposition for explainable consciousness.
+    primitive_processor: Option<crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor>,
+
+    /// State carried over between consecutive cycles (phi modulations, veto flags,
+    /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
+    carryover: CycleCarryover,
 
     /// Relational Phi from dyad computation (set externally by Symthaea facade).
     /// Blended into unified_phi at 15% weight when > 0.
@@ -530,27 +537,9 @@ pub struct CognitiveLoopService {
     /// Populated when `config.enable_phi_attestation` is true.
     phi_attestation_buffer: VecDeque<PhiAttestationRecord>,
 
-    /// Previous cycle's body phi modulation (fed back into next cycle's unified_phi)
-    prev_body_phi_modulation: f64,
-
-    /// Previous cycle's embodied cognition phi modulation (fed back into unified_phi)
-    prev_embodied_phi_modulation: f64,
-
-    /// Consecutive cycles with prediction error below learning threshold.
-    /// Used by CycleUrgency to enter Cruise mode after 10+ stable cycles.
-    consecutive_low_error: u32,
-
-    /// Previous cycle's resonance frequency (fed back into CfC delta_t modulation)
-    /// Science: Buzsáki (2006) — neural oscillations modulate processing speed
-    prev_resonance_frequency: f64,
-
-    /// Previous cycle's quantum coherence level (fed back into exploration boost)
-    /// Science: Lambert (2013) — quantum coherence enhances biological search
-    prev_quantum_coherence: f64,
-
-    /// MCE consciousness-level LR boost (decays 10%/cycle between MCE firings)
-    /// Science: Dehaene (2014) — conscious access improves encoding
-    mce_lr_boost: f32,
+    /// Sliding window of FEP↔MCTS policy agreement for adaptive temperature control.
+    /// Science: Friston & Parr (2020) — policy agreement modulates exploration/exploitation.
+    policy_agreement_window: VecDeque<bool>,
 
     /// Master Consciousness Equation (MCE) — comprehensive consciousness metric.
     /// C(t) = σ(softmin(Φ, B, W, A, R, E, K; τ)) × weighted_sum × S × ρ(t) × M × N × Soc
