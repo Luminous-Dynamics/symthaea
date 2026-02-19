@@ -1,0 +1,452 @@
+//! Support Diagnostics Coordinator Zome
+//! Business logic for diagnostic results, privacy preferences, and cognitive
+//! updates in the Mycelix support domain.
+
+use hdk::prelude::*;
+use support_diagnostics_integrity::*;
+use support_types::*;
+
+// ============================================================================
+// SIGNAL
+// ============================================================================
+
+/// Signal emitted when a cognitive update is published, allowing the
+/// Symthaea bridge to absorb new resolution patterns.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    pub event_type: String,
+    pub payload_hash: ActionHash,
+    pub category: SupportCategory,
+    pub phi: f64,
+}
+
+// ============================================================================
+// HELPERS
+// ============================================================================
+
+fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
+    let mut records = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            records.push(record);
+        }
+    }
+    Ok(records)
+}
+
+// ============================================================================
+// DIAGNOSTIC RESULTS
+// ============================================================================
+
+/// Run a diagnostic and store the result, linking it to the time-sharded
+/// index, the agent, and optionally the originating ticket.
+#[hdk_extern]
+pub fn run_diagnostic(diag: DiagnosticResult) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::DiagnosticResult(diag.clone()))?;
+
+    // Time-sharded diagnostics link
+    let shard = sharded_anchor("support", "diagnostics", &diag.created_at);
+    create_entry(&EntryTypes::Anchor(Anchor(shard.clone())))?;
+    create_link(
+        anchor_hash(&shard)?,
+        action_hash.clone(),
+        LinkTypes::ShardedDiagnostics,
+        (),
+    )?;
+
+    // All diagnostics anchor (for list_diagnostics)
+    create_entry(&EntryTypes::Anchor(Anchor("all_diagnostics".to_string())))?;
+    create_link(
+        anchor_hash("all_diagnostics")?,
+        action_hash.clone(),
+        LinkTypes::ShardedDiagnostics,
+        (),
+    )?;
+
+    // Agent to diagnostic link
+    create_link(
+        diag.agent.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentToDiagnostic,
+        (),
+    )?;
+
+    // Optional ticket to diagnostic link
+    if let Some(ref ticket_hash) = diag.ticket_hash {
+        create_link(
+            ticket_hash.clone(),
+            action_hash.clone(),
+            LinkTypes::TicketToDiagnostic,
+            (),
+        )?;
+    }
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created diagnostic result".into()
+    )))
+}
+
+/// Get a single diagnostic result by its action hash.
+#[hdk_extern]
+pub fn get_diagnostic(hash: ActionHash) -> ExternResult<Option<Record>> {
+    get(hash, GetOptions::default())
+}
+
+/// List all diagnostic results from the "all_diagnostics" anchor.
+#[hdk_extern]
+pub fn list_diagnostics(_: ()) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_diagnostics")?, LinkTypes::ShardedDiagnostics)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+// ============================================================================
+// PRIVACY PREFERENCES
+// ============================================================================
+
+/// Set (or update) the calling agent's privacy preferences.
+#[hdk_extern]
+pub fn set_privacy_preference(pref: PrivacyPreference) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::PrivacyPreference(pref.clone()))?;
+
+    create_link(
+        pref.agent.clone(),
+        action_hash.clone(),
+        LinkTypes::AgentToPrivacyPreference,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created privacy preference".into()
+    )))
+}
+
+/// Get the most recent privacy preference for an agent.
+#[hdk_extern]
+pub fn get_privacy_preference(agent: AgentPubKey) -> ExternResult<Option<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToPrivacyPreference)?,
+        GetStrategy::default(),
+    )?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    // Return the latest link (highest timestamp)
+    let mut sorted = links;
+    sorted.sort_by_key(|l| l.timestamp);
+    let latest = sorted.last().unwrap();
+
+    let action_hash = ActionHash::try_from(latest.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+    get(action_hash, GetOptions::default())
+}
+
+// ============================================================================
+// SHAREABLE DIAGNOSTICS (filtered by privacy preference)
+// ============================================================================
+
+/// Get an agent's diagnostics filtered by their privacy preference sharing tier.
+/// Returns all diagnostics if sharing tier is Full, scrubbed-only if Anonymized,
+/// and empty if LocalOnly.
+#[hdk_extern]
+pub fn get_shareable_diagnostics(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
+    // First get the agent's privacy preference
+    let pref_record = get_privacy_preference(agent.clone())?;
+    let sharing_tier = if let Some(record) = pref_record {
+        let pref: PrivacyPreference = record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Invalid privacy preference entry".into()
+            )))?;
+        pref.sharing_tier
+    } else {
+        // Default to LocalOnly if no preference set
+        SharingTier::LocalOnly
+    };
+
+    match sharing_tier {
+        SharingTier::LocalOnly => Ok(vec![]),
+        SharingTier::Anonymized => {
+            // Return only scrubbed diagnostics
+            let links = get_links(
+                LinkQuery::try_new(agent, LinkTypes::AgentToDiagnostic)?,
+                GetStrategy::default(),
+            )?;
+            let all_records = records_from_links(links)?;
+            let mut scrubbed = Vec::new();
+            for record in all_records {
+                if let Some(diag) = record
+                    .entry()
+                    .to_app_option::<DiagnosticResult>()
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                {
+                    if diag.scrubbed {
+                        scrubbed.push(record);
+                    }
+                }
+            }
+            Ok(scrubbed)
+        }
+        SharingTier::Full => {
+            let links = get_links(
+                LinkQuery::try_new(agent, LinkTypes::AgentToDiagnostic)?,
+                GetStrategy::default(),
+            )?;
+            records_from_links(links)
+        }
+    }
+}
+
+// ============================================================================
+// COGNITIVE UPDATES
+// ============================================================================
+
+/// Publish a cognitive update (resolution pattern encoded as BinaryHV).
+/// Creates links to the category anchor and the all-updates anchor,
+/// then emits a BridgeEventSignal for the Symthaea bridge.
+#[hdk_extern]
+pub fn publish_cognitive_update(update: CognitiveUpdate) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::CognitiveUpdate(update.clone()))?;
+
+    // Category-specific time-sharded link
+    let cat_label = format!("{:?}", update.category).to_lowercase();
+    let cat_anchor = sharded_anchor("support", &format!("cognitive_{}", cat_label), &update.created_at);
+    create_entry(&EntryTypes::Anchor(Anchor(cat_anchor.clone())))?;
+    create_link(
+        anchor_hash(&cat_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CategoryToCognitiveUpdate,
+        (),
+    )?;
+
+    // Static category anchor (for queries without time range)
+    let static_cat_anchor = format!("cognitive_updates:{}", cat_label);
+    create_entry(&EntryTypes::Anchor(Anchor(static_cat_anchor.clone())))?;
+    create_link(
+        anchor_hash(&static_cat_anchor)?,
+        action_hash.clone(),
+        LinkTypes::CategoryToCognitiveUpdate,
+        (),
+    )?;
+
+    // All cognitive updates link
+    let all_anchor = sharded_anchor("support", "cognitive_all", &update.created_at);
+    create_entry(&EntryTypes::Anchor(Anchor(all_anchor.clone())))?;
+    create_link(
+        anchor_hash(&all_anchor)?,
+        action_hash.clone(),
+        LinkTypes::AllCognitiveUpdates,
+        (),
+    )?;
+
+    // Emit bridge event signal
+    let signal = BridgeEventSignal {
+        event_type: "cognitive_update_published".to_string(),
+        payload_hash: action_hash.clone(),
+        category: update.category.clone(),
+        phi: update.phi,
+    };
+    emit_signal(&signal)?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created cognitive update".into()
+    )))
+}
+
+/// Get all cognitive updates for a given support category.
+#[hdk_extern]
+pub fn get_cognitive_updates_by_category(category: SupportCategory) -> ExternResult<Vec<Record>> {
+    let cat_label = format!("{:?}", category).to_lowercase();
+    let static_cat_anchor = format!("cognitive_updates:{}", cat_label);
+    let links = get_links(
+        LinkQuery::try_new(
+            anchor_hash(&static_cat_anchor)?,
+            LinkTypes::CategoryToCognitiveUpdate,
+        )?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+/// Absorb a cognitive update by retrieving its record. Actual absorption
+/// (injecting the BinaryHV into the local Symthaea instance) happens in the
+/// symthaea-support sub-crate, not in the zome.
+#[hdk_extern]
+pub fn absorb_cognitive_update(hash: ActionHash) -> ExternResult<Record> {
+    get(hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Cognitive update not found".into()
+    )))
+}
+
+// ============================================================================
+// TESTS
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn fake_action_hash() -> ActionHash {
+        ActionHash::from_raw_36(vec![0xdb; 36])
+    }
+
+    fn fake_agent() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xab; 36])
+    }
+
+    // ========================================================================
+    // BridgeEventSignal serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn bridge_event_signal_serde_roundtrip() {
+        let signal = BridgeEventSignal {
+            event_type: "cognitive_update_published".to_string(),
+            payload_hash: fake_action_hash(),
+            category: SupportCategory::Network,
+            phi: 0.42,
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let back: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.event_type, "cognitive_update_published");
+        assert_eq!(back.category, SupportCategory::Network);
+        assert_eq!(back.phi, 0.42);
+    }
+
+    #[test]
+    fn bridge_event_signal_all_categories() {
+        for category in [
+            SupportCategory::Network,
+            SupportCategory::Hardware,
+            SupportCategory::Software,
+            SupportCategory::Holochain,
+            SupportCategory::Mycelix,
+            SupportCategory::Security,
+            SupportCategory::General,
+        ] {
+            let signal = BridgeEventSignal {
+                event_type: "cognitive_update_published".to_string(),
+                payload_hash: fake_action_hash(),
+                category: category.clone(),
+                phi: 1.0,
+            };
+            let json = serde_json::to_string(&signal).unwrap();
+            let back: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+            assert_eq!(back.category, category);
+        }
+    }
+
+    #[test]
+    fn bridge_event_signal_zero_phi() {
+        let signal = BridgeEventSignal {
+            event_type: "test".to_string(),
+            payload_hash: fake_action_hash(),
+            category: SupportCategory::General,
+            phi: 0.0,
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let back: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.phi, 0.0);
+    }
+
+    #[test]
+    fn bridge_event_signal_negative_phi() {
+        let signal = BridgeEventSignal {
+            event_type: "test".to_string(),
+            payload_hash: fake_action_hash(),
+            category: SupportCategory::General,
+            phi: -0.5,
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let back: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.phi, -0.5);
+    }
+
+    // ========================================================================
+    // Integrity entry type serde roundtrips (from coordinator perspective)
+    // ========================================================================
+
+    #[test]
+    fn diagnostic_result_serde_roundtrip() {
+        let diag = DiagnosticResult {
+            ticket_hash: Some(fake_action_hash()),
+            diagnostic_type: DiagnosticType::NetworkCheck,
+            findings: r#"{"status":"ok"}"#.to_string(),
+            severity: DiagnosticSeverity::Healthy,
+            recommendations: vec!["All clear".to_string()],
+            agent: fake_agent(),
+            scrubbed: false,
+            created_at: Timestamp::from_micros(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&diag).unwrap();
+        let back: DiagnosticResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(diag, back);
+    }
+
+    #[test]
+    fn privacy_preference_serde_roundtrip() {
+        let pref = PrivacyPreference {
+            agent: fake_agent(),
+            sharing_tier: SharingTier::Full,
+            allowed_categories: vec![SupportCategory::Network],
+            share_system_info: true,
+            share_resolution_patterns: false,
+            share_cognitive_updates: true,
+            updated_at: Timestamp::from_micros(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&pref).unwrap();
+        let back: PrivacyPreference = serde_json::from_str(&json).unwrap();
+        assert_eq!(pref, back);
+    }
+
+    #[test]
+    fn cognitive_update_serde_roundtrip() {
+        let cu = CognitiveUpdate {
+            category: SupportCategory::Software,
+            encoding: vec![0u8; 2048],
+            phi: 0.42,
+            resolution_pattern: "Restart the service".to_string(),
+            source_agent: fake_agent(),
+            created_at: Timestamp::from_micros(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&cu).unwrap();
+        let back: CognitiveUpdate = serde_json::from_str(&json).unwrap();
+        assert_eq!(cu, back);
+    }
+
+    #[test]
+    fn diagnostic_result_no_ticket_roundtrip() {
+        let diag = DiagnosticResult {
+            ticket_hash: None,
+            diagnostic_type: DiagnosticType::DiskSpace,
+            findings: r#"{"disk_free_gb":120}"#.to_string(),
+            severity: DiagnosticSeverity::Warning,
+            recommendations: vec![
+                "Consider cleanup".to_string(),
+                "Archive old logs".to_string(),
+            ],
+            agent: fake_agent(),
+            scrubbed: true,
+            created_at: Timestamp::from_micros(1_700_000_000_000_000),
+        };
+        let json = serde_json::to_string(&diag).unwrap();
+        let back: DiagnosticResult = serde_json::from_str(&json).unwrap();
+        assert!(back.ticket_hash.is_none());
+        assert!(back.scrubbed);
+        assert_eq!(back.recommendations.len(), 2);
+    }
+}

@@ -1,0 +1,15 @@
+[package]
+name = "support_knowledge_integrity"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "support_knowledge_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+support-types = { workspace = true }

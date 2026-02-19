@@ -1,0 +1,16 @@
+[package]
+name = "support_tickets"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "support_tickets"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+support_tickets_integrity = { path = "../integrity" }
+support-types = { workspace = true }

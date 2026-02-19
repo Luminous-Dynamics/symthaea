@@ -52,7 +52,7 @@ pub enum PropertyType {
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct CoOwner {
     pub did: String,
-    pub share_percentage: f64,
+    pub share_basis_points: u32,
 }
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
@@ -1311,4 +1311,548 @@ async fn test_cross_domain_water_dispatches_food_irrigation_credit_check() {
         .await;
 
     assert!(query_record.action().author() == alice.agent_pubkey());
+}
+
+// ============================================================================
+// Support Domain — Mirror Types
+// ============================================================================
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum SupportCategory {
+    Network,
+    Hardware,
+    Software,
+    Holochain,
+    Mycelix,
+    Security,
+    General,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum TicketPriority {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum TicketStatus {
+    Open,
+    InProgress,
+    AwaitingUser,
+    Resolved,
+    Closed,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum AutonomyLevel {
+    Advisory,
+    SemiAutonomous,
+    FullAutonomous,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum DiagnosticType {
+    NetworkCheck,
+    DiskSpace,
+    ServiceStatus,
+    HolochainHealth,
+    MemoryUsage,
+    Custom(String),
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum DiagnosticSeverity {
+    Healthy,
+    Warning,
+    Error,
+    Critical,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum ArticleSource {
+    Community,
+    PreSeeded,
+    SymthaeaGenerated,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum DifficultyLevel {
+    Beginner,
+    Intermediate,
+    Advanced,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum SharingTier {
+    LocalOnly,
+    Anonymized,
+    Full,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub enum EpistemicStatus {
+    Certain,
+    Probable,
+    Uncertain,
+    Unknown,
+    OutOfDomain,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SupportKnowledgeArticle {
+    pub title: String,
+    pub content: String,
+    pub category: SupportCategory,
+    pub tags: Vec<String>,
+    pub author: AgentPubKey,
+    pub source: ArticleSource,
+    pub difficulty_level: DifficultyLevel,
+    pub upvotes: u32,
+    pub verified: bool,
+    pub deprecated: bool,
+    pub deprecation_reason: Option<String>,
+    pub version: u32,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SupportTicketEntry {
+    pub title: String,
+    pub description: String,
+    pub category: SupportCategory,
+    pub priority: TicketPriority,
+    pub status: TicketStatus,
+    pub requester: AgentPubKey,
+    pub assignee: Option<AgentPubKey>,
+    pub autonomy_level: AutonomyLevel,
+    pub system_info: Option<String>,
+    pub is_preemptive: bool,
+    pub prediction_confidence: Option<f32>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SupportTicketComment {
+    pub ticket_hash: ActionHash,
+    pub author: AgentPubKey,
+    pub content: String,
+    pub is_symthaea_response: bool,
+    pub confidence: Option<f32>,
+    pub epistemic_status: Option<EpistemicStatus>,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SupportDiagnosticResult {
+    pub ticket_hash: Option<ActionHash>,
+    pub diagnostic_type: DiagnosticType,
+    pub findings: String,
+    pub severity: DiagnosticSeverity,
+    pub recommendations: Vec<String>,
+    pub agent: AgentPubKey,
+    pub scrubbed: bool,
+    pub created_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SupportPrivacyPreference {
+    pub agent: AgentPubKey,
+    pub sharing_tier: SharingTier,
+    pub allowed_categories: Vec<SupportCategory>,
+    pub share_system_info: bool,
+    pub share_resolution_patterns: bool,
+    pub share_cognitive_updates: bool,
+    pub updated_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SupportCognitiveUpdate {
+    pub category: SupportCategory,
+    pub encoding: Vec<u8>,
+    pub phi: f64,
+    pub resolution_pattern: String,
+    pub source_agent: AgentPubKey,
+    pub created_at: Timestamp,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct SupportUpdateTicketInput {
+    pub original_hash: ActionHash,
+    pub updated: SupportTicketEntry,
+}
+
+// ============================================================================
+// Support Domain — Sweettest Integration Tests
+// ============================================================================
+
+/// Support: Create article → search by category → verify found.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_support_create_article_and_search() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    let article = SupportKnowledgeArticle {
+        title: "Configuring Holochain Bootstrap Servers".into(),
+        content: "## Overview\nBootstrap servers help new agents discover peers...\n\n```bash\nhc sandbox generate\n```".into(),
+        category: SupportCategory::Holochain,
+        tags: vec!["holochain".into(), "bootstrap".into(), "networking".into()],
+        author: agent.clone(),
+        source: ArticleSource::Community,
+        difficulty_level: DifficultyLevel::Intermediate,
+        upvotes: 0,
+        verified: false,
+        deprecated: false,
+        deprecation_reason: None,
+        version: 1,
+    };
+
+    let article_record: Record = conductor
+        .call(&alice.zome("support_knowledge"), "create_article", article)
+        .await;
+
+    assert!(article_record.action().author() == &agent);
+
+    // Search by category
+    let results: Vec<Record> = conductor
+        .call(
+            &alice.zome("support_knowledge"),
+            "search_by_category",
+            SupportCategory::Holochain,
+        )
+        .await;
+
+    assert!(
+        !results.is_empty(),
+        "search_by_category should return the created article"
+    );
+}
+
+/// Support: Create ticket → add comment → update status → close ticket.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_support_create_ticket_lifecycle() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    let ticket = SupportTicketEntry {
+        title: "Conductor crash on restart".into(),
+        description: "After NixOS rebuild, conductor segfaults on startup".into(),
+        category: SupportCategory::Holochain,
+        priority: TicketPriority::High,
+        status: TicketStatus::Open,
+        requester: agent.clone(),
+        assignee: None,
+        autonomy_level: AutonomyLevel::Advisory,
+        system_info: Some("NixOS 25.11, Holochain 0.4".into()),
+        is_preemptive: false,
+        prediction_confidence: None,
+        created_at: now,
+        updated_at: now,
+    };
+
+    let ticket_record: Record = conductor
+        .call(&alice.zome("support_tickets"), "create_ticket", ticket.clone())
+        .await;
+
+    let ticket_hash = ticket_record.action_address().clone();
+
+    // Add a comment
+    let comment = SupportTicketComment {
+        ticket_hash: ticket_hash.clone(),
+        author: agent.clone(),
+        content: "Tried clearing lair cache, same crash persists".into(),
+        is_symthaea_response: false,
+        confidence: None,
+        epistemic_status: None,
+    };
+
+    let _comment_record: Record = conductor
+        .call(&alice.zome("support_tickets"), "add_comment", comment)
+        .await;
+
+    // Update to resolved
+    let mut updated_ticket = ticket.clone();
+    updated_ticket.status = TicketStatus::Resolved;
+    updated_ticket.updated_at = Timestamp::now();
+
+    let update_input = SupportUpdateTicketInput {
+        original_hash: ticket_hash.clone(),
+        updated: updated_ticket,
+    };
+
+    let _updated_record: Record = conductor
+        .call(&alice.zome("support_tickets"), "update_ticket", update_input)
+        .await;
+
+    // Close the ticket
+    let _closed_record: Record = conductor
+        .call(&alice.zome("support_tickets"), "close_ticket", ticket_hash)
+        .await;
+}
+
+/// Support: Run diagnostic → verify link to ticket.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_support_diagnostic_flow() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    // Create a ticket first
+    let ticket = SupportTicketEntry {
+        title: "Slow DHT gossip".into(),
+        description: "Gossip rounds taking >30s".into(),
+        category: SupportCategory::Network,
+        priority: TicketPriority::Medium,
+        status: TicketStatus::Open,
+        requester: agent.clone(),
+        assignee: None,
+        autonomy_level: AutonomyLevel::Advisory,
+        system_info: None,
+        is_preemptive: false,
+        prediction_confidence: None,
+        created_at: now,
+        updated_at: now,
+    };
+
+    let ticket_record: Record = conductor
+        .call(&alice.zome("support_tickets"), "create_ticket", ticket)
+        .await;
+
+    let ticket_hash = ticket_record.action_address().clone();
+
+    // Run diagnostic linked to the ticket
+    let diag = SupportDiagnosticResult {
+        ticket_hash: Some(ticket_hash),
+        diagnostic_type: DiagnosticType::NetworkCheck,
+        findings: r#"{"latency_ms": 2500, "packet_loss": 0.15}"#.into(),
+        severity: DiagnosticSeverity::Warning,
+        recommendations: vec![
+            "Check firewall rules for UDP port range".into(),
+            "Verify bootstrap server reachability".into(),
+        ],
+        agent: agent.clone(),
+        scrubbed: false,
+        created_at: Timestamp::now(),
+    };
+
+    let diag_record: Record = conductor
+        .call(&alice.zome("support_diagnostics"), "run_diagnostic", diag)
+        .await;
+
+    assert!(diag_record.action().author() == &agent);
+
+    // Verify we can fetch it back
+    let fetched: Option<Record> = conductor
+        .call(
+            &alice.zome("support_diagnostics"),
+            "get_diagnostic",
+            diag_record.action_address().clone(),
+        )
+        .await;
+
+    assert!(fetched.is_some(), "Diagnostic should be retrievable after creation");
+}
+
+/// Support: Set privacy preference → get → verify tier.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_support_privacy_preference() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    let pref = SupportPrivacyPreference {
+        agent: agent.clone(),
+        sharing_tier: SharingTier::Anonymized,
+        allowed_categories: vec![SupportCategory::Network, SupportCategory::Holochain],
+        share_system_info: true,
+        share_resolution_patterns: true,
+        share_cognitive_updates: false,
+        updated_at: Timestamp::now(),
+    };
+
+    let _pref_record: Record = conductor
+        .call(&alice.zome("support_diagnostics"), "set_privacy_preference", pref)
+        .await;
+
+    // Retrieve it
+    let fetched: Option<Record> = conductor
+        .call(
+            &alice.zome("support_diagnostics"),
+            "get_privacy_preference",
+            agent,
+        )
+        .await;
+
+    assert!(fetched.is_some(), "Privacy preference should be retrievable");
+}
+
+/// Support: Publish cognitive update → get by category → verify.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_support_cognitive_update_publish() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    let update = SupportCognitiveUpdate {
+        category: SupportCategory::Network,
+        encoding: vec![0xAB; 2048], // 2048-byte BinaryHV
+        phi: 0.72,
+        resolution_pattern: "DNS misconfiguration: edit /etc/resolv.conf, restart systemd-resolved".into(),
+        source_agent: agent.clone(),
+        created_at: Timestamp::now(),
+    };
+
+    let update_record: Record = conductor
+        .call(&alice.zome("support_diagnostics"), "publish_cognitive_update", update)
+        .await;
+
+    assert!(update_record.action().author() == &agent);
+
+    // Query by category
+    let results: Vec<Record> = conductor
+        .call(
+            &alice.zome("support_diagnostics"),
+            "get_cognitive_updates_by_category",
+            SupportCategory::Network,
+        )
+        .await;
+
+    assert!(
+        !results.is_empty(),
+        "Should find the published cognitive update by category"
+    );
+}
+
+/// Support: Bridge dispatch routes to support zomes correctly.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_support_bridge_dispatch() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let (alice,) = conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    let agent = alice.agent_pubkey().clone();
+
+    // Query via commons_bridge for the support domain
+    let query = CommonsQueryInput {
+        domain: "support".to_string(),
+        query_type: "list_tickets".to_string(),
+        requester: agent.clone(),
+        params: "{}".to_string(),
+        created_at: Timestamp::now(),
+    };
+
+    let query_record: Record = conductor
+        .call(&alice.zome("commons_bridge"), "query_commons", query)
+        .await;
+
+    assert!(query_record.action().author() == &agent);
+}
+
+/// Support: Multi-agent ticket resolution — Alice creates, Bob resolves.
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "requires Holochain conductor (nix develop)"]
+async fn test_support_multi_agent_resolution() {
+    let mut conductor = SweetConductor::from_standard_config().await;
+    let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
+    let apps = conductor
+        .setup_app_for_zipped_agents("test-app", &[dna_file.clone()], &[2])
+        .await
+        .unwrap();
+
+    let ((alice,), (bob,)) = apps.into_tuples();
+
+    let alice_agent = alice.agent_pubkey().clone();
+    let bob_agent = bob.agent_pubkey().clone();
+    let now = Timestamp::now();
+
+    // Alice creates a ticket
+    let ticket = SupportTicketEntry {
+        title: "Bridge dispatch timeout".into(),
+        description: "Cross-domain calls to water_flow are timing out after 10s".into(),
+        category: SupportCategory::Mycelix,
+        priority: TicketPriority::High,
+        status: TicketStatus::Open,
+        requester: alice_agent.clone(),
+        assignee: None,
+        autonomy_level: AutonomyLevel::Advisory,
+        system_info: None,
+        is_preemptive: false,
+        prediction_confidence: None,
+        created_at: now,
+        updated_at: now,
+    };
+
+    let ticket_record: Record = conductor
+        .call(&alice.zome("support_tickets"), "create_ticket", ticket)
+        .await;
+
+    let ticket_hash = ticket_record.action_address().clone();
+
+    // Wait for DHT sync
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+    // Bob comments with a resolution suggestion
+    let comment = SupportTicketComment {
+        ticket_hash: ticket_hash.clone(),
+        author: bob_agent.clone(),
+        content: "The issue is a rate limit hitting 100 calls/min. Increase RATE_LIMIT_WINDOW_SECS.".into(),
+        is_symthaea_response: false,
+        confidence: Some(0.85),
+        epistemic_status: Some(EpistemicStatus::Probable),
+    };
+
+    let _comment_record: Record = conductor
+        .call(&bob.zome("support_tickets"), "add_comment", comment)
+        .await;
+
+    // Bob can also fetch the ticket
+    let fetched: Option<Record> = conductor
+        .call(&bob.zome("support_tickets"), "get_ticket", ticket_hash)
+        .await;
+
+    assert!(fetched.is_some(), "Bob should be able to fetch Alice's ticket via DHT");
 }

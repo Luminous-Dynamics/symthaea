@@ -8181,9 +8181,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2195bf6aa996a481483b29d62a7663eed3fe39600c460e323f8ff41e90bdd89b"
 
 [[package]]
+name = "mycelix-bridge-common"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "mycelix-fl-core"
 version = "0.1.0"
 dependencies = [
+ "mycelix-bridge-common",
  "rand 0.8.5",
  "serde",
  "thiserror 1.0.69",
@@ -12532,6 +12540,7 @@ dependencies = [
  "symthaea-sentinel",
  "symthaea-seven-harmonies",
  "symthaea-stt",
+ "symthaea-support",
  "symthaea-types",
  "symthaea-wisdom",
  "syn 2.0.114",
@@ -12809,6 +12818,16 @@ dependencies = [
  "serde_json",
  "tempfile",
  "toml",
+]
+
+[[package]]
+name = "symthaea-support"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "regex",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
