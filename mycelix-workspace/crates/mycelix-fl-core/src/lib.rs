@@ -20,6 +20,7 @@
 //! - 45% does NOT converge when all nodes have equal reputation
 
 pub mod aggregation;
+pub mod adaptive_defense;
 pub mod byzantine;
 pub mod consciousness_plugin;
 pub mod convert;
@@ -30,10 +31,23 @@ pub mod plugins;
 pub mod privacy;
 pub mod types;
 
+#[cfg(feature = "replay")]
+pub mod replay_detection;
+
+#[cfg(feature = "shapley")]
+pub mod shapley;
+
+#[cfg(feature = "ensemble")]
+pub mod ensemble_defense;
+
+#[cfg(feature = "compression")]
+pub mod compression;
+
 #[cfg(feature = "holochain")]
 pub mod holochain_bridge;
 
 pub use aggregation::*;
+pub use adaptive_defense::*;
 pub use byzantine::*;
 pub use consciousness_plugin::*;
 pub use convert::*;

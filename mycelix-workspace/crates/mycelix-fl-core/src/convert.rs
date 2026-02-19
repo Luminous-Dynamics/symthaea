@@ -50,6 +50,8 @@ pub fn method_to_string(method: AggregationMethod) -> &'static str {
         AggregationMethod::TrimmedMean => "trimmed_mean",
         AggregationMethod::Median => "median",
         AggregationMethod::Krum => "krum",
+        AggregationMethod::MultiKrum => "multi_krum",
+        AggregationMethod::GeometricMedian => "geometric_median",
         AggregationMethod::TrustWeighted => "trust_weighted",
     }
 }
@@ -60,6 +62,8 @@ pub fn method_from_string(s: &str) -> Option<AggregationMethod> {
         "trimmed_mean" => Some(AggregationMethod::TrimmedMean),
         "median" => Some(AggregationMethod::Median),
         "krum" => Some(AggregationMethod::Krum),
+        "multi_krum" => Some(AggregationMethod::MultiKrum),
+        "geometric_median" => Some(AggregationMethod::GeometricMedian),
         "trust_weighted" => Some(AggregationMethod::TrustWeighted),
         _ => None,
     }

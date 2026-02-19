@@ -20,16 +20,13 @@
 //! See `mycelix_bridge_common::phi_thresholds` for the single source of truth.
 //! Default values: veto=0.1, dampen=0.3, boost=0.6.
 
+use mycelix_bridge_common::phi_thresholds::phi_thresholds;
 use serde::{Deserialize, Serialize};
-
-// Canonical Phi threshold constants — must match mycelix_bridge_common::phi_thresholds.
-// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
-const CANONICAL_FL_VETO: f32 = 0.1;
-const CANONICAL_FL_BOOST: f32 = 0.6;
 
 /// Configuration for gradient coherence gating.
 ///
-/// Thresholds should align with `mycelix_bridge_common::phi_thresholds::PhiThresholds`.
+/// Default values are imported from `mycelix_bridge_common::phi_thresholds` —
+/// the single source of truth for all Mycelix Phi thresholds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GradientCoherenceConfig {
     /// Minimum coherence score required to submit a gradient (default: 0.1)
@@ -42,10 +39,11 @@ pub struct GradientCoherenceConfig {
 
 impl Default for GradientCoherenceConfig {
     fn default() -> Self {
+        let t = phi_thresholds();
         Self {
-            min_coherence: CANONICAL_FL_VETO,
-            boost_threshold: CANONICAL_FL_BOOST,
-            veto_threshold: CANONICAL_FL_VETO,
+            min_coherence: t.fl_veto,
+            boost_threshold: t.fl_boost,
+            veto_threshold: t.fl_veto,
         }
     }
 }
@@ -227,11 +225,13 @@ mod tests {
     }
 
     #[test]
-    fn test_veto_threshold_aligned_with_canonical() {
-        // Verify our defaults match the canonical thresholds from phi_thresholds.rs
+    fn test_defaults_match_canonical_thresholds() {
+        // Defaults are now imported from bridge-common — verify the link works
         let config = GradientCoherenceConfig::default();
-        assert_eq!(config.veto_threshold, 0.1, "veto should match canonical fl_veto");
-        assert_eq!(config.boost_threshold, 0.6, "boost should match canonical fl_boost");
+        let canonical = mycelix_bridge_common::phi_thresholds::phi_thresholds();
+        assert_eq!(config.veto_threshold, canonical.fl_veto);
+        assert_eq!(config.boost_threshold, canonical.fl_boost);
+        assert_eq!(config.min_coherence, canonical.fl_veto);
     }
 
     #[allow(deprecated)]

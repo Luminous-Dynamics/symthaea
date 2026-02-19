@@ -1,0 +1,19 @@
+[package]
+name = "mycelix-fl-proofs"
+version = "0.1.0"
+edition = "2021"
+description = "zkSTARK proof scaffold for Mycelix Federated Learning"
+license = "Apache-2.0"
+
+[dependencies]
+mycelix-fl-core = { path = "../mycelix-fl-core" }
+winterfell = "0.10"
+blake3 = "1.5"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+# No additional dev deps needed — winterfell prover is in main deps
+
+[features]
+default = []

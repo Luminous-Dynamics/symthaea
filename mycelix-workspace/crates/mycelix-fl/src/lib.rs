@@ -48,5 +48,14 @@ pub mod holochain;
 #[cfg(feature = "attacks")]
 pub mod attacks;
 
+pub mod hdc_aggregation;
+
+#[cfg(feature = "phi-series")]
+pub mod phi_series;
+
+#[cfg(feature = "pogq")]
+pub mod pogq;
+
 pub use types::*;
 pub use pipeline::DecentralizedPipeline;
+pub use phi::{GradientCoherenceConfig, GradientCoherenceGate, CoherenceScore};

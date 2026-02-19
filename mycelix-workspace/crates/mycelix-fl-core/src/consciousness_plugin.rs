@@ -22,32 +22,25 @@ use std::collections::HashMap;
 use crate::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
 use crate::plugins::ByzantinePlugin;
 use crate::types::GradientUpdate;
-
-// Canonical Phi threshold constants — must match mycelix_bridge_common::phi_thresholds::PhiThresholds::default().
-// Source of truth: crates/mycelix-bridge-common/src/phi_thresholds.rs
-const CANONICAL_FL_VETO: f32 = 0.1;
-const CANONICAL_FL_DAMPEN: f32 = 0.3;
-const CANONICAL_FL_BOOST: f32 = 0.6;
-const CANONICAL_FL_DAMPEN_FACTOR: f32 = 0.3;
-const CANONICAL_FL_BOOST_FACTOR: f32 = 1.5;
+use mycelix_bridge_common::phi_thresholds::phi_thresholds;
 
 /// Configuration for consciousness-aware Byzantine detection.
 ///
-/// Default values are aligned with the canonical thresholds in
-/// `mycelix_bridge_common::phi_thresholds::PhiThresholds`. If you
+/// Default values are imported from `mycelix_bridge_common::phi_thresholds` —
+/// the single source of truth for all Mycelix Phi thresholds. If you
 /// need to override per-instance, construct with custom values;
 /// otherwise prefer `Default::default()` to stay aligned.
 #[derive(Debug, Clone)]
 pub struct ConsciousnessConfig {
-    /// Below this phi: dampen weight (default 0.3, canonical: fl_dampen)
+    /// Below this phi: dampen weight (canonical: fl_dampen)
     pub phi_threshold: f32,
-    /// Above this phi: boost weight (default 0.6, canonical: fl_boost)
+    /// Above this phi: boost weight (canonical: fl_boost)
     pub phi_boost_threshold: f32,
-    /// Weight multiplier for low-phi participants (default 0.3, canonical: fl_dampen_factor)
+    /// Weight multiplier for low-phi participants (canonical: fl_dampen_factor)
     pub dampen_factor: f32,
-    /// Weight multiplier for high-phi participants (default 1.5, canonical: fl_boost_factor)
+    /// Weight multiplier for high-phi participants (canonical: fl_boost_factor)
     pub boost_factor: f32,
-    /// Below this phi: veto entirely (default 0.1, canonical: fl_veto)
+    /// Below this phi: veto entirely (canonical: fl_veto)
     pub veto_threshold: f32,
     /// Default phi for participants without a score (default 0.5 = neutral)
     pub default_phi: f32,
@@ -55,12 +48,13 @@ pub struct ConsciousnessConfig {
 
 impl Default for ConsciousnessConfig {
     fn default() -> Self {
+        let t = phi_thresholds();
         Self {
-            phi_threshold: CANONICAL_FL_DAMPEN,
-            phi_boost_threshold: CANONICAL_FL_BOOST,
-            dampen_factor: CANONICAL_FL_DAMPEN_FACTOR,
-            boost_factor: CANONICAL_FL_BOOST_FACTOR,
-            veto_threshold: CANONICAL_FL_VETO,
+            phi_threshold: t.fl_dampen,
+            phi_boost_threshold: t.fl_boost,
+            dampen_factor: t.fl_dampen_factor,
+            boost_factor: t.fl_boost_factor,
+            veto_threshold: t.fl_veto,
             default_phi: 0.5,
         }
     }
@@ -173,13 +167,14 @@ mod tests {
     }
 
     #[test]
-    fn test_default_config() {
+    fn test_default_config_matches_canonical() {
         let config = ConsciousnessConfig::default();
-        assert_eq!(config.phi_threshold, 0.3);
-        assert_eq!(config.phi_boost_threshold, 0.6);
-        assert_eq!(config.dampen_factor, 0.3);
-        assert_eq!(config.boost_factor, 1.5);
-        assert_eq!(config.veto_threshold, 0.1);
+        let canonical = mycelix_bridge_common::phi_thresholds::phi_thresholds();
+        assert_eq!(config.phi_threshold, canonical.fl_dampen);
+        assert_eq!(config.phi_boost_threshold, canonical.fl_boost);
+        assert_eq!(config.dampen_factor, canonical.fl_dampen_factor);
+        assert_eq!(config.boost_factor, canonical.fl_boost_factor);
+        assert_eq!(config.veto_threshold, canonical.fl_veto);
         assert_eq!(config.default_phi, 0.5);
     }
 

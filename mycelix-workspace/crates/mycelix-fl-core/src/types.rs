@@ -173,6 +173,10 @@ pub enum AggregationMethod {
     Median,
     /// Krum algorithm (selects closest to neighbors)
     Krum,
+    /// Multi-Krum: selects and averages top-k gradients by Krum score
+    MultiKrum,
+    /// Geometric Median via Weiszfeld iterative algorithm
+    GeometricMedian,
     /// Trust-weighted aggregation (reputation-based)
     #[default]
     TrustWeighted,

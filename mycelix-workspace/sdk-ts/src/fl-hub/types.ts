@@ -125,6 +125,14 @@ export interface SessionConfig {
   privacyBudget?: PrivacyBudget;
   selectionCriteria?: ParticipantCriteria;
   validationSplit?: number;
+  /** Adaptive defense escalation config (requires feature in Rust backend) */
+  adaptiveDefense?: AdaptiveDefenseConfig;
+  /** Ensemble defense config — runs multiple methods and votes */
+  ensembleConfig?: EnsembleConfig;
+  /** Enable Shapley value computation for contribution attribution */
+  enableShapley?: boolean;
+  /** Enable replay detection across rounds */
+  enableReplayDetection?: boolean;
 }
 
 /**
@@ -262,6 +270,89 @@ export interface DifferentialPrivacyConfig {
   noiseMultiplier: number;
   targetEpsilon?: number;
   targetDelta?: number;
+}
+
+// =============================================================================
+// Advanced Defense Types
+// =============================================================================
+
+/**
+ * Adaptive defense configuration.
+ *
+ * Escalates through aggregation methods as Byzantine activity increases:
+ * FedAvg → Median → TrimmedMean → Krum → MultiKrum
+ */
+export interface AdaptiveDefenseConfig {
+  /** Enable adaptive defense escalation */
+  enabled: boolean;
+  /** Byzantine fraction threshold to escalate (default: 0.1) */
+  escalationThreshold: number;
+  /** Number of rounds before de-escalating (default: 5) */
+  cooldownRounds: number;
+  /** Maximum escalation level (0=FedAvg, 4=MultiKrum) */
+  maxLevel: number;
+}
+
+/**
+ * Ensemble defense configuration.
+ *
+ * Runs multiple aggregation methods and votes on which participants
+ * are Byzantine. Provides stronger guarantees than any single method.
+ */
+export interface EnsembleConfig {
+  /** Aggregation methods to include in the ensemble */
+  methods: AggregationMethod[];
+  /** Voting strategy for Byzantine identification */
+  votingStrategy: 'majority' | 'weighted' | 'unanimous' | 'median' | 'best' | 'adaptive';
+  /** Fraction of methods that must flag a participant as Byzantine (majority voting) */
+  byzantineThreshold: number;
+}
+
+/**
+ * Shapley value result for a participant.
+ *
+ * Measures each participant's marginal contribution to model quality,
+ * enabling fair reward distribution and free-rider detection.
+ */
+export interface ShapleyResult {
+  /** Participant agent ID */
+  participantId: string;
+  /** Computed Shapley value (higher = more contribution) */
+  shapleyValue: number;
+  /** Normalized contribution share (0-1, sums to 1 across participants) */
+  contributionShare: number;
+  /** Sampling method used */
+  method: 'exact' | 'monte_carlo' | 'permutation';
+  /** Number of samples/permutations evaluated */
+  sampleCount: number;
+}
+
+/**
+ * Replay detection result.
+ *
+ * Identifies participants resubmitting identical or near-identical
+ * gradients across rounds (stale replay attacks).
+ */
+export interface ReplayDetectionResult {
+  /** Whether any replay was detected */
+  replayDetected: boolean;
+  /** Participant IDs flagged for replay */
+  flaggedParticipants: string[];
+  /** Detection details per flagged participant */
+  details: ReplayDetail[];
+}
+
+/**
+ * Detail of a single replay detection
+ */
+export interface ReplayDetail {
+  participantId: string;
+  /** Type of replay detected */
+  replayType: 'exact' | 'near_duplicate' | 'cross_node_copy' | 'pattern';
+  /** Similarity score (1.0 = exact match) */
+  similarity: number;
+  /** Round in which the original gradient appeared */
+  sourceRound: number;
 }
 
 // =============================================================================

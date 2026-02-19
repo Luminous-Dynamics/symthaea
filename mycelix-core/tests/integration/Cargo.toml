@@ -11,7 +11,8 @@ rb-bft-consensus = { path = "../../libs/rb-bft-consensus" }
 matl-bridge = { path = "../../libs/matl-bridge" }
 feldman-dkg = { path = "../../libs/feldman-dkg" }
 kvector-zkp = { path = "../../libs/kvector-zkp" }
-fl-aggregator = { path = "../../libs/fl-aggregator", features = ["proofs"] }
+# fl-aggregator ARCHIVED (Feb 2026) — features ported to mycelix-fl-core + mycelix-fl + mycelix-fl-proofs
+# See: mycelix-core/libs/fl-aggregator.archived-v0.1/
 
 # SHA2 for Merkle tree benchmarks
 sha2 = "0.10"
@@ -31,7 +32,7 @@ rand_distr = "0.4"
 # Hashing (for gradient commitments)
 sha3 = "0.10"
 
-# Array operations (must match fl-aggregator version)
+# Array operations
 ndarray = "0.16"
 
 [dev-dependencies]

@@ -334,6 +334,16 @@ impl UnifiedPipeline {
                     aggregation::coordinate_median(&working_updates)?
                 }
             }
+            AggregationMethod::MultiKrum => {
+                if working_updates.len() >= 3 {
+                    aggregation::multi_krum(&working_updates, 1, 3)?
+                } else {
+                    aggregation::coordinate_median(&working_updates)?
+                }
+            }
+            AggregationMethod::GeometricMedian => {
+                aggregation::geometric_median(&working_updates, 100, 1e-6)?
+            }
             AggregationMethod::TrustWeighted => {
                 let result = aggregation::trust_weighted(
                     &working_updates,

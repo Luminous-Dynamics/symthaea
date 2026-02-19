@@ -292,6 +292,153 @@ pub fn trust_weighted(
     ))
 }
 
+/// Multi-Krum Aggregation
+///
+/// Selects the top-k gradients by Krum score (sum of distances to nearest
+/// n-f-2 neighbors) and averages them. Combines Krum's Byzantine resilience
+/// with the stability of averaging multiple selections.
+///
+/// Requires n >= 2*f + 3 participants.
+///
+/// # Arguments
+/// * `updates` - Gradient updates from participants
+/// * `f` - Maximum number of Byzantine participants to tolerate
+/// * `k` - Number of top gradients to select and average
+// Ported from fl-aggregator/src/byzantine.rs (MultiKrum variant)
+pub fn multi_krum(
+    updates: &[GradientUpdate],
+    f: usize,
+    k: usize,
+) -> Result<Vec<f32>, AggregationError> {
+    validate_gradient_consistency(updates)?;
+
+    let n = updates.len();
+    let min_required = 2 * f + 3;
+    if n < min_required {
+        return Err(AggregationError::NotEnoughForKrum(n));
+    }
+    if k == 0 || k > n.saturating_sub(f) {
+        return Err(AggregationError::InvalidKrumSelect(k));
+    }
+
+    let take_count = n.saturating_sub(f).saturating_sub(2);
+
+    // Pairwise distances
+    let mut distances_flat: Vec<f32> = vec![0.0; n * n];
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let dist = euclidean_distance(&updates[i].gradients, &updates[j].gradients);
+            distances_flat[i * n + j] = dist;
+            distances_flat[j * n + i] = dist;
+        }
+    }
+
+    // Krum scores: sum of distances to nearest (n-f-2) neighbors
+    let mut sorted_distances: Vec<f32> = Vec::with_capacity(n);
+    let mut scores: Vec<(usize, f32)> = Vec::with_capacity(n);
+
+    for i in 0..n {
+        sorted_distances.clear();
+        sorted_distances.extend(
+            (0..n)
+                .filter(|&j| j != i)
+                .map(|j| distances_flat[i * n + j]),
+        );
+        sorted_distances
+            .sort_unstable_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let score: f32 = sorted_distances.iter().take(take_count).sum();
+        scores.push((i, score));
+    }
+
+    // Sort by score (lowest = most central)
+    scores.sort_unstable_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+
+    // Average top-k selected gradients (equal weight)
+    let gradient_size = updates[0].gradients.len();
+    let mut result = vec![0.0f32; gradient_size];
+    let selected_count = k.min(scores.len());
+
+    for (idx, _) in &scores[..selected_count] {
+        for (i, grad) in updates[*idx].gradients.iter().enumerate() {
+            result[i] += grad;
+        }
+    }
+
+    for val in result.iter_mut() {
+        *val /= selected_count as f32;
+    }
+
+    Ok(result)
+}
+
+/// Geometric Median Aggregation via Weiszfeld algorithm
+///
+/// Iteratively approximates the geometric median — the point minimizing
+/// the sum of Euclidean distances to all input gradients. More robust
+/// than coordinate-wise median as it considers cross-dimensional structure.
+///
+/// # Arguments
+/// * `updates` - Gradient updates from participants
+/// * `max_iterations` - Maximum Weiszfeld iterations (typically 100)
+/// * `tolerance` - Convergence tolerance (typically 1e-6)
+// Ported from fl-aggregator/src/byzantine.rs (GeometricMedian variant)
+pub fn geometric_median(
+    updates: &[GradientUpdate],
+    max_iterations: usize,
+    tolerance: f32,
+) -> Result<Vec<f32>, AggregationError> {
+    validate_gradient_consistency(updates)?;
+
+    let n = updates.len();
+    let dim = updates[0].gradients.len();
+
+    // Initialize with arithmetic mean
+    let mut median = vec![0.0f32; dim];
+    for update in updates {
+        for (i, g) in update.gradients.iter().enumerate() {
+            median[i] += g;
+        }
+    }
+    for val in median.iter_mut() {
+        *val /= n as f32;
+    }
+
+    // Weiszfeld iteration
+    for _iter in 0..max_iterations {
+        let mut numerator = vec![0.0f32; dim];
+        let mut denominator = 0.0f32;
+
+        for update in updates {
+            let dist = euclidean_distance(&median, &update.gradients);
+            if dist > 1e-10 {
+                let weight = 1.0 / dist;
+                for (i, g) in update.gradients.iter().enumerate() {
+                    numerator[i] += g * weight;
+                }
+                denominator += weight;
+            }
+        }
+
+        if denominator < 1e-10 {
+            break;
+        }
+
+        let mut new_median = Vec::with_capacity(dim);
+        for val in &numerator {
+            new_median.push(val / denominator);
+        }
+
+        let change = euclidean_distance(&new_median, &median);
+        median = new_median;
+
+        if change < tolerance {
+            break;
+        }
+    }
+
+    Ok(median)
+}
+
 /// Euclidean distance between two vectors
 pub fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {
     a.iter()
@@ -299,6 +446,11 @@ pub fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {
         .map(|(x, y)| (x - y).powi(2))
         .sum::<f32>()
         .sqrt()
+}
+
+/// L2 norm of a vector
+pub(crate) fn l2_norm(v: &[f32]) -> f32 {
+    v.iter().map(|x| x * x).sum::<f32>().sqrt()
 }
 
 #[cfg(test)]
@@ -413,5 +565,97 @@ mod tests {
         let updates = test_updates();
         assert!(trimmed_mean(&updates, 0.6).is_err());
         assert!(trimmed_mean(&updates, -0.1).is_err());
+    }
+
+    #[test]
+    fn test_multi_krum_rejects_byzantine() {
+        let updates = vec![
+            GradientUpdate::new("p1".into(), 1, vec![1.0, 2.0, 3.0], 100, 0.5),
+            GradientUpdate::new("p2".into(), 1, vec![1.1, 2.1, 3.1], 100, 0.4),
+            GradientUpdate::new("p3".into(), 1, vec![1.2, 2.2, 3.2], 100, 0.45),
+            GradientUpdate::new("p4".into(), 1, vec![0.9, 1.9, 2.9], 100, 0.5),
+            GradientUpdate::new("byz".into(), 1, vec![100.0, 200.0, 300.0], 100, 0.3),
+        ];
+        let result = multi_krum(&updates, 1, 3).unwrap();
+        // Average of 3 best should be near [1, 2, 3], not pulled by Byzantine
+        assert!(result[0] < 5.0);
+        assert!(result[1] < 5.0);
+    }
+
+    #[test]
+    fn test_multi_krum_all_honest() {
+        let updates = vec![
+            GradientUpdate::new("p1".into(), 1, vec![1.0, 2.0], 100, 0.5),
+            GradientUpdate::new("p2".into(), 1, vec![1.1, 2.1], 100, 0.5),
+            GradientUpdate::new("p3".into(), 1, vec![1.2, 2.2], 100, 0.5),
+            GradientUpdate::new("p4".into(), 1, vec![0.9, 1.9], 100, 0.5),
+            GradientUpdate::new("p5".into(), 1, vec![1.05, 2.05], 100, 0.5),
+        ];
+        let result = multi_krum(&updates, 1, 3).unwrap();
+        // Should be a reasonable average near [1.0, 2.0]
+        assert!((result[0] - 1.0).abs() < 0.5);
+        assert!((result[1] - 2.0).abs() < 0.5);
+    }
+
+    #[test]
+    fn test_multi_krum_insufficient() {
+        let updates = vec![
+            GradientUpdate::new("p1".into(), 1, vec![1.0], 100, 0.5),
+            GradientUpdate::new("p2".into(), 1, vec![2.0], 100, 0.5),
+        ];
+        // f=1 needs n >= 5
+        assert!(multi_krum(&updates, 1, 1).is_err());
+    }
+
+    #[test]
+    fn test_multi_krum_invalid_k() {
+        let updates = vec![
+            GradientUpdate::new("p1".into(), 1, vec![1.0], 100, 0.5),
+            GradientUpdate::new("p2".into(), 1, vec![2.0], 100, 0.5),
+            GradientUpdate::new("p3".into(), 1, vec![3.0], 100, 0.5),
+            GradientUpdate::new("p4".into(), 1, vec![4.0], 100, 0.5),
+            GradientUpdate::new("p5".into(), 1, vec![5.0], 100, 0.5),
+        ];
+        // k=0 is invalid
+        assert!(multi_krum(&updates, 1, 0).is_err());
+    }
+
+    #[test]
+    fn test_geometric_median_unit_square() {
+        let updates = vec![
+            GradientUpdate::new("p1".into(), 1, vec![0.0, 0.0], 100, 0.5),
+            GradientUpdate::new("p2".into(), 1, vec![1.0, 0.0], 100, 0.5),
+            GradientUpdate::new("p3".into(), 1, vec![0.0, 1.0], 100, 0.5),
+            GradientUpdate::new("p4".into(), 1, vec![1.0, 1.0], 100, 0.5),
+        ];
+        let result = geometric_median(&updates, 100, 1e-6).unwrap();
+        // Geometric median of unit square is approximately (0.5, 0.5)
+        assert!((result[0] - 0.5).abs() < 0.1);
+        assert!((result[1] - 0.5).abs() < 0.1);
+    }
+
+    #[test]
+    fn test_geometric_median_robust_to_outlier() {
+        let updates = vec![
+            GradientUpdate::new("p1".into(), 1, vec![1.0, 2.0], 100, 0.5),
+            GradientUpdate::new("p2".into(), 1, vec![1.1, 2.1], 100, 0.5),
+            GradientUpdate::new("p3".into(), 1, vec![0.9, 1.9], 100, 0.5),
+            GradientUpdate::new("byz".into(), 1, vec![100.0, 200.0], 100, 0.3),
+        ];
+        let result = geometric_median(&updates, 100, 1e-6).unwrap();
+        // Should be closer to [1, 2] than to the outlier
+        assert!((result[0] - 1.0).abs() < 1.0);
+        assert!((result[1] - 2.0).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_l2_norm() {
+        assert!((l2_norm(&[3.0, 4.0]) - 5.0).abs() < 1e-6);
+        assert!((l2_norm(&[]) - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_l2_norm_zero() {
+        assert!((l2_norm(&[]) - 0.0).abs() < 1e-6);
     }
 }

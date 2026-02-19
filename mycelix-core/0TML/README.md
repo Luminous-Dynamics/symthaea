@@ -1,5 +1,11 @@
 # Mycelix Protocol: Zero-TrustML (0TML) - Gen 5 AEGIS
 
+> **FROZEN RESEARCH IMPLEMENTATION** (February 2026)
+>
+> This is the IEEE S&P paper reference implementation. For production
+> Federated Learning, see: `mycelix-workspace/crates/mycelix-fl-core/`
+> and `mycelix-workspace/crates/mycelix-fl/`
+
 [![Docs](https://img.shields.io/badge/docs-mycelix.net-6f2dbd.svg)](https://mycelix.net)
 [![Improvement Plan](https://img.shields.io/badge/roadmap-Nov%202025-orange.svg)](../docs/05-roadmap/IMPROVEMENT_PLAN_NOV2025.md)
 

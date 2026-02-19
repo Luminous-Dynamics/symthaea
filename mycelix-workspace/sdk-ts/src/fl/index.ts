@@ -178,6 +178,8 @@ export enum AggregationMethod {
   TrimmedMean = 'trimmed_mean',
   Median = 'median',
   Krum = 'krum',
+  MultiKrum = 'multi_krum',
+  GeometricMedian = 'geometric_median',
   TrustWeighted = 'trust_weighted',
 }
 
@@ -360,6 +362,134 @@ export function krum(
 
   // Average selected updates
   return fedAvg(selectedUpdates);
+}
+
+/**
+ * Multi-Krum Aggregation
+ *
+ * Selects top-m gradients by Krum score and averages them.
+ * More robust than single Krum when Byzantine fraction is lower.
+ * Tolerates up to (n-m-2) Byzantine participants out of n.
+ *
+ * @param updates - Gradient updates to aggregate
+ * @param numSelect - Number of top-scoring gradients to average (default: ceil(n/2))
+ */
+export function multiKrum(
+  updates: GradientUpdate[],
+  numSelect?: number,
+): Float64Array {
+  validateGradientConsistency(updates);
+
+  const n = updates.length;
+  const m = numSelect ?? Math.ceil(n / 2);
+
+  if (m < 1 || m > n) {
+    throw new FederatedLearningError(
+      `numSelect must be between 1 and ${n}`,
+      ErrorCode.INVALID_ARGUMENT,
+      { numSelect: m, numUpdates: n },
+    );
+  }
+
+  if (n < 3) {
+    throw new FederatedLearningError(
+      'Multi-Krum requires at least 3 updates',
+      ErrorCode.FL_NOT_ENOUGH_PARTICIPANTS,
+      { required: 3, received: n },
+    );
+  }
+
+  const numNeighbors = n - 2;
+
+  // Calculate pairwise distances
+  const distances: number[][] = [];
+  for (let i = 0; i < n; i++) {
+    distances[i] = [];
+    for (let j = 0; j < n; j++) {
+      if (i === j) {
+        distances[i][j] = Infinity;
+      } else {
+        distances[i][j] = euclideanDistance(updates[i].gradients, updates[j].gradients);
+      }
+    }
+  }
+
+  // Calculate Krum scores
+  const scores: { index: number; score: number }[] = [];
+  for (let i = 0; i < n; i++) {
+    const sortedDistances = [...distances[i]].sort((a, b) => a - b);
+    const score = sortedDistances.slice(0, numNeighbors).reduce((a, b) => a + b, 0);
+    scores.push({ index: i, score });
+  }
+
+  // Select top-m by lowest score
+  scores.sort((a, b) => a.score - b.score);
+  const selectedUpdates = scores.slice(0, m).map((s) => updates[s.index]);
+
+  return fedAvg(selectedUpdates);
+}
+
+/**
+ * Geometric Median Aggregation (Weiszfeld algorithm)
+ *
+ * Computes the L2 geometric median — the point minimizing the sum of
+ * Euclidean distances to all inputs. More robust than coordinate-wise
+ * median against coordinated attacks across dimensions.
+ *
+ * @param updates - Gradient updates to aggregate
+ * @param maxIterations - Maximum Weiszfeld iterations (default: 100)
+ * @param tolerance - Convergence tolerance (default: 1e-7)
+ */
+export function geometricMedian(
+  updates: GradientUpdate[],
+  maxIterations: number = 100,
+  tolerance: number = 1e-7,
+): Float64Array {
+  validateGradientConsistency(updates);
+
+  if (updates.length === 1) {
+    return new Float64Array(updates[0].gradients);
+  }
+
+  const gradientSize = updates[0].gradients.length;
+  const n = updates.length;
+
+  // Initialize with coordinate-wise mean
+  const estimate = new Float64Array(gradientSize);
+  for (const u of updates) {
+    for (let i = 0; i < gradientSize; i++) {
+      estimate[i] += u.gradients[i] / n;
+    }
+  }
+
+  // Weiszfeld iterations
+  for (let iter = 0; iter < maxIterations; iter++) {
+    const numerator = new Float64Array(gradientSize);
+    let denominator = 0;
+
+    for (const u of updates) {
+      const dist = euclideanDistance(estimate, u.gradients);
+      if (dist < 1e-10) continue; // Skip coincident points
+      const w = 1.0 / dist;
+      denominator += w;
+      for (let i = 0; i < gradientSize; i++) {
+        numerator[i] += u.gradients[i] * w;
+      }
+    }
+
+    if (denominator < 1e-10) break;
+
+    let maxDiff = 0;
+    for (let i = 0; i < gradientSize; i++) {
+      const newVal = numerator[i] / denominator;
+      maxDiff = Math.max(maxDiff, Math.abs(newVal - estimate[i]));
+      estimate[i] = newVal;
+    }
+
+    if (maxDiff < tolerance) break;
+  }
+
+  return estimate;
 }
 
 /**
@@ -735,6 +865,28 @@ export class FLCoordinator {
           participantCount: filtered.length,
           excludedCount,
           aggregationMethod: AggregationMethod.Krum,
+          timestamp: Date.now(),
+        };
+        break;
+
+      case AggregationMethod.MultiKrum:
+        aggregatedResult = {
+          gradients: multiKrum(filtered),
+          modelVersion: this.roundHistory.length + 1,
+          participantCount: filtered.length,
+          excludedCount,
+          aggregationMethod: AggregationMethod.MultiKrum,
+          timestamp: Date.now(),
+        };
+        break;
+
+      case AggregationMethod.GeometricMedian:
+        aggregatedResult = {
+          gradients: geometricMedian(filtered),
+          modelVersion: this.roundHistory.length + 1,
+          participantCount: filtered.length,
+          excludedCount,
+          aggregationMethod: AggregationMethod.GeometricMedian,
           timestamp: Date.now(),
         };
         break;

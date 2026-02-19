@@ -13,11 +13,16 @@ serde_json = "1"
 rand = { version = "0.8", default-features = false, features = ["alloc", "small_rng"] }
 thiserror = "1"
 mycelix-fl-core = { path = "../mycelix-fl-core", default-features = false }
+mycelix-bridge-common = { path = "../../../crates/mycelix-bridge-common", default-features = false }
 
 [features]
 default = []
 # Enable attack simulation modules (test-only, large)
 attacks = []
+# Phi time-series tracking and anomaly detection
+phi-series = []
+# PoGQ-v4.1 Lite Byzantine detection (hysteresis, warm-up, probe head)
+pogq = []
 
 [dev-dependencies]
 rand = { version = "0.8", features = ["std", "std_rng"] }

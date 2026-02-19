@@ -19,12 +19,18 @@ use crate::plugins::ByzantinePlugin;
 use crate::types::GradientUpdate;
 
 /// Configuration for the meta-learning Byzantine plugin.
+///
+/// **Threshold disambiguation**: The thresholds here (`ema_alpha`, `suspicion_threshold`,
+/// `learning_rate`) are meta-learning signal parameters — they are NOT IIT Phi thresholds
+/// and NOT governance Phi gates. For canonical Phi thresholds used in governance and
+/// consciousness-aware FL, see `mycelix_bridge_common::phi_thresholds`.
 #[derive(Debug, Clone)]
 pub struct MetaLearningConfig {
     /// EMA smoothing factor for exclusion rate (0.0-1.0).
     /// Higher = faster adaptation, lower = more stable.
     pub ema_alpha: f32,
     /// Exclusion rate above which a participant is flagged as suspicious.
+    /// This is a meta-learning signal threshold, not an IIT Phi threshold.
     pub suspicion_threshold: f32,
     /// Learning rate for signal weight adaptation.
     pub learning_rate: f32,
