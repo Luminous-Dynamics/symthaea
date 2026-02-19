@@ -1,7 +1,7 @@
 ---
 # Mycelix Commons DNA
 # Universal Resource Coordination: property + housing + care + mutualaid + water + food + transport
-# 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport + 1 space = 35 domain + 1 bridge = 36 coordinator zomes
+# 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport + 3 support + 1 space = 38 domain + 1 bridge = 39 coordinator zomes
 
 manifest_version: "0"
 name: mycelix_commons
@@ -94,6 +94,14 @@ integrity:
       path: ../target/wasm32-unknown-unknown/release/transport_sharing_integrity.wasm
     - name: transport_impact_integrity
       path: ../target/wasm32-unknown-unknown/release/transport_impact_integrity.wasm
+
+    # Support domain
+    - name: support_knowledge_integrity
+      path: ../target/wasm32-unknown-unknown/release/support_knowledge_integrity.wasm
+    - name: support_tickets_integrity
+      path: ../target/wasm32-unknown-unknown/release/support_tickets_integrity.wasm
+    - name: support_diagnostics_integrity
+      path: ../target/wasm32-unknown-unknown/release/support_diagnostics_integrity.wasm
 
     # Space / membrane factory
     - name: space_integrity
@@ -260,6 +268,20 @@ coordinator:
       path: ../target/wasm32-unknown-unknown/release/transport_impact.wasm
       dependencies:
         - name: transport_impact_integrity
+
+    # Support domain
+    - name: support_knowledge
+      path: ../target/wasm32-unknown-unknown/release/support_knowledge.wasm
+      dependencies:
+        - name: support_knowledge_integrity
+    - name: support_tickets
+      path: ../target/wasm32-unknown-unknown/release/support_tickets.wasm
+      dependencies:
+        - name: support_tickets_integrity
+    - name: support_diagnostics
+      path: ../target/wasm32-unknown-unknown/release/support_diagnostics.wasm
+      dependencies:
+        - name: support_diagnostics_integrity
 
     # Space / membrane factory
     - name: space
