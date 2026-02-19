@@ -416,38 +416,9 @@ mod tests {
         }
     }
 
-    /// Integration test with actual proof generation
-    #[test]
-    fn test_gpu_proof_integration() {
-        use fl_aggregator::proofs::{RangeProof, ProofConfig};
-
-        // Generate a range proof (uses internal NTT operations)
-        let start = Instant::now();
-        let proof = RangeProof::generate(42, 0, 100, ProofConfig::default());
-        let proof_time = start.elapsed();
-
-        assert!(proof.is_ok());
-        println!("Range proof generation time: {:.2}ms", proof_time.as_secs_f64() * 1000.0);
-    }
-
-    /// Test GPU context availability
-    #[test]
-    fn test_gpu_availability() {
-        use fl_aggregator::proofs::gpu::{check_gpu_availability, list_devices};
-
-        let status = check_gpu_availability();
-        println!("GPU available: {}", status.available);
-        if let Some(device) = &status.device {
-            println!("GPU device: {}", device.name);
-            println!("Backend: {}", device.backend);
-        }
-        if let Some(error) = &status.error {
-            println!("GPU error: {}", error);
-        }
-
-        let devices = list_devices();
-        println!("Found {} GPU device(s)", devices.len());
-    }
+    // test_gpu_proof_integration and test_gpu_availability removed:
+    // fl_aggregator archived (Feb 2026). Proof generation now in mycelix-fl-proofs.
+    // GPU acceleration for proofs is a future project.
 
     /// Benchmark comparison test
     #[test]

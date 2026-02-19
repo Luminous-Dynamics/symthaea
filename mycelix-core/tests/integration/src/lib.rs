@@ -27,7 +27,8 @@ pub mod consensus_integration;
 pub mod ecosystem_stress;
 pub mod chaos_network;
 pub mod e2e_pipeline;
-pub mod symthaea_bridge;
-pub mod payment_fl_bridge;
+// symthaea_bridge and payment_fl_bridge archived with fl-aggregator (Feb 2026).
+// Files moved to: mycelix-core/libs/fl-aggregator.archived-v0.1/integration_tests/
+// Production FL integration tests: mycelix-workspace/tests/sweettest/tests/phi_attestation_e2e.rs
 pub mod cross_happ_bridge;
 pub mod gpu_acceleration;
