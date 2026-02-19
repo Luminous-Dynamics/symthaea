@@ -1,0 +1,34 @@
+//! # Symthaea Psychological Benchmark Suite
+//!
+//! Standardized evaluation of Symthaea's neuroscience-inspired subsystems
+//! against established psychological benchmarks and published human baselines.
+//!
+//! ## Benchmarks
+//!
+//! - **WorM** — Working memory tasks (N-back, change detection, serial recall,
+//!   spatial updating, binding)
+//! - **CogBench** — Cognitive psychology experiments via FEP active inference
+//!   (probabilistic reasoning, exploration, bandits, instrumental learning,
+//!   two-step task, temporal discounting, BART)
+//! - **Butlin** — Consciousness indicators from 6 theories (RPT, GWT, HOT, PP, AST, IIT)
+//! - **ToMBench** — Theory of Mind tasks (false belief, faux-pas, persuasion,
+//!   strange story, hinting)
+//! - **MemoryAgentBench** — Full memory pipeline competencies (retrieval,
+//!   test-time learning, long-range, conflict resolution)
+//!
+//! ## Usage
+//!
+//! ```rust,ignore
+//! use symthaea_psych_bench::harness::{PsychBenchmark, BenchmarkConfig};
+//! use symthaea_psych_bench::benchmarks::worm::NBackBenchmark;
+//!
+//! let config = BenchmarkConfig::default();
+//! let bench = NBackBenchmark;
+//! let result = bench.run(&config);
+//! println!("{}", result.summary());
+//! ```
+
+pub mod adapter;
+pub mod benchmarks;
+pub mod harness;
+pub mod wm;

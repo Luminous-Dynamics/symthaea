@@ -451,7 +451,7 @@ impl SqliteMemory {
             content: row.get(4)?,
             valence: row.get::<_, f64>(5)? as f32,
             arousal: row.get::<_, f64>(6)? as f32,
-            phi: row.get::<_, f64>(7)?,
+            psi: row.get::<_, f64>(7)?,
             topics,
             metadata: row.get(9)?,
             consolidation_strength: row.get::<_, f64>(10).unwrap_or(0.0),
@@ -567,7 +567,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                     record.content,
                     record.valence as f64,
                     record.arousal as f64,
-                    { record.phi },
+                    { record.psi },
                     topics_json,
                     record.metadata,
                     record.consolidation_strength,
@@ -920,7 +920,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                 avg_query_latency_us: 0, // Not tracked yet
                 total_queries: 0,        // Not tracked yet
                 memory_type_counts,
-                avg_phi,
+                avg_psi: avg_phi,
                 oldest_timestamp_ms: oldest_timestamp_ms as u64,
                 newest_timestamp_ms: newest_timestamp_ms as u64,
                 backend_status,

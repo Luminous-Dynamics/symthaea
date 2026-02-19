@@ -18,7 +18,7 @@
 //! │                                                                              │
 //! │  ┌──────────────────────────────────────────────────────────────────────┐  │
 //! │  │                    CANONICAL Φ PROVIDER                              │  │
-//! │  │  UnifiedConsciousnessEngine.compute_unified_phi() → ALL SYSTEMS     │  │
+//! │  │  UnifiedConsciousnessEngine.compute_unified_psi() → ALL SYSTEMS     │  │
 //! │  └──────────────────────────────────────────────────────────────────────┘  │
 //! │                                    │                                        │
 //! │  ┌──────────────────┬──────────────┼──────────────┬──────────────────────┐ │
@@ -1064,10 +1064,10 @@ pub struct ConsciousnessUnificationEngine {
     pub reality: SystemReality,
     /// Dialogue pipeline
     pub dialogue: ConsciousDialoguePipeline,
-    /// Current unified Φ
-    pub phi: f64,
-    /// Φ history
-    phi_history: VecDeque<f64>,
+    /// Current unified Ψ
+    pub psi: f64,
+    /// Ψ history
+    psi_history: VecDeque<f64>,
 }
 
 impl Default for ConsciousnessUnificationEngine {
@@ -1083,31 +1083,31 @@ impl ConsciousnessUnificationEngine {
             causal: UnifiedCausalReasoning::new(),
             reality: SystemReality::default(),
             dialogue: ConsciousDialoguePipeline::new(),
-            phi: 0.5,
-            phi_history: VecDeque::with_capacity(100),
+            psi: 0.5,
+            psi_history: VecDeque::with_capacity(100),
         }
     }
 
-    /// Update Φ from canonical source
-    pub fn update_phi(&mut self, phi: f64) {
-        self.phi = phi;
-        if self.phi_history.len() >= 100 {
-            self.phi_history.pop_front();
+    /// Update Ψ from canonical source
+    pub fn update_psi(&mut self, psi: f64) {
+        self.psi = psi;
+        if self.psi_history.len() >= 100 {
+            self.psi_history.pop_front();
         }
-        self.phi_history.push_back(phi);
+        self.psi_history.push_back(psi);
     }
 
     /// Process input through unified consciousness
     pub fn process(&mut self, input: &str) -> UnifiedConsciousnessResult {
         // Generate dialogue response
-        let response = self.dialogue.generate(input, self.phi, &self.emotional);
+        let response = self.dialogue.generate(input, self.psi, &self.emotional);
 
         // Detect emotional pattern
         let emotional_pattern = self.emotional.detect_pattern();
 
         // Build result
         UnifiedConsciousnessResult {
-            phi: self.phi,
+            psi: self.psi,
             emotional_state: self.emotional.state().clone(),
             emotional_pattern,
             response,
@@ -1117,9 +1117,9 @@ impl ConsciousnessUnificationEngine {
 
     /// Get consciousness state description
     pub fn describe_state(&self) -> String {
-        let phi_trend = if self.phi_history.len() >= 5 {
-            let recent: f64 = self.phi_history.iter().rev().take(3).sum::<f64>() / 3.0;
-            let older: f64 = self.phi_history.iter().rev().skip(3).take(3).sum::<f64>() / 3.0;
+        let phi_trend = if self.psi_history.len() >= 5 {
+            let recent: f64 = self.psi_history.iter().rev().take(3).sum::<f64>() / 3.0;
+            let older: f64 = self.psi_history.iter().rev().skip(3).take(3).sum::<f64>() / 3.0;
             if recent > older + 0.05 {
                 "rising"
             } else if recent < older - 0.05 {
@@ -1133,7 +1133,7 @@ impl ConsciousnessUnificationEngine {
 
         format!(
             "Consciousness state: Φ={:.3} ({}), {} emotionally, pattern: {:?}",
-            self.phi,
+            self.psi,
             phi_trend,
             self.emotional.state().describe(),
             self.emotional.detect_pattern()
@@ -1144,8 +1144,8 @@ impl ConsciousnessUnificationEngine {
 /// Result from unified consciousness processing
 #[derive(Debug, Clone)]
 pub struct UnifiedConsciousnessResult {
-    /// Current Φ
-    pub phi: f64,
+    /// Current Ψ
+    pub psi: f64,
     /// Unified emotional state
     pub emotional_state: UnifiedEmotionalState,
     /// Detected emotional pattern
@@ -1767,12 +1767,12 @@ mod tests {
     #[test]
     fn test_unification_engine() {
         let mut engine = ConsciousnessUnificationEngine::new();
-        engine.update_phi(0.7);
+        engine.update_psi(0.7);
         engine.emotional.update_from_core_affect(0.5, 0.3, 0.4);
 
         let result = engine.process("Hello, how are you?");
 
-        assert!(result.phi > 0.5);
+        assert!(result.psi > 0.5);
         assert!(!result.response.text.is_empty());
     }
 

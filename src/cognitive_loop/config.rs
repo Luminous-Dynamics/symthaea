@@ -305,6 +305,12 @@ pub struct CognitiveLoopConfig {
     /// anomalies (drops, plateaus, oscillations) that indicate reasoning degradation.
     pub enable_metacognitive_monitoring: bool,
 
+    /// Enable resonator-network-enhanced memory recall.
+    /// When true, the cognitive loop stores episodes as bound (content ⊗ valence ⊗ phi)
+    /// hypervectors and uses iterative factorization for structured recall.
+    /// Science: Kent et al. (2020) — Resonator Networks for fast factorization
+    pub enable_resonator_recall: bool,
+
     /// Agent DID for attestation signing (e.g., "did:key:z6Mk...").
     /// Required when `enable_phi_attestation` is true. If None, attestation generation
     /// is silently skipped even when enabled.
@@ -366,6 +372,7 @@ impl Default for CognitiveLoopConfig {
             enable_primitive_consciousness: false,
             enable_safety_gateway: true,
             enable_metacognitive_monitoring: false,
+            enable_resonator_recall: false,
             enable_phi_attestation: false,
             agent_did: None,
             attestation_buffer_capacity: 64,
@@ -457,6 +464,7 @@ impl ConsciousnessProfile {
         config.enable_phi_attention = false;
         config.enable_negation_detection = false;
         config.enable_primitive_consciousness = false;
+        config.enable_resonator_recall = false;
         config.enable_phi_attestation = false;
         config.causal_enhancement = false;
         config.episodic_replay = false;
@@ -502,6 +510,7 @@ impl ConsciousnessProfile {
                 config.enable_phi_attention = true;
                 config.enable_negation_detection = true;
                 config.enable_primitive_consciousness = true;
+                config.enable_resonator_recall = true;
             }
             ConsciousnessProfile::Research => {
                 ConsciousnessProfile::Full.apply(config);

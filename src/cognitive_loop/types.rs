@@ -21,11 +21,11 @@ pub(crate) struct CycleCarryover {
     pub(crate) cross_modal_phi: f64,
     /// MCTS plan action (action_idx, confidence) for next cycle
     pub(crate) mcts_plan: Option<(usize, f32)>,
-    /// Body phi modulation (fed back into unified_phi)
+    /// Body phi modulation (fed back into unified_psi)
     pub(crate) body_phi_modulation: f64,
     /// Body arousal (fed back into CfC tau modulation)
     pub(crate) body_arousal: f32,
-    /// Embodied cognition phi modulation (fed back into unified_phi)
+    /// Embodied cognition phi modulation (fed back into unified_psi)
     pub(crate) embodied_phi_modulation: f64,
     /// Resonance frequency (fed back into delta_t modulation)
     pub(crate) resonance_frequency: f64,
@@ -346,6 +346,21 @@ pub struct CycleMetadata {
     /// FEP action index selected this cycle (0=exploit, 1=consolidate, 2=explore, 3=tighten).
     pub fep_action: usize,
 
+    /// Learned value feedback trend (moving avg of recent moral assessments, -1.0 to 1.0).
+    pub value_feedback_trend: f32,
+
+    /// Number of support triage classifications this cycle (0 when support disabled).
+    pub support_triage_count: u32,
+
+    /// Whether a support predictive alert fired this cycle.
+    pub support_alert_fired: bool,
+
+    /// Number of knowledge articles graduated via federation this cycle.
+    pub support_federation_graduated: usize,
+
+    /// Support subsystem expected free energy (0.0 when not computed).
+    pub support_efe: f64,
+
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
 }
@@ -413,6 +428,8 @@ pub struct ModuleTimings {
     pub consciousness_thermodynamics: u64,
     pub phenomenal_binding: u64,
     pub hierarchical_free_energy: u64,
+    pub resonator_recall: u64,
+    pub support_intelligence: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -430,10 +447,10 @@ pub struct ModuleTimings {
 /// converts it to the Holochain-compatible `PhiAttestationData` format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PhiAttestationRecord {
-    /// Unified Phi value from this cycle (clamped to [0.0, 1.0])
-    pub phi: f64,
+    /// Ψ — Consciousness estimate from this cycle (clamped to [0.0, 1.0])
+    pub psi: f64,
 
-    /// Cognitive cycle number that produced this Phi
+    /// Cognitive cycle number that produced this Ψ
     pub cycle_id: u64,
 
     /// Timestamp in microseconds since UNIX epoch
@@ -457,7 +474,7 @@ impl PhiAttestationRecord {
     pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {
         format!(
             "symthaea-phi-attestation:v1:{}:{:.6}:{}:{}",
-            agent_did, self.phi, self.cycle_id, self.captured_at_us,
+            agent_did, self.psi, self.cycle_id, self.captured_at_us,
         )
         .into_bytes()
     }

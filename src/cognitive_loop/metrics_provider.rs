@@ -9,7 +9,7 @@ use crate::shell::ipc_server::MetricsProvider;
 
 impl MetricsProvider for CognitiveLoopService {
     fn get_metrics(&self) -> MetricsSnapshot {
-        let phi = self.unification_engine.phi;
+        let phi = self.unification_engine.psi;
         let coherence = self.coherence_bridge.smoothed_coherence() as f64;
         MetricsSnapshot {
             phi,
@@ -33,7 +33,7 @@ impl MetricsProvider for CognitiveLoopService {
     }
 
     fn phi(&self) -> f64 {
-        self.unification_engine.phi
+        self.unification_engine.psi
     }
 
     fn coherence(&self) -> f64 {
@@ -41,7 +41,7 @@ impl MetricsProvider for CognitiveLoopService {
     }
 
     fn is_conscious(&self) -> bool {
-        self.unification_engine.phi > 0.3
+        self.unification_engine.psi > 0.3
     }
 
     fn cognitive_depth(&self) -> String {

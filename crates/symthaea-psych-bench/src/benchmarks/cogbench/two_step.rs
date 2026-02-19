@@ -1,0 +1,171 @@
+//! Two-step task (Daw et al., 2011).
+//!
+//! Tests model-based vs model-free behavior. A choice at stage 1 leads
+//! (probabilistically) to one of two stage-2 states, each with different
+//! reward probabilities. Model-based agents track transition structure.
+
+use crate::harness::config::BenchmarkConfig;
+use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::PsychBenchmark;
+
+use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
+
+/// Two-step task benchmark measuring model-basedness.
+pub struct TwoStepBenchmark;
+
+impl TwoStepBenchmark {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        let seed = config.trial_seed("cogbench", "two_step", trial_idx);
+        let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
+        let num_episodes = 40;
+
+        let agent_config = ActiveInferenceAgentConfig {
+            state_dim: 4,
+            obs_dim: 4,
+            num_actions: 2,
+            planning_horizon: config.planning_horizon,
+            action_temperature: config.action_temperature,
+            enable_td_learning: config.enable_fep,
+            ..Default::default()
+        };
+        let mut agent = ActiveInferenceAgent::new(agent_config);
+
+        // Track stay/switch behavior for model-based analysis
+        let mut common_rewarded_stay = 0u64;
+        let mut common_rewarded_total = 0u64;
+        let mut rare_rewarded_stay = 0u64;
+        let mut rare_rewarded_total = 0u64;
+        let mut common_unrewarded_stay = 0u64;
+        let mut common_unrewarded_total = 0u64;
+        let mut rare_unrewarded_stay = 0u64;
+        let mut rare_unrewarded_total = 0u64;
+
+        let mut prev_action: Option<usize> = None;
+        let mut prev_common = false;
+        let mut prev_rewarded = false;
+
+        for _ in 0..num_episodes {
+            // Stage 1: choose action
+            let stage1_result = agent.select_action();
+            let stage1_action = stage1_result.action % 2;
+
+            // Transition: 70% common, 30% rare
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let is_common = (rng_state % 100) < 70;
+            let stage2_state = if is_common {
+                stage1_action // common transition
+            } else {
+                1 - stage1_action // rare transition
+            };
+
+            // Observe stage 2 state
+            let stage2_obs = vec![stage2_state as f64 * 0.8 + 0.1; 4];
+            agent.perceive(&Observation::new(stage2_obs, 1.0, "state"));
+
+            // Stage 2: reward (drifting probabilities)
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let reward_prob = if stage2_state == 0 { 0.6 } else { 0.4 };
+            let rewarded = (rng_state % 100) as f64 / 100.0 < reward_prob;
+
+            let reward_val = if rewarded { 0.9 } else { 0.1 };
+            let reward_obs = Observation::new(vec![reward_val; 4], 1.0, "reward");
+            agent.perceive(&reward_obs);
+
+            // Track stay/switch behavior relative to previous trial
+            if let Some(prev_a) = prev_action {
+                let stayed = stage1_action == prev_a;
+                match (prev_common, prev_rewarded) {
+                    (true, true) => {
+                        common_rewarded_total += 1;
+                        if stayed { common_rewarded_stay += 1; }
+                    }
+                    (false, true) => {
+                        rare_rewarded_total += 1;
+                        if stayed { rare_rewarded_stay += 1; }
+                    }
+                    (true, false) => {
+                        common_unrewarded_total += 1;
+                        if stayed { common_unrewarded_stay += 1; }
+                    }
+                    (false, false) => {
+                        rare_unrewarded_total += 1;
+                        if stayed { rare_unrewarded_stay += 1; }
+                    }
+                }
+            }
+
+            prev_action = Some(stage1_action);
+            prev_common = is_common;
+            prev_rewarded = rewarded;
+        }
+
+        // Model-basedness (beta3):
+        // Model-based agent shows interaction between transition and reward:
+        // stays more after common-rewarded AND rare-unrewarded (both confirm model)
+        let cr_rate = safe_rate(common_rewarded_stay, common_rewarded_total);
+        let rr_rate = safe_rate(rare_rewarded_stay, rare_rewarded_total);
+        let cu_rate = safe_rate(common_unrewarded_stay, common_unrewarded_total);
+        let ru_rate = safe_rate(rare_unrewarded_stay, rare_unrewarded_total);
+
+        // Model-free: reward effect = (CR + RR)/2 - (CU + RU)/2
+        let reward_effect = ((cr_rate + rr_rate) / 2.0) - ((cu_rate + ru_rate) / 2.0);
+        // Model-based: transition x reward interaction
+        let interaction = (cr_rate - rr_rate) - (cu_rate - ru_rate);
+
+        // beta3 = model-basedness index
+        let model_basedness = interaction.abs().min(1.0);
+
+        (model_basedness, reward_effect)
+    }
+}
+
+fn safe_rate(num: u64, denom: u64) -> f64 {
+    if denom > 0 { num as f64 / denom as f64 } else { 0.5 }
+}
+
+impl PsychBenchmark for TwoStepBenchmark {
+    fn name(&self) -> &str {
+        "CogBench::TwoStep"
+    }
+
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+
+        let mut model_basedness = Vec::new();
+        let mut reward_effects = Vec::new();
+
+        for trial in 0..config.trials_per_condition {
+            let (mb, re) = self.run_trial(config, trial);
+            model_basedness.push(mb);
+            reward_effects.push(re);
+        }
+
+        result.insert("beta3_model_basedness", MetricValue::from_samples(&model_basedness));
+        result.insert("reward_effect", MetricValue::from_samples(&reward_effects));
+
+        result.conditions = 1;
+        result.trials_per_condition = config.trials_per_condition;
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_two_step_runs() {
+        let config = BenchmarkConfig {
+            trials_per_condition: 3,
+            ..Default::default()
+        };
+        let result = TwoStepBenchmark.run(&config);
+        assert!(result.metrics.contains_key("beta3_model_basedness"));
+    }
+}

@@ -161,7 +161,7 @@ impl ConsciousnessTracer {
         let trace = ConsciousnessTrace {
             timestamp_ms: timestamp,
             event_type,
-            phi: consciousness.unified_phi,
+            phi: consciousness.unified_psi,
             coherence: consciousness.temporal_coherence,
             pattern: format!("{:?}", consciousness.pattern),
             depth: format!("{:?}", consciousness.cognitive_depth),
@@ -173,12 +173,12 @@ impl ConsciousnessTracer {
 
         // Update statistics
         self.stats.total_events += 1;
-        self.phi_sum += consciousness.unified_phi;
+        self.phi_sum += consciousness.unified_psi;
         self.phi_count += 1;
         self.stats.avg_phi = self.phi_sum / self.phi_count as f32;
 
-        if consciousness.unified_phi > self.stats.peak_phi {
-            self.stats.peak_phi = consciousness.unified_phi;
+        if consciousness.unified_psi > self.stats.peak_phi {
+            self.stats.peak_phi = consciousness.unified_psi;
         }
 
         // Check flow state change
@@ -203,7 +203,7 @@ impl ConsciousnessTracer {
         debug!(
             session = %self.session_id,
             event = ?event_type,
-            phi = %consciousness.unified_phi,
+            phi = %consciousness.unified_psi,
             coherence = %consciousness.temporal_coherence,
             in_flow = %consciousness.in_flow,
             "Consciousness trace"
@@ -347,7 +347,7 @@ impl ObservabilityHook for LoggingHook {
 
         info!(
             session = %self.session_id,
-            phi = %consciousness.unified_phi,
+            phi = %consciousness.unified_psi,
             coherence = %consciousness.temporal_coherence,
             in_flow = %consciousness.in_flow,
             output_len = %output.len(),
@@ -390,7 +390,7 @@ impl ObservabilityHook for LoggingHook {
         debug!(
             session = %self.session_id,
             cycle = %cycle_num,
-            phi = %consciousness.unified_phi,
+            phi = %consciousness.unified_psi,
             "Cognitive cycle"
         );
     }
@@ -493,7 +493,7 @@ impl ObservabilityHook for MetricsAggregator {
         self.stats.total_events += 1;
 
         // Update histories
-        self.phi_history.push(consciousness.unified_phi);
+        self.phi_history.push(consciousness.unified_psi);
         self.coherence_history
             .push(consciousness.temporal_coherence);
 
@@ -505,15 +505,15 @@ impl ObservabilityHook for MetricsAggregator {
         }
 
         // Update histograms
-        Self::update_histogram(&mut self.phi_histogram, consciousness.unified_phi);
+        Self::update_histogram(&mut self.phi_histogram, consciousness.unified_psi);
         Self::update_histogram(
             &mut self.coherence_histogram,
             consciousness.temporal_coherence,
         );
 
         // Update stats
-        if consciousness.unified_phi > self.stats.peak_phi {
-            self.stats.peak_phi = consciousness.unified_phi;
+        if consciousness.unified_psi > self.stats.peak_phi {
+            self.stats.peak_phi = consciousness.unified_psi;
         }
     }
 
@@ -534,7 +534,7 @@ impl ObservabilityHook for MetricsAggregator {
 
         // Update avg phi (rolling)
         let alpha = 0.05;
-        self.stats.avg_phi = self.stats.avg_phi * (1.0 - alpha) + consciousness.unified_phi * alpha;
+        self.stats.avg_phi = self.stats.avg_phi * (1.0 - alpha) + consciousness.unified_psi * alpha;
     }
 
     fn on_flow_change(&mut self, _in_flow: bool, _intensity: f32) {

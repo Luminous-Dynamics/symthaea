@@ -612,7 +612,7 @@ fn test_consciousness_snapshot_needs_attention() {
         "needs_attention should return a valid bool"
     );
     assert!(
-        snapshot.unified_phi.is_finite(),
+        snapshot.unified_psi.is_finite(),
         "Snapshot phi should be finite"
     );
 }

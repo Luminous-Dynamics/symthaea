@@ -34,11 +34,16 @@ const MEMORY_RECALL_TOP_K: usize = 3; // episodic memories to recall
 const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3; // minimum similarity for recall
 const MEMORY_CONTEXT_BOOST_SCALE: f32 = 0.1; // recalled memory → confidence boost
 
-// -- Phi contribution weights (sum to unified_phi) --
-const FLOW_PHI_WEIGHT: f32 = 0.2; // flow state → phi
-const RELATIONAL_PHI_WEIGHT: f32 = 0.15; // relational dyad → phi
-const BODY_PHI_WEIGHT: f64 = 0.1; // interoceptive body → phi
-const EMBODIED_PHI_WEIGHT: f64 = 0.05; // embodied cognition → phi
+// -- Resonator recall --
+const RESONATOR_CODEBOOK_GROWTH_INTERVAL: usize = 50;
+const RESONATOR_NOVELTY_THRESHOLD: f32 = 0.7;
+const RESONATOR_MAX_SEMANTIC_SYMBOLS: usize = 100;
+
+// -- Psi (Ψ) contribution weights (sum to unified_psi) --
+const FLOW_PSI_WEIGHT: f32 = 0.2; // flow state → psi
+const RELATIONAL_PSI_WEIGHT: f32 = 0.15; // relational dyad → psi
+const BODY_PSI_WEIGHT: f64 = 0.1; // interoceptive body → psi
+const EMBODIED_PSI_WEIGHT: f64 = 0.05; // embodied cognition → psi
 
 // -- FEP tuning --
 const FEP_SURPRISE_SCALE: f32 = 3.0; // free-energy divisor for surprise boost
@@ -255,6 +260,22 @@ impl CognitiveLoopService {
         // Apply contextual weighting: scales moral signal by domain relevance
         let moral_score = moral_score * contextual_weight_factor;
 
+        // Value feedback: self-correcting moral alignment via TD-learning trend.
+        // The moving average of recent moral assessments modulates the current
+        // score, creating a self-correcting loop (positive trend ≈ +10% boost).
+        let value_trend = self.value_feedback.recent_trend(50);
+        let moral_feedback = 1.0 + (value_trend * 0.1).clamp(-0.1, 0.1);
+        let moral_score = moral_score * moral_feedback;
+        // Record this cycle's moral assessment for future trend computation
+        {
+            let signal = self.value_feedback.create_signal(
+                input,
+                crate::consciousness::value_feedback_loop::FeedbackType::SelfAssessment,
+                moral_score,
+            );
+            self.value_feedback.process_feedback(signal);
+        }
+
         module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -266,7 +287,7 @@ impl CognitiveLoopService {
         // - Phi-gating (high Phi -> Exploratory, low Phi -> Supportive)
         // - Moral concerns (bias toward Supportive for ethical guidance)
 
-        let prior_phi = self.unification_engine.phi;
+        let prior_phi = self.unification_engine.psi;
         let prior_reward = self
             .closed_learning_loop
             .last_result
@@ -467,6 +488,64 @@ impl CognitiveLoopService {
                 self.prediction_confidence =
                     (self.prediction_confidence + (memory_phi_avg - 0.4) * 0.05).clamp(0.0, 1.0);
             }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // 1a.1 Resonator-enhanced recall: factorize bundled memories
+        // ═══════════════════════════════════════════════════════════════════════
+        // When episodic recall returns multiple matches, bundle them into a
+        // superposed state and factorize against semantic codebooks. The
+        // factorized valence/phi components are cleaner than raw averages.
+        // Science: Kent et al. (2020) — Resonator Networks for O(log N) factorization
+        if let Some(ref mut res_mem) = self.resonator_memory {
+            let res_start = Instant::now();
+
+            if !res_mem.is_empty() {
+                // Retrieve resonator episodes similar to current content
+                if let Ok(matches) = res_mem.retrieve(&[("content", &compressed_state)]) {
+                    let top_matches: Vec<_> = matches.into_iter().take(MEMORY_RECALL_TOP_K).collect();
+
+                    if top_matches.len() >= 2 {
+                        // Bundle top matches into superposed state
+                        let dim = compressed_state.len();
+                        let mut bundled = vec![0.0f32; dim];
+                        let n = top_matches.len() as f32;
+                        for ep in &top_matches {
+                            for (j, &v) in ep.hv.iter().take(dim).enumerate() {
+                                bundled[j] += v;
+                            }
+                        }
+                        for v in &mut bundled { *v /= n; }
+
+                        // Factorize: unbind content, decompose residual into valence + phi
+                        if let Ok(factors) = res_mem.query_factorize(
+                            &bundled,
+                            &[("content", &compressed_state)],
+                        ) {
+                            // Extract factorized valence/phi for enhanced priming
+                            for (label, _hv) in &factors {
+                                match label.as_str() {
+                                    "positive" => {
+                                        self.emotion_contagion.valence =
+                                            (self.emotion_contagion.valence + 0.1).clamp(-1.0, 1.0);
+                                    }
+                                    "negative" => {
+                                        self.emotion_contagion.valence =
+                                            (self.emotion_contagion.valence - 0.1).clamp(-1.0, 1.0);
+                                    }
+                                    "high" => {
+                                        self.prediction_confidence =
+                                            (self.prediction_confidence + 0.03).clamp(0.0, 1.0);
+                                    }
+                                    _ => {} // neutral, medium, proto_N — no bias
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            module_timings.resonator_recall = res_start.elapsed().as_micros() as u64;
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -1012,32 +1091,32 @@ impl CognitiveLoopService {
         // Compute unified Phi from coherence, confidence, and flow state
         // This feeds the dialogue pipeline for consciousness-aware responses
 
-        let coherence_phi = self.coherence_bridge.phi_contribution();
-        let voice_phi = self.voice_feedback_bridge.summary().phi_adjustment;
-        let flow_phi = if self.flow_state.in_flow {
-            self.flow_state.intensity * FLOW_PHI_WEIGHT
+        let coherence_psi = self.coherence_bridge.phi_contribution();
+        let voice_psi = self.voice_feedback_bridge.summary().phi_adjustment;
+        let flow_psi = if self.flow_state.in_flow {
+            self.flow_state.intensity * FLOW_PSI_WEIGHT
         } else {
             0.0
         };
         // Combine contributions: temporal coherence + voice quality + flow state + relational + body
-        let relational_phi_contrib = if self.relational_phi > 0.0 {
-            self.relational_phi as f32 * RELATIONAL_PHI_WEIGHT
+        let relational_psi_contrib = if self.relational_psi > 0.0 {
+            self.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
         } else {
             0.0
         };
-        // Previous cycle's body phi modulation feeds back into unified_phi
-        let body_phi_contrib = (self.carryover.body_phi_modulation - 1.0) * BODY_PHI_WEIGHT;
-        // FEEDBACK: Embodied cognition phi modulation feeds back into unified_phi
+        // Previous cycle's body psi modulation feeds back into unified_psi
+        let body_psi_contrib = (self.carryover.body_phi_modulation - 1.0) * BODY_PSI_WEIGHT;
+        // FEEDBACK: Embodied cognition psi modulation feeds back into unified_psi
         // Science: Merleau-Ponty, Damasio — body schema modulates consciousness level
-        let embodied_phi_contrib = (self.carryover.embodied_phi_modulation - 1.0) * EMBODIED_PHI_WEIGHT;
-        let unified_phi = (coherence_phi
-            + voice_phi
-            + flow_phi
-            + relational_phi_contrib
-            + body_phi_contrib as f32
-            + embodied_phi_contrib as f32)
+        let embodied_psi_contrib = (self.carryover.embodied_phi_modulation - 1.0) * EMBODIED_PSI_WEIGHT;
+        let unified_psi = (coherence_psi
+            + voice_psi
+            + flow_psi
+            + relational_psi_contrib
+            + body_psi_contrib as f32
+            + embodied_psi_contrib as f32)
             .clamp(0.0, 1.0) as f64;
-        self.unification_engine.update_phi(unified_phi);
+        self.unification_engine.update_psi(unified_psi);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 10h.0 Generate PhiAttestation record for governance bridge
@@ -1048,7 +1127,7 @@ impl CognitiveLoopService {
                 .unwrap_or_default()
                 .as_micros() as u64;
             let record = super::PhiAttestationRecord {
-                phi: unified_phi,
+                psi: unified_psi,
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,
@@ -1088,13 +1167,13 @@ impl CognitiveLoopService {
 
             // Build theory metrics from available consciousness signals
             let ec_metrics = ECMetrics {
-                phi: unified_phi,
+                phi: unified_psi,
                 gwt: coherence as f64,
                 ast: self.prediction_confidence as f64,
                 pp: (1.0 - prediction_error as f64).clamp(0.0, 1.0),
                 rpt: pattern_confidence as f64,
                 embodiment: self.fep_learning_signal as f64,
-                unified: unified_phi,
+                unified: unified_psi,
             };
 
             // Compute available budget: 20ms target cycle minus time already spent
@@ -1103,7 +1182,7 @@ impl CognitiveLoopService {
 
             let reasoning_ctx = ReasoningContext {
                 theory_metrics: ec_metrics,
-                phi: unified_phi,
+                phi: unified_psi,
                 available_budget_us: available_us,
                 available_actions: Vec::new(), // populated by external action providers
                 tool: None,                    // populated by shell integration
@@ -1221,13 +1300,13 @@ impl CognitiveLoopService {
         // and dampen the learning rate to avoid consolidating bad patterns.
         let mut metacognitive_anomaly = false;
         if let Some(ref mut monitor) = self.metacognitive_monitor {
-            if monitor.observe_phi(unified_phi) {
+            if monitor.observe_phi(unified_psi) {
                 metacognitive_anomaly = true;
                 // Dampen learning rate when reasoning is degrading
                 reasoning_lr_factor *= 0.5;
                 tracing::debug!(
                     target: "cognitive_loop::metacognition",
-                    unified_phi,
+                    unified_psi,
                     "Metacognitive anomaly detected — dampening learning rate"
                 );
             }
@@ -1399,7 +1478,7 @@ impl CognitiveLoopService {
         let pp_total_cycles = self.stats.total_cycles;
         let pp_in_flow = self.flow_state.in_flow;
         let pp_emotional_valence = self.emotion_contagion.prosody_valence();
-        let pp_phi = self.unification_engine.phi as f32;
+        let pp_phi = self.unification_engine.psi as f32;
         let pp_smoothed_coh = self.coherence_bridge.smoothed_coherence() as f64;
         let pp_learning_threshold = self.config.learning_threshold;
 
@@ -1440,6 +1519,7 @@ impl CognitiveLoopService {
             let fep_learning_signal = &mut self.fep_learning_signal;
             let prev_primitive_state = &mut self.prev_primitive_state;
             let prediction_confidence_ref = &mut self.prediction_confidence;
+            let resonator_memory = &mut self.resonator_memory;
 
             rayon_join(
                 // -- Branch A: Stability Regime + Semantic Memory + Causal Enhancement --
@@ -1501,6 +1581,47 @@ impl CognitiveLoopService {
                         );
                     }
 
+                    // Resonator memory: store with bound attributes for factorized recall
+                    if let Some(ref mut res_mem) = resonator_memory {
+                        if prediction_error > 0.1 || pp_in_flow {
+                            // Quantize valence → nearest band
+                            let val_label = if pp_emotional_valence > 0.3 {
+                                "positive"
+                            } else if pp_emotional_valence < -0.3 {
+                                "negative"
+                            } else {
+                                "neutral"
+                            };
+                            let val_hv = res_mem.resonator.codebooks.get(1)
+                                .and_then(|cb| cb.symbols.iter().find(|(l, _)| l == val_label))
+                                .map(|(_, hv)| hv.clone());
+
+                            // Quantize phi → nearest band
+                            let phi_label = if pp_phi > 0.7 {
+                                "high"
+                            } else if pp_phi > 0.3 {
+                                "medium"
+                            } else {
+                                "low"
+                            };
+                            let phi_hv = res_mem.resonator.codebooks.get(2)
+                                .and_then(|cb| cb.symbols.iter().find(|(l, _)| l == phi_label))
+                                .map(|(_, hv)| hv.clone());
+
+                            if let (Some(v_hv), Some(p_hv)) = (val_hv, phi_hv) {
+                                res_mem.store(
+                                    &format!("ep_{}", pp_total_cycles),
+                                    &[
+                                        ("content", "input", &compressed_state),
+                                        ("valence", val_label, &v_hv),
+                                        ("phi_level", phi_label, &p_hv),
+                                    ],
+                                    pp_phi, // importance = consciousness level
+                                );
+                            }
+                        }
+                    }
+
                     // Apply memory context boost to confidence
                     *prediction_confidence_ref =
                         (*prediction_confidence_ref + memory_context_boost).clamp(0.0, 1.0);
@@ -1553,6 +1674,40 @@ impl CognitiveLoopService {
         } else {
             0.0
         };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
+        // ═══════════════════════════════════════════════════════════════════════
+        if let Some(ref mut res_mem) = self.resonator_memory {
+            if self.stats.total_cycles % RESONATOR_CODEBOOK_GROWTH_INTERVAL == 0 {
+                if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
+                    // Check novelty: max similarity to existing symbols
+                    let max_sim = semantic_cb.symbols.iter()
+                        .map(|(_, hv)| {
+                            let dot: f32 = compressed_state.iter().zip(hv.iter()).map(|(a, b)| a * b).sum();
+                            let na: f32 = compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            let nb: f32 = hv.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            if na > 0.0 && nb > 0.0 { dot / (na * nb) } else { 0.0 }
+                        })
+                        .fold(0.0f32, f32::max);
+
+                    if max_sim < RESONATOR_NOVELTY_THRESHOLD
+                        && semantic_cb.len() < RESONATOR_MAX_SEMANTIC_SYMBOLS
+                    {
+                        semantic_cb.add(
+                            &format!("learned_{}", self.stats.total_cycles),
+                            compressed_state.clone(),
+                        );
+                        tracing::trace!(
+                            symbols = semantic_cb.len(),
+                            max_sim,
+                            cycle = self.stats.total_cycles,
+                            "Resonator: novel pattern added to semantic codebook"
+                        );
+                    }
+                }
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // DEMAND-DRIVEN CONSOLIDATION TRIGGERS
@@ -1621,7 +1776,7 @@ impl CognitiveLoopService {
                         tracing::debug!(
                             episodes = result.episodes_replayed,
                             avg_loss = result.average_loss,
-                            avg_phi = result.average_phi,
+                            avg_phi = result.average_psi,
                             "Episodic replay session completed"
                         );
                     }
@@ -1648,17 +1803,41 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
-        // SUPPORT INTELLIGENCE: Predictive diagnostics (every 50 cycles)
+        // SUPPORT INTELLIGENCE: Triage + Knowledge + Predictive + Federation
         // ═══════════════════════════════════════════════════════════════════════
         #[cfg(feature = "support")]
-        {
+        let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) = {
             self.support_cycle_counter += 1;
+
+            // Triage: classify current input every cycle (lightweight keyword match)
+            let mut triage_count: u32 = 0;
+            if let Some(ref engine) = self.support_triage_engine {
+                let result = engine.triage(input, "");
+                triage_count = 1;
+                // Feed triage category into knowledge search
+                if let Some(ref manager) = self.support_knowledge_manager {
+                    let category_str = format!("{:?}", result.suggested_category);
+                    let articles = manager.search(&category_str, 3);
+                    if !articles.is_empty() {
+                        tracing::trace!(
+                            category = %category_str,
+                            articles = articles.len(),
+                            "Support: matched knowledge articles for input"
+                        );
+                    }
+                }
+            }
+
             // Predictive telemetry check every 50 cycles
+            let mut alert_fired = false;
+            let mut efe = 0.0_f64;
             if self.support_cycle_counter % 50 == 0 {
                 if let Some(ref engine) = self.support_predictive_engine {
                     let telemetry = symthaea_support::telemetry::collect_telemetry();
                     let prediction = engine.assess_system_state(&telemetry);
+                    efe = prediction.expected_free_energy;
                     if engine.should_alert(&prediction) {
+                        alert_fired = true;
                         tracing::warn!(
                             efe = prediction.expected_free_energy,
                             failure = ?prediction.predicted_failure,
@@ -1667,11 +1846,40 @@ impl CognitiveLoopService {
                     }
                 }
             }
-            // Federation: graduation check every 100 cycles
+
+            // Federation: graduation check every 100 cycles (privacy-gated)
+            let mut graduated: usize = 0;
             if self.support_cycle_counter % 100 == 0 {
-                tracing::trace!("Support federation graduation check");
+                let can_share = self
+                    .support_privacy_manager
+                    .as_ref()
+                    .map(|pm| pm.can_share_cognitive())
+                    .unwrap_or(true); // default: allow if no manager
+
+                if can_share {
+                    if let Some(ref manager) = self.support_knowledge_manager {
+                        let pending = Vec::new(); // populated from resolution queue when bridge is wired
+                        let result =
+                            symthaea_support::federation::check_graduations(manager, &pending);
+                        graduated = result.graduated;
+                        if result.graduated > 0 {
+                            tracing::debug!(
+                                graduated = result.graduated,
+                                deferred = result.deferred,
+                                "Support federation: knowledge graduated"
+                            );
+                        }
+                    }
+                } else {
+                    tracing::trace!("Support federation skipped: privacy tier blocks sharing");
+                }
             }
-        }
+
+            (triage_count, alert_fired, graduated, efe)
+        };
+        #[cfg(not(feature = "support"))]
+        let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) =
+            (0u32, false, 0usize, 0.0f64);
 
         // ═══════════════════════════════════════════════════════════════════════
         // DREAM ENGINE: Record surprise events + dream during Cruise
@@ -1698,7 +1906,7 @@ impl CognitiveLoopService {
                 .map(|n| 1.0 + n.self_phi() as f32 * 0.5) // 1.0 to 1.5x boost
                 .unwrap_or(1.0);
             let phi_weighted_surprise =
-                prediction_error * (1.0 + unified_phi as f32).clamp(1.0, 2.0) * narrative_salience;
+                prediction_error * (1.0 + unified_psi as f32).clamp(1.0, 2.0) * narrative_salience;
             dream.record(
                 &dream_state,
                 &dream_action,
@@ -1731,7 +1939,7 @@ impl CognitiveLoopService {
                                 &hv16_cached,
                                 &format!("dream_insight_{}", result.insights),
                                 true, // counterfactual-validated
-                                unified_phi,
+                                unified_psi,
                                 result.best_phi_improvement as f64,
                             );
                         }
@@ -1889,14 +2097,14 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (body_phi_modulation, body_valence, body_arousal) =
+        let (body_psi_modulation, body_valence, body_arousal) =
             if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
                 if let Some(ref mut body) = self.virtual_body {
                     let signals = super::virtual_body::CognitiveSignals {
                         prediction_error,
                         coherence,
                         prediction_confidence: self.prediction_confidence,
-                        unified_phi,
+                        unified_psi: unified_psi,
                         flow_intensity: self.flow_state.intensity,
                         in_flow: self.flow_state.in_flow,
                         curiosity_boredom: self.curiosity_drive.boredom,
@@ -1948,7 +2156,7 @@ impl CognitiveLoopService {
                 let affect = bridge.evaluate_from_signals_with_social(
                     prediction_error,
                     surprise_triggered,
-                    unified_phi,
+                    unified_psi,
                     moral_score,
                     self.social_trust,
                     self.social_cooperation_rate,
@@ -2061,7 +2269,7 @@ impl CognitiveLoopService {
         // Runs every cycle (lightweight: BinaryHV → prediction → free energy)
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (predictive_free_energy, predictive_phi_modulation) = if let Some(ref mut mind) =
+        let (predictive_free_energy, predictive_psi_modulation) = if let Some(ref mut mind) =
             self.predictive_mind
         {
             if self.affective_bridge.is_some() {
@@ -2076,10 +2284,10 @@ impl CognitiveLoopService {
         };
 
         // FEEDBACK: Predictive phi modulation gates plasticity (Friston 2010)
-        if predictive_phi_modulation > 1.0 {
-            let boost = ((predictive_phi_modulation - 1.0) * 0.1) as f32; // up to +10%
+        if predictive_psi_modulation > 1.0 {
+            let boost = ((predictive_psi_modulation - 1.0) * 0.1) as f32; // up to +10%
             self.carryover.subsystem_lr_factor *= 1.0 + boost;
-        } else if predictive_phi_modulation < 0.8 {
+        } else if predictive_psi_modulation < 0.8 {
             self.carryover.subsystem_lr_factor *= 0.9; // reduce LR when free energy is low
         }
         module_timings.predictive_processing = _t.elapsed().as_micros() as u64;
@@ -2096,11 +2304,11 @@ impl CognitiveLoopService {
                 // FEEDBACK: Phi→precision coupling — higher integrated information
                 // sharpens lower-level precision (Feldman & Friston 2010, §7.4).
                 // This creates a causal mechanism: consciousness improves perceptual accuracy.
-                let phi_boost = (unified_phi * 0.5).clamp(0.0, 0.5);
+                let psi_boost = (unified_psi * 0.5).clamp(0.0, 0.5);
                 let base_decay = hfe.config.precision_decay;
                 for level in &mut hfe.levels {
                     let base_precision = base_decay.powi(level.level as i32);
-                    level.precision = base_precision * (1.0 + phi_boost);
+                    level.precision = base_precision * (1.0 + psi_boost);
                 }
 
                 // Build observation from compressed state (clamped to state_dim)
@@ -2140,7 +2348,7 @@ impl CognitiveLoopService {
                 if let Some(ref narrative) = self.narrative_self {
                     pred_self.observe(narrative);
                 }
-                pred_self.learn_from_outcome_raw(unified_phi, coherence as f64);
+                pred_self.learn_from_outcome_raw(unified_psi, coherence as f64);
                 pred_self.confidence() as f32
             } else {
                 0.0
@@ -2203,11 +2411,11 @@ impl CognitiveLoopService {
         // Science: Dehaene (2014) — conscious access enables flexible routing
         // ═══════════════════════════════════════════════════════════════════════
         let phi_attention_avg = if let Some(ref mut phi_attn) = self.phi_attention {
-            phi_attn.observe(unified_phi as f32);
+            phi_attn.observe(unified_psi as f32);
             // Gate: only allow state-modifying actions when Phi is sufficient
             if !phi_attn.allows_action(
                 crate::consciousness::phi_attention::ActionType::StateModifying,
-                unified_phi as f32,
+                unified_psi as f32,
             ) {
                 // Low consciousness → reduce exploration (don't take risky actions unconsciously)
                 self.curiosity_drive.exploration_urge *= 0.7;
@@ -2315,12 +2523,12 @@ impl CognitiveLoopService {
         let resonance_frequency = if urgency.run_consciousness_monitors() {
             if let Some(ref mut resonance) = self.consciousness_resonance {
                 let dims = [
-                    unified_phi,
+                    unified_psi,
                     coherence as f64,
                     wm_utilization,
                     self.adaptive_behavior.attention_sensitivity as f64,
                     (self.stats.total_cycles.min(100) as f64 / 100.0),
-                    body_phi_modulation,
+                    body_psi_modulation,
                     self.prediction_confidence as f64,
                 ];
                 let state = resonance.analyze(dims);
@@ -2342,7 +2550,7 @@ impl CognitiveLoopService {
 
         let quantum_coherence_level = if urgency.run_consciousness_monitors() {
             if let Some(ref mut qc) = self.quantum_coherence {
-                qc.observe(&hv16_cached, unified_phi);
+                qc.observe(&hv16_cached, unified_psi);
                 qc.coherence()
             } else {
                 0.0
@@ -2373,12 +2581,12 @@ impl CognitiveLoopService {
             if urgency.run_consciousness_monitors() {
                 if let Some(ref mut binding) = self.phenomenal_binding {
                     let dims = [
-                        unified_phi,
+                        unified_psi,
                         coherence as f64,
                         wm_utilization,
                         self.adaptive_behavior.attention_sensitivity as f64,
                         (self.stats.total_cycles.min(100) as f64 / 100.0),
-                        body_phi_modulation,
+                        body_psi_modulation,
                         self.prediction_confidence as f64,
                     ];
                     binding.observe_all(&dims);
@@ -2427,7 +2635,7 @@ impl CognitiveLoopService {
                 if let Some(ref mut temporal) = self.temporal_consciousness {
                     temporal.observe(
                         &hv16_cached,
-                        unified_phi,
+                        unified_psi,
                         self.narrative_self.as_ref(),
                         self.predictive_self.as_ref(),
                     );
@@ -2488,12 +2696,12 @@ impl CognitiveLoopService {
             if urgency.run_consciousness_monitors() {
                 if let Some(ref mut thermo) = self.consciousness_thermodynamics {
                     let dims = [
-                        unified_phi,
+                        unified_psi,
                         coherence as f64,
                         wm_utilization,
                         self.adaptive_behavior.attention_sensitivity as f64,
                         (self.stats.total_cycles.min(100) as f64 / 100.0),
-                        body_phi_modulation,
+                        body_psi_modulation,
                         self.prediction_confidence as f64,
                     ];
                     let state = thermo.analyze(dims);
@@ -2551,7 +2759,7 @@ impl CognitiveLoopService {
         // Urgency-gated: Critical=always, Normal=always, Cruise=every 2nd
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let (embodied_phi_modulation, embodied_agency) =
+        let (embodied_psi_modulation, embodied_agency) =
             if urgency.should_run(self.stats.total_cycles, 1, 1, 2) {
                 if let Some(ref mut embodied) = self.embodied_cognition {
                     if let Some(ref body) = self.virtual_body {
@@ -2642,7 +2850,7 @@ impl CognitiveLoopService {
         let (living_mind_vitality, living_mind_coherence) = {
             // Update autopoietic self-maintenance with current consciousness signals
             self.autopoietic
-                .update(unified_phi, coherence as f64, prediction_error as f64);
+                .update(unified_psi, coherence as f64, prediction_error as f64);
 
             // Map cognitive loop action to enactive ActionType based on adaptive behavior
             let enactive_action = match self.adaptive_behavior.action_hint {
@@ -2667,7 +2875,7 @@ impl CognitiveLoopService {
                     let mut f = std::collections::HashMap::new();
                     f.insert("prediction_error".into(), prediction_error as f64);
                     f.insert("coherence".into(), coherence as f64);
-                    f.insert("phi".into(), unified_phi);
+                    f.insert("phi".into(), unified_psi);
                     f
                 },
                 surprise: prediction_error as f64,
@@ -2701,7 +2909,7 @@ impl CognitiveLoopService {
             let unified_state = self.unified_living_mind.integrate(
                 &self.autopoietic,
                 &self.enactive,
-                unified_phi,
+                unified_psi,
                 free_energy,
             );
 
@@ -2720,12 +2928,12 @@ impl CognitiveLoopService {
         // Urgency-adaptive: Critical=every 5th, Normal=every 10th, Cruise=every 20th
         let consciousness_level = if urgency.should_run(self.stats.total_cycles, 5, 10, 20) {
             let inputs = crate::consciousness::master_consciousness_equation::ConsciousnessInputs {
-                phi: unified_phi,
+                phi: unified_psi,
                 broadcast: coherence as f64, // coherence ~ global workspace broadcast
                 working_memory: self.prefrontal_utilization(),
                 attention: encoding_result.peak_attention as f64,
                 recurrence: (self.stats.total_cycles.min(100) as f64 / 100.0), // ramp up over 100 cycles
-                embodiment: body_phi_modulation, // virtual body provides embodiment
+                embodiment: body_psi_modulation, // virtual body provides embodiment
                 knowledge: self.prediction_confidence as f64,
                 synchrony: (0.3 + self.flow_state.intensity as f64 * 0.7).clamp(0.1, 1.0),
             };
@@ -2834,7 +3042,7 @@ impl CognitiveLoopService {
             meta_cognitive_accuracy,
             meta_cognitive_depth,
             narrative_self_phi,
-            body_phi_modulation,
+            body_phi_modulation: body_psi_modulation,
             body_valence,
             body_arousal,
             consciousness_level,
@@ -2845,7 +3053,7 @@ impl CognitiveLoopService {
             quantum_coherence_level,
             temporal_coherence_score,
             temporal_discontinuity,
-            embodied_phi_modulation,
+            embodied_phi_modulation: embodied_psi_modulation,
             embodied_agency,
             narrative_gwt_veto,
             narrative_gwt_self_phi,
@@ -2856,7 +3064,7 @@ impl CognitiveLoopService {
             dream_phi_improvement,
             dream_wisdom_count,
             predictive_free_energy,
-            predictive_phi_modulation,
+            predictive_phi_modulation: predictive_psi_modulation,
             cross_modal_binding_strength,
             cross_modal_phi,
             affective_valence,
@@ -2877,6 +3085,11 @@ impl CognitiveLoopService {
             actual_effective_lr: if learning_occurred { effective_lr } else { 0.0 },
             cycle_reward,
             fep_action: fep_action_idx,
+            value_feedback_trend: value_trend,
+            support_triage_count,
+            support_alert_fired,
+            support_federation_graduated,
+            support_efe,
             module_timings_us: module_timings,
         };
 

@@ -794,9 +794,9 @@ impl LLMOrgan {
         }
 
         // Add confidence note
-        if thought.phi > 0.7 {
+        if thought.psi > 0.7 {
             response.push_str("(High consciousness integration)");
-        } else if thought.phi < 0.3 {
+        } else if thought.psi < 0.3 {
             response.push_str("(Processing with limited integration)");
         }
 

@@ -38,9 +38,6 @@ pub mod semantic_value_embedder;
 pub mod seven_harmonies;
 pub mod value_feedback_loop;
 
-// Cincinnati-Consciousness integration (now uses its own CincinnatiConsciousNode type)
-pub mod cincinnati_consciousness;
-
 // Counterfactual Dream Engine (extracted to symthaea-dream crate)
 pub use symthaea_dream as dream;
 
@@ -343,11 +340,6 @@ pub mod unified_value_evaluator;
 // Re-export key types
 pub use affective_consciousness::{AffectiveConsciousnessAnalyzer, CoreAffect, EmotionCategory};
 pub use autopoietic_consciousness::{AutopoieticConsciousness, AutopoieticState};
-pub use cincinnati_consciousness::{
-    BuddingReason, CincinnatiConsciousNode, CincinnatiConsciousnessBridge,
-    CincinnatiConsciousnessConfig, ConsciousnessBuddingEvent, ConsciousnessProcessResult,
-    EthicalLearningStats, HarmonyFeedback,
-};
 pub use compositionality::{
     ComposedPrimitive, CompositionMetadata, CompositionResult, CompositionStats, CompositionType,
     CompositionalityConfig, CompositionalityEngine,
@@ -444,14 +436,11 @@ pub mod primitive_validation;
 // causal_calculus and causal_emergence extracted to symthaea-causal-reasoning crate
 pub use symthaea_causal_reasoning::causal_calculus;
 pub use symthaea_causal_reasoning::causal_emergence;
-pub mod compositionality_primitives;
-pub mod consciousness_signatures;
 pub use symthaea_factor_graph as factor_graph;
 
 pub mod dimension_synergies;
 
 pub mod consciousness_profile;
-pub mod meta_primitives;
 pub mod phi_validation;
 
 // ── Tier 4: Dynamics & Field ───────────────────────────────────────────────
@@ -466,7 +455,6 @@ pub mod hierarchical_free_energy;
 /// Hodge Laplacian for simplicial complexes -- rigorous Betti numbers, spectral
 /// analysis, and Hodge decomposition of higher-order neural interaction signals
 pub use symthaea_hodge as hodge_laplacian;
-pub mod meta_cognitive_optimizer;
 pub mod phenomenal_binding;
 pub mod predictive_processing;
 pub mod predictive_self;
@@ -514,14 +502,6 @@ pub mod mycelix_bridge;
 
 /// Value system tests — calibration and validation
 pub mod value_system_tests;
-
-/// Gated: depends on consciousness_driven_evolution (requires full_consciousness)
-#[cfg(feature = "full_consciousness")]
-pub mod consciousness_guided_discovery;
-
-/// Gated: depends on consciousness_guided_discovery (requires full_consciousness)
-#[cfg(feature = "full_consciousness")]
-pub mod meta_meta_learning;
 
 /// Multi-objective evolution — NSGA-II-inspired Pareto frontier optimization
 pub mod multi_objective_evolution;

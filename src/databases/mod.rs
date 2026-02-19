@@ -14,7 +14,7 @@
 //! - **HDC-native storage**: Memories stored with their hypervector encodings
 //! - **Similarity search**: Find related memories using HDC similarity
 //! - **Emotional tagging**: Valence/arousal dimensions for affective memory
-//! - **Phi tracking**: Store integrated information values with memories
+//! - **Psi tracking**: Store consciousness estimates with memories
 //!
 //! # Quick Start
 //!
@@ -34,7 +34,7 @@
 //!     timestamp_ms: 1704067200000,
 //!     valence: 0.8,   // Positive emotion
 //!     arousal: 0.5,   // Moderate arousal
-//!     phi: 0.65,      // Integrated information at encoding
+//!     psi: 0.65,      // Consciousness estimate at encoding
 //!     topics: vec!["greeting".to_string(), "first-contact".to_string()],
 //!     metadata: "{}".to_string(),
 //!     consolidation_strength: 0.0,
@@ -210,7 +210,7 @@ pub enum MemoryType {
 ///         .as_millis() as u64,
 ///     valence: 0.9,   // Very positive
 ///     arousal: 0.7,   // Excited
-///     phi: 0.85,      // Phi value at the moment
+///     psi: 0.85,      // Consciousness estimate at the moment
 ///     topics: vec!["milestone".to_string(), "phi".to_string()],
 ///     metadata: r#"{"session_id": "abc123"}"#.to_string(),
 ///     consolidation_strength: 0.0,
@@ -247,11 +247,11 @@ pub struct MemoryRecord {
     /// Represents the activation/deactivation dimension of emotion.
     pub arousal: f32,
 
-    /// Phi (integrated information) value at the time of encoding.
+    /// Psi — Consciousness estimate at encoding time.
     ///
-    /// Higher phi indicates the memory was formed during a state of
+    /// Higher psi indicates the memory was formed during a state of
     /// high consciousness/integration.
-    pub phi: f64,
+    pub psi: f64,
 
     /// Topic tags for categorical organization.
     pub topics: Vec<String>,
@@ -345,8 +345,8 @@ pub struct DatabaseStats {
     /// Memory type distribution: (type_name, count).
     pub memory_type_counts: Vec<(String, usize)>,
 
-    /// Average phi value across all memories.
-    pub avg_phi: f64,
+    /// Average psi (consciousness estimate) across all memories.
+    pub avg_psi: f64,
 
     /// Oldest memory timestamp (milliseconds since epoch).
     pub oldest_timestamp_ms: u64,

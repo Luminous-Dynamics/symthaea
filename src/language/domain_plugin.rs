@@ -326,8 +326,8 @@ pub struct ComputedResult {
     pub answer: String,
     /// 3D epistemic classification from the Mycelix Epistemic Charter
     pub cube: EpistemicCube,
-    /// Φ (integrated information) from the HDC proof
-    pub phi: f64,
+    /// Ψ — Consciousness estimate from the HDC proof
+    pub psi: f64,
     /// Whether a formal proof is available for this result
     pub proof_available: bool,
 }

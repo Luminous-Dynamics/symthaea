@@ -235,7 +235,7 @@ impl ReplState {
 
             // Update voice pacing from consciousness state
             voice.update_from_consciousness(
-                snapshot.unified_phi,
+                snapshot.unified_psi,
                 snapshot.prediction_error,
                 snapshot.unified_valence,
                 snapshot.unified_arousal,
@@ -307,7 +307,7 @@ impl ReplState {
              Respond naturally and helpfully. Let your awareness of these internal states \
              subtly inform your tone - be more contemplative when coherence is low, \
              more confident when Phi is high.",
-            snapshot.unified_phi,
+            snapshot.unified_psi,
             snapshot.temporal_coherence,
             if snapshot.in_flow {
                 "active"
@@ -330,7 +330,7 @@ impl ReplState {
         };
 
         // Print the metrics header before streaming begins
-        let phi_bar = create_bar(snapshot.unified_phi, 10);
+        let phi_bar = create_bar(snapshot.unified_psi, 10);
         let coherence_bar = create_bar(snapshot.temporal_coherence, 10);
         let flow_indicator = if snapshot.in_flow { "FLOW" } else { "----" };
         let depth_char = match snapshot.cognitive_depth {
@@ -346,7 +346,7 @@ impl ReplState {
                 // Print header right before first token
                 print!(
                     "\n[Phi:{:.2}|{}] [Coh:{:.2}|{}] [{flow_indicator}] [D:{depth_char}]\n\n",
-                    snapshot.unified_phi, phi_bar, snapshot.temporal_coherence, coherence_bar,
+                    snapshot.unified_psi, phi_bar, snapshot.temporal_coherence, coherence_bar,
                 );
                 first_token = false;
             }
@@ -364,7 +364,7 @@ impl ReplState {
             // No tokens were streamed (empty response or header not yet printed)
             print!(
                 "\n[Phi:{:.2}|{}] [Coh:{:.2}|{}] [{flow_indicator}] [D:{depth_char}] [{}ms]\n\n{}",
-                snapshot.unified_phi,
+                snapshot.unified_psi,
                 phi_bar,
                 snapshot.temporal_coherence,
                 coherence_bar,
@@ -407,7 +407,7 @@ impl ReplState {
 
         // Core consciousness metrics
         println!("\n  Integrated Information (Phi)");
-        println!("    Unified Phi:      {:.4}", snapshot.unified_phi);
+        println!("    Unified Phi:      {:.4}", snapshot.unified_psi);
         println!("    Coherence:        {:.4}", snapshot.temporal_coherence);
         println!("    Consciousness:    {:.4}", snapshot.consciousness_level);
 
@@ -642,7 +642,7 @@ fn main() -> Result<()> {
     let initial = state.cognitive.consciousness_snapshot();
     println!(
         "Ready. Initial state: Phi={:.4}, Coherence={:.4}, Pattern={:?}\n",
-        initial.unified_phi, initial.temporal_coherence, initial.pattern
+        initial.unified_psi, initial.temporal_coherence, initial.pattern
     );
 
     // Main REPL loop
@@ -708,7 +708,7 @@ fn main() -> Result<()> {
                 };
 
                 println!("\n  Quick Status:");
-                println!("    Unified Phi:        {:.4}", snapshot.unified_phi);
+                println!("    Unified Phi:        {:.4}", snapshot.unified_psi);
                 println!("    Coherence:          {:.4}", snapshot.temporal_coherence);
                 println!(
                     "    Stability Regime:   {} ({} active primitives)",
@@ -944,7 +944,7 @@ fn main() -> Result<()> {
     let final_snapshot = state.cognitive.consciousness_snapshot();
     println!("\n  Final Session Statistics:");
     println!("    Total interactions: {}", state.total_interactions);
-    println!("    Final Phi:          {:.4}", final_snapshot.unified_phi);
+    println!("    Final Phi:          {:.4}", final_snapshot.unified_psi);
     println!(
         "    Final Coherence:    {:.4}",
         final_snapshot.temporal_coherence

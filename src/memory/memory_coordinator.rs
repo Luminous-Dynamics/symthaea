@@ -31,8 +31,8 @@ use symthaea_core::hdc::unified_hv::ContinuousHV;
 /// Shared signal state across all memory tiers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemorySignals {
-    /// Current integrated information (Phi) from consciousness processing
-    pub phi: f64,
+    /// Psi — Current consciousness estimate from consciousness processing
+    pub psi: f64,
     /// Current coherence level (from coherence tracker)
     pub coherence: f64,
     /// Global retrieval frequency (exponential moving average)
@@ -44,7 +44,7 @@ pub struct MemorySignals {
 impl Default for MemorySignals {
     fn default() -> Self {
         Self {
-            phi: 0.0,
+            psi: 0.0,
             coherence: 0.0,
             retrieval_rate: 0.0,
             step: 0,
@@ -70,8 +70,8 @@ pub struct GraduationEvent {
     pub steps_survived: u64,
     /// Final activation level when evicted/graduated
     pub final_activation: f64,
-    /// Phi at the time of graduation
-    pub phi_at_graduation: f64,
+    /// Psi at the time of graduation
+    pub psi_at_graduation: f64,
     /// Coherence at the time of graduation
     pub coherence_at_graduation: f64,
 }
@@ -154,7 +154,7 @@ impl MemoryCoordinator {
     ///
     /// Call this each cognitive cycle with the current Phi and coherence values.
     pub fn update_signals(&mut self, phi: f64, coherence: f64) {
-        self.signals.phi = phi;
+        self.signals.psi = phi;
         self.signals.coherence = coherence;
         self.signals.step += 1;
         self.stats.signal_updates += 1;
@@ -196,7 +196,7 @@ impl MemoryCoordinator {
 
             // Compute adjusted phi: persistence in WM boosts the effective phi
             let persistence_bonus = (event.steps_survived as f64 / 10.0).min(0.2);
-            let adjusted_phi = event.phi_at_graduation + persistence_bonus;
+            let adjusted_phi = event.psi_at_graduation + persistence_bonus;
 
             // Create episode from graduation event
             let episode = Episode::with_metadata(
@@ -262,7 +262,7 @@ impl MemoryCoordinator {
 
     /// Get current Phi for use by other memory tiers
     pub fn current_phi(&self) -> f64 {
-        self.signals.phi
+        self.signals.psi
     }
 
     /// Get current coherence for use by other memory tiers
@@ -312,14 +312,14 @@ mod tests {
     fn test_coordinator_creation() {
         let coord = MemoryCoordinator::default();
         assert_eq!(coord.signals().step, 0);
-        assert!((coord.signals().phi - 0.0).abs() < 1e-6);
+        assert!((coord.signals().psi - 0.0).abs() < 1e-6);
     }
 
     #[test]
     fn test_signal_updates() {
         let mut coord = MemoryCoordinator::default();
         coord.update_signals(0.7, 0.8);
-        assert!((coord.signals().phi - 0.7).abs() < 1e-6);
+        assert!((coord.signals().psi - 0.7).abs() < 1e-6);
         assert!((coord.signals().coherence - 0.8).abs() < 1e-6);
         assert_eq!(coord.signals().step, 1);
     }
@@ -383,7 +383,7 @@ mod tests {
             label: "short-lived".into(),
             steps_survived: 1,
             final_activation: 0.3,
-            phi_at_graduation: 0.5,
+            psi_at_graduation: 0.5,
             coherence_at_graduation: 0.6,
         });
 
@@ -393,12 +393,12 @@ mod tests {
             label: "persisted".into(),
             steps_survived: 5,
             final_activation: 0.4,
-            phi_at_graduation: 0.6,
+            psi_at_graduation: 0.6,
             coherence_at_graduation: 0.7,
         });
 
         let config = crate::memory::episodic_replay::EpisodicReplayConfig {
-            phi_threshold: 0.1, // Low threshold so graduation works
+            psi_threshold: 0.1, // Low threshold so graduation works
             ..Default::default()
         };
         let mut episodic = EpisodicMemory::new(config);
