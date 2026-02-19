@@ -1,9 +1,10 @@
-//! Public accessor methods for CognitiveLoopService.
+//! Accessor methods for CognitiveLoopService.
 //!
-//! Provides read-only and mutable access to all subsystems including
-//! causal enhancement, episodic replay, flow state, emotion, curiosity,
-//! self-reflection, consciousness patterns, voice feedback, unification
-//! engine, and memory systems.
+//! High-level query methods (flow state, prediction confidence, consciousness
+//! snapshot, etc.) are `pub` for use by external consumers (examples, LUCID,
+//! symthaea-nix). Raw subsystem references (e.g., `thalamic_router()`,
+//! `unification_engine_mut()`) are `pub(crate)` to prevent external coupling
+//! to implementation details.
 
 use crate::causal::{CausalGraph, DiscoveredRelationship};
 use crate::consciousness::consciousness_unification::{
@@ -73,26 +74,30 @@ impl CognitiveLoopService {
     }
 
     /// Force a causal discovery run (useful for testing)
-    pub fn force_causal_discovery(&mut self) -> Option<CausalGraph> {
+    #[allow(dead_code)]
+    pub(crate) fn force_causal_discovery(&mut self) -> Option<CausalGraph> {
         self.causal_enhancer.as_mut().map(|e| e.run_discovery())
     }
 
     /// Get causal attention weights for a target dimension
-    pub fn causal_attention_weights(&mut self, target_dim: usize) -> Option<Vec<f32>> {
+    #[allow(dead_code)]
+    pub(crate) fn causal_attention_weights(&mut self, target_dim: usize) -> Option<Vec<f32>> {
         self.causal_enhancer
             .as_mut()
             .map(|e| e.causal_attention_weights(target_dim))
     }
 
     /// Suggest an intervention based on discovered causal structure
-    pub fn suggest_causal_intervention(&mut self) -> Option<(usize, f64)> {
+    #[allow(dead_code)]
+    pub(crate) fn suggest_causal_intervention(&mut self) -> Option<(usize, f64)> {
         self.causal_enhancer
             .as_mut()
             .and_then(|e| e.suggest_intervention())
     }
 
     /// Get encoder statistics
-    pub fn encoder_stats(&self) -> &symthaea_core::hdc::predictive_encoder::EncoderStats {
+    #[allow(dead_code)]
+    pub(crate) fn encoder_stats(&self) -> &symthaea_core::hdc::predictive_encoder::EncoderStats {
         self.encoder.stats()
     }
 
@@ -129,7 +134,8 @@ impl CognitiveLoopService {
     }
 
     /// Force an episodic replay session (useful for testing or manual consolidation)
-    pub fn force_episodic_replay(
+    #[allow(dead_code)]
+    pub(crate) fn force_episodic_replay(
         &mut self,
         learning_rate: f32,
     ) -> Option<crate::memory::episodic_replay::ReplaySessionResult> {
@@ -304,7 +310,8 @@ impl CognitiveLoopService {
     }
 
     /// Get current flow state reference
-    pub fn flow_state(&self) -> &FlowState {
+    #[allow(dead_code)]
+    pub(crate) fn flow_state(&self) -> &FlowState {
         &self.flow_state
     }
 
@@ -331,7 +338,8 @@ impl CognitiveLoopService {
     }
 
     /// Get emotion contagion reference
-    pub fn emotion_contagion(&self) -> &EmotionContagion {
+    #[allow(dead_code)]
+    pub(crate) fn emotion_contagion(&self) -> &EmotionContagion {
         &self.emotion_contagion
     }
 
@@ -363,7 +371,8 @@ impl CognitiveLoopService {
     }
 
     /// Get curiosity drive reference
-    pub fn curiosity_drive(&self) -> &CuriosityDrive {
+    #[allow(dead_code)]
+    pub(crate) fn curiosity_drive(&self) -> &CuriosityDrive {
         &self.curiosity_drive
     }
 
@@ -425,7 +434,8 @@ impl CognitiveLoopService {
     }
 
     /// Get self-reflection reference
-    pub fn self_reflection(&self) -> &SelfReflection {
+    #[allow(dead_code)]
+    pub(crate) fn self_reflection(&self) -> &SelfReflection {
         &self.self_reflection
     }
 
@@ -566,7 +576,8 @@ impl CognitiveLoopService {
     }
 
     /// Get the thalamic router reference
-    pub fn thalamic_router(&self) -> &ThalamicRouter {
+    #[allow(dead_code)]
+    pub(crate) fn thalamic_router(&self) -> &ThalamicRouter {
         &self.thalamic_router
     }
 
@@ -581,12 +592,14 @@ impl CognitiveLoopService {
     }
 
     /// Get the ConsciousnessUnificationEngine reference
-    pub fn unification_engine(&self) -> &ConsciousnessUnificationEngine {
+    #[allow(dead_code)]
+    pub(crate) fn unification_engine(&self) -> &ConsciousnessUnificationEngine {
         &self.unification_engine
     }
 
     /// Get mutable reference to the unification engine
-    pub fn unification_engine_mut(&mut self) -> &mut ConsciousnessUnificationEngine {
+    #[allow(dead_code)]
+    pub(crate) fn unification_engine_mut(&mut self) -> &mut ConsciousnessUnificationEngine {
         &mut self.unification_engine
     }
 
@@ -624,12 +637,14 @@ impl CognitiveLoopService {
     }
 
     /// Get the Active Inference Bridge reference
-    pub fn active_inference_bridge(&self) -> &ActiveInferenceBridge {
+    #[allow(dead_code)]
+    pub(crate) fn active_inference_bridge(&self) -> &ActiveInferenceBridge {
         &self.active_inference_bridge
     }
 
     /// Get the FEP Active Inference Agent reference
-    pub fn fep_agent(&self) -> &ActiveInferenceAgent {
+    #[allow(dead_code)]
+    pub(crate) fn fep_agent(&self) -> &ActiveInferenceAgent {
         &self.fep_agent
     }
 
@@ -642,7 +657,7 @@ impl CognitiveLoopService {
     }
 
     /// Get the conversation coherence tracker reference
-    pub fn coherence_tracker(&self) -> &ConversationCoherenceTracker {
+    pub(crate) fn coherence_tracker(&self) -> &ConversationCoherenceTracker {
         &self.coherence_tracker
     }
 
@@ -678,7 +693,8 @@ impl CognitiveLoopService {
     }
 
     /// Get the closed learning loop reference
-    pub fn closed_learning_loop(&self) -> &ClosedLearningLoop {
+    #[allow(dead_code)]
+    pub(crate) fn closed_learning_loop(&self) -> &ClosedLearningLoop {
         &self.closed_learning_loop
     }
 
@@ -707,12 +723,14 @@ impl CognitiveLoopService {
     // ═══════════════════════════════════════════════════════════════════════
 
     /// Get the episodic memory bridge reference
-    pub fn episodic_memory(&self) -> &EpisodicMemoryBridge {
+    #[allow(dead_code)]
+    pub(crate) fn episodic_memory(&self) -> &EpisodicMemoryBridge {
         &self.episodic_memory
     }
 
     /// Get mutable reference to episodic memory
-    pub fn episodic_memory_mut(&mut self) -> &mut EpisodicMemoryBridge {
+    #[allow(dead_code)]
+    pub(crate) fn episodic_memory_mut(&mut self) -> &mut EpisodicMemoryBridge {
         &mut self.episodic_memory
     }
 
@@ -727,12 +745,14 @@ impl CognitiveLoopService {
     }
 
     /// Get the goal system bridge reference
-    pub fn goal_system(&self) -> &GoalSystemBridge {
+    #[allow(dead_code)]
+    pub(crate) fn goal_system(&self) -> &GoalSystemBridge {
         &self.goal_system
     }
 
     /// Get mutable reference to goal system
-    pub fn goal_system_mut(&mut self) -> &mut GoalSystemBridge {
+    #[allow(dead_code)]
+    pub(crate) fn goal_system_mut(&mut self) -> &mut GoalSystemBridge {
         &mut self.goal_system
     }
 
@@ -794,7 +814,8 @@ impl CognitiveLoopService {
     // ========== Adaptive Behavior Methods ==========
 
     /// Get current adaptive behavior
-    pub fn adaptive_behavior(&self) -> &AdaptiveBehavior {
+    #[allow(dead_code)]
+    pub(crate) fn adaptive_behavior(&self) -> &AdaptiveBehavior {
         &self.adaptive_behavior
     }
 

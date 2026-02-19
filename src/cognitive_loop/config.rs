@@ -283,6 +283,18 @@ pub struct CognitiveLoopConfig {
     /// Science: Friston (2008) — hierarchical predictive processing
     pub enable_hierarchical_free_energy: bool,
 
+    /// Enable contextual harmony weighting for domain-aware moral evaluation.
+    pub enable_contextual_weights: bool,
+
+    /// Enable Phi-weighted attention routing with adaptive thresholds.
+    pub enable_phi_attention: bool,
+
+    /// Enable negation detection for moral evaluation preprocessing.
+    pub enable_negation_detection: bool,
+
+    /// Enable primitive consciousness decomposition for explainable consciousness.
+    pub enable_primitive_consciousness: bool,
+
     /// Agent DID for attestation signing (e.g., "did:key:z6Mk...").
     /// Required when `enable_phi_attestation` is true. If None, attestation generation
     /// is silently skipped even when enabled.
@@ -338,6 +350,10 @@ impl Default for CognitiveLoopConfig {
             enable_consciousness_thermodynamics: false,
             enable_phenomenal_binding: false,
             enable_hierarchical_free_energy: false,
+            enable_contextual_weights: false,
+            enable_phi_attention: false,
+            enable_negation_detection: false,
+            enable_primitive_consciousness: false,
             enable_phi_attestation: false,
             agent_did: None,
             attestation_buffer_capacity: 64,
@@ -378,5 +394,223 @@ impl CognitiveLoopConfig {
             hdc_ltc_config: HdcLtcBridgeConfig::accurate(),
             ..Default::default()
         }
+    }
+}
+
+/// Named consciousness profiles that set sensible defaults for module groups.
+///
+/// Each profile activates a curated set of consciousness modules appropriate
+/// for different use cases, from minimal overhead to full research instrumentation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum ConsciousnessProfile {
+    /// Only virtual body for somatic grounding. Minimal overhead.
+    Minimal,
+    /// Core modules: surprise, prefrontal, meta-cognition, narrative, GWT,
+    /// embodied cognition, attention schema, contextual weights, negation detection.
+    Standard,
+    /// All modules including dream, predictive, cross-modal, affective, thermo,
+    /// phenomenal, HFE, phi-attention, primitive consciousness.
+    Full,
+    /// Full + research-specific: causal enhancement, episodic replay,
+    /// phi attestation, user state inference.
+    Research,
+}
+
+impl ConsciousnessProfile {
+    /// Apply this profile's settings to a config, first resetting all flags to false.
+    pub fn apply(&self, config: &mut CognitiveLoopConfig) {
+        // Reset all enable flags
+        config.enable_virtual_body = false;
+        config.enable_surprise_exploration = false;
+        config.enable_prefrontal = false;
+        config.enable_meta_cognition = false;
+        config.enable_narrative_self = false;
+        config.enable_predictive_self = false;
+        config.enable_attention_schema = false;
+        config.enable_gwt = false;
+        config.enable_resonance = false;
+        config.enable_quantum_coherence = false;
+        config.enable_temporal_consciousness = false;
+        config.enable_embodied_cognition = false;
+        config.enable_narrative_gwt = false;
+        config.enable_dream_replay = false;
+        config.enable_predictive_processing = false;
+        config.enable_cross_modal_binding = false;
+        config.enable_affective_bridge = false;
+        config.enable_user_state_inference = false;
+        config.enable_consciousness_thermodynamics = false;
+        config.enable_phenomenal_binding = false;
+        config.enable_hierarchical_free_energy = false;
+        config.enable_contextual_weights = false;
+        config.enable_phi_attention = false;
+        config.enable_negation_detection = false;
+        config.enable_primitive_consciousness = false;
+        config.enable_phi_attestation = false;
+        config.causal_enhancement = false;
+        config.episodic_replay = false;
+
+        match self {
+            ConsciousnessProfile::Minimal => {
+                config.enable_virtual_body = true;
+            }
+            ConsciousnessProfile::Standard => {
+                config.enable_virtual_body = true;
+                config.enable_surprise_exploration = true;
+                config.enable_prefrontal = true;
+                config.enable_meta_cognition = true;
+                config.enable_narrative_self = true;
+                config.enable_gwt = true;
+                config.enable_embodied_cognition = true;
+                config.enable_attention_schema = true;
+                config.enable_contextual_weights = true;
+                config.enable_negation_detection = true;
+            }
+            ConsciousnessProfile::Full => {
+                config.enable_virtual_body = true;
+                config.enable_surprise_exploration = true;
+                config.enable_prefrontal = true;
+                config.enable_meta_cognition = true;
+                config.enable_narrative_self = true;
+                config.enable_predictive_self = true;
+                config.enable_attention_schema = true;
+                config.enable_gwt = true;
+                config.enable_resonance = true;
+                config.enable_quantum_coherence = true;
+                config.enable_temporal_consciousness = true;
+                config.enable_embodied_cognition = true;
+                config.enable_narrative_gwt = true;
+                config.enable_dream_replay = true;
+                config.enable_predictive_processing = true;
+                config.enable_cross_modal_binding = true;
+                config.enable_affective_bridge = true;
+                config.enable_consciousness_thermodynamics = true;
+                config.enable_phenomenal_binding = true;
+                config.enable_hierarchical_free_energy = true;
+                config.enable_contextual_weights = true;
+                config.enable_phi_attention = true;
+                config.enable_negation_detection = true;
+                config.enable_primitive_consciousness = true;
+            }
+            ConsciousnessProfile::Research => {
+                ConsciousnessProfile::Full.apply(config);
+                config.causal_enhancement = true;
+                config.episodic_replay = true;
+                config.enable_phi_attestation = true;
+                config.enable_user_state_inference = true;
+            }
+        }
+    }
+}
+
+impl CognitiveLoopConfig {
+    /// Create a configuration from a named consciousness profile.
+    pub fn from_profile(profile: ConsciousnessProfile) -> Self {
+        let mut config = Self::with_cfc();
+        profile.apply(&mut config);
+        config
+    }
+
+    /// Validate configuration for dependency issues.
+    ///
+    /// Returns a list of warnings for soft dependency violations — cases where
+    /// a module is enabled but its upstream dependency is disabled, causing the
+    /// module to operate at reduced capacity or be functionally inert.
+    ///
+    /// All dependencies are handled gracefully at runtime (None checks), so
+    /// these are warnings, not hard errors.
+    pub fn validate(&self) -> Vec<String> {
+        let mut warnings = Vec::new();
+
+        // temporal_consciousness passes narrative_self.as_ref() and predictive_self.as_ref()
+        if self.enable_temporal_consciousness {
+            if !self.enable_narrative_self {
+                warnings.push(
+                    "enable_temporal_consciousness without enable_narrative_self: \
+                     identity continuity tracking will be disabled"
+                        .into(),
+                );
+            }
+            if !self.enable_predictive_self {
+                warnings.push(
+                    "enable_temporal_consciousness without enable_predictive_self: \
+                     action prediction trajectory will be disabled"
+                        .into(),
+                );
+            }
+        }
+
+        // predictive_self.observe(narrative) needs narrative_self
+        if self.enable_predictive_self && !self.enable_narrative_self {
+            warnings.push(
+                "enable_predictive_self without enable_narrative_self: \
+                 self-model observation will be disabled"
+                    .into(),
+            );
+        }
+
+        // embodied_cognition.update_interoception() needs virtual_body state
+        if self.enable_embodied_cognition && !self.enable_virtual_body {
+            warnings.push(
+                "enable_embodied_cognition without enable_virtual_body: \
+                 body schema updates will be disabled"
+                    .into(),
+            );
+        }
+
+        // cross_modal_binding checks affective_bridge.is_some() for affective modality
+        if self.enable_cross_modal_binding && !self.enable_affective_bridge {
+            warnings.push(
+                "enable_cross_modal_binding without enable_affective_bridge: \
+                 affective modality will be absent from binding"
+                    .into(),
+            );
+        }
+
+        // predictive_processing applies affective modulation when affective_bridge present
+        if self.enable_predictive_processing && !self.enable_affective_bridge {
+            warnings.push(
+                "enable_predictive_processing without enable_affective_bridge: \
+                 precision-weighted affective modulation will be disabled"
+                    .into(),
+            );
+        }
+
+        // phi_attestation silently skips without agent_did
+        if self.enable_phi_attestation && self.agent_did.is_none() {
+            warnings.push(
+                "enable_phi_attestation without agent_did: \
+                 attestation records will not be generated"
+                    .into(),
+            );
+        }
+
+        // dream_replay benefits from surprise_exploration (records surprise events)
+        if self.enable_dream_replay && !self.enable_surprise_exploration {
+            warnings.push(
+                "enable_dream_replay without enable_surprise_exploration: \
+                 dream replay will only use prediction error, not surprise events"
+                    .into(),
+            );
+        }
+
+        // narrative_gwt is the capstone integrating narrative_self + gwt
+        if self.enable_narrative_gwt {
+            if !self.enable_narrative_self {
+                warnings.push(
+                    "enable_narrative_gwt without enable_narrative_self: \
+                     narrative governance layer will lack self-model data"
+                        .into(),
+                );
+            }
+            if !self.enable_gwt {
+                warnings.push(
+                    "enable_narrative_gwt without enable_gwt: \
+                     workspace broadcast coherence will be unavailable"
+                        .into(),
+                );
+            }
+        }
+
+        warnings
     }
 }

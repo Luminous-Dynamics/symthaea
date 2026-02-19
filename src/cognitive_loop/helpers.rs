@@ -3,6 +3,7 @@
 //! Contains experience creation, statistics updates, error trend computation,
 //! prediction confidence tracking, reset, and neural bridge processing.
 
+use super::CycleCarryover;
 use crate::consciousness::fep_active_inference::ActiveInferenceAgent;
 use crate::dynamics::temporal_signatures::ConsciousnessPattern;
 #[cfg(feature = "neural-bridge")]
@@ -218,6 +219,28 @@ impl CognitiveLoopService {
         // 10. Update statistics
         self.update_stats(prediction_error, cycle_start.elapsed());
         self.stats.temporal_coherence = coherence;
+
+        // 11. Buffer PhiAttestation record if enabled (mirrors cycle.rs step 10h.0)
+        // For the HV path, unified_phi is derived from temporal coherence since
+        // we don't run the full consciousness subsystems.
+        let urgency = self.carryover.urgency;
+        if self.config.enable_phi_attestation && self.config.agent_did.is_some() {
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_micros() as u64;
+            let record = super::PhiAttestationRecord {
+                phi: coherence.clamp(0.0, 1.0) as f64,
+                cycle_id: self.stats.total_cycles as u64,
+                captured_at_us: now,
+                prediction_error,
+                urgency,
+            };
+            self.phi_attestation_buffer.push_back(record);
+            while self.phi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
+                let _ = self.phi_attestation_buffer.pop_front();
+            }
+        }
 
         super::CycleResult {
             output,
@@ -458,7 +481,7 @@ impl CognitiveLoopService {
         // Enhanced FEP Bridge statistics
         self.stats.fep_learning_signal = self.fep_learning_signal;
         // attention_shift is updated during cycle processing
-        self.stats.fep_action_outcome_coupling = 0.5; // Will be updated during cycle
+        // fep_action_outcome_coupling is updated during cycle processing by enhanced FEP bridge
 
         // Closed Learning Loop statistics
         self.stats.current_strategy = format!("{:?}", self.closed_learning_loop.current_strategy);
@@ -509,6 +532,15 @@ impl CognitiveLoopService {
         }
     }
 
+    /// Prefrontal working memory utilization (0.0–1.0). Returns 0.5 (neutral)
+    /// when the prefrontal cortex is not enabled.
+    pub(super) fn prefrontal_utilization(&self) -> f64 {
+        self.prefrontal
+            .as_ref()
+            .map(|p| p.stats().avg_memory_utilization as f64)
+            .unwrap_or(0.5)
+    }
+
     /// Reset all learning state
     pub fn reset(&mut self) {
         self.encoder.reset_attention();
@@ -538,12 +570,8 @@ impl CognitiveLoopService {
         if let Some(ref mut usi) = self.user_state {
             usi.reset();
         }
-        self.prev_body_phi_modulation = 1.0;
-        self.prev_embodied_phi_modulation = 1.0;
-        self.prev_resonance_frequency = 0.0;
-        self.prev_quantum_coherence = 0.0;
-        self.mce_lr_boost = 0.0;
-        self.narrative_veto_active = false;
+        self.policy_agreement_window.clear();
+        self.carryover = CycleCarryover::default();
         if let Some(ref mut mind) = self.predictive_mind {
             *mind = crate::consciousness::predictive_processing::PredictiveMind::new(
                 crate::consciousness::predictive_processing::PredictiveConfig::default(),
@@ -571,7 +599,19 @@ impl CognitiveLoopService {
                 crate::consciousness::hierarchical_free_energy::HierarchicalFEConfig::default(),
             );
         }
-        self.prev_predictive_phi_modulation = 1.0;
-        self.prev_cross_modal_phi = 0.0;
+        if let Some(ref mut cw) = self.contextual_weights {
+            *cw = crate::consciousness::contextual_weights::ContextualWeights::new();
+        }
+        if let Some(ref mut pa) = self.phi_attention {
+            *pa = crate::consciousness::phi_attention::AdaptiveThresholds::new(100);
+        }
+        if let Some(ref mut nd) = self.negation_detector {
+            *nd = crate::consciousness::negation_detector::NegationDetector::new();
+        }
+        if let Some(ref mut pp) = self.primitive_processor {
+            *pp = crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new();
+        }
+        // Note: predictive_phi_modulation and cross_modal_phi already reset
+        // via self.carryover = CycleCarryover::default() above.
     }
 }
