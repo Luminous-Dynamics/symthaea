@@ -1,4 +1,3 @@
-#![allow(unexpected_cfgs)]
 #![cfg(feature = "voice_module")]
 //! Voice Module Integration Tests
 //!

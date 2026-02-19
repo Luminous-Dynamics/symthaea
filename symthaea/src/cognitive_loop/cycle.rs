@@ -127,6 +127,41 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 0.1: Safety Pre-check (fast amygdala veto)
+        // ═══════════════════════════════════════════════════════════════════════
+        // Fast regex + HDC forbidden-subspace check BEFORE expensive encoding.
+        // Short-circuits dangerous inputs with a safe default response.
+        if let Some(ref mut gateway) = self.safety_gateway {
+            let decision = gateway.check(crate::safety::SafetyCheck::Query(input));
+            if !decision.allowed {
+                let mut metadata = super::CycleMetadata::default();
+                metadata.safety_blocked = true;
+                metadata.safety_category = decision.category.map(|c| format!("{c:?}"));
+                metadata.urgency = self.carryover.urgency;
+                tracing::warn!(
+                    target: "cognitive_loop::safety",
+                    category = ?decision.category,
+                    message = ?decision.message,
+                    "Safety gateway blocked input — returning safe default"
+                );
+                return CycleResult {
+                    output: vec![0.0; self.config.cfc_config.num_neurons],
+                    prediction_error: 0.0,
+                    peak_attention: 0.0,
+                    detected_primitives: vec![],
+                    learning_occurred: false,
+                    training_loss: None,
+                    cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
+                    metadata,
+                    #[cfg(feature = "identity")]
+                    signed_output: None,
+                    #[cfg(feature = "identity")]
+                    assurance_level: crate::identity::AssuranceLevel::E0Anonymous,
+                };
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0: Thalamic Routing (Cognitive Depth Selection)
         // ═══════════════════════════════════════════════════════════════════════
         // Determine how deep to process BEFORE encoding, based on prior state
@@ -171,7 +206,7 @@ impl CognitiveLoopService {
         } else {
             // Cache hit: input unchanged and not due for re-evaluation.
             // Safety: map_or(true, ...) returning false guarantees last_moral_judgment is Some.
-            self.last_moral_judgment.clone().unwrap()
+            self.last_moral_judgment.clone().expect("last_moral_judgment guaranteed Some by map_or guard")
         };
         let moral_concern_detected = moral_judgment.moral_score < MORAL_CONCERN_THRESHOLD
             || moral_judgment.consent_violation
@@ -210,7 +245,10 @@ impl CognitiveLoopService {
                 ActionType::Basic
             };
             let weights = cw.get_all_weights(action_type, domain);
-            weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32
+            let weight_avg = weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32;
+            // Guard near-zero average: prevents all-zero weights from silently
+            // suppressing moral reasoning (moral_score * 0.0 = 0.0)
+            if weight_avg.abs() < f32::EPSILON { 1.0 } else { weight_avg }
         } else {
             1.0
         };
@@ -1175,6 +1213,26 @@ impl CognitiveLoopService {
         self.carryover.mcts_plan = reasoning_plan_action
             .map(|a| (a, reasoning_plan_confidence));
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // 10h.1.5 Metacognitive Monitoring (Phi trajectory anomaly detection)
+        // ═══════════════════════════════════════════════════════════════════════
+        // After reasoning, observe unified Phi for trajectory anomalies.
+        // Anomalies (drops, plateaus, oscillations) indicate reasoning degradation
+        // and dampen the learning rate to avoid consolidating bad patterns.
+        let mut metacognitive_anomaly = false;
+        if let Some(ref mut monitor) = self.metacognitive_monitor {
+            if monitor.observe_phi(unified_phi) {
+                metacognitive_anomaly = true;
+                // Dampen learning rate when reasoning is degrading
+                reasoning_lr_factor *= 0.5;
+                tracing::debug!(
+                    target: "cognitive_loop::metacognition",
+                    unified_phi,
+                    "Metacognitive anomaly detected — dampening learning rate"
+                );
+            }
+        }
+
         // Get adaptive learning rate (respects pause_learning and all modulations)
         // Include flow state boost, curiosity novelty bonus, and semantic context
         let base_lr = self.combined_learning_rate();
@@ -1586,6 +1644,32 @@ impl CognitiveLoopService {
                         "Memory coordinator graduated items to episodic storage"
                     );
                 }
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // SUPPORT INTELLIGENCE: Predictive diagnostics (every 50 cycles)
+        // ═══════════════════════════════════════════════════════════════════════
+        #[cfg(feature = "support")]
+        {
+            self.support_cycle_counter += 1;
+            // Predictive telemetry check every 50 cycles
+            if self.support_cycle_counter % 50 == 0 {
+                if let Some(ref engine) = self.support_predictive_engine {
+                    let telemetry = symthaea_support::telemetry::collect_telemetry();
+                    let prediction = engine.assess_system_state(&telemetry);
+                    if engine.should_alert(&prediction) {
+                        tracing::warn!(
+                            efe = prediction.expected_free_energy,
+                            failure = ?prediction.predicted_failure,
+                            "Support predictive alert: elevated free energy"
+                        );
+                    }
+                }
+            }
+            // Federation: graduation check every 100 cycles
+            if self.support_cycle_counter % 100 == 0 {
+                tracing::trace!("Support federation graduation check");
             }
         }
 
@@ -2784,6 +2868,9 @@ impl CognitiveLoopService {
             hierarchical_total_free_energy,
             phi_attention_avg,
             primitive_phi,
+            metacognitive_anomaly,
+            safety_blocked: false,
+            safety_category: None,
             negation_polarity: input_negation_polarity,
             moral_score,
             selected_strategy: format!("{:?}", selected_strategy),

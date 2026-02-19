@@ -176,6 +176,7 @@ use crate::memory::memory_coordinator::MemoryCoordinator;
 use crate::memory::semantic_memory::SemanticMemory;
 #[cfg(feature = "neural-bridge")]
 use crate::perception::NeuralBridge;
+use crate::safety::SafetyGateway;
 use crate::voice::voice_feedback::VoiceFeedbackBridge;
 use crate::wisdom::meta_cognition::MetaCognitiveLayer;
 use std::collections::VecDeque;
@@ -383,6 +384,20 @@ pub struct CognitiveLoopService {
     mfdi_bridge: crate::identity::MfdiBridge,
 
     // ═══════════════════════════════════════════════════════════════════════
+    // SAFETY GATEWAY: Pre-cognitive fast veto (Amygdala + HDC guardrails)
+    // ═══════════════════════════════════════════════════════════════════════
+    /// Metacognitive monitor for Phi trajectory anomaly detection.
+    /// When enabled, observes Phi after each reasoning step and detects
+    /// drops, plateaus, and oscillations that indicate reasoning degradation.
+    metacognitive_monitor: Option<crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor>,
+
+    /// Safety gateway for pre-cognitive safety veto.
+    /// When enabled, scans input before expensive HDC encoding and short-circuits
+    /// on dangerous patterns. Combines fast regex (AmygdalaActor) and HDC-based
+    /// forbidden-subspace checking (SafetyGuardrails).
+    safety_gateway: Option<SafetyGateway>,
+
+    // ═══════════════════════════════════════════════════════════════════════
     // MORAL ALGEBRA: Compositional Ethical Reasoning
     // ═══════════════════════════════════════════════════════════════════════
     /// Moral Algebra for compositional ethical reasoning using HDC
@@ -502,6 +517,29 @@ pub struct CognitiveLoopService {
 
     /// Primitive consciousness decomposition for explainable consciousness.
     primitive_processor: Option<crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor>,
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SUPPORT INTELLIGENCE: Predictive diagnostics + knowledge federation
+    // ═══════════════════════════════════════════════════════════════════════
+    /// Predictive engine for zero-click proactive support (telemetry → free energy alerts).
+    #[cfg(feature = "support")]
+    support_predictive_engine: Option<symthaea_support::predictive::PredictiveEngine>,
+
+    /// Knowledge manager for article graduation and cognitive update absorption.
+    /// Used by federation graduation checks when wired to DHT publishing.
+    #[cfg(feature = "support")]
+    #[allow(dead_code)]
+    support_knowledge_manager: Option<symthaea_support::knowledge::KnowledgeManager>,
+
+    /// Triage engine for ticket classification and prioritization.
+    /// Used by incoming ticket processing when wired to conductor events.
+    #[cfg(feature = "support")]
+    #[allow(dead_code)]
+    support_triage_engine: Option<symthaea_support::triage::TriageEngine>,
+
+    /// Cycle counter for amortizing support subsystem updates.
+    #[cfg(feature = "support")]
+    support_cycle_counter: u64,
 
     /// State carried over between consecutive cycles (phi modulations, veto flags,
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.

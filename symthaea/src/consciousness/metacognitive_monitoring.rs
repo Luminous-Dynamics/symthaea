@@ -143,6 +143,23 @@ impl MetacognitiveMonitor {
         }
     }
 
+    /// Observe a Phi value from the cognitive loop (lightweight anomaly detection).
+    ///
+    /// Unlike `monitor_step`, this does not require a `PrimitiveExecution` or
+    /// `ReasoningChain`. It simply tracks Phi over time and detects anomalies
+    /// (drops, plateaus, oscillations) in the trajectory.
+    ///
+    /// Returns `true` if an anomaly was detected, `false` if healthy.
+    pub fn observe_phi(&mut self, phi: f64) -> bool {
+        self.phi_history.push(phi);
+        if let Some(_anomaly) = self.anomaly_detector.detect(&self.phi_history, self.phi_threshold) {
+            self.anomalies_detected += 1;
+            true
+        } else {
+            false
+        }
+    }
+
     /// Monitor a reasoning step
     pub fn monitor_step(
         &mut self,

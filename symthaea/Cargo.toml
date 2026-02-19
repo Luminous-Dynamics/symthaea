@@ -26,6 +26,7 @@ members = [
     "crates/symthaea-consciousness-resonance",
     "crates/symthaea-embeddings",
     "crates/symthaea-observability",
+    "crates/symthaea-support",
 ]
 
 
@@ -112,6 +113,7 @@ symthaea-seven-harmonies = { path = "crates/symthaea-seven-harmonies" }
 symthaea-consciousness-resonance = { path = "crates/symthaea-consciousness-resonance" }
 symthaea-embeddings = { path = "crates/symthaea-embeddings" }
 symthaea-observability = { path = "crates/symthaea-observability", optional = true }
+symthaea-support = { path = "crates/symthaea-support", optional = true }
 
 # Mycelix FL Core - Unified federated learning algorithms (shared with Mycelix SDK)
 mycelix-fl-core = { path = "../mycelix-workspace/crates/mycelix-fl-core", optional = true }
@@ -299,7 +301,6 @@ api_module = ["axum", "tower-http"]         # HTTP API binary + module
 
 # ── Voice & Audio ───────────────────────────────────────────────────
 voice-tts = ["ort", "hound", "hf-hub", "espeak-rs"]  # TTS with Kokoro (ONNX) + espeak-ng G2P
-voice-tts-cuda = ["voice-tts", "ort/cuda"]            # TTS with CUDA acceleration
 voice-stt = ["symthaea-stt", "hound"]                 # STT with symthaea-stt crate (HDC + LTC + CfC)
 audio = ["voice-tts", "rodio"]                        # Full audio including playback
 
@@ -314,12 +315,12 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 
 # ── Distributed / Network ──────────────────────────────────────────
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
-holochain = []                              # Gate only (real integration in symthaea-mycelix-bridge)
+holochain = []                              # Gate only — no deps (real integration in symthaea-mycelix-bridge)
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 # mycelix_sdk: Add mycelix-sdk dep when it's published to crates.io, then enable:
 # mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]
 mycelix_sdk = ["mycelix"]                  # Placeholder until mycelix-sdk is published (SDK code is cfg-gated)
-network = []                                # Mycelix network client (real HTTP fetching)
+network = []                                # Mycelix network client — no deps (pending real HTTP integration)
 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
@@ -364,10 +365,18 @@ code_generation = ["code_understanding"]
 # These gate cfg blocks in src/ code and/or examples.
 integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
+support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
 school_lookahead = []           # CfC-based lookahead in school (cfg-gated in school/mod.rs)
 physiology_module = []          # Physiology integration (cfg-gated in school/mod.rs)
 mycelix_module = []             # Mycelix governance hooks (cfg-gated in consciousness + brain)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
+
+# ── Test gates — empty flags to opt-in to integration tests ────────
+benchmarks_module = []          # End-to-end pipeline and performance regression tests
+language_module = []            # Conscious cycle integration tests with language features
+intelligence_module = []        # Causal integration tests with intelligence module
+voice_module = []               # Voice integration tests
+cross_modal_router_module = []  # Cross-modal router integration tests
 
 [dev-dependencies]
 criterion = "0.5"

@@ -318,6 +318,15 @@ pub struct CycleMetadata {
     /// Phi estimate from primitive consciousness decomposition (0.0 when off).
     pub primitive_phi: f64,
 
+    /// Whether metacognitive monitoring detected a Phi trajectory anomaly.
+    pub metacognitive_anomaly: bool,
+
+    /// Whether the safety gateway blocked the input before processing.
+    pub safety_blocked: bool,
+
+    /// Which forbidden category the safety gateway detected (if any).
+    pub safety_category: Option<String>,
+
     /// Negation polarity detected in input text (0.0 = no negation, >0.5 = negated).
     pub negation_polarity: f32,
 

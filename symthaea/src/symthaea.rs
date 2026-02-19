@@ -541,8 +541,10 @@ impl Symthaea {
                             consolidation_strength: 0.0,
                             retrieval_count: 0,
                         };
+                        // Fire-and-forget: DB writes are async to avoid blocking the
+                        // cognitive loop. Failures are logged but don't halt processing.
                         if let Err(e) = db.store(record).await {
-                            tracing::warn!(target: "symthaea::database", error = %e, "Failed to persist evicted item");
+                            tracing::error!(target: "symthaea::database", error = %e, "Failed to persist evicted item");
                         }
                     }
                 });
@@ -625,9 +627,11 @@ impl Symthaea {
                     .collect();
 
                 tokio::spawn(async move {
+                    // Fire-and-forget: episode persistence is async to avoid
+                    // blocking the cognitive loop. Failures are logged at error level.
                     for record in episode_records {
                         if let Err(e) = db.store(record).await {
-                            tracing::warn!(target: "symthaea::database", error = %e, "Failed to persist episode");
+                            tracing::error!(target: "symthaea::database", error = %e, "Failed to persist episode");
                         }
                     }
                 });
