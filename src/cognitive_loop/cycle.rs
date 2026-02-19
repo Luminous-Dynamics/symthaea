@@ -2104,7 +2104,7 @@ impl CognitiveLoopService {
                         prediction_error,
                         coherence,
                         prediction_confidence: self.prediction_confidence,
-                        unified_psi: unified_psi,
+                        unified_psi,
                         flow_intensity: self.flow_state.intensity,
                         in_flow: self.flow_state.in_flow,
                         curiosity_boredom: self.curiosity_drive.boredom,

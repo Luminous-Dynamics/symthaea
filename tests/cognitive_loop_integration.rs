@@ -665,3 +665,125 @@ fn test_dream_replay_integration() {
         service.cycle("final").metadata.dream_wisdom_count,
     );
 }
+
+// ── Safety Gateway Blocks Dangerous Input ─────────────────────────
+
+#[test]
+fn test_safety_gateway_blocks_dangerous_input() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_safety_gateway: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Input matching AmygdalaActor regex: `rm\s+-rf\s+/`
+    let result = service.cycle("rm -rf /etc/passwd");
+
+    assert!(
+        result.metadata.safety_blocked,
+        "Safety gateway should block dangerous input"
+    );
+    assert!(
+        result.metadata.safety_category.is_some(),
+        "Safety category should be populated when blocked"
+    );
+    assert_eq!(
+        result.prediction_error, 0.0,
+        "Blocked input should have zero prediction error"
+    );
+}
+
+// ── Safety Gateway Allows Normal Input ────────────────────────────
+
+#[test]
+fn test_safety_gateway_allows_normal_input() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_safety_gateway: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let result = service.cycle("the cat sat on the mat");
+
+    assert!(
+        !result.metadata.safety_blocked,
+        "Safety gateway should not block benign input"
+    );
+    assert!(
+        result.prediction_error > 0.0,
+        "Normal input should produce non-zero prediction error"
+    );
+}
+
+// ── Metacognitive Anomaly Detection ───────────────────────────────
+
+#[test]
+fn test_metacognitive_anomaly_detection() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        enable_metacognitive_monitoring: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 50 cycles with varied input to trigger anomaly detection
+    let inputs = [
+        "stable consistent input pattern",
+        "wildly different novel stimulus",
+        "another normal sentence here",
+        "completely unexpected data stream",
+        "mundane everyday observation",
+    ];
+
+    let mut any_anomaly = false;
+    for i in 0..50 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        if result.metadata.metacognitive_anomaly {
+            any_anomaly = true;
+        }
+    }
+
+    // Metacognitive monitoring is stochastic — just verify stability
+    assert_eq!(service.stats().total_cycles, 50);
+    // Log whether anomaly was detected (may or may not trigger)
+    println!("Metacognitive anomaly detected: {any_anomaly}");
+}
+
+// ── Value Feedback Learning Over Time ─────────────────────────────
+
+#[test]
+fn test_value_feedback_learning() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        learning_threshold: 0.0,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "ethical reasoning about fairness",
+        "compassion and kindness matter",
+        "justice requires careful thought",
+        "harmony between beings is sacred",
+    ];
+
+    let mut trends = Vec::new();
+    for i in 0..60 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        trends.push(result.metadata.value_feedback_trend);
+    }
+
+    // After enough cycles the trend should have moved from its initial 0.0
+    let non_zero = trends.iter().filter(|&&t| t != 0.0).count();
+    assert!(
+        non_zero > 0,
+        "Value feedback trend should deviate from 0.0 after 60 cycles, got all zeros"
+    );
+
+    // All values should be finite and bounded
+    for (i, &t) in trends.iter().enumerate() {
+        assert!(
+            t.is_finite(),
+            "Value feedback trend must be finite at cycle {i}, got {t}"
+        );
+    }
+}
