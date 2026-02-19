@@ -112,9 +112,17 @@ impl RandomProjection {
         }
     }
 
-    /// Project a vector from input_dim to output_dim
-    pub fn project(&self, input: &[f32]) -> Vec<f32> {
-        assert_eq!(input.len(), self.input_dim, "Input dimension mismatch");
+    /// Project a vector from input_dim to output_dim.
+    ///
+    /// Returns `Err` if `input.len()` does not match the configured `input_dim`.
+    pub fn project(&self, input: &[f32]) -> Result<Vec<f32>, String> {
+        if input.len() != self.input_dim {
+            return Err(format!(
+                "RandomProjection input dimension mismatch: expected {}, got {}",
+                self.input_dim,
+                input.len()
+            ));
+        }
 
         let mut output = vec![0.0f32; self.output_dim];
 
@@ -124,7 +132,7 @@ impl RandomProjection {
             }
         }
 
-        output
+        Ok(output)
     }
 }
 
@@ -281,8 +289,10 @@ impl SemanticEncoder for CachedSemanticEncoder {
             .get(&hash)
         {
             // Project from embedding space to HDC space
-            let projected = self.projection.project(embedding);
-            return ContinuousHV::from_values(projected).normalize();
+            match self.projection.project(embedding) {
+                Ok(projected) => return ContinuousHV::from_values(projected).normalize(),
+                Err(_) => return self.fallback.encode(text),
+            }
         }
 
         // Fall back to character n-grams
@@ -412,9 +422,10 @@ impl SemanticEncoder for WordEmbeddingEncoder {
 
         // Aggregate and project
         let aggregated = self.aggregate_embeddings(&embeddings);
-        let projected = self.projection.project(&aggregated);
-
-        ContinuousHV::from_values(projected).normalize()
+        match self.projection.project(&aggregated) {
+            Ok(projected) => ContinuousHV::from_values(projected).normalize(),
+            Err(_) => self.fallback.encode(text),
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -1028,8 +1039,10 @@ pub mod onnx {
         fn encode(&self, text: &str) -> ContinuousHV {
             match self.encode_to_embedding(text) {
                 Ok(embedding) => {
-                    let projected = self.projection.project(&embedding);
-                    ContinuousHV::from_values(projected).normalize()
+                    match self.projection.project(&embedding) {
+                        Ok(projected) => ContinuousHV::from_values(projected).normalize(),
+                        Err(_) => CharNgramEncoder::new(42).encode(text),
+                    }
                 }
                 Err(_e) => {
                     // Fall back to char n-gram on error
@@ -1151,8 +1164,8 @@ mod tests {
         let v1 = vec![1.0f32; 10];
         let v2 = vec![0.5f32; 10];
 
-        let p1 = proj.project(&v1);
-        let p2 = proj.project(&v2);
+        let p1 = proj.project(&v1).unwrap();
+        let p2 = proj.project(&v2).unwrap();
 
         assert_eq!(p1.len(), 100);
         assert_eq!(p2.len(), 100);

@@ -70,7 +70,7 @@ impl CognitiveLoopService {
             tracing::warn!(target: "cognitive_loop::config", "{w}");
         }
 
-        let encoder = PredictiveHdcEncoder::new(config.encoder_config.clone());
+        let encoder = PredictiveHdcEncoder::new(config.encoder_config.clone())?;
 
         // Create temporal network based on selected backend
         let temporal_network = match config.temporal_backend {
@@ -350,6 +350,20 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional metacognitive monitor
+        let metacognitive_monitor = if config.enable_metacognitive_monitoring {
+            Some(crate::consciousness::metacognitive_monitoring::MetacognitiveMonitor::new(0.001))
+        } else {
+            None
+        };
+
+        // Build optional safety gateway (pre-cognitive safety veto)
+        let safety_gateway = if config.enable_safety_gateway {
+            Some(crate::safety::SafetyGateway::new())
+        } else {
+            None
+        };
+
         // Build optional primitive consciousness processor
         let primitive_processor = if config.enable_primitive_consciousness {
             Some(crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor::new())
@@ -466,6 +480,10 @@ impl CognitiveLoopService {
                 crate::identity::MfdiBridgeConfig::default(),
             ),
 
+            // Metacognitive monitoring for Phi trajectory anomaly detection
+            metacognitive_monitor,
+            // Safety gateway for pre-cognitive safety veto
+            safety_gateway,
             // Moral Algebra for compositional ethical reasoning
             moral_algebra: MoralAlgebra::default_dim(),
             moral_parser: MoralParser::new(),
@@ -485,6 +503,14 @@ impl CognitiveLoopService {
             phi_attention,
             negation_detector,
             primitive_processor,
+            #[cfg(feature = "support")]
+            support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),
+            #[cfg(feature = "support")]
+            support_knowledge_manager: Some(symthaea_support::knowledge::KnowledgeManager::new()),
+            #[cfg(feature = "support")]
+            support_triage_engine: Some(symthaea_support::triage::TriageEngine::new()),
+            #[cfg(feature = "support")]
+            support_cycle_counter: 0,
             carryover: CycleCarryover::default(),
             surprise_bridge,
             prefrontal,

@@ -151,14 +151,15 @@ pub struct PredictiveHdcEncoder {
 }
 
 impl PredictiveHdcEncoder {
-    /// Create a new predictive encoder
-    pub fn new(config: PredictiveEncoderConfig) -> Self {
+    /// Create a new predictive encoder.
+    ///
+    /// Returns `Err` if the underlying `TextEncoder` fails to initialize.
+    pub fn new(config: PredictiveEncoderConfig) -> anyhow::Result<Self> {
         let primitive_system = PrimitiveSystem::global();
         let text_encoder = TextEncoder::new(TextEncoderConfig {
             dimension: config.dimension,
             ..Default::default()
-        })
-        .expect("Failed to create text encoder for predictive encoder");
+        })?;
 
         // Initialize attention weights for all primitives
         let mut attention_weights = HashMap::new();
@@ -186,7 +187,7 @@ impl PredictiveHdcEncoder {
             primitive_names.iter().map(|n| n.to_lowercase()).collect();
         let initial_attention = config.initial_attention;
 
-        Self {
+        Ok(Self {
             config,
             primitive_system,
             text_encoder,
@@ -197,7 +198,7 @@ impl PredictiveHdcEncoder {
             primitive_names,
             primitive_names_lower,
             peak_attention: initial_attention,
-        }
+        })
     }
 
     /// Encode input with attention modulation from prediction
@@ -419,12 +420,15 @@ impl PredictiveHdcEncoder {
 
     /// Expand compressed prediction to full dimension
     fn expand_prediction(&self, compressed: &[f32]) -> Vec<f32> {
+        if compressed.is_empty() {
+            return vec![0.0; self.config.dimension];
+        }
         if compressed.len() >= self.config.dimension {
             return compressed[..self.config.dimension].to_vec();
         }
 
         // Simple expansion: repeat values to fill dimension
-        let repeat_factor = self.config.dimension / compressed.len();
+        let repeat_factor = self.config.dimension / compressed.len().max(1);
         let mut expanded = Vec::with_capacity(self.config.dimension);
 
         for &val in compressed {
@@ -499,15 +503,19 @@ impl PredictiveHdcEncoder {
 
         // Compute attention variance (emergence metric) — iterate in-place, no Vec allocation
         let n = self.attention_weights.len() as f32;
-        let sum: f32 = self.attention_weights.values().sum();
-        let mean = sum / n;
-        let variance: f32 = self
-            .attention_weights
-            .values()
-            .map(|w| (w - mean).powi(2))
-            .sum::<f32>()
-            / n;
-        self.stats.attention_variance = variance;
+        if n < 1.0 {
+            self.stats.attention_variance = 0.0;
+        } else {
+            let sum: f32 = self.attention_weights.values().sum();
+            let mean = sum / n;
+            let variance: f32 = self
+                .attention_weights
+                .values()
+                .map(|w| (w - mean).powi(2))
+                .sum::<f32>()
+                / n;
+            self.stats.attention_variance = variance;
+        }
 
         // Count diverged primitives
         let initial = self.config.initial_attention;
@@ -526,8 +534,11 @@ impl PredictiveHdcEncoder {
 
     /// Get compressed representation for LTC input
     pub fn compress_for_ltc(&self, hdv: &ContinuousHV, output_dim: usize) -> Vec<f32> {
+        if output_dim == 0 {
+            return Vec::new();
+        }
         // Downsample by taking evenly spaced values
-        let step = hdv.values.len() / output_dim;
+        let step = (hdv.values.len() / output_dim).max(1);
         hdv.values
             .iter()
             .step_by(step)
@@ -543,14 +554,14 @@ mod tests {
 
     #[test]
     fn test_encoder_creation() {
-        let encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default());
+        let encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
         assert!(encoder.attention_weights.len() > 0);
         assert_eq!(encoder.stats.total_cycles, 0);
     }
 
     #[test]
     fn test_encoding_produces_result() {
-        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default());
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
         let result = encoder.encode("The cause leads to effect");
 
         assert_eq!(result.hdv.values.len(), HDC_DIMENSION);
@@ -560,7 +571,7 @@ mod tests {
 
     #[test]
     fn test_prediction_reduces_error() {
-        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default());
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
 
         // First encoding (no prediction)
         let result1 = encoder.encode("test input");
@@ -584,7 +595,7 @@ mod tests {
             error_threshold: 0.0, // Always update
             attention_lr: 0.5,    // High learning rate for test
             ..Default::default()
-        });
+        }).unwrap();
 
         // Encode several times with high error
         for _ in 0..10 {
@@ -600,7 +611,7 @@ mod tests {
 
     #[test]
     fn test_primitive_detection() {
-        let encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default());
+        let encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
         let detected = encoder.detect_primitives("The cause leads to an effect");
 
         // Should detect causal primitives
@@ -612,7 +623,7 @@ mod tests {
 
     #[test]
     fn test_stats_accumulate() {
-        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default());
+        let mut encoder = PredictiveHdcEncoder::new(PredictiveEncoderConfig::default()).unwrap();
 
         for _ in 0..5 {
             encoder.encode("test");

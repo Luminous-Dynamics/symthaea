@@ -295,6 +295,16 @@ pub struct CognitiveLoopConfig {
     /// Enable primitive consciousness decomposition for explainable consciousness.
     pub enable_primitive_consciousness: bool,
 
+    /// Enable safety gateway (pre-cognitive safety veto).
+    /// When true, scans input for dangerous patterns before expensive HDC encoding.
+    /// Enabled by default.
+    pub enable_safety_gateway: bool,
+
+    /// Enable metacognitive monitoring for Phi trajectory anomaly detection.
+    /// When true, the cognitive loop observes Phi after reasoning and detects
+    /// anomalies (drops, plateaus, oscillations) that indicate reasoning degradation.
+    pub enable_metacognitive_monitoring: bool,
+
     /// Agent DID for attestation signing (e.g., "did:key:z6Mk...").
     /// Required when `enable_phi_attestation` is true. If None, attestation generation
     /// is silently skipped even when enabled.
@@ -354,6 +364,8 @@ impl Default for CognitiveLoopConfig {
             enable_phi_attention: false,
             enable_negation_detection: false,
             enable_primitive_consciousness: false,
+            enable_safety_gateway: true,
+            enable_metacognitive_monitoring: false,
             enable_phi_attestation: false,
             agent_did: None,
             attestation_buffer_capacity: 64,

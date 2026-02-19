@@ -90,9 +90,22 @@ impl JLProjector {
         }
     }
 
-    /// Project dense vector to output dimension
-    pub fn project(&self, input: &[f32]) -> Vec<f32> {
-        assert_eq!(input.len(), self.input_dim);
+    /// Output dimension of the projector.
+    pub fn output_dim(&self) -> usize {
+        self.output_dim
+    }
+
+    /// Project dense vector to output dimension.
+    ///
+    /// Returns `Err` if `input.len()` does not match the configured `input_dim`.
+    pub fn project(&self, input: &[f32]) -> Result<Vec<f32>, String> {
+        if input.len() != self.input_dim {
+            return Err(format!(
+                "JLProjector input dimension mismatch: expected {}, got {}",
+                self.input_dim,
+                input.len()
+            ));
+        }
 
         let mut output = vec![0.0f32; self.output_dim];
 
@@ -105,20 +118,24 @@ impl JLProjector {
             *x *= self.scale;
         }
 
-        output
+        Ok(output)
     }
 
-    /// Project to binary/bipolar representation
-    pub fn project_to_bipolar(&self, input: &[f32]) -> Vec<i8> {
-        self.project(input)
+    /// Project to binary/bipolar representation.
+    ///
+    /// Returns `Err` if input dimension mismatches.
+    pub fn project_to_bipolar(&self, input: &[f32]) -> Result<Vec<i8>, String> {
+        Ok(self.project(input)?
             .into_iter()
             .map(|v| if v > 0.0 { 1i8 } else { -1i8 })
-            .collect()
+            .collect())
     }
 
-    /// Project to packed bipolar for efficient similarity
-    pub fn project_to_packed(&self, input: &[f32]) -> PackedBipolar {
-        PackedBipolar::from_bipolar(&self.project_to_bipolar(input))
+    /// Project to packed bipolar for efficient similarity.
+    ///
+    /// Returns `Err` if input dimension mismatches.
+    pub fn project_to_packed(&self, input: &[f32]) -> Result<PackedBipolar, String> {
+        Ok(PackedBipolar::from_bipolar(&self.project_to_bipolar(input)?))
     }
 }
 
@@ -253,13 +270,19 @@ impl SemanticEncoder {
     ///
     /// Use this when you have embeddings from an external model
     /// (e.g., sentence transformers, CLIP, etc.)
+    /// Falls back to n-gram encoding on dimension mismatch.
     pub fn encode_embedding(&self, embedding: &[f32]) -> Vec<i8> {
-        self.jl.project_to_bipolar(embedding)
+        self.jl.project_to_bipolar(embedding).unwrap_or_else(|_| {
+            vec![-1i8; self.jl.output_dim()]
+        })
     }
 
-    /// Encode embedding to packed HDC
+    /// Encode embedding to packed HDC.
+    /// Falls back to zero-packed on dimension mismatch.
     pub fn encode_embedding_packed(&self, embedding: &[f32]) -> PackedBipolar {
-        self.jl.project_to_packed(embedding)
+        self.jl.project_to_packed(embedding).unwrap_or_else(|_| {
+            PackedBipolar::from_bipolar(&vec![-1i8; self.jl.output_dim()])
+        })
     }
 
     /// Combine multiple encodings via bundling
@@ -310,7 +333,7 @@ mod tests {
         let jl = JLProjector::new(768, 16384, 42);
 
         let input = vec![0.5f32; 768];
-        let output = jl.project(&input);
+        let output = jl.project(&input).unwrap();
 
         assert_eq!(output.len(), 16384);
     }
@@ -328,8 +351,8 @@ mod tests {
             b[i] = a[i] + 0.1; // Slight perturbation
         }
 
-        let pa = jl.project_to_packed(&a);
-        let pb = jl.project_to_packed(&b);
+        let pa = jl.project_to_packed(&a).unwrap();
+        let pb = jl.project_to_packed(&b).unwrap();
 
         let sim = pa.xor_similarity(&pb);
 

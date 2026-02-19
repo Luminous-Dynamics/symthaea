@@ -165,10 +165,8 @@ impl CausalSpace {
     /// causal.add_causal_link(rain, wet, 0.9);
     /// ```
     pub fn add_causal_link(&mut self, cause: BinaryHV, effect: BinaryHV, strength: f64) {
-        assert!(
-            (0.0..=1.0).contains(&strength),
-            "Strength must be in [0.0, 1.0]"
-        );
+        // Defensive clamp: caller may pass out-of-range strength from noisy estimates
+        let strength = strength.clamp(0.0, 1.0);
 
         // Encode causal relation: cause ⊗ effect
         let causal_vector = cause.bind(&effect);

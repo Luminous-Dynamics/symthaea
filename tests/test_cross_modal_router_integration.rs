@@ -1,4 +1,3 @@
-#![allow(unexpected_cfgs)]
 #![cfg(feature = "cross_modal_router_module")]
 //! Cross-Modal Attention Router Integration Test Suite
 //!

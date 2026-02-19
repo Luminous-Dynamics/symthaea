@@ -142,6 +142,11 @@ pub enum ErrorSeverity {
     Info,
 }
 
+/// Safe byte-range extraction from source: returns "" if range is invalid or non-UTF8.
+fn safe_node_text<'a>(source: &'a str, node: &Node) -> &'a str {
+    source.get(node.byte_range()).unwrap_or("")
+}
+
 impl NixParser {
     /// Create a new Nix parser
     pub fn new() -> Self {
@@ -197,7 +202,7 @@ impl NixParser {
             errors.push(NixParseError {
                 message: format!(
                     "Syntax error near: {}",
-                    &source[node.byte_range()]
+                    safe_node_text(source, node)
                         .chars()
                         .take(50)
                         .collect::<String>()
@@ -237,12 +242,12 @@ impl NixParser {
                         if formal.kind() == "formal" {
                             // Extract identifier
                             if let Some(id) = formal.child_by_field_name("name") {
-                                config.module_args.push(source[id.byte_range()].to_string());
+                                config.module_args.push(safe_node_text(source, &id).to_string());
                             }
                         } else if formal.kind() == "identifier" {
                             config
                                 .module_args
-                                .push(source[formal.byte_range()].to_string());
+                                .push(safe_node_text(source, &formal).to_string());
                         }
                     }
                 }
@@ -261,7 +266,7 @@ impl NixParser {
         // Look for imports = [ ... ] pattern
         if node.kind() == "binding" {
             if let Some(attr_path) = node.child_by_field_name("attrpath") {
-                let path_text = source[attr_path.byte_range()].to_string();
+                let path_text = safe_node_text(source, &attr_path).to_string();
                 if path_text == "imports" {
                     if let Some(value) = node.child_by_field_name("expression") {
                         self.extract_import_paths(&value, source, config);
@@ -280,7 +285,7 @@ impl NixParser {
     /// Extract paths from import list
     fn extract_import_paths(&self, node: &Node, source: &str, config: &mut NixConfig) {
         if node.kind() == "path_expression" || node.kind() == "path" {
-            config.imports.push(source[node.byte_range()].to_string());
+            config.imports.push(safe_node_text(source, node).to_string());
         }
 
         let mut cursor = node.walk();
@@ -293,7 +298,7 @@ impl NixParser {
     fn extract_options(&self, node: &Node, source: &str, prefix: &str, config: &mut NixConfig) {
         if node.kind() == "binding" {
             if let Some(attr_path) = node.child_by_field_name("attrpath") {
-                let path_text = source[attr_path.byte_range()].to_string();
+                let path_text = safe_node_text(source, &attr_path).to_string();
                 let full_path = if prefix.is_empty() {
                     path_text.clone()
                 } else {
@@ -307,7 +312,7 @@ impl NixParser {
 
                 if let Some(value_node) = node.child_by_field_name("expression") {
                     let start = node.start_position();
-                    let raw_value = source[value_node.byte_range()].to_string();
+                    let raw_value = safe_node_text(source, &value_node).to_string();
                     let value = self.parse_value(&value_node, source);
 
                     // If it's an attrset, recurse into it
@@ -337,7 +342,7 @@ impl NixParser {
     fn parse_value(&self, node: &Node, source: &str) -> NixValue {
         match node.kind() {
             "integer_expression" => {
-                let text = source[node.byte_range()].trim();
+                let text = safe_node_text(source, node).trim();
                 text.parse::<i64>()
                     .map(NixValue::Int)
                     .unwrap_or(NixValue::Expression(text.to_string()))
@@ -348,7 +353,7 @@ impl NixParser {
             "null" => NixValue::Null,
 
             "string_expression" | "indented_string_expression" => {
-                let text = source[node.byte_range()].to_string();
+                let text = safe_node_text(source, node).to_string();
                 // Remove quotes
                 let unquoted = text
                     .trim_matches('"')
@@ -358,7 +363,7 @@ impl NixParser {
                 NixValue::String(unquoted)
             }
 
-            "path_expression" | "path" => NixValue::Path(source[node.byte_range()].to_string()),
+            "path_expression" | "path" => NixValue::Path(safe_node_text(source, node).to_string()),
 
             "list_expression" => {
                 let mut items = Vec::new();
@@ -377,7 +382,7 @@ impl NixParser {
                 for child in node.children(&mut cursor) {
                     if child.kind() == "binding" {
                         if let Some(path) = child.child_by_field_name("attrpath") {
-                            let key = source[path.byte_range()].to_string();
+                            let key = safe_node_text(source, &path).to_string();
                             if let Some(val) = child.child_by_field_name("expression") {
                                 attrs.insert(key, self.parse_value(&val, source));
                             }
@@ -390,7 +395,7 @@ impl NixParser {
             "with_expression" => {
                 let scope = node
                     .child_by_field_name("environment")
-                    .map(|n| source[n.byte_range()].to_string())
+                    .map(|n| safe_node_text(source, &n).to_string())
                     .unwrap_or_default();
                 let body = node
                     .child_by_field_name("body")
@@ -403,13 +408,13 @@ impl NixParser {
             }
 
             "select_expression" | "apply_expression" => {
-                NixValue::Apply(source[node.byte_range()].to_string())
+                NixValue::Apply(safe_node_text(source, node).to_string())
             }
 
             // In tree-sitter-nix 0.3+, true/false/null are parsed as variable_expression
             // We need to check the text content to identify boolean/null literals
             "variable_expression" | "identifier" => {
-                let text = source[node.byte_range()].trim();
+                let text = safe_node_text(source, node).trim();
                 match text {
                     "true" => NixValue::Bool(true),
                     "false" => NixValue::Bool(false),
@@ -418,7 +423,7 @@ impl NixParser {
                 }
             }
 
-            _ => NixValue::Expression(source[node.byte_range()].to_string()),
+            _ => NixValue::Expression(safe_node_text(source, node).to_string()),
         }
     }
 
