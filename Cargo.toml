@@ -316,12 +316,10 @@ neural-bridge-cuda = ["neural-bridge", "candle-core/cuda", "candle-nn/cuda", "ca
 
 # ── Distributed / Network ──────────────────────────────────────────
 swarm = ["iroh"]                            # Real-time P2P tensor streaming via Iroh 0.95+
-holochain = []                              # Gate only — no deps (real integration in symthaea-mycelix-bridge)
 mycelix = ["mycelix-fl-core", "sha3"]       # Mycelix FL algorithms + hashing
 # mycelix_sdk: Add mycelix-sdk dep when it's published to crates.io, then enable:
 # mycelix_sdk = ["mycelix", "dep:mycelix-sdk"]
 mycelix_sdk = ["mycelix"]                  # Placeholder until mycelix-sdk is published (SDK code is cfg-gated)
-network = []                                # Mycelix network client — no deps (pending real HTTP integration)
 
 # ── Desktop & System Integration ────────────────────────────────────
 notifications = ["zbus"]                    # D-Bus desktop notifications
@@ -336,8 +334,6 @@ physics = []                                # Tokamak plasma encoding, C-Mod ada
 # DuckDB is an unconditional dep. Others deferred:
 # - cozo: graph_builder 0.4.1 rayon compat
 lancedb-backend = ["dep:lancedb", "dep:arrow-array", "dep:arrow-schema", "dep:futures"]
-hdf5 = []                                  # Requires system HDF5 library (gates cmod_adapter.rs)
-databases_module = []                       # Database backends in experience module
 
 # ── Consciousness & Reasoning (code-level cfg gates) ────────────────
 full_consciousness = []                     # Extended consciousness submodules
@@ -357,17 +353,8 @@ code_generation = ["tree-sitter-rust", "tree-sitter-python"]
 integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
-school_lookahead = []           # CfC-based lookahead in school (cfg-gated in school/mod.rs)
-physiology_module = []          # Physiology integration (cfg-gated in school/mod.rs)
-mycelix_module = []             # Mycelix governance hooks (cfg-gated in consciousness + brain)
 web_research_module = []        # Web research epistemic verification (cfg-gated in lib.rs)
 
-# ── Test gates — empty flags to opt-in to integration tests ────────
-benchmarks_module = []          # End-to-end pipeline and performance regression tests
-language_module = []            # Conscious cycle integration tests with language features
-intelligence_module = []        # Causal integration tests with intelligence module
-voice_module = []               # Voice integration tests
-cross_modal_router_module = []  # Cross-modal router integration tests
 
 [dev-dependencies]
 criterion = "0.5"
@@ -432,6 +419,7 @@ required-features = ["code_generation"]
 
 [[example]]
 name = "causal_tower_test"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "conscious_ollama_demo"
@@ -475,6 +463,7 @@ name = "prediction_gate_experiment"
 
 [[example]]
 name = "quick_primitives"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "meta_conscious_ollama_demo"
@@ -534,6 +523,11 @@ name = "cognitive_loop_validation"
 
 [[example]]
 name = "prefrontal_integration"
+required-features = ["unstable-examples"]
+
+[[example]]
+name = "reproduce_all_benchmarks"
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "symthaea_awakens_demo"
@@ -543,9 +537,13 @@ name = "neuro_autopoietic_demo"
 
 [[example]]
 name = "cfc_lookahead_stress_test"
+# Requires pub(crate) CfCNetwork to be exported — disabled until API stabilizes
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "causal_cantor_test"
+# Requires unimplemented TuebingenAdapter + external dataset — disabled
+required-features = ["unstable-examples"]
 
 [[example]]
 name = "pattern_differentiation"
