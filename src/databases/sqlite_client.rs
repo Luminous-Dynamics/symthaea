@@ -871,8 +871,8 @@ impl ConsciousnessDatabase for SqliteMemory {
                 .filter_map(|r| r.ok())
                 .collect();
 
-            // Get average phi
-            let avg_phi: f64 = conn.query_row(
+            // Get average psi (stored in DB column `phi` for schema compatibility)
+            let avg_psi: f64 = conn.query_row(
                 "SELECT COALESCE(AVG(phi), 0.0) FROM memories",
                 [],
                 |row| row.get(0)
@@ -920,7 +920,7 @@ impl ConsciousnessDatabase for SqliteMemory {
                 avg_query_latency_us: 0, // Not tracked yet
                 total_queries: 0,        // Not tracked yet
                 memory_type_counts,
-                avg_psi: avg_phi,
+                avg_psi,
                 oldest_timestamp_ms: oldest_timestamp_ms as u64,
                 newest_timestamp_ms: newest_timestamp_ms as u64,
                 backend_status,

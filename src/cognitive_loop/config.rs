@@ -257,11 +257,11 @@ pub struct CognitiveLoopConfig {
     /// signals for empathic response formatting.
     pub enable_user_state_inference: bool,
 
-    /// Enable PhiAttestation generation for governance bridge.
-    /// When true, the cognitive loop buffers PhiAttestationRecords after each cycle
+    /// Enable PsiAttestation generation for governance bridge.
+    /// When true, the cognitive loop buffers PsiAttestationRecords after each cycle
     /// for the personal cluster to sign and submit to governance as authenticated
     /// consciousness data. Without this, governance falls back to reputation-only voting.
-    pub enable_phi_attestation: bool,
+    pub enable_psi_attestation: bool,
 
     /// Enable consciousness thermodynamics analysis.
     /// When true, the cognitive loop analyzes thermodynamic state of consciousness
@@ -311,12 +311,23 @@ pub struct CognitiveLoopConfig {
     /// Science: Kent et al. (2020) — Resonator Networks for fast factorization
     pub enable_resonator_recall: bool,
 
+    /// How often (in cycles) the resonator checks for novel patterns to add
+    /// to its semantic codebook. Lower = faster adaptation, higher = less overhead.
+    pub resonator_growth_interval: usize,
+
+    /// Minimum novelty (max cosine similarity < threshold) required to add a
+    /// new symbol to the semantic codebook. Lower = more symbols, higher = fewer.
+    pub resonator_novelty_threshold: f32,
+
+    /// Maximum symbols in the semantic codebook before growth stops.
+    pub resonator_max_symbols: usize,
+
     /// Agent DID for attestation signing (e.g., "did:key:z6Mk...").
-    /// Required when `enable_phi_attestation` is true. If None, attestation generation
+    /// Required when `enable_psi_attestation` is true. If None, attestation generation
     /// is silently skipped even when enabled.
     pub agent_did: Option<String>,
 
-    /// Maximum PhiAttestationRecords to buffer before evicting oldest.
+    /// Maximum PsiAttestationRecords to buffer before evicting oldest.
     /// The personal cluster should drain the buffer periodically.
     pub attestation_buffer_capacity: usize,
 }
@@ -373,7 +384,10 @@ impl Default for CognitiveLoopConfig {
             enable_safety_gateway: true,
             enable_metacognitive_monitoring: false,
             enable_resonator_recall: false,
-            enable_phi_attestation: false,
+            resonator_growth_interval: 50,
+            resonator_novelty_threshold: 0.7,
+            resonator_max_symbols: 100,
+            enable_psi_attestation: false,
             agent_did: None,
             attestation_buffer_capacity: 64,
         }
@@ -465,7 +479,7 @@ impl ConsciousnessProfile {
         config.enable_negation_detection = false;
         config.enable_primitive_consciousness = false;
         config.enable_resonator_recall = false;
-        config.enable_phi_attestation = false;
+        config.enable_psi_attestation = false;
         config.causal_enhancement = false;
         config.episodic_replay = false;
 
@@ -516,7 +530,7 @@ impl ConsciousnessProfile {
                 ConsciousnessProfile::Full.apply(config);
                 config.causal_enhancement = true;
                 config.episodic_replay = true;
-                config.enable_phi_attestation = true;
+                config.enable_psi_attestation = true;
                 config.enable_user_state_inference = true;
             }
         }
@@ -596,10 +610,10 @@ impl CognitiveLoopConfig {
             );
         }
 
-        // phi_attestation silently skips without agent_did
-        if self.enable_phi_attestation && self.agent_did.is_none() {
+        // psi_attestation silently skips without agent_did
+        if self.enable_psi_attestation && self.agent_did.is_none() {
             warnings.push(
-                "enable_phi_attestation without agent_did: \
+                "enable_psi_attestation without agent_did: \
                  attestation records will not be generated"
                     .into(),
             );

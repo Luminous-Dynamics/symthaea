@@ -603,7 +603,7 @@ impl CognitiveLoopService {
                 None
             },
             virtual_body,
-            phi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
+            psi_attestation_buffer: std::collections::VecDeque::with_capacity(attestation_buf_cap),
             policy_agreement_window: std::collections::VecDeque::with_capacity(20),
             master_equation: MasterConsciousnessEquation::default(),
             // Unified Living Mind: life-mind continuity (full_consciousness only)

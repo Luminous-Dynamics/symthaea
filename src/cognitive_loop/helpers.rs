@@ -224,25 +224,25 @@ impl CognitiveLoopService {
         self.update_stats(prediction_error, cycle_start.elapsed());
         self.stats.temporal_coherence = coherence;
 
-        // 11. Buffer PhiAttestation record if enabled (mirrors cycle.rs step 10h.0)
+        // 11. Buffer PsiAttestation record if enabled (mirrors cycle.rs step 10h.0)
         // For the HV path, unified_psi is derived from temporal coherence since
         // we don't run the full consciousness subsystems.
         let urgency = self.carryover.urgency;
-        if self.config.enable_phi_attestation && self.config.agent_did.is_some() {
+        if self.config.enable_psi_attestation && self.config.agent_did.is_some() {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_micros() as u64;
-            let record = super::PhiAttestationRecord {
+            let record = super::PsiAttestationRecord {
                 psi: coherence.clamp(0.0, 1.0) as f64,
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,
                 urgency,
             };
-            self.phi_attestation_buffer.push_back(record);
-            while self.phi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
-                let _ = self.phi_attestation_buffer.pop_front();
+            self.psi_attestation_buffer.push_back(record);
+            while self.psi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
+                let _ = self.psi_attestation_buffer.pop_front();
             }
         }
 

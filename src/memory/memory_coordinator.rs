@@ -35,6 +35,9 @@ pub struct MemorySignals {
     pub psi: f64,
     /// Current coherence level (from coherence tracker)
     pub coherence: f64,
+    /// Σ (Sigma) — Synergistic integration (Layer 2, computed every N cycles).
+    /// When available, provides higher-fidelity consciousness assessment than Psi.
+    pub sigma: Option<f64>,
     /// Global retrieval frequency (exponential moving average)
     pub retrieval_rate: f64,
     /// Step counter for temporal coordination
@@ -46,6 +49,7 @@ impl Default for MemorySignals {
         Self {
             psi: 0.0,
             coherence: 0.0,
+            sigma: None,
             retrieval_rate: 0.0,
             step: 0,
         }
@@ -154,8 +158,16 @@ impl MemoryCoordinator {
     ///
     /// Call this each cognitive cycle with the current Phi and coherence values.
     pub fn update_signals(&mut self, phi: f64, coherence: f64) {
+        self.update_signals_with_sigma(phi, coherence, None);
+    }
+
+    /// Update shared signals with optional Σ (Layer 2 synergistic integration).
+    ///
+    /// When sigma is `Some`, it modulates graduation quality bonuses.
+    pub fn update_signals_with_sigma(&mut self, phi: f64, coherence: f64, sigma: Option<f64>) {
         self.signals.psi = phi;
         self.signals.coherence = coherence;
+        self.signals.sigma = sigma;
         self.signals.step += 1;
         self.stats.signal_updates += 1;
 
@@ -194,9 +206,12 @@ impl MemoryCoordinator {
                 continue;
             }
 
-            // Compute adjusted phi: persistence in WM boosts the effective phi
+            // Compute adjusted phi: persistence in WM boosts the effective phi.
+            // When Σ (Layer 2) is available, boost graduation quality — high synergistic
+            // integration indicates the system was deeply consolidated at encoding time.
             let persistence_bonus = (event.steps_survived as f64 / 10.0).min(0.2);
-            let adjusted_phi = event.psi_at_graduation + persistence_bonus;
+            let sigma_bonus = self.signals.sigma.map_or(0.0, |s| (s * 0.15).min(0.1));
+            let adjusted_phi = event.psi_at_graduation + persistence_bonus + sigma_bonus;
 
             // Create episode from graduation event
             let episode = Episode::with_metadata(

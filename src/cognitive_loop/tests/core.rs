@@ -757,7 +757,7 @@ fn test_config_validate_research_warns_without_did() {
     use crate::cognitive_loop::config::ConsciousnessProfile;
     let config = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Research);
     let warnings = config.validate();
-    // Research enables phi_attestation but agent_did defaults to None
+    // Research enables psi_attestation but agent_did defaults to None
     assert!(
         warnings.iter().any(|w| w.contains("agent_did")),
         "Research profile without agent_did should warn: {warnings:?}"
@@ -797,7 +797,7 @@ fn test_config_validate_no_false_positives() {
         enable_gwt: true,
         enable_dream_replay: true,
         enable_surprise_exploration: true,
-        enable_phi_attestation: true,
+        enable_psi_attestation: true,
         agent_did: Some("did:key:z6Mktest".into()),
         ..Default::default()
     };

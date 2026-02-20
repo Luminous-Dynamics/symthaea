@@ -652,24 +652,24 @@ fn test_cycle_with_hv_different_inputs() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// PHI ATTESTATION TESTS
+// PSI ATTESTATION TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn test_phi_attestation_disabled_by_default() {
+fn test_psi_attestation_disabled_by_default() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
     let _ = service.cycle("test");
     assert_eq!(
-        service.phi_attestation_count(),
+        service.psi_attestation_count(),
         0,
         "attestation should be off by default"
     );
 }
 
 #[test]
-fn test_phi_attestation_enabled_produces_records() {
+fn test_psi_attestation_enabled_produces_records() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-        enable_phi_attestation: true,
+        enable_psi_attestation: true,
         agent_did: Some("did:key:z6MkTest123".to_string()),
         ..Default::default()
     })
@@ -681,13 +681,13 @@ fn test_phi_attestation_enabled_produces_records() {
     }
 
     assert_eq!(
-        service.phi_attestation_count(),
+        service.psi_attestation_count(),
         3,
         "should have 3 attestation records"
     );
 
     // Verify latest record
-    let latest = service.latest_phi_attestation().unwrap();
+    let latest = service.latest_psi_attestation().unwrap();
     assert!(
         latest.psi >= 0.0 && latest.psi <= 1.0,
         "psi should be in [0, 1]"
@@ -700,9 +700,9 @@ fn test_phi_attestation_enabled_produces_records() {
 }
 
 #[test]
-fn test_phi_attestation_drain() {
+fn test_psi_attestation_drain() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-        enable_phi_attestation: true,
+        enable_psi_attestation: true,
         agent_did: Some("did:key:z6MkTest456".to_string()),
         ..Default::default()
     })
@@ -712,10 +712,10 @@ fn test_phi_attestation_drain() {
         let _ = service.cycle("test");
     }
 
-    let records = service.drain_phi_attestations();
+    let records = service.drain_psi_attestations();
     assert_eq!(records.len(), 5, "should drain all 5 records");
     assert_eq!(
-        service.phi_attestation_count(),
+        service.psi_attestation_count(),
         0,
         "buffer should be empty after drain"
     );
@@ -731,9 +731,9 @@ fn test_phi_attestation_drain() {
 }
 
 #[test]
-fn test_phi_attestation_buffer_capacity() {
+fn test_psi_attestation_buffer_capacity() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-        enable_phi_attestation: true,
+        enable_psi_attestation: true,
         agent_did: Some("did:key:z6MkCapTest".to_string()),
         attestation_buffer_capacity: 3,
         ..Default::default()
@@ -745,19 +745,19 @@ fn test_phi_attestation_buffer_capacity() {
     }
 
     assert_eq!(
-        service.phi_attestation_count(),
+        service.psi_attestation_count(),
         3,
         "should not exceed capacity"
     );
     // Oldest records evicted — remaining should be cycles 8, 9, 10 (1-indexed)
-    let records = service.drain_phi_attestations();
+    let records = service.drain_psi_attestations();
     assert_eq!(records[0].cycle_id, 8);
     assert_eq!(records[2].cycle_id, 10);
 }
 
 #[test]
-fn test_phi_attestation_sign_message_deterministic() {
-    let record = PhiAttestationRecord {
+fn test_psi_attestation_sign_message_deterministic() {
+    let record = PsiAttestationRecord {
         psi: 0.654321,
         cycle_id: 42,
         captured_at_us: 1708000000000000,
@@ -774,9 +774,9 @@ fn test_phi_attestation_sign_message_deterministic() {
 }
 
 #[test]
-fn test_phi_attestation_skipped_without_agent_did() {
+fn test_psi_attestation_skipped_without_agent_did() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
-        enable_phi_attestation: true,
+        enable_psi_attestation: true,
         agent_did: None, // No DID — should skip
         ..Default::default()
     })
@@ -784,7 +784,7 @@ fn test_phi_attestation_skipped_without_agent_did() {
 
     let _ = service.cycle("test");
     assert_eq!(
-        service.phi_attestation_count(),
+        service.psi_attestation_count(),
         0,
         "no attestation without agent_did"
     );

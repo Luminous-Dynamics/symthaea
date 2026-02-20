@@ -657,6 +657,7 @@ impl CognitiveLoopService {
     }
 
     /// Get the conversation coherence tracker reference
+    #[allow(dead_code)] // Used by fep_temporal_benchmark
     pub(crate) fn coherence_tracker(&self) -> &ConversationCoherenceTracker {
         &self.coherence_tracker
     }
@@ -870,22 +871,22 @@ impl CognitiveLoopService {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
-    // PHI ATTESTATION ACCESSORS
+    // PSI ATTESTATION ACCESSORS
     // ═══════════════════════════════════════════════════════════════════════
 
-    /// Get the number of buffered PhiAttestationRecords.
-    pub fn phi_attestation_count(&self) -> usize {
-        self.phi_attestation_buffer.len()
+    /// Get the number of buffered PsiAttestationRecords.
+    pub fn psi_attestation_count(&self) -> usize {
+        self.psi_attestation_buffer.len()
     }
 
-    /// Drain all buffered PhiAttestationRecords for submission to the governance bridge.
+    /// Drain all buffered PsiAttestationRecords for submission to the governance bridge.
     /// Returns the records and clears the buffer.
-    pub fn drain_phi_attestations(&mut self) -> Vec<super::PhiAttestationRecord> {
-        self.phi_attestation_buffer.drain(..).collect()
+    pub fn drain_psi_attestations(&mut self) -> Vec<super::PsiAttestationRecord> {
+        self.psi_attestation_buffer.drain(..).collect()
     }
 
-    /// Peek at the most recent PhiAttestationRecord without consuming it.
-    pub fn latest_phi_attestation(&self) -> Option<&super::PhiAttestationRecord> {
-        self.phi_attestation_buffer.back()
+    /// Peek at the most recent PsiAttestationRecord without consuming it.
+    pub fn latest_psi_attestation(&self) -> Option<&super::PsiAttestationRecord> {
+        self.psi_attestation_buffer.back()
     }
 }
