@@ -498,12 +498,12 @@ mod proptests {
     /// Generate a random valid positive-definite covariance matrix of size n.
     /// Strategy: C = A^T A + εI where A is random, guaranteeing PD.
     fn random_pd_covariance(n: usize) -> impl Strategy<Value = Vec<f64>> {
-        proptest::collection::vec(-1.0f64..1.0, n * n).prop_map(move |a_flat| {
-            let mut cov = vec![0.0; n * n];
+        proptest::collection::vec(-1.0f64..1.0f64, n * n).prop_map(move |a_flat: Vec<f64>| {
+            let mut cov = vec![0.0f64; n * n];
             // C = A^T * A  (Gram matrix, always PSD)
             for i in 0..n {
                 for j in 0..n {
-                    let mut dot = 0.0;
+                    let mut dot = 0.0f64;
                     for k in 0..n {
                         dot += a_flat[k * n + i] * a_flat[k * n + j];
                     }
@@ -549,7 +549,8 @@ mod proptests {
             let finder = SpectralMIPFinder::with_defaults();
             let result = finder.compute_from_covariance(&cov, 16, 30);
             if let Some(r) = result {
-                let (a, b) = &r.partition;
+                let a = &r.mip.part_a;
+                let b = &r.mip.part_b;
                 prop_assert!(!a.is_empty(), "Partition part A must be non-empty");
                 prop_assert!(!b.is_empty(), "Partition part B must be non-empty");
                 prop_assert_eq!(
