@@ -4,7 +4,7 @@
 //! `mycelix-fl-core` pipeline via the [`ByzantinePlugin`] trait. It provides
 //! richer weight adjustments than the simple Phi-threshold plugin by using
 //! the full [`QualityScore`] signal: epistemic confidence, anomaly severity,
-//! integration gain trends, and gray-zone ambiguity detection.
+//! connectivity gain trends, and gray-zone ambiguity detection.
 //!
 //! # Usage
 //!
@@ -37,8 +37,8 @@ pub struct QualityPluginConfig {
     pub confidence_threshold: f32,
     /// Epistemic confidence below which the update is vetoed (default: 0.1).
     pub veto_confidence: f32,
-    /// Integration gain above which the update gets a boost (default: 0.05).
-    pub integration_gain_boost_threshold: f32,
+    /// Connectivity gain above which the update gets a boost (default: 0.05).
+    pub connectivity_gain_boost_threshold: f32,
     /// Weight multiplier for boosted updates (default: 1.4).
     pub boost_factor: f32,
     /// Whether to veto on Severe anomaly regardless of confidence (default: true).
@@ -50,7 +50,7 @@ impl Default for QualityPluginConfig {
         Self {
             confidence_threshold: 0.3,
             veto_confidence: 0.1,
-            integration_gain_boost_threshold: 0.05,
+            connectivity_gain_boost_threshold: 0.05,
             boost_factor: 1.4,
             veto_severe: true,
         }
@@ -65,7 +65,7 @@ impl Default for QualityPluginConfig {
 ///
 /// - **Epistemic confidence**: composite of Phi + validation accuracy
 /// - **Anomaly severity**: None/Mild/Moderate/Severe classification
-/// - **Phi gain trend**: positive gain -> integration improving -> boost
+/// - **Connectivity gain trend**: positive gain -> connectivity improving -> boost
 /// - **Gray-zone detection**: ambiguous similarity to known prototypes
 ///
 /// Quality scores must be set externally each round via [`set_quality_scores`].
@@ -149,7 +149,21 @@ impl SymthaeaQualityPlugin {
             });
         }
 
-        // Rule 3: Low confidence or moderate anomaly -> dampen proportionally
+        // Rule 3: Spectral-phi divergence — network looks connected but lacks integration.
+        // When spectral connectivity is high but true/fast phi is very low,
+        // the network structure doesn't produce genuine information integration.
+        let cv = &q.consciousness_vector;
+        let spectral = cv.spectral_connectivity.unwrap_or(0.0);
+        let best_phi = cv.best_phi();
+        if spectral > 0.5 && best_phi < 0.1 && cv.true_phi.or(cv.phi_fast).is_some() {
+            return Some(ParticipantWeightAdjustment {
+                weight_multiplier: 0.5,
+                veto: false,
+                source: "symthaea_quality_spectral_phi_divergence".into(),
+            });
+        }
+
+        // Rule 4: Low confidence or moderate anomaly -> dampen proportionally
         if q.epistemic_confidence < self.config.confidence_threshold
             || matches!(q.severity, ConsciousAnomalySeverity::Moderate)
         {
@@ -161,7 +175,7 @@ impl SymthaeaQualityPlugin {
             });
         }
 
-        // Rule 4: Mild anomaly with ambiguity -> slight dampen
+        // Rule 5: Mild anomaly with ambiguity -> slight dampen
         if q.is_ambiguous && matches!(q.severity, ConsciousAnomalySeverity::Mild) {
             return Some(ParticipantWeightAdjustment {
                 weight_multiplier: 0.8,
@@ -170,8 +184,9 @@ impl SymthaeaQualityPlugin {
             });
         }
 
-        // Rule 5: High confidence + positive integration gain -> boost
-        if q.epistemic_confidence > 0.7 && q.integration.integration_gain > self.config.integration_gain_boost_threshold {
+        // Rule 6: High confidence + positive connectivity gain -> boost
+        // Uses best_phi from C-Vector for richer signal
+        if q.epistemic_confidence > 0.7 && q.spectral.connectivity_gain > self.config.connectivity_gain_boost_threshold {
             return Some(ParticipantWeightAdjustment {
                 weight_multiplier: self.config.boost_factor,
                 veto: false,
@@ -224,7 +239,7 @@ impl ByzantinePlugin for SymthaeaQualityPlugin {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::IntegrationAssessment;
+    use crate::{ConsciousnessVector, SpectralConnectivityAssessment};
 
     fn make_update(id: &str) -> GradientUpdate {
         GradientUpdate::new(id.into(), 1, vec![0.5; 10], 100, 0.5)
@@ -234,7 +249,8 @@ mod tests {
         QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            integration: IntegrationAssessment::new(0.4, 0.6),
+            spectral: SpectralConnectivityAssessment::new(0.4, 0.6),
+            consciousness_vector: ConsciousnessVector::default(),
             epistemic_confidence: 0.85,
             is_anomalous: false,
             similarity: Some(0.95),
@@ -248,7 +264,8 @@ mod tests {
         QualityScore {
             accuracy: 0.2,
             loss: 2.0,
-            integration: IntegrationAssessment::new(0.6, 0.1),
+            spectral: SpectralConnectivityAssessment::new(0.6, 0.1),
+            consciousness_vector: ConsciousnessVector::default(),
             epistemic_confidence: 0.05,
             is_anomalous: true,
             similarity: Some(0.3),
@@ -262,7 +279,8 @@ mod tests {
         QualityScore {
             accuracy: 0.5,
             loss: 0.8,
-            integration: IntegrationAssessment::new(0.5, 0.35),
+            spectral: SpectralConnectivityAssessment::new(0.5, 0.35),
+            consciousness_vector: ConsciousnessVector::default(),
             epistemic_confidence: 0.25,
             is_anomalous: true,
             similarity: Some(0.6),
@@ -276,7 +294,8 @@ mod tests {
         QualityScore {
             accuracy: 0.6,
             loss: 0.5,
-            integration: IntegrationAssessment::new(0.5, 0.52),
+            spectral: SpectralConnectivityAssessment::new(0.5, 0.52),
+            consciousness_vector: ConsciousnessVector::default(),
             epistemic_confidence: 0.55,
             is_anomalous: true,
             similarity: Some(0.8),
@@ -357,7 +376,7 @@ mod tests {
     fn test_good_quality_boosted() {
         let mut plugin = SymthaeaQualityPlugin::new();
         let mut q = good_quality();
-        q.integration.integration_gain = 0.2;
+        q.spectral.connectivity_gain = 0.2;
         q.epistemic_confidence = 0.85;
 
         let mut scores = HashMap::new();
@@ -379,7 +398,7 @@ mod tests {
         let mut plugin = SymthaeaQualityPlugin::new();
         let mut q = good_quality();
         q.epistemic_confidence = 0.5;
-        q.integration.integration_gain = 0.01;
+        q.spectral.connectivity_gain = 0.01;
 
         let mut scores = HashMap::new();
         scores.insert("neutral".to_string(), q);
@@ -406,7 +425,7 @@ mod tests {
         let mut scores = HashMap::new();
 
         let mut boost = good_quality();
-        boost.integration.integration_gain = 0.2;
+        boost.spectral.connectivity_gain = 0.2;
         boost.epistemic_confidence = 0.85;
         scores.insert("boost".to_string(), boost);
 
@@ -435,7 +454,7 @@ mod tests {
         let mut scores = HashMap::new();
 
         let mut boost_q = good_quality();
-        boost_q.integration.integration_gain = 0.2;
+        boost_q.spectral.connectivity_gain = 0.2;
         boost_q.epistemic_confidence = 0.85;
         scores.insert("boost".to_string(), boost_q);
         scores.insert("veto".to_string(), bad_quality());
@@ -466,7 +485,7 @@ mod tests {
         let config = QualityPluginConfig {
             confidence_threshold: 0.5,
             veto_confidence: 0.2,
-            integration_gain_boost_threshold: 0.1,
+            connectivity_gain_boost_threshold: 0.1,
             boost_factor: 2.0,
             veto_severe: false,
         };
@@ -506,5 +525,63 @@ mod tests {
         let mut plugin = SymthaeaQualityPlugin::new();
         let weights = plugin.analyze(&[]);
         assert!(weights.is_empty());
+    }
+
+    #[test]
+    fn test_spectral_phi_divergence_detected() {
+        let mut plugin = SymthaeaQualityPlugin::new();
+
+        // High spectral connectivity but very low phi -> divergence signal
+        let mut q = good_quality();
+        q.consciousness_vector = ConsciousnessVector {
+            spectral_connectivity: Some(0.8),
+            true_phi: Some(0.05),   // Very low true phi
+            phi_fast: Some(0.03),
+            entropy: Some(0.5),
+            coherence: Some(0.7),
+            epistemic_confidence: Some(0.6),
+        };
+        q.epistemic_confidence = 0.6;
+
+        let mut scores = HashMap::new();
+        scores.insert("divergent".to_string(), q);
+        plugin.set_quality_scores(scores);
+
+        let updates = vec![make_update("divergent")];
+        let weights = plugin.analyze(&updates);
+
+        assert!(weights.contains_key("divergent"));
+        let adj = &weights["divergent"][0];
+        assert!(!adj.veto, "divergence should dampen, not veto");
+        assert_eq!(adj.weight_multiplier, 0.5);
+        assert_eq!(adj.source, "symthaea_quality_spectral_phi_divergence");
+    }
+
+    #[test]
+    fn test_no_divergence_when_phi_not_computed() {
+        let mut plugin = SymthaeaQualityPlugin::new();
+
+        // High spectral but no phi computed -> no divergence detection
+        let mut q = good_quality();
+        q.consciousness_vector = ConsciousnessVector {
+            spectral_connectivity: Some(0.8),
+            true_phi: None,
+            phi_fast: None,
+            entropy: Some(0.5),
+            coherence: Some(0.7),
+            epistemic_confidence: Some(0.6),
+        };
+        q.epistemic_confidence = 0.6;
+        q.spectral.connectivity_gain = 0.01; // below boost threshold
+
+        let mut scores = HashMap::new();
+        scores.insert("no_phi".to_string(), q);
+        plugin.set_quality_scores(scores);
+
+        let updates = vec![make_update("no_phi")];
+        let weights = plugin.analyze(&updates);
+
+        // Should have no adjustment (not divergence, not dampened, not boosted)
+        assert!(!weights.contains_key("no_phi"), "No divergence without phi data");
     }
 }

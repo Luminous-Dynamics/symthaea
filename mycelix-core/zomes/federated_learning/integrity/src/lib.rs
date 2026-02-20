@@ -460,6 +460,53 @@ pub struct ModelConfig {
     pub registered_by: String,
 }
 
+// =============================================================================
+// Coherence Time-Series Tracking
+// =============================================================================
+
+/// Per-round coherence data point for anomaly detection across rounds.
+/// Stored on DHT so CoherenceTimeSeries can be rebuilt from history.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CoherenceRecord {
+    /// FL round number
+    pub round: u64,
+    /// Coherence value: 1.0 - (byzantine_count / total_nodes)
+    pub coherence_value: f32,
+    /// Epistemic confidence in the measurement
+    pub epistemic_confidence: f32,
+    /// Number of Byzantine nodes detected
+    pub byzantine_count: u32,
+    /// Total nodes in the round
+    pub node_count: u32,
+    /// Adaptive defense escalation level at time of measurement
+    pub defense_level: u32,
+    /// Timestamp (unix millis)
+    pub recorded_at: i64,
+}
+
+/// Gradient fingerprint for cross-round replay detection.
+/// Stores the SHA-256 hash + statistics of a gradient submission so that
+/// ReplayDetector can check future rounds against historical submissions.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct GradientFingerprint {
+    /// Node that submitted this gradient
+    pub node_id: String,
+    /// Round this gradient was submitted in
+    pub round: u64,
+    /// SHA-256 hash of the gradient bytes
+    pub hash_hex: String,
+    /// L2 norm of the gradient (for near-replay detection)
+    pub l2_norm: f32,
+    /// Mean value of gradient components
+    pub mean: f32,
+    /// Standard deviation of gradient components
+    pub std_dev: f32,
+    /// Timestamp of submission
+    pub submitted_at: i64,
+}
+
 /// Entry types for the federated learning hApp
 #[hdk_entry_types]
 #[unit_enum(EntryTypesUnit)]
@@ -492,6 +539,10 @@ pub enum EntryTypes {
     ModelConfig(ModelConfig),
     // Coordinator rotation
     CoordinatorTerm(CoordinatorTerm),
+    // Coherence time-series tracking
+    CoherenceRecord(CoherenceRecord),
+    // Cross-round replay detection
+    GradientFingerprint(GradientFingerprint),
 }
 
 /// Link types for the federated learning hApp
@@ -534,6 +585,10 @@ pub enum LinkTypes {
     // Coordinator rotation
     CoordinatorTerms,         // Path to CoordinatorTerm entries
     AgentToTerms,             // Agent -> their CoordinatorTerm entries
+    // Coherence time-series
+    CoherenceTimeSeries,      // Path to CoherenceRecord entries
+    // Replay detection
+    GradientFingerprints,     // Path to GradientFingerprint entries
 }
 
 // === Validation Functions ===
@@ -1236,6 +1291,26 @@ pub fn validate_coordinator_term(term: CoordinatorTerm) -> ExternResult<Validate
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Validate CoherenceRecord entries
+pub fn validate_coherence_record(r: CoherenceRecord) -> ExternResult<ValidateCallbackResult> {
+    if !(0.0..=1.0).contains(&r.coherence_value) || !r.coherence_value.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Coherence value must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+    if !(0.0..=1.0).contains(&r.epistemic_confidence) || !r.epistemic_confidence.is_finite() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Epistemic confidence must be between 0.0 and 1.0".to_string(),
+        ));
+    }
+    if r.byzantine_count > r.node_count {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Byzantine count cannot exceed node count".to_string(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 /// Main validation dispatcher
 #[hdk_extern]
 pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
@@ -1274,6 +1349,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     Some(EntryTypes::ModelConfig(config)) => validate_model_config(config),
                     // Coordinator rotation
                     Some(EntryTypes::CoordinatorTerm(term)) => validate_coordinator_term(term),
+                    // Coherence tracking
+                    Some(EntryTypes::CoherenceRecord(r)) => validate_coherence_record(r),
+                    // Replay detection fingerprints (lightweight — just validate node_id)
+                    Some(EntryTypes::GradientFingerprint(f)) => {
+                        if f.node_id.trim().is_empty() {
+                            Ok(ValidateCallbackResult::Invalid("Fingerprint node_id cannot be empty".to_string()))
+                        } else if f.hash_hex.len() != 64 || !f.hash_hex.chars().all(|c| c.is_ascii_hexdigit()) {
+                            Ok(ValidateCallbackResult::Invalid("Fingerprint hash must be 64 hex chars".to_string()))
+                        } else {
+                            Ok(ValidateCallbackResult::Valid)
+                        }
+                    }
                     None => Ok(ValidateCallbackResult::Valid),
                 }
             }

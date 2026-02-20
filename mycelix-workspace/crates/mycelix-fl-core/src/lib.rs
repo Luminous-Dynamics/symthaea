@@ -55,3 +55,15 @@ pub use hybrid_bft::*;
 pub use pipeline::*;
 pub use privacy::*;
 pub use types::*;
+
+#[cfg(feature = "replay")]
+pub use replay_detection::*;
+
+#[cfg(feature = "shapley")]
+pub use shapley::*;
+
+#[cfg(feature = "ensemble")]
+pub use ensemble_defense::*;
+
+#[cfg(feature = "compression")]
+pub use compression::*;

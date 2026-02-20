@@ -60,9 +60,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  accuracy: {:.3}", quality.accuracy);
     println!("  loss: {:.3}", quality.loss);
     println!(
-        "  Φ before/after/gain: {:.3} → {:.3} (Δ = {:.3})",
-        quality.phi.phi_before, quality.phi.phi_after, quality.phi.phi_gain
+        "  connectivity before/after/gain: {:.3} → {:.3} (Δ = {:.3})",
+        quality.spectral.connectivity_before, quality.spectral.connectivity_after, quality.spectral.connectivity_gain
     );
+    println!("  consciousness composite: {:.3}", quality.consciousness_vector.composite());
+    println!("  best phi: {:.3}", quality.consciousness_vector.best_phi());
     println!("  epistemic confidence: {:.3}", quality.epistemic_confidence);
     println!("  is anomalous? {}", quality.is_anomalous);
     if !quality.causes.is_empty() {

@@ -32,7 +32,7 @@ use mycelix_sdk::hyperfeel::HyperGradient;
 use crate::fl_plugin::{QualityPluginConfig, SymthaeaQualityPlugin};
 use crate::{
     pogq_from_quality_score, BridgeError, ConsciousAnomalySeverity, ConsciousnessBackend,
-    ModelSnapshot, IntegrationAssessment, Result, SymthaeaBackend,
+    ConsciousnessVector, ModelSnapshot, SpectralConnectivityAssessment, Result, SymthaeaBackend,
 };
 
 /// Configuration for a conscious FL round.
@@ -110,8 +110,10 @@ pub struct ConsciousRoundResult {
 /// Per-node consciousness assessment for a round.
 #[derive(Debug, Clone)]
 pub struct NodeRoundScore {
-    /// Integration assessment (before/after/gain).
-    pub integration: IntegrationAssessment,
+    /// Spectral connectivity assessment (before/after/gain).
+    pub spectral: SpectralConnectivityAssessment,
+    /// Multi-dimensional consciousness vector.
+    pub consciousness_vector: ConsciousnessVector,
     /// Epistemic confidence [0,1].
     pub epistemic_confidence: f32,
     /// Whether the node was flagged as anomalous.
@@ -206,7 +208,8 @@ impl ConsciousFlRound {
             node_scores.insert(
                 node_id.clone(),
                 NodeRoundScore {
-                    integration: quality.integration.clone(),
+                    spectral: quality.spectral.clone(),
+                    consciousness_vector: quality.consciousness_vector.clone(),
                     epistemic_confidence: quality.epistemic_confidence,
                     is_anomalous: quality.is_anomalous,
                     severity: quality.severity,
@@ -406,7 +409,7 @@ mod tests {
         let _r1 = round.run(&snapshot, &gradients, &reputations).unwrap();
         assert_eq!(round.rounds_completed(), 1);
 
-        // Round 2 (same gradients but backend has integration history)
+        // Round 2 (same gradients but backend has connectivity history)
         let r2 = round.run(&snapshot, &gradients, &reputations).unwrap();
         assert_eq!(round.rounds_completed(), 2);
         assert!(!r2.aggregated.is_empty());

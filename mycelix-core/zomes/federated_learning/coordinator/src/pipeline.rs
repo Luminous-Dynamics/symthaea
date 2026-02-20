@@ -18,6 +18,18 @@ use super::ensure_path;
 use crate::hyperfeel::get_round_hypervectors;
 use crate::consensus::get_active_validators_internal;
 
+/// Convert HV16 binary bytes to bipolar f32: bit=1 → +1.0, bit=0 → -1.0
+///
+/// Used by Shapley computation, replay detection, and HV similarity comparison.
+/// 2048 bytes (HV16) → 16384 f32 values.
+pub(crate) fn hv16_to_bipolar(hv_bytes: &[u8]) -> Vec<f32> {
+    hv_bytes.iter()
+        .flat_map(|byte| (0..8).rev().map(move |i| {
+            if (byte >> i) & 1 == 1 { 1.0f32 } else { -1.0f32 }
+        }))
+        .collect()
+}
+
 /// Result of running the validator pipeline locally
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ValidatorPipelineResult {
@@ -115,17 +127,31 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
         reputations.insert(node_id.clone(), rep);
     }
 
-    // Step 2.5: Check for gradient replay attacks
+    // Step 2.5: Check for gradient replay attacks (cross-round + same-round)
     let mut replay_excluded = Vec::new();
     {
         let mut replay_detector = ReplayDetector::new(ReplayDetectorConfig::default());
+
+        // Load prior round fingerprints from DHT for cross-round detection
+        let lookback_rounds = 5u32;
+        if let Ok(prior_fps) = load_gradient_fingerprints(
+            round.saturating_sub(lookback_rounds),
+            round.saturating_sub(1),
+        ) {
+            for fp in &prior_fps {
+                // Reconstruct a synthetic gradient from statistics for near-replay detection
+                // The hash-based detection works purely from the SHA-256 fingerprint
+                replay_detector.record_submission(
+                    &fp.node_id,
+                    &[fp.l2_norm, fp.mean, fp.std_dev],
+                    fp.round,
+                );
+            }
+        }
+
+        // Check current round's gradients against history + each other
         for gradient in &compressed_gradients {
-            // Convert HV16 bytes to f32 for replay fingerprinting
-            let gradient_f32: Vec<f32> = gradient.hv_data.iter()
-                .flat_map(|byte| (0..8).rev().map(move |i| {
-                    if (byte >> i) & 1 == 1 { 1.0f32 } else { -1.0f32 }
-                }))
-                .collect();
+            let gradient_f32 = hv16_to_bipolar(&gradient.hv_data);
             let check = replay_detector.check_replay(
                 &gradient.participant_id,
                 &gradient_f32,
@@ -133,6 +159,19 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
             );
             if check.is_replay {
                 replay_excluded.push(gradient.participant_id.clone());
+            }
+        }
+
+        // Persist this round's fingerprints for future rounds (best effort)
+        for gradient in &compressed_gradients {
+            if !replay_excluded.contains(&gradient.participant_id) {
+                let gradient_f32 = hv16_to_bipolar(&gradient.hv_data);
+                let fp = replay_detector.compute_fingerprint(&gradient_f32);
+                let _ = store_gradient_fingerprint(
+                    &gradient.participant_id,
+                    round as u64,
+                    &fp,
+                );
             }
         }
     }
@@ -163,11 +202,40 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
             }
         }
     }
-    // Let adaptive defense potentially escalate the method
+    // Let adaptive defense escalate detection thresholds based on recent Byzantine rates
     let _adapted_method = defense_manager.adapt();
+    let defense_stats = defense_manager.get_stats();
 
-    // Step 3: Run the unified pipeline
-    let pipeline = DecentralizedPipeline::new(PipelineConfig::default());
+    // Step 3: Configure pipeline with defense-adjusted thresholds
+    // Higher escalation → stricter cosine filtering, higher reputation bar
+    let mut pipeline_config = PipelineConfig::default();
+    match defense_stats.escalation_level {
+        0 => {} // Level 0: defaults (cosine=0.1, rep=0.3, confidence=0.7)
+        1 => {
+            pipeline_config.cosine_threshold = 0.15;
+            pipeline_config.method = format!("AdaptiveHV-L1-{:?}", defense_stats.current_method);
+        }
+        2 => {
+            pipeline_config.cosine_threshold = 0.2;
+            pipeline_config.reputation_threshold = 0.4;
+            pipeline_config.method = format!("AdaptiveHV-L2-{:?}", defense_stats.current_method);
+        }
+        3 => {
+            pipeline_config.cosine_threshold = 0.25;
+            pipeline_config.reputation_threshold = 0.5;
+            pipeline_config.confidence_threshold = 0.6;
+            pipeline_config.method = format!("AdaptiveHV-L3-{:?}", defense_stats.current_method);
+        }
+        _ => {
+            // Level 4+: maximum defense
+            pipeline_config.cosine_threshold = 0.3;
+            pipeline_config.reputation_threshold = 0.6;
+            pipeline_config.confidence_threshold = 0.5;
+            pipeline_config.max_byzantine_fraction = 0.34;
+            pipeline_config.method = format!("AdaptiveHV-L{}-{:?}", defense_stats.escalation_level, defense_stats.current_method);
+        }
+    }
+    let pipeline = DecentralizedPipeline::new(pipeline_config);
     let result = pipeline.aggregate_compressed(&compressed_gradients, &reputations)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(
             format!("Pipeline aggregation failed: {:?}", e)
@@ -207,10 +275,10 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
         total_flagged: result.stats.byzantine_detected + replay_excluded.len(),
     };
 
-    // Step 5.5: Record coherence time-series data point for this round
+    // Step 5.5: Record coherence data point to DHT + run anomaly detection
     {
         use mycelix_fl::coherence_series::{CoherenceTimeSeries, CoherenceTimeSeriesConfig};
-        // Compute coherence as (1 - byzantine_fraction) — higher = more coherent
+
         let total = result.stats.total_contributions + replay_excluded.len();
         let flagged = result.stats.byzantine_detected + replay_excluded.len();
         let coherence = if total > 0 {
@@ -219,18 +287,38 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
             1.0
         };
         let now_ms = sys_time().map(|t| t.0 as i64 / 1_000).unwrap_or(0);
+
+        // Persist this round's coherence to DHT
+        let record = CoherenceRecord {
+            round: round as u64,
+            coherence_value: coherence,
+            epistemic_confidence: 0.8,
+            byzantine_count: flagged as u32,
+            node_count: total as u32,
+            defense_level: defense_stats.escalation_level as u32,
+            recorded_at: now_ms,
+        };
+        if let Ok(hash) = create_entry(&EntryTypes::CoherenceRecord(record)) {
+            let series_path = Path::from("coherence_time_series");
+            if let Ok(series_hash) = ensure_path(series_path, LinkTypes::CoherenceTimeSeries) {
+                let _ = create_link(series_hash, hash, LinkTypes::CoherenceTimeSeries, vec![]);
+            }
+        }
+
+        // Load recent history from DHT and run anomaly detection
         let mut series = CoherenceTimeSeries::new(
             CoherenceTimeSeriesConfig::default().with_window_size(50)
         );
-        series.record(
-            round as u64,
-            now_ms,
-            coherence,
-            0.8, // default epistemic confidence
-            flagged,
-            total,
-        );
-        // Check for anomalies (result available for future DHT persistence)
+        if let Ok(history) = load_coherence_history(50) {
+            for h in &history {
+                series.record(
+                    h.round, h.recorded_at, h.coherence_value,
+                    h.epistemic_confidence, h.byzantine_count as usize, h.node_count as usize,
+                );
+            }
+        }
+        // Record current point into the series for anomaly detection
+        series.record(round as u64, now_ms, coherence, 0.8, flagged, total);
         let _anomaly = series.detect_anomaly();
     }
 
@@ -388,12 +476,7 @@ fn compute_reveal_shapley_values(
     let mut gradient_map: std::collections::HashMap<String, Vec<f32>> =
         std::collections::HashMap::new();
     for (node_id, hv_bytes) in &valid_hvs {
-        let bipolar: Vec<f32> = hv_bytes.iter()
-            .flat_map(|byte| (0..8).rev().map(move |i| {
-                if (byte >> i) & 1 == 1 { 1.0f32 } else { -1.0f32 }
-            }))
-            .collect();
-        gradient_map.insert((*node_id).clone(), bipolar);
+        gradient_map.insert((*node_id).clone(), hv16_to_bipolar(hv_bytes));
     }
 
     // Compute aggregated reference (mean of all valid HVs)
@@ -537,4 +620,195 @@ pub(crate) fn get_or_create_reputation(node_id: &str) -> ExternResult<NodeReputa
     create_link(rep_hash, hash, LinkTypes::NodeToReputation, vec![])?;
 
     Ok(reputation)
+}
+
+// =============================================================================
+// Gradient Fingerprint DHT Operations (Cross-Round Replay Detection)
+// =============================================================================
+
+/// Store a gradient fingerprint on DHT for future replay detection.
+fn store_gradient_fingerprint(
+    node_id: &str,
+    round: u64,
+    fp: &mycelix_fl::fl_core::GradientFingerprint,
+) -> ExternResult<()> {
+    let now_ms = sys_time().map(|t| t.0 as i64 / 1_000).unwrap_or(0);
+    let hash_hex = fp.hash.iter().map(|b| format!("{:02x}", b)).collect::<String>();
+
+    let entry = GradientFingerprint {
+        node_id: node_id.to_string(),
+        round,
+        hash_hex,
+        l2_norm: fp.norm,
+        mean: fp.mean,
+        std_dev: fp.std_dev,
+        submitted_at: now_ms,
+    };
+
+    let action_hash = create_entry(&EntryTypes::GradientFingerprint(entry))?;
+    let fp_path = Path::from(format!("gradient_fingerprints/{}", round));
+    let fp_hash = ensure_path(fp_path, LinkTypes::GradientFingerprints)?;
+    create_link(fp_hash, action_hash, LinkTypes::GradientFingerprints, vec![])?;
+    Ok(())
+}
+
+/// Load gradient fingerprints from DHT for a range of rounds.
+fn load_gradient_fingerprints(
+    start_round: u32,
+    end_round: u32,
+) -> ExternResult<Vec<GradientFingerprint>> {
+    let mut all_fps = Vec::new();
+
+    for round in start_round..=end_round {
+        let fp_path = Path::from(format!("gradient_fingerprints/{}", round));
+        let typed = fp_path.typed(LinkTypes::GradientFingerprints)?;
+        if !typed.exists()? {
+            continue;
+        }
+        let fp_hash = typed.path_entry_hash()?;
+
+        let links = get_links(
+            LinkQuery::new(
+                fp_hash,
+                LinkTypeFilter::single_type(0.into(), (LinkTypes::GradientFingerprints as u8).into()),
+            ),
+            GetStrategy::default(),
+        )?;
+
+        for link in &links {
+            if let Some(action_hash) = link.target.clone().into_action_hash() {
+                if let Some(record) = get(action_hash, GetOptions::default())? {
+                    if let Some(entry) = record.entry().as_option() {
+                        if let Entry::App(bytes) = entry {
+                            if let Ok(fp) = GradientFingerprint::try_from(
+                                SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
+                            ) {
+                                all_fps.push(fp);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(all_fps)
+}
+
+// =============================================================================
+// Coherence Time-Series DHT Operations
+// =============================================================================
+
+/// Load recent coherence history from DHT, most recent last.
+pub(crate) fn load_coherence_history(limit: usize) -> ExternResult<Vec<CoherenceRecord>> {
+    let series_path = Path::from("coherence_time_series");
+    let typed = series_path.typed(LinkTypes::CoherenceTimeSeries)?;
+    if !typed.exists()? {
+        return Ok(vec![]);
+    }
+    let series_hash = typed.path_entry_hash()?;
+
+    let links = get_links(
+        LinkQuery::new(
+            series_hash,
+            LinkTypeFilter::single_type(0.into(), (LinkTypes::CoherenceTimeSeries as u8).into()),
+        ),
+        GetStrategy::default(),
+    )?;
+
+    let mut records = Vec::new();
+    for link in links.iter().rev() {
+        if records.len() >= limit {
+            break;
+        }
+        if let Some(action_hash) = link.target.clone().into_action_hash() {
+            if let Some(record) = get(action_hash, GetOptions::default())? {
+                if let Some(entry) = record.entry().as_option() {
+                    if let Entry::App(bytes) = entry {
+                        if let Ok(cr) = CoherenceRecord::try_from(
+                            SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()))
+                        ) {
+                            records.push(cr);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    // Sort by round ascending for chronological replay into CoherenceTimeSeries
+    records.sort_by_key(|r| r.round);
+    Ok(records)
+}
+
+/// Input for querying coherence time-series
+#[derive(Serialize, Deserialize, Debug)]
+pub struct GetCoherenceSeriesInput {
+    pub start_round: Option<u64>,
+    pub end_round: Option<u64>,
+    pub limit: Option<usize>,
+}
+
+/// Query coherence time-series data from DHT
+#[hdk_extern]
+pub fn get_coherence_series(input: GetCoherenceSeriesInput) -> ExternResult<Vec<CoherenceRecord>> {
+    let limit = input.limit.unwrap_or(100);
+    let mut records = load_coherence_history(limit)?;
+
+    // Apply round range filter
+    if let Some(start) = input.start_round {
+        records.retain(|r| r.round >= start);
+    }
+    if let Some(end) = input.end_round {
+        records.retain(|r| r.round <= end);
+    }
+
+    Ok(records)
+}
+
+/// Coherence anomaly result returned to callers
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct CoherenceAnomalyResult {
+    pub round: u64,
+    pub expected_coherence: f32,
+    pub actual_coherence: f32,
+    pub z_score: f32,
+    pub severity: String,
+}
+
+/// Check for coherence anomalies over a recent window
+#[hdk_extern]
+pub fn check_coherence_anomalies(window_size: u32) -> ExternResult<Vec<CoherenceAnomalyResult>> {
+    use mycelix_fl::coherence_series::{CoherenceTimeSeries, CoherenceTimeSeriesConfig};
+
+    let history = load_coherence_history(window_size as usize)?;
+    if history.len() < 3 {
+        return Ok(vec![]); // Need enough data for statistical significance
+    }
+
+    let config = CoherenceTimeSeriesConfig::default()
+        .with_window_size(window_size as usize);
+    let mut series = CoherenceTimeSeries::new(config);
+
+    let mut anomalies = Vec::new();
+    for (i, h) in history.iter().enumerate() {
+        series.record(
+            h.round, h.recorded_at, h.coherence_value,
+            h.epistemic_confidence, h.byzantine_count as usize, h.node_count as usize,
+        );
+
+        // Only check anomalies after enough data points (at least 5)
+        if i >= 4 {
+            if let Some(anomaly) = series.detect_anomaly() {
+                anomalies.push(CoherenceAnomalyResult {
+                    round: anomaly.round,
+                    expected_coherence: anomaly.expected_coherence,
+                    actual_coherence: anomaly.actual_coherence,
+                    z_score: anomaly.z_score,
+                    severity: format!("{:?}", anomaly.severity),
+                });
+            }
+        }
+    }
+
+    Ok(anomalies)
 }

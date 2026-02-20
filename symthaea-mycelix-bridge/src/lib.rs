@@ -20,6 +20,7 @@ use mycelix_sdk::hyperfeel::{HyperGradient, HV16_BYTES};
 use mycelix_sdk::epistemic::{EpistemicClaim, ClaimBuilder};
 use mycelix_sdk::matl::ProofOfGradientQuality;
 
+use symthaea_core::consciousness_metrics::TruePhiCalculator;
 use symthaea_core::hdc::unified_hv::{ContinuousHV, HDC_DIMENSION};
 use symthaea_core::phi_engine::{PhiEngine, PhiMethod};
 
@@ -268,15 +269,15 @@ pub fn pogq_from_quality_score(q: &QualityScore) -> ProofOfGradientQuality {
     // Treat epistemic confidence as the primary quality signal.
     let quality = q.epistemic_confidence as f64;
 
-    // Consistency captures both integration trend and similarity to prior behavior.
-    let integration_trend = if q.integration.integration_gain >= 0.0 {
+    // Consistency captures both connectivity trend and similarity to prior behavior.
+    let connectivity_trend = if q.spectral.connectivity_gain >= 0.0 {
         1.0
     } else {
-        (1.0 - (-q.integration.integration_gain as f64)).clamp(0.0, 1.0)
+        (1.0 - (-q.spectral.connectivity_gain as f64)).clamp(0.0, 1.0)
     };
 
     let sim_component = q.similarity.unwrap_or(0.0) as f64;
-    let consistency = 0.5 * integration_trend + 0.5 * sim_component;
+    let consistency = 0.5 * connectivity_trend + 0.5 * sim_component;
 
     // Entropy: ambiguous or anomalous updates have higher "uncertainty".
     let entropy = if q.is_anomalous {
@@ -305,28 +306,138 @@ fn gradient_id_from_hash(hash: &[u8; 32]) -> String {
     s
 }
 
-/// Integration assessment from Symthaea's PhiEngine.
+/// Spectral connectivity assessment from Symthaea's PhiEngine.
 ///
-/// NOTE: Currently uses SpectralConnectivity (algebraic connectivity / Fiedler value),
-/// NOT true IIT Phi. Correlation with IIT Phi is r=0.097 (near zero).
-/// See symthaea-core/src/physics/true_phi/ for the real IIT Phi calculator.
+/// Uses algebraic connectivity (Fiedler value) of the network graph.
+/// NOT true IIT Phi — correlation with IIT Phi is r=0.097 (near zero).
+/// See `symthaea-core/src/consciousness_metrics/` for the real IIT Phi calculator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IntegrationAssessment {
-    /// Integration score before applying the update.
-    pub integration_before: f32,
-    /// Integration score after applying the update.
-    pub integration_after: f32,
-    /// Difference (positive = more integration/coherence).
-    pub integration_gain: f32,
+pub struct SpectralConnectivityAssessment {
+    /// Connectivity score before applying the update.
+    pub connectivity_before: f32,
+    /// Connectivity score after applying the update.
+    pub connectivity_after: f32,
+    /// Difference (positive = more connectivity/coherence).
+    pub connectivity_gain: f32,
 }
 
-impl IntegrationAssessment {
-    /// Construct a new assessment from before/after values.
-    pub fn new(integration_before: f32, integration_after: f32) -> Self {
+/// Deprecated: use [`SpectralConnectivityAssessment`] instead.
+pub type IntegrationAssessment = SpectralConnectivityAssessment;
+
+/// Multi-dimensional consciousness assessment (C-Vector).
+///
+/// Each dimension is `Option<f64>` for incremental population —
+/// not all dimensions are computed every cycle.
+/// Use [`composite()`](ConsciousnessVector::composite) for a backward-compatible single scalar.
+///
+/// See `CONSCIOUSNESS_METRICS.md` for what each dimension actually measures.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ConsciousnessVector {
+    /// Spectral connectivity (Fiedler value) [0,1]. Always computed. NOT IIT Phi.
+    pub spectral_connectivity: Option<f64>,
+    /// True IIT Phi from TruePhiCalculator [0,1]. Expensive: O(2^n) for n<=8.
+    pub true_phi: Option<f64>,
+    /// Fast Phi approximation via effective information [0,1]. O(n^2).
+    pub phi_fast: Option<f64>,
+    /// Shannon entropy of state space [0,1] (normalized).
+    pub entropy: Option<f64>,
+    /// Internal coherence: 1 - mean pairwise distance [0,1].
+    pub coherence: Option<f64>,
+    /// Epistemic confidence from validation metrics [0,1].
+    pub epistemic_confidence: Option<f64>,
+}
+
+impl ConsciousnessVector {
+    /// Best available phi: true_phi > phi_fast > spectral_connectivity.
+    pub fn best_phi(&self) -> f64 {
+        self.true_phi
+            .or(self.phi_fast)
+            .or(self.spectral_connectivity)
+            .unwrap_or(0.0)
+    }
+
+    /// Weighted composite for backward compatibility.
+    /// Weights: phi=0.35, coherence=0.20, entropy=0.15, epistemic=0.15, spectral=0.15
+    ///
+    /// Only populated dimensions contribute; result is renormalized.
+    pub fn composite(&self) -> f64 {
+        let mut total = 0.0;
+        let mut weight_sum = 0.0;
+
+        if let Some(v) = self.true_phi.or(self.phi_fast) {
+            total += 0.35 * v;
+            weight_sum += 0.35;
+        }
+        if let Some(v) = self.coherence {
+            total += 0.20 * v;
+            weight_sum += 0.20;
+        }
+        if let Some(v) = self.entropy {
+            total += 0.15 * v;
+            weight_sum += 0.15;
+        }
+        if let Some(v) = self.epistemic_confidence {
+            total += 0.15 * v;
+            weight_sum += 0.15;
+        }
+        if let Some(v) = self.spectral_connectivity {
+            total += 0.15 * v;
+            weight_sum += 0.15;
+        }
+
+        if weight_sum > 0.0 {
+            (total / weight_sum).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Number of populated (Some) dimensions.
+    pub fn populated_count(&self) -> usize {
+        [
+            self.spectral_connectivity.is_some(),
+            self.true_phi.is_some(),
+            self.phi_fast.is_some(),
+            self.entropy.is_some(),
+            self.coherence.is_some(),
+            self.epistemic_confidence.is_some(),
+        ]
+        .iter()
+        .filter(|&&b| b)
+        .count()
+    }
+}
+
+/// Configuration for C-Vector computation in the backend.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsciousnessVectorConfig {
+    /// Maximum component count for true_phi computation (default: 4).
+    /// Set to 0 to disable true_phi entirely.
+    pub max_components_true_phi: usize,
+    /// Whether to compute phi_fast (default: true).
+    pub compute_phi_fast: bool,
+    /// Max entropy value for [0,1] normalization (log2 of num_bins).
+    pub max_entropy: f64,
+}
+
+impl Default for ConsciousnessVectorConfig {
+    fn default() -> Self {
         Self {
-            integration_before,
-            integration_after,
-            integration_gain: integration_after - integration_before,
+            max_components_true_phi: 4,
+            compute_phi_fast: true,
+            // log2(16) = 4.0 for default 16-bin entropy
+            max_entropy: 4.0,
+        }
+    }
+}
+
+impl SpectralConnectivityAssessment {
+    /// Construct a new assessment from before/after values.
+    pub fn new(connectivity_before: f32, connectivity_after: f32) -> Self {
+        Self {
+            connectivity_before,
+            connectivity_after,
+            connectivity_gain: connectivity_after - connectivity_before,
         }
     }
 }
@@ -338,8 +449,10 @@ pub struct QualityScore {
     pub accuracy: f32,
     /// Validation loss after applying the update.
     pub loss: f32,
-    /// Integration assessment (before/after/gain).
-    pub integration: IntegrationAssessment,
+    /// Spectral connectivity assessment (before/after/gain).
+    pub spectral: SpectralConnectivityAssessment,
+    /// Multi-dimensional consciousness vector.
+    pub consciousness_vector: ConsciousnessVector,
     /// Epistemic confidence in the quality claim [0, 1].
     pub epistemic_confidence: f32,
     /// Whether the update appears anomalous (potentially Byzantine).
@@ -417,10 +530,14 @@ pub struct SymthaeaBackend {
     mapper: PhiToEpistemicMapper,
     /// Vector store for gradient prototypes (content-addressable cosine recall).
     memory: VectorStore,
-    /// Per-node state for trend-aware Φ tracking and anomaly counts.
+    /// Per-node state for trend-aware connectivity tracking and anomaly counts.
     node_states: HashMap<String, NodeState>,
     /// Shared sparse projector for HyperGradient → ContinuousHV.
     projector: SparseProjector,
+    /// True IIT Phi calculator for C-Vector computation.
+    true_phi_calculator: TruePhiCalculator,
+    /// Configuration for C-Vector computation.
+    cvector_config: ConsciousnessVectorConfig,
 }
 
 /// Configuration for the Symthaea backend behavior.
@@ -430,8 +547,8 @@ pub struct SymthaeaBackendConfig {
     pub recall_threshold: f32,
     /// Lower bound of the "gray zone" where updates are considered ambiguous.
     pub ambiguity_threshold: f32,
-    /// Minimum integration drop (before → after) to consider suspicious.
-    pub integration_drop_threshold: f32,
+    /// Minimum connectivity drop (before → after) to consider suspicious.
+    pub connectivity_drop_threshold: f32,
     /// Optional cap on number of concepts stored in associative memory.
     /// `None` = unbounded (not recommended for long-running deployments).
     pub max_concepts: Option<usize>,
@@ -442,7 +559,7 @@ impl Default for SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.9,
             ambiguity_threshold: 0.75,
-            integration_drop_threshold: 0.1,
+            connectivity_drop_threshold: 0.1,
             max_concepts: Some(10_000),
         }
     }
@@ -454,7 +571,7 @@ impl SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.92,
             ambiguity_threshold: 0.8,
-            integration_drop_threshold: 0.05,
+            connectivity_drop_threshold: 0.05,
             max_concepts: Some(5_000),
         }
     }
@@ -464,7 +581,7 @@ impl SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.88,
             ambiguity_threshold: 0.7,
-            integration_drop_threshold: 0.15,
+            connectivity_drop_threshold: 0.15,
             max_concepts: Some(20_000),
         }
     }
@@ -474,7 +591,7 @@ impl SymthaeaBackendConfig {
         Self {
             recall_threshold: 0.9,
             ambiguity_threshold: 0.6,
-            integration_drop_threshold: 0.05,
+            connectivity_drop_threshold: 0.05,
             max_concepts: Some(2_000),
         }
     }
@@ -483,8 +600,8 @@ impl SymthaeaBackendConfig {
 /// Per-node consciousness state.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct NodeState {
-    /// Last observed integration score for this node.
-    last_integration: f32,
+    /// Last observed connectivity score for this node.
+    last_connectivity: f32,
     /// Number of anomalous updates detected so far.
     anomaly_count: u32,
 }
@@ -492,7 +609,7 @@ struct NodeState {
 impl Default for NodeState {
     fn default() -> Self {
         Self {
-            last_integration: 0.5, // Neutral starting point
+            last_connectivity: 0.5, // Neutral starting point
             anomaly_count: 0,
         }
     }
@@ -553,6 +670,11 @@ impl SymthaeaBackend {
 
     /// Create a new backend with an explicit configuration.
     pub fn with_config(config: SymthaeaBackendConfig) -> Self {
+        Self::with_full_config(config, ConsciousnessVectorConfig::default())
+    }
+
+    /// Create with both backend and C-Vector configuration.
+    pub fn with_full_config(config: SymthaeaBackendConfig, cvector_config: ConsciousnessVectorConfig) -> Self {
         let phi_engine = PhiEngine::new(PhiMethod::SpectralConnectivity);
         let mapper = PhiToEpistemicMapper::new();
         Self {
@@ -562,6 +684,8 @@ impl SymthaeaBackend {
             memory: VectorStore::new(),
             node_states: HashMap::new(),
             projector: SparseProjector::new(8, HDC_DIMENSION),
+            true_phi_calculator: TruePhiCalculator::new(),
+            cvector_config,
         }
     }
 
@@ -576,11 +700,11 @@ impl SymthaeaBackend {
         self.memory = VectorStore::new();
     }
 
-    /// Get a lightweight snapshot of a node's state (last Φ, anomaly count).
+    /// Get a lightweight snapshot of a node's state (last connectivity, anomaly count).
     pub fn node_state_snapshot(&self, node_id: &str) -> Option<(f32, u32)> {
         self.node_states
             .get(node_id)
-            .map(|s| (s.last_integration, s.anomaly_count))
+            .map(|s| (s.last_connectivity, s.anomaly_count))
     }
 
     /// Access the current configuration.
@@ -652,8 +776,8 @@ impl SymthaeaBackend {
         Ok((hv, best_sim))
     }
 
-    /// Helper: derive an epistemic classification from Φ and Mycelix context.
-    fn classify_from_integration(
+    /// Helper: derive an epistemic classification from connectivity and Mycelix context.
+    fn classify_from_connectivity(
         &self,
         phi: f32,
         update: &HyperGradient,
@@ -696,6 +820,71 @@ impl SymthaeaBackend {
             .materiality(materiality)
             .build()
     }
+
+    /// Compute the multi-dimensional ConsciousnessVector for a hypervector.
+    fn compute_consciousness_vector(
+        &self,
+        hv: &ContinuousHV,
+        spectral_connectivity: f64,
+        epistemic_confidence: f64,
+    ) -> ConsciousnessVector {
+        let components = &[hv.clone()];
+
+        // Entropy: normalized Shannon entropy via TruePhiCalculator
+        let raw_entropy = self.true_phi_calculator.entropy(hv);
+        let max_e = self.cvector_config.max_entropy;
+        let entropy = if max_e > 0.0 {
+            (raw_entropy / max_e).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
+        // Phi fast: effective information approximation (O(n^2) in component count)
+        let phi_fast = if self.cvector_config.compute_phi_fast {
+            Some(self.true_phi_calculator.compute_phi_fast(components))
+        } else {
+            None
+        };
+
+        // True phi: only for small component counts (default ≤ 4)
+        let true_phi = if components.len() >= 2
+            && components.len() <= self.cvector_config.max_components_true_phi
+        {
+            let result = self.true_phi_calculator.compute_true_phi(components);
+            Some(result.phi.clamp(0.0, 1.0))
+        } else {
+            None
+        };
+
+        // Coherence: for a single HV, self-coherence is 1.0 (trivial).
+        // For multi-component systems, use mean pairwise cosine similarity.
+        let coherence = if components.len() <= 1 {
+            1.0
+        } else {
+            let mut total_sim = 0.0;
+            let mut pairs = 0;
+            for i in 0..components.len() {
+                for j in (i + 1)..components.len() {
+                    total_sim += components[i].similarity(&components[j]) as f64;
+                    pairs += 1;
+                }
+            }
+            if pairs > 0 {
+                (total_sim / pairs as f64).clamp(0.0, 1.0)
+            } else {
+                1.0
+            }
+        };
+
+        ConsciousnessVector {
+            spectral_connectivity: Some(spectral_connectivity),
+            true_phi,
+            phi_fast,
+            entropy: Some(entropy),
+            coherence: Some(coherence),
+            epistemic_confidence: Some(epistemic_confidence),
+        }
+    }
 }
 
 impl Default for SymthaeaBackend {
@@ -710,54 +899,61 @@ impl ConsciousnessBackend for SymthaeaBackend {
         snapshot: &dyn ModelSnapshot,
         update: &HyperGradient,
     ) -> Result<QualityScore> {
-        // 1. Identify node and load prior state (extract integration_before, drop borrow)
+        // 1. Identify node and load prior state (extract connectivity_before, drop borrow)
         let node_id = update.node_id.to_string();
-        let integration_before = self
+        let connectivity_before = self
             .node_states
             .entry(node_id.clone())
             .or_insert_with(NodeState::default)
-            .last_integration;
+            .last_connectivity;
 
         // 2. Convert HyperGradient -> ContinuousHV, with recall-or-project semantics.
         let (hv, similarity) = self.recall_or_project(update)?;
 
-        // 3. Compute integration score for this node
-        let phi_result = self.phi_engine.compute(&[hv]);
-        let integration_after = phi_result.phi as f32;
-        let integration_assessment = IntegrationAssessment::new(integration_before, integration_after);
+        // 3. Compute spectral connectivity score for this node
+        let phi_result = self.phi_engine.compute(&[hv.clone()]);
+        let connectivity_after = phi_result.phi as f32;
+        let spectral_assessment = SpectralConnectivityAssessment::new(connectivity_before, connectivity_after);
 
         // 4. Evaluate validation metrics on the updated snapshot
         let (accuracy, loss) = snapshot.evaluate()?;
 
-        // 5. Map integration to epistemic classification
-        let classification = self.classify_from_integration(integration_after, update);
+        // 5. Map connectivity to epistemic classification
+        let classification = self.classify_from_connectivity(connectivity_after, update);
 
         // 6. Build a canonical EpistemicClaim (currently unused, but ready
         //    for callers that want to store it in Mycelix UESS)
-        let claim = self.build_claim(integration_after, snapshot, &classification);
+        let claim = self.build_claim(connectivity_after, snapshot, &classification);
         let _claim_code = claim.code(); // exercise the claim for now
 
-        // 7. Epistemic confidence: scaled combination of integration and accuracy
-        let epistemic_confidence = ((integration_after + accuracy) / 2.0).clamp(0.0, 1.0);
+        // 7. Epistemic confidence: scaled combination of connectivity and accuracy
+        let epistemic_confidence = ((connectivity_after + accuracy) / 2.0).clamp(0.0, 1.0);
+
+        // 7b. Compute ConsciousnessVector
+        let consciousness_vector = self.compute_consciousness_vector(
+            &hv,
+            connectivity_after as f64,
+            epistemic_confidence as f64,
+        );
 
         // 8. Anomaly heuristic:
-        //    - strong negative integration gain
+        //    - strong negative connectivity gain
         //    - or gray-zone similarity (uncanny valley)
         //    - or very low epistemic confidence
-        let integration_gain = integration_assessment.integration_gain;
+        let connectivity_gain = spectral_assessment.connectivity_gain;
 
         let is_ambiguous = similarity.map_or(false, |sim| {
             sim >= self.config.ambiguity_threshold && sim < self.config.recall_threshold
         });
 
-        let is_drop = integration_gain < -self.config.integration_drop_threshold;
+        let is_drop = connectivity_gain < -self.config.connectivity_drop_threshold;
         let low_confidence = epistemic_confidence < 0.2;
 
         let is_anomalous = is_drop || is_ambiguous || low_confidence;
 
         // 9. Update node state (re-borrow now that other methods are done)
         if let Some(state) = self.node_states.get_mut(&node_id) {
-            state.last_integration = integration_after;
+            state.last_connectivity = connectivity_after;
             if is_anomalous {
                 state.anomaly_count = state.anomaly_count.saturating_add(1);
             }
@@ -766,7 +962,7 @@ impl ConsciousnessBackend for SymthaeaBackend {
         // 10. Classify severity
         let severity = if !is_anomalous {
             ConsciousAnomalySeverity::None
-        } else if is_drop && (integration_gain < -2.0 * self.config.integration_drop_threshold || low_confidence) {
+        } else if is_drop && (connectivity_gain < -2.0 * self.config.connectivity_drop_threshold || low_confidence) {
             ConsciousAnomalySeverity::Severe
         } else if is_drop || is_ambiguous || low_confidence {
             // Any single signal without the stronger criteria above.
@@ -790,7 +986,8 @@ impl ConsciousnessBackend for SymthaeaBackend {
         Ok(QualityScore {
             accuracy,
             loss,
-            integration: integration_assessment,
+            spectral: spectral_assessment,
+            consciousness_vector,
             epistemic_confidence,
             is_anomalous,
             similarity,
@@ -861,7 +1058,7 @@ impl SymthaeaBackend {
 /// submitted to the governance bridge via `record_consciousness_attestation()`.
 ///
 /// NOTE: The `consciousness_level` is derived from SpectralConnectivity (Fiedler value),
-/// NOT true IIT Phi. See `IntegrationAssessment` for details.
+/// NOT true IIT Phi. See `SpectralConnectivityAssessment` for details.
 ///
 /// The `signature` field must be filled by the caller using their agent's
 /// signing key (e.g., Holochain agent key or Ed25519 key).
@@ -869,7 +1066,7 @@ impl SymthaeaBackend {
 pub struct ConsciousnessAttestationData {
     /// Agent's DID identifier.
     pub agent_did: String,
-    /// Consciousness level from Symthaea's integration assessment, in [0.0, 1.0].
+    /// Consciousness level from Symthaea's spectral connectivity assessment, in [0.0, 1.0].
     pub consciousness_level: f64,
     /// Symthaea cognitive cycle number that produced this assessment.
     pub cycle_id: u64,
@@ -899,8 +1096,8 @@ impl ConsciousnessAttestationData {
 
 /// Create an unsigned `ConsciousnessAttestationData` from a `QualityScore`.
 ///
-/// The `consciousness_level` is taken from `quality.integration.integration_after`
-/// (the post-update integration score).
+/// The `consciousness_level` is taken from `quality.spectral.connectivity_after`
+/// (the post-update spectral connectivity score).
 /// The caller must:
 /// 1. Call `.sign_message()` to get the canonical bytes
 /// 2. Sign those bytes with their agent key
@@ -928,7 +1125,7 @@ pub fn create_consciousness_attestation_data(
 
     ConsciousnessAttestationData {
         agent_did: agent_did.to_string(),
-        consciousness_level: (quality.integration.integration_after as f64).clamp(0.0, 1.0),
+        consciousness_level: quality.consciousness_vector.composite().clamp(0.0, 1.0),
         cycle_id,
         captured_at_us: now_us,
         signature: Vec::new(), // Caller must fill this
@@ -968,11 +1165,12 @@ mod tests {
             _update: &HyperGradient,
         ) -> Result<QualityScore> {
             let (accuracy, loss) = snapshot.evaluate()?;
-            let integration = IntegrationAssessment::new(0.0, 0.0);
+            let spectral = SpectralConnectivityAssessment::new(0.0, 0.0);
             Ok(QualityScore {
                 accuracy,
                 loss,
-                integration,
+                spectral,
+                consciousness_vector: ConsciousnessVector::default(),
                 epistemic_confidence: 0.0,
                 is_anomalous: false,
                 similarity: None,
@@ -1019,7 +1217,7 @@ mod tests {
         );
 
         let result = backend.assess_update(&snapshot, &hg).unwrap();
-        assert!(result.integration.integration_after >= 0.0 && result.integration.integration_after <= 1.0);
+        assert!(result.spectral.connectivity_after >= 0.0 && result.spectral.connectivity_after <= 1.0);
         assert!(result.epistemic_confidence >= 0.0 && result.epistemic_confidence <= 1.0);
     }
 
@@ -1031,8 +1229,8 @@ mod tests {
         // Strict mode should use a smaller Φ drop threshold and stricter
         // ambiguity handling than lenient mode.
         assert!(
-            strict.integration_drop_threshold < lenient.integration_drop_threshold,
-            "strict mode should be more sensitive to Φ drops"
+            strict.connectivity_drop_threshold < lenient.connectivity_drop_threshold,
+            "strict mode should be more sensitive to connectivity drops"
         );
         assert!(
             strict.ambiguity_threshold > lenient.ambiguity_threshold,
@@ -1158,11 +1356,11 @@ mod tests {
     }
 
     // ============================================================================
-    // classify_from_integration tests
+    // classify_from_connectivity tests
     // ============================================================================
 
     #[test]
-    fn classify_from_integration_produces_valid_classification() {
+    fn classify_from_connectivity_produces_valid_classification() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-1".to_string(),
@@ -1173,13 +1371,13 @@ mod tests {
             10.0,
             [0u8; 32],
         );
-        let classification = backend.classify_from_integration(0.9, &hg);
+        let classification = backend.classify_from_connectivity(0.9, &hg);
         // Must produce a classification without panicking
         let _ = classification;
     }
 
     #[test]
-    fn classify_from_integration_low_phi_does_not_panic() {
+    fn classify_from_connectivity_low_phi_does_not_panic() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-2".to_string(),
@@ -1190,11 +1388,11 @@ mod tests {
             1.0,
             [0u8; 32],
         );
-        let _classification = backend.classify_from_integration(0.05, &hg);
+        let _classification = backend.classify_from_connectivity(0.05, &hg);
     }
 
     #[test]
-    fn classify_from_integration_reproducible_for_same_inputs() {
+    fn classify_from_connectivity_reproducible_for_same_inputs() {
         let backend = SymthaeaBackend::new();
         let hg = HyperGradient::new(
             "node-3".to_string(),
@@ -1205,8 +1403,8 @@ mod tests {
             5.0,
             [1u8; 32],
         );
-        let c1 = backend.classify_from_integration(0.5, &hg);
-        let c2 = backend.classify_from_integration(0.5, &hg);
+        let c1 = backend.classify_from_connectivity(0.5, &hg);
+        let c2 = backend.classify_from_connectivity(0.5, &hg);
         assert_eq!(format!("{:?}", c1), format!("{:?}", c2));
     }
 
@@ -1216,10 +1414,20 @@ mod tests {
 
     #[test]
     fn test_create_consciousness_attestation_data_from_quality() {
+        let cvec = ConsciousnessVector {
+            spectral_connectivity: Some(0.7),
+            true_phi: None,
+            phi_fast: Some(0.8),
+            entropy: Some(0.6),
+            coherence: Some(0.9),
+            epistemic_confidence: Some(0.85),
+        };
+        let expected_composite = cvec.composite();
         let quality = QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            integration: IntegrationAssessment::new(0.4, 0.7),
+            spectral: SpectralConnectivityAssessment::new(0.4, 0.7),
+            consciousness_vector: cvec,
             epistemic_confidence: 0.85,
             is_anomalous: false,
             similarity: None,
@@ -1231,7 +1439,10 @@ mod tests {
         let attestation = create_consciousness_attestation_data(&quality, "did:key:z6MkTest", 42);
 
         assert_eq!(attestation.agent_did, "did:key:z6MkTest");
-        assert!((attestation.consciousness_level - 0.7).abs() < 1e-6, "should be integration_after");
+        assert!(
+            (attestation.consciousness_level - expected_composite).abs() < 1e-6,
+            "should be composite of consciousness_vector"
+        );
         assert_eq!(attestation.cycle_id, 42);
         assert_eq!(attestation.source, "symthaea");
         assert!(attestation.signature.is_empty(), "signature should be empty until caller signs");
@@ -1240,10 +1451,20 @@ mod tests {
 
     #[test]
     fn test_attestation_consciousness_clamped_to_unit() {
+        // C-Vector with all values > 1.0 to test clamping
+        let cvec = ConsciousnessVector {
+            spectral_connectivity: Some(1.5),
+            true_phi: Some(1.5),
+            phi_fast: None,
+            entropy: Some(1.5),
+            coherence: Some(1.5),
+            epistemic_confidence: Some(1.5),
+        };
         let quality = QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            integration: IntegrationAssessment::new(0.0, 1.5), // integration_after > 1.0
+            spectral: SpectralConnectivityAssessment::new(0.0, 1.5),
+            consciousness_vector: cvec,
             epistemic_confidence: 0.85,
             is_anomalous: false,
             similarity: None,
@@ -1310,7 +1531,8 @@ mod tests {
         let high = QualityScore {
             accuracy: 0.9,
             loss: 0.1,
-            integration: IntegrationAssessment::new(0.4, 0.6),
+            spectral: SpectralConnectivityAssessment::new(0.4, 0.6),
+            consciousness_vector: ConsciousnessVector::default(),
             epistemic_confidence: 0.95,
             is_anomalous: false,
             similarity: Some(0.9),
@@ -1334,7 +1556,8 @@ mod tests {
         let bad = QualityScore {
             accuracy: 0.4,
             loss: 1.5,
-            integration: IntegrationAssessment::new(0.6, 0.2),
+            spectral: SpectralConnectivityAssessment::new(0.6, 0.2),
+            consciousness_vector: ConsciousnessVector::default(),
             epistemic_confidence: 0.1,
             is_anomalous: true,
             similarity: Some(0.2),
@@ -1352,5 +1575,124 @@ mod tests {
             pogq_bad.entropy > pogq_high.entropy,
             "expected higher entropy for anomalous update"
         );
+    }
+
+    // ============================================================================
+    // ConsciousnessVector tests
+    // ============================================================================
+
+    #[test]
+    fn cvector_composite_all_populated() {
+        let cv = ConsciousnessVector {
+            spectral_connectivity: Some(0.5),
+            true_phi: Some(0.8),
+            phi_fast: Some(0.7),  // ignored because true_phi is present
+            entropy: Some(0.6),
+            coherence: Some(0.9),
+            epistemic_confidence: Some(0.75),
+        };
+        let c = cv.composite();
+        // Weights: phi(true)=0.35, coherence=0.20, entropy=0.15, epistemic=0.15, spectral=0.15
+        let expected = 0.35 * 0.8 + 0.20 * 0.9 + 0.15 * 0.6 + 0.15 * 0.75 + 0.15 * 0.5;
+        assert!((c - expected).abs() < 1e-10, "c={c}, expected={expected}");
+    }
+
+    #[test]
+    fn cvector_composite_partial_population() {
+        let cv = ConsciousnessVector {
+            spectral_connectivity: Some(0.5),
+            true_phi: None,
+            phi_fast: None,
+            entropy: None,
+            coherence: Some(0.8),
+            epistemic_confidence: None,
+        };
+        let c = cv.composite();
+        // Only spectral (0.15) + coherence (0.20) populated
+        let expected = (0.15 * 0.5 + 0.20 * 0.8) / (0.15 + 0.20);
+        assert!((c - expected).abs() < 1e-10, "c={c}, expected={expected}");
+    }
+
+    #[test]
+    fn cvector_composite_empty_returns_zero() {
+        let cv = ConsciousnessVector::default();
+        assert_eq!(cv.composite(), 0.0);
+    }
+
+    #[test]
+    fn cvector_best_phi_fallback_chain() {
+        // true_phi > phi_fast > spectral_connectivity
+        let cv = ConsciousnessVector {
+            spectral_connectivity: Some(0.3),
+            true_phi: Some(0.9),
+            phi_fast: Some(0.7),
+            ..ConsciousnessVector::default()
+        };
+        assert!((cv.best_phi() - 0.9).abs() < 1e-10, "should prefer true_phi");
+
+        let cv2 = ConsciousnessVector {
+            spectral_connectivity: Some(0.3),
+            true_phi: None,
+            phi_fast: Some(0.7),
+            ..ConsciousnessVector::default()
+        };
+        assert!((cv2.best_phi() - 0.7).abs() < 1e-10, "should fall back to phi_fast");
+
+        let cv3 = ConsciousnessVector {
+            spectral_connectivity: Some(0.3),
+            true_phi: None,
+            phi_fast: None,
+            ..ConsciousnessVector::default()
+        };
+        assert!((cv3.best_phi() - 0.3).abs() < 1e-10, "should fall back to spectral");
+
+        let cv4 = ConsciousnessVector::default();
+        assert_eq!(cv4.best_phi(), 0.0, "should return 0 when nothing populated");
+    }
+
+    #[test]
+    fn cvector_populated_count() {
+        let cv = ConsciousnessVector {
+            spectral_connectivity: Some(0.5),
+            true_phi: None,
+            phi_fast: Some(0.7),
+            entropy: Some(0.6),
+            coherence: None,
+            epistemic_confidence: None,
+        };
+        assert_eq!(cv.populated_count(), 3);
+        assert_eq!(ConsciousnessVector::default().populated_count(), 0);
+    }
+
+    #[test]
+    fn cvector_composite_clamped() {
+        // Values > 1.0 should still produce composite <= 1.0
+        let cv = ConsciousnessVector {
+            spectral_connectivity: Some(2.0),
+            true_phi: Some(2.0),
+            phi_fast: None,
+            entropy: Some(2.0),
+            coherence: Some(2.0),
+            epistemic_confidence: Some(2.0),
+        };
+        assert_eq!(cv.composite(), 1.0, "composite should clamp to 1.0");
+    }
+
+    #[test]
+    fn cvector_serialization_roundtrip() {
+        let cv = ConsciousnessVector {
+            spectral_connectivity: Some(0.5),
+            true_phi: Some(0.8),
+            phi_fast: None,
+            entropy: Some(0.6),
+            coherence: Some(0.9),
+            epistemic_confidence: Some(0.75),
+        };
+        let json = serde_json::to_string(&cv).unwrap();
+        let decoded: ConsciousnessVector = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.spectral_connectivity, cv.spectral_connectivity);
+        assert_eq!(decoded.true_phi, cv.true_phi);
+        assert_eq!(decoded.phi_fast, cv.phi_fast);
+        assert!((decoded.composite() - cv.composite()).abs() < 1e-10);
     }
 }

@@ -23,8 +23,8 @@ use mycelix_sdk::hyperfeel::{HyperGradient, HV16_BYTES};
 
 use symthaea_mycelix_bridge::fl_plugin::SymthaeaQualityPlugin;
 use symthaea_mycelix_bridge::{
-    pogq_from_quality_score, ConsciousAnomalySeverity, ConsciousnessBackend, PhiAssessment,
-    QualityScore, SymthaeaBackend,
+    pogq_from_quality_score, ConsciousAnomalySeverity, ConsciousnessBackend, ConsciousnessVector,
+    SpectralConnectivityAssessment, QualityScore, SymthaeaBackend,
 };
 
 // =============================================================================
@@ -65,7 +65,8 @@ fn synthetic_quality(
     QualityScore {
         accuracy: if is_anomalous { 0.3 } else { 0.85 },
         loss: if is_anomalous { 1.5 } else { 0.2 },
-        phi: PhiAssessment::new(phi_before, phi_after),
+        spectral: SpectralConnectivityAssessment::new(phi_before, phi_after),
+        consciousness_vector: ConsciousnessVector::default(),
         epistemic_confidence: confidence,
         is_anomalous,
         similarity: Some(if is_anomalous { 0.4 } else { 0.9 }),
@@ -240,15 +241,15 @@ fn test_e2e_composed_plugins_synergy() {
 
     quality_plugin.set_quality_scores(quality_scores);
 
-    // --- ConsciousnessAwareByzantinePlugin with Phi scores ---
+    // --- ConsciousnessAwareByzantinePlugin with connectivity scores ---
     let mut phi_plugin = ConsciousnessAwareByzantinePlugin::new();
     let mut phi_scores = HashMap::new();
     for i in 0..6 {
-        phi_scores.insert(format!("h{}", i), 0.8); // High Phi for honest
+        phi_scores.insert(format!("h{}", i), 0.8); // High connectivity for honest
     }
     phi_scores.insert("byz0".into(), 0.05); // Below veto threshold (0.1)
     phi_scores.insert("byz1".into(), 0.05); // Below veto threshold
-    phi_plugin.set_phi_scores(phi_scores);
+    phi_plugin.set_consciousness_scores(phi_scores);
 
     // --- Build updates ---
     let mut updates = Vec::new();
@@ -407,9 +408,9 @@ fn test_e2e_quality_plugin_boosts_high_confidence() {
     let mut quality_plugin = SymthaeaQualityPlugin::new();
 
     let mut scores = HashMap::new();
-    // High confidence + positive phi gain → should boost
+    // High confidence + positive connectivity gain → should boost
     let mut q = synthetic_quality(0.9, 0.3, 0.6, false, ConsciousAnomalySeverity::None);
-    q.phi = PhiAssessment::new(0.3, 0.6); // phi_gain = 0.3 > 0.05 threshold
+    q.spectral = SpectralConnectivityAssessment::new(0.3, 0.6); // connectivity_gain = 0.3 > 0.05 threshold
     q.epistemic_confidence = 0.85; // > 0.7 threshold
     scores.insert("boosted".into(), q);
 

@@ -268,13 +268,7 @@ pub(crate) fn compute_shapley_values_from_gradients(
             if byzantine_nodes.contains(node_id) {
                 continue;
             }
-            // Convert HV16 binary to bipolar f32: bit=1 → +1.0, bit=0 → -1.0
-            let bipolar: Vec<f32> = hv_bytes.iter()
-                .flat_map(|byte| (0..8).rev().map(move |i| {
-                    if (byte >> i) & 1 == 1 { 1.0f32 } else { -1.0f32 }
-                }))
-                .collect();
-            gradient_map.insert(node_id.clone(), bipolar);
+            gradient_map.insert(node_id.clone(), crate::pipeline::hv16_to_bipolar(hv_bytes));
         }
 
         if gradient_map.len() >= 2 {
