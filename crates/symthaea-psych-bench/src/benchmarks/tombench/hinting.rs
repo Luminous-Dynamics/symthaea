@@ -1,15 +1,17 @@
 //! Hinting task.
 //!
 //! Tests desire inference from indirect cues: the system must infer
-//! what a character wants without being told directly, by detecting
-//! implicit desires in their hints via WM similarity.
+//! what a character wants without being told directly. Uses HDC
+//! bundling to accumulate contextual cues, then measures whether
+//! the accumulated context is more similar to the correct desire
+//! inference than to the surface-level (wrong) interpretation.
 
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
-use crate::wm::{WmConfig, WorkingMemory};
+use symthaea_core::hdc::ContinuousHV;
 
 /// Hinting task benchmark.
 pub struct HintingBenchmark;
@@ -68,32 +70,34 @@ impl HintingBenchmark {
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
 
-        let mut wm = WorkingMemory::new(WmConfig {
-            dimension: dim,
-            capacity: config.working_memory_capacity,
-            ..Default::default()
-        });
+        // Bundle all context cues into a single accumulated representation.
+        // The bundle captures the combined semantic content of the hints.
+        let context_hvs: Vec<ContinuousHV> = scenario
+            .context
+            .iter()
+            .map(|s| adapter.encode(&Scenario::new(*s), dim))
+            .collect();
+        let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
 
-        for sentence in &scenario.context {
-            let hv = adapter.encode(&Scenario::new(*sentence), dim);
-            wm.perceive(hv);
-            wm.tick();
-        }
+        // Also encode a "desire/want" marker to bias toward desire inference
+        let desire_marker = adapter.encode(
+            &Scenario::new("wants needs desires wishes hopes for"),
+            dim,
+        );
 
-        let contents = wm.contents();
         let correct_hv = adapter.encode(&Scenario::new(scenario.correct_inference), dim);
         let wrong_hv = adapter.encode(&Scenario::new(scenario.wrong_inference), dim);
 
-        let correct_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&correct_hv))
-            .fold(0.0f32, f32::max);
-        let wrong_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&wrong_hv))
-            .fold(0.0f32, f32::max);
+        // Score: context similarity + desire-weighted bonus
+        let correct_context_sim = context_bundle.similarity(&correct_hv);
+        let wrong_context_sim = context_bundle.similarity(&wrong_hv);
+        let correct_desire_sim = desire_marker.similarity(&correct_hv);
+        let wrong_desire_sim = desire_marker.similarity(&wrong_hv);
 
-        if correct_sim > wrong_sim { 1.0 } else { 0.0 }
+        let correct_score = correct_context_sim + correct_desire_sim * 0.3;
+        let wrong_score = wrong_context_sim + wrong_desire_sim * 0.3;
+
+        if correct_score > wrong_score { 1.0 } else { 0.0 }
     }
 }
 

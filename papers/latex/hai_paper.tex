@@ -28,6 +28,7 @@
 \usepackage{array}
 \usepackage{float}
 \usepackage{enumitem}
+\usepackage{tikz}
 
 \hypersetup{
   colorlinks=true,
@@ -570,7 +571,87 @@ Conflict Resolution & Recency preference & $1.00 \pm 0.00$ \\
 }
 \end{table}
 
-\textbf{Working memory.} Change detection accuracy drops from 90\% ($K{=}2$) to 70\% ($K{=}8$), consistent with Cowan's $K \approx 4$ capacity limit~\citep{cowan2001magical}.  Serial recall shows perfect performance at $L{=}7$ (within capacity) but drops to 0\% for the first two positions at $L{=}9$ (exceeds capacity by 2), demonstrating the expected FIFO eviction of oldest items.  Binding accuracy degrades from 100\% ($K{=}2$) to 60\% ($K{=}6$) with a positive binding deficit ($+0.30$), matching the human pattern where feature-conjunction memory is harder than individual feature memory~\citep{wheeler2002binding}.
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.9cm, y=6cm]
+  % Axes
+  \draw[->] (1,0.35) -- (9.2,0.35) node[right] {\small Set size ($K$)};
+  \draw[->] (1,0.35) -- (1,1.1) node[above] {\small Accuracy};
+  % Y ticks
+  \foreach \y/\l in {0.4/0.4,0.5/0.5,0.6/0.6,0.7/0.7,0.8/0.8,0.9/0.9,1.0/1.0} {
+    \draw (0.95,\y) -- (1.05,\y) node[left=3pt] {\tiny \l};
+    \draw[gray!25] (1.05,\y) -- (9,\y);
+  }
+  % X ticks
+  \foreach \x in {2,4,6,8} {
+    \draw (\x,0.34) -- (\x,0.36) node[below=3pt] {\small \x};
+  }
+  % Change detection (blue squares)
+  \draw[blue, thick] (2,0.90) -- (4,0.80) -- (6,0.70) -- (8,0.70);
+  \foreach \x/\y in {2/0.90, 4/0.80, 6/0.70, 8/0.70}
+    \fill[blue] (\x,\y) +(-0.08,-0.008) rectangle +(0.08,0.008);
+  % Binding (red triangles, dashed)
+  \draw[red, thick, dashed] (2,1.00) -- (4,0.80) -- (6,0.60) -- (8,0.50);
+  \foreach \x/\y in {2/1.00, 4/0.80, 6/0.60, 8/0.50}
+    \draw[red, thick] (\x,\y) +(-0.1,-0.01) -- +(0.1,-0.01) -- +(0,0.015) -- cycle;
+  % Cowan's K line
+  \draw[gray, dashed, thick] (4,0.35) -- (4,1.05);
+  \node[gray, font=\footnotesize] at (5.2,0.38) {Cowan's $K$};
+  % Legend
+  \draw[blue, thick] (5.5,1.05) -- (6.3,1.05);
+  \fill[blue] (5.9,1.05) +(-0.08,-0.008) rectangle +(0.08,0.008);
+  \node[right, font=\footnotesize] at (6.4,1.05) {Change detection};
+  \draw[red, thick, dashed] (5.5,1.00) -- (6.3,1.00);
+  \draw[red, thick] (5.9,1.00) +(-0.1,-0.01) -- +(0.1,-0.01) -- +(0,0.015) -- cycle;
+  \node[right, font=\footnotesize] at (6.4,1.00) {Binding};
+\end{tikzpicture}
+\caption{Working memory capacity curve. Change detection and binding accuracy decline as set size exceeds WM capacity ($C{=}7$). The dashed vertical line marks Cowan's $K \approx 4$ human capacity limit. Binding degrades faster than simple change detection, consistent with the human binding deficit~\citep{wheeler2002binding}.}
+\label{fig:capacity-curve}
+\end{figure}
+
+\begin{figure}[ht]
+\centering
+\begin{tikzpicture}[x=0.85cm, y=5cm]
+  % Axes
+  \draw[->] (-0.5,-0.08) -- (9.5,-0.08) node[right] {\small Serial position};
+  \draw[->] (-0.5,-0.08) -- (-0.5,1.15) node[above] {\small Recall accuracy};
+  % Y ticks
+  \foreach \y/\l in {0.0/0.0,0.2/0.2,0.4/0.4,0.6/0.6,0.8/0.8,1.0/1.0} {
+    \draw (-0.55,\y) -- (-0.45,\y) node[left=3pt] {\tiny \l};
+    \draw[gray!25] (-0.45,\y) -- (9.2,\y);
+  }
+  % X ticks
+  \foreach \x in {0,1,2,3,4,5,6,7,8} {
+    \draw (\x,-0.09) -- (\x,-0.07) node[below=3pt] {\small \x};
+  }
+  % L=5 (green circles)
+  \draw[green!60!black, thick] (0,1.0) -- (1,1.0) -- (2,1.0) -- (3,1.0) -- (4,1.0);
+  \foreach \x in {0,1,2,3,4}
+    \fill[green!60!black] (\x,1.0) circle (0.07);
+  % L=7 (blue squares)
+  \draw[blue, thick] (0,1.0) -- (1,1.0) -- (2,1.0) -- (3,1.0) -- (4,1.0) -- (5,1.0) -- (6,1.0);
+  \foreach \x in {0,1,2,3,4,5,6}
+    \fill[blue] (\x,1.0) +(-0.08,-0.008) rectangle +(0.08,0.008);
+  % L=9 (red triangles, dashed)
+  \draw[red, thick, dashed] (0,0.0) -- (1,0.0) -- (2,1.0) -- (3,1.0) -- (4,1.0) -- (5,1.0) -- (6,1.0) -- (7,1.0) -- (8,1.0);
+  \foreach \x/\y in {0/0.0, 1/0.0, 2/1.0, 3/1.0, 4/1.0, 5/1.0, 6/1.0, 7/1.0, 8/1.0}
+    \draw[red, thick] (\x,\y) +(-0.1,-0.012) -- +(0.1,-0.012) -- +(0,0.018) -- cycle;
+  % Legend
+  \draw[green!60!black, thick] (5.5,0.3) -- (6.3,0.3);
+  \fill[green!60!black] (5.9,0.3) circle (0.07);
+  \node[right, font=\footnotesize] at (6.4,0.3) {$L{=}5$};
+  \draw[blue, thick] (5.5,0.2) -- (6.3,0.2);
+  \fill[blue] (5.9,0.2) +(-0.08,-0.008) rectangle +(0.08,0.008);
+  \node[right, font=\footnotesize] at (6.4,0.2) {$L{=}7$};
+  \draw[red, thick, dashed] (5.5,0.1) -- (6.3,0.1);
+  \draw[red, thick] (5.9,0.1) +(-0.1,-0.012) -- +(0.1,-0.012) -- +(0,0.018) -- cycle;
+  \node[right, font=\footnotesize] at (6.4,0.1) {$L{=}9$};
+\end{tikzpicture}
+\caption{Serial position curves for three list lengths. Lists within WM capacity ($L{=}5,7$) show perfect recall at all positions. At $L{=}9$ (exceeds capacity by 2), FIFO eviction eliminates the two oldest items (positions 0--1), producing a sharp primacy deficit while preserving recency---the expected pattern for a capacity-limited FIFO buffer.}
+\label{fig:serial-position}
+\end{figure}
+
+\textbf{Working memory.} Change detection accuracy drops from 90\% ($K{=}2$) to 70\% ($K{=}8$), consistent with Cowan's $K \approx 4$ capacity limit~\citep{cowan2001magical} (Figure~\ref{fig:capacity-curve}).  Serial recall shows perfect performance at $L{=}7$ (within capacity) but drops to 0\% for the first two positions at $L{=}9$ (exceeds capacity by 2), demonstrating the expected FIFO eviction of oldest items (Figure~\ref{fig:serial-position}).  Binding accuracy degrades from 100\% ($K{=}2$) to 60\% ($K{=}6$) with a positive binding deficit ($+0.30$), matching the human pattern where feature-conjunction memory is harder than individual feature memory~\citep{wheeler2002binding}.
 
 \textbf{Active inference.} The FEP agent shows a prior weight of $\beta_1 = 0.63$ (moderate conservatism), model-basedness of $\beta_3 = 0.30$ (partial model-based planning), and a learning rate of 0.09 with near-zero optimism bias ($0.05$), reflecting calibrated belief updating.
 

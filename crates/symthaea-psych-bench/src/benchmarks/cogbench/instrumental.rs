@@ -7,6 +7,7 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
+use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
 /// Instrumental learning benchmark.
@@ -35,7 +36,7 @@ impl InstrumentalLearningBenchmark {
         let mut win_errors = Vec::new();
         for _ in 0..20 {
             let action_result = agent.select_action();
-            let chosen = action_result.action % 2;
+            let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
 
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
@@ -56,7 +57,7 @@ impl InstrumentalLearningBenchmark {
         let mut loss_errors = Vec::new();
         for _ in 0..20 {
             let action_result = agent.select_action();
-            let chosen = action_result.action % 2;
+            let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
 
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;

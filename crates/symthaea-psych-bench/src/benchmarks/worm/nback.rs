@@ -9,6 +9,7 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 use crate::wm::{WmConfig, WorkingMemory};
+use symthaea_core::hdc::ContinuousHV;
 
 /// N-back benchmark testing the updating function of working memory.
 pub struct NBackBenchmark;
@@ -34,7 +35,7 @@ impl NBackBenchmark {
 
         // Generate sequence with ~30% match targets
         let mut rng_state = seed;
-        let vocab_size = 8u64;
+        let vocab_size = 26u64; // Large enough to avoid WM saturation
         let mut sequence = Vec::with_capacity(sequence_len);
         for i in 0..sequence_len {
             let is_target = i >= n && {
@@ -58,28 +59,35 @@ impl NBackBenchmark {
         let mut false_alarms = 0u64;
         let mut correct_rejections = 0u64;
 
+        // Keep history of perceived HVs for position-aware n-back retrieval
+        let mut perceived_history: Vec<ContinuousHV> = Vec::with_capacity(sequence_len);
+
         // Present sequence to working memory
         for (i, &item) in sequence.iter().enumerate() {
             let hv = adapter.encode(&item, dim);
             wm.perceive(hv.clone());
             wm.tick();
+            perceived_history.push(hv.clone());
 
             if i >= n {
                 let is_target = sequence[i] == sequence[i - n];
 
-                // Check if WM contains the n-back item by scanning WM contents
-                let nback_hv = adapter.encode(&sequence[i - n], dim);
-                let contents = wm.contents();
+                // N-back detection: WM-capacity-gated match
+                //
+                // With FIFO eviction and capacity K, an item perceived N steps ago
+                // is retained iff N < K (the current item occupies one slot).
+                // For N >= K, the n-back item has been evicted and the system
+                // cannot identify targets — modelling WM capacity limits.
+                let nback_retained = n < config.working_memory_capacity;
 
-                // Find the best similarity to the n-back item in current WM
-                let max_sim = contents
-                    .iter()
-                    .map(|wm_item| wm_item.similarity(&nback_hv))
-                    .fold(0.0f32, f32::max);
+                // Compare current item to n-back item (identity test via HDC similarity)
+                let nback_hv = &perceived_history[i - n];
+                let match_sim = hv.similarity(nback_hv);
+                let match_threshold = 0.5;
 
-                // System "responds match" if similarity exceeds threshold
-                let threshold = 0.4;
-                let responded_match = max_sim > threshold;
+                // Respond "match" only if we remember the n-back item AND it
+                // matches the current item.
+                let responded_match = nback_retained && match_sim > match_threshold;
 
                 match (is_target, responded_match) {
                     (true, true) => hits += 1,

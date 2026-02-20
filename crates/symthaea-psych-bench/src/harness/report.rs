@@ -124,6 +124,19 @@ impl BenchmarkResult {
     }
 }
 
+/// A baseline comparison annotation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaselineComparison {
+    /// Human reference value.
+    pub human_value: f64,
+    /// Source citation.
+    pub source: String,
+    /// Population (e.g., "human adults").
+    pub population: String,
+    /// Ratio: system_value / human_value.
+    pub ratio: f64,
+}
+
 /// Collection of benchmark results with comparison support.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BenchmarkReport {
@@ -147,16 +160,96 @@ impl BenchmarkReport {
         self.results.push(result);
     }
 
-    /// Full summary of all results.
+    /// Full summary of all results with baseline comparisons.
     pub fn summary(&self) -> String {
+        use super::baselines;
+
+        let worm_bl = baselines::worm_baselines();
+        let cog_bl = baselines::cogbench_baselines();
+        let tom_bl = baselines::tombench_baselines();
+        let mem_bl = baselines::memory_agent_baselines();
+
         let mut lines = vec![format!("Psych Benchmark Report ({})", self.timestamp)];
         lines.push(format!("{} benchmarks run", self.results.len()));
         lines.push(String::new());
         for result in &self.results {
             lines.push(result.summary());
+
+            // Add baseline comparisons for known metrics
+            let comparisons = self.find_comparisons(result, &worm_bl, &cog_bl, &tom_bl, &mem_bl);
+            if !comparisons.is_empty() {
+                lines.push("  --- Baseline Comparisons ---".to_string());
+                for (metric, comp) in &comparisons {
+                    let pct = comp.ratio * 100.0;
+                    lines.push(format!(
+                        "  {} -> {:.1}% of human ({:.3}, {})",
+                        metric, pct, comp.human_value, comp.source
+                    ));
+                }
+            }
+
             lines.push(String::new());
         }
         lines.join("\n")
+    }
+
+    /// Find applicable baseline comparisons for a benchmark result.
+    fn find_comparisons(
+        &self,
+        result: &BenchmarkResult,
+        worm_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        cog_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        tom_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        mem_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+    ) -> Vec<(String, BaselineComparison)> {
+        let mut comps = Vec::new();
+        let benchmark = result.benchmark.as_str();
+
+        // Map benchmark metrics to baselines
+        let mappings: Vec<(&str, &str, &std::collections::BTreeMap<&str, super::baselines::Baseline>)> = vec![
+            ("nback_2::accuracy", "nback_2_accuracy", worm_bl),
+            ("nback_3::accuracy", "nback_3_accuracy", worm_bl),
+            ("set_size_4::accuracy", "change_detection_k4", worm_bl),
+            ("average_pumps", "bart_avg_pumps", cog_bl),
+            ("horizon_6::directed_exploration", "directed_exploration", cog_bl),
+            ("beta3_model_basedness", "model_basedness", cog_bl),
+            ("discounting_score_S", "discounting_score", cog_bl),
+            ("false_belief_accuracy", "false_belief_accuracy", tom_bl),
+            ("faux_pas_accuracy", "faux_pas_accuracy", tom_bl),
+            ("hinting_accuracy", "hinting_accuracy", tom_bl),
+            ("retrieval_accuracy", "accurate_retrieval", mem_bl),
+            ("correction_accuracy", "test_time_learning", mem_bl),
+        ];
+
+        for (metric_key, baseline_key, baselines) in mappings {
+            if let Some(metric) = result.metrics.get(metric_key) {
+                if let Some(bl) = baselines.get(baseline_key) {
+                    let ratio = if bl.value.abs() > 1e-10 {
+                        metric.mean / bl.value
+                    } else {
+                        0.0
+                    };
+                    comps.push((
+                        metric_key.to_string(),
+                        BaselineComparison {
+                            human_value: bl.value,
+                            source: bl.source.to_string(),
+                            population: bl.population.to_string(),
+                            ratio,
+                        },
+                    ));
+                }
+            }
+        }
+
+        // Only return comparisons relevant to this benchmark
+        if benchmark.contains("WorM") || benchmark.contains("CogBench")
+            || benchmark.contains("ToM") || benchmark.contains("Memory")
+        {
+            comps
+        } else {
+            Vec::new()
+        }
     }
 
     /// Export all results as CSV.

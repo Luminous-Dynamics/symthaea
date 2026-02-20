@@ -7,6 +7,7 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
+use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
 /// Restless bandit benchmark measuring metacognitive sensitivity.
@@ -59,7 +60,7 @@ impl RestlessBanditBenchmark {
             }
 
             let action_result = agent.select_action();
-            let chosen_arm = action_result.action % num_arms;
+            let chosen_arm = sample_action(&action_result.action_probabilities, &mut rng_state);
 
             // Was the choice optimal?
             let best_arm = arm_values

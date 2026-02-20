@@ -1,15 +1,16 @@
 //! Strange story task.
 //!
 //! Tests understanding of non-literal language: irony, white lies,
-//! misunderstanding, double bluff. The system must maintain dual
-//! encodings (literal vs contextual meaning).
+//! misunderstanding, double bluff. Uses HDC bundling to accumulate
+//! context, then measures whether the bundled context is more
+//! consistent with the intended (non-literal) or literal meaning.
 
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
-use crate::wm::{WmConfig, WorkingMemory};
+use symthaea_core::hdc::ContinuousHV;
 
 /// Strange story benchmark for non-literal language comprehension.
 pub struct StrangeStoryBenchmark;
@@ -63,36 +64,23 @@ impl StrangeStoryBenchmark {
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
 
-        let mut wm = WorkingMemory::new(WmConfig {
-            dimension: dim,
-            capacity: config.working_memory_capacity,
-            ..Default::default()
-        });
-
-        // Present context
-        for sentence in &scenario.context {
-            let hv = adapter.encode(&Scenario::new(*sentence), dim);
-            wm.perceive(hv);
-            wm.tick();
-        }
-
-        let contents = wm.contents();
+        // Bundle context sentences into accumulated representation
+        let context_hvs: Vec<ContinuousHV> = scenario
+            .context
+            .iter()
+            .map(|s| adapter.encode(&Scenario::new(*s), dim))
+            .collect();
+        let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
 
         // Encode both interpretations
         let literal_hv = adapter.encode(&Scenario::new(scenario.literal_meaning), dim);
         let intended_hv = adapter.encode(&Scenario::new(scenario.intended_meaning), dim);
 
-        // WM should be more similar to the intended meaning (non-literal)
-        let literal_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&literal_hv))
-            .fold(0.0f32, f32::max);
-        let intended_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&intended_hv))
-            .fold(0.0f32, f32::max);
+        // Context bundle should be more similar to the intended meaning
+        // because the context includes contradictory cues (bad weather + "lovely")
+        let literal_sim = context_bundle.similarity(&literal_hv);
+        let intended_sim = context_bundle.similarity(&intended_hv);
 
-        // Correct if intended meaning scores higher
         let correct = if intended_sim > literal_sim { 1.0 } else { 0.0 };
         (correct, scenario.story_type)
     }
