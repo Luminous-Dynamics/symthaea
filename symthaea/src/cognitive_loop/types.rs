@@ -75,6 +75,16 @@ pub(crate) struct CycleCarryover {
     pub(crate) last_phi_eff: f64,
     /// Last consciousness equation v2 result (cached, updated every 25 cycles).
     pub(crate) last_equation_v2_consciousness: f64,
+    /// Last holographic unity score (0.0–1.0, cached from last analyze).
+    pub(crate) last_holographic_unity: f64,
+    /// Last differentiable consciousness gradient magnitude (cached).
+    pub(crate) last_gradient_magnitude: f64,
+    /// Last affective valence (cached from last process_stimulus).
+    pub(crate) last_affective_valence: f32,
+    /// Last unified pipeline consciousness score (cached).
+    pub(crate) last_pipeline_consciousness: f64,
+    /// Last multi-modal integrated phi (cached).
+    pub(crate) last_multimodal_phi: f64,
     /// Recent BinaryHV ring buffer for multi-component consciousness profile.
     /// Holds last 4 cycle BinaryHVs to make gradient/diversity/coherence meaningful.
     pub(crate) recent_hvs: Vec<crate::hdc::BinaryHV>,
@@ -110,6 +120,11 @@ impl Default for CycleCarryover {
             last_dissipative_health: 0.0,
             last_phi_eff: 0.0,
             last_equation_v2_consciousness: 0.0,
+            last_holographic_unity: 0.0,
+            last_gradient_magnitude: 0.0,
+            last_affective_valence: 0.0,
+            last_pipeline_consciousness: 0.0,
+            last_multimodal_phi: 0.0,
             recent_hvs: Vec::with_capacity(4),
         }
     }
@@ -433,6 +448,24 @@ pub struct CycleMetadata {
     /// Hierarchical LTC estimated Phi (0.0 when off).
     pub hierarchical_ltc_phi: f32,
 
+    // ── Session 6: Holographic + Differentiable + Affective + Pipeline + MultiModal ──
+    /// Holographic consciousness unity score (0.0–1.0, 0.0 when off).
+    pub holographic_unity: f64,
+    /// Holographic binding strength (0.0 when off).
+    pub holographic_binding: f64,
+    /// Differentiable consciousness gradient magnitude (0.0 when off).
+    pub consciousness_gradient_magnitude: f64,
+    /// Limiting component identified by gradient analysis ("" when off).
+    pub consciousness_limiting_component: String,
+    /// Affective consciousness valence (-1.0 to 1.0, 0.0 when off).
+    pub affect_consciousness_valence: f32,
+    /// Affective consciousness arousal (0.0–1.0, 0.0 when off).
+    pub affect_consciousness_arousal: f32,
+    /// Unified pipeline consciousness score (0.0 when off).
+    pub pipeline_consciousness: f64,
+    /// Multi-modal integrated phi (0.0 when off).
+    pub multimodal_integrated_phi: f64,
+
     /// Whether metacognitive monitoring detected a Phi trajectory anomaly.
     pub metacognitive_anomaly: bool,
 
@@ -593,6 +626,11 @@ pub struct ModuleTimings {
     pub consciousness_equation_v2: u64,
     pub hierarchical_ltc: u64,
     pub primitive_evolution: u64,
+    pub consciousness_holography: u64,
+    pub differentiable_consciousness: u64,
+    pub affective_consciousness: u64,
+    pub unified_consciousness_pipeline: u64,
+    pub multi_modal_integration: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

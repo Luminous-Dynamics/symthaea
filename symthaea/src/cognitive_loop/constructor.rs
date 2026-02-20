@@ -444,6 +444,29 @@ impl CognitiveLoopService {
                 (None, None, None, None, None)
             };
 
+        // Build optional holographic + differentiable + affective + pipeline + multi-modal
+        // (all co-gated with primitive consciousness)
+        let (holographic_analyzer, differentiable_consciousness, affective_consciousness,
+             unified_consciousness_pipeline, multi_modal_integrator) =
+            if primitive_processor.is_some() {
+                let ha = crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer::new(
+                    crate::consciousness::consciousness_holography::HolographicConfig::default(),
+                );
+                let dc = crate::consciousness::differentiable::DifferentiableConsciousness::new();
+                let ac = crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer::new(
+                    crate::consciousness::affective_consciousness::AffectiveConfig::default(),
+                );
+                let ucp = crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline::new(
+                    crate::consciousness::unified_consciousness_pipeline::PipelineConfig::default(),
+                ).ok(); // Returns Result — use .ok() for graceful degradation
+                let mmi = crate::consciousness::multi_modal_integration::MultiModalIntegrator::new(
+                    crate::consciousness::multi_modal_integration::IntegrationConfig::default(),
+                );
+                (Some(ha), Some(dc), Some(ac), ucp, Some(mmi))
+            } else {
+                (None, None, None, None, None)
+            };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -650,6 +673,11 @@ impl CognitiveLoopService {
             theory_calibrator,
             consciousness_equation_v2,
             hierarchical_ltc,
+            holographic_analyzer,
+            differentiable_consciousness,
+            affective_consciousness,
+            unified_consciousness_pipeline,
+            multi_modal_integrator,
             value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop::default(),
             #[cfg(feature = "support")]
             support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),

@@ -2372,6 +2372,166 @@ impl CognitiveLoopService {
         module_timings.primitive_evolution = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // CONSCIOUSNESS HOLOGRAPHY: Interference-based binding and holographic recall
+        // Encodes current experience as holographic pattern; analyzes coherence,
+        // unity score, and binding strength via interference patterns.
+        // Science: Pribram (1971), Gabor (1946), Bohm (1980).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (holographic_unity, holographic_binding) =
+            if let Some(ref mut ha) = self.holographic_analyzer {
+                if self.stats.total_cycles % 20 == 0 {
+                    let content: Vec<f64> = (0..64).map(|i| {
+                        if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
+                    }).collect();
+                    ha.encode_experience(&content, &format!("cycle_{}", self.stats.total_cycles));
+                    let analysis = ha.analyze();
+                    self.carryover.last_holographic_unity = analysis.unity_score;
+                    (analysis.unity_score, analysis.binding_strength)
+                } else {
+                    (self.carryover.last_holographic_unity, 0.0)
+                }
+            } else {
+                (0.0, 0.0)
+            };
+        module_timings.consciousness_holography = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // DIFFERENTIABLE CONSCIOUSNESS: Gradient-based consciousness optimization
+        // Computes ∂C/∂component to identify which factor limits consciousness most.
+        // Science: Bengio (2017), Tononi (2004), Oizumi et al. (2014).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (consciousness_gradient_magnitude, consciousness_limiting_component) =
+            if let Some(ref dc) = self.differentiable_consciousness {
+                if self.stats.total_cycles % 25 == 0 && self.stats.total_cycles > 0 {
+                    use crate::consciousness::consciousness_equation_v2::{ConsciousnessStateV2, CoreComponent};
+                    use std::collections::HashMap;
+                    let mut core_values = HashMap::new();
+                    core_values.insert(CoreComponent::Integration, unified_psi.clamp(0.0, 1.0));
+                    core_values.insert(CoreComponent::Binding, coherence as f64);
+                    core_values.insert(CoreComponent::Workspace, coherence as f64 * 0.8);
+                    core_values.insert(CoreComponent::Attention, phi_attention_weight as f64);
+                    core_values.insert(CoreComponent::Recursion, 0.5);
+                    core_values.insert(CoreComponent::Efficacy, 1.0 - prediction_error as f64);
+                    core_values.insert(CoreComponent::Knowledge, self.carryover.last_epistemic_quality);
+                    let state = ConsciousnessStateV2 {
+                        core_values,
+                        extended_values: HashMap::new(),
+                        phase_coherence: HashMap::new(),
+                        substrate_feasibility: 1.0,
+                        timestamp: self.stats.total_cycles as u64,
+                        context: String::new(),
+                    };
+                    let (_value, gradient) = dc.forward(&state);
+                    let (component, _grad_val, _suggestion) = dc.suggest_improvement(&state);
+                    self.carryover.last_gradient_magnitude = gradient.magnitude;
+                    (gradient.magnitude, format!("{:?}", component))
+                } else {
+                    (self.carryover.last_gradient_magnitude, String::new())
+                }
+            } else {
+                (0.0, String::new())
+            };
+        module_timings.differentiable_consciousness = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // AFFECTIVE CONSCIOUSNESS: Valence-arousal-dominance affect tracking
+        // Lightweight: decay every cycle, process stimulus every 10 cycles.
+        // Science: Russell (2003), Barrett (2017), Colombetti (2014).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (affect_cons_valence, affect_cons_arousal) =
+            if let Some(ref mut ac) = self.affective_consciousness {
+                ac.decay(0.05);
+                if self.stats.total_cycles % 10 == 0 {
+                    let valence = 1.0 - 2.0 * prediction_error;
+                    let base_affect = crate::consciousness::affective_consciousness::CoreAffect {
+                        valence,
+                        arousal: prediction_error.abs().clamp(0.0, 1.0),
+                        dominance: self.prediction_confidence * 2.0 - 1.0,
+                    };
+                    let affect = ac.process_stimulus(
+                        &format!("cycle_{}", self.stats.total_cycles),
+                        Some(base_affect),
+                    );
+                    self.carryover.last_affective_valence = affect.valence;
+                    (affect.valence, affect.arousal)
+                } else {
+                    let affect = ac.current_affect();
+                    (affect.valence, affect.arousal)
+                }
+            } else {
+                (0.0, 0.0)
+            };
+        module_timings.affective_consciousness = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Negative affect strengthens caution (lower confidence)
+        if let Some(ref ac) = self.affective_consciousness {
+            let affect = ac.current_affect();
+            if affect.valence < -0.3 {
+                self.prediction_confidence = (self.prediction_confidence + affect.valence * 0.02).max(0.0);
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // UNIFIED CONSCIOUSNESS PIPELINE: End-to-end sensory→consciousness
+        // EXPENSIVE — runs every 50 cycles. Combines HDC, LTC, binding, equation.
+        // Science: Dehaene (2011), Tononi (2004), Hasani et al. (2021).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let pipeline_consciousness =
+            if let Some(ref mut pipeline) = self.unified_consciousness_pipeline {
+                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                    let sensory: Vec<f64> = (0..64).map(|i| {
+                        if hv16_cached.get_bit(i) != 0 { 1.0 } else { -1.0 }
+                    }).collect();
+                    match pipeline.process(&sensory) {
+                        Ok(moment) => {
+                            self.carryover.last_pipeline_consciousness = moment.consciousness;
+                            moment.consciousness
+                        }
+                        Err(_) => self.carryover.last_pipeline_consciousness,
+                    }
+                } else {
+                    self.carryover.last_pipeline_consciousness
+                }
+            } else {
+                0.0
+            };
+        module_timings.unified_consciousness_pipeline = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // MULTI-MODAL INTEGRATION: Phi-guided cross-modal binding
+        // Science: Damasio (1994), Mesulam (1998), Ghazanfar & Schroeder (2006).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let multimodal_integrated_phi =
+            if let Some(ref mut mmi) = self.multi_modal_integrator {
+                if self.stats.total_cycles % 15 == 0 && self.stats.total_cycles > 0 {
+                    use crate::consciousness::multi_modal_integration::{ModalInput};
+                    let visual_input = ModalInput::new(
+                        Modality::Visual,
+                        hv16_cached.clone(),
+                        coherence as f64,
+                    );
+                    let temporal_input = ModalInput::new(
+                        Modality::Temporal,
+                        hv16_cached.clone(),
+                        unified_psi.clamp(0.0, 1.0),
+                    );
+                    let result = mmi.integrate(&[visual_input, temporal_input]);
+                    self.carryover.last_multimodal_phi = result.integrated_phi;
+                    result.integrated_phi
+                } else {
+                    self.carryover.last_multimodal_phi
+                }
+            } else {
+                0.0
+            };
+        module_timings.multi_modal_integration = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut res_mem) = self.resonator_memory {
@@ -3904,6 +4064,14 @@ impl CognitiveLoopService {
             epistemic_conflict_count,
             equation_v2_consciousness,
             hierarchical_ltc_phi,
+            holographic_unity,
+            holographic_binding,
+            consciousness_gradient_magnitude,
+            consciousness_limiting_component,
+            affect_consciousness_valence: affect_cons_valence,
+            affect_consciousness_arousal: affect_cons_arousal,
+            pipeline_consciousness,
+            multimodal_integrated_phi,
             metacognitive_anomaly,
             safety_blocked: false,
             safety_category: None,
