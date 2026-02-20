@@ -277,31 +277,100 @@ fn build_mi_laplacian(cov: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
 
 /// Compute Fiedler ordering: sort indices by the second eigenvector of the Laplacian.
 ///
+/// Uses shifted inverse iteration with deflation — O(n³/6 + k*n²) vs O(n³) full QR.
+/// Only extracts the Fiedler vector (2nd eigenvector), not all eigenvalues.
+///
 /// Returns (spectral_order, fiedler_zero_crossing).
 fn compute_fiedler_order(
     laplacian: &[f64],
     _mi_weights: &[f64],
     n: usize,
 ) -> (Vec<usize>, usize) {
-    use nalgebra::DMatrix;
+    use nalgebra::{DMatrix, DVector};
 
-    let lap_matrix = DMatrix::from_row_slice(n, n, laplacian);
-    let eigen = nalgebra::SymmetricEigen::new(lap_matrix);
+    // Shift Laplacian to make it positive definite: M = L + σI
+    // (L has eigenvalue 0 with eigenvector = constant; shift makes it invertible)
+    let sigma = 1e-8;
+    let mut shifted = DMatrix::from_row_slice(n, n, laplacian);
+    for i in 0..n {
+        shifted[(i, i)] += sigma;
+    }
 
-    // Sort eigenvalues to find the second-smallest
-    let mut eigen_indices: Vec<usize> = (0..n).collect();
-    let eigenvalues = &eigen.eigenvalues;
-    eigen_indices.sort_by(|&a, &b| eigenvalues[a].total_cmp(&eigenvalues[b]));
+    // One-time Cholesky factorization: O(n³/6)
+    let cholesky = match shifted.cholesky() {
+        Some(c) => c,
+        None => {
+            // Fallback to full eigendecomposition if Cholesky fails
+            return compute_fiedler_order_full(laplacian, n);
+        }
+    };
 
-    // Fiedler vector = eigenvector for 2nd-smallest eigenvalue
-    let fiedler_idx = eigen_indices[1];
-    let fiedler_vec: Vec<f64> = (0..n).map(|i| eigen.eigenvectors[(i, fiedler_idx)]).collect();
+    // Deterministic start vector orthogonal to constant eigenvector:
+    // v[i] = i - (n-1)/2, then deflate and normalize
+    let inv_sqrt_n = 1.0 / (n as f64).sqrt();
+    let mut v = DVector::from_fn(n, |i, _| i as f64 - (n as f64 - 1.0) / 2.0);
+    // Deflate: remove constant-vector component
+    let dot_const: f64 = v.iter().sum::<f64>() * inv_sqrt_n;
+    for vi in v.iter_mut() {
+        *vi -= dot_const * inv_sqrt_n;
+    }
+    let norm = v.norm();
+    if norm < 1e-15 {
+        return compute_fiedler_order_full(laplacian, n);
+    }
+    v /= norm;
+
+    // Inverse iteration with deflation: ~20-30 iterations of O(n²) each
+    for _ in 0..30 {
+        // Solve (L + σI) * w = v via Cholesky: O(n²)
+        let w = cholesky.solve(&v);
+        // Deflate: remove constant-vector component
+        let dot_const: f64 = w.iter().sum::<f64>() * inv_sqrt_n;
+        let mut w_deflated = w;
+        for wi in w_deflated.iter_mut() {
+            *wi -= dot_const * inv_sqrt_n;
+        }
+        let norm = w_deflated.norm();
+        if norm < 1e-15 {
+            break;
+        }
+        v = w_deflated / norm;
+    }
+
+    // v is now the Fiedler vector
+    let fiedler_vec: Vec<f64> = v.iter().copied().collect();
 
     // Sort indices by Fiedler vector value
     let mut order: Vec<usize> = (0..n).collect();
     order.sort_by(|&a, &b| fiedler_vec[a].total_cmp(&fiedler_vec[b]));
 
     // Find zero-crossing in sorted Fiedler values
+    let sorted_fiedler: Vec<f64> = order.iter().map(|&i| fiedler_vec[i]).collect();
+    let zero_crossing = sorted_fiedler
+        .windows(2)
+        .position(|w| w[0] <= 0.0 && w[1] > 0.0)
+        .unwrap_or(n / 2);
+
+    (order, zero_crossing)
+}
+
+/// Fallback: full eigendecomposition via nalgebra::SymmetricEigen.
+fn compute_fiedler_order_full(laplacian: &[f64], n: usize) -> (Vec<usize>, usize) {
+    use nalgebra::DMatrix;
+
+    let lap_matrix = DMatrix::from_row_slice(n, n, laplacian);
+    let eigen = nalgebra::SymmetricEigen::new(lap_matrix);
+
+    let mut eigen_indices: Vec<usize> = (0..n).collect();
+    let eigenvalues = &eigen.eigenvalues;
+    eigen_indices.sort_by(|&a, &b| eigenvalues[a].total_cmp(&eigenvalues[b]));
+
+    let fiedler_idx = eigen_indices[1];
+    let fiedler_vec: Vec<f64> = (0..n).map(|i| eigen.eigenvectors[(i, fiedler_idx)]).collect();
+
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| fiedler_vec[a].total_cmp(&fiedler_vec[b]));
+
     let sorted_fiedler: Vec<f64> = order.iter().map(|&i| fiedler_vec[i]).collect();
     let zero_crossing = sorted_fiedler
         .windows(2)

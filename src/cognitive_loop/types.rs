@@ -426,6 +426,16 @@ pub struct CycleMetadata {
     /// Causal self-explanation: average confidence in causal model (0.0 when off).
     pub causal_avg_confidence: f64,
 
+    /// Evolution coordinator generation count (0 when off).
+    pub evolution_generation: usize,
+    /// Evolution coordinator Phi delta from last evolution step (0.0 when off).
+    pub evolution_phi_delta: f64,
+
+    /// Total value-aligned embeddings created by semantic value embedder (0 when off).
+    pub value_embeddings_created: u64,
+    /// Semantic value embedder cache hit rate (0.0 when off).
+    pub value_cache_hit_rate: f32,
+
     // ── Session 4: Epistemic Tiers + Phi Validation ────────────────────────
     /// Epistemic quality score from 3-axis classification (0.0–1.0, 0.0 when off).
     pub epistemic_quality: f64,
@@ -631,6 +641,7 @@ pub struct ModuleTimings {
     pub affective_consciousness: u64,
     pub unified_consciousness_pipeline: u64,
     pub multi_modal_integration: u64,
+    pub semantic_value_embedder: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

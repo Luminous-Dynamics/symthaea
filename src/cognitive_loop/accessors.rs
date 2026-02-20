@@ -935,6 +935,16 @@ impl CognitiveLoopService {
         self.context_optimizer.as_ref()
     }
 
+    /// Borrow the evolution coordinator (if enabled).
+    pub fn evolution_coordinator(&self) -> Option<&crate::consciousness::evolution_bridge::EvolutionCoordinator> {
+        self.evolution_coordinator.as_ref()
+    }
+
+    /// Borrow the semantic value embedder (if enabled).
+    pub fn semantic_value_embedder(&self) -> Option<&crate::consciousness::semantic_value_embedder::SemanticValueEmbedder> {
+        self.semantic_value_embedder.as_ref()
+    }
+
     /// Borrow the dissipative consciousness model (if enabled).
     pub fn dissipative_consciousness(&self) -> Option<&crate::consciousness::dissipative_consciousness::DissipativeConsciousness> {
         self.dissipative_consciousness.as_ref()

@@ -2029,6 +2029,7 @@ impl CognitiveLoopService {
         // harmony bases. Cached — repeated inputs hit O(1) lookup.
         // Science: Schwartz (2012) — value theory, Kanerva (2009) — HDC semantics.
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         let (value_embeddings_created, value_cache_hit_rate) =
             if let Some(ref mut embedder) = self.semantic_value_embedder {
                 if self.stats.total_cycles % 10 == 0 {
@@ -2044,6 +2045,7 @@ impl CognitiveLoopService {
             } else {
                 (0, 0.0)
             };
+        module_timings.semantic_value_embedder = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
@@ -3963,34 +3965,23 @@ impl CognitiveLoopService {
         self.carryover.urgency = urgency;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // Σ (SIGMA) — Synergistic Integration (Layer 2)
-        // Feed HDC state snapshot and compute every 50 cycles.
-        // ═══════════════════════════════════════════════════════════════════════
-        self.synergistic_integration.push(&encoding_result.hdv);
-        let sigma = if self.stats.total_cycles % 50 == 0 {
-            let s = self.synergistic_integration.compute().map(|r| r.sigma);
-            if s.is_some() {
-                self.carryover.last_sigma = s;
-            }
-            s
-        } else {
-            self.carryover.last_sigma // Use cached value between computations
-        };
-
-        // ═══════════════════════════════════════════════════════════════════════
-        // SPECTRAL MIP — O(n³) Fiedler-ordered MIP search (Layer 2+)
-        // Feed HDC state snapshot and compute every 50 cycles (interleaved with Sigma).
+        // SPECTRAL MIP — O(n³) Fiedler-ordered MIP search (Layer 2)
+        // Replaces SynergisticIntegration: 128 dims (vs 64), better MIP via
+        // Fiedler ordering + bordered Cholesky. Computed every 50 cycles.
+        // sigma derived from spectral_mip_phi for backward compatibility.
         // ═══════════════════════════════════════════════════════════════════════
         self.spectral_mip_finder.push(&encoding_result.hdv);
         let spectral_mip_phi = if self.stats.total_cycles % 50 == 0 {
             let phi = self.spectral_mip_finder.compute().map(|r| r.phi);
             if phi.is_some() {
                 self.carryover.last_spectral_mip_phi = phi;
+                self.carryover.last_sigma = phi; // backward compat for memory coordinator
             }
             phi
         } else {
             self.carryover.last_spectral_mip_phi
         };
+        let sigma = self.carryover.last_sigma;
 
         // Soul experience integration: feed cycle outcome back into value learning.
         // This closes the loop: Soul evaluates alignment (pre-cycle) → cognitive cycle

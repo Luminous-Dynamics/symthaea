@@ -725,7 +725,6 @@ impl CognitiveLoopService {
             temporal_consciousness,
             embodied_cognition,
             narrative_gwt,
-            synergistic_integration: symthaea_core::consciousness_metrics::SynergisticIntegration::default_config(),
             spectral_mip_finder: symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults(),
             soul: Some(crate::soul::Soul::new(crate::soul::SoulConfig {
                 dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
