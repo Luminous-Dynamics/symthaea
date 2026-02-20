@@ -23,9 +23,8 @@ use symthaea::hdc::cross_modal_binding::Modality;
 
 #[test]
 fn test_router_creation() {
-    let router = CrossModalAttentionRouter::new();
+    let _router = CrossModalAttentionRouter::new();
     // Should create without panicking
-    assert!(true, "Router created successfully");
 }
 
 #[test]
@@ -42,9 +41,8 @@ fn test_router_with_custom_config() {
         ior_strength: 0.0,
     };
 
-    let router = CrossModalAttentionRouter::with_config(config.clone());
+    let _router = CrossModalAttentionRouter::with_config(config.clone());
     // Should create with custom config
-    assert!(true, "Router with custom config created");
 }
 
 #[test]

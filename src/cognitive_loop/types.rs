@@ -85,6 +85,10 @@ pub(crate) struct CycleCarryover {
     pub(crate) last_pipeline_consciousness: f64,
     /// Last multi-modal integrated phi (cached).
     pub(crate) last_multimodal_phi: f64,
+    /// Last detected consciousness state type (cached, updated every 100 cycles).
+    pub(crate) last_consciousness_state: String,
+    /// Last epistemic confidence (cached from gate evaluation).
+    pub(crate) last_epistemic_confidence: f32,
     /// Recent BinaryHV ring buffer for multi-component consciousness profile.
     /// Holds last 4 cycle BinaryHVs to make gradient/diversity/coherence meaningful.
     pub(crate) recent_hvs: Vec<crate::hdc::BinaryHV>,
@@ -125,6 +129,8 @@ impl Default for CycleCarryover {
             last_affective_valence: 0.0,
             last_pipeline_consciousness: 0.0,
             last_multimodal_phi: 0.0,
+            last_consciousness_state: String::new(),
+            last_epistemic_confidence: 0.5,
             recent_hvs: Vec::with_capacity(4),
         }
     }
@@ -483,6 +489,16 @@ pub struct CycleMetadata {
     /// Multi-modal integrated phi (0.0 when off).
     pub multimodal_integrated_phi: f64,
 
+    // ── Session 7: Synthetic States + Epistemic Gate ────────────────────
+    /// Detected consciousness state label (e.g., "Awake", "Alert", "" when off).
+    pub consciousness_state_label: String,
+    /// Consciousness state level (0.0–1.0, from NSM grounding, 0.0 when off).
+    pub consciousness_state_level: f64,
+    /// Epistemic gate confidence (0.0–1.0, 0.5 when off).
+    pub epistemic_gate_confidence: f32,
+    /// Whether epistemic gate approved the current cycle's action.
+    pub epistemic_gate_approved: bool,
+
     /// Whether metacognitive monitoring detected a Phi trajectory anomaly.
     pub metacognitive_anomaly: bool,
 
@@ -648,6 +664,8 @@ pub struct ModuleTimings {
     pub affective_consciousness: u64,
     pub unified_consciousness_pipeline: u64,
     pub multi_modal_integration: u64,
+    pub synthetic_grounding: u64,
+    pub epistemic_gate: u64,
     pub semantic_value_embedder: u64,
     pub composition_rules: u64,
     pub harmonies_integration: u64,

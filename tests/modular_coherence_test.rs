@@ -99,6 +99,7 @@ fn test_pattern_library_delegation() {
         cortisol: 0.2,
         dopamine: 0.7,
         acetylcholine: 0.8,
+        ..Default::default()
     };
 
     // Record pattern should delegate to PatternLibrary
@@ -119,6 +120,7 @@ fn test_scatter_analysis_delegation() {
         cortisol: 0.8,
         dopamine: 0.5,
         acetylcholine: 0.5,
+        ..Default::default()
     };
 
     // analyze_scatter should delegate to diagnostics module
@@ -134,16 +136,19 @@ fn test_scatter_cause_variants() {
         cortisol: 0.8,
         dopamine: 0.5,
         acetylcholine: 0.5,
+        ..Default::default()
     };
     let hormones_emotional = HormoneState {
         cortisol: 0.3,
         dopamine: 0.2,
         acetylcholine: 0.5,
+        ..Default::default()
     };
     let hormones_cognitive = HormoneState {
         cortisol: 0.3,
         dopamine: 0.5,
         acetylcholine: 0.2,
+        ..Default::default()
     };
 
     let analysis_stress = analyze_scatter(0.3, 0.5, &hormones_stress);
@@ -171,6 +176,7 @@ fn test_full_workflow() {
         cortisol: 0.3,
         dopamine: 0.6,
         acetylcholine: 0.7,
+        ..Default::default()
     };
     field.apply_hormone_modulation(&hormones);
 

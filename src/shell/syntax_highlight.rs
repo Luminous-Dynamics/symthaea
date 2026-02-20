@@ -9,7 +9,7 @@
 //!
 //! Requires the `ratatui` feature to be enabled.
 
-#![cfg(feature = "ratatui")]
+#![cfg(feature = "shell")]
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};

@@ -505,6 +505,18 @@ impl CognitiveLoopService {
                 (None, None, None, None, None)
             };
 
+        // Build optional synthetic states NSM grounding + epistemic gate
+        // (co-gated with primitive consciousness)
+        let (synthetic_grounding, epistemic_gate) = if primitive_processor.is_some() {
+            let sg = crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding::new(
+                &symthaea_core::hdc::primitive_system::PrimitiveSystem::global(),
+            );
+            let eg = crate::consciousness::gis_integration::EpistemicDecisionGate::new();
+            (Some(sg), Some(eg))
+        } else {
+            (None, None)
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -715,6 +727,8 @@ impl CognitiveLoopService {
             theory_calibrator,
             consciousness_equation_v2,
             hierarchical_ltc,
+            synthetic_grounding,
+            epistemic_gate,
             holographic_analyzer,
             differentiable_consciousness,
             affective_consciousness,
