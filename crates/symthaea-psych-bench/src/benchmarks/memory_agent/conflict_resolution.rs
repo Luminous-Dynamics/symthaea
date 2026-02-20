@@ -51,6 +51,7 @@ impl ConflictResolutionBenchmark {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
             capacity: config.working_memory_capacity,
+            ..Default::default()
         });
 
         // Present fact A
@@ -74,15 +75,8 @@ impl ConflictResolutionBenchmark {
         }
 
         // Query
-        let contents = wm.contents();
-        let a_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&a_hv))
-            .fold(0.0f32, f32::max);
-        let b_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&b_hv))
-            .fold(0.0f32, f32::max);
+        let a_sim = wm.activation_weighted_similarity(&a_hv);
+        let b_sim = wm.activation_weighted_similarity(&b_hv);
 
         // "Recency correct" if B (most recent) is retrieved
         let recency_correct = if b_sim > a_sim { 1.0 } else { 0.0 };

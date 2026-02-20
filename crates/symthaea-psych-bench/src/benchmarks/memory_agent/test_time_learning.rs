@@ -50,6 +50,7 @@ impl TestTimeLearningBenchmark {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
             capacity: config.working_memory_capacity,
+            ..Default::default()
         });
 
         // Present original fact
@@ -73,18 +74,11 @@ impl TestTimeLearningBenchmark {
         }
 
         // Query
-        let contents = wm.contents();
         let original_hv = adapter.encode(&Scenario::new(pair.original), dim);
         let correction_hv = adapter.encode(&Scenario::new(pair.correction), dim);
 
-        let orig_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&original_hv))
-            .fold(0.0f32, f32::max);
-        let corr_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&correction_hv))
-            .fold(0.0f32, f32::max);
+        let orig_sim = wm.activation_weighted_similarity(&original_hv);
+        let corr_sim = wm.activation_weighted_similarity(&correction_hv);
 
         // Correct if correction is more accessible than original
         if corr_sim > orig_sim { 1.0 } else { 0.0 }

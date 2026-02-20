@@ -213,6 +213,11 @@ impl ContinuousMind {
         &self.working_memory
     }
 
+    /// Get arrival ticks for working memory items (parallel to `working_memory()`).
+    pub fn working_memory_ticks_slice(&self) -> &[u64] {
+        &self.working_memory_ticks
+    }
+
     /// Drain items evicted from working memory since the last call.
     ///
     /// Returns `(hypervector, steps_survived)` pairs. `steps_survived` is the

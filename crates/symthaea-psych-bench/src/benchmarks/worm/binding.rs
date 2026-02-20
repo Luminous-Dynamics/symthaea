@@ -30,6 +30,7 @@ impl BindingBenchmark {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
             capacity: config.working_memory_capacity,
+            ..Default::default()
         });
 
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;

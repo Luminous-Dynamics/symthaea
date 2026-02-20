@@ -27,6 +27,7 @@ impl LongRangeBenchmark {
         let mut wm = WorkingMemory::new(WmConfig {
             dimension: dim,
             capacity: config.working_memory_capacity,
+            ..Default::default()
         });
 
         // Warm-up ticks

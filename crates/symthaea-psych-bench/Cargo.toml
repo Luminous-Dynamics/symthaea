@@ -11,9 +11,14 @@ homepage = "https://luminousdynamics.org"
 keywords = ["psychology", "benchmarks", "consciousness", "neuroscience", "cognitive-science"]
 categories = ["science", "algorithms"]
 
+[features]
+default = []
+symthaea-backend = ["dep:symthaea"]
+
 [dependencies]
 symthaea-core = { path = "../../symthaea-core" }
 symthaea-fep = { path = "../symthaea-fep" }
+symthaea = { path = "../..", optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 rand = { workspace = true }
