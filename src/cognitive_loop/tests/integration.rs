@@ -55,7 +55,7 @@ fn test_demand_driven_consolidation_trigger() {
 
     // Test that trigger_demand_replay causes should_replay to return true
     let config = EpisodicReplayConfig {
-        phi_threshold: 0.01,
+        psi_threshold: 0.01,
         min_episodes_for_replay: 1,
         replay_interval: 1000, // Long interval so periodic won't trigger
         ..Default::default()

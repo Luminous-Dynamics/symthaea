@@ -55,7 +55,7 @@ mod repl_cognitive_fep_motor_integration {
         let snapshot = service.consciousness_snapshot();
 
         // Verify consciousness metrics are being computed
-        assert!(snapshot.unified_phi >= 0.0, "Phi must be non-negative");
+        assert!(snapshot.unified_psi >= 0.0, "Phi must be non-negative");
         assert!(
             snapshot.temporal_coherence >= 0.0,
             "Coherence must be non-negative"
@@ -67,7 +67,7 @@ mod repl_cognitive_fep_motor_integration {
 
         println!("Cognitive Loop Integration Test Results:");
         println!("  Cycles completed: {}", stats.total_cycles);
-        println!("  Final Phi: {:.4}", snapshot.unified_phi);
+        println!("  Final Phi: {:.4}", snapshot.unified_psi);
         println!("  Temporal coherence: {:.4}", snapshot.temporal_coherence);
         println!("  Prediction errors: {:?}", prediction_errors);
     }
@@ -216,7 +216,7 @@ mod repl_cognitive_fep_motor_integration {
             assert!(!result.response.is_empty(), "Response should not be empty");
 
             // Verify consciousness state is tracked
-            assert!(result.consciousness.unified_phi >= 0.0);
+            assert!(result.consciousness.unified_psi >= 0.0);
 
             // Verify timing
             assert!(result.elapsed.as_micros() > 0);
@@ -319,7 +319,7 @@ mod repl_cognitive_fep_motor_integration {
 
         // 5. Feed to FEP for motor command generation
         let observation = Observation::from_consciousness_state(
-            snapshot.unified_phi as f64,
+            snapshot.unified_psi as f64,
             snapshot.consciousness_level as f64,
             snapshot.temporal_coherence as f64,
             snapshot.prediction_confidence as f64,
@@ -345,7 +345,7 @@ mod repl_cognitive_fep_motor_integration {
         println!("Full Integration Test Results:");
         println!("  Input: '{}'", input);
         println!("  Prediction error: {:.4}", cycle_result.prediction_error);
-        println!("  Consciousness Phi: {:.4}", snapshot.unified_phi);
+        println!("  Consciousness Phi: {:.4}", snapshot.unified_psi);
         println!("  Free energy: {:.4}", perception.free_energy.total);
         println!("  Selected motor command: {:?}", motor_command);
         println!(
@@ -1048,7 +1048,7 @@ mod unified_system_integration {
             let _ = cognitive_loop.cycle(input);
         }
         let consciousness = cognitive_loop.consciousness_snapshot();
-        println!("    Phi: {:.4}", consciousness.unified_phi);
+        println!("    Phi: {:.4}", consciousness.unified_psi);
         println!("    Coherence: {:.4}", consciousness.temporal_coherence);
 
         // 2. FEP: Generate motor commands from consciousness state
@@ -1056,7 +1056,7 @@ mod unified_system_integration {
         let mut fep_agent = ActiveInferenceAgent::new(fep_config);
 
         let observation = Observation::from_consciousness_state(
-            consciousness.unified_phi as f64,
+            consciousness.unified_psi as f64,
             consciousness.consciousness_level as f64,
             consciousness.temporal_coherence as f64,
             consciousness.prediction_confidence as f64,
@@ -1076,13 +1076,13 @@ mod unified_system_integration {
         let attention_pattern: Vec<f32> = (0..64)
             .map(|i| {
                 // Create attention pattern based on consciousness state
-                let base = consciousness.unified_phi;
+                let base = consciousness.unified_psi;
                 let variation = (i as f32 / 64.0 * std::f32::consts::PI).sin() * 0.2;
                 (base + variation).clamp(0.0, 1.0)
             })
             .collect();
 
-        let cv = ConsciousnessVector::new(attention_pattern, consciousness.unified_phi as f64);
+        let cv = ConsciousnessVector::new(attention_pattern, consciousness.unified_psi as f64);
         println!("    Vector Phi: {:.4}", cv.phi);
         println!("    Attention dims: {}", cv.attention.len());
         println!("    Size: {} bytes", cv.estimated_size());
@@ -1106,7 +1106,7 @@ mod unified_system_integration {
 
         // VERIFICATION
         println!("\n[✓] UNIFIED PIPELINE VERIFICATION");
-        assert!(consciousness.unified_phi >= 0.0, "Consciousness Phi valid");
+        assert!(consciousness.unified_psi >= 0.0, "Consciousness Phi valid");
         assert!(
             perception.free_energy.total.is_finite(),
             "Free energy finite"

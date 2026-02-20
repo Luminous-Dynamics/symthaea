@@ -758,7 +758,7 @@ fn test_phi_attestation_buffer_capacity() {
 #[test]
 fn test_phi_attestation_sign_message_deterministic() {
     let record = PhiAttestationRecord {
-        phi: 0.654321,
+        psi: 0.654321,
         cycle_id: 42,
         captured_at_us: 1708000000000000,
         prediction_error: 0.05,

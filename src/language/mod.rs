@@ -39,7 +39,7 @@ pub mod code_domain_plugin;
 pub mod code_generator;
 #[cfg(feature = "code_generation")]
 pub mod code_intent;
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod code_parser;
 #[cfg(feature = "code_generation")]
 pub mod code_verifier;
@@ -47,13 +47,13 @@ pub mod code_verifier;
 pub mod emitters;
 #[cfg(feature = "code_generation")]
 pub mod epistemic_generation;
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod nix_code_parser;
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod parser_registry;
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod python_parser;
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod rust_parser;
 #[cfg(feature = "code_generation")]
 pub mod triune_intent;

@@ -344,7 +344,7 @@ impl DesignIntegrationEngine {
 
         // Coupling index: entropy-based integration measure of state components
         let coupling_index = {
-            use super::true_phi::TruePhiCalculator;
+            use crate::consciousness_metrics::TruePhiCalculator;
             let calc = TruePhiCalculator::new();
             let components = vec![
                 state.thermal_vector.clone(),

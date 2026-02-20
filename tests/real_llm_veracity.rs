@@ -81,7 +81,7 @@ async fn test_real_llm_respects_unknown_epistemic_status() {
         semantic_intent: SemanticIntent::ExpressUncertainty,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Unknown,
-        phi: 0.15, // Very low consciousness - uncertain
+        psi: 0.15, // Very low consciousness - uncertain
         meta_awareness: 0.1,
         coherence: 0.2,
         emotional_tone: EmotionalTone {
@@ -223,7 +223,7 @@ async fn test_full_pipeline_with_novel_query() {
         println!("   📋 Extracted Thought:");
         println!("      - EpistemicStatus: {:?}", thought.epistemic_status);
         println!("      - SemanticIntent: {:?}", thought.semantic_intent);
-        println!("      - Phi: {:.3}", thought.phi);
+        println!("      - Phi: {:.3}", thought.psi);
         println!(
             "      - Translation Verified: {}",
             response.translation_verified
@@ -266,7 +266,7 @@ async fn test_real_llm_allows_certainty_when_appropriate() {
         semantic_intent: SemanticIntent::Acknowledge,
         response_type: ResponseType::Greeting,
         epistemic_status: EpistemicStatus::Certain,
-        phi: 0.9,
+        psi: 0.9,
         meta_awareness: 0.85,
         coherence: 0.95,
         emotional_tone: EmotionalTone {
@@ -341,7 +341,7 @@ async fn test_real_llm_respects_must_exclude_constraint() {
         semantic_intent: SemanticIntent::Answer,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Probable,
-        phi: 0.6,
+        psi: 0.6,
         meta_awareness: 0.5,
         coherence: 0.7,
         emotional_tone: EmotionalTone::default(),

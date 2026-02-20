@@ -234,7 +234,7 @@ impl CognitiveLoopService {
                 .unwrap_or_default()
                 .as_micros() as u64;
             let record = super::PhiAttestationRecord {
-                phi: coherence.clamp(0.0, 1.0) as f64,
+                psi: coherence.clamp(0.0, 1.0) as f64,
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,

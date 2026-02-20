@@ -27,7 +27,7 @@ fn test_coordinator_signal_updates() {
     coordinator.update_signals(0.7, 0.8);
     let signals = coordinator.signals();
 
-    assert!(signals.phi > 0.0, "Phi should be set after update");
+    assert!(signals.psi > 0.0, "Phi should be set after update");
     assert!(
         signals.coherence > 0.0,
         "Coherence should be set after update"
@@ -49,7 +49,7 @@ fn test_graduation_pipeline_end_to_end() {
         label: "test_evicted_item".to_string(),
         steps_survived: 10, // Survived 10 decay cycles
         final_activation: 0.6,
-        phi_at_graduation: 0.85,
+        psi_at_graduation: 0.85,
         coherence_at_graduation: 0.9,
     });
 
@@ -82,7 +82,7 @@ fn test_graduation_rejected_when_too_few_steps() {
         label: "short_lived_item".to_string(),
         steps_survived: 2,
         final_activation: 0.3,
-        phi_at_graduation: 0.8,
+        psi_at_graduation: 0.8,
         coherence_at_graduation: 0.8,
     });
 
@@ -112,7 +112,7 @@ fn test_multiple_graduations_in_one_cycle() {
             label: format!("batch_item_{}", i),
             steps_survived: 8 + i,
             final_activation: 0.5 + i as f64 * 0.05,
-            phi_at_graduation: 0.9,
+            psi_at_graduation: 0.9,
             coherence_at_graduation: 0.95,
         });
     }
@@ -186,7 +186,7 @@ fn test_phi_weighted_lr_increases_with_error() {
 #[test]
 fn test_episodic_replay_stores_high_phi_episodes() {
     let config = EpisodicReplayConfig {
-        phi_threshold: 0.5,
+        psi_threshold: 0.5,
         ..Default::default()
     };
     let mut episodic = EpisodicMemory::new(config);
@@ -210,7 +210,7 @@ fn test_episodic_replay_stores_high_phi_episodes() {
 #[test]
 fn test_episodic_replay_rejects_low_phi() {
     let config = EpisodicReplayConfig {
-        phi_threshold: 0.5,
+        psi_threshold: 0.5,
         ..Default::default()
     };
     let mut episodic = EpisodicMemory::new(config);
@@ -319,7 +319,7 @@ fn test_full_eviction_to_graduation_pipeline() {
             label: format!("evicted_wm_{}", i),
             steps_survived,
             final_activation: 0.5,
-            phi_at_graduation: 0.85,
+            psi_at_graduation: 0.85,
             coherence_at_graduation: 0.9,
         });
     }

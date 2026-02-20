@@ -9,7 +9,7 @@ use super::hadrons::Hadrons;
 use super::nonequilibrium::JarzynskiEstimator;
 use super::quantum_tunneling::TunnelingCalculator;
 use super::standard_model::StandardModel;
-use super::true_phi::TruePhiCalculator;
+use crate::consciousness_metrics::TruePhiCalculator;
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 use std::time::Instant;

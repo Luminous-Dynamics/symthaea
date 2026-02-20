@@ -361,6 +361,10 @@ pub struct CycleMetadata {
     /// Support subsystem expected free energy (0.0 when not computed).
     pub support_efe: f64,
 
+    /// Σ (Sigma) — Synergistic integration via covariance-based Phi* (Layer 2).
+    /// `None` when not computed this cycle (only computed every N cycles).
+    pub sigma: Option<f64>,
+
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
 }

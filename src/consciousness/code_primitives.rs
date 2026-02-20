@@ -35,7 +35,7 @@ use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use symthaea_core::hdc::{BinaryHV, ContinuousHV, Primitive, PrimitiveTier};
 
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 use crate::hdc::code_encoder::CodeHDEncoder;
 #[cfg(feature = "code_generation")]
 use crate::language::code_intent::{CodeIntent, CodeIntentCategory};
@@ -346,7 +346,7 @@ impl CodePrimitiveRouter {
 /// Execute code primitives with Phi measurement
 pub struct CodePrimitiveExecutor {
     router: CodePrimitiveRouter,
-    #[cfg(feature = "code_understanding")]
+    #[cfg(feature = "code_generation")]
     _encoder: Option<CodeHDEncoder>,
 }
 
@@ -358,7 +358,7 @@ impl CodePrimitiveExecutor {
 
         Self {
             router,
-            #[cfg(feature = "code_understanding")]
+            #[cfg(feature = "code_generation")]
             _encoder: Some(CodeHDEncoder::new(dim)),
         }
     }

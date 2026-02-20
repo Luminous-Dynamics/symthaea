@@ -151,6 +151,9 @@ pub struct Symthaea {
     memory_coordinator: MemoryCoordinator,
     /// Episodic memory: Phi-weighted priority queue for significant moments.
     episodic_memory: EpisodicMemory,
+    /// Resonant speech: user-adaptive response generation.
+    /// Modulates output based on inferred cognitive load and user state.
+    resonant_speech: crate::resonant_speech::ResonantSpeech,
 }
 
 impl Symthaea {
@@ -266,6 +269,7 @@ impl Symthaea {
             database: None,
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
+            resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
         })
     }
 
@@ -411,6 +415,7 @@ impl Symthaea {
             database: None,
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
+            resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
         })
     }
 
@@ -768,6 +773,21 @@ impl Symthaea {
         }
 
         // ====================================================================
+        // PHASE 6.5: RESONANT SPEECH (User-adaptive polishing)
+        // ====================================================================
+        // Modulate response based on estimated cognitive load.
+        // Uses consciousness level as a proxy for user engagement:
+        // high Psi → user is engaged → can handle detail,
+        // low Psi → simplify output.
+        let response_text = {
+            let load = crate::resonant_speech::CognitiveLoad::from_level(thought.psi);
+            let mut user_state = crate::resonant_speech::UserState::default();
+            user_state.cognitive_load = load;
+            self.resonant_speech.update_state(user_state);
+            self.resonant_speech.generate(&generation.text, content)
+        };
+
+        // ====================================================================
         // PHASE 7: PARTNERSHIP UPDATE
         // ====================================================================
         let consciousness = thought.psi as f32;
@@ -921,7 +941,7 @@ impl Symthaea {
         }
 
         Ok(ProcessResponse {
-            content: generation.text,
+            content: response_text,
             confidence: generation.confidence.min(consciousness),
             safe,
             steps_to_emergence,

@@ -18,7 +18,7 @@ fn create_test_memory(id: &str, seed: u64, memory_type: MemoryType) -> MemoryRec
         content: format!("Test memory content for {}", id),
         valence: 0.5,
         arousal: 0.3,
-        phi: 0.65,
+        psi: 0.65,
         topics: vec!["integration_test".to_string()],
         metadata: "{}".to_string(),
         consolidation_strength: 0.0,
@@ -192,7 +192,7 @@ async fn test_continuous_mind_phi_preservation() {
 
     // Store a memory with specific Φ
     let mut record = create_test_memory("phi-test", 42, MemoryType::Episodic);
-    record.phi = 0.85; // High consciousness moment
+    record.psi = 0.85; // High consciousness moment
 
     let encoding = record.encoding.clone();
     mind.remember(record).await.unwrap();
@@ -200,8 +200,8 @@ async fn test_continuous_mind_phi_preservation() {
     let results = mind.recall_long_term(&encoding, 1).await.unwrap();
     assert!(!results.is_empty());
     assert!(
-        (results[0].record.phi - 0.85).abs() < 0.001,
+        (results[0].record.psi - 0.85).abs() < 0.001,
         "Φ should be preserved: got {}",
-        results[0].record.phi
+        results[0].record.psi
     );
 }

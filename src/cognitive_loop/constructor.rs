@@ -587,6 +587,12 @@ impl CognitiveLoopService {
             temporal_consciousness,
             embodied_cognition,
             narrative_gwt,
+            synergistic_integration: symthaea_core::consciousness_metrics::SynergisticIntegration::default_config(),
+            soul: Some(crate::soul::Soul::new(crate::soul::SoulConfig {
+                dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
+                ..Default::default()
+            })),
+            attention_visualizer: Some(crate::visualization::AttentionVisualizer::new()),
             relational_psi: 0.0,
             external_reward: 0.0,
             social_trust: 0.5,

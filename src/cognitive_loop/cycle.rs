@@ -39,7 +39,21 @@ const RESONATOR_CODEBOOK_GROWTH_INTERVAL: usize = 50;
 const RESONATOR_NOVELTY_THRESHOLD: f32 = 0.7;
 const RESONATOR_MAX_SEMANTIC_SYMBOLS: usize = 100;
 
-// -- Psi (Ψ) contribution weights (sum to unified_psi) --
+// ═══════════════════════════════════════════════════════════════════
+// Ψ (PSI) SYNTHESIS — Consciousness Estimate
+//
+// Computes a composite soft signal from multiple subsystem indicators.
+// This is Layer 1 of Symthaea's three-layer measurement:
+//
+//   Layer 1: Ψ (Psi)  — Fast estimate (every cycle, O(1))
+//   Layer 2: Σ (Sigma) — Synergistic integration (every N cycles, O(n²))
+//   Layer 3: Φ (Phi)   — True IIT (on demand, O(n³))
+//
+// Components: temporal_coherence + voice_quality + flow_state
+//           + relational + body + embodied
+//
+// For actual integrated information, use PhiEngine or true_phi.
+// ═══════════════════════════════════════════════════════════════════
 const FLOW_PSI_WEIGHT: f32 = 0.2; // flow state → psi
 const RELATIONAL_PSI_WEIGHT: f32 = 0.15; // relational dyad → psi
 const BODY_PSI_WEIGHT: f64 = 0.1; // interoceptive body → psi
@@ -328,6 +342,15 @@ impl CognitiveLoopService {
         // real_hv_to_hv16 iterates 16,384 floats twice (mean + threshold).
         // Previously called 7× per cycle — this caches the result.
         let hv16_cached = real_hv_to_hv16(&encoding_result.hdv);
+
+        // Soul value alignment: evaluate encoding against Seven Harmonies.
+        // If strongly misaligned with core values, flag moral concern.
+        if let Some(ref soul) = self.soul {
+            let alignment = soul.evaluate_alignment(&encoding_result.hdv);
+            if alignment.overall_alignment < MORAL_CONCERN_THRESHOLD {
+                self.stats.moral_concerns_detected += 1;
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1.1 Surprise-Driven Exploration: Track surprise, modulate curiosity
@@ -2425,6 +2448,22 @@ impl CognitiveLoopService {
             0.0
         };
 
+        // Attention visualization: record snapshot for debugging/introspection
+        if let Some(ref mut viz) = self.attention_visualizer {
+            let snapshot = crate::visualization::AttentionSnapshot::new(
+                vec!["psi".into(), "coherence".into(), "body".into(), "attention".into()],
+                vec![unified_psi, coherence as f64, body_psi_modulation, phi_attention_avg as f64],
+                vec![
+                    unified_psi as f32,
+                    coherence,
+                    body_psi_modulation as f32,
+                    phi_attention_avg,
+                ],
+                1.0,
+            );
+            viz.record(snapshot);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // GWT INTEGRATION: Submit encoding to global workspace for broadcast
         // Urgency-gated: Critical=always, Normal=every 2nd, Cruise=every 4th
@@ -3028,6 +3067,17 @@ impl CognitiveLoopService {
         // Store urgency for next cycle's hysteresis
         self.carryover.urgency = urgency;
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // Σ (SIGMA) — Synergistic Integration (Layer 2)
+        // Feed HDC state snapshot and compute every 50 cycles.
+        // ═══════════════════════════════════════════════════════════════════════
+        self.synergistic_integration.push(&encoding_result.hdv);
+        let sigma = if self.stats.total_cycles % 50 == 0 {
+            self.synergistic_integration.compute().map(|r| r.sigma)
+        } else {
+            None
+        };
+
         // Build cycle metadata for observability
         let metadata = super::CycleMetadata {
             surprise_triggered,
@@ -3090,6 +3140,7 @@ impl CognitiveLoopService {
             support_alert_fired,
             support_federation_graduated,
             support_efe,
+            sigma,
             module_timings_us: module_timings,
         };
 

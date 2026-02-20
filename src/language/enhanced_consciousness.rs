@@ -1473,10 +1473,10 @@ pub struct EnhancedConsciousness {
     /// EmotionalCore from language module (now connected!)
     pub emotional_core: EmotionalCore,
     /// Epistemic conflict detector (detects 15 pairwise theory conflicts)
-    #[cfg(feature = "epistemic_conflict")]
+    #[cfg(feature = "reasoning_engine")]
     pub conflict_detector: crate::consciousness::epistemic_conflict::ConflictDetector,
     /// Theory calibrator (reliability R, γ, Brier scores)
-    #[cfg(feature = "epistemic_conflict")]
+    #[cfg(feature = "reasoning_engine")]
     pub calibrator: crate::consciousness::epistemic_conflict::TheoryCalibrator,
 }
 
@@ -1494,9 +1494,9 @@ impl Default for EnhancedConsciousness {
             narrative: NarrativeEngine::new(),
             emotional_bridge: EmotionalBridge::new(),
             emotional_core: EmotionalCore::new(),
-            #[cfg(feature = "epistemic_conflict")]
+            #[cfg(feature = "reasoning_engine")]
             conflict_detector: crate::consciousness::epistemic_conflict::ConflictDetector::new(),
-            #[cfg(feature = "epistemic_conflict")]
+            #[cfg(feature = "reasoning_engine")]
             calibrator: crate::consciousness::epistemic_conflict::TheoryCalibrator::new(),
         }
     }
@@ -1537,7 +1537,7 @@ impl EnhancedConsciousness {
         }
 
         // 3b. Epistemic conflict detection (if enabled)
-        #[cfg(feature = "epistemic_conflict")]
+        #[cfg(feature = "reasoning_engine")]
         let conflict_matrix = {
             let ec_metrics: crate::consciousness::epistemic_conflict::MultiTheoryMetrics =
                 (&base_result.metrics).into();
@@ -1559,7 +1559,7 @@ impl EnhancedConsciousness {
             }
             matrix
         };
-        #[cfg(not(feature = "epistemic_conflict"))]
+        #[cfg(not(feature = "reasoning_engine"))]
         let _ = &base_result; // suppress unused warning
 
         // 4. Higher-order observation

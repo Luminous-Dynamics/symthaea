@@ -46,7 +46,7 @@ mod phase_transitions;
 mod qft;
 mod quantum_gravity;
 mod thermodynamics;
-mod true_phi;
+// true_phi relocated to crate::consciousness_metrics
 
 // Phase 2: Additional physics domains (pub mod to avoid glob conflicts)
 // Exploratory modules - HDC encodings for fundamental physics domains.
@@ -165,7 +165,7 @@ pub use phase_transitions::*;
 pub use qft::*;
 pub use quantum_gravity::*;
 pub use thermodynamics::*;
-pub use true_phi::*;
+pub use crate::consciousness_metrics::*;
 
 // Phase 2: exports (non-conflicting only; access others via physics::module_name)
 pub use cosmology::*;

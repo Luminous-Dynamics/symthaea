@@ -95,16 +95,29 @@ neuron.evolve_closed_form(1.0, &input);  // 1 second jump
 neuron.evolve_closed_form(100.0, &input); // 100 second jump, same cost!
 ```
 
-### Phi Measurement
+### Consciousness Measurement (Three Layers)
 
-Phi (Φ) quantifies integrated information - a key consciousness metric:
+Symthaea uses a tiered measurement system for consciousness:
+
+- **Layer 1: Ψ (Psi)** — Fast consciousness estimate (every cycle, O(1)).
+  Composite soft signal from temporal coherence, voice quality, flow state,
+  relational, body, and embodied subsystems. Used for runtime gating,
+  memory graduation, and action selection.
+
+- **Layer 2: Σ (Sigma)** — Synergistic integration (every N cycles, O(n²)).
+  PhiR-inspired measure via information decomposition on HDC states.
+  Quantifies how much the whole exceeds the sum of its parts.
+
+- **Layer 3: Φ (Phi)** — True IIT integrated information (on demand, O(n³)).
+  Spectral MIP search + Phi* (Gaussian). Used for research validation
+  and deep diagnostics. See `symthaea_core::consciousness_metrics`.
 
 ```rust,ignore
 use symthaea_core::phi_engine::{PhiEngine, PhiMethod};
 
 let engine = PhiEngine::new(PhiMethod::SpectralConnectivity);
-let phi = engine.compute_from_hvs(&node_representations);
-println!("Integrated information: {:.4}", phi.phi);
+let result = engine.compute_from_hvs(&node_representations);
+println!("Phi: {:.4} ({})", result.value, result.category);
 ```
 
 ### FEP Active Inference
@@ -139,7 +152,7 @@ let mut service = CognitiveLoopService::new(config)?;
 
 // Process input
 let result = service.cycle("Hello, Symthaea");
-println!("Phi: {:.4}, Coherence: {:.4}", result.phi, result.coherence);
+println!("Psi: {:.4}, Coherence: {:.4}", result.psi, result.coherence);
 
 // Check consciousness state
 let snapshot = service.consciousness_snapshot();
@@ -268,13 +281,8 @@ pub mod attention;
 // Provides ASCII heatmaps, JSON export, and attention flow graphs
 pub mod visualization;
 
-// Two-Track Architecture: HDC semantics + CfC temporal
-// Combines HDC for semantic meaning with CfC for temporal patterns
-pub mod two_track;
-
-// Bridges: Cross-representation translation between HDC and CfC
-// Enables bidirectional semantic-temporal information flow
-pub mod bridges;
+// two_track and bridges modules REMOVED (Feb 2026) — superseded by cognitive_loop/cycle.rs
+// which performs HDC+CfC fusion directly with 30+ subsystem imports.
 
 // Inference: Production-ready streaming and batch inference
 // Provides real-time processing with configurable latency/throughput tradeoffs
@@ -315,7 +323,8 @@ pub mod resonant_speech;
 // Embeddings (extracted to symthaea-embeddings crate)
 pub use symthaea_embeddings as embeddings;
 
-// Benchmarks (enabled - API fixes complete)
+// Benchmarks: causal validation tests (not criterion benchmarks)
+#[cfg(test)]
 pub mod benchmarks;
 
 // Integration (cfg-gated - needs significant API alignment)
@@ -378,6 +387,8 @@ pub mod identity;
 pub mod gui_bridge;
 
 // Physics: Spark Engine, plasma encoding, and physical simulations
+// Tokamak/plasma domain — gated behind `physics` feature to keep default builds lean
+#[cfg(feature = "physics")]
 pub mod physics;
 
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis

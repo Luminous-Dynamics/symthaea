@@ -28,7 +28,7 @@ fn create_memory(id: &str, seed: u64, memory_type: MemoryType, content: &str) ->
         content: content.to_string(),
         valence: ((seed % 200) as f32 / 100.0) - 1.0, // -1.0 to 1.0
         arousal: (seed % 100) as f32 / 100.0,         // 0.0 to 1.0
-        phi: (seed % 100) as f64 / 100.0,             // 0.0 to 1.0
+        psi: (seed % 100) as f64 / 100.0,             // 0.0 to 1.0
         topics: vec![format!("topic_{}", seed % 10)],
         metadata: format!(r#"{{"seed": {}}}"#, seed),
         consolidation_strength: 0.0,
@@ -67,7 +67,7 @@ mod roundtrip_tests {
         assert_eq!(retrieved.memory_type, original.memory_type);
         assert!((retrieved.valence - original.valence).abs() < 0.001);
         assert!((retrieved.arousal - original.arousal).abs() < 0.001);
-        assert!((retrieved.phi - original.phi).abs() < 0.0001);
+        assert!((retrieved.psi - original.psi).abs() < 0.0001);
     }
 
     #[tokio::test]
@@ -85,7 +85,7 @@ mod roundtrip_tests {
             content: "Testing encoding integrity".to_string(),
             valence: 0.0,
             arousal: 0.5,
-            phi: 0.75,
+            psi: 0.75,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -214,7 +214,7 @@ mod roundtrip_tests {
             content: "".to_string(), // Empty content
             valence: 1.0,            // Max positive
             arousal: 0.0,            // Min arousal
-            phi: 1.0,                // Max phi
+            psi: 1.0,                // Max phi
             topics: vec![],          // Empty topics
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -229,7 +229,7 @@ mod roundtrip_tests {
         assert!(retrieved.content.is_empty());
         assert!(retrieved.topics.is_empty());
         assert!((retrieved.valence - 1.0).abs() < 0.001);
-        assert!((retrieved.phi - 1.0).abs() < 0.0001);
+        assert!((retrieved.psi - 1.0).abs() < 0.0001);
     }
 }
 

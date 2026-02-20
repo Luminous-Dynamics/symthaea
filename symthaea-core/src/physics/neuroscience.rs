@@ -782,7 +782,7 @@ impl NeuroEncoder {
 
         // Phenomenal index of circuit activity (entropy-based)
         let phenomenal = {
-            use super::true_phi::TruePhiCalculator;
+            use crate::consciousness_metrics::TruePhiCalculator;
             let calc = TruePhiCalculator::new();
             let components: Vec<_> = circuit.neurons.iter().map(|n| n.vector.clone()).collect();
             let nc = components.len();

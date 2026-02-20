@@ -21,8 +21,10 @@
 //!
 //! - **[`hdc`]** — Hyperdimensional computing: vector types, encoding, binding, bundling,
 //!   similarity search, attention, memory, and consciousness topology
+//! - **[`consciousness_metrics`]** — True IIT consciousness metrics: entropy estimation,
+//!   MIP search, Phi* computation, temporal/causal analysis
 //! - **[`physics`]** — Physics-grounded modeling: periodic table, emergence chains,
-//!   chemical kinetics, IIT/Φ computation, and thermodynamic consciousness
+//!   chemical kinetics, and thermodynamic consciousness
 //! - **[`phi_engine`]** — Integrated Information (Φ) calculation engine
 //! - **[`core`]** — Core consciousness state types and configuration
 //! - **[`genesis`]** — System bootstrap and initialization
@@ -60,6 +62,9 @@ pub mod observability;
 /// Integrated Information (Phi) calculation engine.
 #[allow(missing_docs)]
 pub mod phi_engine;
-/// Physics-grounded modeling: periodic table, emergence, kinetics, IIT, and thermodynamics.
+/// True IIT consciousness metrics: entropy estimation, MIP search, Phi* computation.
+#[allow(missing_docs)]
+pub mod consciousness_metrics;
+/// Physics-grounded modeling: periodic table, emergence, kinetics, and thermodynamics.
 #[allow(missing_docs)]
 pub mod physics;
