@@ -190,21 +190,36 @@ pub fn run_validator_pipeline(round: u32) -> ExternResult<ValidatorPipelineResul
 
     // Step 2.7: Adaptive defense — select aggregation strategy based on recent Byzantine rates
     let mut defense_manager = AdaptiveDefenseManager::new(AdaptiveDefenseConfig::default());
-    // Feed historical Byzantine rates from recent rounds (best effort, no error on failure)
+    // Feed historical Byzantine rates from recent rounds
+    // Track DHT failures to apply fallback escalation
+    let mut dht_history_failures = 0u32;
+    let mut dht_history_loaded = 0u32;
     if round > 0 {
         let lookback = round.min(5);
         for prev_round in (round.saturating_sub(lookback))..round {
-            // Approximate: check if any Byzantine records exist for prior rounds
-            if let Ok(byz_records) = crate::gradients::get_round_byzantine_records(prev_round) {
-                if let Ok(prev_hvs) = crate::hyperfeel::get_round_hypervectors(prev_round) {
+            match (
+                crate::gradients::get_round_byzantine_records(prev_round),
+                crate::hyperfeel::get_round_hypervectors(prev_round),
+            ) {
+                (Ok(byz_records), Ok(prev_hvs)) => {
                     defense_manager.record_round_result(byz_records.len(), prev_hvs.len());
+                    dht_history_loaded += 1;
+                }
+                _ => {
+                    dht_history_failures += 1;
                 }
             }
         }
     }
     // Let adaptive defense escalate detection thresholds based on recent Byzantine rates
     let _adapted_method = defense_manager.adapt();
-    let defense_stats = defense_manager.get_stats();
+    let mut defense_stats = defense_manager.get_stats();
+
+    // Fallback escalation: if DHT reads failed and we couldn't load history,
+    // assume at least level 1 defense to avoid being lenient under uncertainty.
+    if dht_history_failures > 0 && dht_history_loaded == 0 && defense_stats.escalation_level == 0 {
+        defense_stats.escalation_level = 1;
+    }
 
     // Step 3: Configure pipeline with defense-adjusted thresholds
     // Higher escalation → stricter cosine filtering, higher reputation bar

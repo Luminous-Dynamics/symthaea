@@ -272,15 +272,28 @@ pub(crate) fn compute_shapley_values_from_gradients(
         }
 
         if gradient_map.len() >= 2 {
-            // Compute aggregated reference (simple mean of all valid HVs)
+            // Compute aggregated reference (reputation-weighted mean of valid HVs)
             let dim = gradient_map.values().next().map_or(0, |v| v.len());
             let mut aggregated = vec![0.0f32; dim];
-            let count = gradient_map.len() as f32;
-            for vals in gradient_map.values() {
+
+            // Look up reputations for weighting
+            let mut weight_sum = 0.0f32;
+            for (node_id, vals) in &gradient_map {
+                let rep = match crate::pipeline::get_or_create_reputation(node_id) {
+                    Ok(r) => (r.reputation_score as f32).max(0.1), // floor at 0.1 to avoid zero-weight
+                    Err(_) => 0.5, // default for unknown nodes
+                };
+                weight_sum += rep;
                 for (i, v) in vals.iter().enumerate() {
                     if i < dim {
-                        aggregated[i] += v / count;
+                        aggregated[i] += v * rep;
                     }
+                }
+            }
+            // Normalize by total weight
+            if weight_sum > 0.0 {
+                for v in &mut aggregated {
+                    *v /= weight_sum;
                 }
             }
 
@@ -302,7 +315,70 @@ pub(crate) fn compute_shapley_values_from_gradients(
         }
     }
 
-    // Fallback: equal-share for large rounds or missing HV data
+    // Fallback for large rounds or missing HV data:
+    // Use marginal-contribution sampling (lightweight Shapley approximation).
+    // For each participant, estimate their contribution by comparing the aggregated
+    // result with and without their gradient, using cosine similarity as the utility.
+    if let Some(hvs) = hv_data {
+        if !hvs.is_empty() {
+            let mut gradient_map: std::collections::HashMap<String, Vec<f32>> =
+                std::collections::HashMap::new();
+            for (node_id, hv_bytes) in &hvs {
+                if !byzantine_nodes.contains(node_id) {
+                    gradient_map.insert(node_id.clone(), crate::pipeline::hv16_to_bipolar(hv_bytes));
+                }
+            }
+
+            if gradient_map.len() >= 2 {
+                let dim = gradient_map.values().next().map_or(0, |v| v.len());
+                // Compute full aggregation (mean of all)
+                let mut full_agg = vec![0.0f32; dim];
+                let n = gradient_map.len() as f32;
+                for vals in gradient_map.values() {
+                    for (i, v) in vals.iter().enumerate() {
+                        if i < dim { full_agg[i] += v / n; }
+                    }
+                }
+
+                // For each participant, compute leave-one-out aggregation
+                // Marginal contribution = cosine_sim(full_agg) - cosine_sim(leave_one_out_agg)
+                // This is O(n * d) — feasible even for n > 20
+                for (_, gradient) in gradients {
+                    if byzantine_nodes.contains(&gradient.node_id) {
+                        shapley_values.insert(gradient.node_id.clone(), 0.0);
+                        continue;
+                    }
+                    if let Some(participant_hv) = gradient_map.get(&gradient.node_id) {
+                        // Leave-one-out: remove this participant's contribution from the mean
+                        let n_minus_1 = n - 1.0;
+                        if n_minus_1 > 0.0 {
+                            let mut loo_agg = vec![0.0f32; dim];
+                            for (i, v) in full_agg.iter().enumerate() {
+                                loo_agg[i] = (v * n - participant_hv[i]) / n_minus_1;
+                            }
+                            // Utility = cosine similarity between aggregation and ideal (all 1s as proxy)
+                            let norm_full: f32 = full_agg.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            let norm_loo: f32 = loo_agg.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            let dot_full: f32 = full_agg.iter().sum();
+                            let dot_loo: f32 = loo_agg.iter().sum();
+                            let sim_full = if norm_full > 0.0 { dot_full / (norm_full * (dim as f32).sqrt()) } else { 0.0 };
+                            let sim_loo = if norm_loo > 0.0 { dot_loo / (norm_loo * (dim as f32).sqrt()) } else { 0.0 };
+                            let marginal = (sim_full - sim_loo).max(0.0) as f64;
+                            shapley_values.insert(gradient.node_id.clone(), marginal);
+                        } else {
+                            // Only one participant left — they get full credit
+                            shapley_values.insert(gradient.node_id.clone(), 1.0);
+                        }
+                    } else {
+                        shapley_values.insert(gradient.node_id.clone(), 0.0);
+                    }
+                }
+                return Ok(shapley_values);
+            }
+        }
+    }
+
+    // Final fallback: equal-share when no HV data is available at all
     let equal_share = 1.0 / valid_count as f64;
     for (_, gradient) in gradients {
         if byzantine_nodes.contains(&gradient.node_id) {

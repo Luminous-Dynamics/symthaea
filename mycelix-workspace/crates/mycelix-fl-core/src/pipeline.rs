@@ -582,7 +582,10 @@ mod tests {
 
     #[test]
     fn test_pipeline_with_dp() {
-        let (updates, reps) = test_contributions(5, 0);
+        // Use 20 honest nodes: DP noise (sigma=1.0 for low_privacy) applied
+        // before detection means we need enough honest nodes that noised
+        // gradients aren't falsely flagged as Byzantine (>34% threshold).
+        let (updates, reps) = test_contributions(20, 0);
         let config = PipelineConfig {
             dp_config: Some(DifferentialPrivacyConfig::low_privacy()),
             ..Default::default()

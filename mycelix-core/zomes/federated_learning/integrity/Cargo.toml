@@ -34,9 +34,3 @@ sha2 = "0.10"
 
 # Mycelix Core Types - K-Vector, E/N/M/H Classification, Trust
 mycelix-core-types = { path = "../../../libs/mycelix-core-types", features = ["serde"] }
-
-[profile.release]
-opt-level = 'z'
-lto = true
-codegen-units = 1
-panic = 'abort'

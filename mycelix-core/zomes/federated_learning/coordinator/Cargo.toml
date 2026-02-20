@@ -47,9 +47,3 @@ default = []
 # Enable zkSTARK proof verification (simulation mode).
 # Without this feature, submit_compressed_gradient rejects all proofs (fail-closed).
 zkstark = []
-
-[profile.release]
-opt-level = 'z'
-lto = true
-codegen-units = 1
-panic = 'abort'
