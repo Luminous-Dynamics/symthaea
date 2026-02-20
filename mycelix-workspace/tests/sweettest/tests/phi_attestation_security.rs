@@ -32,7 +32,7 @@ fn build_attestation_input(
     signature: Vec<u8>,
 ) -> serde_json::Value {
     serde_json::json!({
-        "phi": phi,
+        "consciousness_level": phi,
         "cycle_id": cycle_id,
         "captured_at_us": captured_at_us,
         "signature": signature

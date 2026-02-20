@@ -111,3 +111,19 @@ path = "tests/conductor_e2e.rs"
 [[test]]
 name = "cross_cluster_bridge"
 path = "tests/cross_cluster_bridge.rs"
+
+[[test]]
+name = "phi_attestation_security"
+path = "tests/phi_attestation_security.rs"
+
+[[test]]
+name = "housing_workflow"
+path = "tests/housing_workflow.rs"
+
+[[test]]
+name = "mutualaid_workflow"
+path = "tests/mutualaid_workflow.rs"
+
+[[test]]
+name = "food_transport_workflow"
+path = "tests/food_transport_workflow.rs"
