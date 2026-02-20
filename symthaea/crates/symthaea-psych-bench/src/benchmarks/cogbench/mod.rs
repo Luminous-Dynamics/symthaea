@@ -2,6 +2,10 @@
 //!
 //! 7 experiments testing exploration, model-based reasoning, learning,
 //! temporal discounting, and risk-taking using `ActiveInferenceAgent`.
+//!
+//! All benchmarks use stochastic action sampling from the agent's softmax
+//! distribution (the standard active inference formulation) rather than
+//! greedy argmax, ensuring genuine exploration/exploitation behavior.
 
 pub mod bart;
 pub mod horizon;
@@ -10,6 +14,26 @@ pub mod probabilistic;
 pub mod restless_bandit;
 pub mod temporal_discounting;
 pub mod two_step;
+
+/// Sample an action from the FEP agent's softmax probability distribution.
+///
+/// Uses xorshift64 for deterministic, reproducible sampling. This implements
+/// the standard active inference decision procedure: actions are sampled from
+/// the softmax over negative expected free energies.
+pub(crate) fn sample_action(probabilities: &[f64], rng_state: &mut u64) -> usize {
+    *rng_state ^= *rng_state << 13;
+    *rng_state ^= *rng_state >> 7;
+    *rng_state ^= *rng_state << 17;
+    let r = (*rng_state % 10000) as f64 / 10000.0;
+    let mut cumsum = 0.0;
+    for (i, &p) in probabilities.iter().enumerate() {
+        cumsum += p;
+        if r < cumsum {
+            return i;
+        }
+    }
+    probabilities.len() - 1
+}
 
 pub use bart::BartBenchmark;
 pub use horizon::HorizonBenchmark;

@@ -5,7 +5,7 @@ pub mod config;
 pub mod report;
 
 pub use config::{AblationConfig, AblationPreset, BenchmarkConfig};
-pub use report::{BenchmarkReport, BenchmarkResult, MetricValue};
+pub use report::{BaselineComparison, BenchmarkReport, BenchmarkResult, MetricValue};
 
 /// A runnable psychological benchmark.
 pub trait PsychBenchmark {

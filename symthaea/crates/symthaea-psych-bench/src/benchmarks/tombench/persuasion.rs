@@ -1,15 +1,16 @@
 //! Persuasion story task.
 //!
 //! Tests intention tracking: one agent tries to change another's mind.
-//! The system should detect the intent to persuade by tracking
-//! WM similarity to persuasion vs neutral intent markers.
+//! The system should detect the intent to persuade by bundling the
+//! scenario context and measuring similarity to persuasion vs neutral
+//! intent markers. Uses HDC bundling for accumulated context encoding.
 
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
-use crate::wm::{WmConfig, WorkingMemory};
+use symthaea_core::hdc::ContinuousHV;
 
 /// Persuasion story benchmark.
 pub struct PersuasionBenchmark;
@@ -59,21 +60,15 @@ impl PersuasionBenchmark {
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
 
-        let mut wm = WorkingMemory::new(WmConfig {
-            dimension: dim,
-            capacity: config.working_memory_capacity,
-            ..Default::default()
-        });
+        // Bundle all scenario sentences into accumulated context
+        let context_hvs: Vec<ContinuousHV> = scenario
+            .setup
+            .iter()
+            .map(|s| adapter.encode(&Scenario::new(*s), dim))
+            .collect();
+        let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
 
-        // Present scenario
-        for sentence in &scenario.setup {
-            let hv = adapter.encode(&Scenario::new(*sentence), dim);
-            wm.perceive(hv);
-            wm.tick();
-        }
-
-        // Detect persuasion: look for intent markers in WM
-        let contents = wm.contents();
+        // Intent markers for detection
         let persuasion_marker = adapter.encode(
             &Scenario::new("wants convince persuade influence change mind"),
             dim,
@@ -83,14 +78,9 @@ impl PersuasionBenchmark {
             dim,
         );
 
-        let persuasion_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&persuasion_marker))
-            .fold(0.0f32, f32::max);
-        let neutral_sim: f32 = contents
-            .iter()
-            .map(|item| item.similarity(&neutral_marker))
-            .fold(0.0f32, f32::max);
+        // Measure context affinity to each intent marker
+        let persuasion_sim = context_bundle.similarity(&persuasion_marker);
+        let neutral_sim = context_bundle.similarity(&neutral_marker);
 
         let detected_persuasion = persuasion_sim > neutral_sim;
 

@@ -8,6 +8,7 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
+use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
 /// Two-step task benchmark measuring model-basedness.
@@ -47,7 +48,7 @@ impl TwoStepBenchmark {
         for _ in 0..num_episodes {
             // Stage 1: choose action
             let stage1_result = agent.select_action();
-            let stage1_action = stage1_result.action % 2;
+            let stage1_action = sample_action(&stage1_result.action_probabilities, &mut rng_state);
 
             // Transition: 70% common, 30% rare
             rng_state ^= rng_state << 13;

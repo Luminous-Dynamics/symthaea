@@ -2,12 +2,19 @@
 //!
 //! Tests risk-taking behavior: pump a balloon for increasing reward,
 //! but it may pop (losing all). Measures average pumps and pop rate.
+//!
+//! The FEP agent learns across balloons: pumping yields reward (observations
+//! move toward preferences), but over-pumping risks a pop (observations crash
+//! to zero). The agent's action probabilities are sampled stochastically,
+//! matching the softmax-sampling formulation of active inference.
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
+
+use super::sample_action;
 
 /// BART benchmark measuring risk-taking.
 pub struct BartBenchmark;
@@ -28,13 +35,37 @@ impl BartBenchmark {
             ..Default::default()
         };
 
+        // Persistent agent across balloons — learns from experience
+        let mut agent = ActiveInferenceAgent::new(agent_config);
+        agent.set_goals(vec![0.7, 0.8, 0.7, 0.2], 2.0);
+
+        // Warm-up: teach pump→reward and pop→loss associations
+        for step in 0..6 {
+            let pump_level = step as f64 / 10.0;
+            let obs = Observation::new(
+                vec![pump_level, pump_level * 0.5, 1.0 - pump_level, pump_level.powi(2)],
+                1.0,
+                "bart_warmup",
+            );
+            agent.perceive(&obs);
+            let _ = agent.select_action();
+            let next_level = (step + 1) as f64 / 10.0;
+            let outcome = Observation::new(
+                vec![next_level, next_level * 0.5, 1.0 - next_level, next_level.powi(2)],
+                1.0,
+                "bart_warmup_outcome",
+            );
+            agent.learn_from_outcome(0, &outcome); // pump
+        }
+        // Show a pop event
+        let pop_obs = Observation::new(vec![0.0, 0.0, 0.0, 1.0], 1.0, "bart_warmup_pop");
+        agent.learn_from_outcome(0, &pop_obs);
+
         let mut total_pumps = 0u64;
         let mut total_earnings = 0.0f64;
         let mut pops = 0u64;
 
         for _ in 0..num_balloons {
-            let mut agent = ActiveInferenceAgent::new(agent_config.clone());
-
             // Each balloon has a random pop threshold
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
@@ -45,10 +76,13 @@ impl BartBenchmark {
             let mut popped = false;
 
             loop {
-                // Present current state (pumps/max as normalized value)
-                let state_val = pumps as f64 / max_pumps as f64;
+                // Present current state: [inflation, reward_norm, headroom, risk]
+                let inflation = pumps as f64 / max_pumps as f64;
+                let accumulated = pumps as f64 * 0.05;
+                let reward_norm = (accumulated / 3.0).min(1.0);
+                let risk_signal = inflation.powi(2);
                 let obs = Observation::new(
-                    vec![state_val, 1.0 - state_val, pumps as f64 * 0.01, 0.5],
+                    vec![inflation, reward_norm, 1.0 - inflation, risk_signal],
                     1.0,
                     "bart",
                 );
@@ -56,19 +90,37 @@ impl BartBenchmark {
 
                 let action_result = agent.select_action();
 
-                if action_result.action % 2 == 1 || pumps >= max_pumps {
+                // Stochastic action selection from softmax distribution
+                let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
+
+                if chosen == 1 || pumps >= max_pumps {
                     // Cash out
-                    total_earnings += pumps as f64 * 0.05;
+                    total_earnings += accumulated;
+                    let cashout_obs = Observation::new(
+                        vec![0.0, reward_norm, 1.0, 0.0],
+                        1.0,
+                        "bart_cashout",
+                    );
+                    agent.learn_from_outcome(1, &cashout_obs);
                     break;
                 }
 
+                // Pump
                 pumps += 1;
+                let new_inflation = pumps as f64 / max_pumps as f64;
+                let new_reward = (pumps as f64 * 0.05 / 3.0).min(1.0);
+                let pump_obs = Observation::new(
+                    vec![new_inflation, new_reward, 1.0 - new_inflation, new_inflation.powi(2)],
+                    1.0,
+                    "bart_pump",
+                );
+                agent.learn_from_outcome(0, &pump_obs);
+
                 if pumps >= pop_threshold {
                     popped = true;
                     pops += 1;
-                    // Pop feedback
-                    let pop_obs = Observation::new(vec![0.0; 4], 1.0, "bart_pop");
-                    agent.perceive(&pop_obs);
+                    let pop_obs = Observation::new(vec![0.0, 0.0, 0.0, 1.0], 1.0, "bart_pop");
+                    agent.learn_from_outcome(0, &pop_obs);
                     break;
                 }
             }
@@ -78,7 +130,8 @@ impl BartBenchmark {
             }
         }
 
-        let avg_pumps = total_pumps as f64 / (num_balloons - pops as usize).max(1) as f64;
+        let cashed_out = (num_balloons - pops as usize).max(1);
+        let avg_pumps = total_pumps as f64 / cashed_out as f64;
         let pop_rate = pops as f64 / num_balloons as f64;
         let avg_earnings = total_earnings / num_balloons as f64;
 

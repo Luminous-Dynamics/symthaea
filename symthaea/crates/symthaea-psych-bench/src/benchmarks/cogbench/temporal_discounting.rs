@@ -7,6 +7,7 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
+use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
 /// Temporal discounting benchmark.
@@ -35,9 +36,11 @@ impl TemporalDiscountingBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, _trial_idx: usize) -> f64 {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let choices = Self::choice_set();
         let mut patient_count = 0u64;
+        let seed = config.trial_seed("cogbench", "discounting", trial_idx);
+        let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
 
         for (_ci, choice) in choices.iter().enumerate() {
             let agent_config = ActiveInferenceAgentConfig {
@@ -68,8 +71,9 @@ impl TemporalDiscountingBenchmark {
 
             let action_result = agent.select_action();
 
-            // Action 1 = patient (larger-later)
-            if action_result.action % 2 == 1 {
+            // Stochastic sampling; action 1 = patient (larger-later)
+            let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
+            if chosen == 1 {
                 patient_count += 1;
             }
         }
