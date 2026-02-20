@@ -852,7 +852,7 @@ impl PowerSpectrum {
         ];
         bands
             .iter()
-            .max_by(|a, b| a.0.partial_cmp(&b.0).unwrap())
+            .max_by(|a, b| a.0.total_cmp(&b.0))
             .map(|(_, band)| *band)
             .unwrap_or(FrequencyBand::Alpha)
     }
@@ -1034,7 +1034,7 @@ impl ResonanceAnalyzer {
         let dominant_frequency = self
             .oscillators
             .iter()
-            .max_by(|a, b| a.amplitude.partial_cmp(&b.amplitude).unwrap())
+            .max_by(|a, b| a.amplitude.total_cmp(&b.amplitude))
             .map(|o| o.current_frequency)
             .unwrap_or(10.0);
 

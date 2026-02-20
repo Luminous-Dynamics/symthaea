@@ -193,7 +193,7 @@ impl CoreSelf {
         });
         // Keep goals sorted by priority
         self.goals
-            .sort_by(|a, b| b.priority.partial_cmp(&a.priority).unwrap());
+            .sort_by(|a, b| b.priority.total_cmp(&a.priority));
     }
 
     /// Update context with new information

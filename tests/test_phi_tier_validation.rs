@@ -142,7 +142,7 @@ fn pearson_correlation(x: &[f64], y: &[f64]) -> f64 {
 fn spearman_correlation(x: &[f64], y: &[f64]) -> f64 {
     fn rank(values: &[f64]) -> Vec<f64> {
         let mut indexed: Vec<(usize, f64)> = values.iter().cloned().enumerate().collect();
-        indexed.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        indexed.sort_by(|a, b| a.1.total_cmp(&b.1));
 
         let mut ranks = vec![0.0; values.len()];
         for (rank, (orig_idx, _)) in indexed.iter().enumerate() {
@@ -299,7 +299,7 @@ fn test_heuristic_vs_exact_correlation() {
     }
 
     // Sort by mean Φ (descending)
-    topology_means.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    topology_means.sort_by(|a, b| b.1.total_cmp(&a.1));
 
     println!("Exact Φ ranking by topology (highest first):");
     for (rank, (topo, mean)) in topology_means.iter().enumerate() {

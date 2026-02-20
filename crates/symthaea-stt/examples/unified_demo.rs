@@ -44,7 +44,7 @@ fn compute_stats(audio: &[f32], sample_rate: f32, frame_size: usize) -> (f32, f3
     }
 
     let mut sorted = energies.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let p25 = sorted.get(sorted.len() / 4).copied().unwrap_or(0.0);
     let p75 = sorted.get(3 * sorted.len() / 4).copied().unwrap_or(0.0);

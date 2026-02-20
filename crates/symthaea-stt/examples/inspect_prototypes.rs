@@ -45,7 +45,7 @@ fn main() {
     }
 
     // Statistics
-    all_sims.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    all_sims.sort_by(|a, b| a.total_cmp(b));
     let min_sim = all_sims.first().copied().unwrap_or(0.0);
     let max_sim = all_sims.last().copied().unwrap_or(0.0);
     let mean_sim: f32 = all_sims.iter().sum::<f32>() / all_sims.len() as f32;
@@ -87,7 +87,7 @@ fn main() {
     );
 
     // Most similar pairs (potential issues)
-    similarities.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap());
+    similarities.sort_by(|a, b| b.2.total_cmp(&a.2));
     println!("\n=== MOST SIMILAR PHONEME PAIRS ===");
     println!("(Acoustically similar phonemes SHOULD be close)");
     for (p1, p2, sim) in similarities.iter().take(15) {

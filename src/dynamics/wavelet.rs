@@ -833,7 +833,7 @@ mod tests {
             .frequencies
             .iter()
             .enumerate()
-            .min_by(|a, b| (a.1 - 10.0).abs().partial_cmp(&(b.1 - 10.0).abs()).unwrap())
+            .min_by(|a, b| (a.1 - 10.0).abs().total_cmp(&(b.1 - 10.0).abs()))
             .map(|(i, _)| i)
             .unwrap();
 

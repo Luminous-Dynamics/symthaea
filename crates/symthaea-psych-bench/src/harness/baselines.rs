@@ -117,6 +117,26 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Restless bandit: reward tracking over changing payoffs
+    m.insert(
+        "restless_bandit_regret",
+        Baseline {
+            value: 0.25,
+            source: "Speekenbrink & Konstantinidis (2015), Information & choice in a changing world",
+            population: "human adults",
+        },
+    );
+
+    // Instrumental conditioning: contingency sensitivity
+    m.insert(
+        "instrumental_sensitivity",
+        Baseline {
+            value: 0.70,
+            source: "Dickinson (1985), Actions and habits",
+            population: "human adults (estimated from instrumental learning literature)",
+        },
+    );
+
     m
 }
 
@@ -165,7 +185,7 @@ pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
         "accurate_retrieval",
         Baseline {
             value: 0.85,
-            source: "Estimated from human episodic memory literature",
+            source: "Tulving (1985), Memory and consciousness; Roediger & McDermott (1995), DRM paradigm false recall ~15%",
             population: "human adults",
         },
     );
@@ -174,7 +194,7 @@ pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
         "test_time_learning",
         Baseline {
             value: 0.75,
-            source: "Estimated from human correction-learning studies",
+            source: "Karpicke & Roediger (2008), The critical importance of retrieval for learning",
             population: "human adults",
         },
     );

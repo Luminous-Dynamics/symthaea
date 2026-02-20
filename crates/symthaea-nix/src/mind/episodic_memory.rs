@@ -136,7 +136,7 @@ impl NixEpisodicMemory {
             })
             .collect();
 
-        scored.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+        scored.sort_by(|a, b| b.0.total_cmp(&a.0));
         scored.into_iter().take(limit).map(|(_, ep)| ep).collect()
     }
 
@@ -192,7 +192,7 @@ impl NixEpisodicMemory {
         self.episodes.sort_by(|a, b| {
             let imp_a = a.prediction_error * a.phi_at_encoding;
             let imp_b = b.prediction_error * b.phi_at_encoding;
-            imp_b.partial_cmp(&imp_a).unwrap()
+            imp_b.total_cmp(&imp_a)
         });
 
         // Keep only max_episodes

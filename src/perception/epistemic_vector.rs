@@ -263,7 +263,7 @@ impl EpistemicSemanticVector {
     pub fn primary_uncertainty(&self) -> Option<&UncertaintySource> {
         self.uncertainty_sources
             .iter()
-            .max_by(|a, b| a.contribution().partial_cmp(&b.contribution()).unwrap())
+            .max_by(|a, b| a.contribution().total_cmp(&b.contribution()))
     }
 
     /// Create a builder for more complex construction

@@ -596,7 +596,7 @@ impl ProspectiveMemory {
                 .intentions
                 .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| a.priority.partial_cmp(&b.priority).unwrap())
+                .min_by(|(_, a), (_, b)| a.priority.total_cmp(&b.priority))
                 .map(|(i, _)| i)
             {
                 if self.intentions[min_idx].priority < priority {
@@ -643,7 +643,7 @@ impl ProspectiveMemory {
         self.intentions
             .iter()
             .filter(|i| !i.completed)
-            .max_by(|a, b| a.priority.partial_cmp(&b.priority).unwrap())
+            .max_by(|a, b| a.priority.total_cmp(&b.priority))
     }
 
     /// Completion rate

@@ -6,7 +6,9 @@
 //! speaker's intent and the listener's reaction as separate ContinuousHV
 //! embeddings, then detect faux pas via intent-reaction divergence.
 
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
@@ -16,6 +18,7 @@ use crate::harness::PsychBenchmark;
 /// Faux-pas recognition benchmark.
 pub struct FauxPasBenchmark;
 
+#[allow(dead_code)]
 struct FauxPasScenario {
     /// The statement made by the speaker.
     statement: &'static str,
@@ -62,6 +65,7 @@ impl FauxPasBenchmark {
     }
 
     /// Lightweight trial: HDC geometry only.
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
@@ -92,7 +96,7 @@ impl FauxPasBenchmark {
     /// For faux pas: negative reaction → agent detects blunder → action 1 (repair)
     /// For non-faux-pas: positive reaction → agent stays calm → action 0 (continue)
     #[cfg(feature = "symthaea-backend")]
-    fn run_trial_full(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial_full(&self, _config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         use super::applied_tom::{make_observation, predict_behavior, social_agent};
 
         let scenarios = Self::scenarios();
@@ -130,16 +134,9 @@ impl FauxPasBenchmark {
         (accuracy, confidence)
     }
 
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
-        #[cfg(feature = "symthaea-backend")]
-        {
-            let (acc, _) = self.run_trial_full(config, trial_idx);
-            return acc;
-        }
-        #[cfg(not(feature = "symthaea-backend"))]
-        {
-            return self.run_trial_lightweight(config, trial_idx);
-        }
+        self.run_trial_lightweight(config, trial_idx)
     }
 }
 

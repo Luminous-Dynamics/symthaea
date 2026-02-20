@@ -236,7 +236,7 @@ impl AudioSentinel {
         // Find best match
         let (best_name, best_sim) = similarities
             .iter()
-            .max_by(|(_, a), (_, b)| a.combined.partial_cmp(&b.combined).unwrap())
+            .max_by(|(_, a), (_, b)| a.combined.total_cmp(&b.combined))
             .map(|(n, s)| (n.clone(), s.combined))
             .unwrap_or(("Unknown".to_string(), 0.0));
 

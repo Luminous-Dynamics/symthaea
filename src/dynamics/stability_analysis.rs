@@ -1329,7 +1329,7 @@ mod tests {
         assert_eq!(eigs.len(), 3);
 
         let mut reals: Vec<f64> = eigs.iter().map(|(re, _)| *re).collect();
-        reals.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        reals.sort_by(|a, b| a.total_cmp(b));
 
         assert!((reals[0] - (-3.0)).abs() < 1e-6);
         assert!((reals[1] - (-2.0)).abs() < 1e-6);

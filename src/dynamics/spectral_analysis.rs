@@ -942,7 +942,7 @@ mod tests {
             .iter()
             .enumerate()
             .skip(1) // skip DC
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap()
             .0;
         assert!(
@@ -1123,7 +1123,7 @@ mod tests {
             .iter()
             .enumerate()
             .skip(1)
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap()
             .0;
 

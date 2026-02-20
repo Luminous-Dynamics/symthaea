@@ -345,11 +345,11 @@ impl ConflictMatrix {
         let total_entropy = Self::compute_entropy(&conflicts);
         let dominant = conflicts
             .iter()
-            .max_by(|a, b| a.magnitude.partial_cmp(&b.magnitude).unwrap())
+            .max_by(|a, b| a.magnitude.total_cmp(&b.magnitude))
             .map(|c| (c.theory_a, c.theory_b));
         let dominant_kind = conflicts
             .iter()
-            .max_by(|a, b| a.magnitude.partial_cmp(&b.magnitude).unwrap())
+            .max_by(|a, b| a.magnitude.total_cmp(&b.magnitude))
             .map(|c| c.kind);
 
         Self {

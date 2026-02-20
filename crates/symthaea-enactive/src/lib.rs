@@ -1061,7 +1061,7 @@ impl EmbodiedSimulator {
                     .iter()
                     .any(|c| context.contains(c) || c.contains(context))
             })
-            .max_by(|a, b| a.reliability.partial_cmp(&b.reliability).unwrap())
+            .max_by(|a, b| a.reliability.total_cmp(&b.reliability))
     }
 
     /// Get number of learned schemas

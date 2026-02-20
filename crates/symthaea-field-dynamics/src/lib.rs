@@ -500,7 +500,7 @@ impl ConsciousnessFieldAnalyzer {
         let max_idx = amplitudes
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .map(|(i, _)| i)
             .unwrap_or(0);
 
@@ -780,7 +780,7 @@ impl ConsciousnessFieldAnalyzer {
         let dominant_mode = self
             .standing_waves
             .iter()
-            .max_by(|a, b| a.stability.partial_cmp(&b.stability).unwrap())
+            .max_by(|a, b| a.stability.total_cmp(&b.stability))
             .cloned();
 
         ResonanceReport {

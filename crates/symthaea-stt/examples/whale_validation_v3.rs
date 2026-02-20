@@ -109,7 +109,7 @@ fn compute_signal_stats(audio: &[f32], sample_rate: f32, frame_size: usize) -> S
         .sqrt();
 
     let mut sorted_e = energies.clone();
-    sorted_e.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted_e.sort_by(|a, b| a.total_cmp(b));
     let energy_median = sorted_e.get(sorted_e.len() / 2).copied().unwrap_or(0.0);
 
     let tk_mean = tk_energies.iter().sum::<f32>() / tk_energies.len().max(1) as f32;

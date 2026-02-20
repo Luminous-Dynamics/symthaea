@@ -10,17 +10,21 @@
 //! updated. The test checks whether the system predicts based on the
 //! character's belief rather than reality.
 
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
+#[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
 /// False belief benchmark (Sally-Anne paradigm).
 pub struct FalseBeliefBenchmark;
 
 /// A single false-belief scenario.
+#[allow(dead_code)]
 struct FalseBeliefScenario {
     /// Setup sentences (agent observes object location).
     setup: Vec<&'static str>,
@@ -81,6 +85,7 @@ impl FalseBeliefBenchmark {
     }
 
     /// Lightweight trial: HDC geometry only (no FEP).
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
@@ -124,7 +129,7 @@ impl FalseBeliefBenchmark {
     /// Sally wants to find marble → set_goals prefers basket-area obs
     /// select_action() → should return action 0 (go-to-basket) based on false beliefs
     #[cfg(feature = "symthaea-backend")]
-    fn run_trial_full(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial_full(&self, _config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         use super::applied_tom::{inject_belief, predict_behavior, social_agent};
 
         let scenarios = Self::scenarios();
@@ -153,16 +158,9 @@ impl FalseBeliefBenchmark {
         (accuracy, confidence)
     }
 
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
-        #[cfg(feature = "symthaea-backend")]
-        {
-            let (acc, _confidence) = self.run_trial_full(config, trial_idx);
-            return acc;
-        }
-        #[cfg(not(feature = "symthaea-backend"))]
-        {
-            return self.run_trial_lightweight(config, trial_idx);
-        }
+        self.run_trial_lightweight(config, trial_idx)
     }
 }
 
