@@ -308,7 +308,7 @@ pub mod soul;
 // Language processing (enabled - core modules, advanced gated behind full_language)
 pub mod language;
 
-// School: learning (enabled - with stub lookahead when full feature disabled)
+// School: anticipatory curriculum learning with CfC lookahead, mastery tracking
 pub mod school;
 
 // Physiology (enabled - social coherence and hormone modeling)
