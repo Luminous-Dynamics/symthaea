@@ -2,7 +2,13 @@
 //!
 //! Tests `SocialCoherence` module with mental model tracking,
 //! belief/desire/intention attribution via 5 task types.
+//!
+//! When the `symthaea-backend` feature is enabled, each benchmark uses
+//! the FEP `ActiveInferenceAgent` to predict *behavior* from mental states
+//! (Applied ToM), proving behavioral reasoning that LLMs lack.
 
+#[cfg(feature = "symthaea-backend")]
+pub mod applied_tom;
 pub mod false_belief;
 pub mod faux_pas;
 pub mod hinting;

@@ -257,6 +257,40 @@ impl PsychBenchmark for ButlinIndicatorSuite {
             }
         }
 
+        // When symthaea-backend is enabled, run the ablation matrix and add
+        // ablation results as additional metrics proving indicators are load-bearing.
+        #[cfg(feature = "symthaea-backend")]
+        {
+            let ablation_results = super::ablation::run_ablation_matrix(config);
+            for ar in &ablation_results {
+                let prefix = format!("ablation::{}", ar.name);
+                result.insert(
+                    format!("{}::baseline_indicator", prefix),
+                    MetricValue::from_samples(&[ar.baseline_indicator_score]),
+                );
+                result.insert(
+                    format!("{}::ablated_indicator", prefix),
+                    MetricValue::from_samples(&[ar.ablated_indicator_score]),
+                );
+                result.insert(
+                    format!("{}::baseline_accuracy", prefix),
+                    MetricValue::from_samples(&[ar.baseline_benchmark_accuracy]),
+                );
+                result.insert(
+                    format!("{}::ablated_accuracy", prefix),
+                    MetricValue::from_samples(&[ar.ablated_benchmark_accuracy]),
+                );
+                result.insert(
+                    format!("{}::indicator_dropped", prefix),
+                    MetricValue::from_samples(&[if ar.indicator_dropped { 1.0 } else { 0.0 }]),
+                );
+                result.insert(
+                    format!("{}::benchmark_degraded", prefix),
+                    MetricValue::from_samples(&[if ar.benchmark_degraded { 1.0 } else { 0.0 }]),
+                );
+            }
+        }
+
         result.conditions = 14;
         result.trials_per_condition = 1;
         result.elapsed_ms = start.elapsed().as_millis() as u64;

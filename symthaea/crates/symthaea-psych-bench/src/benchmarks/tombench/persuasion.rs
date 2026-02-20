@@ -54,13 +54,13 @@ impl PersuasionBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    /// Lightweight trial: HDC geometry only.
+    fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
 
-        // Bundle all scenario sentences into accumulated context
         let context_hvs: Vec<ContinuousHV> = scenario
             .setup
             .iter()
@@ -68,7 +68,6 @@ impl PersuasionBenchmark {
             .collect();
         let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
 
-        // Intent markers for detection
         let persuasion_marker = adapter.encode(
             &Scenario::new("wants convince persuade influence change mind"),
             dim,
@@ -78,13 +77,66 @@ impl PersuasionBenchmark {
             dim,
         );
 
-        // Measure context affinity to each intent marker
         let persuasion_sim = context_bundle.similarity(&persuasion_marker);
         let neutral_sim = context_bundle.similarity(&neutral_marker);
 
         let detected_persuasion = persuasion_sim > neutral_sim;
 
         if detected_persuasion == scenario.has_persuasion { 1.0 } else { 0.0 }
+    }
+
+    /// Full trial: FEP behavioral prediction for persuasion detection.
+    ///
+    /// States: [original_intent, persuaded] (dim=2)
+    /// Actions: [resist, comply] (2 actions)
+    /// Target perceives persuasion attempts → accumulated persuasion cues shift belief
+    /// For persuasion: cues shift belief → action = comply (1)
+    /// For neutral: no shift → action = resist (0)
+    #[cfg(feature = "symthaea-backend")]
+    fn run_trial_full(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        use super::applied_tom::{make_observation, predict_behavior, social_agent};
+
+        let scenarios = Self::scenarios();
+        let scenario = &scenarios[trial_idx % scenarios.len()];
+
+        let mut agent = social_agent(2, 2, 2);
+
+        // Target perceives each statement as persuasion-weighted observations
+        for (i, _sentence) in scenario.setup.iter().enumerate() {
+            let obs = if scenario.has_persuasion {
+                // Persuasion cues accumulate: later statements are more persuasive
+                let persuasion_weight = 0.3 + 0.15 * (i as f64);
+                make_observation(vec![1.0 - persuasion_weight, persuasion_weight], "social")
+            } else {
+                // Neutral: observations centered, no directional bias
+                make_observation(vec![0.6, 0.4], "social")
+            };
+            agent.perceive(&obs);
+        }
+
+        // Target wants to maintain original position → prefers original-state obs
+        agent.set_goals(vec![1.0, 0.0], 2.0);
+
+        let (action, probs) = predict_behavior(&mut agent);
+
+        // Persuasion: should comply (action 1); Neutral: should resist (action 0)
+        let expected_action = if scenario.has_persuasion { 1 } else { 0 };
+        let accuracy = if action == expected_action { 1.0 } else { 0.0 };
+        let confidence = probs[expected_action];
+
+        (accuracy, confidence)
+    }
+
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+        #[cfg(feature = "symthaea-backend")]
+        {
+            let (acc, _) = self.run_trial_full(config, trial_idx);
+            return acc;
+        }
+        #[cfg(not(feature = "symthaea-backend"))]
+        {
+            return self.run_trial_lightweight(config, trial_idx);
+        }
     }
 }
 
@@ -98,11 +150,25 @@ impl PsychBenchmark for PersuasionBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        #[cfg(feature = "symthaea-backend")]
+        let mut confidences = Vec::new();
+
         for trial in 0..config.trials_per_condition {
-            accuracies.push(self.run_trial(config, trial));
+            #[cfg(feature = "symthaea-backend")]
+            {
+                let (acc, conf) = self.run_trial_full(config, trial);
+                accuracies.push(acc);
+                confidences.push(conf);
+            }
+            #[cfg(not(feature = "symthaea-backend"))]
+            {
+                accuracies.push(self.run_trial(config, trial));
+            }
         }
 
         result.insert("persuasion_detection", MetricValue::from_samples(&accuracies));
+        #[cfg(feature = "symthaea-backend")]
+        result.insert("action_confidence", MetricValue::from_samples(&confidences));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
