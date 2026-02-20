@@ -666,11 +666,8 @@ pub struct CognitiveLoopService {
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
     carryover: CycleCarryover,
 
-    /// Σ (Sigma) — Synergistic integration tracker (Layer 2).
-    /// Fed with HDC state snapshots each cycle; computed every N cycles.
-    synergistic_integration: symthaea_core::consciousness_metrics::SynergisticIntegration,
-
-    /// Spectral MIP Finder — O(n³) MIP search via Fiedler ordering (Layer 2+).
+    /// Spectral MIP Finder — O(n³) MIP search via Fiedler ordering (Layer 2).
+    /// Replaces SynergisticIntegration: 128 dims, Fiedler + bordered Cholesky.
     /// Fed with HDC state snapshots each cycle; computed every 50 cycles.
     spectral_mip_finder: symthaea_core::consciousness_metrics::SpectralMIPFinder,
 
