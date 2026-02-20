@@ -237,6 +237,11 @@ impl ConsciousnessPrimitiveProcessor {
         }
     }
 
+    /// Borrow the underlying primitive system (needed by PrimitiveLattice construction).
+    pub fn primitive_system(&self) -> &PrimitiveSystem {
+        &self.primitive_system
+    }
+
     /// Get all primitives from the system
     fn get_all_primitives(&self) -> Vec<&Primitive> {
         let tiers = [

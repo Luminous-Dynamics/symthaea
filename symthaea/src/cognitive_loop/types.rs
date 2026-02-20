@@ -56,6 +56,10 @@ pub(crate) struct CycleCarryover {
     /// Σ is only computed every N cycles, so we cache the most recent value
     /// for use by subsystems (memory coordinator, consciousness gating) in between.
     pub(crate) last_sigma: Option<f64>,
+    /// Number of detected causal chains (cached from last analysis, every 50 cycles).
+    pub(crate) causal_chain_count: usize,
+    /// Temporal continuity ratio (0.0–1.0, cached from last analysis, every 100 cycles).
+    pub(crate) temporal_continuity: f64,
 }
 
 impl Default for CycleCarryover {
@@ -79,6 +83,8 @@ impl Default for CycleCarryover {
             consciousness_level: 0.0,
             subsystem_lr_factor: 1.0,
             last_sigma: None,
+            causal_chain_count: 0,
+            temporal_continuity: 0.0,
         }
     }
 }
@@ -323,6 +329,17 @@ pub struct CycleMetadata {
     /// Phi estimate from primitive consciousness decomposition (0.0 when off).
     pub primitive_phi: f64,
 
+    /// Number of causal chains detected by temporal analyzer (0 when off).
+    pub temporal_causal_chains: usize,
+    /// Temporal continuity ratio (0.0–1.0, 0.0 when off).
+    pub temporal_continuity: f64,
+    /// Longest causal chain length (0 when off).
+    pub temporal_max_chain_length: usize,
+    /// Primitive lattice height (depth of cognitive integration, 0 when off).
+    pub lattice_height: usize,
+    /// Primitive lattice width (max parallelism at any level, 0 when off).
+    pub lattice_width: usize,
+
     /// Whether metacognitive monitoring detected a Phi trajectory anomaly.
     pub metacognitive_anomaly: bool,
 
@@ -454,6 +471,8 @@ pub struct ModuleTimings {
     pub hierarchical_free_energy: u64,
     pub resonator_recall: u64,
     pub support_intelligence: u64,
+    pub temporal_analyzer: u64,
+    pub primitive_lattice: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

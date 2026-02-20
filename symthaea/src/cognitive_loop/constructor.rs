@@ -371,6 +371,17 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional temporal analyzer + lattice (co-gated with primitive consciousness)
+        let (temporal_analyzer, primitive_lattice) = if let Some(ref processor) = primitive_processor {
+            let analyzer = crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer::new(0.3);
+            let lattice = crate::consciousness::primitive_lattice::PrimitiveLattice::from_primitive_system(
+                processor.primitive_system(),
+            );
+            (Some(analyzer), Some(lattice))
+        } else {
+            (None, None)
+        };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -561,6 +572,8 @@ impl CognitiveLoopService {
             phi_attention,
             negation_detector,
             primitive_processor,
+            temporal_analyzer,
+            primitive_lattice,
             value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop::default(),
             #[cfg(feature = "support")]
             support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),

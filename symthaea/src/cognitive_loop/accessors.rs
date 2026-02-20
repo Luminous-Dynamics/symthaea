@@ -889,4 +889,14 @@ impl CognitiveLoopService {
     pub fn latest_psi_attestation(&self) -> Option<&super::PsiAttestationRecord> {
         self.psi_attestation_buffer.back()
     }
+
+    /// Borrow the temporal primitives analyzer (if enabled).
+    pub fn temporal_analyzer(&self) -> Option<&crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer> {
+        self.temporal_analyzer.as_ref()
+    }
+
+    /// Borrow the primitive lattice (if enabled).
+    pub fn primitive_lattice(&self) -> Option<&crate::consciousness::primitive_lattice::PrimitiveLattice> {
+        self.primitive_lattice.as_ref()
+    }
 }

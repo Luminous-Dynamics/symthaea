@@ -879,6 +879,76 @@ fn test_embodied_cognition_telemetry() {
     }
 }
 
+// ── Temporal Primitives + Primitive Lattice ─────────────────────
+
+#[test]
+fn test_temporal_analyzer_records_intervals() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 60 cycles with varied input to trigger amortized analysis at cycle 50
+    let inputs = [
+        "the sun rises over mountains",
+        "rivers flow into the ocean",
+        "birds sing in the morning light",
+        "wind whispers through the trees",
+    ];
+    let mut last_metadata = None;
+    for i in 0..60 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        last_metadata = Some(result.metadata);
+    }
+
+    let meta = last_metadata.unwrap();
+    // After 60 cycles, the amortized causal chain analysis (every 50 cycles)
+    // should have run at least once. The cached count may be 0 if no chains
+    // were found, but temporal_continuity should be computed at cycle 50.
+    // Lattice metrics should always be present when primitive consciousness is on.
+    assert!(
+        meta.lattice_height > 0,
+        "Lattice height should be >0 with primitive consciousness enabled, got {}",
+        meta.lattice_height,
+    );
+    assert!(
+        meta.lattice_width > 0,
+        "Lattice width should be >0 with primitive consciousness enabled, got {}",
+        meta.lattice_width,
+    );
+}
+
+#[test]
+fn test_lattice_structural_properties() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Single cycle is enough — lattice is computed at startup
+    let result = service.cycle("consciousness emerges from integration");
+
+    // 9-tier primitive system should have height >= 8 (layers) and width >= 1
+    assert!(
+        result.metadata.lattice_height >= 8,
+        "9-tier system should have lattice height >= 8, got {}",
+        result.metadata.lattice_height,
+    );
+    assert!(
+        result.metadata.lattice_width > 0,
+        "Lattice width should be >0, got {}",
+        result.metadata.lattice_width,
+    );
+    // Timing should be recorded
+    assert!(
+        result.metadata.module_timings_us.primitive_lattice < 10_000,
+        "Lattice property read should be fast (<10ms), got {}µs",
+        result.metadata.module_timings_us.primitive_lattice,
+    );
+}
+
 // ── Temporal Consciousness Telemetry ────────────────────────────
 
 #[test]

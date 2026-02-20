@@ -1713,6 +1713,102 @@ impl CognitiveLoopService {
         };
 
         // ═══════════════════════════════════════════════════════════════════════
+        // TEMPORAL PRIMITIVES: Allen's Interval Algebra on conscious states
+        // Records conscious intervals each cycle; amortized causal chain detection
+        // and continuity analysis. Science: Allen (1983), Varela (1999).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (temporal_causal_chains, temporal_continuity, temporal_max_chain_length) =
+            if let Some(ref mut analyzer) = self.temporal_analyzer {
+                // Record this cycle as a conscious interval
+                let timestamp = self.stats.total_cycles as f64 * 0.02; // 50Hz → seconds
+                use crate::consciousness::temporal_primitives::{
+                    ConsciousInterval, PhiTrend, TemporalInterval,
+                };
+                let mut ti = TemporalInterval::new(
+                    format!("c{}", self.stats.total_cycles),
+                    timestamp,
+                    timestamp + 0.02,
+                ).unwrap_or_else(|_| {
+                    // Fallback for cycle 0 where start==0.0, end==0.02 (always valid)
+                    TemporalInterval::new("c_fallback", 0.0, 0.02).unwrap()
+                });
+                ti.phi = Some(unified_psi);
+                let mut interval = ConsciousInterval::new(
+                    ti,
+                    unified_psi,
+                    coherence as f64,
+                    if self.stats.total_cycles > 0 { 0.5 } else { 0.0 },
+                );
+                interval.phi_trend = if unified_psi > self.carryover.consciousness_level + 0.01 {
+                    PhiTrend::Rising
+                } else if unified_psi < self.carryover.consciousness_level - 0.01 {
+                    PhiTrend::Falling
+                } else {
+                    PhiTrend::Stable
+                };
+                interval.content = Some(hv16_cached.clone());
+                analyzer.add_interval(interval);
+
+                // Amortized analysis: causal chains every 50 cycles
+                let chains = if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                    let detected = analyzer.detect_causal_chains(3);
+                    let count = detected.len();
+                    let max_len = detected.iter().map(|c| c.intervals.len()).max().unwrap_or(0);
+                    self.carryover.causal_chain_count = count;
+                    (count, max_len)
+                } else {
+                    (self.carryover.causal_chain_count, 0)
+                };
+
+                // Amortized analysis: continuity every 100 cycles
+                let continuity = if self.stats.total_cycles % 100 == 0 && self.stats.total_cycles > 0 {
+                    let analysis = analyzer.analyze_continuity();
+                    self.carryover.temporal_continuity = analysis.continuity_score;
+                    analysis.continuity_score
+                } else {
+                    self.carryover.temporal_continuity
+                };
+
+                (chains.0, continuity, chains.1)
+            } else {
+                (0, 0.0, 0)
+            };
+        module_timings.temporal_analyzer = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Temporal continuity → prediction confidence (stable time-axis = reliable predictions)
+        if temporal_continuity > 0.7 {
+            let boost = ((temporal_continuity - 0.7) * 0.05) as f32; // up to +1.5%
+            self.prediction_confidence = (self.prediction_confidence + boost).min(1.0);
+        }
+
+        // FEEDBACK: Causal chain detection → confidence boost (the system found real structure)
+        if temporal_causal_chains > 2 {
+            let chain_boost = (temporal_causal_chains.min(10) as f32 - 2.0) * 0.005; // +0.5% per chain, up to +4%
+            self.prediction_confidence = (self.prediction_confidence + chain_boost).min(1.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PRIMITIVE LATTICE: Structural metrics from tier system
+        // Computed once at startup; just read height/width per cycle for telemetry.
+        // Science: Davey & Priestley (2002) — lattice theory for knowledge systems
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (lattice_height, lattice_width) = if let Some(ref lattice) = self.primitive_lattice {
+            let props = lattice.properties();
+            // FEEDBACK: Lattice height (integration depth) → LR modulation
+            // Deeper lattice = more hierarchical structure = slower but more stable learning
+            if props.height > 5 {
+                let depth_factor = 1.0 - (props.height.min(9) as f32 - 5.0) * 0.01; // -1% per level above 5
+                self.carryover.subsystem_lr_factor *= depth_factor;
+            }
+            (props.height, props.width)
+        } else {
+            (0, 0)
+        };
+        module_timings.primitive_lattice = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut res_mem) = self.resonator_memory {
@@ -3164,6 +3260,11 @@ impl CognitiveLoopService {
             hierarchical_total_free_energy,
             phi_attention_avg,
             primitive_phi,
+            temporal_causal_chains,
+            temporal_continuity,
+            temporal_max_chain_length,
+            lattice_height,
+            lattice_width,
             metacognitive_anomaly,
             safety_blocked: false,
             safety_category: None,
