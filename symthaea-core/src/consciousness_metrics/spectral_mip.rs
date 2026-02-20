@@ -328,84 +328,17 @@ fn reorder_matrix(matrix: &[f64], n: usize, order: &[usize]) -> Vec<f64> {
 ///   cut_mi[k] = mi_left[k] + mi_right[k]
 ///
 /// Uses O(k²) bordered Cholesky per step → O(n³) total.
+/// Left and right sweeps run in parallel via `rayon::join`.
 fn sweep_contiguous_cuts(cov: &[f64], n: usize) -> Vec<f64> {
     if n < 2 {
         return vec![];
     }
 
-    // ─── Left sweep: grow block from left ───
-    // l_factors[k] stores the flat lower-triangular Cholesky factor for cov[0..=k, 0..=k]
-    let mut left_ln_det = vec![0.0f64; n];
-    let mut left_sum_ln_var = vec![0.0f64; n];
-    // We store the Cholesky factor as a flat Vec growing incrementally
-    let mut left_factor: Vec<f64> = Vec::with_capacity(n * n);
-
-    // k=0: single element
-    let d0 = cov[0].max(1e-30);
-    left_factor.push(d0.sqrt());
-    left_ln_det[0] = d0.sqrt().ln() * 2.0;
-    left_sum_ln_var[0] = d0.ln();
-
-    for k in 1..n {
-        // Extract column: cov[0..k, k]
-        let col: Vec<f64> = (0..k).map(|i| cov[i * n + k]).collect();
-        let diag = cov[k * n + k];
-
-        let (x, l_new) = bordered_cholesky_step(&left_factor, k, &col, diag);
-
-        // Append new row to factor: [x[0], x[1], ..., x[k-1], l_new]
-        // The factor is stored as rows of increasing size: row 0 has 1 elem, row 1 has 2, etc.
-        // Actually, let's store as a flat (k+1)×(k+1) lower triangular in row-major with stride (k+1).
-        // But that's complex to maintain. Instead, store rows packed: row i has i+1 elements.
-        left_factor.extend_from_slice(&x);
-        left_factor.push(l_new);
-
-        left_ln_det[k] = left_ln_det[k - 1] + 2.0 * l_new.max(1e-300).ln();
-        left_sum_ln_var[k] = left_sum_ln_var[k - 1] + cov[k * n + k].max(1e-30).ln();
-    }
-
-    // ─── Right sweep: grow block from right ───
-    let mut right_ln_det = vec![0.0f64; n];
-    let mut right_sum_ln_var = vec![0.0f64; n];
-    let mut right_factor: Vec<f64> = Vec::with_capacity(n * n);
-
-    // k=n-1: single element (rightmost)
-    let dn = cov[(n - 1) * n + (n - 1)].max(1e-30);
-    right_factor.push(dn.sqrt());
-    right_ln_det[n - 1] = dn.sqrt().ln() * 2.0;
-    right_sum_ln_var[n - 1] = dn.ln();
-
-    // Grow rightward: for position p from n-2 down to 0, the right block is [p..n-1]
-    // We build incrementally: at step s, the block has s+1 elements (indices n-1-s..n-1)
-    for s in 1..n {
-        let p = n - 1 - s; // the new element to add
-        // The right block so far is [p+1..n-1], reindexed as 0..s-1
-        // New column: cov[p+1..n-1, p] reindexed relative to the existing right block
-        // The existing right block is ordered [n-1, n-2, ..., p+1] (reversed, since we built from right)
-        // Actually, let's be precise: the right factor covers elements in the order they were added:
-        // step 0: element n-1
-        // step 1: element n-2
-        // ...
-        // step s: element p = n-1-s
-        //
-        // So the sub-covariance for the right block uses elements in reverse order.
-        // Element at right-index r corresponds to original index (n-1-r).
-        let col: Vec<f64> = (0..s)
-            .map(|r| {
-                let orig_r = n - 1 - r;
-                cov[orig_r * n + p]
-            })
-            .collect();
-        let diag = cov[p * n + p];
-
-        let (x, l_new) = bordered_cholesky_step(&right_factor, s, &col, diag);
-
-        right_factor.extend_from_slice(&x);
-        right_factor.push(l_new);
-
-        right_ln_det[p] = right_ln_det[p + 1] + 2.0 * l_new.max(1e-300).ln();
-        right_sum_ln_var[p] = right_sum_ln_var[p + 1] + cov[p * n + p].max(1e-30).ln();
-    }
+    // Left and right sweeps are independent — run in parallel.
+    let ((left_ln_det, left_sum_ln_var), (right_ln_det, right_sum_ln_var)) = rayon::join(
+        || sweep_left(cov, n),
+        || sweep_right(cov, n),
+    );
 
     // ─── Combine: for cut at k, left = [0..=k], right = [k+1..n-1] ───
     let mut cut_mis = Vec::with_capacity(n - 1);
@@ -424,6 +357,68 @@ fn sweep_contiguous_cuts(cov: &[f64], n: usize) -> Vec<f64> {
     }
 
     cut_mis
+}
+
+/// Left sweep: grow Cholesky factor from index 0 → n-1.
+fn sweep_left(cov: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
+    let mut ln_det = vec![0.0f64; n];
+    let mut sum_ln_var = vec![0.0f64; n];
+    let mut factor: Vec<f64> = Vec::with_capacity(n * (n + 1) / 2);
+
+    let d0 = cov[0].max(1e-30);
+    factor.push(d0.sqrt());
+    ln_det[0] = d0.sqrt().ln() * 2.0;
+    sum_ln_var[0] = d0.ln();
+
+    for k in 1..n {
+        let col: Vec<f64> = (0..k).map(|i| cov[i * n + k]).collect();
+        let diag = cov[k * n + k];
+
+        let (x, l_new) = bordered_cholesky_step(&factor, k, &col, diag);
+
+        factor.extend_from_slice(&x);
+        factor.push(l_new);
+
+        ln_det[k] = ln_det[k - 1] + 2.0 * l_new.max(1e-300).ln();
+        sum_ln_var[k] = sum_ln_var[k - 1] + cov[k * n + k].max(1e-30).ln();
+    }
+
+    (ln_det, sum_ln_var)
+}
+
+/// Right sweep: grow Cholesky factor from index n-1 → 0.
+fn sweep_right(cov: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
+    let mut ln_det = vec![0.0f64; n];
+    let mut sum_ln_var = vec![0.0f64; n];
+    let mut factor: Vec<f64> = Vec::with_capacity(n * (n + 1) / 2);
+
+    let dn = cov[(n - 1) * n + (n - 1)].max(1e-30);
+    factor.push(dn.sqrt());
+    ln_det[n - 1] = dn.sqrt().ln() * 2.0;
+    sum_ln_var[n - 1] = dn.ln();
+
+    for s in 1..n {
+        let p = n - 1 - s;
+        // Right block elements in order added: [n-1, n-2, ..., p+1]
+        // Element at right-index r → original index (n-1-r)
+        let col: Vec<f64> = (0..s)
+            .map(|r| {
+                let orig_r = n - 1 - r;
+                cov[orig_r * n + p]
+            })
+            .collect();
+        let diag = cov[p * n + p];
+
+        let (x, l_new) = bordered_cholesky_step(&factor, s, &col, diag);
+
+        factor.extend_from_slice(&x);
+        factor.push(l_new);
+
+        ln_det[p] = ln_det[p + 1] + 2.0 * l_new.max(1e-300).ln();
+        sum_ln_var[p] = sum_ln_var[p + 1] + cov[p * n + p].max(1e-30).ln();
+    }
+
+    (ln_det, sum_ln_var)
 }
 
 /// Bordered Cholesky update: extend a k×k Cholesky factor by one row/column.

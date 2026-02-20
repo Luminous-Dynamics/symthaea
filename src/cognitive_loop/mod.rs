@@ -566,6 +566,10 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     causal_explainer: Option<crate::consciousness::causal_explanation::CausalExplainer>,
 
+    /// Context-aware optimizer: dynamic Φ/Harmonic/Epistemic weighting by reasoning context.
+    /// Co-gated with `enable_primitive_consciousness`.
+    context_optimizer: Option<crate::consciousness::context_aware_evolution::ContextAwareOptimizer>,
+
     /// Dissipative consciousness: Prigogine thermodynamic model for consciousness.
     /// Tracks entropy production, order parameters, and criticality distance.
     /// Co-gated with `enable_primitive_consciousness`.
@@ -632,6 +636,10 @@ pub struct CognitiveLoopService {
     /// Σ (Sigma) — Synergistic integration tracker (Layer 2).
     /// Fed with HDC state snapshots each cycle; computed every N cycles.
     synergistic_integration: symthaea_core::consciousness_metrics::SynergisticIntegration,
+
+    /// Spectral MIP Finder — O(n³) MIP search via Fiedler ordering (Layer 2+).
+    /// Fed with HDC state snapshots each cycle; computed every 50 cycles.
+    spectral_mip_finder: symthaea_core::consciousness_metrics::SpectralMIPFinder,
 
     /// Soul: Seven Harmonies value alignment for moral evaluation.
     /// When present, evaluates action alignment against core values

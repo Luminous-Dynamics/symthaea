@@ -93,6 +93,10 @@ harness = false
 name = "consciousness_benchmarks"
 harness = false
 
+[[bench]]
+name = "spectral_mip"
+harness = false
+
 [features]
 default = ["simd"]
 embeddings = []       # Enable embedding model integration

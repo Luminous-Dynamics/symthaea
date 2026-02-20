@@ -1987,17 +1987,41 @@ impl CognitiveLoopService {
         // Science: Tononi (2004), Koch (2012) — multi-dimensional consciousness.
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        let consciousness_profile_composite = if self.stats.total_cycles % 10 == 0
-            && self.primitive_processor.is_some()
-        {
-            let profile = crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
-                &[hv16_cached],
-            );
-            profile.composite
-        } else {
-            0.0
-        };
+        // Maintain ring buffer of last 4 BinaryHVs for multi-component profile
+        self.carryover.recent_hvs.push(hv16_cached.clone());
+        if self.carryover.recent_hvs.len() > 4 {
+            self.carryover.recent_hvs.remove(0);
+        }
+        let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count) =
+            if self.stats.total_cycles % 10 == 0 && self.primitive_processor.is_some() {
+                let profile =
+                    crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
+                        &self.carryover.recent_hvs,
+                    );
+                let composite = profile.composite;
+                // Dimension synergies: discover non-linear interactions between consciousness dims
+                let synergy =
+                    crate::consciousness::dimension_synergies::SynergyProfile::from_base(profile);
+                (composite, synergy.enhanced_composite, synergy.emergent_properties.len())
+            } else {
+                (0.0, 0.0, 0)
+            };
         module_timings.consciousness_profile = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CONTEXT-AWARE EVOLUTION: Dynamic Φ/Harmonic/Epistemic weighting
+        // Detects reasoning context from input text and adjusts objective weights.
+        // Runs every cycle (keyword match is O(1) in input length).
+        // Science: Gigerenzer (2007) — ecological rationality, context-adaptive reasoning.
+        // ═══════════════════════════════════════════════════════════════════════
+        let (reasoning_context, context_phi_weight) =
+            if let Some(ref optimizer) = self.context_optimizer {
+                let ctx = optimizer.detect_context(input, None);
+                let weights = optimizer.get_weights_for_context(&ctx);
+                (ctx.description().to_string(), weights.phi_weight)
+            } else {
+                (String::new(), 0.0)
+            };
 
         // ═══════════════════════════════════════════════════════════════════════
         // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
@@ -3765,6 +3789,21 @@ impl CognitiveLoopService {
             self.carryover.last_sigma // Use cached value between computations
         };
 
+        // ═══════════════════════════════════════════════════════════════════════
+        // SPECTRAL MIP — O(n³) Fiedler-ordered MIP search (Layer 2+)
+        // Feed HDC state snapshot and compute every 50 cycles (interleaved with Sigma).
+        // ═══════════════════════════════════════════════════════════════════════
+        self.spectral_mip_finder.push(&encoding_result.hdv);
+        let spectral_mip_phi = if self.stats.total_cycles % 50 == 0 {
+            let phi = self.spectral_mip_finder.compute().map(|r| r.phi);
+            if phi.is_some() {
+                self.carryover.last_spectral_mip_phi = phi;
+            }
+            phi
+        } else {
+            self.carryover.last_spectral_mip_phi
+        };
+
         // Soul experience integration: feed cycle outcome back into value learning.
         // This closes the loop: Soul evaluates alignment (pre-cycle) → cognitive cycle
         // → integrate experience (post-cycle) → Soul's essence evolves.
@@ -3844,6 +3883,10 @@ impl CognitiveLoopService {
             value_evaluator_score,
             value_evaluator_decision,
             consciousness_profile_composite,
+            synergy_enhanced_composite,
+            emergent_properties_count,
+            reasoning_context,
+            context_phi_weight,
             harmonic_field_coherence,
             harmonic_love_resonance,
             harmonic_interferences,
@@ -3876,6 +3919,7 @@ impl CognitiveLoopService {
             support_federation_graduated,
             support_efe,
             sigma,
+            spectral_mip_phi,
             resonator_codebook_size: self.resonator_memory.as_ref()
                 .and_then(|m| m.resonator.codebooks.first())
                 .map(|cb| cb.len())
