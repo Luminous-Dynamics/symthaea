@@ -935,19 +935,33 @@ impl CognitiveLoopService {
         self.dissipative_consciousness.as_ref()
     }
 
-    // epistemic_conflict_detector accessor removed — field lives in reasoning_engine feature gate.
+    /// Borrow the epistemic conflict detector (if enabled).
+    pub fn epistemic_conflict_detector(
+        &self,
+    ) -> Option<&crate::consciousness::epistemic_conflict::ConflictDetector> {
+        self.epistemic_conflict_detector.as_ref()
+    }
 
     /// Borrow the consciousness equation v2 (if enabled).
-    pub fn consciousness_equation_v2(&self) -> Option<&crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
+    pub fn consciousness_equation_v2(
+        &self,
+    ) -> Option<&crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
         self.consciousness_equation_v2.as_ref()
     }
 
     /// Borrow the hierarchical LTC (if enabled).
-    pub fn hierarchical_ltc(&self) -> Option<&crate::consciousness::hierarchical_ltc::HierarchicalLTC> {
+    pub fn hierarchical_ltc(
+        &self,
+    ) -> Option<&crate::consciousness::hierarchical_ltc::HierarchicalLTC> {
         self.hierarchical_ltc.as_ref()
     }
 
-    // theory_calibrator accessor removed — field lives in reasoning_engine feature gate.
+    /// Borrow the theory calibrator (if enabled).
+    pub fn theory_calibrator(
+        &self,
+    ) -> Option<&crate::consciousness::epistemic_conflict::TheoryCalibrator> {
+        self.theory_calibrator.as_ref()
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // EXPERIENCE BUS: Principled signals + Seven Harmonies

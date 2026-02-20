@@ -2232,9 +2232,33 @@ impl CognitiveLoopService {
         // Science: IIT (Tononi 2015), GWT (Baars 1988), AST (Graziano 2013).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        // Epistemic conflict detection runs via reasoning_engine when enabled.
-        // Without reasoning_engine, defaults to zero (no multi-theory conflict analysis).
-        let (epistemic_phi_eff, epistemic_conflict_count) = (0.0, 0_usize);
+        let (epistemic_phi_eff, epistemic_conflict_count) =
+            if let (Some(ref mut detector), Some(ref calibrator)) =
+                (&mut self.epistemic_conflict_detector, &self.theory_calibrator)
+            {
+                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                    use crate::consciousness::epistemic_conflict::{
+                        compute_phi_eff, ConflictMatrix, MultiTheoryMetrics,
+                    };
+                    let metrics = MultiTheoryMetrics {
+                        phi: unified_psi,
+                        gwt: coherence as f64 * 0.8,
+                        ast: coherence as f64,
+                        pp: 1.0 - prediction_error as f64,
+                        rpt: coherence as f64 * 0.9,
+                        embodiment: self.carryover.body_phi_modulation,
+                        unified: unified_psi,
+                    };
+                    let matrix: ConflictMatrix = detector.detect(&metrics);
+                    let phi_eff_result = compute_phi_eff(&metrics, calibrator);
+                    self.carryover.last_phi_eff = phi_eff_result.phi_eff;
+                    (phi_eff_result.phi_eff, matrix.conflicts.len())
+                } else {
+                    (self.carryover.last_phi_eff, 0)
+                }
+            } else {
+                (0.0, 0)
+            };
         module_timings.epistemic_conflict = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════

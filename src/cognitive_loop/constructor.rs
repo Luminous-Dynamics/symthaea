@@ -418,22 +418,21 @@ impl CognitiveLoopService {
             None
         };
 
-        // Build optional dissipative consciousness + equation v2 + hierarchical LTC
-        // (co-gated with primitive consciousness)
-        let (dissipative_consciousness, consciousness_equation_v2, hierarchical_ltc) =
+        // Build optional dissipative consciousness + epistemic conflict + equation v2 + hierarchical LTC
+        // (all co-gated with primitive consciousness — NO feature gate)
+        let (dissipative_consciousness, epistemic_conflict_detector, theory_calibrator,
+             consciousness_equation_v2, hierarchical_ltc) =
             if primitive_processor.is_some() {
                 let dc = crate::consciousness::dissipative_consciousness::DissipativeConsciousness::new();
+                let cd = crate::consciousness::epistemic_conflict::ConflictDetector::new();
+                let tc = crate::consciousness::epistemic_conflict::TheoryCalibrator::new();
                 let eq = crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2::new();
                 let hltc = crate::consciousness::hierarchical_ltc::HierarchicalLTC::minimal_network()
-                    .ok(); // Use minimal (4 circuits) for per-cycle cost; None on failure
-                (Some(dc), Some(eq), hltc)
+                    .ok();
+                (Some(dc), Some(cd), Some(tc), Some(eq), hltc)
             } else {
-                (None, None, None)
+                (None, None, None, None, None)
             };
-        // Build optional epistemic conflict detector + theory calibrator
-        // (co-gated with primitive consciousness + reasoning_engine feature)
-        // Epistemic conflict detector + theory calibrator are gated behind reasoning_engine feature.
-        // When reasoning_engine is enabled, they're built inside the reasoning engine itself.
 
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
@@ -636,6 +635,8 @@ impl CognitiveLoopService {
             phi_validation,
             causal_explainer,
             dissipative_consciousness,
+            epistemic_conflict_detector,
+            theory_calibrator,
             consciousness_equation_v2,
             hierarchical_ltc,
             value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop::default(),
