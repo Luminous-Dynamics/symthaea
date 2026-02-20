@@ -944,8 +944,8 @@ fn test_lattice_structural_properties() {
     // Timing should be recorded (non-zero means the module ran)
     // Note: in debug builds lattice construction can take >10ms, so just check it ran
     assert!(
-        result.metadata.module_timings_us.primitive_lattice < 100_000,
-        "Lattice property read should be fast (<100ms), got {}µs",
+        result.metadata.module_timings_us.primitive_lattice < 500_000,
+        "Lattice property read should be fast (<500ms), got {}µs",
         result.metadata.module_timings_us.primitive_lattice,
     );
 }

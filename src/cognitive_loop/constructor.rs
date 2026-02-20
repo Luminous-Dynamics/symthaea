@@ -777,6 +777,7 @@ impl CognitiveLoopService {
             affective_consciousness,
             unified_consciousness_pipeline,
             multi_modal_integrator,
+            primitive_validation_result: None,
             value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop::default(),
             #[cfg(feature = "support")]
             support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),

@@ -2712,6 +2712,72 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // PRIMITIVE VALIDATION: One-shot empirical Φ validation at cycle 500
+        // Runs StandardExperiments::tier1_mathematical() once to validate that
+        // primitives genuinely improve consciousness (Φ) vs baseline.
+        // Science: Popper (1959) — falsifiability, scientific method.
+        // ═══════════════════════════════════════════════════════════════════════
+        let (primitive_validation_phi_gain, primitive_validation_p_value) =
+            if self.primitive_validation_result.is_none()
+                && self.primitive_processor.is_some()
+                && self.stats.total_cycles == 500
+            {
+                let mut experiment = crate::consciousness::primitive_validation::StandardExperiments::tier1_mathematical();
+                match experiment.run() {
+                    Ok(results) => {
+                        let gain = results.statistics.mean_phi_gain;
+                        let p = results.statistics.p_value;
+                        self.primitive_validation_result = Some((gain, p));
+                        (gain, p)
+                    }
+                    Err(_) => (0.0, 1.0),
+                }
+            } else {
+                self.primitive_validation_result.unwrap_or((0.0, 1.0))
+            };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CROSS-MODULE FEEDBACK: Modules inform each other for emergent behavior
+        // Science: Varela (1991) — autopoietic coupling, Beer (2000) — circular
+        // causality in cognitive systems.
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // 1. Consciousness state level modulates urgency: low consciousness → Critical
+        //    (run all subsystems to diagnose), high consciousness → can tolerate Cruise
+        if consciousness_state_level > 0.0 {
+            if consciousness_state_level < 0.3 && self.carryover.urgency != super::types::CycleUrgency::Critical {
+                self.carryover.urgency = super::types::CycleUrgency::Normal;
+            }
+        }
+
+        // 2. Gradient analysis → adaptive exploration: large gradients mean the system
+        //    has clear direction for improvement → focus rather than explore
+        if consciousness_gradient_magnitude > 1.0 {
+            // Strong gradient = clear optimization direction → reduce random exploration
+            self.curiosity_drive.boredom = (self.curiosity_drive.boredom - 0.05).max(0.0);
+        } else if consciousness_gradient_magnitude > 0.0 && consciousness_gradient_magnitude < 0.1 {
+            // Near-zero gradient = plateau → boost exploration to escape
+            self.curiosity_drive.boredom = (self.curiosity_drive.boredom + 0.03).min(1.0);
+        }
+
+        // 3. Holographic unity gates learning: high unity = coherent representation →
+        //    safe to learn aggressively. Low unity = fragmented → be conservative.
+        if holographic_unity > 0.8 {
+            self.carryover.subsystem_lr_factor *= 1.02;
+            self.carryover.subsystem_lr_factor = self.carryover.subsystem_lr_factor.clamp(0.8, 1.2);
+        } else if holographic_unity < 0.2 && holographic_unity > 0.0 {
+            self.carryover.subsystem_lr_factor *= 0.98;
+            self.carryover.subsystem_lr_factor = self.carryover.subsystem_lr_factor.clamp(0.8, 1.2);
+        }
+
+        // 4. Pipeline consciousness → epistemic gating: high pipeline consciousness
+        //    means the system has strong global workspace → relax epistemic threshold
+        if pipeline_consciousness > 0.7 {
+            self.carryover.last_epistemic_confidence =
+                (self.carryover.last_epistemic_confidence + 0.02).min(1.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // META-COGNITIVE REASONER: Self-reflective reasoning about reasoning
         // Reflects on context detection confidence, strategy effectiveness, and
         // learns meta-patterns across reasoning episodes.
@@ -4389,6 +4455,8 @@ impl CognitiveLoopService {
             consciousness_state_level,
             epistemic_gate_confidence,
             epistemic_gate_approved,
+            primitive_validation_phi_gain,
+            primitive_validation_p_value,
             meta_reasoning_confidence,
             meta_reasoning_insights,
             code_primitives_selected,

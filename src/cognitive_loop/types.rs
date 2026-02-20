@@ -506,6 +506,11 @@ pub struct CycleMetadata {
     /// Whether epistemic gate approved the current cycle's action.
     pub epistemic_gate_approved: bool,
 
+    /// Primitive validation: mean Φ gain from standard experiment (0.0 until validated).
+    pub primitive_validation_phi_gain: f64,
+    /// Primitive validation: statistical p-value (1.0 until validated).
+    pub primitive_validation_p_value: f64,
+
     /// Meta-cognitive reasoning confidence (0.0–1.0, 0.5 when off or not evaluated).
     pub meta_reasoning_confidence: f64,
     /// Number of meta-learning insights discovered this cycle.

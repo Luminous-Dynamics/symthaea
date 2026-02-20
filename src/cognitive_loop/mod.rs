@@ -667,6 +667,10 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`. Very expensive — runs rarely.
     multi_objective_evolution: Option<crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution>,
 
+    /// Cached primitive validation results (one-shot at cycle 500).
+    /// Validates whether mathematical primitives actually improve Φ.
+    primitive_validation_result: Option<(f64, f64)>, // (mean_phi_gain, p_value)
+
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
     /// that modulates future moral scores as a self-correcting mechanism.
