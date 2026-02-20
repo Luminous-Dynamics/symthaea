@@ -60,6 +60,12 @@ pub(crate) struct CycleCarryover {
     pub(crate) causal_chain_count: usize,
     /// Temporal continuity ratio (0.0–1.0, cached from last analysis, every 100 cycles).
     pub(crate) temporal_continuity: f64,
+    /// Last harmonic field coherence (cached, updated every 10 cycles).
+    pub(crate) last_harmonic_coherence: f64,
+    /// Last value evaluator overall score (cached, updated every 20 cycles).
+    pub(crate) last_value_score: f64,
+    /// Last epistemic quality score (cached, updated every 50 cycles).
+    pub(crate) last_epistemic_quality: f64,
 }
 
 impl Default for CycleCarryover {
@@ -85,6 +91,9 @@ impl Default for CycleCarryover {
             last_sigma: None,
             causal_chain_count: 0,
             temporal_continuity: 0.0,
+            last_harmonic_coherence: 0.0,
+            last_value_score: 0.0,
+            last_epistemic_quality: 0.0,
         }
     }
 }
@@ -340,6 +349,38 @@ pub struct CycleMetadata {
     /// Primitive lattice width (max parallelism at any level, 0 when off).
     pub lattice_width: usize,
 
+    // ── Session 1: Compositionality + Value Evaluator ──────────────────────
+    /// Total compositions registered in the compositionality engine (0 when off).
+    pub compositionality_total: usize,
+    /// Unified value evaluator overall score (0.0–1.0, 0.0 when off).
+    pub value_evaluator_score: f64,
+    /// Value evaluator decision this cycle ("" when off).
+    pub value_evaluator_decision: String,
+
+    // ── Session 2: Consciousness Profile + Harmonics ───────────────────────
+    /// Multi-dimensional consciousness composite score (0.0 when off).
+    pub consciousness_profile_composite: f64,
+    /// Harmonic field coherence — geometric mean of all 7 harmonics (0.0 when off).
+    pub harmonic_field_coherence: f64,
+    /// Infinite Love resonance — emergent unity measure (0.0 when off).
+    pub harmonic_love_resonance: f64,
+    /// Number of harmonic interference patterns detected (0 when off).
+    pub harmonic_interferences: usize,
+
+    // ── Session 3: Primitive Reasoning + Adaptive Reasoning ────────────────
+    /// Primitive reasoner confidence (0.0–1.0, 0.0 when off).
+    pub reasoning_chain_confidence: f32,
+    /// Primitive reasoner chain depth (0 when off).
+    pub reasoning_chain_depth: usize,
+    /// Adaptive reasoner total Phi from RL-guided chain (0.0 when off).
+    pub adaptive_reasoning_phi: f64,
+
+    // ── Session 4: Epistemic Tiers + Phi Validation ────────────────────────
+    /// Epistemic quality score from 3-axis classification (0.0–1.0, 0.0 when off).
+    pub epistemic_quality: f64,
+    /// Phi validation Pearson correlation (0.0 when not yet computed).
+    pub phi_validation_correlation: f64,
+
     /// Whether metacognitive monitoring detected a Phi trajectory anomaly.
     pub metacognitive_anomaly: bool,
 
@@ -473,6 +514,14 @@ pub struct ModuleTimings {
     pub support_intelligence: u64,
     pub temporal_analyzer: u64,
     pub primitive_lattice: u64,
+    pub compositionality: u64,
+    pub value_evaluator: u64,
+    pub consciousness_profile: u64,
+    pub harmonics: u64,
+    pub primitive_reasoning: u64,
+    pub adaptive_reasoning: u64,
+    pub epistemic_tiers: u64,
+    pub phi_validation: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -899,4 +899,29 @@ impl CognitiveLoopService {
     pub fn primitive_lattice(&self) -> Option<&crate::consciousness::primitive_lattice::PrimitiveLattice> {
         self.primitive_lattice.as_ref()
     }
+
+    /// Borrow the compositionality engine (if enabled).
+    pub fn compositionality_engine(&self) -> Option<&crate::consciousness::compositionality::CompositionalityEngine> {
+        self.compositionality_engine.as_ref()
+    }
+
+    /// Borrow the unified value evaluator (if enabled).
+    pub fn value_evaluator(&self) -> Option<&crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator> {
+        self.value_evaluator.as_ref()
+    }
+
+    /// Borrow the harmonic field (if enabled).
+    pub fn harmonic_field(&self) -> Option<&crate::consciousness::harmonics::HarmonicField> {
+        self.harmonic_field.as_ref()
+    }
+
+    /// Borrow the primitive reasoner (if enabled).
+    pub fn primitive_reasoner(&self) -> Option<&crate::consciousness::primitive_reasoning::PrimitiveReasoner> {
+        self.primitive_reasoner.as_ref()
+    }
+
+    /// Borrow the adaptive reasoner (if enabled).
+    pub fn adaptive_reasoner(&self) -> Option<&crate::consciousness::adaptive_reasoning::AdaptiveReasoner> {
+        self.adaptive_reasoner.as_ref()
+    }
 }

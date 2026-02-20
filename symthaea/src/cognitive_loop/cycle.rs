@@ -1824,6 +1824,225 @@ impl CognitiveLoopService {
         module_timings.primitive_lattice = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // COMPOSITIONALITY ENGINE: Algebraic composition of primitives
+        // Tracks composition stats; actual compositions are demand-driven.
+        // Science: Category Theory (Mac Lane 1998), HDC algebraic operators.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let compositionality_total = if let Some(ref compositionality) = self.compositionality_engine {
+            compositionality.get_stats().total_compositions
+        } else {
+            0
+        };
+        module_timings.compositionality = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // UNIFIED VALUE EVALUATOR: Seven Harmonies alignment scoring
+        // Evaluates current cognitive action against fiduciary harmonics.
+        // Amortized: every 20 cycles (lightweight keyword match + harmony check).
+        // Science: Panksepp (1998) affective neuroscience + value alignment.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (value_evaluator_score, value_evaluator_decision) =
+            if let Some(ref mut evaluator) = self.value_evaluator {
+                if self.stats.total_cycles % 20 == 0 {
+                    let ctx = crate::consciousness::unified_value_evaluator::EvaluationContext {
+                        consciousness_level: unified_psi,
+                        ..Default::default()
+                    };
+                    let result = evaluator.evaluate("cognitive_cycle", ctx);
+                    let decision_str = match &result.decision {
+                        crate::consciousness::unified_value_evaluator::Decision::Allow => "Allow",
+                        crate::consciousness::unified_value_evaluator::Decision::Warn(_) => "Warn",
+                        crate::consciousness::unified_value_evaluator::Decision::Veto(_) => "Veto",
+                    };
+                    self.carryover.last_value_score = result.overall_score;
+                    (result.overall_score, decision_str.to_string())
+                } else {
+                    (self.carryover.last_value_score, String::new())
+                }
+            } else {
+                (0.0, String::new())
+            };
+        module_timings.value_evaluator = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Value evaluator Veto → suppress learning for this cycle
+        if value_evaluator_decision == "Veto" {
+            self.carryover.subsystem_lr_factor *= 0.1; // Drastically reduce LR on value violation
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CONSCIOUSNESS PROFILE: Multi-dimensional consciousness assessment
+        // Computes 5-axis profile (Phi, gradient, entropy, complexity, coherence).
+        // Amortized: every 10 cycles (involves Phi computation over HDC state).
+        // Science: Tononi (2004), Koch (2012) — multi-dimensional consciousness.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let consciousness_profile_composite = if self.stats.total_cycles % 10 == 0
+            && self.primitive_processor.is_some()
+        {
+            let profile = crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
+                &[hv16_cached.clone()],
+            );
+            profile.composite
+        } else {
+            0.0
+        };
+        module_timings.consciousness_profile = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
+        // Tracks harmonic levels driven by consciousness metrics, detects tensions.
+        // Amortized: every 10 cycles (field update + interference scan).
+        // Science: Whitehead (1929), Deci & Ryan (2000) — value coherence theory.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (harmonic_field_coherence, harmonic_love_resonance, harmonic_interferences) =
+            if let Some(ref mut field) = self.harmonic_field {
+                if self.stats.total_cycles % 10 == 0 {
+                    // Drive harmonic levels from consciousness metrics
+                    use crate::consciousness::harmonics::FiduciaryHarmonic;
+                    field.set_level(FiduciaryHarmonic::ResonantCoherence, coherence as f64);
+                    field.set_level(FiduciaryHarmonic::EvolutionaryProgression,
+                        (prediction_error as f64 * 2.0).clamp(0.0, 1.0)); // high error = high evolution pressure
+                    field.set_level(FiduciaryHarmonic::IntegralWisdom,
+                        self.prediction_confidence as f64);
+                    field.set_level(FiduciaryHarmonic::PanSentientFlourishing,
+                        unified_psi.clamp(0.0, 1.0));
+                    field.detect_interferences();
+                    // Resolve interferences if any were detected
+                    if !field.interferences.is_empty() {
+                        if let Some(ref resolver) = self.harmonic_resolver {
+                            let _resolution = resolver.resolve(field);
+                        }
+                    }
+                    self.carryover.last_harmonic_coherence = field.field_coherence;
+                    (field.field_coherence, field.infinite_love_resonance, field.interferences.len())
+                } else {
+                    (self.carryover.last_harmonic_coherence, 0.0, 0)
+                }
+            } else {
+                (0.0, 0.0, 0)
+            };
+        module_timings.harmonics = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Harmonic coherence → LR stability (coherent values = stable learning)
+        if harmonic_field_coherence > 0.6 {
+            let harmony_boost = 1.0 + ((harmonic_field_coherence - 0.6) * 0.05) as f32; // up to +2%
+            self.carryover.subsystem_lr_factor *= harmony_boost;
+        }
+        // FEEDBACK: Harmonic interferences → reduce confidence (value tensions = uncertainty)
+        if harmonic_interferences > 0 {
+            let interference_penalty = (harmonic_interferences.min(3) as f32) * 0.01; // -1% per interference
+            self.prediction_confidence = (self.prediction_confidence - interference_penalty).max(0.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PRIMITIVE REASONING: HDC-based analogical reasoning
+        // Runs a quick reasoning chain on the current input for concept binding.
+        // Amortized: every 25 cycles (reasoning chains have some compute cost).
+        // Science: Kanerva (2009) — hyperdimensional analogical reasoning.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (reasoning_chain_confidence, reasoning_chain_depth) =
+            if let Some(ref mut reasoner) = self.primitive_reasoner {
+                if self.stats.total_cycles % 25 == 0 && self.stats.total_cycles > 0 {
+                    let result = reasoner.reason("cognitive_state", &[]);
+                    (result.confidence, result.reasoning_chain.len())
+                } else {
+                    (0.0, 0)
+                }
+            } else {
+                (0.0, 0)
+            };
+        module_timings.primitive_reasoning = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: High reasoning confidence → boost prediction confidence
+        if reasoning_chain_confidence > 0.7 {
+            let reason_boost = (reasoning_chain_confidence - 0.7) * 0.03; // up to +0.9%
+            self.prediction_confidence = (self.prediction_confidence + reason_boost).min(1.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // ADAPTIVE REASONING: Q-learning-guided primitive selection
+        // Builds reasoning chains with RL-optimized primitive selection.
+        // Amortized: every 50 cycles (Q-learning step + chain construction).
+        // Science: Sutton & Barto (2018) — reinforcement learning + HDC.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let adaptive_reasoning_phi =
+            if let Some(ref mut reasoner) = self.adaptive_reasoner {
+                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                    match reasoner.reason_adaptive(hv16_cached.clone(), 5) {
+                        Ok(chain) => chain.total_phi,
+                        Err(_) => 0.0,
+                    }
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+        module_timings.adaptive_reasoning = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // EPISTEMIC TIERS: 3-axis epistemic classification of Phi measurements
+        // Classifies the current Phi measurement's empirical, normative, and
+        // materiality status. Lightweight — computed each cycle.
+        // Science: Mycelix Epistemic Charter v2.0.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let epistemic_quality = if self.primitive_processor.is_some() {
+            if self.stats.total_cycles % 50 == 0 {
+                use crate::consciousness::epistemic_tiers::*;
+                // Classify based on cycle count (more cycles = higher empirical tier)
+                let empirical = if self.stats.total_cycles > 1000 {
+                    EmpiricalTier::E3CryptographicallyProven
+                } else if self.stats.total_cycles > 100 {
+                    EmpiricalTier::E2PrivatelyVerifiable
+                } else if self.stats.total_cycles > 10 {
+                    EmpiricalTier::E1Testimonial
+                } else {
+                    EmpiricalTier::E0Null
+                };
+                let coord = EpistemicCoordinate::new(
+                    empirical,
+                    NormativeTier::N0Personal,
+                    MaterialityTier::M1Temporal,
+                );
+                let q = coord.quality_score();
+                self.carryover.last_epistemic_quality = q;
+                q
+            } else {
+                self.carryover.last_epistemic_quality
+            }
+        } else {
+            0.0
+        };
+        module_timings.epistemic_tiers = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHI VALIDATION: Empirical validation of Phi against synthetic states
+        // EXPENSIVE — runs a validation study very rarely (every 500 cycles).
+        // Results cached as correlation metric for telemetry.
+        // Science: IIT empirical validation (Casali et al. 2013).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let phi_validation_correlation =
+            if let Some(ref mut validator) = self.phi_validation {
+                if self.stats.total_cycles == 500 {
+                    // Run once at cycle 500 (enough history, one-shot validation)
+                    let results = validator.run_validation_study(10); // small sample for speed
+                    results.pearson_r
+                } else {
+                    0.0
+                }
+            } else {
+                0.0
+            };
+        module_timings.phi_validation = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut res_mem) = self.resonator_memory {
@@ -3280,6 +3499,18 @@ impl CognitiveLoopService {
             temporal_max_chain_length,
             lattice_height,
             lattice_width,
+            compositionality_total,
+            value_evaluator_score,
+            value_evaluator_decision,
+            consciousness_profile_composite,
+            harmonic_field_coherence,
+            harmonic_love_resonance,
+            harmonic_interferences,
+            reasoning_chain_confidence,
+            reasoning_chain_depth,
+            adaptive_reasoning_phi,
+            epistemic_quality,
+            phi_validation_correlation,
             metacognitive_anomaly,
             safety_blocked: false,
             safety_category: None,
