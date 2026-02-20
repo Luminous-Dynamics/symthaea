@@ -74,7 +74,6 @@ pub mod stability_regime;
 
 // Epistemic conflict detection: 15 pairwise theory conflicts, typed ConflictKind,
 // reliability R, effective Φ = Φ × R^γ, calibration with bounded updates (INV-9)
-#[cfg(feature = "reasoning_engine")]
 pub mod epistemic_conflict;
 
 // Consciousness-gated tool use: risk lattice, two-signal gating (Φ_eff + confidence),

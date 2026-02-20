@@ -571,8 +571,13 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     dissipative_consciousness: Option<crate::consciousness::dissipative_consciousness::DissipativeConsciousness>,
 
-    // Note: epistemic_conflict fields removed — functionality lives in reasoning_engine feature gate.
-    // ConflictDetector and TheoryCalibrator are available via reasoning_engine::narrative when enabled.
+    /// Epistemic conflict detector: multi-theory conflict analysis (IIT vs GWT vs AST vs PP vs RPT vs 4E).
+    /// Co-gated with `enable_primitive_consciousness`.
+    epistemic_conflict_detector: Option<crate::consciousness::epistemic_conflict::ConflictDetector>,
+
+    /// Theory calibrator for Φ_eff = Φ × R^γ reliability weighting.
+    /// Co-gated with `enable_primitive_consciousness`.
+    theory_calibrator: Option<crate::consciousness::epistemic_conflict::TheoryCalibrator>,
 
     /// Master Consciousness Equation v2: unified 7-theory consciousness formula C(t).
     /// Co-gated with `enable_primitive_consciousness`.
