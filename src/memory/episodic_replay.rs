@@ -596,7 +596,7 @@ impl EpisodicMemory {
         }
 
         let mut total_loss = 0.0;
-        let mut total_phi = 0.0;
+        let mut total_psi = 0.0;
 
         for episode in &batch {
             let loss = self.replay_training_step(
@@ -606,7 +606,7 @@ impl EpisodicMemory {
                 self.config.replay_dt,
             );
             total_loss += loss;
-            total_phi += episode.psi;
+            total_psi += episode.psi;
         }
 
         // Reset replay counter and demand trigger
@@ -617,7 +617,7 @@ impl EpisodicMemory {
         // (This requires mutable access to episodes, which we'll handle by rebuilding)
         // Reconsolidation: retrieval makes memories labile, then re-stores them
         // with updated consolidation strength (biological reconsolidation model).
-        let current_phi = total_phi / batch.len().max(1) as f64;
+        let current_psi = total_psi / batch.len().max(1) as f64;
         let mut new_episodes = BinaryHeap::new();
         for mut pe in self.episodes.drain() {
             // Check if this episode was in the batch
@@ -625,7 +625,7 @@ impl EpisodicMemory {
             for be in &batch {
                 if (pe.episode.psi - be.psi).abs() < 0.001 && pe.episode.timestamp == be.timestamp {
                     pe.episode.replay_count += 1;
-                    pe.episode.reconsolidate(current_phi);
+                    pe.episode.reconsolidate(current_psi);
                     break;
                 }
             }
@@ -637,7 +637,7 @@ impl EpisodicMemory {
         ReplaySessionResult {
             episodes_replayed: n,
             average_loss: total_loss / n as f32,
-            average_psi: total_phi / n as f64,
+            average_psi: total_psi / n as f64,
             skipped: false,
         }
     }
