@@ -628,7 +628,7 @@ fn multi_cycle_stability() {
 // PROPERTY-BASED TESTS FOR COUNTERFACTUAL REASONING
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod proptest_counterfactual {
     use proptest::prelude::*;
     use std::collections::HashSet;
@@ -794,7 +794,7 @@ mod proptest_counterfactual {
 // E-VALUE SENSITIVITY ANALYSIS TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod sensitivity_analysis_tests {
     use symthaea::consciousness::counterfactual::{
         IdentificationMethod, RobustEstimate, SensitivityAnalysis,
@@ -907,7 +907,7 @@ mod sensitivity_analysis_tests {
 // PC ALGORITHM (CAUSAL DISCOVERY) TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod causal_discovery_tests {
     use symthaea::consciousness::counterfactual::{ObservationalData, PCAlgorithm};
 
@@ -1015,7 +1015,7 @@ mod causal_discovery_tests {
 // MEDIATION ANALYSIS TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod mediation_tests {
     use symthaea::consciousness::counterfactual::{
         CausalDAG, MediationAnalysis, MediationIdentification, ObservationalData,
@@ -1144,7 +1144,7 @@ mod mediation_tests {
 // EFFECT ESTIMATION TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod effect_estimation_tests {
     use symthaea::consciousness::counterfactual::{
         CausalDAG, CausalQuery, EffectEstimator, ObservationalData, RobustEstimate,
@@ -1251,7 +1251,7 @@ mod effect_estimation_tests {
 // EDGE CASE AND STRESS TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod edge_case_tests {
     use symthaea::consciousness::counterfactual::{
         CausalDAG, CausalQuery, CounterfactualReasoner, EffectEstimator, ObservationalData,
@@ -1377,7 +1377,7 @@ mod edge_case_tests {
 // INSTRUMENTAL VARIABLE TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod iv_tests {
     use symthaea::consciousness::counterfactual::{
         CausalDAG, IVEstimator, IVValidity, ObservationalData,
@@ -1485,7 +1485,7 @@ mod iv_tests {
 // TIME-SERIES CAUSAL DISCOVERY TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod time_series_tests {
     use symthaea::consciousness::counterfactual::{TimeSeriesCausalDiscovery, TimeSeriesData};
 
@@ -1578,7 +1578,7 @@ mod time_series_tests {
 // TRANSPORTABILITY TESTS
 // ==================================================================================
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 mod transportability_tests {
     use symthaea::consciousness::counterfactual::{
         CausalDAG, TransportabilityAnalyzer, TransportabilityResult,
