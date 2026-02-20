@@ -2712,6 +2712,140 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // META-COGNITIVE REASONER: Self-reflective reasoning about reasoning
+        // Reflects on context detection confidence, strategy effectiveness, and
+        // learns meta-patterns across reasoning episodes.
+        // Amortized: every 50 cycles (heavy — creates CandidatePrimitives + chain).
+        // Science: Flavell (1979), Nelson & Narens (1990) — metacognition hierarchy.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (meta_reasoning_confidence, meta_reasoning_insights) =
+            if let Some(ref mut reasoner) = self.meta_cognitive_reasoner {
+                if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
+                    // Build lightweight candidate primitives from active set
+                    let candidates: Vec<crate::consciousness::primitive_evolution::CandidatePrimitive> =
+                        active_primitive_names.iter().take(3).map(|name| {
+                            crate::consciousness::primitive_evolution::CandidatePrimitive {
+                                name: name.clone(),
+                                tier: symthaea_core::hdc::PrimitiveTier::NSM,
+                                definition: name.clone(),
+                                fitness: unified_psi,
+                                encoding: symthaea_core::hdc::BinaryHV::random(42),
+                                epistemic_coordinate: Default::default(),
+                                harmonic_alignment: 0.5,
+                            }
+                        }).collect();
+                    let mut chain = crate::consciousness::primitive_reasoning::ReasoningChain::new(
+                        hv16_cached,
+                    );
+                    match reasoner.meta_reason(input, candidates, &mut chain) {
+                        Ok(result) => (result.meta_confidence, result.meta_insights.len()),
+                        Err(_) => (0.5, 0),
+                    }
+                } else {
+                    (0.5, 0)
+                }
+            } else {
+                (0.5, 0)
+            };
+        module_timings.meta_cognitive_reasoning = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: High meta-cognitive confidence boosts learning rate
+        // Science: Nelson & Narens (1990) — monitoring-control loop
+        if meta_reasoning_confidence > 0.7 {
+            let meta_boost = (meta_reasoning_confidence - 0.7) * 0.1;
+            self.fep_lr_boost = (self.fep_lr_boost + meta_boost as f32).clamp(1.0, 2.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // CODE PRIMITIVE ROUTER: Consciousness-aware code reasoning
+        // Selects optimal code-tier primitives when input looks code-related.
+        // Amortized: every 10 cycles (lightweight O(1) lookup).
+        // Science: Plate (2003) — VSA for structured representations.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let code_primitives_selected =
+            if let Some(ref router) = self.code_primitive_router {
+                if self.stats.total_cycles % 10 == 0 {
+                    // Heuristic: detect code-related input
+                    let code_related = input.contains("code")
+                        || input.contains("function")
+                        || input.contains("debug")
+                        || input.contains("refactor")
+                        || input.contains("parse")
+                        || input.contains("compile");
+                    if code_related {
+                        let operation = if input.contains("debug") {
+                            crate::consciousness::code_primitives::CodeOperation::Debug
+                        } else if input.contains("refactor") {
+                            crate::consciousness::code_primitives::CodeOperation::Refactor
+                        } else if input.contains("parse") {
+                            crate::consciousness::code_primitives::CodeOperation::Parse
+                        } else {
+                            crate::consciousness::code_primitives::CodeOperation::Explain
+                        };
+                        router.select_primitives(operation).len()
+                    } else {
+                        0
+                    }
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+        module_timings.code_primitive_routing = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // EMPATHIC UNIFICATION: Resonant empathy via user state inference
+        // Senses user emotional state from input, generates compassion response.
+        // Amortized: every 10 cycles (lightweight keyword + inference).
+        // Science: Decety & Jackson (2004) — shared neural representations.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (empathic_compassion, empathic_tone_adj) =
+            if let Some(ref mut empathy) = self.empathic_unification {
+                if self.stats.total_cycles % 10 == 0 {
+                    let context = crate::user_state_inference::ContextKind::Task;
+                    let response = empathy.process(input, context);
+                    (response.compassion, response.patience_adjustment)
+                } else {
+                    (0.0, 0.0)
+                }
+            } else {
+                (0.0, 0.0)
+            };
+        module_timings.empathic_unification = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: High compassion slightly boosts LR (empathic learning bias)
+        if empathic_compassion > 0.7 {
+            self.carryover.subsystem_lr_factor *= 1.0 + (empathic_compassion as f32 - 0.7) * 0.02;
+            self.carryover.subsystem_lr_factor = self.carryover.subsystem_lr_factor.clamp(0.8, 1.2);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // MULTI-OBJECTIVE EVOLUTION: Pareto-frontier consciousness optimization
+        // Very expensive — runs once every 1000 cycles. Evolves primitives across
+        // 5 dimensions (Φ, ∇Φ, Entropy, Complexity, Coherence).
+        // Science: Deb et al. (2002) — NSGA-II multi-objective optimization.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let multi_obj_frontier_size =
+            if let Some(ref mut moe) = self.multi_objective_evolution {
+                if self.stats.total_cycles % 1000 == 0 && self.stats.total_cycles > 0 {
+                    match moe.evolve() {
+                        Ok(result) => result.frontier_size,
+                        Err(_) => 0,
+                    }
+                } else {
+                    0
+                }
+            } else {
+                0
+            };
+        module_timings.multi_objective_evolution = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut res_mem) = self.resonator_memory {
@@ -4212,6 +4346,9 @@ impl CognitiveLoopService {
             composition_rule_applied,
             harmonies_alignment,
             harmonies_approved,
+            empathic_compassion,
+            empathic_tone_adj,
+            multi_obj_frontier_size,
             value_evaluator_score,
             value_evaluator_decision,
             consciousness_profile_composite,
@@ -4252,6 +4389,9 @@ impl CognitiveLoopService {
             consciousness_state_level,
             epistemic_gate_confidence,
             epistemic_gate_approved,
+            meta_reasoning_confidence,
+            meta_reasoning_insights,
+            code_primitives_selected,
             metacognitive_anomaly,
             safety_blocked: false,
             safety_category: None,
