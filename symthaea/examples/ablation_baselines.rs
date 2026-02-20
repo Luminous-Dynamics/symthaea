@@ -184,7 +184,7 @@ fn run_ablation(
         initial_error,
         final_error,
         reduction_pct,
-        final_phi: service.unified_phi(),
+        final_phi: service.unified_psi(),
         learning_pct,
     }
 }

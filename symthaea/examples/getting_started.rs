@@ -399,7 +399,7 @@ fn demo_cognitive_loop() {
             let snapshot = service.consciousness_snapshot();
 
             println!("  Consciousness Snapshot:");
-            println!("    Unified Phi:        {:.4}", snapshot.unified_phi);
+            println!("    Unified Phi:        {:.4}", snapshot.unified_psi);
             println!("    Temporal Coherence: {:.4}", snapshot.temporal_coherence);
             println!("    Cognitive Depth:    {:?}", snapshot.cognitive_depth);
             println!("    In Flow State:      {}", snapshot.in_flow);

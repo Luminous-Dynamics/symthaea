@@ -134,7 +134,7 @@ fn run_phi_proxy_analysis() {
         let start = std::time::Instant::now();
         for i in 0..100 {
             let _result = service.cycle(words[i % words.len()]);
-            phi_values.push(service.unified_phi());
+            phi_values.push(service.unified_psi());
             coherence_values.push(service.temporal_coherence());
         }
         let elapsed = start.elapsed();
