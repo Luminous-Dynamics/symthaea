@@ -5,16 +5,20 @@
 //! context, then measures whether the bundled context is more
 //! consistent with the intended (non-literal) or literal meaning.
 
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
+#[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
 /// Strange story benchmark for non-literal language comprehension.
 pub struct StrangeStoryBenchmark;
 
+#[allow(dead_code)]
 struct StrangeStoryScenario {
     context: Vec<&'static str>,
     literal_meaning: &'static str,
@@ -59,6 +63,7 @@ impl StrangeStoryBenchmark {
     }
 
     /// Lightweight trial: HDC geometry only.
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, &'static str) {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
@@ -92,7 +97,7 @@ impl StrangeStoryBenchmark {
     #[cfg(feature = "symthaea-backend")]
     fn run_trial_full(
         &self,
-        config: &BenchmarkConfig,
+        _config: &BenchmarkConfig,
         trial_idx: usize,
     ) -> (f64, f64, &'static str) {
         use super::applied_tom::{make_observation, predict_behavior, social_agent};
@@ -130,16 +135,9 @@ impl StrangeStoryBenchmark {
         (accuracy, confidence, scenario.story_type)
     }
 
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, &'static str) {
-        #[cfg(feature = "symthaea-backend")]
-        {
-            let (acc, _conf, stype) = self.run_trial_full(config, trial_idx);
-            return (acc, stype);
-        }
-        #[cfg(not(feature = "symthaea-backend"))]
-        {
-            return self.run_trial_lightweight(config, trial_idx);
-        }
+        self.run_trial_lightweight(config, trial_idx)
     }
 }
 

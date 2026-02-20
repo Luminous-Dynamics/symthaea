@@ -84,7 +84,7 @@ fn compute_stats(audio: &[f32], sample_rate: f32, frame_size: usize) -> SignalSt
     }
 
     let mut sorted = energies.clone();
-    sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted.sort_by(|a, b| a.total_cmp(b));
 
     let centroid_mean = centroids.iter().sum::<f32>() / centroids.len().max(1) as f32;
     let centroid_std = (centroids
@@ -582,7 +582,7 @@ fn main() -> std::io::Result<()> {
                 scores.push((species, score));
             }
 
-            scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+            scores.sort_by(|a, b| b.1.total_cmp(&a.1));
 
             let predicted = scores.first().map(|(s, _)| *s).unwrap_or("unknown");
             let is_correct = predicted == *true_species;

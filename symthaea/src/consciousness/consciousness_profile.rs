@@ -386,7 +386,7 @@ impl ParetoFrontier {
         self.profiles.iter().min_by(|a, b| {
             let dist_a = a.distance_to(&ideal);
             let dist_b = b.distance_to(&ideal);
-            dist_a.partial_cmp(&dist_b).unwrap()
+            dist_a.total_cmp(&dist_b)
         })
     }
 
@@ -394,7 +394,7 @@ impl ParetoFrontier {
     pub fn highest_composite(&self) -> Option<&ConsciousnessProfile> {
         self.profiles
             .iter()
-            .max_by(|a, b| a.composite.partial_cmp(&b.composite).unwrap())
+            .max_by(|a, b| a.composite.total_cmp(&b.composite))
     }
 }
 

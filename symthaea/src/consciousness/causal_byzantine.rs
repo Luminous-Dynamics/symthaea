@@ -460,7 +460,7 @@ impl CausalByzantineDefense {
         }
 
         // Sort factors by causal strength
-        factors.sort_by(|a, b| b.causal_strength.partial_cmp(&a.causal_strength).unwrap());
+        factors.sort_by(|a, b| b.causal_strength.total_cmp(&a.causal_strength));
 
         // Primary cause = strongest factor
         let primary_cause = if !factors.is_empty() {

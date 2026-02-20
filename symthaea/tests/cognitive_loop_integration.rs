@@ -403,7 +403,7 @@ fn test_embodied_phi_accumulation_across_cycles() {
 
     // At least 3 unique values (state evolves, not static)
     let mut unique = embodied_mods.clone();
-    unique.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    unique.sort_by(|a, b| a.total_cmp(b));
     unique.dedup_by(|a, b| (*a - *b).abs() < 0.0001);
     assert!(
         unique.len() >= 3,

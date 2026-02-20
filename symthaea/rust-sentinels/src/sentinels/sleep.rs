@@ -444,7 +444,7 @@ impl SleepSentinel {
 
         // Find winning stage
         let (max_idx, &max_score) = scores.iter().enumerate()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap();
 
         let stage = match max_idx {

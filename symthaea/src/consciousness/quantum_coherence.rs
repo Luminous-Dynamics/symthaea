@@ -611,7 +611,7 @@ impl QuantumCoherenceAnalyzer {
         let dominant_interference = self
             .interference_patterns
             .iter()
-            .max_by(|a, b| a.visibility.partial_cmp(&b.visibility).unwrap())
+            .max_by(|a, b| a.visibility.total_cmp(&b.visibility))
             .cloned();
 
         QuantumCoherenceReport {

@@ -154,6 +154,9 @@ pub struct Symthaea {
     /// Resonant speech: user-adaptive response generation.
     /// Modulates output based on inferred cognitive load and user state.
     resonant_speech: crate::resonant_speech::ResonantSpeech,
+    /// Optional streaming inference engine for real-time sensor-driven CfC processing.
+    /// Independent of the main cognitive loop — for edge/robot deployments.
+    streaming_inference: Option<crate::inference::StreamingInference>,
 }
 
 impl Symthaea {
@@ -270,6 +273,7 @@ impl Symthaea {
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
+            streaming_inference: None,
         })
     }
 
@@ -299,6 +303,30 @@ impl Symthaea {
     /// Get a reference to the consciousness database (if configured).
     pub fn database(&self) -> Option<&dyn ConsciousnessDatabase> {
         self.database.as_ref().map(|d| d.as_ref())
+    }
+
+    /// Create a streaming inference engine for real-time sensor-driven CfC processing.
+    ///
+    /// This is independent of the main cognitive loop — suited for edge deployments,
+    /// robot control, and other scenarios needing low-latency incremental inference.
+    pub fn create_streaming_engine(
+        &mut self,
+        input_dim: usize,
+        output_dim: usize,
+    ) -> &crate::inference::StreamingInference {
+        self.streaming_inference =
+            Some(crate::inference::default_streaming(input_dim, output_dim));
+        self.streaming_inference.as_ref().unwrap()
+    }
+
+    /// Get a reference to the streaming inference engine (if created).
+    pub fn streaming_engine(&self) -> Option<&crate::inference::StreamingInference> {
+        self.streaming_inference.as_ref()
+    }
+
+    /// Get a mutable reference to the streaming inference engine (if created).
+    pub fn streaming_engine_mut(&mut self) -> Option<&mut crate::inference::StreamingInference> {
+        self.streaming_inference.as_mut()
     }
 
     /// Resume from a saved state file.
@@ -416,6 +444,7 @@ impl Symthaea {
             memory_coordinator: MemoryCoordinator::new(CoordinatorConfig::default()),
             episodic_memory: EpisodicMemory::new(EpisodicReplayConfig::default()),
             resonant_speech: crate::resonant_speech::ResonantSpeech::new(),
+            streaming_inference: None,
         })
     }
 

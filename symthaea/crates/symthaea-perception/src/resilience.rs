@@ -403,7 +403,7 @@ impl CoherenceGate {
             let avg = self.average_coherence();
             // Don't let threshold go above 90th percentile of history
             let mut sorted = self.history.clone();
-            sorted.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            sorted.sort_by(|a, b| a.total_cmp(b));
             let p10 = sorted[sorted.len() / 10];
 
             // Threshold should be between p10 and avg

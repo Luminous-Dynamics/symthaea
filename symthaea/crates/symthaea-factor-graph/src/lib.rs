@@ -648,7 +648,7 @@ impl FactorGraph {
             let (best_state, &best_val) = belief
                 .iter()
                 .enumerate()
-                .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+                .max_by(|(_, a), (_, b)| a.total_cmp(b))
                 .unwrap();
             assignment[v] = best_state;
             if best_val > 0.0 {

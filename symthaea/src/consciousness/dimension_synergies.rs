@@ -447,7 +447,7 @@ impl SynergyFrontier {
         self.profiles.iter().max_by(|a, b| {
             let a_boost = a.enhanced_composite - a.base.composite;
             let b_boost = b.enhanced_composite - b.base.composite;
-            a_boost.partial_cmp(&b_boost).unwrap()
+            a_boost.total_cmp(&b_boost)
         })
     }
 }

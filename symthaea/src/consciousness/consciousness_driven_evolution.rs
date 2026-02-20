@@ -737,7 +737,7 @@ impl ConsciousnessDrivenEvolver {
             .map(|(name, gene)| (name.clone(), gene.phi_sensitivity))
             .collect();
 
-        gene_sensitivities.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        gene_sensitivities.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         self.stats.top_sensitive_genes = gene_sensitivities.into_iter().take(5).collect();
     }

@@ -1085,7 +1085,7 @@ impl MoralAlgebra {
         // Determine winner
         let (winner, max_vote) = votes
             .iter()
-            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap())
+            .max_by(|a, b| a.1.total_cmp(b.1))
             .unwrap_or((&"neutral", &0.0));
 
         let final_verdict = match *winner {

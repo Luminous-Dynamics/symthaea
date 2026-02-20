@@ -6,16 +6,20 @@
 //! the accumulated context is more similar to the correct desire
 //! inference than to the surface-level (wrong) interpretation.
 
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::scenario::{Scenario, ScenarioAdapter};
+#[cfg(not(feature = "symthaea-backend"))]
 use crate::adapter::StimulusAdapter;
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
+#[cfg(not(feature = "symthaea-backend"))]
 use symthaea_core::hdc::ContinuousHV;
 
 /// Hinting task benchmark.
 pub struct HintingBenchmark;
 
+#[allow(dead_code)]
 struct HintingScenario {
     context: Vec<&'static str>,
     correct_inference: &'static str,
@@ -65,6 +69,7 @@ impl HintingBenchmark {
     }
 
     /// Lightweight trial: HDC geometry only.
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
@@ -104,7 +109,7 @@ impl HintingBenchmark {
     /// Observer perceives hints → accumulates desire cues via perceive()
     /// select_action() → should choose action 1 (fulfill) after accumulating hint cues
     #[cfg(feature = "symthaea-backend")]
-    fn run_trial_full(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+    fn run_trial_full(&self, _config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
         use super::applied_tom::{make_observation, predict_behavior, social_agent};
 
         let scenarios = Self::scenarios();
@@ -133,16 +138,9 @@ impl HintingBenchmark {
         (accuracy, confidence)
     }
 
+    #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
-        #[cfg(feature = "symthaea-backend")]
-        {
-            let (acc, _) = self.run_trial_full(config, trial_idx);
-            return acc;
-        }
-        #[cfg(not(feature = "symthaea-backend"))]
-        {
-            return self.run_trial_lightweight(config, trial_idx);
-        }
+        self.run_trial_lightweight(config, trial_idx)
     }
 }
 

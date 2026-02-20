@@ -430,7 +430,7 @@ impl MetaCognitiveReasoner {
             .collect();
 
         // Sort by confidence descending
-        alternatives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        alternatives.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         // Return top 3 alternatives
         alternatives.into_iter().take(3).collect()
@@ -532,7 +532,7 @@ impl MetaCognitiveReasoner {
         ));
 
         // Sort by expected fitness
-        alternatives.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+        alternatives.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         alternatives
     }

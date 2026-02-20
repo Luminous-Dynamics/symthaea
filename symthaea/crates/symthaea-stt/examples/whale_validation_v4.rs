@@ -111,7 +111,7 @@ fn compute_signal_stats(audio: &[f32], sample_rate: f32, frame_size: usize) -> S
         .sqrt();
 
     let mut sorted_e = energies.clone();
-    sorted_e.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    sorted_e.sort_by(|a, b| a.total_cmp(b));
     let energy_p25 = percentile(&sorted_e, 0.25);
     let energy_p75 = percentile(&sorted_e, 0.75);
 

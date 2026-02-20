@@ -115,7 +115,7 @@ impl WorkingMemory {
                 .items
                 .iter()
                 .enumerate()
-                .min_by(|(_, a), (_, b)| a.activation.partial_cmp(&b.activation).unwrap())
+                .min_by(|(_, a), (_, b)| a.activation.total_cmp(&b.activation))
                 .map(|(i, _)| i)
                 .unwrap();
             let evicted = self.items.remove(min_idx);
@@ -124,7 +124,7 @@ impl WorkingMemory {
 
         // Sort by activation (highest first)
         self.items
-            .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+            .sort_by(|a, b| b.activation.total_cmp(&a.activation));
     }
 
     /// Take the last evicted item, if any.
@@ -151,7 +151,7 @@ impl WorkingMemory {
             }
         }
         self.items
-            .sort_by(|a, b| b.activation.partial_cmp(&a.activation).unwrap());
+            .sort_by(|a, b| b.activation.total_cmp(&a.activation));
     }
 
     /// Get the bundled context vector — weighted bundle of all items.
@@ -173,7 +173,7 @@ impl WorkingMemory {
         self.items.iter().max_by(|a, b| {
             let sim_a = a.content.similarity(query);
             let sim_b = b.content.similarity(query);
-            sim_a.partial_cmp(&sim_b).unwrap()
+            sim_a.total_cmp(&sim_b)
         })
     }
 

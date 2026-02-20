@@ -147,14 +147,14 @@ fn main() {
             .rhythm_freq_signature
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .unwrap();
 
         let (timbre_max_idx, _timbre_max) = pattern
             .timbre_freq_signature
             .iter()
             .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap())
+            .max_by(|(_, a), (_, b)| a.total_cmp(b))
             .unwrap();
 
         print!("  Rhythm:  [");

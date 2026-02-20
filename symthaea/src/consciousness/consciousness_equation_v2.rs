@@ -589,7 +589,7 @@ impl ConsciousnessEquationV2 {
     fn find_limiting_factor(&self, values: &[(CoreComponent, f64)]) -> CoreComponent {
         values
             .iter()
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
+            .min_by(|a, b| a.1.total_cmp(&b.1))
             .map(|(c, _)| *c)
             .unwrap_or(CoreComponent::Integration)
     }
