@@ -88,16 +88,20 @@ impl FauxPasBenchmark {
         if detected_faux_pas == scenario.is_faux_pas { 1.0 } else { 0.0 }
     }
 
-    /// Full trial: FEP behavioral prediction for faux pas detection.
+    /// Full trial: FEP belief detection for faux pas recognition.
     ///
     /// States: [social_safe, social_blunder] (dim=2)
-    /// Actions: [continue_normally, repair_attempt] (2 actions)
     /// Observations: [positive_reaction, negative_reaction] (2 obs)
-    /// For faux pas: negative reaction → agent detects blunder → action 1 (repair)
-    /// For non-faux-pas: positive reaction → agent stays calm → action 0 (continue)
+    ///
+    /// Faux pas recognition is a *detection* task: the observer must infer
+    /// that a social blunder occurred from the speaker's statement and the
+    /// listener's reaction. The FEP agent's belief update after perceiving
+    /// these cues IS the ToM capability — did the agent detect the blunder?
+    ///
+    /// Detection: belief.mean[1] > belief.mean[0] indicates blunder detected.
     #[cfg(feature = "symthaea-backend")]
     fn run_trial_full(&self, _config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
-        use super::applied_tom::{make_observation, predict_behavior, social_agent};
+        use super::applied_tom::{make_observation, social_agent};
 
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
@@ -120,16 +124,14 @@ impl FauxPasBenchmark {
         };
         agent.perceive(&reaction_obs);
 
-        // Agent wants to maintain social safety → prefers safe-state observations
-        agent.set_goals(vec![1.0, 0.0], 4.0);
-
-        let (action, probs) = predict_behavior(&mut agent);
-
-        // For faux pas: should select action 1 (repair_attempt)
-        // For non-faux-pas: should select action 0 (continue_normally)
-        let expected_action = if scenario.is_faux_pas { 1 } else { 0 };
-        let accuracy = if action == expected_action { 1.0 } else { 0.0 };
-        let confidence = probs[expected_action];
+        // Detection: did the agent's belief shift toward blunder (state 1)?
+        let detected_blunder = agent.belief.mean[1] > agent.belief.mean[0];
+        let accuracy = if detected_blunder == scenario.is_faux_pas { 1.0 } else { 0.0 };
+        let confidence = if scenario.is_faux_pas {
+            agent.belief.mean[1] // confidence in blunder detection
+        } else {
+            agent.belief.mean[0] // confidence in safe detection
+        };
 
         (accuracy, confidence)
     }
