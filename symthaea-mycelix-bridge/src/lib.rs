@@ -14,7 +14,7 @@ pub mod support;
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
 use mycelix_sdk::hyperfeel::{HyperGradient, HV16_BYTES};
 use mycelix_sdk::epistemic::{EpistemicClaim, ClaimBuilder};
@@ -597,13 +597,19 @@ impl SymthaeaBackendConfig {
     }
 }
 
+/// Maximum number of recent HVs stored per node for multi-component C-Vector.
+const NODE_HV_HISTORY_CAP: usize = 4;
+
 /// Per-node consciousness state.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 struct NodeState {
     /// Last observed connectivity score for this node.
     last_connectivity: f32,
     /// Number of anomalous updates detected so far.
     anomaly_count: u32,
+    /// Recent HVs for this node (bounded ring buffer).
+    /// Used as the multi-component system for true_phi and coherence.
+    recent_hvs: VecDeque<ContinuousHV>,
 }
 
 impl Default for NodeState {
@@ -611,6 +617,7 @@ impl Default for NodeState {
         Self {
             last_connectivity: 0.5, // Neutral starting point
             anomaly_count: 0,
+            recent_hvs: VecDeque::with_capacity(NODE_HV_HISTORY_CAP),
         }
     }
 }
@@ -821,17 +828,21 @@ impl SymthaeaBackend {
             .build()
     }
 
-    /// Compute the multi-dimensional ConsciousnessVector for a hypervector.
+    /// Compute the multi-dimensional ConsciousnessVector.
+    ///
+    /// `components` is the node's recent HV history (most recent last).
+    /// With ≥2 components, true_phi and coherence become non-trivial.
     fn compute_consciousness_vector(
         &self,
-        hv: &ContinuousHV,
+        components: &[ContinuousHV],
         spectral_connectivity: f64,
         epistemic_confidence: f64,
     ) -> ConsciousnessVector {
-        let components = &[hv.clone()];
+        // Use the most recent HV for entropy (single-component metric)
+        let current_hv = components.last().expect("components must be non-empty");
 
         // Entropy: normalized Shannon entropy via TruePhiCalculator
-        let raw_entropy = self.true_phi_calculator.entropy(hv);
+        let raw_entropy = self.true_phi_calculator.entropy(current_hv);
         let max_e = self.cvector_config.max_entropy;
         let entropy = if max_e > 0.0 {
             (raw_entropy / max_e).clamp(0.0, 1.0)
@@ -929,9 +940,22 @@ impl ConsciousnessBackend for SymthaeaBackend {
         // 7. Epistemic confidence: scaled combination of connectivity and accuracy
         let epistemic_confidence = ((connectivity_after + accuracy) / 2.0).clamp(0.0, 1.0);
 
-        // 7b. Compute ConsciousnessVector
+        // 7b. Update node HV history and compute ConsciousnessVector
+        {
+            let state = self.node_states.get_mut(&node_id).unwrap();
+            if state.recent_hvs.len() >= NODE_HV_HISTORY_CAP {
+                state.recent_hvs.pop_front();
+            }
+            state.recent_hvs.push_back(hv.clone());
+        }
+        let components: Vec<ContinuousHV> = self
+            .node_states[&node_id]
+            .recent_hvs
+            .iter()
+            .cloned()
+            .collect();
         let consciousness_vector = self.compute_consciousness_vector(
-            &hv,
+            &components,
             connectivity_after as f64,
             epistemic_confidence as f64,
         );

@@ -397,30 +397,20 @@ impl HolochainCortex {
             return Ok(());
         }
 
-        #[cfg(feature = "holochain")]
-        {
-            match self.connect_real().await {
-                Ok(()) => {
-                    self.connected = true;
-                    tracing::info!("HolochainCortex connected to {}", self.config.conductor_url);
-                    return Ok(());
-                }
-                Err(e) => {
-                    tracing::warn!(
-                        "Real Holochain connection failed, falling back to mock: {}",
-                        e
-                    );
-                    self.connected = true;
-                    return Ok(());
-                }
+        match self.connect_real().await {
+            Ok(()) => {
+                self.connected = true;
+                tracing::info!("HolochainCortex connected to {}", self.config.conductor_url);
+                Ok(())
             }
-        }
-
-        #[cfg(not(feature = "holochain"))]
-        {
-            Err(CortexError::NotImplemented(
-                "Real Holochain connection requires the 'holochain' feature".into(),
-            ))
+            Err(e) => {
+                tracing::warn!(
+                    "Real Holochain connection failed, falling back to mock: {}",
+                    e
+                );
+                self.connected = true;
+                Ok(())
+            }
         }
     }
 
@@ -430,13 +420,14 @@ impl HolochainCortex {
     /// irreconcilable rmp-serde version conflict (holochain pins =1.3.0, burn requires ^1.3.1).
     /// Real Holochain integration should go through symthaea-mycelix-bridge which doesn't
     /// depend on burn. This method validates the URL and logs the connection attempt.
-    #[cfg(feature = "holochain")]
     async fn connect_real(&mut self) -> Result<(), CortexError> {
-        use std::str::FromStr;
-
-        // Validate the conductor URL
-        let _url = url::Url::from_str(&self.config.conductor_url)
-            .map_err(|e| CortexError::ConnectionError(format!("Invalid conductor URL: {}", e)))?;
+        // Validate the conductor URL (basic check — full URL parsing in bridge crate)
+        if !self.config.conductor_url.starts_with("ws://") && !self.config.conductor_url.starts_with("wss://") {
+            return Err(CortexError::ConnectionError(format!(
+                "Invalid conductor URL (expected ws:// or wss://): {}",
+                self.config.conductor_url
+            )));
+        }
 
         // Real WebSocket connection via holochain_client is in symthaea-mycelix-bridge.
         // Here we validate config and fall back to mock mode with caching.
@@ -537,26 +528,10 @@ impl HolochainCortex {
             return Ok(self.get_or_create_agent_info(agent_key));
         }
 
-        #[cfg(feature = "holochain")]
-        {
-            // When connected to a real conductor, zome calls would go here:
-            // let response = self.app_ws.call_zome(
-            //     RoleName::from("symthaea_trust"),
-            //     ZomeName::from("trust"),
-            //     FunctionName::from("get_agent_info"),
-            //     ExternIO::encode(agent_key.as_str())?,
-            // ).await?;
-            // For now, fall through to local cache
-            tracing::debug!("Holochain feature enabled but zome call not yet wired; using cache");
-            return Ok(self.get_or_create_agent_info(agent_key));
-        }
-
-        #[cfg(not(feature = "holochain"))]
-        {
-            Err(CortexError::NotImplemented(
-                "Real DHT query requires the 'holochain' feature".into(),
-            ))
-        }
+        // Real zome calls go through symthaea-mycelix-bridge.
+        // Fall through to local cache for now.
+        tracing::debug!("Zome call not yet wired; using local cache");
+        Ok(self.get_or_create_agent_info(agent_key))
     }
 
     /// Record a successful interaction with an agent

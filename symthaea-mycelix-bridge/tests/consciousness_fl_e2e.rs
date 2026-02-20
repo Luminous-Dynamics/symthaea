@@ -630,3 +630,64 @@ fn test_e2e_pogq_uses_cvector_composite() {
     assert!(composite < 0.6, "Composite should be pulled down by low true_phi, got {}", composite);
     assert!(composite > 0.0, "Composite should still be positive");
 }
+
+// =============================================================================
+// Multi-round C-Vector: true_phi activates with HV history
+// =============================================================================
+
+/// After multiple assessments of the same node, the C-Vector should have
+/// true_phi populated (requires ≥2 components from HV history).
+#[test]
+fn test_multi_round_cvector_activates_true_phi() {
+    struct TestSnapshot;
+    impl symthaea_mycelix_bridge::ModelSnapshot for TestSnapshot {
+        fn apply_update_clone(
+            &self,
+            _update: &HyperGradient,
+        ) -> symthaea_mycelix_bridge::Result<Box<dyn symthaea_mycelix_bridge::ModelSnapshot>> {
+            Ok(Box::new(TestSnapshot))
+        }
+        fn evaluate(&self) -> symthaea_mycelix_bridge::Result<(f32, f32)> {
+            Ok((0.80, 0.3))
+        }
+        fn current_accuracy(&self) -> Option<f32> {
+            Some(0.75)
+        }
+    }
+
+    let mut backend = SymthaeaBackend::new();
+
+    // Round 1: single component — true_phi should be None
+    let hg1 = make_hypergradient("multi-round-node", 1, 100);
+    let q1 = backend.assess_update(&TestSnapshot, &hg1).unwrap();
+    assert!(
+        q1.consciousness_vector.true_phi.is_none(),
+        "Round 1: true_phi should be None with only 1 component"
+    );
+
+    // Round 2: now 2 components — true_phi should be Some
+    let hg2 = make_hypergradient("multi-round-node", 2, 150);
+    let q2 = backend.assess_update(&TestSnapshot, &hg2).unwrap();
+    assert!(
+        q2.consciousness_vector.true_phi.is_some(),
+        "Round 2: true_phi should be populated with 2 HV history components"
+    );
+    let phi = q2.consciousness_vector.true_phi.unwrap();
+    assert!(phi.is_finite(), "true_phi should be finite, got {}", phi);
+
+    // Round 3: coherence should now be non-trivial (not always 1.0)
+    let hg3 = make_hypergradient("multi-round-node", 3, 200);
+    let q3 = backend.assess_update(&TestSnapshot, &hg3).unwrap();
+    assert!(q3.consciousness_vector.true_phi.is_some());
+    // With 3 diverse components, coherence should differ from 1.0
+    let coh = q3.consciousness_vector.coherence.unwrap();
+    assert!(coh < 1.0, "Coherence with 3 diverse HVs should be < 1.0, got {}", coh);
+    assert!(coh >= 0.0, "Coherence should be non-negative");
+
+    // Verify populated_count grows
+    assert!(
+        q3.consciousness_vector.populated_count() >= 5,
+        "Round 3 should have at least 5 dimensions populated, got {}",
+        q3.consciousness_vector.populated_count()
+    );
+}
