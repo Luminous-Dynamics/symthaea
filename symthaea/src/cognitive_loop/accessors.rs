@@ -940,6 +940,16 @@ impl CognitiveLoopService {
         self.evolution_coordinator.as_ref()
     }
 
+    /// Borrow the harmonies integrator (if enabled).
+    pub fn harmonies_integrator(&self) -> Option<&crate::consciousness::harmonies_integration::HarmoniesIntegrator> {
+        self.harmonies_integrator.as_ref()
+    }
+
+    /// Borrow the composition rule engine (if enabled).
+    pub fn composition_rule_engine(&self) -> Option<&crate::consciousness::primitive_composition_rules::CompositionRuleEngine> {
+        self.composition_rule_engine.as_ref()
+    }
+
     /// Borrow the semantic value embedder (if enabled).
     pub fn semantic_value_embedder(&self) -> Option<&crate::consciousness::semantic_value_embedder::SemanticValueEmbedder> {
         self.semantic_value_embedder.as_ref()

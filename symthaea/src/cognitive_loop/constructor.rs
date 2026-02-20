@@ -418,6 +418,20 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional composition rule engine (co-gated with primitive consciousness)
+        let composition_rule_engine = if primitive_processor.is_some() {
+            Some(crate::consciousness::primitive_composition_rules::CompositionRuleEngine::new())
+        } else {
+            None
+        };
+
+        // Build optional harmonies integrator (co-gated with primitive consciousness)
+        let harmonies_integrator = if primitive_processor.is_some() {
+            Some(crate::consciousness::harmonies_integration::HarmoniesIntegrator::default())
+        } else {
+            None
+        };
+
         // Build optional context-aware optimizer (co-gated with primitive consciousness)
         let context_optimizer = if primitive_processor.is_some() {
             crate::consciousness::context_aware_evolution::ContextAwareOptimizer::new(
@@ -686,6 +700,8 @@ impl CognitiveLoopService {
             adaptive_reasoner,
             phi_validation,
             causal_explainer,
+            composition_rule_engine,
+            harmonies_integrator,
             context_optimizer,
             evolution_coordinator,
             semantic_value_embedder,
