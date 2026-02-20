@@ -56,7 +56,7 @@ jobs:
           key: ${{ runner.os }}-fl-core-test-${{ hashFiles('mycelix-workspace/crates/mycelix-fl-core/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-fl-core-test-
-      - run: cargo test
+      - run: cargo test --all-features
         env:
           RUST_BACKTRACE: 1
 
@@ -80,7 +80,7 @@ jobs:
           key: ${{ runner.os }}-fl-core-clippy-${{ hashFiles('mycelix-workspace/crates/mycelix-fl-core/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-fl-core-clippy-
-      - run: cargo clippy -- -D warnings
+      - run: cargo clippy --all-features -- -D warnings
 
   benchmark:
     name: Benchmark
@@ -100,22 +100,10 @@ jobs:
           key: ${{ runner.os }}-fl-core-bench-${{ hashFiles('mycelix-workspace/crates/mycelix-fl-core/Cargo.toml') }}
           restore-keys: |
             ${{ runner.os }}-fl-core-bench-
-      - name: Run unified pipeline benchmark
+      - name: Run criterion benchmarks (quick)
+        run: cargo bench --all-features --bench aggregation_bench -- --quick
+      - name: Run unified pipeline example
         run: cargo run --example benchmark_unified_pipeline --release
-      - name: Run model training benchmark
-        run: cargo run --example benchmark_model_training --release
-      - name: Run MNIST federated benchmark
-        run: cargo run --example benchmark_mnist_federated --release
-      - name: Run meta-learning benchmark
-        run: cargo run --example benchmark_meta_learning --release
-      - name: Run privacy budget benchmark
-        run: cargo run --example benchmark_privacy_budget --release
-      - name: Run compression benchmark
-        run: cargo run --example benchmark_compression --release
-      - name: Run Byzantine sweep benchmark
-        run: cargo run --example benchmark_byzantine_sweep --release
-      - name: Run FEMNIST benchmark
-        run: cargo run --example benchmark_femnist --release
 
   holochain-bridge:
     name: Holochain Bridge
