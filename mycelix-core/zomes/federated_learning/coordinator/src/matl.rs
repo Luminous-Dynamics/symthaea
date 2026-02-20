@@ -1,7 +1,6 @@
 //! MATL SDK Integration - Proof of Gradient Quality & Byzantine Detection.
 
 use hdk::prelude::*;
-use hdk::prelude::HdkPathExt;
 use federated_learning_integrity::*;
 
 use sha2::Digest;

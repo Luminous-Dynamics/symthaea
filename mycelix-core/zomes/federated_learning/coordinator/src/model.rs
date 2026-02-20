@@ -16,6 +16,7 @@ use super::ensure_path;
 /// - No ModelConfig is registered for this round (no enforcement)
 /// - The hashes match
 /// Returns Err if both are present and they don't match.
+#[allow(dead_code)] // Designed for future wiring into submit_gradient validation path
 pub(crate) fn validate_model_version(round: u32, submitted_hash: &Option<String>) -> ExternResult<()> {
     let submitted = match submitted_hash {
         Some(h) if !h.is_empty() => h,
@@ -67,6 +68,7 @@ pub(crate) fn validate_model_version(round: u32, submitted_hash: &Option<String>
 /// Check that all gradients in a round were computed against the same model config.
 /// Used during aggregation to prevent mixing gradients from different model versions.
 /// Returns Ok(architecture_hash) if consistent, or Ok(None) if no config registered.
+#[allow(dead_code)] // Designed for future wiring into aggregation validation
 pub(crate) fn validate_round_model_consistency(round: u32) -> ExternResult<Option<String>> {
     let config_path = Path::from(format!("model_config.round.{}", round));
     let config_hash = match config_path.path_entry_hash() {

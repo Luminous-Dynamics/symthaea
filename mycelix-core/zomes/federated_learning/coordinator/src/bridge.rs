@@ -44,6 +44,7 @@ impl Default for CrossZomeRetryConfig {
 }
 
 impl CrossZomeRetryConfig {
+    #[allow(dead_code)] // Part of the designed retry API; will be used when fire-and-forget broadcasts are wired
     pub fn fire_and_forget() -> Self {
         Self {
             max_retries: 0,
@@ -88,6 +89,7 @@ impl CrossZomeCallResult {
 }
 
 /// Error type for cross-zome calls
+#[allow(dead_code)] // Part of the designed cross-zome reliability API
 #[derive(Debug, Clone)]
 pub enum CrossZomeError {
     CallFailed(String),

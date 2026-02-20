@@ -10,7 +10,6 @@
 //! - **Byzantine Detection**: Cartel detection and adaptive thresholds
 
 use hdk::prelude::*;
-use hdk::prelude::HdkPathExt;
 use federated_learning_integrity::*;
 
 // NOTE: SDK imports (mycelix_sdk::matl, hyperfeel, sha2, etc.) are now
@@ -47,38 +46,29 @@ use federated_learning_integrity::*;
 // Verify with: cargo check --target wasm32-unknown-unknown (in nix develop)
 //
 mod config;
-use config::*;
 mod auth;
-use auth::*;
 mod signals;
-use signals::*;
 mod model;
-use model::*;
-
 mod bootstrap;
-use bootstrap::*;
 mod bridge;
-use bridge::*;
 mod consensus;
-use consensus::*;
 mod detection;
-use detection::*;
 mod governance;
-use governance::*;
 mod gradients;
-use gradients::*;
 mod hyperfeel;
-use hyperfeel::*;
 mod matl;
-use matl::*;
 mod payments;
-use payments::*;
 mod pipeline;
-use pipeline::*;
 mod proof;
-use proof::*;
 mod scheduling;
-use scheduling::*;
+
+// Test modules use `use super::*` — bring needed types into scope only for tests
+#[cfg(test)]
+use config::*;
+#[cfg(test)]
+use bootstrap::*;
+#[cfg(test)]
+use signals::*;
 
 // === Path Helper (shared by all modules via super::ensure_path) ===
 
