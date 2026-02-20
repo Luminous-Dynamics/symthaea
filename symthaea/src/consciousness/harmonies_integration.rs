@@ -19,6 +19,8 @@ pub struct HarmoniesIntegrationConfig {
     pub enforce_alignment: bool,
     /// Learning rate for value updates
     pub learning_rate: f32,
+    /// Embedding dimension for harmony vectors (must match input embeddings)
+    pub dimension: usize,
 }
 
 impl Default for HarmoniesIntegrationConfig {
@@ -37,6 +39,7 @@ impl Default for HarmoniesIntegrationConfig {
             harmony_weights: weights,
             enforce_alignment: true,
             learning_rate: 0.1,
+            dimension: 512,
         }
     }
 }
@@ -144,7 +147,7 @@ impl HarmoniesIntegrator {
             Harmony::SacredReciprocity,
             Harmony::EvolutionaryProgression,
         ] {
-            harmony_embeddings.insert(harmony, ContinuousHV::random(512, 42));
+            harmony_embeddings.insert(harmony, ContinuousHV::random(config.dimension, harmony as u64 + 42));
         }
 
         Self {

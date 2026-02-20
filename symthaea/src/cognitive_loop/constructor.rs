@@ -427,7 +427,12 @@ impl CognitiveLoopService {
 
         // Build optional harmonies integrator (co-gated with primitive consciousness)
         let harmonies_integrator = if primitive_processor.is_some() {
-            Some(crate::consciousness::harmonies_integration::HarmoniesIntegrator::default())
+            Some(crate::consciousness::harmonies_integration::HarmoniesIntegrator::new(
+                crate::consciousness::harmonies_integration::HarmoniesIntegrationConfig {
+                    dimension: config.cfc_config.input_dim,
+                    ..Default::default()
+                },
+            ))
         } else {
             None
         };
