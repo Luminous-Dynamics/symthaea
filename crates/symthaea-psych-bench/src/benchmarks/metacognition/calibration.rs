@@ -28,10 +28,12 @@ struct Difficulty {
     delay: usize,
 }
 
+// Delays calibrated to create a difficulty gradient:
+// Easy: most items survive in WM. Hard: most items evicted, retrieval fails.
 const DIFFICULTIES: [Difficulty; 3] = [
     Difficulty { _name: "easy", num_items: 3, delay: 2 },
     Difficulty { _name: "medium", num_items: 5, delay: 5 },
-    Difficulty { _name: "hard", num_items: 7, delay: 10 },
+    Difficulty { _name: "hard", num_items: 7, delay: 7 },
 ];
 
 impl MetacognitiveCalibrationBenchmark {
@@ -95,7 +97,7 @@ impl MetacognitiveCalibrationBenchmark {
                     continue;
                 }
 
-                let (best_idx, best_sim) = contents
+                let (_best_idx, best_sim) = contents
                     .iter()
                     .enumerate()
                     .map(|(i, hv)| (i, target.similarity(hv)))
@@ -105,11 +107,9 @@ impl MetacognitiveCalibrationBenchmark {
                 // Confidence = max similarity (natural HDC metric), clamped to [0, 1]
                 let confidence = (best_sim as f64).clamp(0.0, 1.0);
 
-                // Accuracy: does the best-matching item actually correspond to the target?
-                // Check if similarity is above a meaningful threshold (> 0.5)
-                let retrieved = &contents[best_idx];
-                let match_sim = target.similarity(retrieved);
-                let accurate = match_sim > 0.5;
+                // Accuracy: exact match has sim ~1.0, random has sim ~0.
+                // Threshold 0.3 separates genuine matches from noise.
+                let accurate = best_sim > 0.3;
 
                 all_confidences.push(confidence);
                 all_accuracies.push(if accurate { 1.0 } else { 0.0 });

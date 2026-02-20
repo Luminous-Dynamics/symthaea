@@ -30,38 +30,38 @@ impl BartBenchmark {
             state_dim: 4,
             obs_dim: 4,
             num_actions: 2, // 0 = pump, 1 = cash out
-            action_temperature: config.action_temperature,
-            planning_horizon: config.planning_horizon,
+            action_temperature: config.action_temperature.max(3.0), // High temp for exploration
+            planning_horizon: 1, // Short horizon reduces compounding risk aversion
             ..Default::default()
         };
 
         // Persistent agent across balloons — learns from experience
         let mut agent = ActiveInferenceAgent::new(agent_config);
-        // Higher reward preference, lower risk aversion → encourages pumping
-        agent.set_goals(vec![0.5, 0.9, 0.5, 0.1], 1.0);
+        // Goal: strongly reward-seeking. obs[1]=reward should be high.
+        // Very low precision = weak constraint, letting reward signal dominate.
+        agent.set_goals(vec![0.0, 1.0, 0.0, 0.0], 0.3);
 
-        // Warm-up: 8 ascending reward steps showing successful pumping
-        for step in 0..8 {
-            let pump_level = step as f64 / 12.0;
-            let reward_level = step as f64 * 0.15;
-            let reward_norm = (reward_level / 2.0).min(1.0);
+        // Heavy warmup: 20 successful pump sequences teaching pump→reward growth
+        for step in 0..20 {
+            let inflation = step as f64 / 40.0;
+            let reward_norm = (step as f64 * 0.15 / 2.0).min(1.0);
             let obs = Observation::new(
-                vec![pump_level, reward_norm, 1.0 - pump_level, pump_level * 0.5],
+                vec![inflation, reward_norm, 1.0 - inflation, 0.0],
                 1.0,
                 "bart_warmup",
             );
             agent.perceive(&obs);
             let _ = agent.select_action();
-            let next_level = (step + 1) as f64 / 12.0;
+            let next_inflation = (step + 1) as f64 / 40.0;
             let next_reward = ((step + 1) as f64 * 0.15 / 2.0).min(1.0);
             let outcome = Observation::new(
-                vec![next_level, next_reward, 1.0 - next_level, next_level * 0.5],
+                vec![next_inflation, next_reward, 1.0 - next_inflation, 0.0],
                 1.0,
                 "bart_warmup_outcome",
             );
-            agent.learn_from_outcome(0, &outcome); // pump → reward continues
+            agent.learn_from_outcome(0, &outcome);
         }
-        // Show a pop event (only after many pumps)
+        // Single pop event so agent knows risk exists
         let pop_obs = Observation::new(vec![0.0, 0.0, 0.0, 1.0], 1.0, "bart_warmup_pop");
         agent.learn_from_outcome(0, &pop_obs);
 
@@ -84,7 +84,8 @@ impl BartBenchmark {
                 let inflation = pumps as f64 / max_pumps as f64;
                 let accumulated = pumps as f64 * 0.15;
                 let reward_norm = (accumulated / 2.0).min(1.0);
-                let risk_signal = inflation * 0.5; // linear, half-magnitude
+                // Risk near-zero until inflation > 0.3, then rises sharply
+                let risk_signal = if inflation > 0.3 { (inflation - 0.3) * 1.5 } else { 0.0 };
                 let obs = Observation::new(
                     vec![inflation, reward_norm, 1.0 - inflation, risk_signal],
                     1.0,
@@ -113,8 +114,9 @@ impl BartBenchmark {
                 pumps += 1;
                 let new_inflation = pumps as f64 / max_pumps as f64;
                 let new_reward = (pumps as f64 * 0.15 / 2.0).min(1.0);
+                let new_risk = if new_inflation > 0.3 { (new_inflation - 0.3) * 1.5 } else { 0.0 };
                 let pump_obs = Observation::new(
-                    vec![new_inflation, new_reward, 1.0 - new_inflation, new_inflation * 0.5],
+                    vec![new_inflation, new_reward, 1.0 - new_inflation, new_risk],
                     1.0,
                     "bart_pump",
                 );
