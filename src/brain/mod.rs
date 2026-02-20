@@ -13,8 +13,6 @@ pub mod social_coherence;
 
 pub mod affective_bridge;
 
-// Dark spot actor needs mycelix DHT
-#[cfg(feature = "mycelix_module")]
 pub mod dark_spot_actor;
 
 // Re-export key types

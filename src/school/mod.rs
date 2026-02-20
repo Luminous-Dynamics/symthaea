@@ -105,12 +105,7 @@ mod curriculum_loader;
 mod objective;
 mod reality_check;
 
-// Lookahead needs CfCNetwork API alignment (cfg-gated)
-#[cfg(feature = "school_lookahead")]
 mod lookahead;
-
-// Coherence bridge depends on physiology module (cfg-gated)
-#[cfg(feature = "physiology_module")]
 mod coherence_bridge;
 
 pub use assessment::{
@@ -122,93 +117,8 @@ pub use curriculum_loader::{CurriculumLoader, CurriculumSpec, LoadError, Objecti
 pub use objective::{Difficulty, Domain, LearningObjective, ObjectiveBuilder};
 pub use reality_check::{CorrectionStrategy, RealityCheckResult, RealityChecker};
 
-#[cfg(feature = "school_lookahead")]
 pub use lookahead::{LearningRecommendation, LookaheadEngine, LookaheadResult};
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// STUB IMPLEMENTATIONS (when school_lookahead feature is disabled)
-// ═══════════════════════════════════════════════════════════════════════════════
-//
-// These stubs allow the school module to compile without the full CfC lookahead
-// functionality. They provide minimal implementations that return neutral/safe values.
-
-#[cfg(not(feature = "school_lookahead"))]
-pub use self::lookahead_stub::{LearningRecommendation, LookaheadEngine, LookaheadResult};
-
-#[cfg(not(feature = "school_lookahead"))]
-mod lookahead_stub {
-    use super::LearningObjective;
-    use anyhow::Result;
-    use symthaea_core::hdc::unified_hv::ContinuousHV;
-
-    /// Stub LearningRecommendation for when lookahead is disabled
-    #[derive(Debug, Clone)]
-    pub enum LearningRecommendation {
-        /// Curriculum complete
-        CurriculumComplete,
-        /// Learning recommended (stub)
-        Recommended { reason: String },
-        /// Not recommended (stub)
-        NotRecommended { reason: String },
-    }
-
-    /// Stub LookaheadResult for when lookahead is disabled
-    #[derive(Debug, Clone)]
-    pub struct LookaheadResult {
-        pub predicted_phi_gain: f32,
-        pub confidence: f32,
-        pub recommendation: LearningRecommendation,
-    }
-
-    /// Stub LookaheadEngine that provides minimal functionality
-    pub struct LookaheadEngine {
-        min_phi_gain: f32,
-    }
-
-    impl LookaheadEngine {
-        /// Create a new stub lookahead engine
-        pub fn new(_neurons: usize, _horizon: f32, min_phi_gain: f32) -> Result<Self> {
-            Ok(Self { min_phi_gain })
-        }
-
-        /// Evaluate an objective (stub - returns neutral prediction)
-        pub fn evaluate(
-            &self,
-            objective: &LearningObjective,
-            _state: &[ContinuousHV],
-        ) -> Result<LookaheadResult> {
-            // Return a neutral prediction based on objective difficulty
-            let base_gain = match objective.difficulty {
-                super::Difficulty::Beginner => 0.01,
-                super::Difficulty::Elementary => 0.015,
-                super::Difficulty::Intermediate => 0.02,
-                super::Difficulty::Advanced => 0.03,
-                super::Difficulty::Expert => 0.04,
-            };
-
-            Ok(LookaheadResult {
-                predicted_phi_gain: base_gain,
-                confidence: 0.5, // Medium confidence for stub
-                recommendation: if base_gain > self.min_phi_gain {
-                    LearningRecommendation::Recommended {
-                        reason: "Stub evaluation - actual CfC lookahead not enabled".to_string(),
-                    }
-                } else {
-                    LearningRecommendation::NotRecommended {
-                        reason: "Below minimum phi gain threshold".to_string(),
-                    }
-                },
-            })
-        }
-
-        /// Record an outcome (stub - no-op)
-        pub fn record_outcome(&mut self, _predicted: f32, _actual: f32) {
-            // No-op in stub implementation
-        }
-    }
-}
-
-#[cfg(feature = "physiology_module")]
 pub use coherence_bridge::{
     CoherenceBridgedSchool, CoherenceBridgedStats, CoherenceLearningConfig,
     CoherenceLearningResult, CoherenceRecommendation, LearningCoherencePrediction,

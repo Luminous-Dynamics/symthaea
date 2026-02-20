@@ -1,4 +1,3 @@
-#![cfg(feature = "benchmarks_module")]
 //! Performance Regression Tests
 //!
 //! These tests validate that critical operations maintain expected performance

@@ -192,12 +192,12 @@ pub mod naming_ceremony;
 pub mod semantic_bridge;
 
 // These 3 modules need SemanticPrimitiveEncoder type stubs before they can compile.
-// Gated behind `recursive_improvement_advanced` feature flag (which implies full_consciousness).
-#[cfg(feature = "recursive_improvement_advanced")]
+// Folded into full_consciousness (formerly recursive_improvement_advanced).
+#[cfg(feature = "full_consciousness")]
 pub mod benchmark_suite;
-#[cfg(feature = "recursive_improvement_advanced")]
+#[cfg(feature = "full_consciousness")]
 pub mod primitive_semantic_bridge;
-#[cfg(feature = "recursive_improvement_advanced")]
+#[cfg(feature = "full_consciousness")]
 pub mod routing_hub;
 
 // ── Conditional re-exports for compiled legacy modules ──
