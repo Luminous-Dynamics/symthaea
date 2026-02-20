@@ -2485,6 +2485,13 @@ impl CognitiveLoopService {
             };
         module_timings.consciousness_holography = _t.elapsed().as_micros() as u64;
 
+        // FEEDBACK: High holographic unity boosts prediction confidence
+        // Science: Pribram (1991) — holographic encoding enables stable predictions
+        if holographic_unity > 0.7 {
+            let unity_boost = (holographic_unity - 0.7) * 0.03;
+            self.prediction_confidence = (self.prediction_confidence + unity_boost as f32).clamp(0.0, 1.0);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // DIFFERENTIABLE CONSCIOUSNESS: Gradient-based consciousness optimization
         // Computes ∂C/∂component to identify which factor limits consciousness most.
@@ -2523,6 +2530,14 @@ impl CognitiveLoopService {
                 (0.0, String::new())
             };
         module_timings.differentiable_consciousness = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Large consciousness gradients drive exploration
+        // Science: Bengio (2017) — gradient information guides search
+        if consciousness_gradient_magnitude > 0.5 {
+            let gradient_explore = (consciousness_gradient_magnitude - 0.5).clamp(0.0, 0.5) * 0.1;
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + gradient_explore as f32).clamp(0.0, 1.0);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // AFFECTIVE CONSCIOUSNESS: Valence-arousal-dominance affect tracking
@@ -2590,6 +2605,13 @@ impl CognitiveLoopService {
             };
         module_timings.unified_consciousness_pipeline = _t.elapsed().as_micros() as u64;
 
+        // FEEDBACK: High pipeline consciousness strengthens learning toward coherence
+        // Science: Dehaene (2011) — global workspace broadcasts learning signals
+        if pipeline_consciousness > 0.6 {
+            let pipeline_lr_scale = 1.0 + (pipeline_consciousness - 0.6) * 0.5;
+            self.fep_lr_boost = (self.fep_lr_boost * pipeline_lr_scale as f32).clamp(1.0, 2.0);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // MULTI-MODAL INTEGRATION: Phi-guided cross-modal binding
         // Science: Damasio (1994), Mesulam (1998), Ghazanfar & Schroeder (2006).
@@ -2619,6 +2641,16 @@ impl CognitiveLoopService {
                 0.0
             };
         module_timings.multi_modal_integration = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Strong multimodal integration improves learning precision
+        // Science: Ghazanfar & Schroeder (2006) — cross-modal binding enables precise learning
+        if multimodal_integrated_phi > 0.5 {
+            let phi_confidence = (multimodal_integrated_phi - 0.5) * 0.04;
+            self.prediction_confidence = (self.prediction_confidence + phi_confidence as f32).clamp(0.0, 1.0);
+            let phi_subsystem_lr = 1.0 + (multimodal_integrated_phi - 0.5) * 0.4;
+            self.carryover.subsystem_lr_factor *= phi_subsystem_lr as f32;
+            self.carryover.subsystem_lr_factor = self.carryover.subsystem_lr_factor.clamp(0.8, 1.2);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
