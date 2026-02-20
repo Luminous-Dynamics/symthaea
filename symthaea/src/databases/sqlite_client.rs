@@ -31,7 +31,7 @@
 //!     timestamp_ms: 1704067200000,
 //!     valence: 0.7,
 //!     arousal: 0.5,
-//!     phi: 0.65,
+//!     psi: 0.65,
 //!     topics: vec!["greeting".to_string()],
 //!     metadata: "{}".to_string(),
 //!     consolidation_strength: 0.0,
@@ -947,7 +947,7 @@ mod tests {
             content: "Hello, I am Symthaea".to_string(),
             valence: 0.8,
             arousal: 0.5,
-            phi: 0.75,
+            psi: 0.75,
             topics: vec!["greeting".to_string()],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -992,7 +992,7 @@ mod tests {
                 content: "I remember this".to_string(),
                 valence: 0.5,
                 arousal: 0.3,
-                phi: 0.6,
+                psi: 0.6,
                 topics: vec!["test".to_string()],
                 metadata: "{}".to_string(),
                 consolidation_strength: 0.0,
@@ -1063,7 +1063,7 @@ mod tests {
             content: "LSH test".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1094,7 +1094,7 @@ mod tests {
             content: "Will be deleted".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1129,7 +1129,7 @@ mod tests {
                 content: format!("Record {}", i),
                 valence: 0.5,
                 arousal: 0.5,
-                phi: 0.5,
+                psi: 0.5,
                 topics: vec![],
                 metadata: "{}".to_string(),
                 consolidation_strength: 0.0,
@@ -1147,7 +1147,7 @@ mod tests {
             content: "Target record".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1175,7 +1175,7 @@ mod tests {
                 content: format!("Record {}", i),
                 valence: 0.5,
                 arousal: 0.5,
-                phi: 0.5,
+                psi: 0.5,
                 topics: vec![],
                 metadata: "{}".to_string(),
                 consolidation_strength: 0.0,
@@ -1205,7 +1205,7 @@ mod tests {
             content: format!("Record {}", id),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1226,7 +1226,7 @@ mod tests {
             content: "Test store-and-retrieve".to_string(),
             valence: 0.9,
             arousal: 0.3,
-            phi: 0.85,
+            psi: 0.85,
             topics: vec!["test".to_string(), "retrieval".to_string()],
             metadata: r#"{"session":"abc"}"#.to_string(),
             consolidation_strength: 0.0,
@@ -1242,7 +1242,7 @@ mod tests {
         assert_eq!(retrieved.memory_type, MemoryType::Episodic);
         assert!((retrieved.valence - 0.9).abs() < 0.01);
         assert!((retrieved.arousal - 0.3).abs() < 0.01);
-        assert!((retrieved.phi - 0.85).abs() < 0.001);
+        assert!((retrieved.psi - 0.85).abs() < 0.001);
         assert_eq!(
             retrieved.topics,
             vec!["test".to_string(), "retrieval".to_string()]
@@ -1277,7 +1277,7 @@ mod tests {
             content: "version 1".to_string(),
             valence: 0.1,
             arousal: 0.1,
-            phi: 0.1,
+            psi: 0.1,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1294,7 +1294,7 @@ mod tests {
             content: "version 2".to_string(),
             valence: 0.9,
             arousal: 0.9,
-            phi: 0.9,
+            psi: 0.9,
             topics: vec!["updated".to_string()],
             metadata: "{}".to_string(),
             consolidation_strength: 0.5,
@@ -1336,7 +1336,7 @@ mod tests {
             content: "Near neighbor".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1352,7 +1352,7 @@ mod tests {
             content: "Exact match".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1417,7 +1417,7 @@ mod tests {
             content: "Target for LSH threshold test".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1483,7 +1483,7 @@ mod tests {
             content: "Newly written after LSH populated".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1526,7 +1526,7 @@ mod tests {
             content: "Reconsolidation test".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.7,
+            psi: 0.7,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1584,7 +1584,7 @@ mod tests {
             content: "Cap test".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.95, // Start near cap
@@ -1623,7 +1623,7 @@ mod tests {
             content: "Target".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1640,7 +1640,7 @@ mod tests {
             content: "Bystander".to_string(),
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -1699,14 +1699,14 @@ mod tests {
                 label: format!("wm_eviction_step_{}", i),
                 steps_survived: if i < 2 { 1 } else { 5 }, // First two are too short
                 final_activation: 0.4,
-                phi_at_graduation: 0.7,
+                psi_at_graduation: 0.7,
                 coherence_at_graduation: 0.8,
             });
         }
 
         // Step 3: Process graduations into episodic memory
         let episodic_config = EpisodicReplayConfig {
-            phi_threshold: 0.1,
+            psi_threshold: 0.1,
             ..Default::default()
         };
         let mut episodic = EpisodicMemory::new(episodic_config);
@@ -1736,7 +1736,7 @@ mod tests {
                 timestamp_ms,
                 valence: 0.0,
                 arousal: 0.0,
-                phi: 0.7,
+                psi: 0.7,
                 topics: vec![],
                 metadata: "{}".to_string(),
                 consolidation_strength: 0.0,
@@ -1837,7 +1837,7 @@ mod tests {
                 content: format!("Test memory {}", i),
                 valence: 0.5,
                 arousal: 0.5,
-                phi: 0.5 + i as f64 * 0.1,
+                psi: 0.5 + i as f64 * 0.1,
                 topics: vec!["test".to_string()],
                 metadata: "{}".to_string(),
                 consolidation_strength: 0.0,
@@ -1857,7 +1857,7 @@ mod tests {
         assert_eq!(total_type_count, 5);
 
         // Check phi average (0.5 + 0.6 + 0.7 + 0.8 + 0.9) / 5 = 0.7
-        assert!((stats.avg_phi - 0.7).abs() < 0.01);
+        assert!((stats.avg_psi - 0.7).abs() < 0.01);
 
         // Check timestamp range
         assert_eq!(stats.oldest_timestamp_ms, 1000000000);

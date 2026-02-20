@@ -2169,7 +2169,7 @@ mod consciousness_snapshot_tests {
         ConsciousnessSnapshot {
             id: "test-snapshot-1".to_string(),
             agent_did: "did:mycelix:test123".to_string(),
-            phi,
+            consciousness_level: phi,
             meta_awareness: 0.6,
             self_model_accuracy: 0.7,
             coherence: 0.8,
@@ -2363,7 +2363,7 @@ mod consciousness_edge_case_tests {
         let snapshot = ConsciousnessSnapshot {
             id: "test".to_string(),
             agent_did: "did:mycelix:test".to_string(),
-            phi: 0.0,
+            consciousness_level: 0.0,
             meta_awareness: 0.0,
             self_model_accuracy: 0.0,
             coherence: 0.0,
@@ -2382,7 +2382,7 @@ mod consciousness_edge_case_tests {
         let snapshot = ConsciousnessSnapshot {
             id: "test".to_string(),
             agent_did: "did:mycelix:test".to_string(),
-            phi: 1.0,
+            consciousness_level: 1.0,
             meta_awareness: 1.0,
             self_model_accuracy: 1.0,
             coherence: 1.0,

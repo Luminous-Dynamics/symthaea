@@ -53,7 +53,7 @@ async fn test_uncertain_thought_produces_hedged_translation() {
         semantic_intent: SemanticIntent::Answer,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Uncertain,
-        phi: 0.3,
+        psi: 0.3,
         meta_awareness: 0.2,
         coherence: 0.4,
         emotional_tone: EmotionalTone {
@@ -109,7 +109,7 @@ async fn test_unknown_epistemic_status_forces_admission() {
         semantic_intent: SemanticIntent::ExpressUncertainty,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Unknown,
-        phi: 0.1,
+        psi: 0.1,
         meta_awareness: 0.1,
         coherence: 0.2,
         emotional_tone: EmotionalTone::default(),
@@ -154,7 +154,7 @@ async fn test_out_of_domain_marked_correctly() {
         semantic_intent: SemanticIntent::ExpressUncertainty,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::OutOfDomain,
-        phi: 0.5,
+        psi: 0.5,
         meta_awareness: 0.6,
         coherence: 0.7,
         emotional_tone: EmotionalTone {
@@ -209,7 +209,7 @@ async fn test_certain_thought_can_be_confident() {
         semantic_intent: SemanticIntent::Answer,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Certain,
-        phi: 0.9,
+        psi: 0.9,
         meta_awareness: 0.85,
         coherence: 0.95,
         emotional_tone: EmotionalTone {
@@ -257,7 +257,7 @@ async fn test_must_include_constraint_verified() {
         semantic_intent: SemanticIntent::Answer,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Probable,
-        phi: 0.6,
+        psi: 0.6,
         meta_awareness: 0.5,
         coherence: 0.7,
         emotional_tone: EmotionalTone::default(),
@@ -296,7 +296,7 @@ async fn test_must_exclude_constraint_verified() {
         semantic_intent: SemanticIntent::Answer,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Certain,
-        phi: 0.8,
+        psi: 0.8,
         meta_awareness: 0.7,
         coherence: 0.8,
         emotional_tone: EmotionalTone::default(),
@@ -340,7 +340,7 @@ async fn test_hedging_detection_comprehensive() {
         semantic_intent: SemanticIntent::Answer,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Uncertain,
-        phi: 0.3,
+        psi: 0.3,
         meta_awareness: 0.2,
         coherence: 0.4,
         emotional_tone: EmotionalTone::default(),
@@ -425,14 +425,14 @@ async fn test_full_pipeline_respects_epistemic_status() {
     let thought = response.structured_thought.as_ref().unwrap();
     println!("Epistemic status: {:?}", thought.epistemic_status);
     println!("Semantic intent: {:?}", thought.semantic_intent);
-    println!("Phi: {:.3}", thought.phi);
+    println!("Phi: {:.3}", thought.psi);
 
     // Note: With a fresh mind and novel query, the system should recognize uncertainty
     // The exact behavior depends on the mind's state, but we can verify the pipeline works
     assert!(
-        thought.phi >= 0.0 && thought.phi <= 1.0,
+        thought.psi >= 0.0 && thought.psi <= 1.0,
         "Phi should be in [0,1], got {}",
-        thought.phi
+        thought.psi
     );
     assert!(
         thought.coherence >= 0.0 && thought.coherence <= 1.0,
@@ -480,7 +480,7 @@ fn test_translation_prompt_includes_epistemic_markers() {
         semantic_intent: SemanticIntent::ExpressUncertainty,
         response_type: ResponseType::Statement,
         epistemic_status: EpistemicStatus::Unknown,
-        phi: 0.2,
+        psi: 0.2,
         meta_awareness: 0.1,
         coherence: 0.3,
         emotional_tone: EmotionalTone {

@@ -340,15 +340,15 @@ pub mod learned_encoding;
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /// HDC encoder for code AST structures.
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod code_encoder;
 
 /// Algebraic operations on code hypervectors (similarity, analogy, compose).
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod code_algebra;
 
 /// Project-level HDC memory for codebase indexing and retrieval.
-#[cfg(feature = "code_understanding")]
+#[cfg(feature = "code_generation")]
 pub mod code_memory;
 
 // ═══════════════════════════════════════════════════════════════════════════════

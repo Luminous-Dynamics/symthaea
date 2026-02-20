@@ -24,7 +24,7 @@ impl ParserRegistry {
     }
 
     /// Create a registry with all built-in parsers (Rust, Python, Nix)
-    #[cfg(feature = "code_understanding")]
+    #[cfg(feature = "code_generation")]
     pub fn with_builtins() -> Self {
         let mut registry = Self::new();
         registry.register(Box::new(super::rust_parser::RustParser::new()));

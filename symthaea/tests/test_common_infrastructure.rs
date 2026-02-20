@@ -12,13 +12,13 @@ fn test_memory_builder_works() {
     let record = MemoryRecordBuilder::new("infra-test-1")
         .with_seed(999)
         .with_type(MemoryType::Episodic)
-        .with_phi(0.85)
+        .with_psi(0.85)
         .with_content("Infrastructure test content")
         .build();
 
     assert_eq!(record.id, "infra-test-1");
     assert_eq!(record.memory_type, MemoryType::Episodic);
-    assert!((record.phi - 0.85).abs() < 0.001);
+    assert!((record.psi - 0.85).abs() < 0.001);
 }
 
 #[test]

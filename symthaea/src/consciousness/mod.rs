@@ -74,22 +74,22 @@ pub mod stability_regime;
 
 // Epistemic conflict detection: 15 pairwise theory conflicts, typed ConflictKind,
 // reliability R, effective Φ = Φ × R^γ, calibration with bounded updates (INV-9)
-#[cfg(feature = "epistemic_conflict")]
+#[cfg(feature = "reasoning_engine")]
 pub mod epistemic_conflict;
 
 // Consciousness-gated tool use: risk lattice, two-signal gating (Φ_eff + confidence),
 // fallback strategies, NixOS backward compatibility
-#[cfg(feature = "conscious_tool_gate")]
+#[cfg(feature = "reasoning_engine")]
 pub mod tool_gate;
 
 // Temporal planning: ForkedState + micro-MCTS + EVS + dream integration
-#[cfg(feature = "temporal_planning")]
+#[cfg(feature = "reasoning_engine")]
 pub mod temporal_planning;
 
 // Counterfactual reasoning v0: backdoor/frontdoor identification,
 // HDC graph surgery, semantic role substitution, reference harness
 // (extracted to symthaea-causal-reasoning crate)
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 pub use symthaea_causal_reasoning::counterfactual;
 
 // Unified Conscious Reasoning Engine: composes conflict detection, temporal

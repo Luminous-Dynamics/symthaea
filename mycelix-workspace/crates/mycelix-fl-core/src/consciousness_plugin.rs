@@ -1,15 +1,18 @@
 //! Consciousness-Aware Byzantine Plugin
 //!
-//! Uses Phi (integrated information) scores to adjust FL aggregation weights.
-//! Nodes with low consciousness integration get dampened or vetoed; nodes with
-//! high Phi get boosted. This closes the consciousness loop in federated learning.
+//! Uses consciousness scores to adjust FL aggregation weights.
+//! Nodes with low consciousness scores get dampened or vetoed; nodes with
+//! high scores get boosted. This closes the consciousness loop in federated learning.
+//!
+//! **Note**: Consciousness scores are currently derived from SpectralConnectivity
+//! (Fiedler value), NOT true IIT Phi. See `CONSCIOUSNESS_METRICS.md` for details.
 //!
 //! # Usage
 //!
 //! ```ignore
 //! let mut plugin = ConsciousnessAwareByzantinePlugin::new();
-//! // Set phi scores from Symthaea before each round
-//! plugin.set_phi_scores(scores);
+//! // Set consciousness scores from Symthaea before each round
+//! plugin.set_consciousness_scores(scores);
 //! // Use with PipelinePlugins
 //! let mut plugins = PipelinePlugins {
 //!     byzantine: vec![&mut plugin],
@@ -22,52 +25,52 @@ use std::collections::HashMap;
 use crate::pipeline::{ExternalWeightMap, ParticipantWeightAdjustment};
 use crate::plugins::ByzantinePlugin;
 use crate::types::GradientUpdate;
-use mycelix_bridge_common::phi_thresholds::phi_thresholds;
+use mycelix_bridge_common::consciousness_thresholds::consciousness_thresholds;
 
 /// Configuration for consciousness-aware Byzantine detection.
 ///
-/// Default values are imported from `mycelix_bridge_common::phi_thresholds` —
-/// the single source of truth for all Mycelix Phi thresholds. If you
+/// Default values are imported from `mycelix_bridge_common::consciousness_thresholds` —
+/// the single source of truth for all Mycelix consciousness thresholds. If you
 /// need to override per-instance, construct with custom values;
 /// otherwise prefer `Default::default()` to stay aligned.
 #[derive(Debug, Clone)]
 pub struct ConsciousnessConfig {
-    /// Below this phi: dampen weight (canonical: fl_dampen)
-    pub phi_threshold: f32,
-    /// Above this phi: boost weight (canonical: fl_boost)
-    pub phi_boost_threshold: f32,
-    /// Weight multiplier for low-phi participants (canonical: fl_dampen_factor)
+    /// Below this score: dampen weight (canonical: fl_dampen)
+    pub dampen_threshold: f32,
+    /// Above this score: boost weight (canonical: fl_boost)
+    pub boost_threshold: f32,
+    /// Weight multiplier for low-score participants (canonical: fl_dampen_factor)
     pub dampen_factor: f32,
-    /// Weight multiplier for high-phi participants (canonical: fl_boost_factor)
+    /// Weight multiplier for high-score participants (canonical: fl_boost_factor)
     pub boost_factor: f32,
-    /// Below this phi: veto entirely (canonical: fl_veto)
+    /// Below this score: veto entirely (canonical: fl_veto)
     pub veto_threshold: f32,
-    /// Default phi for participants without a score (default 0.5 = neutral)
-    pub default_phi: f32,
+    /// Default score for participants without a consciousness score (default 0.5 = neutral)
+    pub default_score: f32,
 }
 
 impl Default for ConsciousnessConfig {
     fn default() -> Self {
-        let t = phi_thresholds();
+        let t = consciousness_thresholds();
         Self {
-            phi_threshold: t.fl_dampen,
-            phi_boost_threshold: t.fl_boost,
+            dampen_threshold: t.fl_dampen,
+            boost_threshold: t.fl_boost,
             dampen_factor: t.fl_dampen_factor,
             boost_factor: t.fl_boost_factor,
             veto_threshold: t.fl_veto,
-            default_phi: 0.5,
+            default_score: 0.5,
         }
     }
 }
 
 /// Consciousness-aware Byzantine detection plugin.
 ///
-/// Maps per-participant Phi scores to weight adjustments in the FL pipeline.
-/// Phi scores must be set externally each round via [`set_phi_scores`].
+/// Maps per-participant consciousness scores to weight adjustments in the FL pipeline.
+/// Scores must be set externally each round via [`set_consciousness_scores`].
 pub struct ConsciousnessAwareByzantinePlugin {
     config: ConsciousnessConfig,
-    /// Per-participant phi scores, set externally before each round.
-    phi_scores: HashMap<String, f32>,
+    /// Per-participant consciousness scores, set externally before each round.
+    consciousness_scores: HashMap<String, f32>,
 }
 
 impl ConsciousnessAwareByzantinePlugin {
@@ -80,21 +83,21 @@ impl ConsciousnessAwareByzantinePlugin {
     pub fn with_config(config: ConsciousnessConfig) -> Self {
         Self {
             config,
-            phi_scores: HashMap::new(),
+            consciousness_scores: HashMap::new(),
         }
     }
 
-    /// Set phi scores for all participants in the current round.
-    pub fn set_phi_scores(&mut self, scores: HashMap<String, f32>) {
-        self.phi_scores = scores;
+    /// Set consciousness scores for all participants in the current round.
+    pub fn set_consciousness_scores(&mut self, scores: HashMap<String, f32>) {
+        self.consciousness_scores = scores;
     }
 
-    /// Get the phi score for a participant (or default if missing).
-    pub fn phi_for(&self, participant_id: &str) -> f32 {
-        self.phi_scores
+    /// Get the consciousness score for a participant (or default if missing).
+    pub fn consciousness_score_for(&self, participant_id: &str) -> f32 {
+        self.consciousness_scores
             .get(participant_id)
             .copied()
-            .unwrap_or(self.config.default_phi)
+            .unwrap_or(self.config.default_score)
     }
 
     /// Get the current configuration.
@@ -114,10 +117,10 @@ impl ByzantinePlugin for ConsciousnessAwareByzantinePlugin {
         let mut weights = ExternalWeightMap::new();
 
         for update in updates {
-            let phi = self.phi_for(&update.participant_id);
+            let score = self.consciousness_score_for(&update.participant_id);
 
-            if phi < self.config.veto_threshold {
-                // Extremely low phi: veto entirely
+            if score < self.config.veto_threshold {
+                // Extremely low consciousness: veto entirely
                 weights.insert(
                     update.participant_id.clone(),
                     vec![ParticipantWeightAdjustment {
@@ -126,8 +129,8 @@ impl ByzantinePlugin for ConsciousnessAwareByzantinePlugin {
                         source: "consciousness_aware".into(),
                     }],
                 );
-            } else if phi < self.config.phi_threshold {
-                // Low phi: dampen
+            } else if score < self.config.dampen_threshold {
+                // Low consciousness: dampen
                 weights.insert(
                     update.participant_id.clone(),
                     vec![ParticipantWeightAdjustment {
@@ -136,8 +139,8 @@ impl ByzantinePlugin for ConsciousnessAwareByzantinePlugin {
                         source: "consciousness_aware".into(),
                     }],
                 );
-            } else if phi > self.config.phi_boost_threshold {
-                // High phi: boost
+            } else if score > self.config.boost_threshold {
+                // High consciousness: boost
                 weights.insert(
                     update.participant_id.clone(),
                     vec![ParticipantWeightAdjustment {
@@ -147,7 +150,7 @@ impl ByzantinePlugin for ConsciousnessAwareByzantinePlugin {
                     }],
                 );
             }
-            // else: neutral (phi between threshold and boost_threshold), no adjustment
+            // else: neutral (score between dampen and boost thresholds), no adjustment
         }
 
         weights
@@ -169,36 +172,36 @@ mod tests {
     #[test]
     fn test_default_config_matches_canonical() {
         let config = ConsciousnessConfig::default();
-        let canonical = mycelix_bridge_common::phi_thresholds::phi_thresholds();
-        assert_eq!(config.phi_threshold, canonical.fl_dampen);
-        assert_eq!(config.phi_boost_threshold, canonical.fl_boost);
+        let canonical = consciousness_thresholds();
+        assert_eq!(config.dampen_threshold, canonical.fl_dampen);
+        assert_eq!(config.boost_threshold, canonical.fl_boost);
         assert_eq!(config.dampen_factor, canonical.fl_dampen_factor);
         assert_eq!(config.boost_factor, canonical.fl_boost_factor);
         assert_eq!(config.veto_threshold, canonical.fl_veto);
-        assert_eq!(config.default_phi, 0.5);
+        assert_eq!(config.default_score, 0.5);
     }
 
     #[test]
     fn test_custom_config() {
         let config = ConsciousnessConfig {
-            phi_threshold: 0.4,
-            phi_boost_threshold: 0.8,
+            dampen_threshold: 0.4,
+            boost_threshold: 0.8,
             dampen_factor: 0.1,
             boost_factor: 2.0,
             veto_threshold: 0.05,
-            default_phi: 0.3,
+            default_score: 0.3,
         };
         let plugin = ConsciousnessAwareByzantinePlugin::with_config(config.clone());
-        assert_eq!(plugin.config().phi_threshold, 0.4);
+        assert_eq!(plugin.config().dampen_threshold, 0.4);
         assert_eq!(plugin.config().boost_factor, 2.0);
     }
 
     #[test]
-    fn test_high_phi_gets_boosted() {
+    fn test_high_score_gets_boosted() {
         let mut plugin = ConsciousnessAwareByzantinePlugin::new();
         let mut scores = HashMap::new();
         scores.insert("node_a".to_string(), 0.8);
-        plugin.set_phi_scores(scores);
+        plugin.set_consciousness_scores(scores);
 
         let updates = vec![make_update("node_a")];
         let weights = plugin.analyze(&updates);
@@ -210,11 +213,11 @@ mod tests {
     }
 
     #[test]
-    fn test_low_phi_gets_dampened() {
+    fn test_low_score_gets_dampened() {
         let mut plugin = ConsciousnessAwareByzantinePlugin::new();
         let mut scores = HashMap::new();
         scores.insert("node_b".to_string(), 0.2);
-        plugin.set_phi_scores(scores);
+        plugin.set_consciousness_scores(scores);
 
         let updates = vec![make_update("node_b")];
         let weights = plugin.analyze(&updates);
@@ -226,11 +229,11 @@ mod tests {
     }
 
     #[test]
-    fn test_very_low_phi_gets_vetoed() {
+    fn test_very_low_score_gets_vetoed() {
         let mut plugin = ConsciousnessAwareByzantinePlugin::new();
         let mut scores = HashMap::new();
         scores.insert("node_c".to_string(), 0.05);
-        plugin.set_phi_scores(scores);
+        plugin.set_consciousness_scores(scores);
 
         let updates = vec![make_update("node_c")];
         let weights = plugin.analyze(&updates);
@@ -242,11 +245,11 @@ mod tests {
     }
 
     #[test]
-    fn test_neutral_phi_no_adjustment() {
+    fn test_neutral_score_no_adjustment() {
         let mut plugin = ConsciousnessAwareByzantinePlugin::new();
         let mut scores = HashMap::new();
         scores.insert("node_d".to_string(), 0.45); // Between 0.3 and 0.6
-        plugin.set_phi_scores(scores);
+        plugin.set_consciousness_scores(scores);
 
         let updates = vec![make_update("node_d")];
         let weights = plugin.analyze(&updates);
@@ -254,39 +257,39 @@ mod tests {
         // Neutral range: no entry in weight map
         assert!(
             !weights.contains_key("node_d"),
-            "Neutral phi should produce no adjustment"
+            "Neutral score should produce no adjustment"
         );
     }
 
     #[test]
     fn test_missing_participant_uses_default() {
         let plugin = ConsciousnessAwareByzantinePlugin::new();
-        // default_phi = 0.5, which is in the neutral range (0.3..0.6)
-        assert_eq!(plugin.phi_for("unknown_node"), 0.5);
+        // default_score = 0.5, which is in the neutral range (0.3..0.6)
+        assert_eq!(plugin.consciousness_score_for("unknown_node"), 0.5);
     }
 
     #[test]
     fn test_missing_participant_default_is_neutral() {
         let mut plugin = ConsciousnessAwareByzantinePlugin::new();
-        // No phi scores set — all participants use default (0.5 = neutral)
+        // No consciousness scores set — all participants use default (0.5 = neutral)
         let updates = vec![make_update("node_x"), make_update("node_y")];
         let weights = plugin.analyze(&updates);
 
         assert!(
             weights.is_empty(),
-            "Default phi (0.5) is neutral, should produce no adjustments"
+            "Default score (0.5) is neutral, should produce no adjustments"
         );
     }
 
     #[test]
-    fn test_mixed_phi_scores() {
+    fn test_mixed_consciousness_scores() {
         let mut plugin = ConsciousnessAwareByzantinePlugin::new();
         let mut scores = HashMap::new();
         scores.insert("high".to_string(), 0.9);
         scores.insert("mid".to_string(), 0.5);
         scores.insert("low".to_string(), 0.2);
         scores.insert("veto".to_string(), 0.05);
-        plugin.set_phi_scores(scores);
+        plugin.set_consciousness_scores(scores);
 
         let updates = vec![
             make_update("high"),
@@ -320,26 +323,26 @@ mod tests {
         let mut scores = HashMap::new();
         // Exact boundary values
         scores.insert("at_veto".to_string(), 0.1); // == veto_threshold → dampened (not vetoed)
-        scores.insert("at_threshold".to_string(), 0.3); // == phi_threshold → neutral
-        scores.insert("at_boost".to_string(), 0.6); // == phi_boost_threshold → neutral
-        plugin.set_phi_scores(scores);
+        scores.insert("at_dampen".to_string(), 0.3); // == dampen_threshold → neutral
+        scores.insert("at_boost".to_string(), 0.6); // == boost_threshold → neutral
+        plugin.set_consciousness_scores(scores);
 
         let updates = vec![
             make_update("at_veto"),
-            make_update("at_threshold"),
+            make_update("at_dampen"),
             make_update("at_boost"),
         ];
         let weights = plugin.analyze(&updates);
 
-        // at_veto (0.1): >= veto_threshold(0.1), < phi_threshold(0.3) → dampened
+        // at_veto (0.1): >= veto_threshold(0.1), < dampen_threshold(0.3) → dampened
         assert!(weights.contains_key("at_veto"));
         assert!(!weights["at_veto"][0].veto);
         assert_eq!(weights["at_veto"][0].weight_multiplier, 0.3);
 
-        // at_threshold (0.3): >= phi_threshold(0.3), <= phi_boost_threshold(0.6) → neutral
-        assert!(!weights.contains_key("at_threshold"));
+        // at_dampen (0.3): >= dampen_threshold(0.3), <= boost_threshold(0.6) → neutral
+        assert!(!weights.contains_key("at_dampen"));
 
-        // at_boost (0.6): == phi_boost_threshold(0.6), not > → neutral
+        // at_boost (0.6): == boost_threshold(0.6), not > → neutral
         assert!(!weights.contains_key("at_boost"));
     }
 

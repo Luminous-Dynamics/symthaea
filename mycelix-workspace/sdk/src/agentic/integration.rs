@@ -2160,7 +2160,7 @@ impl ZKIntegratedPipeline {
             previous_state: update_result.previous_state,
             new_state: update_result.new_state,
             state_changed: update_result.state_changed,
-            phi_measurement: update_result.measurement.phi,
+            phi_measurement: update_result.measurement.coherence,
             trend: history.trend,
         })
     }
@@ -2826,7 +2826,7 @@ impl ObservabilityExports {
 
         self.gauge(
             "phi_current",
-            metrics.phi,
+            metrics.coherence,
             labels.clone(),
             "Current Phi coherence value",
         );
@@ -2838,7 +2838,7 @@ impl ObservabilityExports {
         );
         self.gauge(
             "phi_rolling",
-            metrics.rolling_phi,
+            metrics.rolling_coherence,
             labels.clone(),
             "Rolling average Phi",
         );

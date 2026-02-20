@@ -708,7 +708,7 @@ mod tests {
             semantic_intent: SemanticIntent::Answer,
             response_type: ResponseType::Statement,
             epistemic_status: EpistemicStatus::Probable,
-            phi: 0.75,
+            psi: 0.75,
             meta_awareness: 0.6,
             coherence: 0.8,
             emotional_tone: EmotionalTone {
@@ -745,7 +745,7 @@ mod tests {
             ],
             computed_answer: None,
             cube: None,
-            phi: None,
+            psi: None,
         });
 
         let prompt = thought.to_translation_prompt();
@@ -764,7 +764,7 @@ mod tests {
             entities: vec![],
             computed_answer: Some("2 + 2 = 4".to_string()),
             cube: None,
-            phi: None,
+            psi: None,
         });
 
         let prompt = thought.to_translation_prompt();
@@ -780,7 +780,7 @@ mod tests {
             entities: vec![],
             computed_answer: None,
             cube: None,
-            phi: None,
+            psi: None,
         });
 
         let prompt = thought.to_translation_prompt();
@@ -802,7 +802,7 @@ mod tests {
                 m: MTier::M3,
                 h: None,
             }),
-            phi: Some(0.95),
+            psi: Some(0.95),
         });
 
         let prompt = thought.to_translation_prompt();

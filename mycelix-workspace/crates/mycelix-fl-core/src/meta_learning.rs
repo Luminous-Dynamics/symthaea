@@ -22,8 +22,8 @@ use crate::types::GradientUpdate;
 ///
 /// **Threshold disambiguation**: The thresholds here (`ema_alpha`, `suspicion_threshold`,
 /// `learning_rate`) are meta-learning signal parameters — they are NOT IIT Phi thresholds
-/// and NOT governance Phi gates. For canonical Phi thresholds used in governance and
-/// consciousness-aware FL, see `mycelix_bridge_common::phi_thresholds`.
+/// and NOT governance consciousness gates. For canonical consciousness thresholds used in
+/// governance and consciousness-aware FL, see `mycelix_bridge_common::consciousness_thresholds`.
 #[derive(Debug, Clone)]
 pub struct MetaLearningConfig {
     /// EMA smoothing factor for exclusion rate (0.0-1.0).

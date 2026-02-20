@@ -200,16 +200,16 @@ fn run_consciousness_trial(
         .collect();
 
     let mut consciousness_plugin = ConsciousnessAwareByzantinePlugin::new();
-    let mut phi_scores = HashMap::new();
+    let mut consciousness_scores = HashMap::new();
     for u in updates {
-        let phi = if u.participant_id.starts_with("honest") {
+        let score = if u.participant_id.starts_with("honest") {
             0.7
         } else {
             0.08 // Below veto threshold (0.1)
         };
-        phi_scores.insert(u.participant_id.clone(), phi);
+        consciousness_scores.insert(u.participant_id.clone(), score);
     }
-    consciousness_plugin.set_phi_scores(phi_scores);
+    consciousness_plugin.set_consciousness_scores(consciousness_scores);
 
     let mut plugins = PipelinePlugins {
         compression: None,

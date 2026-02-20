@@ -182,11 +182,9 @@ jobs:
           - full_consciousness
           - reasoning_engine
           # Feature groups (test combinations)
-          - epistemic_conflict
-          - temporal_planning
           - api_module
           # Multi-feature combinations (test interactions)
-          - reasoning_engine,code_understanding
+          - reasoning_engine,code_generation
           - code_generation,neural-bridge
     defaults:
       run:

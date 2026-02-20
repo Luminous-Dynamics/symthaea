@@ -2,7 +2,7 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use mycelix_fl::compression::HyperFeelCompressor;
 use mycelix_fl::fl_core::GradientMetadata;
 use mycelix_fl::pipeline::{DecentralizedPipeline, PipelineConfig};
-use mycelix_fl::types::{CompressedGradient, HV16_BYTES};
+use mycelix_fl::types::CompressedGradient;
 use std::collections::HashMap;
 
 fn generate_gradient(dim: usize, seed: usize) -> Vec<f32> {
@@ -65,5 +65,49 @@ fn bench_decentralized_pipeline(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "pogq")]
+fn bench_pogq_scoring(c: &mut Criterion) {
+    use mycelix_fl::pogq::{PoGQLiteConfig, PoGQLiteDetector};
+
+    let mut group = c.benchmark_group("pogq");
+    let dim = 1_000;
+
+    for &n_clients in &[10, 100] {
+        let gradients: Vec<Vec<f32>> = (0..n_clients)
+            .map(|i| generate_gradient(dim, i))
+            .collect();
+        let reference = generate_gradient(dim, 999);
+
+        group.bench_with_input(
+            BenchmarkId::new("score_gradient", n_clients),
+            &(&gradients, &reference),
+            |b, (grads, ref_grad)| {
+                b.iter(|| {
+                    let mut det = PoGQLiteDetector::new(PoGQLiteConfig::default());
+                    for (i, g) in grads.iter().enumerate() {
+                        det.score_gradient(
+                            black_box(g),
+                            &format!("c{}", i),
+                            black_box(ref_grad),
+                            0,
+                        );
+                    }
+                })
+            },
+        );
+    }
+    group.finish();
+}
+
+#[cfg(feature = "pogq")]
+criterion_group!(
+    benches,
+    bench_hyperfeel_encode_decode,
+    bench_decentralized_pipeline,
+    bench_pogq_scoring
+);
+
+#[cfg(not(feature = "pogq"))]
 criterion_group!(benches, bench_hyperfeel_encode_decode, bench_decentralized_pipeline);
+
 criterion_main!(benches);

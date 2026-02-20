@@ -41,6 +41,7 @@ mod parallel;
 mod quantum;
 mod simd;
 mod streaming;
+mod synergistic;
 mod temporal;
 mod types;
 
@@ -55,6 +56,7 @@ pub use parallel::*;
 pub use quantum::*;
 pub use simd::*;
 pub use streaming::*;
+pub use synergistic::*;
 pub use temporal::*;
 pub use types::*;
 

@@ -376,15 +376,15 @@ fn test_e2e_with_consciousness_plugin() {
     let dim = 15;
     let mut consciousness_plugin = ConsciousnessAwareByzantinePlugin::new();
 
-    // Set phi scores: honest nodes have high phi, Byzantine have very low
-    let mut phi_scores = HashMap::new();
+    // Set consciousness scores: honest nodes have high score, Byzantine have very low
+    let mut consciousness_scores = HashMap::new();
     for i in 0..8 {
-        phi_scores.insert(format!("h{}", i), 0.7);
+        consciousness_scores.insert(format!("h{}", i), 0.7);
     }
     for i in 0..2 {
-        phi_scores.insert(format!("byz{}", i), 0.05); // Below veto threshold
+        consciousness_scores.insert(format!("byz{}", i), 0.05); // Below veto threshold
     }
-    consciousness_plugin.set_phi_scores(phi_scores);
+    consciousness_plugin.set_consciousness_scores(consciousness_scores);
 
     let config = PipelineConfig::adaptive();
     let mut pipeline = UnifiedPipeline::new(config);
@@ -443,14 +443,14 @@ fn test_e2e_meta_learning_plus_consciousness() {
     let mut consciousness_plugin = ConsciousnessAwareByzantinePlugin::new();
 
     // Set phi scores
-    let mut phi_scores = HashMap::new();
+    let mut consciousness_scores = HashMap::new();
     for i in 0..6 {
-        phi_scores.insert(format!("h{}", i), 0.8);
+        consciousness_scores.insert(format!("h{}", i), 0.8);
     }
     for i in 0..2 {
-        phi_scores.insert(format!("byz{}", i), 0.15); // Low but above veto
+        consciousness_scores.insert(format!("byz{}", i), 0.15); // Low but above veto
     }
-    consciousness_plugin.set_phi_scores(phi_scores);
+    consciousness_plugin.set_consciousness_scores(consciousness_scores);
 
     let config = PipelineConfig::adaptive();
     let mut pipeline = UnifiedPipeline::new(config);

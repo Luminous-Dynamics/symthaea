@@ -1796,14 +1796,25 @@ async fn test_support_bridge_dispatch() {
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "requires Holochain conductor (nix develop)"]
 async fn test_support_multi_agent_resolution() {
-    let mut conductor = SweetConductor::from_standard_config().await;
     let dna_file = SweetDnaFile::from_bundle(&commons_dna_path()).await.unwrap();
-    let apps = conductor
-        .setup_app_for_zipped_agents("test-app", &[dna_file.clone()], &[2])
-        .await
-        .unwrap();
 
-    let ((alice,), (bob,)) = apps.into_tuples();
+    // Set up two separate conductors (Holochain 0.6 multi-agent pattern)
+    let mut alice_conductor = SweetConductor::from_standard_config().await;
+    let mut bob_conductor = SweetConductor::from_standard_config().await;
+
+    let (alice,) = alice_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+    let (bob,) = bob_conductor
+        .setup_app("test-app", &[dna_file.clone()])
+        .await
+        .unwrap()
+        .into_tuple();
+
+    // Exchange peers for DHT gossip
+    SweetConductor::exchange_peer_info([&alice_conductor, &bob_conductor]).await;
 
     let alice_agent = alice.agent_pubkey().clone();
     let bob_agent = bob.agent_pubkey().clone();
@@ -1826,14 +1837,14 @@ async fn test_support_multi_agent_resolution() {
         updated_at: now,
     };
 
-    let ticket_record: Record = conductor
+    let ticket_record: Record = alice_conductor
         .call(&alice.zome("support_tickets"), "create_ticket", ticket)
         .await;
 
     let ticket_hash = ticket_record.action_address().clone();
 
-    // Wait for DHT sync
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    // Wait for DHT sync between conductors
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
 
     // Bob comments with a resolution suggestion
     let comment = SupportTicketComment {
@@ -1845,12 +1856,12 @@ async fn test_support_multi_agent_resolution() {
         epistemic_status: Some(EpistemicStatus::Probable),
     };
 
-    let _comment_record: Record = conductor
+    let _comment_record: Record = bob_conductor
         .call(&bob.zome("support_tickets"), "add_comment", comment)
         .await;
 
     // Bob can also fetch the ticket
-    let fetched: Option<Record> = conductor
+    let fetched: Option<Record> = bob_conductor
         .call(&bob.zome("support_tickets"), "get_ticket", ticket_hash)
         .await;
 

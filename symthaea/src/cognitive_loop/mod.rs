@@ -566,6 +566,20 @@ pub struct CognitiveLoopService {
     /// urgency hysteresis, MCE boost, etc.). Reset via `CycleCarryover::default()`.
     carryover: CycleCarryover,
 
+    /// Σ (Sigma) — Synergistic integration tracker (Layer 2).
+    /// Fed with HDC state snapshots each cycle; computed every N cycles.
+    synergistic_integration: symthaea_core::consciousness_metrics::SynergisticIntegration,
+
+    /// Soul: Seven Harmonies value alignment for moral evaluation.
+    /// When present, evaluates action alignment against core values
+    /// and integrates experiences for long-term value learning.
+    soul: Option<crate::soul::Soul>,
+
+    /// Attention visualizer for debugging attention flow.
+    /// When present, captures attention snapshots each cycle for
+    /// ASCII heatmaps, JSON export, and Graphviz flow graphs.
+    attention_visualizer: Option<crate::visualization::AttentionVisualizer>,
+
     /// Relational Psi from dyad computation (set externally by Symthaea facade).
     /// Blended into unified_psi at 15% weight when > 0.
     relational_psi: f64,

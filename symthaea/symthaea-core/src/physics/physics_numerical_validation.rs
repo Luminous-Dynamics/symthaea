@@ -26,7 +26,7 @@ use super::tensor_algebra::{ChristoffelSymbols, MetricTensor};
 use super::thermal_transport::{LayerGeometry, ThermalProperties, ThermalTransport};
 use super::thermodynamics::ThermoEncoder;
 use super::trigger_systems::LcfPhysicsConstants;
-use super::true_phi::{QuantumEntropyCalculator, TruePhiCalculator};
+use crate::consciousness_metrics::{QuantumEntropyCalculator, TruePhiCalculator};
 use crate::genesis::GenesisSeed;
 use crate::hdc::unified_hv::ContinuousHV;
 

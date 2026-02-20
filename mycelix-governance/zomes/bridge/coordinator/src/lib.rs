@@ -1133,9 +1133,9 @@ mod tests {
     #[test]
     fn test_adaptive_threshold_voter_consciousness_check() {
         let t = AdaptiveThreshold::for_proposal_type(&ProposalType::Constitutional);
-        assert!(!t.voter_meets_phi_requirement(0.49), "0.49 < 0.5");
-        assert!(t.voter_meets_phi_requirement(0.50), "0.50 = 0.5");
-        assert!(t.voter_meets_phi_requirement(0.80), "0.80 > 0.5");
+        assert!(!t.voter_meets_consciousness_requirement(0.49), "0.49 < 0.5");
+        assert!(t.voter_meets_consciousness_requirement(0.50), "0.50 = 0.5");
+        assert!(t.voter_meets_consciousness_requirement(0.80), "0.80 > 0.5");
     }
 
     #[test]

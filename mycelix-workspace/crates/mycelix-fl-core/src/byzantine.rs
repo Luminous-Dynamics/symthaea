@@ -8,8 +8,8 @@
 //!
 //! **Threshold disambiguation**: The thresholds in this module (`direction_threshold`,
 //! `confidence_threshold`, `SignalWeights`) are gradient-space detection parameters —
-//! they are NOT IIT Phi thresholds and NOT governance Phi gates. For canonical Phi
-//! thresholds, see `mycelix_bridge_common::phi_thresholds`.
+//! they are NOT IIT Phi thresholds and NOT governance consciousness gates. For canonical
+//! consciousness thresholds, see `mycelix_bridge_common::consciousness_thresholds`.
 
 use crate::aggregation::euclidean_distance;
 use crate::types::GradientUpdate;

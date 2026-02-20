@@ -17,15 +17,15 @@
 //!
 //! # Canonical Thresholds
 //!
-//! See `mycelix_bridge_common::phi_thresholds` for the single source of truth.
+//! See `mycelix_bridge_common::consciousness_thresholds` for the single source of truth.
 //! Default values: veto=0.1, dampen=0.3, boost=0.6.
 
-use mycelix_bridge_common::phi_thresholds::phi_thresholds as consciousness_thresholds;
+use mycelix_bridge_common::consciousness_thresholds::consciousness_thresholds;
 use serde::{Deserialize, Serialize};
 
 /// Configuration for gradient coherence gating.
 ///
-/// Default values are imported from `mycelix_bridge_common::phi_thresholds` —
+/// Default values are imported from `mycelix_bridge_common::consciousness_thresholds` —
 /// the single source of truth for all Mycelix consciousness thresholds.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GradientCoherenceConfig {

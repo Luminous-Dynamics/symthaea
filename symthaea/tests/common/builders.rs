@@ -18,7 +18,7 @@ use symthaea::hdc::binary_hv::BinaryHV;
 /// let record = MemoryRecordBuilder::new("test-1")
 ///     .with_type(MemoryType::Episodic)
 ///     .with_content("Test content")
-///     .with_phi(0.75)
+///     .with_psi(0.75)
 ///     .build();
 /// ```
 #[derive(Clone)]
@@ -29,7 +29,7 @@ pub struct MemoryRecordBuilder {
     content: String,
     valence: f32,
     arousal: f32,
-    phi: f64,
+    psi: f64,
     topics: Vec<String>,
     metadata: String,
     timestamp_ms: u64,
@@ -45,7 +45,7 @@ impl MemoryRecordBuilder {
             content: format!("Test content for {}", id),
             valence: 0.5,
             arousal: 0.3,
-            phi: 0.65,
+            psi: 0.65,
             topics: vec!["test".to_string()],
             metadata: "{}".to_string(),
             timestamp_ms: 1700000000000,
@@ -83,9 +83,9 @@ impl MemoryRecordBuilder {
         self
     }
 
-    /// Set the phi value (0.0 to 1.0)
-    pub fn with_phi(mut self, phi: f64) -> Self {
-        self.phi = phi.clamp(0.0, 1.0);
+    /// Set the psi value (0.0 to 1.0)
+    pub fn with_psi(mut self, psi: f64) -> Self {
+        self.psi = psi.clamp(0.0, 1.0);
         self
     }
 
@@ -117,7 +117,7 @@ impl MemoryRecordBuilder {
             content: self.content,
             valence: self.valence,
             arousal: self.arousal,
-            phi: self.phi,
+            psi: self.psi,
             topics: self.topics,
             metadata: self.metadata,
             consolidation_strength: 0.0,
@@ -212,7 +212,7 @@ mod tests {
         let record = MemoryRecordBuilder::new("test").build();
         assert_eq!(record.id, "test");
         assert_eq!(record.memory_type, MemoryType::Working);
-        assert!((record.phi - 0.65).abs() < 0.001);
+        assert!((record.psi - 0.65).abs() < 0.001);
     }
 
     #[test]
@@ -220,13 +220,13 @@ mod tests {
         let record = MemoryRecordBuilder::new("chain-test")
             .with_seed(123)
             .with_type(MemoryType::Episodic)
-            .with_phi(0.9)
+            .with_psi(0.9)
             .with_content("Custom content")
             .build();
 
         assert_eq!(record.id, "chain-test");
         assert_eq!(record.memory_type, MemoryType::Episodic);
-        assert!((record.phi - 0.9).abs() < 0.001);
+        assert!((record.psi - 0.9).abs() < 0.001);
         assert_eq!(record.content, "Custom content");
     }
 

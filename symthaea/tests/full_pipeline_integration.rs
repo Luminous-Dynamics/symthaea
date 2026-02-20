@@ -41,7 +41,7 @@ use symthaea::dynamics::cfc_gpu::{GpuBackend, GpuCfcConfig, GpuCfcNetwork};
 use symthaea::dynamics::hierarchical_cfc::{HierarchicalCfC, HierarchicalCfCConfig};
 
 // Bridges
-use symthaea::bridges::{HdcCfcBridge, HdcCfcBridgeConfig};
+// bridges module removed — HdcCfcBridge superseded by cognitive_loop
 
 // Attention
 use symthaea::attention::{PhiAttentionConfig, PhiAttentionGate};
@@ -65,8 +65,6 @@ use symthaea::swarm::FederatedNetworkConfig;
 // Visualization
 use symthaea::visualization::attention_viz::{AttentionHistory, AttentionSnapshot};
 
-// Two-track
-use symthaea::two_track::{TwoTrackConfig, TwoTrackProcessor};
 
 // ==================================================================================
 // CONSTANTS
@@ -330,75 +328,7 @@ fn test_full_pipeline_integration() {
         ),
     );
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // STAGE 4: HDC-CfC Bidirectional Bridge (16384D <-> 128D)
-    // ──────────────────────────────────────────────────────────────────────────
-    let t = Instant::now();
-
-    let bridge_config = HdcCfcBridgeConfig {
-        hdc_dim: PIPELINE_HDC_DIM,
-        cfc_hidden_dim: CFC_HIDDEN,
-        intermediate_dim: 256,
-        num_attention_heads: 4,
-        dropout_rate: 0.0,
-        learning_rate: 0.001,
-        seed: 42,
-        use_layer_norm: true,
-        genesis_phrase: Some(GENESIS_PHRASE.to_string()),
-    };
-    let bridge = HdcCfcBridge::new(bridge_config);
-
-    // Encode: HDC -> CfC
-    let test_hv = genesis.hv("bridge:test", PIPELINE_HDC_DIM);
-    let encoded = bridge.encode_semantic_to_temporal(&test_hv);
-    assert_eq!(
-        encoded.len(),
-        CFC_HIDDEN,
-        "Encoded temporal dimension must be {}",
-        CFC_HIDDEN
-    );
-    assert_all_finite(&encoded, "Bridge encode");
-
-    // Decode: CfC -> HDC
-    let decoded = bridge.decode_temporal_to_semantic(&encoded);
-    assert_eq!(
-        decoded.dim(),
-        PIPELINE_HDC_DIM,
-        "Decoded HDC dimension must be {}",
-        PIPELINE_HDC_DIM
-    );
-    assert!(
-        decoded.values.iter().all(|x| x.is_finite()),
-        "Bridge decode must produce finite values"
-    );
-
-    // Roundtrip similarity (untrained bridge will have modest similarity)
-    let roundtrip_sim = bridge.measure_roundtrip_similarity(&test_hv);
-    assert!(
-        roundtrip_sim.is_finite(),
-        "Roundtrip similarity must be finite"
-    );
-
-    // NOTE: Bridge training uses numerical gradients (finite differences) which
-    // requires O(num_params) forward passes per step.  With a 2048x256 weight
-    // matrix that is ~500k perturbations per layer per step, far too expensive
-    // at opt-level 1.  The individual test_stage_04_bridge_roundtrip covers
-    // bridge training at full 16384D.  Here we verify encode/decode/roundtrip
-    // but skip gradient-based training.
-    let last_loss = f32::NAN; // placeholder -- training skipped in pipeline test
-
-    print_stage(
-        4,
-        "HDC-CfC Bridge (16384D <-> 128D)",
-        t.elapsed(),
-        &format!(
-            "encode_dim={}, decode_dim={}, roundtrip_sim={:.4}, final_loss={:.4}",
-            encoded.len(),
-            decoded.dim(),
-            roundtrip_sim,
-            last_loss
-        ),
-    );
+    // STAGE 4 (HDC-CfC Bridge) REMOVED — bridges module superseded by cognitive_loop
 
     // ──────────────────────────────────────────────────────────────────────────
     // STAGE 5: Phi-Guided Attention Gating
@@ -551,7 +481,7 @@ fn test_full_pipeline_integration() {
 
     let mem_config = EpisodicReplayConfig {
         capacity: 100,
-        phi_threshold: 0.3,
+        psi_threshold: 0.3,
         replay_interval: 5,
         batch_size: 4,
         ..Default::default()
@@ -582,9 +512,9 @@ fn test_full_pipeline_integration() {
     // All replayed episodes should have Phi >= threshold
     for ep in &batch {
         assert!(
-            ep.phi >= 0.3,
+            ep.psi >= 0.3,
             "Replayed episode Phi ({}) must be >= threshold",
-            ep.phi
+            ep.psi
         );
     }
 
@@ -1031,124 +961,7 @@ fn test_full_pipeline_integration() {
         ),
     );
 
-    // ──────────────────────────────────────────────────────────────────────────
-    // STAGE 15: Two-Track Semantic+Temporal Processing
-    // ──────────────────────────────────────────────────────────────────────────
-    let t = Instant::now();
-
-    let two_track_config = TwoTrackConfig {
-        input_dim: INPUT_DIM,
-        hdc_dim: PIPELINE_HDC_DIM,
-        cfc_hidden_dim: CFC_HIDDEN,
-        cfc_layers: 2,
-        cfc_output_dim: 64,
-        fusion_weights: (0.6, 0.4),
-        normalize_before_fusion: true,
-        seed: 0x5954_2154,
-        genesis_phrase: Some(GENESIS_PHRASE.to_string()),
-        cfc_delta_t: 0.02,
-        cfc_learning_rate: 0.001,
-        enable_bridge: true,
-        bridge_intermediate_dim: 256,
-        bridge_attention_heads: 4,
-    };
-
-    let mut two_track = TwoTrackProcessor::new(two_track_config);
-    assert!(two_track.has_bridge(), "Bridge should be enabled");
-
-    // Process through both tracks
-    let tt_input = sequence[0].clone();
-    let tt_output = two_track.process_with_bridge(&tt_input);
-
-    assert_eq!(
-        tt_output.semantic_hv.dim(),
-        PIPELINE_HDC_DIM,
-        "Two-track semantic HV dim"
-    );
-    assert!(
-        !tt_output.temporal_state.is_empty(),
-        "Two-track temporal state should be non-empty"
-    );
-    assert_eq!(
-        tt_output.fused.dim(),
-        PIPELINE_HDC_DIM,
-        "Two-track fused HV dim"
-    );
-    assert!(
-        tt_output.semantic_hv.values.iter().all(|x| x.is_finite()),
-        "Semantic HV must be finite"
-    );
-    assert_all_finite(&tt_output.temporal_state, "Temporal state");
-    assert!(
-        tt_output.fused.values.iter().all(|x| x.is_finite()),
-        "Fused HV must be finite"
-    );
-
-    // Verify determinism (same genesis => same output)
-    let two_track_config2 = TwoTrackConfig {
-        input_dim: INPUT_DIM,
-        hdc_dim: PIPELINE_HDC_DIM,
-        cfc_hidden_dim: CFC_HIDDEN,
-        cfc_layers: 2,
-        cfc_output_dim: 64,
-        fusion_weights: (0.6, 0.4),
-        normalize_before_fusion: true,
-        seed: 0x5954_2154,
-        genesis_phrase: Some(GENESIS_PHRASE.to_string()),
-        cfc_delta_t: 0.02,
-        cfc_learning_rate: 0.001,
-        enable_bridge: true,
-        bridge_intermediate_dim: 256,
-        bridge_attention_heads: 4,
-    };
-    let mut two_track2 = TwoTrackProcessor::new(two_track_config2);
-    let tt_output2 = two_track2.process_with_bridge(&tt_input);
-
-    let determinism_sim = tt_output.semantic_hv.similarity(&tt_output2.semantic_hv);
-    assert_eq!(
-        determinism_sim, 1.0,
-        "Same genesis must produce identical semantic HVs"
-    );
-
-    // Process a sequence and verify temporal evolution
-    let mut prev_temporal = tt_output.temporal_state.clone();
-    for i in 1..3 {
-        let out = two_track.process_with_bridge(&sequence[i]);
-        let temporal_diff: f32 = prev_temporal
-            .iter()
-            .zip(out.temporal_state.iter())
-            .map(|(a, b)| (a - b).abs())
-            .sum::<f32>();
-        assert!(
-            temporal_diff > 0.0 || i == 0,
-            "Temporal state should evolve with different inputs at step {}",
-            i
-        );
-        prev_temporal = out.temporal_state.clone();
-    }
-
-    // Test bridge roundtrip within two-track
-    let roundtrip = two_track
-        .measure_bridge_roundtrip(&tt_output.semantic_hv)
-        .expect("Bridge roundtrip measurement must work");
-    assert!(
-        roundtrip.is_finite(),
-        "Two-track bridge roundtrip must be finite"
-    );
-
-    print_stage(
-        15,
-        "Two-Track Semantic+Temporal",
-        t.elapsed(),
-        &format!(
-            "semantic_dim={}, temporal_dim={}, fused_dim={}, determinism={:.4}, roundtrip={:.4}",
-            tt_output.semantic_hv.dim(),
-            tt_output.temporal_state.len(),
-            tt_output.fused.dim(),
-            determinism_sim,
-            roundtrip
-        ),
-    );
+    // STAGE 15 (Two-Track) REMOVED — superseded by cognitive_loop
 
     // ──────────────────────────────────────────────────────────────────────────
     // INTEROPERABILITY VERIFICATION
@@ -1157,15 +970,12 @@ fn test_full_pipeline_integration() {
 
     let t = Instant::now();
 
-    // Verify: Two-track output feeds into Phi attention
-    let tt_outputs: Vec<ContinuousHV> = (0..2)
-        .map(|i| {
-            let out = two_track.process_with_bridge(&sequence[i]);
-            out.fused
-        })
+    // Verify: HDC encodings feed into Phi attention
+    let test_outputs: Vec<ContinuousHV> = (0..2)
+        .map(|i| ContinuousHV::random(PIPELINE_HDC_DIM, i as u64 + 500))
         .collect();
-    let tt_phis = vec![0.8, 0.3];
-    let integrated_attention = phi_gate.forward(&tt_outputs, &tt_phis);
+    let test_phis = vec![0.8, 0.3];
+    let integrated_attention = phi_gate.forward(&test_outputs, &test_phis);
     assert!(
         integrated_attention.weights.iter().all(|w| w.is_finite()),
         "Integrated attention weights must be finite"
@@ -1202,20 +1012,12 @@ fn test_full_pipeline_integration() {
         );
     }
 
-    // Verify: Bridge output feeds into GPU CfC
-    let bridge_encoded_for_gpu = bridge.encode_semantic_to_temporal(&test_hv);
-    // Pad/truncate to GPU input dim
-    let gpu_bridge_input: Vec<f32> = if bridge_encoded_for_gpu.len() >= 64 {
-        bridge_encoded_for_gpu[..64].to_vec()
-    } else {
-        let mut v = bridge_encoded_for_gpu.clone();
-        v.resize(64, 0.0);
-        v
-    };
+    // Verify: HDC data feeds into GPU CfC
+    let gpu_bridge_input: Vec<f32> = ContinuousHV::random(64, 999).values;
     let gpu_bridge_output = gpu_net
         .forward(&gpu_bridge_input, 0.1)
-        .expect("GPU forward from bridge data must succeed");
-    assert_all_finite(&gpu_bridge_output, "GPU output from bridge data");
+        .expect("GPU forward from HDC data must succeed");
+    assert_all_finite(&gpu_bridge_output, "GPU output from HDC data");
 
     print_stage(
         0,
@@ -1300,31 +1102,7 @@ fn test_stage_03_hierarchical_cfc() {
     }
 }
 
-#[test]
-fn test_stage_04_bridge_roundtrip() {
-    let genesis = GenesisSeed::from_phrase(GENESIS_PHRASE);
-    let config = HdcCfcBridgeConfig {
-        hdc_dim: 1024,
-        cfc_hidden_dim: 64,
-        intermediate_dim: 128,
-        num_attention_heads: 2,
-        ..Default::default()
-    };
-    let mut bridge = HdcCfcBridge::new(config);
-
-    let hv = genesis.hv("bridge_test", 1024);
-    let encoded = bridge.encode_semantic_to_temporal(&hv);
-    assert_eq!(encoded.len(), 64);
-    let decoded = bridge.decode_temporal_to_semantic(&encoded);
-    assert_eq!(decoded.dim(), 1024);
-
-    // Train and check loss is finite
-    for i in 0..10 {
-        let train_hv = ContinuousHV::random(1024, i as u64 + 100);
-        let loss = bridge.train_step(&train_hv);
-        assert!(loss.is_finite());
-    }
-}
+// test_stage_04_bridge_roundtrip REMOVED — bridges module superseded by cognitive_loop
 
 #[test]
 fn test_stage_05_phi_attention() {
@@ -1367,7 +1145,7 @@ fn test_stage_06_online_learning() {
 fn test_stage_07_episodic_memory() {
     let config = EpisodicReplayConfig {
         capacity: 50,
-        phi_threshold: 0.5,
+        psi_threshold: 0.5,
         ..Default::default()
     };
     let mut memory = EpisodicMemory::new(config);
@@ -1501,20 +1279,4 @@ fn test_stage_14_attention_visualization() {
     assert_eq!(restored.attention_weights, snapshot.attention_weights);
 }
 
-#[test]
-fn test_stage_15_two_track_processor() {
-    let config = TwoTrackConfig {
-        genesis_phrase: Some(GENESIS_PHRASE.to_string()),
-        enable_bridge: true,
-        ..Default::default()
-    };
-    let mut proc = TwoTrackProcessor::new(config);
-    assert!(proc.has_bridge());
-
-    let embedding = vec![0.5f32; 256];
-    let output = proc.process_with_bridge(&embedding);
-
-    assert_eq!(output.semantic_hv.dim(), HDC_DIMENSION);
-    assert!(!output.temporal_state.is_empty());
-    assert_eq!(output.fused.dim(), HDC_DIMENSION);
-}
+// test_stage_15_two_track_processor REMOVED — two_track module superseded by cognitive_loop

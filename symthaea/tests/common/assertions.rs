@@ -64,7 +64,7 @@ pub fn assert_memory_eq(actual: &MemoryRecord, expected: &MemoryRecord) {
 
     assert_f32_eq(actual.valence, expected.valence, F32_EPSILON, "Valence");
     assert_f32_eq(actual.arousal, expected.arousal, F32_EPSILON, "Arousal");
-    assert_f64_eq(actual.phi, expected.phi, F64_EPSILON, "Phi");
+    assert_f64_eq(actual.psi, expected.psi, F64_EPSILON, "Phi");
 }
 
 /// Assert MemoryRecord IDs match
@@ -79,7 +79,7 @@ pub fn assert_memory_id(record: &MemoryRecord, expected_id: &str) {
 /// Assert MemoryRecord has expected phi value
 pub fn assert_memory_phi(record: &MemoryRecord, expected_phi: f64, epsilon: f64) {
     assert_f64_eq(
-        record.phi,
+        record.psi,
         expected_phi,
         epsilon,
         &format!("Memory '{}' phi", record.id),

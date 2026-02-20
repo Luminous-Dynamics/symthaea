@@ -151,7 +151,7 @@ async fn test_similarity_search_exact_match() {
         timestamp_ms: 1704067200000,
         valence: 0.5,
         arousal: 0.5,
-        phi: 0.5,
+        psi: 0.5,
         topics: vec!["test".to_string()],
         metadata: "{}".to_string(),
         consolidation_strength: 0.0,
@@ -198,7 +198,7 @@ async fn test_similarity_search_ordering() {
             timestamp_ms: 1704067200000 + i as u64,
             valence: 0.5,
             arousal: 0.5,
-            phi: 0.5,
+            psi: 0.5,
             topics: vec![],
             metadata: "{}".to_string(),
             consolidation_strength: 0.0,
@@ -330,7 +330,7 @@ async fn test_encoding_roundtrip_integrity() {
         timestamp_ms: 1704067200000,
         valence: 0.5,
         arousal: 0.5,
-        phi: 0.5,
+        psi: 0.5,
         topics: vec![],
         metadata: "{}".to_string(),
         consolidation_strength: 0.0,
@@ -363,7 +363,7 @@ async fn test_emotional_values_roundtrip() {
         timestamp_ms: 1704067200000,
         valence: -0.75, // Negative emotion
         arousal: 0.95,  // High arousal
-        phi: 0.88,
+        psi: 0.88,
         topics: vec!["emotion".to_string()],
         metadata: r#"{"intensity": "high"}"#.to_string(),
         consolidation_strength: 0.0,
@@ -375,7 +375,7 @@ async fn test_emotional_values_roundtrip() {
 
     assert_f32_eq(retrieved.valence, -0.75, 0.001, "Valence should roundtrip");
     assert_f32_eq(retrieved.arousal, 0.95, 0.001, "Arousal should roundtrip");
-    assert_f64_eq(retrieved.phi, 0.88, 0.0001, "Phi should roundtrip");
+    assert_f64_eq(retrieved.psi, 0.88, 0.0001, "Phi should roundtrip");
 }
 
 // ============================================================================
@@ -518,7 +518,7 @@ async fn test_sqlite_search_similar_filtered_by_phi() {
     // Store records with varying phi values
     for i in 0..10u64 {
         let mut record = create_test_memory(&format!("phi-{i}"), i, MemoryType::Episodic);
-        record.phi = i as f64 * 0.1; // 0.0, 0.1, ..., 0.9
+        record.psi = i as f64 * 0.1; // 0.0, 0.1, ..., 0.9
         db.store(record).await.unwrap();
     }
 
@@ -533,7 +533,7 @@ async fn test_sqlite_search_similar_filtered_by_phi() {
     // phi > 0.5 matches 0.6, 0.7, 0.8, 0.9 → 4 records
     assert_eq!(results.len(), 4);
     for r in &results {
-        assert!(r.record.phi > 0.5, "All results should have phi > 0.5");
+        assert!(r.record.psi > 0.5, "All results should have phi > 0.5");
     }
 }
 
@@ -568,7 +568,7 @@ async fn test_sqlite_reconsolidation_tracking() {
         timestamp_ms: 1704067200000,
         valence: 0.5,
         arousal: 0.5,
-        phi: 0.5,
+        psi: 0.5,
         topics: vec![],
         metadata: "{}".to_string(),
         consolidation_strength: 0.0,

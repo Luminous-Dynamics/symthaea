@@ -244,9 +244,9 @@ fn test_mind_structured_thought_extraction() {
 
     // Thought should have valid phi and coherence
     assert!(
-        thought.phi >= 0.0,
+        thought.psi >= 0.0,
         "Phi {} should be non-negative",
-        thought.phi
+        thought.psi
     );
     assert!(
         thought.coherence >= 0.0,
@@ -306,8 +306,8 @@ fn test_mind_snapshot_fields() {
     );
     // phi and consciousness_level should both be set
     assert_eq!(
-        state.phi, state.consciousness_level,
-        "phi should equal consciousness_level in snapshot"
+        state.psi, state.consciousness_level,
+        "psi should equal consciousness_level in snapshot"
     );
 }
 

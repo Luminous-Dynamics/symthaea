@@ -185,7 +185,7 @@ impl PhysicsConsciousnessBridge {
         table: &PeriodicTable,
         chemistry: &Chemistry,
     ) -> CompositionalAnalysis {
-        use super::true_phi::TruePhiCalculator;
+        use crate::consciousness_metrics::TruePhiCalculator;
         let calc = TruePhiCalculator::new();
 
         // Helper to normalize phi to [0, 1] range
@@ -252,7 +252,7 @@ impl PhysicsConsciousnessBridge {
         table: &PeriodicTable,
         chemistry: &Chemistry,
     ) -> CompositionalPhiAnalysis {
-        use super::true_phi::TruePhiCalculator;
+        use crate::consciousness_metrics::TruePhiCalculator;
         let calc = TruePhiCalculator::new();
 
         // Level 0: Fundamental particles (quarks and electron)
@@ -275,11 +275,11 @@ impl PhysicsConsciousnessBridge {
         let atom_phi = if atom_components.len() >= 2 {
             calc.compute_true_phi(&atom_components)
         } else {
-            super::true_phi::TruePhiResult {
+            crate::consciousness_metrics::TruePhiResult {
                 phi: 0.0,
                 system_ei: 0.0,
                 mip_ei: 0.0,
-                mip: super::true_phi::TruePartition {
+                mip: crate::consciousness_metrics::TruePartition {
                     part_a: vec![],
                     part_b: vec![],
                 },
@@ -296,11 +296,11 @@ impl PhysicsConsciousnessBridge {
             let mol_components = vec![water.vector.clone(), h.clone(), h, o];
             calc.compute_true_phi(&mol_components)
         } else {
-            super::true_phi::TruePhiResult {
+            crate::consciousness_metrics::TruePhiResult {
                 phi: 0.0,
                 system_ei: 0.0,
                 mip_ei: 0.0,
-                mip: super::true_phi::TruePartition {
+                mip: crate::consciousness_metrics::TruePartition {
                     part_a: vec![],
                     part_b: vec![],
                 },
@@ -499,7 +499,7 @@ impl CompositionalPhiAnalysis {
 // Connecting temporal information integration to consciousness evolution
 // ═══════════════════════════════════════════════════════════════════════════════
 
-use super::true_phi::{TemporalPhiCalculator, TemporalTransition};
+use crate::consciousness_metrics::{TemporalPhiCalculator, TemporalTransition};
 
 /// Temporal consciousness state
 ///

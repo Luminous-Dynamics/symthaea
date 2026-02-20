@@ -87,10 +87,74 @@ fn bench_unified_pipeline(c: &mut Criterion) {
     group.finish();
 }
 
+#[cfg(feature = "shapley")]
+fn bench_shapley(c: &mut Criterion) {
+    use mycelix_fl_core::shapley::{ShapleyCalculator, ShapleyConfig};
+
+    let mut group = c.benchmark_group("shapley");
+
+    for &n in &[5, 10, 20] {
+        let dim = 1_000;
+        let updates = generate_updates(n, dim);
+        let gradient_map: HashMap<String, Vec<f32>> = updates
+            .iter()
+            .map(|u| (u.participant_id.clone(), u.gradients.clone()))
+            .collect();
+        let aggregated: Vec<f32> = {
+            let mut avg = vec![0.0f32; dim];
+            let count = gradient_map.len() as f32;
+            for g in gradient_map.values() {
+                for (i, v) in g.iter().enumerate() {
+                    avg[i] += v / count;
+                }
+            }
+            avg
+        };
+
+        group.bench_with_input(
+            BenchmarkId::new("monte_carlo_100", n),
+            &(&gradient_map, &aggregated),
+            |b, (gmap, agg)| {
+                b.iter(|| {
+                    let config = ShapleyConfig::monte_carlo(100).with_seed(42);
+                    let mut calc = ShapleyCalculator::new(config);
+                    calc.calculate_values(black_box(gmap), black_box(agg))
+                })
+            },
+        );
+
+        if n <= 10 {
+            group.bench_with_input(
+                BenchmarkId::new("monte_carlo_1000", n),
+                &(&gradient_map, &aggregated),
+                |b, (gmap, agg)| {
+                    b.iter(|| {
+                        let config = ShapleyConfig::monte_carlo(1000).with_seed(42);
+                        let mut calc = ShapleyCalculator::new(config);
+                        calc.calculate_values(black_box(gmap), black_box(agg))
+                    })
+                },
+            );
+        }
+    }
+    group.finish();
+}
+
+#[cfg(feature = "shapley")]
+criterion_group!(
+    benches,
+    bench_aggregation_algorithms,
+    bench_gradient_dimensions,
+    bench_unified_pipeline,
+    bench_shapley
+);
+
+#[cfg(not(feature = "shapley"))]
 criterion_group!(
     benches,
     bench_aggregation_algorithms,
     bench_gradient_dimensions,
     bench_unified_pipeline
 );
+
 criterion_main!(benches);
