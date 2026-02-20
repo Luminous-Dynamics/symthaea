@@ -652,6 +652,16 @@ pub struct CognitiveLoopService {
 
     /// Cycle counter for biorhythm refresh (refreshes every 100 cycles).
     biorhythm_refresh_counter: usize,
+
+    /// Phi-guided attention gate for consciousness-aware perception weighting.
+    /// When present, weights perception inputs by their integrated information
+    /// contribution, focusing processing on high-Phi signals.
+    phi_attention_gate: Option<crate::attention::PhiAttentionGate>,
+
+    /// Metrics collector for Prometheus-compatible observability.
+    /// When present, records per-cycle consciousness, performance, and safety metrics
+    /// for external monitoring dashboards.
+    metrics_collector: Option<crate::infrastructure::MetricsCollector>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

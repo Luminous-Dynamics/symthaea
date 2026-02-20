@@ -632,6 +632,8 @@ impl CognitiveLoopService {
             enactive: EnactiveCognition::new(),
             biorhythm: crate::chronobiology::Biorhythm::current(),
             biorhythm_refresh_counter: 0,
+            phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
+            metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
         })
     }
 
