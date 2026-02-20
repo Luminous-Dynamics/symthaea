@@ -1798,7 +1798,7 @@ impl CognitiveLoopService {
                 } else {
                     PhiTrend::Stable
                 };
-                interval.content = Some(hv16_cached.clone());
+                interval.content = Some(hv16_cached);
                 analyzer.add_interval(interval);
 
                 // Amortized analysis: causal chains every 50 cycles
@@ -1819,11 +1819,17 @@ impl CognitiveLoopService {
                                 .filter_map(|id| analyzer.interval_content(id))
                                 .collect();
                             if contents.len() >= 2 {
-                                let mut bound = contents[0].clone();
+                                let mut bound = *contents[0];
                                 for hv in &contents[1..] { bound = bound.bind(hv); }
+                                // Compress to resonator dim via same pipeline as compressed_state
+                                let continuous = bound.to_continuous();
+                                let compressed = self.encoder.compress_for_ltc(
+                                    &continuous,
+                                    self.config.cfc_config.input_dim,
+                                );
                                 Some((
                                     format!("causal_{}_{}", self.stats.total_cycles, c.intervals.len()),
-                                    bound.to_bipolar(),
+                                    compressed,
                                 ))
                             } else {
                                 None
@@ -1985,7 +1991,7 @@ impl CognitiveLoopService {
             && self.primitive_processor.is_some()
         {
             let profile = crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
-                &[hv16_cached.clone()],
+                &[hv16_cached],
             );
             profile.composite
         } else {
@@ -2067,6 +2073,55 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // CAUSAL SELF-EXPLANATION: Builds causal model of primitive→Φ effects.
+        // Learns which primitives cause which Φ changes and accumulates evidence.
+        // Amortized: every 25 cycles (matches primitive reasoning cadence).
+        // Science: Pearl (2009) — causal inference, Woodward (2003) — interventionism.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (causal_relations_count, causal_avg_confidence) =
+            if let Some(ref mut explainer) = self.causal_explainer {
+                if self.stats.total_cycles % 25 == 0
+                    && self.stats.total_cycles > 0
+                    && !active_primitive_names.is_empty()
+                {
+                    // Construct PrimitiveExecution entries from active primitives
+                    if let Some(ref mut processor) = self.primitive_processor {
+                        let timestamp = self.stats.total_cycles as f64 * 0.02;
+                        let state = processor.process_input(&hv16_cached, timestamp);
+                        let chain = {
+                            let mut c = crate::consciousness::primitive_reasoning::ReasoningChain::new(
+                                hv16_cached,
+                            );
+                            for ap in state.all_active().iter().take(4) {
+                                let exec = crate::consciousness::primitive_reasoning::PrimitiveExecution {
+                                    primitive: ap.primitive.clone(),
+                                    input: hv16_cached,
+                                    output: hv16_cached.bind(&crate::hdc::BinaryHV::random(
+                                        self.stats.total_cycles as u64,
+                                    )),
+                                    transformation: crate::consciousness::primitive_reasoning::TransformationType::Bind,
+                                    phi_contribution: primitive_phi * ap.activation,
+                                    timestamp,
+                                };
+                                c.executions.push(exec);
+                            }
+                            c
+                        };
+                        explainer.learn_from_chain(&chain, "cognitive_cycle");
+                    }
+                    let summary = explainer.summarize_understanding();
+                    (summary.total_causal_relations, summary.average_confidence)
+                } else {
+                    let summary = explainer.summarize_understanding();
+                    (summary.total_causal_relations, summary.average_confidence)
+                }
+            } else {
+                (0, 0.0)
+            };
+        module_timings.causal_explanation = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
         // ADAPTIVE REASONING: Q-learning-guided primitive selection
         // Builds reasoning chains with RL-optimized primitive selection.
         // Amortized: every 50 cycles (Q-learning step + chain construction).
@@ -2076,7 +2131,7 @@ impl CognitiveLoopService {
         let adaptive_reasoning_phi =
             if let Some(ref mut reasoner) = self.adaptive_reasoner {
                 if self.stats.total_cycles % 50 == 0 && self.stats.total_cycles > 0 {
-                    match reasoner.reason_adaptive(hv16_cached.clone(), 5) {
+                    match reasoner.reason_adaptive(hv16_cached, 5) {
                         Ok(chain) => chain.total_phi,
                         Err(_) => 0.0,
                     }
@@ -3770,6 +3825,8 @@ impl CognitiveLoopService {
             harmonic_interferences,
             reasoning_chain_confidence,
             reasoning_chain_depth,
+            causal_relations_count,
+            causal_avg_confidence,
             adaptive_reasoning_phi,
             epistemic_quality,
             phi_validation_correlation,

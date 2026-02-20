@@ -391,6 +391,11 @@ pub struct CycleMetadata {
     /// Adaptive reasoner total Phi from RL-guided chain (0.0 when off).
     pub adaptive_reasoning_phi: f64,
 
+    /// Causal self-explanation: total learned causal relations (0 when off).
+    pub causal_relations_count: usize,
+    /// Causal self-explanation: average confidence in causal model (0.0 when off).
+    pub causal_avg_confidence: f64,
+
     // ── Session 4: Epistemic Tiers + Phi Validation ────────────────────────
     /// Epistemic quality score from 3-axis classification (0.0–1.0, 0.0 when off).
     pub epistemic_quality: f64,
@@ -560,6 +565,7 @@ pub struct ModuleTimings {
     pub consciousness_profile: u64,
     pub harmonics: u64,
     pub primitive_reasoning: u64,
+    pub causal_explanation: u64,
     pub adaptive_reasoning: u64,
     pub epistemic_tiers: u64,
     pub phi_validation: u64,

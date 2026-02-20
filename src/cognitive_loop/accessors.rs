@@ -925,6 +925,11 @@ impl CognitiveLoopService {
         self.adaptive_reasoner.as_ref()
     }
 
+    /// Borrow the causal self-explainer (if enabled).
+    pub fn causal_explainer(&self) -> Option<&crate::consciousness::causal_explanation::CausalExplainer> {
+        self.causal_explainer.as_ref()
+    }
+
     /// Borrow the dissipative consciousness model (if enabled).
     pub fn dissipative_consciousness(&self) -> Option<&crate::consciousness::dissipative_consciousness::DissipativeConsciousness> {
         self.dissipative_consciousness.as_ref()

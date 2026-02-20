@@ -562,6 +562,10 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`. Expensive — runs rarely.
     phi_validation: Option<crate::consciousness::phi_validation::PhiValidationFramework>,
 
+    /// Causal self-explanation: builds causal model of primitive→Φ relationships.
+    /// Co-gated with `enable_primitive_consciousness`.
+    causal_explainer: Option<crate::consciousness::causal_explanation::CausalExplainer>,
+
     /// Dissipative consciousness: Prigogine thermodynamic model for consciousness.
     /// Tracks entropy production, order parameters, and criticality distance.
     /// Co-gated with `enable_primitive_consciousness`.
