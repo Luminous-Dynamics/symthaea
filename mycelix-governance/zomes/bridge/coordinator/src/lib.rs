@@ -73,7 +73,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Get the latest ConsciousnessAttestation for an agent
 fn get_latest_agent_attestation(
     agent_did: &str,
-) -> ExternResult<Option<(f64, Record)>> {
+) -> ExternResult<Option<(f64, Option<ConsciousnessVectorEntry>, Record)>> {
     let agent_anchor = format!("agent:{}", agent_did);
     let anchor = match anchor_hash(&agent_anchor) {
         Ok(h) => h,
@@ -85,7 +85,7 @@ fn get_latest_agent_attestation(
         GetStrategy::default(),
     )?;
 
-    let mut latest: Option<(f64, Record, Timestamp)> = None;
+    let mut latest: Option<(f64, Option<ConsciousnessVectorEntry>, Record, Timestamp)> = None;
 
     for link in links {
         let action_hash = ActionHash::try_from(link.target)
@@ -99,9 +99,9 @@ fn get_latest_agent_attestation(
             {
                 let ts = record.action().timestamp();
                 match &latest {
-                    None => latest = Some((attestation.consciousness_level, record, ts)),
-                    Some((_, _, prev_ts)) if ts > *prev_ts => {
-                        latest = Some((attestation.consciousness_level, record, ts));
+                    None => latest = Some((attestation.consciousness_level, attestation.consciousness_vector, record, ts)),
+                    Some((_, _, _, prev_ts)) if ts > *prev_ts => {
+                        latest = Some((attestation.consciousness_level, attestation.consciousness_vector, record, ts));
                     }
                     _ => {}
                 }
@@ -109,7 +109,7 @@ fn get_latest_agent_attestation(
         }
     }
 
-    Ok(latest.map(|(consciousness_level, record, _)| (consciousness_level, record)))
+    Ok(latest.map(|(consciousness_level, cv, record, _)| (consciousness_level, cv, record)))
 }
 
 /// Get the latest consciousness snapshot for an agent

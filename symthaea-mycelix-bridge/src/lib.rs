@@ -1066,7 +1066,7 @@ impl SymthaeaBackend {
 pub struct ConsciousnessAttestationData {
     /// Agent's DID identifier.
     pub agent_did: String,
-    /// Consciousness level from Symthaea's spectral connectivity assessment, in [0.0, 1.0].
+    /// Consciousness level from C-Vector composite, in [0.0, 1.0].
     pub consciousness_level: f64,
     /// Symthaea cognitive cycle number that produced this assessment.
     pub cycle_id: u64,
@@ -1076,6 +1076,36 @@ pub struct ConsciousnessAttestationData {
     pub signature: Vec<u8>,
     /// Source system identifier (always "symthaea").
     pub source: String,
+    /// C-Vector dimensions for governance per-dimension gating.
+    /// Serializes to the same JSON shape as governance's `ConsciousnessVectorEntry`.
+    pub consciousness_vector: Option<ConsciousnessVectorSerde>,
+}
+
+/// Serializable C-Vector for governance submission.
+///
+/// Field names match `governance_bridge_integrity::ConsciousnessVectorEntry` exactly,
+/// so `serde_json` round-trip works as a type adapter between the two crates.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConsciousnessVectorSerde {
+    pub spectral_connectivity: Option<f64>,
+    pub true_phi: Option<f64>,
+    pub phi_fast: Option<f64>,
+    pub entropy: Option<f64>,
+    pub coherence: Option<f64>,
+    pub epistemic_confidence: Option<f64>,
+}
+
+impl From<&ConsciousnessVector> for ConsciousnessVectorSerde {
+    fn from(cv: &ConsciousnessVector) -> Self {
+        Self {
+            spectral_connectivity: cv.spectral_connectivity,
+            true_phi: cv.true_phi,
+            phi_fast: cv.phi_fast,
+            entropy: cv.entropy,
+            coherence: cv.coherence,
+            epistemic_confidence: cv.epistemic_confidence,
+        }
+    }
 }
 
 impl ConsciousnessAttestationData {
@@ -1130,6 +1160,7 @@ pub fn create_consciousness_attestation_data(
         captured_at_us: now_us,
         signature: Vec::new(), // Caller must fill this
         source: "symthaea".to_string(),
+        consciousness_vector: Some(ConsciousnessVectorSerde::from(&quality.consciousness_vector)),
     }
 }
 
@@ -1486,6 +1517,7 @@ mod tests {
             captured_at_us: 1708000000_000000,
             signature: Vec::new(),
             source: "symthaea".to_string(),
+            consciousness_vector: None,
         };
 
         let msg1 = attestation.sign_message();
@@ -1511,6 +1543,7 @@ mod tests {
             captured_at_us: 1708000000_000000,
             signature: vec![1, 2, 3],
             source: "symthaea".to_string(),
+            consciousness_vector: None,
         };
 
         let json = serde_json::to_string(&attestation).unwrap();

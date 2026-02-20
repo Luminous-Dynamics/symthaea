@@ -109,21 +109,60 @@ pub fn verify_consciousness_gate_v2(input: VerifyGateInput) -> ExternResult<Gate
     let required_consciousness = input.action_type.consciousness_gate();
 
     // Phase 1: Try to find latest ConsciousnessAttestation
-    if let Some((consciousness_level, _record)) = get_latest_agent_attestation(&agent_did)? {
+    if let Some((consciousness_level, consciousness_vector, _record)) = get_latest_agent_attestation(&agent_did)? {
         // Use C-Vector composite if available, otherwise fall back to scalar
-        let effective_level = consciousness_level; // scalar already incorporates composite
-        let passed = effective_level >= required_consciousness;
-        let failure_reason = if passed {
+        let effective_level = match &consciousness_vector {
+            Some(cv) => cv.composite(),
+            None => consciousness_level,
+        };
+        let mut passed = effective_level >= required_consciousness;
+        let mut failure_reason = if passed {
             None
         } else {
             Some(format!(
                 "Attested consciousness {:.2} below gate {:.2} for {:?}",
-                consciousness_level, required_consciousness, input.action_type
+                effective_level, required_consciousness, input.action_type
             ))
         };
+
+        // Per-dimension C-Vector gates (checked in addition to composite gate)
+        if passed {
+            if let Some(cv) = &consciousness_vector {
+                let config = get_current_consciousness_config()?;
+
+                // Constitutional actions require minimum true_phi if configured
+                if input.action_type == GovernanceActionType::Constitutional {
+                    if let Some(min_phi) = config.min_true_phi_constitutional {
+                        if cv.best_phi() < min_phi {
+                            passed = false;
+                            failure_reason = Some(format!(
+                                "True phi {:.2} below constitutional minimum {:.2}",
+                                cv.best_phi(), min_phi
+                            ));
+                        }
+                    }
+                }
+
+                // Voting actions require minimum coherence if configured
+                if matches!(input.action_type, GovernanceActionType::Voting | GovernanceActionType::Constitutional) {
+                    if let Some(min_coh) = config.min_coherence_voting {
+                        if let Some(coh) = cv.coherence {
+                            if coh < min_coh {
+                                passed = false;
+                                failure_reason = Some(format!(
+                                    "Coherence {:.2} below voting minimum {:.2}",
+                                    coh, min_coh
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         return Ok(GateVerificationResultV2 {
             passed,
-            consciousness_level: Some(consciousness_level),
+            consciousness_level: Some(effective_level),
             required_consciousness,
             provenance: ConsciousnessProvenance::Attested,
             action_type: input.action_type,
