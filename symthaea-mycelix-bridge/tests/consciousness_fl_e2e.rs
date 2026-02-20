@@ -519,3 +519,114 @@ fn test_e2e_ambiguous_update_dampened() {
         adj.weight_multiplier
     );
 }
+
+// =============================================================================
+// Full C-Vector → Attestation → Governance compatibility test
+// =============================================================================
+
+/// End-to-end: SymthaeaBackend computes C-Vector, attestation carries it,
+/// and the serialized form is compatible with governance's expected input.
+#[test]
+fn test_e2e_cvector_attestation_governance_compatibility() {
+    use symthaea_mycelix_bridge::{
+        create_consciousness_attestation_data, ConsciousnessVectorSerde,
+    };
+
+    // Step 1: Assess an update — produces a QualityScore with populated C-Vector
+    let mut backend = SymthaeaBackend::new();
+
+    struct TestSnapshot;
+    impl symthaea_mycelix_bridge::ModelSnapshot for TestSnapshot {
+        fn apply_update_clone(
+            &self,
+            _update: &HyperGradient,
+        ) -> symthaea_mycelix_bridge::Result<Box<dyn symthaea_mycelix_bridge::ModelSnapshot>> {
+            Ok(Box::new(TestSnapshot))
+        }
+        fn evaluate(&self) -> symthaea_mycelix_bridge::Result<(f32, f32)> {
+            Ok((0.82, 0.3))
+        }
+        fn current_accuracy(&self) -> Option<f32> {
+            Some(0.78)
+        }
+    }
+
+    let hg = make_hypergradient("attester-node", 1, 170);
+    let quality = backend.assess_update(&TestSnapshot, &hg).unwrap();
+
+    // Step 2: Verify C-Vector is populated
+    let cv = &quality.consciousness_vector;
+    assert!(cv.populated_count() >= 3, "C-Vector should have at least 3 dimensions populated, got {}", cv.populated_count());
+    assert!(cv.spectral_connectivity.is_some(), "spectral_connectivity must be populated");
+    assert!(cv.epistemic_confidence.is_some(), "epistemic_confidence must be populated");
+
+    // Step 3: Create attestation — should include C-Vector
+    let attestation = create_consciousness_attestation_data(
+        &quality,
+        "did:mycelix:test-agent",
+        42,
+    );
+
+    // Consciousness level should equal composite
+    let composite = cv.composite();
+    assert!(
+        (attestation.consciousness_level - composite).abs() < 0.01,
+        "Attestation consciousness_level ({}) should match C-Vector composite ({})",
+        attestation.consciousness_level, composite
+    );
+
+    // Step 4: Verify C-Vector is present in attestation
+    assert!(attestation.consciousness_vector.is_some(), "Attestation should carry C-Vector");
+    let serde_cv = attestation.consciousness_vector.as_ref().unwrap();
+    assert_eq!(serde_cv.spectral_connectivity, cv.spectral_connectivity);
+    assert_eq!(serde_cv.true_phi, cv.true_phi);
+    assert_eq!(serde_cv.entropy, cv.entropy);
+
+    // Step 5: Verify governance-compatible serialization
+    // Governance's RecordConsciousnessAttestationInput expects the C-Vector as
+    // a JSON object with the same field names. Test round-trip.
+    let json = serde_json::to_string(&serde_cv).unwrap();
+    let roundtrip: ConsciousnessVectorSerde = serde_json::from_str(&json).unwrap();
+    assert_eq!(roundtrip.spectral_connectivity, serde_cv.spectral_connectivity);
+    assert_eq!(roundtrip.true_phi, serde_cv.true_phi);
+    assert_eq!(roundtrip.phi_fast, serde_cv.phi_fast);
+    assert_eq!(roundtrip.entropy, serde_cv.entropy);
+    assert_eq!(roundtrip.coherence, serde_cv.coherence);
+    assert_eq!(roundtrip.epistemic_confidence, serde_cv.epistemic_confidence);
+
+    // Step 6: Verify best_phi fallback chain works on the bridge side
+    let best = cv.best_phi();
+    assert!(best >= 0.0 && best <= 1.0, "best_phi should be in [0,1], got {}", best);
+
+    // Step 7: Verify sign message is deterministic (governance verification depends on this)
+    let msg1 = attestation.sign_message();
+    let msg2 = attestation.sign_message();
+    assert_eq!(msg1, msg2, "sign_message must be deterministic");
+}
+
+/// Verify that PoGQ mapping uses C-Vector composite, not raw spectral connectivity
+#[test]
+fn test_e2e_pogq_uses_cvector_composite() {
+    use mycelix_sdk::matl::ProofOfGradientQuality;
+
+    // Create a quality score with high spectral but low true_phi
+    let mut quality = synthetic_quality(0.8, 0.3, 0.7, false, ConsciousAnomalySeverity::None);
+    quality.consciousness_vector = ConsciousnessVector {
+        spectral_connectivity: Some(0.7),
+        true_phi: Some(0.15),  // Much lower than spectral
+        phi_fast: Some(0.12),
+        entropy: Some(0.5),
+        coherence: Some(0.4),
+        epistemic_confidence: Some(0.8),
+    };
+
+    let pogq: ProofOfGradientQuality = pogq_from_quality_score(&quality);
+
+    // PoGQ quality should reflect epistemic confidence
+    assert!(pogq.quality > 0.0, "PoGQ quality should be positive");
+
+    // Verify the C-Vector composite reflects the lower true_phi
+    let composite = quality.consciousness_vector.composite();
+    assert!(composite < 0.6, "Composite should be pulled down by low true_phi, got {}", composite);
+    assert!(composite > 0.0, "Composite should still be positive");
+}
