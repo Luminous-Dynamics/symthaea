@@ -524,6 +524,16 @@ pub struct CognitiveLoopService {
     /// Primitive consciousness decomposition for explainable consciousness.
     primitive_processor: Option<crate::consciousness::primitive_consciousness::ConsciousnessPrimitiveProcessor>,
 
+    /// Temporal consciousness analyzer using Allen's Interval Algebra.
+    /// Records conscious intervals each cycle; detects causal chains and continuity gaps.
+    /// Co-gated with `enable_primitive_consciousness`.
+    temporal_analyzer: Option<crate::consciousness::temporal_primitives::ConsciousnessTemporalAnalyzer>,
+
+    /// Lattice structure over the 9-tier primitive system.
+    /// Computed once at startup; provides O(1) join/meet and structural metrics.
+    /// Co-gated with `enable_primitive_consciousness`.
+    primitive_lattice: Option<crate::consciousness::primitive_lattice::PrimitiveLattice>,
+
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
     /// that modulates future moral scores as a self-correcting mechanism.
