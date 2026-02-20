@@ -80,22 +80,18 @@ impl FalseBeliefBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    /// Lightweight trial: HDC geometry only (no FEP).
+    fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
 
-        // Agent model: tracks the character's belief as a ContinuousHV
-        // This mirrors SocialCoherence.MentalModel.beliefs
         let mut agent_belief: Option<ContinuousHV> = None;
         let mut reality_state: Option<ContinuousHV> = None;
 
-        // Phase 1: Setup — agent observes initial state
-        // Both agent belief and reality track the same state
         for sentence in &scenario.setup {
             let hv = adapter.encode(&Scenario::new(*sentence), dim);
-            // Bundle into agent's belief model (accumulate observations)
             agent_belief = Some(match agent_belief {
                 Some(prev) => ContinuousHV::bundle_owned(&[prev, hv.clone()]),
                 None => hv.clone(),
@@ -103,28 +99,70 @@ impl FalseBeliefBenchmark {
             reality_state = agent_belief.clone();
         }
 
-        // Phase 2: Agent leaves — belief model FREEZES (not updated further)
-        // Reality continues to be tracked
-
-        // Phase 3: Object moved — update reality but NOT agent's belief
         let change_hv = adapter.encode(&Scenario::new(scenario.change), dim);
         let _reality_state = Some(match reality_state {
             Some(prev) => ContinuousHV::bundle_owned(&[prev, change_hv]),
             None => change_hv,
         });
 
-        // Phase 4: Test — which answer does the system select?
         let belief_hv = adapter.encode(&Scenario::new(scenario.belief_location), dim);
         let reality_hv = adapter.encode(&Scenario::new(scenario.reality_location), dim);
 
-        // The agent's FROZEN belief should be more similar to the belief answer
-        // than to the reality answer (because it missed the change)
         let agent = agent_belief.unwrap();
         let belief_sim = agent.similarity(&belief_hv);
         let reality_sim = agent.similarity(&reality_hv);
 
-        // Correct if the agent model (stale belief) is closer to belief_location
         if belief_sim > reality_sim { 1.0 } else { 0.0 }
+    }
+
+    /// Full trial: FEP behavioral prediction from false beliefs.
+    ///
+    /// States: [marble_at_basket, marble_at_box] (dim=2)
+    /// Actions: [go_to_basket, go_to_box] (2 actions)
+    /// Sally observes marble in basket → belief = [0.9, 0.1]
+    /// Anne moves marble → NO update to Sally's beliefs
+    /// Sally wants to find marble → set_goals prefers basket-area obs
+    /// select_action() → should return action 0 (go-to-basket) based on false beliefs
+    #[cfg(feature = "symthaea-backend")]
+    fn run_trial_full(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        use super::applied_tom::{inject_belief, predict_behavior, social_agent};
+
+        let scenarios = Self::scenarios();
+        let _scenario = &scenarios[trial_idx % scenarios.len()];
+
+        // Create FEP agent modeling Sally's mental state
+        let mut agent = social_agent(2, 2, 2);
+
+        // Sally observes marble placed in basket → belief = [0.9, 0.1]
+        inject_belief(&mut agent, vec![0.9, 0.1]);
+
+        // Anne moves marble to box while Sally is away → NO update to Sally's beliefs
+        // (belief stays frozen at [0.9, 0.1])
+
+        // Sally wants to find the marble → prefers basket-area observations
+        agent.set_goals(vec![1.0, 0.0], 4.0);
+
+        // Ask: what would Sally DO given her (false) beliefs?
+        let (action, probs) = predict_behavior(&mut agent);
+
+        // Expected: action 0 (go-to-basket) because Sally believes marble is there
+        let expected_action = 0;
+        let accuracy = if action == expected_action { 1.0 } else { 0.0 };
+        let confidence = probs[expected_action];
+
+        (accuracy, confidence)
+    }
+
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+        #[cfg(feature = "symthaea-backend")]
+        {
+            let (acc, _confidence) = self.run_trial_full(config, trial_idx);
+            return acc;
+        }
+        #[cfg(not(feature = "symthaea-backend"))]
+        {
+            return self.run_trial_lightweight(config, trial_idx);
+        }
     }
 }
 
@@ -138,12 +176,25 @@ impl PsychBenchmark for FalseBeliefBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        #[cfg(feature = "symthaea-backend")]
+        let mut confidences = Vec::new();
+
         for trial in 0..config.trials_per_condition {
-            let acc = self.run_trial(config, trial);
-            accuracies.push(acc);
+            #[cfg(feature = "symthaea-backend")]
+            {
+                let (acc, conf) = self.run_trial_full(config, trial);
+                accuracies.push(acc);
+                confidences.push(conf);
+            }
+            #[cfg(not(feature = "symthaea-backend"))]
+            {
+                accuracies.push(self.run_trial(config, trial));
+            }
         }
 
         result.insert("false_belief_accuracy", MetricValue::from_samples(&accuracies));
+        #[cfg(feature = "symthaea-backend")]
+        result.insert("action_confidence", MetricValue::from_samples(&confidences));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;

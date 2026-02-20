@@ -279,6 +279,13 @@ impl BenchmarkReport {
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
+
+    /// Write pretty-printed JSON directly to a file.
+    pub fn to_json_file(&self, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+        let json = self.to_json()?;
+        std::fs::write(path, json)?;
+        Ok(())
+    }
 }
 
 impl Default for BenchmarkReport {

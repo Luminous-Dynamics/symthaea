@@ -4,7 +4,9 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --json
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --csv
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --json-output /tmp/bench.json
 
+use std::path::PathBuf;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
@@ -26,8 +28,13 @@ use symthaea_psych_bench::benchmarks::worm::{
 use symthaea_psych_bench::harness::{BenchmarkConfig, BenchmarkReport, PsychBenchmark};
 
 fn main() {
-    let output_json = std::env::args().any(|a| a == "--json");
-    let output_csv = std::env::args().any(|a| a == "--csv");
+    let args: Vec<String> = std::env::args().collect();
+    let output_json = args.iter().any(|a| a == "--json");
+    let output_csv = args.iter().any(|a| a == "--csv");
+    let json_output_path: Option<PathBuf> = args
+        .windows(2)
+        .find(|w| w[0] == "--json-output")
+        .map(|w| PathBuf::from(&w[1]));
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -73,6 +80,14 @@ fn main() {
         let result = bench.run(&config);
         eprintln!("{}ms ({} metrics)", result.elapsed_ms, result.metrics.len());
         report.add(result);
+    }
+
+    // Write JSON to file if --json-output was specified
+    if let Some(path) = &json_output_path {
+        report
+            .to_json_file(path)
+            .expect("failed to write JSON output file");
+        eprintln!("JSON written to {}", path.display());
     }
 
     if output_json {

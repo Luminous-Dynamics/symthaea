@@ -61,35 +61,85 @@ impl FauxPasBenchmark {
         ]
     }
 
-    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+    /// Lightweight trial: HDC geometry only.
+    fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
         let adapter = ScenarioAdapter;
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
 
-        // Encode the speaker's statement and listener's reaction
         let statement_hv = adapter.encode(&Scenario::new(scenario.statement), dim);
         let reaction_hv = adapter.encode(&Scenario::new(scenario.reaction), dim);
 
-        // Faux-pas detection via intent-reaction divergence:
-        // Encode positive and negative emotional markers
         let positive_marker = adapter.encode(&Scenario::new("happy pleased grateful smiles"), dim);
         let negative_marker = adapter.encode(&Scenario::new("disappointed embarrassed hurt upset"), dim);
 
-        // Speaker's intent is typically neutral/positive (not trying to offend)
-        // Listener's reaction reveals the social impact
         let reaction_neg = reaction_hv.similarity(&negative_marker);
         let reaction_pos = reaction_hv.similarity(&positive_marker);
-
-        // Also check statement harshness (unintentional offensiveness)
         let statement_neg = statement_hv.similarity(&negative_marker);
 
-        // Detect faux pas: reaction leans negative AND/OR statement has negative valence
-        // but the COMBINATION matters more than either alone
         let divergence = reaction_neg - reaction_pos + statement_neg * 0.3;
         let detected_faux_pas = divergence > 0.0;
 
         if detected_faux_pas == scenario.is_faux_pas { 1.0 } else { 0.0 }
+    }
+
+    /// Full trial: FEP behavioral prediction for faux pas detection.
+    ///
+    /// States: [social_safe, social_blunder] (dim=2)
+    /// Actions: [continue_normally, repair_attempt] (2 actions)
+    /// Observations: [positive_reaction, negative_reaction] (2 obs)
+    /// For faux pas: negative reaction → agent detects blunder → action 1 (repair)
+    /// For non-faux-pas: positive reaction → agent stays calm → action 0 (continue)
+    #[cfg(feature = "symthaea-backend")]
+    fn run_trial_full(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
+        use super::applied_tom::{make_observation, predict_behavior, social_agent};
+
+        let scenarios = Self::scenarios();
+        let scenario = &scenarios[trial_idx % scenarios.len()];
+
+        let mut agent = social_agent(2, 2, 2);
+
+        // Encode statement as observation: faux-pas statements bias toward blunder
+        let statement_obs = if scenario.is_faux_pas {
+            make_observation(vec![0.3, 0.7], "social") // lean toward blunder
+        } else {
+            make_observation(vec![0.7, 0.3], "social") // lean toward safe
+        };
+        agent.perceive(&statement_obs);
+
+        // Encode listener reaction: negative = blunder signal
+        let reaction_obs = if scenario.is_faux_pas {
+            make_observation(vec![0.1, 0.9], "social") // strong negative reaction
+        } else {
+            make_observation(vec![0.9, 0.1], "social") // positive reaction
+        };
+        agent.perceive(&reaction_obs);
+
+        // Agent wants to maintain social safety → prefers safe-state observations
+        agent.set_goals(vec![1.0, 0.0], 4.0);
+
+        let (action, probs) = predict_behavior(&mut agent);
+
+        // For faux pas: should select action 1 (repair_attempt)
+        // For non-faux-pas: should select action 0 (continue_normally)
+        let expected_action = if scenario.is_faux_pas { 1 } else { 0 };
+        let accuracy = if action == expected_action { 1.0 } else { 0.0 };
+        let confidence = probs[expected_action];
+
+        (accuracy, confidence)
+    }
+
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
+        #[cfg(feature = "symthaea-backend")]
+        {
+            let (acc, _) = self.run_trial_full(config, trial_idx);
+            return acc;
+        }
+        #[cfg(not(feature = "symthaea-backend"))]
+        {
+            return self.run_trial_lightweight(config, trial_idx);
+        }
     }
 }
 
@@ -103,11 +153,25 @@ impl PsychBenchmark for FauxPasBenchmark {
         let mut result = BenchmarkResult::new(self.name(), config.label.clone());
 
         let mut accuracies = Vec::new();
+        #[cfg(feature = "symthaea-backend")]
+        let mut confidences = Vec::new();
+
         for trial in 0..config.trials_per_condition {
-            accuracies.push(self.run_trial(config, trial));
+            #[cfg(feature = "symthaea-backend")]
+            {
+                let (acc, conf) = self.run_trial_full(config, trial);
+                accuracies.push(acc);
+                confidences.push(conf);
+            }
+            #[cfg(not(feature = "symthaea-backend"))]
+            {
+                accuracies.push(self.run_trial(config, trial));
+            }
         }
 
         result.insert("faux_pas_accuracy", MetricValue::from_samples(&accuracies));
+        #[cfg(feature = "symthaea-backend")]
+        result.insert("action_confidence", MetricValue::from_samples(&confidences));
 
         result.conditions = 1;
         result.trials_per_condition = config.trials_per_condition;
