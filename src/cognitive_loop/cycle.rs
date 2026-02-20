@@ -2048,6 +2048,65 @@ impl CognitiveLoopService {
         module_timings.semantic_value_embedder = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
+        // HARMONIES INTEGRATOR: Per-action ethical alignment via Seven Harmonies
+        // Evaluates the current cycle's compressed state as a ValuedAction and
+        // scores it against harmony embeddings for approval/rejection.
+        // Amortized: every 20 cycles (embedding similarity + scoring).
+        // Science: Schwartz (2012) — basic human values, Deci & Ryan (2000).
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (harmonies_alignment, harmonies_approved) =
+            if let Some(ref mut integrator) = self.harmonies_integrator {
+                if self.stats.total_cycles % 20 == 0 {
+                    let embedding = symthaea_core::hdc::ContinuousHV::from_slice(&compressed_state);
+                    let action = crate::consciousness::harmonies_integration::ValuedAction::new(
+                        format!("cycle_{}", self.stats.total_cycles),
+                        input,
+                        embedding,
+                    );
+                    let eval = integrator.evaluate(&action);
+                    (eval.overall_alignment, eval.approved)
+                } else {
+                    (integrator.stats().avg_alignment, true)
+                }
+            } else {
+                (0.0, true)
+            };
+        module_timings.harmonies_integration = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Low harmony alignment → reduce confidence (ethical uncertainty)
+        if harmonies_alignment > 0.0 && !harmonies_approved {
+            self.prediction_confidence = (self.prediction_confidence - 0.02).max(0.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // COMPOSITION RULES: Domain-specific HDC binding operator selection
+        // Selects the best composition rule (temporal-physical, mathematical,
+        // consciousness, cross-tier) for the top-2 active primitives.
+        // Stateless — O(1) rule lookup per cycle.
+        // Science: Plate (2003) — holographic reduced representations.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let composition_rule_applied =
+            if let Some(ref rule_engine) = self.composition_rule_engine {
+                if active_primitive_names.len() >= 2 {
+                    let system = symthaea_core::hdc::primitive_system::PrimitiveSystem::global();
+                    let tier1 = system.get(&active_primitive_names[0])
+                        .map(|p| p.tier)
+                        .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
+                    let tier2 = system.get(&active_primitive_names[1])
+                        .map(|p| p.tier)
+                        .unwrap_or(symthaea_core::hdc::primitive_system::PrimitiveTier::NSM);
+                    rule_engine.matching_rule_name(tier1, tier2).to_string()
+                } else {
+                    String::new()
+                }
+            } else {
+                String::new()
+            };
+        module_timings.composition_rules = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
         // FIDUCIARY HARMONICS: Seven Harmonies field coherence + interference
         // Tracks harmonic levels driven by consciousness metrics, detects tensions.
         // Amortized: every 10 cycles (field update + interference scan).
@@ -4059,6 +4118,9 @@ impl CognitiveLoopService {
             causal_codebook_entries: causal_codebook_entries.len(),
             continuity_replay_triggered: continuity_replay_needed,
             compositionality_total,
+            composition_rule_applied,
+            harmonies_alignment,
+            harmonies_approved,
             value_evaluator_score,
             value_evaluator_decision,
             consciousness_profile_composite,

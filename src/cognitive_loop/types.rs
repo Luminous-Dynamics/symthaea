@@ -395,6 +395,13 @@ pub struct CycleMetadata {
     /// Value evaluator decision this cycle ("" when off).
     pub value_evaluator_decision: String,
 
+    /// Composition rule engine: name of the rule applied this cycle (empty when off).
+    pub composition_rule_applied: String,
+    /// Harmonies integrator: overall value alignment score (0.0–1.0, 0.0 when off).
+    pub harmonies_alignment: f32,
+    /// Harmonies integrator: whether the current action was approved.
+    pub harmonies_approved: bool,
+
     // ── Session 2: Consciousness Profile + Synergies + Context ─────────────
     /// Multi-dimensional consciousness composite score (0.0 when off).
     pub consciousness_profile_composite: f64,
@@ -642,6 +649,8 @@ pub struct ModuleTimings {
     pub unified_consciousness_pipeline: u64,
     pub multi_modal_integration: u64,
     pub semantic_value_embedder: u64,
+    pub composition_rules: u64,
+    pub harmonies_integration: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -575,6 +575,11 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     evolution_coordinator: Option<crate::consciousness::evolution_bridge::EvolutionCoordinator>,
 
+    /// Harmonies integrator: per-action ethical alignment gate using Seven Harmonies.
+    /// Evaluates cycle actions against harmony embeddings for approval/rejection.
+    /// Co-gated with `enable_primitive_consciousness`.
+    harmonies_integrator: Option<crate::consciousness::harmonies_integration::HarmoniesIntegrator>,
+
     /// Semantic value embedder: value-aligned embeddings grounded in primitive tiers.
     /// Maps input embeddings to harmony-scored value-aware representations.
     /// Co-gated with `enable_primitive_consciousness`.
@@ -623,6 +628,12 @@ pub struct CognitiveLoopService {
     /// Multi-modal integration: phi-guided cross-modal binding with convergence zones.
     /// Co-gated with `enable_primitive_consciousness`.
     multi_modal_integrator: Option<crate::consciousness::multi_modal_integration::MultiModalIntegrator>,
+
+    /// Primitive composition rules: domain-specific HDC binding operators.
+    /// Selects TemporalPhysical, Mathematical, Consciousness, or CrossTier rule
+    /// based on operand tiers, yielding semantically structured bindings.
+    /// Co-gated with `enable_primitive_consciousness`.
+    composition_rule_engine: Option<crate::consciousness::primitive_composition_rules::CompositionRuleEngine>,
 
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
