@@ -10,13 +10,13 @@
 
 use std::time::Instant;
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 use symthaea::consciousness::counterfactual::{
     CausalDAG, CausalQuery, CounterfactualReasoner, EffectEstimator, IVEstimator,
     MediationAnalysis, ObservationalData, PCAlgorithm, TimeSeriesCausalDiscovery, TimeSeriesData,
 };
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 fn main() {
     println!("═══════════════════════════════════════════════════════════════════");
     println!("                 CAUSAL REASONING BENCHMARK SUITE                  ");
@@ -40,7 +40,7 @@ fn main() {
     println!("Run with: cargo run --example benchmark_causal_reasoning --features counterfactual");
 }
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 fn bench_dseparation() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│                    D-SEPARATION BENCHMARK                       │");
@@ -73,7 +73,7 @@ fn bench_dseparation() {
     println!();
 }
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 fn bench_pc_algorithm() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│                    PC ALGORITHM BENCHMARK                       │");
@@ -112,7 +112,7 @@ fn bench_pc_algorithm() {
     println!();
 }
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 fn bench_effect_estimation() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│                  EFFECT ESTIMATION BENCHMARK                    │");
@@ -160,7 +160,7 @@ fn bench_effect_estimation() {
     println!();
 }
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 fn bench_iv_estimation() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│                    IV ESTIMATION BENCHMARK                      │");
@@ -195,7 +195,7 @@ fn bench_iv_estimation() {
     println!();
 }
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 fn bench_mediation_analysis() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│                  MEDIATION ANALYSIS BENCHMARK                   │");
@@ -233,7 +233,7 @@ fn bench_mediation_analysis() {
     println!();
 }
 
-#[cfg(feature = "counterfactual")]
+#[cfg(feature = "reasoning_engine")]
 fn bench_time_series_discovery() {
     println!("┌─────────────────────────────────────────────────────────────────┐");
     println!("│               TIME-SERIES DISCOVERY BENCHMARK                   │");

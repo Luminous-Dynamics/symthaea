@@ -470,7 +470,6 @@ name = "meta_conscious_ollama_demo"
 
 [[example]]
 name = "school_coherence_integration"
-required-features = ["physiology_module"]
 
 [[example]]
 name = "cfc_learning_lookahead_prototype"
@@ -489,7 +488,6 @@ name = "conscious_learning_demo"
 
 [[example]]
 name = "embodied_consciousness_learning"
-required-features = ["physiology_module"]
 
 [[example]]
 name = "primitive_decomposition_test"
