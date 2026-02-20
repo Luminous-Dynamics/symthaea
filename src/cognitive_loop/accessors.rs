@@ -930,6 +930,11 @@ impl CognitiveLoopService {
         self.causal_explainer.as_ref()
     }
 
+    /// Borrow the context-aware optimizer (if enabled).
+    pub fn context_optimizer(&self) -> Option<&crate::consciousness::context_aware_evolution::ContextAwareOptimizer> {
+        self.context_optimizer.as_ref()
+    }
+
     /// Borrow the dissipative consciousness model (if enabled).
     pub fn dissipative_consciousness(&self) -> Option<&crate::consciousness::dissipative_consciousness::DissipativeConsciousness> {
         self.dissipative_consciousness.as_ref()
@@ -961,6 +966,31 @@ impl CognitiveLoopService {
         &self,
     ) -> Option<&crate::consciousness::epistemic_conflict::TheoryCalibrator> {
         self.theory_calibrator.as_ref()
+    }
+
+    /// Borrow the holographic consciousness analyzer (if enabled).
+    pub fn holographic_analyzer(&self) -> Option<&crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer> {
+        self.holographic_analyzer.as_ref()
+    }
+
+    /// Borrow the differentiable consciousness model (if enabled).
+    pub fn differentiable_consciousness(&self) -> Option<&crate::consciousness::differentiable::DifferentiableConsciousness> {
+        self.differentiable_consciousness.as_ref()
+    }
+
+    /// Borrow the affective consciousness analyzer (if enabled).
+    pub fn affective_consciousness(&self) -> Option<&crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer> {
+        self.affective_consciousness.as_ref()
+    }
+
+    /// Borrow the unified consciousness pipeline (if enabled).
+    pub fn unified_consciousness_pipeline(&self) -> Option<&crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline> {
+        self.unified_consciousness_pipeline.as_ref()
+    }
+
+    /// Borrow the multi-modal integrator (if enabled).
+    pub fn multi_modal_integrator(&self) -> Option<&crate::consciousness::multi_modal_integration::MultiModalIntegrator> {
+        self.multi_modal_integrator.as_ref()
     }
 
     // ═══════════════════════════════════════════════════════════════════════

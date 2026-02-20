@@ -591,6 +591,29 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     hierarchical_ltc: Option<crate::consciousness::hierarchical_ltc::HierarchicalLTC>,
 
+    /// Holographic consciousness analyzer: interference-based binding and holographic recall.
+    /// Co-gated with `enable_primitive_consciousness`.
+    holographic_analyzer: Option<crate::consciousness::consciousness_holography::HolographicConsciousnessAnalyzer>,
+
+    /// Differentiable consciousness: gradient-based optimization of consciousness components.
+    /// Provides ∂C/∂component gradients for identifying bottlenecks.
+    /// Co-gated with `enable_primitive_consciousness`.
+    differentiable_consciousness: Option<crate::consciousness::differentiable::DifferentiableConsciousness>,
+
+    /// Affective consciousness analyzer: valence-arousal-dominance affect tracking.
+    /// Processes stimuli into core affect, decays over time, learns affective markers.
+    /// Co-gated with `enable_primitive_consciousness`.
+    affective_consciousness: Option<crate::consciousness::affective_consciousness::AffectiveConsciousnessAnalyzer>,
+
+    /// Unified consciousness pipeline: end-to-end sensory→consciousness pipeline.
+    /// Combines HDC encoding, hierarchical LTC, binding, and master equation.
+    /// Co-gated with `enable_primitive_consciousness`.
+    unified_consciousness_pipeline: Option<crate::consciousness::unified_consciousness_pipeline::UnifiedConsciousnessPipeline>,
+
+    /// Multi-modal integration: phi-guided cross-modal binding with convergence zones.
+    /// Co-gated with `enable_primitive_consciousness`.
+    multi_modal_integrator: Option<crate::consciousness::multi_modal_integration::MultiModalIntegrator>,
+
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
     /// that modulates future moral scores as a self-correcting mechanism.
