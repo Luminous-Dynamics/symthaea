@@ -1279,3 +1279,90 @@ fn test_hierarchical_ltc_wired() {
         "Hierarchical LTC accessor should return Some",
     );
 }
+
+// ── Session 6: Holographic + Differentiable + Affective + Pipeline + MultiModal ──
+
+#[test]
+fn test_holographic_and_affective_wired() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 25 cycles (past 20-cycle holographic trigger + 10-cycle affective trigger)
+    let mut last_result = service.cycle("holographic binding analysis");
+    for _ in 1..25 {
+        last_result = service.cycle("affective consciousness dynamics");
+    }
+
+    assert!(
+        last_result.metadata.holographic_unity >= 0.0,
+        "Holographic unity should be non-negative, got: {}",
+        last_result.metadata.holographic_unity,
+    );
+    assert!(
+        last_result.metadata.affect_consciousness_valence.is_finite(),
+        "Affective consciousness valence should be finite, got: {}",
+        last_result.metadata.affect_consciousness_valence,
+    );
+    assert!(
+        service.holographic_analyzer().is_some(),
+        "Holographic analyzer accessor should return Some",
+    );
+    assert!(
+        service.affective_consciousness().is_some(),
+        "Affective consciousness accessor should return Some",
+    );
+}
+
+#[test]
+fn test_differentiable_and_pipeline_wired() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 55 cycles (past 50-cycle pipeline trigger + 25-cycle differentiable trigger)
+    let mut last_result = service.cycle("gradient consciousness optimization");
+    for _ in 1..55 {
+        last_result = service.cycle("unified pipeline processing");
+    }
+
+    assert!(
+        last_result.metadata.consciousness_gradient_magnitude >= 0.0,
+        "Gradient magnitude should be non-negative, got: {}",
+        last_result.metadata.consciousness_gradient_magnitude,
+    );
+    assert!(
+        last_result.metadata.pipeline_consciousness >= 0.0,
+        "Pipeline consciousness should be non-negative, got: {}",
+        last_result.metadata.pipeline_consciousness,
+    );
+}
+
+#[test]
+fn test_multimodal_integration_wired() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 20 cycles (past 15-cycle trigger)
+    let mut last_result = service.cycle("cross-modal binding");
+    for _ in 1..20 {
+        last_result = service.cycle("multi-modal integration");
+    }
+
+    assert!(
+        last_result.metadata.multimodal_integrated_phi >= 0.0,
+        "Multi-modal integrated phi should be non-negative, got: {}",
+        last_result.metadata.multimodal_integrated_phi,
+    );
+    assert!(
+        service.multi_modal_integrator().is_some(),
+        "Multi-modal integrator accessor should return Some",
+    );
+}

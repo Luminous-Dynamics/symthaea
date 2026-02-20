@@ -1988,7 +1988,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         // Maintain ring buffer of last 4 BinaryHVs for multi-component profile
-        self.carryover.recent_hvs.push(hv16_cached.clone());
+        self.carryover.recent_hvs.push(hv16_cached);
         if self.carryover.recent_hvs.len() > 4 {
             self.carryover.recent_hvs.remove(0);
         }
@@ -2021,6 +2021,28 @@ impl CognitiveLoopService {
                 (ctx.description().to_string(), weights.phi_weight)
             } else {
                 (String::new(), 0.0)
+            };
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // SEMANTIC VALUE EMBEDDER: Value-aligned embeddings grounded in primitives
+        // Projects compressed state into value-aware space using primitive-tier
+        // harmony bases. Cached — repeated inputs hit O(1) lookup.
+        // Science: Schwartz (2012) — value theory, Kanerva (2009) — HDC semantics.
+        // ═══════════════════════════════════════════════════════════════════════
+        let (value_embeddings_created, value_cache_hit_rate) =
+            if let Some(ref mut embedder) = self.semantic_value_embedder {
+                if self.stats.total_cycles % 10 == 0 {
+                    let continuous = symthaea_core::hdc::ContinuousHV::from_slice(&compressed_state);
+                    let _concept = embedder.embed(
+                        format!("cycle_{}", self.stats.total_cycles),
+                        continuous,
+                    );
+                    (embedder.stats().embeddings_created, embedder.cache_hit_rate())
+                } else {
+                    (embedder.stats().embeddings_created, embedder.cache_hit_rate())
+                }
+            } else {
+                (0, 0.0)
             };
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2349,27 +2371,33 @@ impl CognitiveLoopService {
         module_timings.hierarchical_ltc = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PRIMITIVE EVOLUTION: Genetic algorithm for primitive optimization
-        // EXPENSIVE — runs every 200 cycles. Constructs fresh PrimitiveEvolution
-        // with small population (10) and few generations (5) for bounded cost.
-        // Science: Holland (1975), Kauffman (1993).
+        // EVOLUTION COORDINATOR: Stateful co-evolution of primitives + architecture
+        // Replaces one-shot PrimitiveEvolution with cross-generation Thompson sampling.
+        // The coordinator manages its own Interleaved schedule internally.
+        // EXPENSIVE — called every 200 cycles (actual evolution runs every 5th step).
+        // Science: Holland (1975), Kauffman (1993), Thompson (1933).
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        if self.primitive_processor.is_some()
-            && self.stats.total_cycles % 200 == 0
-            && self.stats.total_cycles > 0
-        {
-            use crate::consciousness::primitive_evolution::{EvolutionConfig, PrimitiveEvolution};
-            let config = EvolutionConfig {
-                population_size: 10,
-                num_generations: 5,
-                ..Default::default()
+        let (evolution_generation, evolution_phi_delta) =
+            if let Some(ref mut coordinator) = self.evolution_coordinator {
+                if self.stats.total_cycles % 200 == 0 && self.stats.total_cycles > 0 {
+                    match coordinator.step() {
+                        Ok(result) => (result.generation, result.primitive_phi_delta),
+                        Err(_) => (coordinator.generation(), 0.0),
+                    }
+                } else {
+                    (coordinator.generation(), 0.0)
+                }
+            } else {
+                (0, 0.0)
             };
-            if let Ok(mut evolver) = PrimitiveEvolution::new(config) {
-                let _ = evolver.evolve();
-            }
-        }
         module_timings.primitive_evolution = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Positive evolution delta → boost learning rate
+        if evolution_phi_delta > 0.01 {
+            let evo_boost = 1.0 + (evolution_phi_delta * 0.1).min(0.05) as f32; // up to +5%
+            self.carryover.subsystem_lr_factor *= evo_boost;
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // CONSCIOUSNESS HOLOGRAPHY: Interference-based binding and holographic recall
@@ -2512,12 +2540,12 @@ impl CognitiveLoopService {
                     use crate::consciousness::multi_modal_integration::{ModalInput};
                     let visual_input = ModalInput::new(
                         Modality::Visual,
-                        hv16_cached.clone(),
+                        hv16_cached,
                         coherence as f64,
                     );
                     let temporal_input = ModalInput::new(
                         Modality::Temporal,
-                        hv16_cached.clone(),
+                        hv16_cached,
                         unified_psi.clamp(0.0, 1.0),
                     );
                     let result = mmi.integrate(&[visual_input, temporal_input]);
@@ -4054,6 +4082,10 @@ impl CognitiveLoopService {
             reasoning_chain_depth,
             causal_relations_count,
             causal_avg_confidence,
+            evolution_generation,
+            evolution_phi_delta,
+            value_embeddings_created,
+            value_cache_hit_rate,
             adaptive_reasoning_phi,
             epistemic_quality,
             phi_validation_correlation,
