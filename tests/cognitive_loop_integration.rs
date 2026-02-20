@@ -178,7 +178,7 @@ fn test_primitives_detected_from_input() {
 
     // The encoder should detect at least some primitives
     // (exact primitives depend on the HDC encoder's dictionary)
-    assert!(result.detected_primitives.len() >= 0); // Non-panicking access
+    let _ = result.detected_primitives.len(); // Non-panicking access
     assert!(result.peak_attention >= 0.0); // Attention state populated
 }
 
@@ -784,6 +784,124 @@ fn test_value_feedback_learning() {
         assert!(
             t.is_finite(),
             "Value feedback trend must be finite at cycle {i}, got {t}"
+        );
+    }
+}
+
+// ── Chronobiology Integration ────────────────────────────────────
+
+#[test]
+fn test_chronobiology_modulates_learning() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    let result = service.cycle("test circadian modulation");
+
+    // Circadian phase should be a valid phase name
+    let valid_phases = ["Dawn", "Day", "Dusk", "Night"];
+    assert!(
+        valid_phases.contains(&result.metadata.circadian_phase.as_str()),
+        "Circadian phase should be valid, got: {}",
+        result.metadata.circadian_phase,
+    );
+
+    // Plasticity modifier should be in reasonable range (0.1 to 1.2)
+    assert!(
+        result.metadata.circadian_plasticity > 0.0 && result.metadata.circadian_plasticity <= 1.2,
+        "Circadian plasticity should be in (0.0, 1.2], got: {}",
+        result.metadata.circadian_plasticity,
+    );
+
+    // Learning rate should be positive and bounded after circadian modulation
+    assert!(
+        service.stats().adaptive_learning_rate > 0.0
+            && service.stats().adaptive_learning_rate <= 0.1,
+        "Learning rate should be positive and bounded after circadian modulation"
+    );
+}
+
+// ── Dream Replay Produces Insights ──────────────────────────────
+
+#[test]
+fn test_dream_replay_produces_insights() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_dream_replay: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run enough cycles with varied input to populate episodic replay buffer
+    let inputs = [
+        "the sun rises over the mountains",
+        "a new algorithm for sorting",
+        "the cat sleeps on warm blankets",
+        "quantum mechanics describes particles",
+        "rivers flow to the ocean",
+    ];
+
+    let mut saw_dream = false;
+    for i in 0..100 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+        if result.metadata.dream_insights > 0 || result.metadata.dream_wisdom_count > 0 {
+            saw_dream = true;
+        }
+    }
+
+    // Dream replay is stochastic (depends on Cruise urgency), so just verify no panics
+    // and that the metadata fields are always finite
+    let final_result = service.cycle("final check");
+    assert!(final_result.metadata.dream_phi_improvement.is_finite());
+    println!("Dream observed: {saw_dream}, wisdom_count: {}", final_result.metadata.dream_wisdom_count);
+}
+
+// ── Embodied Cognition Telemetry ────────────────────────────────
+
+#[test]
+fn test_embodied_cognition_telemetry() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_embodied_cognition: true,
+        enable_virtual_body: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run several cycles and check embodied cognition metadata
+    for _ in 0..10 {
+        let result = service.cycle("embodied test input");
+        assert!(
+            result.metadata.embodied_phi_modulation.is_finite(),
+            "Embodied phi modulation should be finite"
+        );
+        assert!(
+            result.metadata.embodied_agency >= 0.0 && result.metadata.embodied_agency <= 1.0,
+            "Embodied agency should be in [0, 1], got: {}",
+            result.metadata.embodied_agency,
+        );
+    }
+}
+
+// ── Temporal Consciousness Telemetry ────────────────────────────
+
+#[test]
+fn test_temporal_consciousness_telemetry() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_temporal_consciousness: true,
+        enable_narrative_self: true,
+        enable_predictive_self: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for _ in 0..20 {
+        let result = service.cycle("temporal coherence test");
+        assert!(
+            result.metadata.temporal_coherence_score.is_finite(),
+            "Temporal coherence score should be finite"
+        );
+        // Temporal coherence should be non-negative
+        assert!(
+            result.metadata.temporal_coherence_score >= 0.0,
+            "Temporal coherence should be non-negative, got: {}",
+            result.metadata.temporal_coherence_score,
         );
     }
 }

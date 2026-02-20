@@ -704,19 +704,8 @@ fn test_backend_auto_selection() {
         backend.description()
     );
 
-    // Should resolve to something valid
-    assert!(
-        matches!(backend, GpuBackend::Cpu | GpuBackend::Wgpu) || {
-            #[cfg(feature = "cuda")]
-            {
-                matches!(backend, GpuBackend::Cuda)
-            }
-            #[cfg(not(feature = "cuda"))]
-            {
-                false
-            }
-        }
-    );
+    // Should resolve to something valid (Cuda variant removed — only Cpu or Wgpu)
+    assert!(matches!(backend, GpuBackend::Cpu | GpuBackend::Wgpu));
 }
 
 #[test]

@@ -634,6 +634,14 @@ pub struct CognitiveLoopService {
     /// Tracks action-perception coupling, meaning emergence, and enacted world.
     #[cfg(feature = "full_consciousness")]
     enactive: EnactiveCognition,
+
+    /// Chronobiology: circadian/ultradian rhythm modulation.
+    /// Modulates learning rate (plasticity) and exploration (creativity) based on local time.
+    /// Refreshed every 100 cycles to avoid unnecessary chrono calls.
+    biorhythm: crate::chronobiology::Biorhythm,
+
+    /// Cycle counter for biorhythm refresh (refreshes every 100 cycles).
+    biorhythm_refresh_counter: usize,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

@@ -1,4 +1,4 @@
-#![cfg(all(feature = "embeddings_module", feature = "full_consciousness"))]
+#![cfg(all(feature = "full_consciousness"))]
 //! Integration tests for consciousness critical paths
 //!
 //! Tests the core consciousness infrastructure including:
