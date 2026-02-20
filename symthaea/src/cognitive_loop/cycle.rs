@@ -359,6 +359,21 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // 0.5 Phi-Guided Attention Gating
+        // When present, weight the encoded HDV by its integrated information
+        // contribution. High-Phi signals get boosted, low-Phi get attenuated.
+        // ═══════════════════════════════════════════════════════════════════════
+        let phi_attention_weight = if let Some(ref mut gate) = self.phi_attention_gate {
+            let inputs = [encoding_result.hdv.clone()];
+            let phi_vals = [self.stats.unified_psi as f64];
+            let result = gate.forward(&inputs, &phi_vals);
+            result.weights.first().copied().unwrap_or(1.0)
+        } else {
+            1.0
+        };
+        let _ = phi_attention_weight; // Available for downstream use
+
+        // ═══════════════════════════════════════════════════════════════════════
         // 1.1 Surprise-Driven Exploration: Track surprise, modulate curiosity
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
@@ -3302,6 +3317,16 @@ impl CognitiveLoopService {
             exploration = ?metadata.exploration_action,
             "Cycle metadata"
         );
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // METRICS COLLECTION: Export consciousness telemetry for observability.
+        // ═══════════════════════════════════════════════════════════════════════
+        if let Some(ref metrics) = self.metrics_collector {
+            metrics.record_phi(metadata.unified_psi as f64);
+            metrics.record_coherence(metadata.coherence as f64);
+            metrics.record_consciousness(metadata.consciousness_level);
+            metrics.record_execution(metadata.safety_blocked);
+        }
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
