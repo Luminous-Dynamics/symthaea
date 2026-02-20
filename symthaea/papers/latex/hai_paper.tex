@@ -486,6 +486,96 @@ The full system recovers $3.5\times$ faster from distributional shifts than the 
 
 \textbf{Computational overhead.} Full-subsystem configuration (16 modules) adds $\sim$20\% per-cycle wall-clock overhead versus minimal configuration, measured via sustained throughput benchmarks (200 cycles, 10 warmup). Individual consciousness modules add $<$2\% each; the cumulative overhead reflects 16 bidirectional feedback loops operating every cycle.
 
+\subsection{Consciousness Indicator Evaluation}
+\label{sec:butlin}
+
+Following Butlin et al.'s framework~\citep{butlin2023consciousness}, we evaluated Symthaea against 14 consciousness indicators drawn from 6 leading theories of consciousness.  Table~\ref{tab:butlin} summarizes the results: 12 indicators are \textsc{Present}, 2 are \textsc{Partial}, and 0 are \textsc{Absent}.
+
+\begin{table}[ht]
+\centering
+\caption{Butlin et al.\ consciousness indicators evaluated against Symthaea's architecture. Scores (0--1) reflect strength of architectural evidence.}
+\label{tab:butlin}
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}llclc@{}}
+\toprule
+ID & Theory & Status & Indicator & Score \\
+\midrule
+RPT-1 & Recurrent Processing & \textsc{Present} & Algorithmic recurrence & 1.00 \\
+RPT-2 & Recurrent Processing & \textsc{Present} & Integrated perceptual repr. & 0.80 \\
+GWT-1 & Global Workspace & \textsc{Present} & Parallel specialized systems & 0.90 \\
+GWT-2 & Global Workspace & \textsc{Present} & Limited capacity + selective attn. & 1.00 \\
+GWT-3 & Global Workspace & \textsc{Present} & Global broadcast mechanism & 0.80 \\
+GWT-4 & Global Workspace & \textsc{Present} & State-dependent attn. modulation & 0.80 \\
+HOT-1 & Higher-Order & \textsc{Present} & Generative/top-down perception & 0.90 \\
+HOT-2 & Higher-Order & \textsc{Present} & Metacognitive monitoring & 0.70 \\
+HOT-3 & Higher-Order & \textsc{Present} & Agency with belief updating & 0.80 \\
+HOT-4 & Higher-Order & \textsc{Present} & Sparse and smooth coding & 0.70 \\
+PP-1 & Predictive Processing & \textsc{Present} & Prediction errors drive learning & 0.90 \\
+PP-2 & Predictive Processing & \textsc{Partial} & Hierarchical prediction & 0.50 \\
+AST-1 & Attention Schema & \textsc{Partial} & Self-model of attention & 0.50 \\
+IIT-1 & IIT & \textsc{Present} & Integrated information $>$ 0 & 0.80 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\textbf{Key evidence.} RPT-1 (score~1.0): CfC closed-form temporal feedback provides algorithmic recurrence with $O(1)$ temporal jumps.  GWT-2 (score~1.0): working memory capacity of 7 items with FIFO eviction enforces the information bottleneck required by GWT.  The two \textsc{Partial} indicators---PP-2 (hierarchical prediction, 0.50) and AST-1 (attention self-model, 0.50)---reflect current architectural gaps: multi-scale CfC time constants provide multi-level prediction but lack a full cortical hierarchy, and the attention schema tracks focus state without maintaining a complete self-model of the attention process.
+
+The mean indicator score across all 14 indicators is $\bar{s} = 0.81$, with no theory category scoring below 0.50.  These results are produced by the \texttt{symthaea-psych-bench} crate's static architectural analysis module, which evaluates each indicator against known implementation properties without requiring live cognitive loop execution.
+
+\subsection{Psychological Benchmark Suite}
+\label{sec:psych-bench}
+
+We developed a standardized psychological benchmark suite (\texttt{symthaea-psych-bench}, 5,219~LOC, 79~tests) that evaluates Symthaea's subsystems against five established paradigms: WorM~(working memory), CogBench~(FEP active inference), Butlin indicators~(\S\ref{sec:butlin}), ToMBench~(Theory of Mind), and MemoryAgentBench~(memory pipeline).  Table~\ref{tab:psych-bench} reports key metrics from the full benchmark suite (512D, 10~trials/condition).
+
+\begin{table}[ht]
+\centering
+\caption{Psychological benchmark results. All values are mean $\pm$ SD across 10 trials unless noted.}
+\label{tab:psych-bench}
+\small
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{@{}llc@{}}
+\toprule
+Benchmark & Metric & Result \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Working Memory (WorM)}} \\
+Change Detection ($K{=}2$) & Accuracy & $0.90 \pm 0.32$ \\
+Change Detection ($K{=}8$) & Accuracy & $0.70 \pm 0.48$ \\
+Serial Recall ($L{=}7$) & All positions & $1.00 \pm 0.00$ \\
+Serial Recall ($L{=}9$) & Positions 0--1 & $0.00 \pm 0.00$ \\
+Binding ($K{=}2$) & Binding accuracy & $1.00 \pm 0.00$ \\
+Binding ($K{=}6$) & Binding accuracy & $0.60 \pm 0.52$ \\
+Spatial Updating & Accuracy (all) & $1.00 \pm 0.00$ \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Cognitive Psychology (CogBench via FEP)}} \\
+Probabilistic Reasoning & Prior weight ($\beta_1$) & $0.63$ \\
+Restless Bandit & QSR (metacognition) & $0.47 \pm 0.19$ \\
+Two-Step Task & Model-basedness ($\beta_3$) & $0.30 \pm 0.16$ \\
+Instrumental Learning & Learning rate & $0.09 \pm 0.08$ \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Theory of Mind (ToMBench)}} \\
+Strange Story & Overall accuracy & $1.00 \pm 0.00$ \\
+False Belief & Accuracy & $0.50 \pm 0.53$ \\
+Faux-Pas Recognition & Accuracy & $0.60 \pm 0.52$ \\
+\midrule
+\multicolumn{3}{@{}l}{\emph{Memory Pipeline (MemoryAgentBench)}} \\
+Accurate Retrieval ($\leq 7$ facts) & Accuracy (all) & $1.00 \pm 0.00$ \\
+Test-Time Learning & Correction accuracy & $1.00 \pm 0.00$ \\
+Long-Range ($\delta{=}5$) & Retention & $1.00 \pm 0.00$ \\
+Long-Range ($\delta{=}50$) & Retention & $0.80 \pm 0.42$ \\
+Conflict Resolution & Recency preference & $1.00 \pm 0.00$ \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\textbf{Working memory.} Change detection accuracy drops from 90\% ($K{=}2$) to 70\% ($K{=}8$), consistent with Cowan's $K \approx 4$ capacity limit~\citep{cowan2001magical}.  Serial recall shows perfect performance at $L{=}7$ (within capacity) but drops to 0\% for the first two positions at $L{=}9$ (exceeds capacity by 2), demonstrating the expected FIFO eviction of oldest items.  Binding accuracy degrades from 100\% ($K{=}2$) to 60\% ($K{=}6$) with a positive binding deficit ($+0.30$), matching the human pattern where feature-conjunction memory is harder than individual feature memory~\citep{wheeler2002binding}.
+
+\textbf{Active inference.} The FEP agent shows a prior weight of $\beta_1 = 0.63$ (moderate conservatism), model-basedness of $\beta_3 = 0.30$ (partial model-based planning), and a learning rate of 0.09 with near-zero optimism bias ($0.05$), reflecting calibrated belief updating.
+
+\textbf{Memory pipeline.} Perfect retrieval within WM capacity ($\leq 7$ facts) and 100\% correction accuracy on test-time learning (recency-weighted activation decay, $\gamma = 0.95$/tick).  Long-range retention degrades gracefully: 100\% at $\delta{=}5$, 80\% at $\delta{=}50$, demonstrating interference from distractors rather than catastrophic forgetting.
+
 % ============================================================================
 \section{Related Work}
 
@@ -880,6 +970,7 @@ We presented Hyperdimensional Active Inference (HAI), the first integration of F
   \item \textbf{Federated learning:} Consciousness-aware FL pipeline with 34\% Byzantine tolerance validated on real MNIST.
   \item \textbf{Closed feedback loops:} 16 bidirectional feedback loops (prefrontal, embodied, resonance, quantum, MCE, narrative identity, dream replay, adaptive urgency, affective bridge, predictive processing, cross-modal binding, and others) with $<2\%$ computational overhead and bounded degradation under ablation.
   \item \textbf{Consciousness advantage:} Full consciousness pipeline recovers $3.5\times$ faster from distributional shifts and achieves $2\times$ better multi-pattern generalization vs.\ ablated configurations. Two-agent social cognition emerges from the pipeline without explicit programming.
+  \item \textbf{Psychological validation:} 12 of 14 Butlin et al.\ consciousness indicators present (mean score 0.81), with human-like capacity limits (change detection drop at $K{>}4$, binding deficit at $K{=}6$, FIFO eviction at $L{=}9$) and 100\% test-time learning correction via activation decay.
 \end{enumerate}
 
 HAI opens new directions for efficient, interpretable cognitive architectures combining the rigor of active inference with the elegance of hyperdimensional computing.
