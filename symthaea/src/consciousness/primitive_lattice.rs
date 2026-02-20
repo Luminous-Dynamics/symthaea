@@ -459,6 +459,14 @@ impl PrimitiveLattice {
         }
     }
 
+    /// Find a lattice element's index by its name.
+    ///
+    /// Used to map active primitive names (from `PrimitiveConsciousnessProcessor`)
+    /// to lattice indices for join/meet operations.
+    pub fn element_index_by_name(&self, name: &str) -> Option<usize> {
+        self.elements.iter().position(|e| e.name == name)
+    }
+
     // -----------------------------------------------------------------------
     // Structural queries
     // -----------------------------------------------------------------------

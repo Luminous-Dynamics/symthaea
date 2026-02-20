@@ -69,6 +69,7 @@ pub(crate) struct CycleCarryover {
     /// Last dissipative consciousness health score (0.0–1.0, cached from last update).
     pub(crate) last_dissipative_health: f64,
     /// Last Φ_eff from epistemic conflict (cached, updated every 50 cycles).
+    #[allow(dead_code)]
     pub(crate) last_phi_eff: f64,
     /// Last consciousness equation v2 result (cached, updated every 25 cycles).
     pub(crate) last_equation_v2_consciousness: f64,
