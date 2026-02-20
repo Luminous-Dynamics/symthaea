@@ -1169,6 +1169,33 @@ impl ConsciousnessTemporalAnalyzer {
         chains
     }
 
+    /// Look up the content BinaryHV for a given interval ID.
+    ///
+    /// Searches the stored conscious intervals for one whose ID matches, returning
+    /// a reference to its `content` BinaryHV (if present). Used to bind causal chain
+    /// contents for resonator codebook symbol creation.
+    pub fn interval_content(&self, id: &str) -> Option<&BinaryHV> {
+        self.conscious_intervals
+            .iter()
+            .find(|ci| ci.interval.id == id)
+            .and_then(|ci| ci.content.as_ref())
+    }
+
+    /// Extract cycle numbers from genuine causal chains.
+    ///
+    /// Parses the `"c{N}"` interval ID format used by the cognitive loop to recover
+    /// the original cycle number. Only returns cycle numbers from chains where
+    /// `genuine_causation == true`. Used to boost episodic memory consolidation
+    /// for cycles involved in real causal structure.
+    pub fn genuine_chain_cycle_numbers(&self) -> Vec<u64> {
+        self.causal_chains
+            .iter()
+            .filter(|c| c.genuine_causation)
+            .flat_map(|c| c.intervals.iter())
+            .filter_map(|id| id.strip_prefix('c').and_then(|n| n.parse::<u64>().ok()))
+            .collect()
+    }
+
     /// Analyze consciousness continuity - how smooth is the conscious experience?
     pub fn analyze_continuity(&mut self) -> ContinuityAnalysis {
         let mut gaps = Vec::new();

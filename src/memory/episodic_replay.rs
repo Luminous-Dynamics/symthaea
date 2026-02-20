@@ -685,6 +685,30 @@ impl EpisodicMemory {
         self.episodes.is_empty()
     }
 
+    /// Boost consolidation strength for episodes whose timestamps match causal chain cycle numbers.
+    ///
+    /// When the temporal analyzer detects genuine causal chains, the cycle numbers involved
+    /// represent moments of real causal structure. Boosting their consolidation strength
+    /// in episodic memory makes them more resistant to eviction and more likely to be
+    /// replayed, reinforcing the causal patterns the system discovered.
+    ///
+    /// Drains the heap into a vec, applies boosts, then rebuilds. O(episodes × cycle_numbers).
+    pub fn boost_causal_consolidation(&mut self, cycle_numbers: &[u64], boost: f64) {
+        if cycle_numbers.is_empty() {
+            return;
+        }
+        let mut all: Vec<PrioritizedEpisode> = self.episodes.drain().collect();
+        for pe in &mut all {
+            if cycle_numbers.contains(&pe.episode.timestamp) {
+                pe.episode.consolidation_strength =
+                    (pe.episode.consolidation_strength + boost).min(5.0);
+                // Recalculate priority score with updated consolidation
+                pe.score = pe.episode.priority_score(self.current_cycle, self.config.recency_weight);
+            }
+        }
+        self.episodes.extend(all);
+    }
+
     /// Get all episodes sorted by Phi (highest first)
     pub fn get_top_episodes(&self, n: usize) -> Vec<Episode> {
         let mut sorted: Vec<_> = self.episodes.iter().collect();
