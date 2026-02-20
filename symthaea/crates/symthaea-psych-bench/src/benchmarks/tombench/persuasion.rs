@@ -89,16 +89,20 @@ impl PersuasionBenchmark {
         if detected_persuasion == scenario.has_persuasion { 1.0 } else { 0.0 }
     }
 
-    /// Full trial: FEP behavioral prediction for persuasion detection.
+    /// Full trial: FEP belief detection for persuasion recognition.
     ///
     /// States: [original_intent, persuaded] (dim=2)
-    /// Actions: [resist, comply] (2 actions)
-    /// Target perceives persuasion attempts → accumulated persuasion cues shift belief
-    /// For persuasion: cues shift belief → action = comply (1)
-    /// For neutral: no shift → action = resist (0)
+    /// Observations: [neutral_info, persuasion_cue] (2 obs)
+    ///
+    /// Persuasion detection is a *belief tracking* task: after the target
+    /// perceives a sequence of statements, has their belief shifted toward
+    /// the "persuaded" state? The FEP agent's belief update from accumulated
+    /// observations IS the ToM capability.
+    ///
+    /// Detection: belief.mean[1] > belief.mean[0] indicates persuasion detected.
     #[cfg(feature = "symthaea-backend")]
     fn run_trial_full(&self, _config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64) {
-        use super::applied_tom::{make_observation, predict_behavior, social_agent};
+        use super::applied_tom::{make_observation, social_agent};
 
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
@@ -118,15 +122,14 @@ impl PersuasionBenchmark {
             agent.perceive(&obs);
         }
 
-        // Target wants to maintain original position → prefers original-state obs
-        agent.set_goals(vec![1.0, 0.0], 2.0);
-
-        let (action, probs) = predict_behavior(&mut agent);
-
-        // Persuasion: should comply (action 1); Neutral: should resist (action 0)
-        let expected_action = if scenario.has_persuasion { 1 } else { 0 };
-        let accuracy = if action == expected_action { 1.0 } else { 0.0 };
-        let confidence = probs[expected_action];
+        // Detection: did the agent's belief shift toward persuaded (state 1)?
+        let detected_persuasion = agent.belief.mean[1] > agent.belief.mean[0];
+        let accuracy = if detected_persuasion == scenario.has_persuasion { 1.0 } else { 0.0 };
+        let confidence = if scenario.has_persuasion {
+            agent.belief.mean[1] // confidence in persuasion detection
+        } else {
+            agent.belief.mean[0] // confidence in original intent
+        };
 
         (accuracy, confidence)
     }

@@ -46,12 +46,23 @@ pub fn inject_belief(agent: &mut ActiveInferenceAgent, belief_mean: Vec<f64>) {
     agent.belief.precision = vec![4.0; agent.config.state_dim];
 }
 
-/// Ask the agent to choose an action given its current beliefs + goals.
+/// Ask the agent for its preferred (MAP) action given current beliefs + goals.
 ///
-/// Returns `(selected_action, action_probabilities)`.
+/// Returns `(map_action, action_probabilities)`.
+///
+/// Uses the maximum a posteriori action from the softmax distribution rather
+/// than a stochastic sample. For Theory of Mind tasks we care about the agent's
+/// *preferred* action — not whether a random draw happened to match.
 pub fn predict_behavior(agent: &mut ActiveInferenceAgent) -> (usize, Vec<f64>) {
     let result: ActionSelectionResult = agent.select_action();
-    (result.action, result.action_probabilities)
+    let map_action = result
+        .action_probabilities
+        .iter()
+        .enumerate()
+        .max_by(|(_, a), (_, b)| a.total_cmp(b))
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    (map_action, result.action_probabilities)
 }
 
 /// Convenience: create an observation vector from a slice.

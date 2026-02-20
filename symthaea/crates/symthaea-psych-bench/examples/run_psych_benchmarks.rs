@@ -35,6 +35,10 @@ fn main() {
         .windows(2)
         .find(|w| w[0] == "--json-output")
         .map(|w| PathBuf::from(&w[1]));
+    let filter: Option<String> = args
+        .windows(2)
+        .find(|w| w[0] == "--filter")
+        .map(|w| w[1].to_lowercase());
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -76,6 +80,11 @@ fn main() {
 
     eprintln!("Running {} benchmarks...", benchmarks.len());
     for bench in &benchmarks {
+        if let Some(ref f) = filter {
+            if !bench.name().to_lowercase().contains(f) {
+                continue;
+            }
+        }
         eprint!("  {} ... ", bench.name());
         let result = bench.run(&config);
         eprintln!("{}ms ({} metrics)", result.elapsed_ms, result.metrics.len());
