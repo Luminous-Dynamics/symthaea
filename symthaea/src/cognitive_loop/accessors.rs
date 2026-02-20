@@ -154,7 +154,7 @@ impl CognitiveLoopService {
                 }
 
                 let mut total_loss = 0.0;
-                let mut total_phi = 0.0;
+                let mut total_psi = 0.0;
 
                 for episode in &batch {
                     let loss = replay.replay_training_step(
@@ -164,14 +164,14 @@ impl CognitiveLoopService {
                         self.config.episodic_replay_config.replay_dt,
                     );
                     total_loss += loss;
-                    total_phi += episode.psi;
+                    total_psi += episode.psi;
                 }
 
                 let n = batch.len();
                 return Some(crate::memory::episodic_replay::ReplaySessionResult {
                     episodes_replayed: n,
                     average_loss: total_loss / n as f32,
-                    average_psi: total_phi / n as f64,
+                    average_psi: total_psi / n as f64,
                     skipped: false,
                 });
             }
