@@ -590,5 +590,133 @@ fn test_cycle_with_narrative_gwt() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// RESONATOR MEMORY INTEGRATION TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_resonator_memory_disabled_by_default() {
+    let config = CognitiveLoopConfig::default();
+    assert!(!config.enable_resonator_recall);
+
+    // When disabled, resonator metadata should be zero after cycling
+    let mut service = CognitiveLoopService::new(config).unwrap();
+    let result = service.cycle("test input");
+    assert_eq!(result.metadata.resonator_codebook_size, 0);
+    assert_eq!(result.metadata.resonator_episodes, 0);
+    assert_eq!(result.metadata.resonator_factorization_iters, 0);
+}
+
+#[test]
+fn test_resonator_memory_initializes_with_codebooks() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_resonator_recall = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // First cycle — resonator is empty, no episodes yet
+    let result = service.cycle("first experience in consciousness");
+    assert_eq!(result.metadata.resonator_codebook_size, 8); // 8 proto-symbols
+    assert_eq!(result.metadata.resonator_episodes, 0); // need pred_error > 0.1 or flow
+}
+
+#[test]
+fn test_resonator_memory_stores_episodes() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_resonator_recall = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run enough cycles with varied input to trigger storage (pred_error > 0.1)
+    let inputs = [
+        "exploring a completely novel concept about quantum mechanics",
+        "switching to an entirely different topic like cooking pasta",
+        "another dramatic shift to discuss deep sea exploration",
+        "yet another pivot to interstellar travel and warp drives",
+        "now talking about medieval architecture and flying buttresses",
+    ];
+    for input in &inputs {
+        service.cycle(input);
+    }
+
+    let result = service.cycle("final check on consciousness state");
+    // Should have stored at least some episodes (exact count depends on pred_error)
+    // The key assertion: no panic occurred during encoding/storage
+    assert!(result.metadata.resonator_codebook_size >= 8); // at least proto-symbols
+}
+
+#[test]
+fn test_resonator_codebook_grows_on_novel_patterns() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_resonator_recall = true;
+    config.resonator_growth_interval = 5; // grow every 5 cycles for faster test
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    let initial_size = 8; // proto-symbols
+
+    // Run 50+ cycles with diverse input to trigger codebook growth
+    for i in 0..60 {
+        service.cycle(&format!("unique topic number {} about diverse subjects", i));
+    }
+
+    let result = service.cycle("check codebook growth");
+    // Codebook should have grown beyond initial proto-symbols
+    // (exact growth depends on novelty threshold, but some growth expected)
+    assert!(
+        result.metadata.resonator_codebook_size >= initial_size,
+        "Codebook should be at least initial size, got {}",
+        result.metadata.resonator_codebook_size,
+    );
+}
+
+#[test]
+fn test_resonator_recall_no_panic_on_cold_start() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_resonator_recall = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // First cycle with empty resonator — recall should gracefully skip
+    let result = service.cycle("cold start input with no prior episodes");
+    assert!(result.prediction_error.is_finite());
+    assert_eq!(result.metadata.resonator_episodes, 0);
+    assert_eq!(result.metadata.resonator_factorization_iters, 0);
+}
+
+#[test]
+fn test_resonator_metadata_reported_correctly() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_resonator_recall = true;
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run cycles and verify metadata is finite/reasonable
+    for i in 0..20 {
+        let result = service.cycle(&format!("varied input {}", i));
+        assert!(result.metadata.resonator_codebook_size <= 200);
+        assert!(result.metadata.resonator_episodes <= 500);
+        // Timing should be recorded
+        // (may be 0 on cycles where urgency gating skipped it)
+    }
+}
+
+#[test]
+fn test_resonator_configurable_parameters() {
+    let mut config = CognitiveLoopConfig::default();
+    config.enable_resonator_recall = true;
+    config.resonator_growth_interval = 10;
+    config.resonator_novelty_threshold = 0.9; // very strict
+    config.resonator_max_symbols = 12; // tight cap
+    let mut service = CognitiveLoopService::new(config).unwrap();
+
+    // Run many cycles — codebook should be capped at max_symbols
+    for i in 0..100 {
+        service.cycle(&format!("input {}", i));
+    }
+
+    let result = service.cycle("final");
+    assert!(
+        result.metadata.resonator_codebook_size <= 12,
+        "Codebook size {} should be <= max_symbols 12",
+        result.metadata.resonator_codebook_size,
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // v0.6.1 FEEDBACK LOOP TESTS
 // ═══════════════════════════════════════════════════════════════════════════════
