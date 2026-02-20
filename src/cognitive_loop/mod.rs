@@ -570,6 +570,16 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     context_optimizer: Option<crate::consciousness::context_aware_evolution::ContextAwareOptimizer>,
 
+    /// Evolution coordinator: co-evolves primitives and architecture via Thompson sampling.
+    /// Replaces one-shot PrimitiveEvolution with stateful cross-generation tracking.
+    /// Co-gated with `enable_primitive_consciousness`.
+    evolution_coordinator: Option<crate::consciousness::evolution_bridge::EvolutionCoordinator>,
+
+    /// Semantic value embedder: value-aligned embeddings grounded in primitive tiers.
+    /// Maps input embeddings to harmony-scored value-aware representations.
+    /// Co-gated with `enable_primitive_consciousness`.
+    semantic_value_embedder: Option<crate::consciousness::semantic_value_embedder::SemanticValueEmbedder>,
+
     /// Dissipative consciousness: Prigogine thermodynamic model for consciousness.
     /// Tracks entropy production, order parameters, and criticality distance.
     /// Co-gated with `enable_primitive_consciousness`.

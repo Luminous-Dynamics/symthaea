@@ -428,6 +428,25 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional evolution coordinator (co-gated with primitive consciousness)
+        let evolution_coordinator = if primitive_processor.is_some() {
+            Some(crate::consciousness::evolution_bridge::EvolutionCoordinator::default())
+        } else {
+            None
+        };
+
+        // Build optional semantic value embedder at CfC input dimension (co-gated with primitive consciousness)
+        let semantic_value_embedder = if primitive_processor.is_some() {
+            Some(crate::consciousness::semantic_value_embedder::SemanticValueEmbedder::new(
+                crate::consciousness::semantic_value_embedder::EmbedderConfig {
+                    dimension: config.cfc_config.input_dim,
+                    ..Default::default()
+                },
+            ))
+        } else {
+            None
+        };
+
         // Build optional dissipative consciousness + epistemic conflict + equation v2 + hierarchical LTC
         // (all co-gated with primitive consciousness — NO feature gate)
         let (dissipative_consciousness, epistemic_conflict_detector, theory_calibrator,
@@ -668,6 +687,8 @@ impl CognitiveLoopService {
             phi_validation,
             causal_explainer,
             context_optimizer,
+            evolution_coordinator,
+            semantic_value_embedder,
             dissipative_consciousness,
             epistemic_conflict_detector,
             theory_calibrator,
