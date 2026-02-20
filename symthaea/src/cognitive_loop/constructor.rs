@@ -411,6 +411,13 @@ impl CognitiveLoopService {
                 (None, None, None, None, None, None, None)
             };
 
+        // Build optional causal self-explainer (co-gated with primitive consciousness)
+        let causal_explainer = if primitive_processor.is_some() {
+            Some(crate::consciousness::causal_explanation::CausalExplainer::new())
+        } else {
+            None
+        };
+
         // Build optional dissipative consciousness + equation v2 + hierarchical LTC
         // (co-gated with primitive consciousness)
         let (dissipative_consciousness, consciousness_equation_v2, hierarchical_ltc) =
@@ -627,6 +634,7 @@ impl CognitiveLoopService {
             primitive_reasoner,
             adaptive_reasoner,
             phi_validation,
+            causal_explainer,
             dissipative_consciousness,
             consciousness_equation_v2,
             hierarchical_ltc,
