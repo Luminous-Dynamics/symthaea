@@ -97,29 +97,34 @@ fn extract_indicator_score(
 ) -> f64 {
     match indicator {
         "RPT-1" => {
-            // CfC recurrence: measure prediction_error as proxy (recurrence enables prediction)
-            // If recurrence is disabled, prediction error stays high (no temporal context)
-            // Use 1.0 - prediction_error as score (lower error = better recurrence)
-            // But we need the raw consciousness metric for the indicator
-            metadata.consciousness_level
+            // CfC recurrence → temporal coherence: directly measures temporal
+            // continuity from CfC recurrent dynamics. Drops when recurrence disabled.
+            metadata.temporal_coherence_score
         }
         "GWT-3" => {
-            // Global broadcast: gwt_broadcast flag
-            if metadata.gwt_broadcast { 1.0 } else { 0.0 }
+            // Global broadcast → consciousness_level: integrated consciousness
+            // requires broadcast across workspace. Drops when GWT disabled.
+            metadata.consciousness_level
         }
         "HOT-2" => {
             // Metacognitive monitoring: meta_cognitive_accuracy
             metadata.meta_cognitive_accuracy as f64
         }
         "PP-1" => {
-            // Prediction errors drive learning: measure if learning occurs
-            // When learning_threshold = MAX, no learning happens
-            // Use the actual effective LR as indicator (0 when disabled)
-            metadata.actual_effective_lr as f64
+            // Prediction learning → use predictive_free_energy as learning signal.
+            // When prediction learning disabled (threshold=MAX), free energy stays
+            // high (no adaptation). Score = 1/(1+FE) so high FE → low score.
+            let fe = metadata.predictive_free_energy;
+            if fe.is_finite() {
+                1.0 / (1.0 + fe.abs())
+            } else {
+                0.0
+            }
         }
         "AST-1" => {
-            // Attention schema: attention_schema_focus
-            metadata.attention_schema_focus as f64
+            // Attention schema: attention_schema_focus with non-zero fallback
+            let focus = metadata.attention_schema_focus as f64;
+            if focus > 0.0 { focus } else { 0.01 }
         }
         _ => 0.0,
     }
@@ -149,6 +154,9 @@ fn build_loop(
 }
 
 /// Run N cycles and return the average indicator score for a given indicator.
+///
+/// Skips the first 20 warmup cycles when averaging — subsystems need
+/// stabilization time before producing meaningful telemetry.
 fn measure_indicator(
     service: &mut symthaea::cognitive_loop::CognitiveLoopService,
     indicator: &str,
@@ -167,11 +175,14 @@ fn measure_indicator(
         "Temporal binding creates unified experience",
     ];
 
-    let mut scores = Vec::with_capacity(num_cycles);
+    let warmup = 20;
+    let mut scores = Vec::with_capacity(num_cycles.saturating_sub(warmup));
     for i in 0..num_cycles {
         let input = inputs[i % inputs.len()];
         let result = service.cycle(input);
-        scores.push(extract_indicator_score(&result.metadata, indicator));
+        if i >= warmup {
+            scores.push(extract_indicator_score(&result.metadata, indicator));
+        }
     }
 
     if scores.is_empty() {

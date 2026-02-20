@@ -177,6 +177,99 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
     m
 }
 
+/// Get all executive function baselines (WCST, IGT, Raven's).
+pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
+    let mut m = BTreeMap::new();
+
+    // WCST (Kohli & Kaur, 2006)
+    m.insert(
+        "wcst_categories_completed",
+        Baseline {
+            value: 5.62,
+            source: "Kohli & Kaur (2006), WCST norms",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "wcst_perseverative_errors",
+        Baseline {
+            value: 8.29,
+            source: "Kohli & Kaur (2006), WCST norms",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "wcst_trials_to_first",
+        Baseline {
+            value: 12.17,
+            source: "Kohli & Kaur (2006), WCST norms",
+            population: "human adults",
+        },
+    );
+
+    // IGT (Bechara et al., 1994; Steingroever et al., 2015)
+    m.insert(
+        "igt_overall_net_score",
+        Baseline {
+            value: 17.5,
+            source: "Bechara et al. (1994); Steingroever et al. (2015), midpoint of +10 to +25",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "igt_deck_preference_good",
+        Baseline {
+            value: 0.65,
+            source: "Steingroever et al. (2015), last 40 trials",
+            population: "human adults",
+        },
+    );
+
+    // Raven's Progressive Matrices (Raven, 1938; Murphy et al., 2023)
+    m.insert(
+        "ravens_overall_accuracy",
+        Baseline {
+            value: 0.78,
+            source: "Raven (1938); Murphy et al. (2023), SPM ~47/60",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "ravens_easy_accuracy",
+        Baseline {
+            value: 0.95,
+            source: "Raven (1938), Set A-B",
+            population: "human adults",
+        },
+    );
+
+    m
+}
+
+/// Get all metacognition baselines (calibration).
+pub fn metacognition_baselines() -> BTreeMap<&'static str, Baseline> {
+    let mut m = BTreeMap::new();
+
+    m.insert(
+        "calibration_error_ece",
+        Baseline {
+            value: 0.15,
+            source: "Fleming & Lau (2014), midpoint of 0.10-0.20",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "discrimination_gamma",
+        Baseline {
+            value: 0.50,
+            source: "Fleming & Lau (2014), midpoint of 0.40-0.60",
+            population: "human adults",
+        },
+    );
+
+    m
+}
+
 /// Get all memory agent baselines.
 pub fn memory_agent_baselines() -> BTreeMap<&'static str, Baseline> {
     let mut m = BTreeMap::new();
@@ -212,5 +305,7 @@ mod tests {
         assert!(!cogbench_baselines().is_empty());
         assert!(!tombench_baselines().is_empty());
         assert!(!memory_agent_baselines().is_empty());
+        assert!(!executive_baselines().is_empty());
+        assert!(!metacognition_baselines().is_empty());
     }
 }

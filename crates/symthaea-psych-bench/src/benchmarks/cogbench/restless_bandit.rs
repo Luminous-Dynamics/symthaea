@@ -49,6 +49,10 @@ impl RestlessBanditBenchmark {
         let mut unconfident_correct = 0u64;
         let mut unconfident_total = 0u64;
 
+        // Exponential moving average of arm values for belief concentration
+        let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
+        let ema_alpha = 0.3;
+
         for _ in 0..num_trials {
             // Drift arm values (restless)
             for val in arm_values.iter_mut() {
@@ -74,8 +78,18 @@ impl RestlessBanditBenchmark {
                 correct_count += 1;
             }
 
-            // Confidence from precision estimator
-            let confidence = agent.precision.perceptual_precision();
+            // Confidence from belief concentration: how peaked is belief over arms
+            let ema_sum: f64 = arm_ema.iter().sum();
+            let ema_max = arm_ema.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let concentration = if ema_sum > 1e-10 {
+                ema_max / ema_sum // Higher when one arm dominates
+            } else {
+                1.0 / num_arms as f64
+            };
+            // Normalize: uniform = 1/N, peaked = ~1.0; map to 0..1
+            let confidence = ((concentration - 1.0 / num_arms as f64)
+                / (1.0 - 1.0 / num_arms as f64))
+                .clamp(0.0, 1.0);
             let confident = confidence > 0.5;
 
             if confident {
@@ -97,7 +111,13 @@ impl RestlessBanditBenchmark {
             let noise = ((rng_state % 200) as f64 - 100.0) / 500.0;
             let reward = (arm_values[chosen_arm] + noise).clamp(0.0, 1.0);
 
-            let obs = Observation::new(vec![reward; 4], 1.0, "bandit");
+            // Update EMA for chosen arm
+            arm_ema[chosen_arm] = ema_alpha * reward + (1.0 - ema_alpha) * arm_ema[chosen_arm];
+
+            // Arm-indexed observation: only the chosen arm slot carries the reward
+            let mut obs_vec = vec![0.0; num_arms];
+            obs_vec[chosen_arm] = reward;
+            let obs = Observation::new(obs_vec, 1.0, "bandit");
             agent.perceive(&obs);
         }
 

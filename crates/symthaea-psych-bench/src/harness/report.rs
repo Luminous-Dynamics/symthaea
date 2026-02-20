@@ -168,6 +168,8 @@ impl BenchmarkReport {
         let cog_bl = baselines::cogbench_baselines();
         let tom_bl = baselines::tombench_baselines();
         let mem_bl = baselines::memory_agent_baselines();
+        let exec_bl = baselines::executive_baselines();
+        let meta_bl = baselines::metacognition_baselines();
 
         let mut lines = vec![format!("Psych Benchmark Report ({})", self.timestamp)];
         lines.push(format!("{} benchmarks run", self.results.len()));
@@ -176,7 +178,7 @@ impl BenchmarkReport {
             lines.push(result.summary());
 
             // Add baseline comparisons for known metrics
-            let comparisons = self.find_comparisons(result, &worm_bl, &cog_bl, &tom_bl, &mem_bl);
+            let comparisons = self.find_comparisons(result, &worm_bl, &cog_bl, &tom_bl, &mem_bl, &exec_bl, &meta_bl);
             if !comparisons.is_empty() {
                 lines.push("  --- Baseline Comparisons ---".to_string());
                 for (metric, comp) in &comparisons {
@@ -201,6 +203,8 @@ impl BenchmarkReport {
         cog_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
         tom_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
         mem_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        exec_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
+        meta_bl: &std::collections::BTreeMap<&str, super::baselines::Baseline>,
     ) -> Vec<(String, BaselineComparison)> {
         let mut comps = Vec::new();
         let benchmark = result.benchmark.as_str();
@@ -219,6 +223,17 @@ impl BenchmarkReport {
             ("hinting_accuracy", "hinting_accuracy", tom_bl),
             ("retrieval_accuracy", "accurate_retrieval", mem_bl),
             ("correction_accuracy", "test_time_learning", mem_bl),
+            // Executive
+            ("categories_completed", "wcst_categories_completed", exec_bl),
+            ("perseverative_errors", "wcst_perseverative_errors", exec_bl),
+            ("trials_to_first_category", "wcst_trials_to_first", exec_bl),
+            ("overall_net_score", "igt_overall_net_score", exec_bl),
+            ("deck_preference_good", "igt_deck_preference_good", exec_bl),
+            ("overall_accuracy", "ravens_overall_accuracy", exec_bl),
+            ("easy_accuracy", "ravens_easy_accuracy", exec_bl),
+            // Metacognition
+            ("calibration_error_ece", "calibration_error_ece", meta_bl),
+            ("discrimination_gamma", "discrimination_gamma", meta_bl),
         ];
 
         for (metric_key, baseline_key, baselines) in mappings {
@@ -245,6 +260,7 @@ impl BenchmarkReport {
         // Only return comparisons relevant to this benchmark
         if benchmark.contains("WorM") || benchmark.contains("CogBench")
             || benchmark.contains("ToM") || benchmark.contains("Memory")
+            || benchmark.contains("Executive") || benchmark.contains("Metacognition")
         {
             comps
         } else {

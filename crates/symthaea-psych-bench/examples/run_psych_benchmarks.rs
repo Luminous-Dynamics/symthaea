@@ -13,10 +13,14 @@ use symthaea_psych_bench::benchmarks::cogbench::{
     ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, TemporalDiscountingBenchmark,
     TwoStepBenchmark,
 };
+use symthaea_psych_bench::benchmarks::executive::{
+    IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark, WisconsinCardSortingBenchmark,
+};
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
     TestTimeLearningBenchmark,
 };
+use symthaea_psych_bench::benchmarks::metacognition::MetacognitiveCalibrationBenchmark;
 use symthaea_psych_bench::benchmarks::tombench::{
     FalseBeliefBenchmark, FauxPasBenchmark, HintingBenchmark, PersuasionBenchmark,
     StrangeStoryBenchmark,
@@ -63,6 +67,12 @@ fn main() {
         Box::new(TwoStepBenchmark),
         Box::new(TemporalDiscountingBenchmark),
         Box::new(BartBenchmark),
+        // Executive
+        Box::new(WisconsinCardSortingBenchmark),
+        Box::new(IowaGamblingBenchmark),
+        Box::new(RavensProgressiveMatricesBenchmark),
+        // Metacognition
+        Box::new(MetacognitiveCalibrationBenchmark),
         // Butlin
         Box::new(ButlinIndicatorSuite),
         // ToMBench
