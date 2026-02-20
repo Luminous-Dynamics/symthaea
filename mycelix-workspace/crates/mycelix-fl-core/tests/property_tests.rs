@@ -398,3 +398,285 @@ mod ensemble_tests {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// Coordinate median additional properties
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    /// Identical inputs yield that identical value for coordinate median.
+    #[test]
+    fn coordinate_median_identical_inputs(updates in identical_updates_strategy(6, 5)) {
+        let result = coordinate_median(&updates).unwrap();
+        assert_close("coordinate_median_ident", &result, &updates[0].gradients, 1e-4)?;
+    }
+
+    /// Coordinate median output per dimension lies between min and max of inputs.
+    #[test]
+    fn coordinate_median_in_range(updates in gradient_update_strategy(8, 7)) {
+        let result = coordinate_median(&updates).unwrap();
+        for d in 0..updates[0].gradients.len() {
+            let min_v = updates.iter().map(|u| u.gradients[d]).fold(f32::INFINITY, f32::min);
+            let max_v = updates.iter().map(|u| u.gradients[d]).fold(f32::NEG_INFINITY, f32::max);
+            prop_assert!(
+                result[d] >= min_v - 1e-5 && result[d] <= max_v + 1e-5,
+                "coordinate_median[{}]={} not in [{},{}]", d, result[d], min_v, max_v
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Multi-Krum additional properties
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+
+    /// Multi-Krum output per dimension lies within the convex hull of inputs.
+    #[test]
+    fn multi_krum_output_in_convex_hull(updates in gradient_update_strategy(6, 5)) {
+        let result = multi_krum(&updates, 1, 2).unwrap();
+        for d in 0..updates[0].gradients.len() {
+            let min_v = updates.iter().map(|u| u.gradients[d]).fold(f32::INFINITY, f32::min);
+            let max_v = updates.iter().map(|u| u.gradients[d]).fold(f32::NEG_INFINITY, f32::max);
+            prop_assert!(
+                result[d] >= min_v - 1e-5 && result[d] <= max_v + 1e-5,
+                "multi_krum[{}]={} not in [{},{}]", d, result[d], min_v, max_v
+            );
+        }
+    }
+
+    /// Identical inputs yield that identical value for multi-krum.
+    #[test]
+    fn multi_krum_identical_inputs(updates in identical_updates_strategy(6, 5)) {
+        let result = multi_krum(&updates, 1, 2).unwrap();
+        assert_close("multi_krum_ident", &result, &updates[0].gradients, 1e-4)?;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Geometric median additional properties
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(32))]
+
+    /// Identical inputs yield that identical value for geometric median.
+    #[test]
+    fn geometric_median_identical_inputs(updates in identical_updates_strategy(6, 5)) {
+        let result = geometric_median(&updates, 100, 1e-6).unwrap();
+        assert_close("geometric_median_ident", &result, &updates[0].gradients, 1e-4)?;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Trimmed mean additional properties
+// ---------------------------------------------------------------------------
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(64))]
+
+    /// Identical inputs yield that identical value for trimmed mean.
+    #[test]
+    fn trimmed_mean_identical_inputs(updates in identical_updates_strategy(6, 5)) {
+        let result = trimmed_mean(&updates, 0.15).unwrap();
+        assert_close("trimmed_mean_ident", &result, &updates[0].gradients, 1e-4)?;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Byzantine detection properties
+// ---------------------------------------------------------------------------
+
+mod byzantine_property_tests {
+    use super::*;
+    use mycelix_fl_core::byzantine::{
+        EarlyByzantineDetector, MultiSignalByzantineDetector, cosine_similarity,
+    };
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(32))]
+
+        // Byzantine indices are always a subset of [0, n)
+        #[test]
+        fn early_detector_indices_in_range(updates in gradient_update_strategy(4, 6)) {
+            let detector = EarlyByzantineDetector::new();
+            let result = detector.detect(&updates);
+            for &idx in &result.byzantine_indices {
+                prop_assert!(idx < updates.len(), "Index {} out of range", idx);
+            }
+        }
+
+        #[test]
+        fn multi_signal_indices_in_range(updates in gradient_update_strategy(4, 6)) {
+            let detector = MultiSignalByzantineDetector::new();
+            let result = detector.detect(&updates);
+            for &idx in &result.byzantine_indices {
+                prop_assert!(idx < updates.len(), "Index {} out of range", idx);
+            }
+        }
+
+        // Confidence scores are in [0, 1]
+        #[test]
+        fn early_detector_confidence_bounded(updates in gradient_update_strategy(4, 6)) {
+            let detector = EarlyByzantineDetector::new();
+            let result = detector.detect(&updates);
+            for &c in &result.confidence_scores {
+                prop_assert!(c >= 0.0 && c <= 1.0 + 1e-5, "Confidence {} out of [0,1]", c);
+            }
+        }
+
+        #[test]
+        fn multi_signal_confidence_bounded(updates in gradient_update_strategy(4, 6)) {
+            let detector = MultiSignalByzantineDetector::new();
+            let result = detector.detect(&updates);
+            for &c in &result.confidence_scores {
+                prop_assert!(c >= 0.0 && c <= 1.0 + 1e-5, "Confidence {} out of [0,1]", c);
+            }
+        }
+
+        // Signal breakdown has correct length = n
+        #[test]
+        fn multi_signal_breakdown_complete(updates in gradient_update_strategy(4, 6)) {
+            let detector = MultiSignalByzantineDetector::new();
+            let result = detector.detect(&updates);
+            prop_assert_eq!(result.signal_breakdown.len(), updates.len());
+            for sb in &result.signal_breakdown {
+                prop_assert!(sb.combined_score >= 0.0, "Combined score negative: {}", sb.combined_score);
+                prop_assert!(sb.magnitude_score >= 0.0 && sb.magnitude_score <= 1.0 + 1e-5);
+                prop_assert!(sb.direction_score >= 0.0 && sb.direction_score <= 1.0 + 1e-5);
+                prop_assert!(sb.coordinate_score >= 0.0 && sb.coordinate_score <= 1.0 + 1e-5);
+            }
+        }
+
+        // Cosine similarity properties
+        #[test]
+        fn cosine_self_similarity_is_one(
+            v in prop::collection::vec(1.0f32..10.0f32, 4..=4)
+        ) {
+            let sim = cosine_similarity(&v, &v);
+            prop_assert!((sim - 1.0).abs() < 1e-5, "Self-similarity should be 1.0, got {}", sim);
+        }
+
+        #[test]
+        fn cosine_similarity_bounded(
+            a in prop::collection::vec(-100.0f32..100.0, 4..=4),
+            b in prop::collection::vec(-100.0f32..100.0, 4..=4),
+        ) {
+            let sim = cosine_similarity(&a, &b);
+            prop_assert!(sim >= -1.0 - 1e-5 && sim <= 1.0 + 1e-5,
+                "Cosine similarity {} out of [-1,1]", sim);
+        }
+
+        // Empty input → no byzantine detected
+        #[test]
+        fn early_detector_empty_safe(_x in 0u32..1) {
+            let detector = EarlyByzantineDetector::new();
+            let result = detector.detect(&[]);
+            prop_assert!(result.byzantine_indices.is_empty());
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Hybrid BFT properties
+// ---------------------------------------------------------------------------
+
+mod hybrid_bft_property_tests {
+    use super::*;
+    use mycelix_fl_core::hybrid_bft::{
+        HybridBftConfig, ReputationGradient, hybrid_trimmed_mean, effective_byzantine_fraction,
+    };
+
+    fn rep_gradient_strategy(
+        dim: usize,
+        count: usize,
+    ) -> impl Strategy<Value = Vec<ReputationGradient>> {
+        prop::collection::vec(
+            (
+                prop::collection::vec(-100.0f32..100.0f32, dim..=dim),
+                0.3f32..1.0f32,
+            ),
+            count..=count,
+        )
+        .prop_map(|entries| {
+            entries.into_iter().enumerate().map(|(i, (gradients, rep))| {
+                ReputationGradient {
+                    update: GradientUpdate::new(format!("node-{}", i), 1, gradients, 100, 0.5),
+                    reputation: rep,
+                }
+            }).collect()
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(32))]
+
+        // Output dimension matches input
+        #[test]
+        fn hybrid_output_dimension(contribs in rep_gradient_strategy(6, 5)) {
+            if let Some(result) = hybrid_trimmed_mean(&contribs, &HybridBftConfig::default()) {
+                prop_assert_eq!(result.aggregated.len(), contribs[0].update.gradients.len());
+            }
+        }
+
+        // Output all finite
+        #[test]
+        fn hybrid_output_finite(contribs in rep_gradient_strategy(6, 5)) {
+            if let Some(result) = hybrid_trimmed_mean(&contribs, &HybridBftConfig::default()) {
+                assert_all_finite("hybrid", &result.aggregated)?;
+            }
+        }
+
+        // surviving_count <= gated_count <= total
+        #[test]
+        fn hybrid_count_invariants(contribs in rep_gradient_strategy(6, 8)) {
+            if let Some(result) = hybrid_trimmed_mean(&contribs, &HybridBftConfig::default()) {
+                prop_assert!(result.surviving_count <= result.gated_count);
+                prop_assert!(result.gated_count <= contribs.len());
+            }
+        }
+
+        // trimmed_indices are valid original indices
+        #[test]
+        fn hybrid_trimmed_indices_valid(contribs in rep_gradient_strategy(6, 8)) {
+            let config = HybridBftConfig { trim_fraction: 0.2, ..Default::default() };
+            if let Some(result) = hybrid_trimmed_mean(&contribs, &config) {
+                for &idx in &result.trimmed_indices {
+                    prop_assert!(idx < contribs.len(), "Trimmed index {} out of range", idx);
+                }
+            }
+        }
+
+        // effective_byzantine_fraction in [0, 1]
+        #[test]
+        fn effective_byz_fraction_bounded(
+            total in 10usize..100,
+            byz_frac in 0.0f32..0.5,
+            byz_rep in 0.1f32..1.0,
+            honest_rep in 0.1f32..1.0,
+        ) {
+            let byz = (total as f32 * byz_frac) as usize;
+            let frac = effective_byzantine_fraction(total, byz, byz_rep, honest_rep, 2.0);
+            prop_assert!(frac >= 0.0 && frac <= 1.0 + 1e-5,
+                "Byzantine fraction {} out of [0,1]", frac);
+        }
+
+        // Same reputation → fraction equals raw proportion
+        #[test]
+        fn effective_byz_same_rep_equals_raw(
+            total in 10usize..50,
+            byz_frac in 0.1f32..0.49,
+            rep in 0.3f32..1.0,
+        ) {
+            let byz = (total as f32 * byz_frac) as usize;
+            let frac = effective_byzantine_fraction(total, byz, rep, rep, 2.0);
+            let expected = byz as f32 / total as f32;
+            prop_assert!((frac - expected).abs() < 0.02,
+                "Same rep: got {}, expected {}", frac, expected);
+        }
+    }
+}

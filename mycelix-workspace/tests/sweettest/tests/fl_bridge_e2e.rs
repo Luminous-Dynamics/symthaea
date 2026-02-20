@@ -410,3 +410,127 @@ mod sdk_tests {
         assert!(above > 0.5, "Above-threshold composite {} > 0.5", above);
     }
 }
+
+// ============================================================================
+// FL COHERENCE SERIES & ANOMALY DETECTION TESTS
+// ============================================================================
+
+/// Mirror type for CoherenceRecord from integrity zome
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CoherenceRecord {
+    pub round: u64,
+    pub coherence_value: f32,
+    pub epistemic_confidence: f32,
+    pub byzantine_count: u32,
+    pub node_count: u32,
+    pub defense_level: u32,
+    pub recorded_at: i64,
+}
+
+/// Mirror type for GetCoherenceSeriesInput
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct GetCoherenceSeriesInput {
+    pub start_round: Option<u64>,
+    pub end_round: Option<u64>,
+    pub limit: Option<usize>,
+}
+
+/// Mirror type for CoherenceAnomalyResult
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct CoherenceAnomalyResult {
+    pub round: u64,
+    pub expected_coherence: f32,
+    pub actual_coherence: f32,
+    pub z_score: f32,
+    pub severity: String,
+}
+
+/// Mirror type for ValidatorPipelineResult
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct ValidatorPipelineResult {
+    pub commitment_hash: String,
+    pub aggregated_hv: Vec<u8>,
+    pub method: String,
+    pub gradient_count: u32,
+    pub excluded_count: u32,
+    pub excluded_participants: Vec<String>,
+    // detection_summary is complex nested -- use serde_json::Value
+    pub detection_summary: serde_json::Value,
+}
+
+/// Test that get_coherence_series returns empty vec when no data exists
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore] // Requires Holochain conductor + FL DNA
+async fn test_coherence_series_empty_returns_empty() {
+    let agents = setup_test_agents(
+        &DnaPaths::federated_learning(),
+        "fl-coherence-test",
+        1,
+    )
+    .await;
+
+    let node = &agents[0];
+
+    let input = GetCoherenceSeriesInput {
+        start_round: None,
+        end_round: None,
+        limit: Some(10),
+    };
+
+    let result: Vec<CoherenceRecord> = node
+        .call_zome_fn("federated_learning", "get_coherence_series", input)
+        .await;
+
+    assert!(result.is_empty(), "Should be empty with no pipeline runs");
+}
+
+/// Test that check_coherence_anomalies returns empty with insufficient data
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore] // Requires Holochain conductor + FL DNA
+async fn test_coherence_anomalies_insufficient_data() {
+    let agents = setup_test_agents(
+        &DnaPaths::federated_learning(),
+        "fl-anomaly-test",
+        1,
+    )
+    .await;
+
+    let node = &agents[0];
+
+    let result: Vec<CoherenceAnomalyResult> = node
+        .call_zome_fn("federated_learning", "check_coherence_anomalies", 5u32)
+        .await;
+
+    assert!(result.is_empty(), "Should be empty with <3 data points");
+}
+
+/// Test that run_validator_pipeline fails gracefully with no gradients
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+#[ignore] // Requires Holochain conductor + FL DNA
+async fn test_validator_pipeline_no_gradients_returns_error() {
+    let agents = setup_test_agents(
+        &DnaPaths::federated_learning(),
+        "fl-pipeline-test",
+        1,
+    )
+    .await;
+
+    let node = &agents[0];
+
+    // Round 99 has no submitted gradients -- should return error
+    let result = node
+        .call_zome_fn_fallible::<_, ValidatorPipelineResult>(
+            "federated_learning",
+            "run_validator_pipeline",
+            99u32,
+        )
+        .await;
+
+    assert!(
+        result.is_err(),
+        "Pipeline should fail when no gradients exist for round"
+    );
+}

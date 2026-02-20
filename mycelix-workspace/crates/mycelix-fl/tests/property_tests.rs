@@ -285,3 +285,109 @@ mod coherence_series_properties {
         }
     }
 }
+
+// =============================================================================
+// HV16 Bipolar Conversion Properties
+//
+// Tests the byte→bipolar conversion logic used by the FL coordinator zome.
+// The algorithm is: for each byte, MSB-first, bit=1 → +1.0, bit=0 → -1.0.
+// This is tested here because the zome targets wasm32 and can't run unit tests.
+// =============================================================================
+
+/// Convert HV16 binary bytes to bipolar f32 (same algorithm as pipeline.rs:hv16_to_bipolar)
+fn hv16_to_bipolar(hv_bytes: &[u8]) -> Vec<f32> {
+    hv_bytes
+        .iter()
+        .flat_map(|byte| {
+            (0..8).rev().map(move |i| {
+                if (byte >> i) & 1 == 1 {
+                    1.0f32
+                } else {
+                    -1.0f32
+                }
+            })
+        })
+        .collect()
+}
+
+proptest! {
+    #![proptest_config(ProptestConfig::with_cases(200))]
+
+    /// Output length is always 8x input length.
+    #[test]
+    fn hv16_bipolar_output_length(
+        bytes in prop::collection::vec(0u8..=255, 1..=256)
+    ) {
+        let result = hv16_to_bipolar(&bytes);
+        prop_assert_eq!(result.len(), bytes.len() * 8);
+    }
+
+    /// All output values are exactly +1.0 or -1.0.
+    #[test]
+    fn hv16_bipolar_values_are_unit(
+        bytes in prop::collection::vec(0u8..=255, 1..=128)
+    ) {
+        let result = hv16_to_bipolar(&bytes);
+        for (i, &v) in result.iter().enumerate() {
+            prop_assert!(
+                v == 1.0 || v == -1.0,
+                "Value at index {} is {}, expected ±1.0", i, v,
+            );
+        }
+    }
+
+    /// Deterministic: same input always produces same output.
+    #[test]
+    fn hv16_bipolar_deterministic(
+        bytes in prop::collection::vec(0u8..=255, 1..=64)
+    ) {
+        let r1 = hv16_to_bipolar(&bytes);
+        let r2 = hv16_to_bipolar(&bytes);
+        prop_assert_eq!(r1, r2);
+    }
+}
+
+#[cfg(test)]
+mod hv16_bipolar_unit_tests {
+    use super::hv16_to_bipolar;
+
+    #[test]
+    fn all_zeros_byte() {
+        let result = hv16_to_bipolar(&[0x00]);
+        assert_eq!(result, vec![-1.0; 8]);
+    }
+
+    #[test]
+    fn all_ones_byte() {
+        let result = hv16_to_bipolar(&[0xFF]);
+        assert_eq!(result, vec![1.0; 8]);
+    }
+
+    #[test]
+    fn known_pattern() {
+        // 0b10100101 = 0xA5
+        let result = hv16_to_bipolar(&[0xA5]);
+        assert_eq!(
+            result,
+            vec![1.0, -1.0, 1.0, -1.0, -1.0, 1.0, -1.0, 1.0]
+        );
+    }
+
+    #[test]
+    fn empty_input() {
+        let result = hv16_to_bipolar(&[]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn hv16_full_size() {
+        // HV16 = 2048 bytes = 16384 bipolar values
+        let bytes = vec![0xAA; 2048]; // alternating 1010...
+        let result = hv16_to_bipolar(&bytes);
+        assert_eq!(result.len(), 16384);
+        // 0xAA = 0b10101010 → [1, -1, 1, -1, 1, -1, 1, -1]
+        for chunk in result.chunks(8) {
+            assert_eq!(chunk, &[1.0, -1.0, 1.0, -1.0, 1.0, -1.0, 1.0, -1.0]);
+        }
+    }
+}
