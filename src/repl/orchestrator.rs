@@ -232,6 +232,10 @@ impl ReplOrchestrator {
                 self.connection_state.indicator()
             )),
 
+            "/phi" | "/consciousness" => Some(self.format_phi_analysis()),
+
+            "/attention" | "/attn" => Some(self.format_attention()),
+
             _ if input.starts_with('/') => Some(format!(
                 "Unknown command: {input}. Type /help for available commands."
             )),
@@ -331,6 +335,58 @@ impl ReplOrchestrator {
         }
     }
 
+    /// Format Phi analysis — three-layer consciousness decomposition.
+    fn format_phi_analysis(&self) -> String {
+        if let Some(ref session) = self.session {
+            let s = session.consciousness_state();
+            let loop_stats = session.cognitive.stats();
+            format!(
+                "\n  Three-Layer Consciousness Analysis:\n\
+                   ═════════════════════════════════════\n\
+                   Layer 1 - Psi (fast estimate):    {:.4}\n\
+                   Layer 2 - Sigma (synergistic):    computed every 50 cycles\n\
+                   Layer 3 - Phi (IIT, on demand):   use true_phi module\n\
+                   \n\
+                   Consciousness Level (MCE):        {:.4}\n\
+                   Coherence:                        {:.4}\n\
+                   Moral Score:                      {:.4}\n\
+                   Total Cycles:                     {}\n\
+                   Moral Concerns Detected:          {}\n",
+                s.unified_psi,
+                s.consciousness_level,
+                s.temporal_coherence,
+                loop_stats.moral_score,
+                loop_stats.total_cycles,
+                loop_stats.moral_concerns_detected,
+            )
+        } else {
+            "No local session - phi analysis not available in client mode".to_string()
+        }
+    }
+
+    /// Format attention snapshot — latest attention distribution.
+    fn format_attention(&self) -> String {
+        if let Some(ref session) = self.session {
+            let loop_stats = session.cognitive.stats();
+            format!(
+                "\n  Attention Analysis:\n\
+                   ═════════════════════════════════════\n\
+                   Attention Variance:               {:.4}\n\
+                   Prediction Error:                 {:.4}\n\
+                   Effective Learning Rate:          {:.6}\n\
+                   Curiosity:                        {:.4}\n\
+                   Exploration Urge:                 {:.4}\n",
+                loop_stats.attention_variance,
+                loop_stats.avg_prediction_error,
+                loop_stats.effective_learning_rate,
+                loop_stats.curiosity,
+                loop_stats.exploration_urge,
+            )
+        } else {
+            "No local session - attention data not available in client mode".to_string()
+        }
+    }
+
     /// Get help text
     fn help_text(&self) -> String {
         format!(
@@ -345,6 +401,8 @@ impl ReplOrchestrator {
     Introspection:
       /metrics, /m         Display consciousness metrics
       /stats, /s           Display session statistics
+      /phi                 Three-layer consciousness analysis (Psi/Sigma/Phi)
+      /attention, /attn    Attention distribution and learning stats
       /connection, /c      Show IPC connection status
 
     State Management:

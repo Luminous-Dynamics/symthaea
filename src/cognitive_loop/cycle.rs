@@ -3322,10 +3322,10 @@ impl CognitiveLoopService {
         // METRICS COLLECTION: Export consciousness telemetry for observability.
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref metrics) = self.metrics_collector {
-            metrics.record_phi(metadata.unified_psi as f64);
-            metrics.record_coherence(metadata.coherence as f64);
-            metrics.record_consciousness(metadata.consciousness_level);
-            metrics.record_execution(metadata.safety_blocked);
+            metrics.set_phi(unified_psi);
+            metrics.set_coherence(coherence as f64);
+            metrics.set_consciousness_level(metadata.consciousness_level);
+            metrics.track_execution(metadata.safety_blocked, false);
         }
 
         // Pre-compute identity fields before moving output
