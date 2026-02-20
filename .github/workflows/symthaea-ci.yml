@@ -186,6 +186,10 @@ jobs:
           # Multi-feature combinations (test interactions)
           - reasoning_engine,code_generation
           - code_generation,neural-bridge
+          - full_consciousness,reasoning_engine
+          - magi_loop
+          - full_language
+          - support
     defaults:
       run:
         working-directory: symthaea
