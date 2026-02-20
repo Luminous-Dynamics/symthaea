@@ -2816,12 +2816,9 @@ impl CognitiveLoopService {
             };
         module_timings.meta_cognitive_reasoning = _t.elapsed().as_micros() as u64;
 
-        // FEEDBACK: High meta-cognitive confidence boosts learning rate
-        // Science: Nelson & Narens (1990) — monitoring-control loop
-        if meta_reasoning_confidence > 0.7 {
-            let meta_boost = (meta_reasoning_confidence - 0.7) * 0.1;
-            self.fep_lr_boost = (self.fep_lr_boost + meta_boost as f32).clamp(1.0, 2.0);
-        }
+        // NOTE: Meta-cognitive confidence is recorded in metadata for observability
+        // but does NOT feed back into LR because the internal PrimitiveEvolution
+        // uses non-seeded rand::random(), which would break genesis determinism.
 
         // ═══════════════════════════════════════════════════════════════════════
         // CODE PRIMITIVE ROUTER: Consciousness-aware code reasoning
@@ -2883,11 +2880,9 @@ impl CognitiveLoopService {
             };
         module_timings.empathic_unification = _t.elapsed().as_micros() as u64;
 
-        // FEEDBACK: High compassion slightly boosts LR (empathic learning bias)
-        if empathic_compassion > 0.7 {
-            self.carryover.subsystem_lr_factor *= 1.0 + (empathic_compassion as f32 - 0.7) * 0.02;
-            self.carryover.subsystem_lr_factor = self.carryover.subsystem_lr_factor.clamp(0.8, 1.2);
-        }
+        // NOTE: Empathic compassion is recorded in metadata for observability
+        // but does NOT feed back into LR because UserStateInference may use
+        // timing-dependent state, which would break genesis determinism.
 
         // ═══════════════════════════════════════════════════════════════════════
         // MULTI-OBJECTIVE EVOLUTION: Pareto-frontier consciousness optimization
