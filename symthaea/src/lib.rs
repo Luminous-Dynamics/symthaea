@@ -323,8 +323,8 @@ pub mod resonant_speech;
 // Embeddings (extracted to symthaea-embeddings crate)
 pub use symthaea_embeddings as embeddings;
 
-// Benchmarks: causal validation tests (not criterion benchmarks)
-#[cfg(test)]
+// Benchmarks: causal validation tests (not criterion benchmarks).
+// Unconditional so integration tests in tests/ can import these types.
 pub mod benchmarks;
 
 // Integration (cfg-gated - needs significant API alignment)
@@ -386,8 +386,8 @@ pub mod identity;
 // GUI bridge (enabled - 0 errors)
 pub mod gui_bridge;
 
-// Physics: Spark Engine, plasma encoding, and physical simulations
-// Tokamak/plasma domain — gated behind `physics` feature to keep default builds lean
+// Physics: tokamak plasma encoding, C-Mod adapter, Phi-based control loops
+// Kept in-crate (not extracted) due to deps on consciousness::fep_active_inference + language::phi_monitor
 #[cfg(feature = "physics")]
 pub mod physics;
 

@@ -169,7 +169,7 @@ impl SynergisticIntegration {
     // ─── Internal helpers ──────────────────────────────────────────────
 
     /// Build n×n covariance matrix from window snapshots.
-    fn covariance_matrix(&self, n: usize, t: usize) -> Vec<f64> {
+    pub(crate) fn covariance_matrix(&self, n: usize, t: usize) -> Vec<f64> {
         let mut means = vec![0.0f64; n];
         for snap in &self.window {
             for (i, &v) in snap.iter().enumerate().take(n) {
@@ -232,7 +232,7 @@ impl SynergisticIntegration {
     }
 
     /// Exhaustive bipartition MIP search (2^(n-1) - 1 partitions).
-    fn exhaustive_mip(&self, cov: &[f64], n: usize) -> f64 {
+    pub(crate) fn exhaustive_mip(&self, cov: &[f64], n: usize) -> f64 {
         let mut min_mi = f64::MAX;
         // Enumerate all bipartitions: bit i indicates which side
         // Only need half of 2^n due to symmetry (fix element 0 in partition A)
@@ -263,7 +263,7 @@ impl SynergisticIntegration {
     }
 
     /// Greedy MIP search for n > 16: iteratively move the element that reduces MI most.
-    fn greedy_mip(&self, cov: &[f64], n: usize) -> f64 {
+    pub(crate) fn greedy_mip(&self, cov: &[f64], n: usize) -> f64 {
         // Start with balanced partition: first half / second half
         let mut part_a: Vec<usize> = (0..n / 2).collect();
         let mut part_b: Vec<usize> = (n / 2..n).collect();

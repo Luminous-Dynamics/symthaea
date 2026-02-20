@@ -89,6 +89,8 @@ pub struct ActiveInferenceAgent {
     pub stats: ActiveInferenceAgentStats,
     /// Current timestamp counter
     timestamp: u64,
+    /// RNG state for stochastic action sampling
+    rng_state: u64,
 }
 
 impl ActiveInferenceAgent {
@@ -124,6 +126,7 @@ impl ActiveInferenceAgent {
             last_fe_components: None,
             stats: ActiveInferenceAgentStats::default(),
             timestamp: 0,
+            rng_state: 0x9E3779B97F4A7C15, // Golden ratio hash — good default seed
         }
     }
 
@@ -290,13 +293,24 @@ impl ActiveInferenceAgent {
         let sum_exp: f64 = exp_values.iter().sum();
         let probabilities: Vec<f64> = exp_values.iter().map(|e| e / sum_exp).collect();
 
-        // Select action with highest probability (greedy for now)
-        let selected_idx = probabilities
-            .iter()
-            .enumerate()
-            .max_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(i, _)| i)
-            .unwrap_or(0);
+        // Stochastic action selection: sample from softmax distribution
+        let selected_idx = {
+            // xorshift64 step
+            self.rng_state ^= self.rng_state << 13;
+            self.rng_state ^= self.rng_state >> 7;
+            self.rng_state ^= self.rng_state << 17;
+            let u = (self.rng_state as f64) / (u64::MAX as f64); // uniform [0, 1)
+            let mut cumulative = 0.0;
+            let mut idx = probabilities.len() - 1;
+            for (i, &p) in probabilities.iter().enumerate() {
+                cumulative += p;
+                if u < cumulative {
+                    idx = i;
+                    break;
+                }
+            }
+            idx
+        };
 
         let selected = &efe_results[selected_idx];
 

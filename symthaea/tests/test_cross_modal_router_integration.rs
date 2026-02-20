@@ -12,7 +12,7 @@
 //! salience, consciousness level (Φ), context, and goals.
 
 use symthaea::hdc::binary_hv::BinaryHV;
-use symthaea::hdc::cross_modal_attention_router::{
+use symthaea::hdc::core_attention_router::{
     CrossModalAttentionRouter, ModalityInput, RouterConfig,
 };
 use symthaea::hdc::cross_modal_binding::Modality;

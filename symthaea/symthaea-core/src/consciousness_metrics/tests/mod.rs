@@ -25,4 +25,5 @@ mod parallel_tests;
 mod pyphi_tests;
 mod quantum_tests;
 mod simd_tests;
+mod spectral_mip_tests;
 mod temporal_tests;

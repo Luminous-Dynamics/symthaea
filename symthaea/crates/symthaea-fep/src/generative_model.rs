@@ -66,7 +66,7 @@ impl GenerativeModel {
                 // Self-transition
                 transition[i][i] = 0.7;
                 // Action-dependent bias
-                let bias_direction = if action_idx % 2 == 0 { 1 } else { -1 };
+                let bias_direction = if action_idx % 2 == 0 { -1 } else { 1 };
                 let next_i = ((i as isize + bias_direction).max(0) as usize).min(state_dim - 1);
                 transition[i][next_i] += 0.2;
                 // Small transitions to other states
