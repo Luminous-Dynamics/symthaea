@@ -258,14 +258,14 @@ pub(crate) fn compute_shapley_values_from_gradients(
         && hv_data.as_ref().map_or(false, |hvs| !hvs.is_empty());
 
     if use_real_shapley {
-        let hvs = hv_data.unwrap();
+        let hvs = hv_data.as_ref().unwrap();
 
         // Build gradient_map: convert HV16 bytes to bipolar f32 for Shapley
         let mut gradient_map: std::collections::HashMap<String, Vec<f32>> =
             std::collections::HashMap::new();
 
-        for (node_id, hv_bytes) in &hvs {
-            if byzantine_nodes.contains(node_id) {
+        for (node_id, hv_bytes) in hvs.iter() {
+            if byzantine_nodes.contains(node_id.as_str()) {
                 continue;
             }
             gradient_map.insert(node_id.clone(), crate::pipeline::hv16_to_bipolar(hv_bytes));
@@ -319,12 +319,12 @@ pub(crate) fn compute_shapley_values_from_gradients(
     // Use marginal-contribution sampling (lightweight Shapley approximation).
     // For each participant, estimate their contribution by comparing the aggregated
     // result with and without their gradient, using cosine similarity as the utility.
-    if let Some(hvs) = hv_data {
+    if let Some(ref hvs) = hv_data {
         if !hvs.is_empty() {
             let mut gradient_map: std::collections::HashMap<String, Vec<f32>> =
                 std::collections::HashMap::new();
-            for (node_id, hv_bytes) in &hvs {
-                if !byzantine_nodes.contains(node_id) {
+            for (node_id, hv_bytes) in hvs.iter() {
+                if !byzantine_nodes.contains(node_id.as_str()) {
                     gradient_map.insert(node_id.clone(), crate::pipeline::hv16_to_bipolar(hv_bytes));
                 }
             }
