@@ -258,5 +258,14 @@ symthaea-core.stale-v0.1/
 11-meta-consciousness/nsfw/
 docs/examples/
 
+# === Archived Libraries (reference only, not built) ===
+mycelix-core/libs/fl-aggregator.archived-v0.1/
+
+# === Vite Cache ===
+mycelix-workspace/.vite/
+
+# === Personal Configs (machine-specific) ===
+configs/
+
 # === Claude Session Artifacts ===
 .claude-sessions/
