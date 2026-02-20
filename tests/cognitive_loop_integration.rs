@@ -950,6 +950,113 @@ fn test_lattice_structural_properties() {
     );
 }
 
+// ── Session 1-4 Module Wiring ──────────────────────────────────
+
+#[test]
+fn test_compositionality_and_value_evaluator_wired() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 25 cycles to hit value evaluator amortization (every 20 cycles)
+    let mut last_result = service.cycle("compositionality test");
+    for _ in 1..25 {
+        last_result = service.cycle("value alignment check");
+    }
+
+    // Compositionality engine should be present
+    assert!(service.compositionality_engine().is_some());
+    // Value evaluator should be present
+    assert!(service.value_evaluator().is_some());
+    // Value score should have been computed at cycle 20
+    assert!(
+        last_result.metadata.value_evaluator_score >= 0.0,
+        "Value evaluator score should be non-negative, got: {}",
+        last_result.metadata.value_evaluator_score
+    );
+}
+
+#[test]
+fn test_harmonics_and_consciousness_profile_wired() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 15 cycles to hit harmonic amortization (every 10 cycles)
+    let mut last_result = service.cycle("harmony test");
+    for _ in 1..15 {
+        last_result = service.cycle("harmonic coherence");
+    }
+
+    // Harmonic field should be present
+    assert!(service.harmonic_field().is_some());
+    // Field coherence should have been computed
+    assert!(
+        last_result.metadata.harmonic_field_coherence >= 0.0,
+        "Harmonic field coherence should be non-negative"
+    );
+    // Consciousness profile computed at cycle 10
+    assert!(
+        last_result.metadata.consciousness_profile_composite.is_finite(),
+        "Consciousness profile composite should be finite"
+    );
+}
+
+#[test]
+fn test_reasoning_modules_wired() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 55 cycles to hit both amortization points (25 and 50)
+    let mut last_result = service.cycle("reasoning test");
+    for _ in 1..55 {
+        last_result = service.cycle("analogical reasoning chain");
+    }
+
+    // Reasoners should be present
+    assert!(service.primitive_reasoner().is_some());
+    assert!(service.adaptive_reasoner().is_some());
+    // Reasoning should have produced results
+    assert!(
+        last_result.metadata.reasoning_chain_confidence.is_finite(),
+        "Reasoning confidence should be finite"
+    );
+    assert!(
+        last_result.metadata.adaptive_reasoning_phi.is_finite(),
+        "Adaptive reasoning Phi should be finite"
+    );
+}
+
+#[test]
+fn test_epistemic_tiers_wired() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 55 cycles to hit epistemic amortization (every 50 cycles)
+    let mut last_result = service.cycle("epistemic classification");
+    for _ in 1..55 {
+        last_result = service.cycle("knowledge verification");
+    }
+
+    // Epistemic quality should have been classified
+    assert!(
+        last_result.metadata.epistemic_quality >= 0.0
+            && last_result.metadata.epistemic_quality <= 1.0,
+        "Epistemic quality should be in [0,1], got: {}",
+        last_result.metadata.epistemic_quality
+    );
+}
+
 // ── Temporal Consciousness Telemetry ────────────────────────────
 
 #[test]

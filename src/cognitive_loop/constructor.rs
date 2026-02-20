@@ -382,6 +382,35 @@ impl CognitiveLoopService {
             (None, None)
         };
 
+        // Build optional compositionality engine + value evaluator + harmonics + reasoning + validation
+        // (all co-gated with primitive consciousness)
+        let (compositionality_engine, value_evaluator, harmonic_field, harmonic_resolver,
+             primitive_reasoner, adaptive_reasoner, phi_validation) =
+            if primitive_processor.is_some() {
+                let comp_engine = {
+                    let ps = std::sync::Arc::new(
+                        symthaea_core::hdc::primitive_system::PrimitiveSystem::new(),
+                    );
+                    crate::consciousness::compositionality::CompositionalityEngine::new(
+                        ps,
+                        crate::consciousness::compositionality::CompositionalityConfig::default(),
+                    )
+                };
+                let val_eval = crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator::new();
+                let hf = crate::consciousness::harmonics::HarmonicField::new();
+                let hr = crate::consciousness::harmonics::HarmonicResolver::new();
+                let pr = crate::consciousness::primitive_reasoning::PrimitiveReasoner::new(
+                    crate::consciousness::primitive_reasoning::ReasonerConfig::default(),
+                );
+                let ar = crate::consciousness::adaptive_reasoning::AdaptiveReasoner::new(
+                    symthaea_core::hdc::primitive_system::PrimitiveTier::NSM,
+                );
+                let pv = crate::consciousness::phi_validation::PhiValidationFramework::new();
+                (Some(comp_engine), Some(val_eval), Some(hf), Some(hr), Some(pr), Some(ar), Some(pv))
+            } else {
+                (None, None, None, None, None, None, None)
+            };
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -574,6 +603,13 @@ impl CognitiveLoopService {
             primitive_processor,
             temporal_analyzer,
             primitive_lattice,
+            compositionality_engine,
+            value_evaluator,
+            harmonic_field,
+            harmonic_resolver,
+            primitive_reasoner,
+            adaptive_reasoner,
+            phi_validation,
             value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop::default(),
             #[cfg(feature = "support")]
             support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),

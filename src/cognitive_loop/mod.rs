@@ -534,6 +534,34 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     primitive_lattice: Option<crate::consciousness::primitive_lattice::PrimitiveLattice>,
 
+    /// Compositionality engine: algebraic composition of primitives (sequential, parallel, etc.).
+    /// Co-gated with `enable_primitive_consciousness`.
+    compositionality_engine: Option<crate::consciousness::compositionality::CompositionalityEngine>,
+
+    /// Unified value evaluator: Seven Harmonies alignment scoring.
+    /// Co-gated with `enable_primitive_consciousness`.
+    value_evaluator: Option<crate::consciousness::unified_value_evaluator::UnifiedValueEvaluator>,
+
+    /// Harmonic field: tracks strength of each of the Seven Fiduciary Harmonics.
+    /// Co-gated with `enable_primitive_consciousness`.
+    harmonic_field: Option<crate::consciousness::harmonics::HarmonicField>,
+
+    /// Harmonic resolver: resolves conflicts between harmonics.
+    /// Co-gated with `enable_primitive_consciousness`.
+    harmonic_resolver: Option<crate::consciousness::harmonics::HarmonicResolver>,
+
+    /// Primitive reasoner: HDC-based analogical reasoning with concept binding.
+    /// Co-gated with `enable_primitive_consciousness`.
+    primitive_reasoner: Option<crate::consciousness::primitive_reasoning::PrimitiveReasoner>,
+
+    /// Adaptive reasoner: Q-learning-guided primitive selection for reasoning chains.
+    /// Co-gated with `enable_primitive_consciousness`.
+    adaptive_reasoner: Option<crate::consciousness::adaptive_reasoning::AdaptiveReasoner>,
+
+    /// Phi validation framework: empirical validation of Phi against synthetic states.
+    /// Co-gated with `enable_primitive_consciousness`. Expensive — runs rarely.
+    phi_validation: Option<crate::consciousness::phi_validation::PhiValidationFramework>,
+
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
     /// that modulates future moral scores as a self-correcting mechanism.
