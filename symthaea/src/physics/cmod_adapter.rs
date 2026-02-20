@@ -684,76 +684,13 @@ pub fn load_csv(path: &Path) -> Result<Vec<CModShot>> {
     Ok(shots)
 }
 
-/// Load C-Mod data from HDF5 file (requires hdf5 feature)
-#[cfg(feature = "hdf5")]
-pub fn load_hdf5(path: &Path) -> Result<Vec<CModShot>> {
-    use hdf5::File;
-
-    let file = File::open(path).map_err(|e| anyhow!("Failed to open HDF5 file: {}", e))?;
-
-    let mut shots = Vec::new();
-
-    // Iterate over shot groups
-    for shot_name in file.member_names()? {
-        let shot_group = file.group(&shot_name)?;
-
-        // Parse shot_id from group name
-        let shot_id: u32 = shot_name.trim_start_matches("shot_").parse().unwrap_or(0);
-
-        let mut shot = CModShot::new(shot_id);
-
-        // Read disruption info
-        if let Ok(attr) = shot_group.attr("disrupted") {
-            shot.disrupted = attr.read_scalar::<i32>()? != 0;
-        }
-        if let Ok(attr) = shot_group.attr("disruption_time_ms") {
-            shot.disruption_time_ms = Some(attr.read_scalar::<f64>()?);
-        }
-
-        // Read time array
-        let time_ms: Vec<f64> = shot_group.dataset("time_ms")?.read_raw()?;
-
-        // Read sensor arrays
-        let ip: Vec<f32> = shot_group.dataset("ip")?.read_raw()?;
-        let ne: Vec<f32> = shot_group.dataset("ne")?.read_raw()?;
-        let te: Vec<f32> = shot_group.dataset("te")?.read_raw()?;
-        let prad: Vec<f32> = shot_group.dataset("prad")?.read_raw()?;
-        let vloop: Vec<f32> = shot_group.dataset("vloop")?.read_raw()?;
-        let q95: Vec<f32> = shot_group.dataset("q95")?.read_raw()?;
-        let wmhd: Vec<f32> = shot_group.dataset("wmhd")?.read_raw()?;
-        let beta: Vec<f32> = shot_group.dataset("beta")?.read_raw()?;
-
-        // Create samples
-        for i in 0..time_ms.len() {
-            let sample = CModSample {
-                shot_id,
-                time_ms: time_ms[i],
-                ip: *ip.get(i).unwrap_or(&f32::NAN),
-                ne: *ne.get(i).unwrap_or(&f32::NAN),
-                te: *te.get(i).unwrap_or(&f32::NAN),
-                prad: *prad.get(i).unwrap_or(&f32::NAN),
-                vloop: *vloop.get(i).unwrap_or(&f32::NAN),
-                q95: *q95.get(i).unwrap_or(&f32::NAN),
-                wmhd: *wmhd.get(i).unwrap_or(&f32::NAN),
-                beta: *beta.get(i).unwrap_or(&f32::NAN),
-                is_disruption: false,
-                time_to_disruption_ms: None,
-            };
-            shot.add_sample(sample);
-        }
-
-        shots.push(shot);
-    }
-
-    shots.sort_by_key(|s| s.shot_id);
-    Ok(shots)
-}
-
-/// Stub for HDF5 loading when feature is disabled
-#[cfg(not(feature = "hdf5"))]
+/// Load C-Mod data from HDF5 file.
+///
+/// HDF5 support was removed (no system HDF5 library available).
+/// Use `load_csv` or `load_synthetic` instead.
 pub fn load_hdf5(_path: &Path) -> Result<Vec<CModShot>> {
     Err(anyhow!(
-        "HDF5 support not enabled. Compile with --features hdf5"
+        "HDF5 support removed. Use load_csv or load_synthetic instead."
     ))
 }
 

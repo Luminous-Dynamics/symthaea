@@ -1,4 +1,3 @@
-#![cfg(feature = "voice_module")]
 //! Voice Module Integration Tests
 //!
 //! Tests for the voice interface components that don't require

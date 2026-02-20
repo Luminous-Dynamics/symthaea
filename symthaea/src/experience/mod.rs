@@ -31,11 +31,8 @@ pub mod kosmic_state;
 pub mod memory;
 pub mod signals;
 
-#[cfg(feature = "databases_module")]
 pub mod analytics;
-#[cfg(feature = "databases_module")]
 pub mod reasoning_engine;
-#[cfg(feature = "databases_module")]
 pub mod vector_store;
 
 use serde::{Deserialize, Serialize};

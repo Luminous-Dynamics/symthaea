@@ -75,7 +75,6 @@ pub struct NetworkClient {
     /// Gateway base URL
     gateway_url: String,
     /// HTTP client
-    #[cfg(feature = "network")]
     client: reqwest::Client,
     /// Cache for K-Vectors
     cache: Option<(Vec<NetworkKVector>, Instant)>,
@@ -88,7 +87,6 @@ impl NetworkClient {
     pub fn new(gateway_url: impl Into<String>) -> Self {
         Self {
             gateway_url: gateway_url.into(),
-            #[cfg(feature = "network")]
             client: reqwest::Client::builder()
                 .timeout(Duration::from_secs(10))
                 .build()
@@ -105,7 +103,6 @@ impl NetworkClient {
     }
 
     /// Fetch K-Vectors from the gateway
-    #[cfg(feature = "network")]
     pub async fn fetch_k_vectors(&mut self) -> Result<Vec<NetworkKVector>, NetworkError> {
         // Check cache
         if let Some((ref cached, timestamp)) = self.cache {
@@ -157,26 +154,6 @@ impl NetworkClient {
         self.cache = Some((k_vectors.clone(), Instant::now()));
 
         Ok(k_vectors)
-    }
-
-    /// Fallback: return mock K-Vectors when network feature is disabled
-    #[cfg(not(feature = "network"))]
-    pub async fn fetch_k_vectors(&mut self) -> Result<Vec<NetworkKVector>, NetworkError> {
-        // Return synthetic K-Vectors for testing without network
-        Ok(vec![
-            NetworkKVector {
-                agent: "mock-agent-001".to_string(),
-                k_vector: vec![0.5, 0.6, 0.7, 0.4, 0.8, 0.3, 0.9, 0.2],
-            },
-            NetworkKVector {
-                agent: "mock-agent-002".to_string(),
-                k_vector: vec![0.6, 0.5, 0.8, 0.3, 0.7, 0.4, 0.8, 0.3],
-            },
-            NetworkKVector {
-                agent: "mock-agent-003".to_string(),
-                k_vector: vec![0.4, 0.7, 0.6, 0.5, 0.6, 0.5, 0.7, 0.4],
-            },
-        ])
     }
 
     /// Clear the cache

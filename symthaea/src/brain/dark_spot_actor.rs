@@ -670,7 +670,7 @@ mod tests {
         match response {
             DarkSpotResponse::Published { signature_id } => Ok(signature_id),
             other => {
-                log::warn!("Received unexpected response: {:?}", other);
+                tracing::warn!("Received unexpected response: {:?}", other);
                 Err(ActorError::UnexpectedResponse {
                     expected: "Published",
                     actual: format!("{:?}", other),
@@ -683,7 +683,7 @@ mod tests {
         match response {
             DarkSpotResponse::KnowledgeAdded { id } => Ok(id),
             other => {
-                log::warn!("Received unexpected response: {:?}", other);
+                tracing::warn!("Received unexpected response: {:?}", other);
                 Err(ActorError::UnexpectedResponse {
                     expected: "KnowledgeAdded",
                     actual: format!("{:?}", other),
@@ -698,7 +698,7 @@ mod tests {
         match response {
             DarkSpotResponse::BlindSpots { spots } => Ok(spots),
             other => {
-                log::warn!("Received unexpected response: {:?}", other);
+                tracing::warn!("Received unexpected response: {:?}", other);
                 Err(ActorError::UnexpectedResponse {
                     expected: "BlindSpots",
                     actual: format!("{:?}", other),
@@ -715,7 +715,7 @@ mod tests {
                 blind_spot_count,
             } => Ok((signature_count, knowledge_count, blind_spot_count)),
             other => {
-                log::warn!("Received unexpected response: {:?}", other);
+                tracing::warn!("Received unexpected response: {:?}", other);
                 Err(ActorError::UnexpectedResponse {
                     expected: "Stats",
                     actual: format!("{:?}", other),

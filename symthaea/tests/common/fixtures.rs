@@ -8,7 +8,6 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::TempDir;
 
-#[cfg(feature = "databases_module")]
 use symthaea::databases::SqliteMemory;
 
 // ============================================================================
@@ -24,14 +23,12 @@ use symthaea::databases::SqliteMemory;
 /// // Use db...
 /// // Automatically cleaned up when fixture is dropped
 /// ```
-#[cfg(feature = "databases_module")]
 pub struct TempDatabase {
     _temp_dir: TempDir,
     db: SqliteMemory,
     path: PathBuf,
 }
 
-#[cfg(feature = "databases_module")]
 impl TempDatabase {
     /// Create a new temporary database
     pub fn new() -> Result<Self, Box<dyn std::error::Error>> {

@@ -1,4 +1,3 @@
-#![cfg(feature = "databases_module")]
 //! Integration tests for ContinuousMind + UnifiedMind database architecture
 //!
 //! Tests the integration of the multi-database consciousness system with
