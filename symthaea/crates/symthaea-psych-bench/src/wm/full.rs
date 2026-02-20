@@ -53,8 +53,10 @@ impl WorkingMemory {
             working_memory_capacity: config.capacity,
             ..Default::default()
         };
+        let mut mind = ContinuousMind::new(mind_config);
+        mind.activate();
         Self {
-            mind: ContinuousMind::new(mind_config),
+            mind,
             decay_rate: config.decay_rate,
         }
     }

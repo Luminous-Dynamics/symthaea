@@ -617,6 +617,8 @@ impl CognitiveLoopService {
             },
             #[cfg(feature = "full_consciousness")]
             enactive: EnactiveCognition::new(),
+            biorhythm: crate::chronobiology::Biorhythm::current(),
+            biorhythm_refresh_counter: 0,
         })
     }
 

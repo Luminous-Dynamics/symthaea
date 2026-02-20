@@ -132,6 +132,16 @@ impl CognitiveLoopService {
         // Snapshot confidence for end-of-cycle drift clamping (Task G)
         self.carryover.prediction_confidence = self.prediction_confidence;
 
+        // Chronobiology: refresh biorhythm every 100 cycles (time-of-day modulation)
+        self.biorhythm_refresh_counter += 1;
+        if self.biorhythm_refresh_counter >= 100 {
+            self.biorhythm = crate::chronobiology::Biorhythm::current();
+            self.biorhythm_refresh_counter = 0;
+        }
+        // Apply circadian plasticity to learning rate (Night=high plasticity, Day=low)
+        let circadian_lr = self.stats.adaptive_learning_rate * self.biorhythm.plasticity_mod as f32;
+        self.stats.adaptive_learning_rate = circadian_lr.clamp(0.0001, 0.1);
+
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE -1: Ingest background-trained weights (non-blocking)
         // ═══════════════════════════════════════════════════════════════════════
@@ -3180,6 +3190,8 @@ impl CognitiveLoopService {
                 .map(|m| m.resonator.iterations())
                 .unwrap_or(0),
             module_timings_us: module_timings,
+            circadian_phase: format!("{:?}", self.biorhythm.phase),
+            circadian_plasticity: self.biorhythm.plasticity_mod as f32,
         };
 
         tracing::debug!(

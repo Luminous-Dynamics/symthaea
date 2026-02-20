@@ -381,6 +381,12 @@ pub struct CycleMetadata {
 
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
+
+    /// Circadian phase (Dawn/Day/Dusk/Night) from chronobiology module.
+    pub circadian_phase: String,
+
+    /// Circadian plasticity modifier (0.0–1.0) applied to learning rate.
+    pub circadian_plasticity: f32,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.
