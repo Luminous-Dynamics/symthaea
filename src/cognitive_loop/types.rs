@@ -66,6 +66,12 @@ pub(crate) struct CycleCarryover {
     pub(crate) last_value_score: f64,
     /// Last epistemic quality score (cached, updated every 50 cycles).
     pub(crate) last_epistemic_quality: f64,
+    /// Last dissipative consciousness health score (0.0–1.0, cached from last update).
+    pub(crate) last_dissipative_health: f64,
+    /// Last Φ_eff from epistemic conflict (cached, updated every 50 cycles).
+    pub(crate) last_phi_eff: f64,
+    /// Last consciousness equation v2 result (cached, updated every 25 cycles).
+    pub(crate) last_equation_v2_consciousness: f64,
 }
 
 impl Default for CycleCarryover {
@@ -94,6 +100,9 @@ impl Default for CycleCarryover {
             last_harmonic_coherence: 0.0,
             last_value_score: 0.0,
             last_epistemic_quality: 0.0,
+            last_dissipative_health: 0.0,
+            last_phi_eff: 0.0,
+            last_equation_v2_consciousness: 0.0,
         }
     }
 }
@@ -348,6 +357,12 @@ pub struct CycleMetadata {
     pub lattice_height: usize,
     /// Primitive lattice width (max parallelism at any level, 0 when off).
     pub lattice_width: usize,
+    /// Integrating concept from lattice join of active primitives (empty when off).
+    pub lattice_join_concept: String,
+    /// Number of causal patterns added to resonator codebook this cycle.
+    pub causal_codebook_entries: usize,
+    /// Whether a continuity gap triggered demand replay this cycle.
+    pub continuity_replay_triggered: bool,
 
     // ── Session 1: Compositionality + Value Evaluator ──────────────────────
     /// Total compositions registered in the compositionality engine (0 when off).
@@ -380,6 +395,22 @@ pub struct CycleMetadata {
     pub epistemic_quality: f64,
     /// Phi validation Pearson correlation (0.0 when not yet computed).
     pub phi_validation_correlation: f64,
+
+    // ── Session 5: Dissipative + Conflict + Equation + Hierarchical + Evolution ──
+    /// Dissipative consciousness health score (0.0–1.0, 0.0 when off).
+    pub dissipative_health: f64,
+    /// Current thermodynamic regime (e.g., "Subcritical", "Critical", "Supercritical").
+    pub dissipative_regime: String,
+    /// Dissipative entropy production rate (0.0 when off).
+    pub dissipative_entropy_rate: f64,
+    /// Φ_eff = Φ × R^γ from epistemic conflict reliability weighting (0.0 when off).
+    pub epistemic_phi_eff: f64,
+    /// Number of inter-theory conflicts detected (0 when off).
+    pub epistemic_conflict_count: usize,
+    /// Consciousness Equation v2 C(t) result (0.0 when off).
+    pub equation_v2_consciousness: f64,
+    /// Hierarchical LTC estimated Phi (0.0 when off).
+    pub hierarchical_ltc_phi: f32,
 
     /// Whether metacognitive monitoring detected a Phi trajectory anomaly.
     pub metacognitive_anomaly: bool,
@@ -445,6 +476,15 @@ pub struct CycleMetadata {
 
     /// Circadian plasticity modifier (0.0–1.0) applied to learning rate.
     pub circadian_plasticity: f32,
+
+    /// Phi attention gate weight applied to perception (1.0 = neutral).
+    pub phi_attention_weight: f32,
+
+    /// Current guiding question from wisdom system (e.g., "What don't I know?").
+    pub guiding_question: String,
+
+    /// Dominant harmonic mode (e.g., "Wisdom", "Play", "Coherence").
+    pub dominant_harmonic: String,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.
@@ -522,6 +562,11 @@ pub struct ModuleTimings {
     pub adaptive_reasoning: u64,
     pub epistemic_tiers: u64,
     pub phi_validation: u64,
+    pub dissipative_consciousness: u64,
+    pub epistemic_conflict: u64,
+    pub consciousness_equation_v2: u64,
+    pub hierarchical_ltc: u64,
+    pub primitive_evolution: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -924,4 +924,42 @@ impl CognitiveLoopService {
     pub fn adaptive_reasoner(&self) -> Option<&crate::consciousness::adaptive_reasoning::AdaptiveReasoner> {
         self.adaptive_reasoner.as_ref()
     }
+
+    /// Borrow the dissipative consciousness model (if enabled).
+    pub fn dissipative_consciousness(&self) -> Option<&crate::consciousness::dissipative_consciousness::DissipativeConsciousness> {
+        self.dissipative_consciousness.as_ref()
+    }
+
+    // epistemic_conflict_detector accessor removed — field lives in reasoning_engine feature gate.
+
+    /// Borrow the consciousness equation v2 (if enabled).
+    pub fn consciousness_equation_v2(&self) -> Option<&crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2> {
+        self.consciousness_equation_v2.as_ref()
+    }
+
+    /// Borrow the hierarchical LTC (if enabled).
+    pub fn hierarchical_ltc(&self) -> Option<&crate::consciousness::hierarchical_ltc::HierarchicalLTC> {
+        self.hierarchical_ltc.as_ref()
+    }
+
+    // theory_calibrator accessor removed — field lives in reasoning_engine feature gate.
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // EXPERIENCE BUS: Principled signals + Seven Harmonies
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Current principled signals from experience bus.
+    pub fn experience_signals(&self) -> Option<&crate::experience::PrincipledSignals> {
+        self.experience_bus.as_ref().map(|bus| bus.signals())
+    }
+
+    /// KosmicSong state (Seven Harmonies + GIS + moral uncertainty).
+    pub fn kosmic_state(&self) -> Option<&crate::experience::KosmicSong> {
+        self.experience_bus.as_ref().map(|bus| bus.kosmic())
+    }
+
+    /// Current guiding question from wisdom system.
+    pub fn guiding_question(&self) -> Option<&'static str> {
+        self.experience_bus.as_ref().map(|bus| bus.current_guiding_question())
+    }
 }

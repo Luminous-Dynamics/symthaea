@@ -411,6 +411,23 @@ impl CognitiveLoopService {
                 (None, None, None, None, None, None, None)
             };
 
+        // Build optional dissipative consciousness + equation v2 + hierarchical LTC
+        // (co-gated with primitive consciousness)
+        let (dissipative_consciousness, consciousness_equation_v2, hierarchical_ltc) =
+            if primitive_processor.is_some() {
+                let dc = crate::consciousness::dissipative_consciousness::DissipativeConsciousness::new();
+                let eq = crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2::new();
+                let hltc = crate::consciousness::hierarchical_ltc::HierarchicalLTC::minimal_network()
+                    .ok(); // Use minimal (4 circuits) for per-cycle cost; None on failure
+                (Some(dc), Some(eq), hltc)
+            } else {
+                (None, None, None)
+            };
+        // Build optional epistemic conflict detector + theory calibrator
+        // (co-gated with primitive consciousness + reasoning_engine feature)
+        // Epistemic conflict detector + theory calibrator are gated behind reasoning_engine feature.
+        // When reasoning_engine is enabled, they're built inside the reasoning engine itself.
+
         // Build optional episodic replay (needs config fields before move)
         let phi_episodic_replay = if config.episodic_replay {
             Some(crate::memory::episodic_replay::EpisodicMemory::new(
@@ -610,6 +627,9 @@ impl CognitiveLoopService {
             primitive_reasoner,
             adaptive_reasoner,
             phi_validation,
+            dissipative_consciousness,
+            consciousness_equation_v2,
+            hierarchical_ltc,
             value_feedback: crate::consciousness::value_feedback_loop::ValueFeedbackLoop::default(),
             #[cfg(feature = "support")]
             support_predictive_engine: Some(symthaea_support::predictive::PredictiveEngine::new()),
@@ -670,6 +690,7 @@ impl CognitiveLoopService {
             biorhythm_refresh_counter: 0,
             phi_attention_gate: Some(crate::attention::PhiAttentionGate::default_gate()),
             metrics_collector: Some(crate::infrastructure::MetricsCollector::new()),
+            experience_bus: Some(crate::experience::ExperienceBus::with_defaults()),
         })
     }
 

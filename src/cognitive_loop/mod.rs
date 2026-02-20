@@ -562,6 +562,22 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`. Expensive — runs rarely.
     phi_validation: Option<crate::consciousness::phi_validation::PhiValidationFramework>,
 
+    /// Dissipative consciousness: Prigogine thermodynamic model for consciousness.
+    /// Tracks entropy production, order parameters, and criticality distance.
+    /// Co-gated with `enable_primitive_consciousness`.
+    dissipative_consciousness: Option<crate::consciousness::dissipative_consciousness::DissipativeConsciousness>,
+
+    // Note: epistemic_conflict fields removed — functionality lives in reasoning_engine feature gate.
+    // ConflictDetector and TheoryCalibrator are available via reasoning_engine::narrative when enabled.
+
+    /// Master Consciousness Equation v2: unified 7-theory consciousness formula C(t).
+    /// Co-gated with `enable_primitive_consciousness`.
+    consciousness_equation_v2: Option<crate::consciousness::consciousness_equation_v2::ConsciousnessEquationV2>,
+
+    /// Hierarchical LTC: local circuits + global integrator for distributed temporal processing.
+    /// Co-gated with `enable_primitive_consciousness`.
+    hierarchical_ltc: Option<crate::consciousness::hierarchical_ltc::HierarchicalLTC>,
+
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
     /// that modulates future moral scores as a self-correcting mechanism.
@@ -690,6 +706,10 @@ pub struct CognitiveLoopService {
     /// When present, records per-cycle consciousness, performance, and safety metrics
     /// for external monitoring dashboards.
     metrics_collector: Option<crate::infrastructure::MetricsCollector>,
+
+    /// Experience integration bus for principled signal tracking and harmonic reasoning.
+    /// Bridges cognitive loop signals to Seven Harmonies wisdom system.
+    experience_bus: Option<crate::experience::ExperienceBus>,
 }
 
 // MetricsProvider impl is in metrics_provider.rs

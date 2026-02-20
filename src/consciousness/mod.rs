@@ -295,8 +295,6 @@ pub mod empathic_unification {
     }
 }
 
-// Needs: mycelix
-#[cfg(feature = "mycelix_module")]
 pub mod gis_integration;
 
 // ============================================================================
