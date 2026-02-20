@@ -753,7 +753,7 @@ impl ConsciousnessDatabase for LanceMemory {
             avg_query_latency_us: 0,
             total_queries: 0,
             memory_type_counts: type_counts,
-            avg_phi,
+            avg_psi: avg_phi,
             oldest_timestamp_ms: oldest_ts,
             newest_timestamp_ms: newest_ts,
             backend_status,
@@ -883,7 +883,7 @@ mod tests {
         assert_eq!(total_type_count, 5);
 
         // avg phi: (0.5 + 0.6 + 0.7 + 0.8 + 0.9) / 5 = 0.7
-        assert!((stats.avg_phi - 0.7).abs() < 0.01);
+        assert!((stats.avg_psi - 0.7).abs() < 0.01);
         assert_eq!(stats.oldest_timestamp_ms, 1000000000);
         assert_eq!(stats.newest_timestamp_ms, 1000004000);
     }

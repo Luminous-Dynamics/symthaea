@@ -52,6 +52,10 @@ pub(crate) struct CycleCarryover {
     /// and thermodynamics each multiply this to influence the NEXT cycle's training LR.
     /// Default 1.0 (neutral).
     pub(crate) subsystem_lr_factor: f32,
+    /// Last computed Σ (Sigma) — cached for inter-cycle use.
+    /// Σ is only computed every N cycles, so we cache the most recent value
+    /// for use by subsystems (memory coordinator, consciousness gating) in between.
+    pub(crate) last_sigma: Option<f64>,
 }
 
 impl Default for CycleCarryover {
@@ -74,6 +78,7 @@ impl Default for CycleCarryover {
             arousal_trap_counter: 0,
             consciousness_level: 0.0,
             subsystem_lr_factor: 1.0,
+            last_sigma: None,
         }
     }
 }
@@ -365,6 +370,15 @@ pub struct CycleMetadata {
     /// `None` when not computed this cycle (only computed every N cycles).
     pub sigma: Option<f64>,
 
+    /// Number of symbols in the resonator semantic codebook (0 when disabled).
+    pub resonator_codebook_size: usize,
+
+    /// Number of episodes stored in resonator memory (0 when disabled).
+    pub resonator_episodes: usize,
+
+    /// Number of iterations used in last resonator factorization (0 when not run).
+    pub resonator_factorization_iters: usize,
+
     /// Per-module timing (microseconds). 0 = module disabled or not run this cycle.
     pub module_timings_us: ModuleTimings,
 }
@@ -445,12 +459,12 @@ pub struct ModuleTimings {
 /// The cognitive loop produces these after each cycle where Phi is computed.
 /// The personal cluster (or symthaea-mycelix-bridge) can consume these records,
 /// sign them with the agent's cryptographic key, and submit to governance as
-/// authenticated `PhiAttestation` entries.
+/// authenticated `PsiAttestation` entries.
 ///
 /// This is a lightweight struct with no external dependencies — the bridge crate
-/// converts it to the Holochain-compatible `PhiAttestationData` format.
+/// converts it to the Holochain-compatible `PsiAttestationData` format.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PhiAttestationRecord {
+pub struct PsiAttestationRecord {
     /// Ψ — Consciousness estimate from this cycle (clamped to [0.0, 1.0])
     pub psi: f64,
 
@@ -467,12 +481,12 @@ pub struct PhiAttestationRecord {
     pub urgency: CycleUrgency,
 }
 
-impl PhiAttestationRecord {
+impl PsiAttestationRecord {
     /// Canonical message for signing: deterministic byte representation.
     /// The bridge crate signs this with the agent's Ed25519 key.
     ///
     /// Phi is formatted to 6 decimal places (`{:.6}`), matching the governance
-    /// bridge's reconstruction format in `record_phi_attestation`. This precision
+    /// bridge's reconstruction format in `record_psi_attestation`. This precision
     /// (~0.000001) is sufficient for IIT Phi and ensures signature verification
     /// succeeds across Symthaea → bridge → governance without floating-point drift.
     pub fn sign_message(&self, agent_did: &str) -> Vec<u8> {

@@ -128,15 +128,20 @@ build-sdk-ts:
         echo "⚠️  sdk-ts not found"; \
     fi
 
-# Build Commons cluster (property + housing + care + mutualaid + water — 28 zomes)
+# Build Commons cluster (split into land + care sub-cluster DNAs)
 build-commons:
-    @echo "🏘️ Building mycelix-commons cluster..."
+    @echo "Building mycelix-commons cluster (land + care sub-DNAs)..."
     @if [ -f "../mycelix-commons/Cargo.toml" ]; then \
         cd ../mycelix-commons && \
         cargo build --release --target wasm32-unknown-unknown && \
-        hc dna pack dna && hc app pack .; \
+        echo "  Packing commons-land DNA..." && \
+        hc dna pack dna -o dna/mycelix_commons_land.dna --manifest-path dna/commons-land.yaml && \
+        echo "  Packing commons-care DNA..." && \
+        hc dna pack dna -o dna/mycelix_commons_care.dna --manifest-path dna/commons-care.yaml && \
+        echo "  Packing unified commons hApp..." && \
+        hc app pack .; \
     else \
-        echo "⚠️  mycelix-commons not found"; \
+        echo "  mycelix-commons not found"; \
     fi
 
 # Build Civic cluster (justice + emergency + media — 16 zomes)
@@ -1041,6 +1046,99 @@ test-sweettest-commons:
 
 test-sweettest-civic:
     cd ../mycelix-civic && cargo test --release --test sweettest_integration -- --ignored --nocapture
+
+# Memory-safe sweettest runner: runs each test binary sequentially with --test-threads=1.
+# Each [[test]] binary is a separate OS process, so memory is fully reclaimed between binaries.
+# This avoids OOM kills on machines with <= 32GB RAM where running all conductor tests in
+# a single process accumulates 1-2 GB per SweetConductor without cleanup.
+# IMPORTANT: --release is required (debug mode exceeds Holochain's 5-min nonce lifetime).
+test-sweettest-safe:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo ""
+    echo "Memory-Safe Sweettest Runner"
+    echo "============================="
+    echo "Running each test binary sequentially with --test-threads=1"
+    echo "to keep memory under 31GB."
+    echo ""
+
+    passed=0
+    failed=0
+    skipped=0
+    errors=""
+
+    run_binary() {
+        local dir="$1"
+        local binary="$2"
+        local label="$3"
+
+        echo -n "  [$label] $binary ... "
+        if (cd "$dir" && cargo test --release --test "$binary" -- --ignored --test-threads=1 --nocapture 2>&1); then
+            echo "PASS"
+            ((passed++))
+        else
+            echo "FAIL"
+            ((failed++))
+            errors="$errors\n  - $label/$binary"
+        fi
+        # Brief pause for OS memory reclamation between binaries
+        sleep 2
+    }
+
+    echo "--- Commons cluster (split binaries) ---"
+    COMMONS_DIR="/srv/luminous-dynamics/mycelix-commons/tests"
+    run_binary "$COMMONS_DIR" "sweettest_property_bridge"  "commons"
+    run_binary "$COMMONS_DIR" "sweettest_food_transport"    "commons"
+    run_binary "$COMMONS_DIR" "sweettest_dispatch_support"  "commons"
+    run_binary "$COMMONS_DIR" "cross_domain_sweettest"      "commons"
+    echo ""
+
+    echo "--- Civic cluster (split binaries) ---"
+    CIVIC_DIR="/srv/luminous-dynamics/mycelix-civic/tests"
+    run_binary "$CIVIC_DIR" "sweettest_bridge_media"        "civic"
+    run_binary "$CIVIC_DIR" "sweettest_justice_emergency"   "civic"
+    echo ""
+
+    echo "--- Workspace sweettests (individual binaries) ---"
+    WS_DIR="/srv/luminous-dynamics/mycelix-workspace/tests/sweettest"
+    run_binary "$WS_DIR" "conductor_e2e"                    "workspace"
+    run_binary "$WS_DIR" "cross_cluster_bridge"             "workspace"
+    echo ""
+
+    echo "============================="
+    echo "Results: $passed passed, $failed failed, $skipped skipped"
+    if [ "$failed" -gt 0 ]; then
+        echo -e "Failed:$errors"
+        exit 1
+    else
+        echo "All sweettest binaries passed!"
+    fi
+
+# Memory-safe Commons-only sweettest (split binaries, sequential)
+test-sweettest-commons-safe:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Commons sweettest (split binaries, sequential)..."
+    cd /srv/luminous-dynamics/mycelix-commons/tests
+    for bin in sweettest_property_bridge sweettest_food_transport sweettest_dispatch_support cross_domain_sweettest; do
+        echo "  Running $bin ..."
+        cargo test --release --test "$bin" -- --ignored --test-threads=1 --nocapture
+        sleep 2
+    done
+    echo "All commons sweettest binaries passed!"
+
+# Memory-safe Civic-only sweettest (split binaries, sequential)
+test-sweettest-civic-safe:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    echo "Civic sweettest (split binaries, sequential)..."
+    cd /srv/luminous-dynamics/mycelix-civic/tests
+    for bin in sweettest_bridge_media sweettest_justice_emergency; do
+        echo "  Running $bin ..."
+        cargo test --release --test "$bin" -- --ignored --test-threads=1 --nocapture
+        sleep 2
+    done
+    echo "All civic sweettest binaries passed!"
 
 # Run Commons cluster Rust unit tests (no conductor needed)
 test-commons-unit:

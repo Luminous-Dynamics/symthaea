@@ -28,6 +28,7 @@ mod consciousness_snapshot_tests {
             care_activation: 0.6,
             captured_at: Timestamp::from_micros(1000000),
             source: "symthaea".to_string(),
+            consciousness_vector: None,
         }
     }
 
@@ -411,6 +412,7 @@ mod edge_case_tests {
             care_activation: 0.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".to_string(),
+            consciousness_vector: None,
         };
 
         assert_eq!(snapshot.quality_score(), 0.0);
@@ -430,6 +432,7 @@ mod edge_case_tests {
             care_activation: 1.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".to_string(),
+            consciousness_vector: None,
         };
 
         assert_eq!(snapshot.quality_score(), 1.0);
@@ -449,6 +452,7 @@ mod edge_case_tests {
             care_activation: 0.3,
             captured_at: Timestamp::from_micros(0),
             source: "test".to_string(),
+            consciousness_vector: None,
         };
 
         // Negative valence doesn't affect quality score (not included)

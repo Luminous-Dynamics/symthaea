@@ -1,22 +1,38 @@
 ---
 # Mycelix Commons hApp Bundle
-# Universal Resource Coordination: property + housing + care + mutualaid + water
+# Universal Resource Coordination split into two sub-cluster DNAs:
+#   - commons_land: property + housing + water + food (physical infrastructure)
+#   - commons_care: care + mutualaid + transport + support + space (social/care)
+#
+# Cross-DNA calls use CallTargetCell::OtherRole("commons_land"/"commons_care").
+# Intra-DNA calls still use CallTargetCell::Local for zero-overhead dispatch.
 
 manifest_version: "0"
 name: mycelix-commons
 description: |
   Universal resource coordination for the Mycelix ecosystem.
-  Consolidates property registries, cooperative housing, community care,
-  mutual aid networks, and water stewardship into a single DNA for
-  cross-domain integration.
+  Split into two sub-cluster DNAs to fit under Holochain's 16MB DNA limit:
+  - commons_land: property registries, cooperative housing, water stewardship, food systems
+  - commons_care: community care, mutual aid networks, transport coordination, support, space
 
 roles:
-  - name: commons
+  - name: commons_land
     provisioning:
       strategy: create
       deferred: false
     dna:
-      path: ./dna/mycelix_commons.dna
+      path: ./dna/mycelix_commons_land.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: commons_care
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_commons_care.dna
       modifiers:
         network_seed: ~
         properties: ~

@@ -906,6 +906,7 @@ mod tests {
             care_activation: 1.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".into(),
+            consciousness_vector: None,
         };
         // 1.0*0.4 + 1.0*0.2 + 1.0*0.2 + 1.0*0.2 = 1.0
         assert!((snap.quality_score() - 1.0).abs() < 1e-10);
@@ -924,6 +925,7 @@ mod tests {
             care_activation: 0.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".into(),
+            consciousness_vector: None,
         };
         assert!((snap.quality_score() - 0.0).abs() < 1e-10);
     }
@@ -942,6 +944,7 @@ mod tests {
             care_activation: 0.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".into(),
+            consciousness_vector: None,
         };
         assert!((snap.quality_score() - 0.4).abs() < 1e-10);
     }
@@ -960,10 +963,12 @@ mod tests {
             care_activation: 0.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".into(),
+            consciousness_vector: None,
         };
         let with_extras = ConsciousnessSnapshot {
             affective_valence: 1.0,
             care_activation: 1.0,
+            consciousness_vector: None,
             ..base.clone()
         };
         assert!((base.quality_score() - with_extras.quality_score()).abs() < 1e-10,
@@ -983,6 +988,7 @@ mod tests {
             care_activation: 0.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".into(),
+            consciousness_vector: None,
         };
         assert!(snap.meets_threshold(&GovernanceActionType::Basic));       // 0.5 >= 0.2
         assert!(snap.meets_threshold(&GovernanceActionType::ProposalSubmission)); // 0.5 >= 0.3

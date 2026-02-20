@@ -22,3 +22,11 @@ rmp-serde = "1"
 [[test]]
 name = "sweettest_integration"
 path = "sweettest_integration.rs"
+
+[[test]]
+name = "sweettest_bridge_media"
+path = "sweettest_bridge_media.rs"
+
+[[test]]
+name = "sweettest_justice_emergency"
+path = "sweettest_justice_emergency.rs"

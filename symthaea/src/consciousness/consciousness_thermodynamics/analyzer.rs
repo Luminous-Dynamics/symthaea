@@ -24,7 +24,7 @@ pub struct ConsciousnessThermodynamicsAnalyzer {
     probability_distribution: Vec<f64>,
 
     /// Current fluctuation stats
-    pub(crate) fluctuations: FluctuationStats,
+    pub fluctuations: FluctuationStats,
 
     /// Statistics
     pub stats: ThermodynamicsStats,

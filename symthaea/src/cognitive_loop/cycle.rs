@@ -34,10 +34,6 @@ const MEMORY_RECALL_TOP_K: usize = 3; // episodic memories to recall
 const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3; // minimum similarity for recall
 const MEMORY_CONTEXT_BOOST_SCALE: f32 = 0.1; // recalled memory → confidence boost
 
-// -- Resonator recall --
-const RESONATOR_CODEBOOK_GROWTH_INTERVAL: usize = 50;
-const RESONATOR_NOVELTY_THRESHOLD: f32 = 0.7;
-const RESONATOR_MAX_SEMANTIC_SYMBOLS: usize = 100;
 
 // ═══════════════════════════════════════════════════════════════════
 // Ψ (PSI) SYNTHESIS — Consciousness Estimate
@@ -520,10 +516,14 @@ impl CognitiveLoopService {
         // superposed state and factorize against semantic codebooks. The
         // factorized valence/phi components are cleaner than raw averages.
         // Science: Kent et al. (2020) — Resonator Networks for O(log N) factorization
+        // Urgency-gated: Critical=always, Normal=always, Cruise=every 4th
+        if urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
         if let Some(ref mut res_mem) = self.resonator_memory {
             let res_start = Instant::now();
 
-            if !res_mem.is_empty() {
+            // Dimension guard: skip if compressed_state doesn't match resonator codebook dim
+            let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
+            if res_dim_ok && !res_mem.is_empty() {
                 // Retrieve resonator episodes similar to current content
                 if let Ok(matches) = res_mem.retrieve(&[("content", &compressed_state)]) {
                     let top_matches: Vec<_> = matches.into_iter().take(MEMORY_RECALL_TOP_K).collect();
@@ -570,6 +570,7 @@ impl CognitiveLoopService {
 
             module_timings.resonator_recall = res_start.elapsed().as_micros() as u64;
         }
+        } // urgency gate
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1a.2. Goal System: Apply attention bias from active goals
@@ -1142,24 +1143,24 @@ impl CognitiveLoopService {
         self.unification_engine.update_psi(unified_psi);
 
         // ═══════════════════════════════════════════════════════════════════════
-        // 10h.0 Generate PhiAttestation record for governance bridge
+        // 10h.0 Generate PsiAttestation record for governance bridge
         // ═══════════════════════════════════════════════════════════════════════
-        if self.config.enable_phi_attestation && self.config.agent_did.is_some() {
+        if self.config.enable_psi_attestation && self.config.agent_did.is_some() {
             let now = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap_or_default()
                 .as_micros() as u64;
-            let record = super::PhiAttestationRecord {
+            let record = super::PsiAttestationRecord {
                 psi: unified_psi,
                 cycle_id: self.stats.total_cycles as u64,
                 captured_at_us: now,
                 prediction_error,
                 urgency,
             };
-            self.phi_attestation_buffer.push_back(record);
+            self.psi_attestation_buffer.push_back(record);
             // Evict oldest if over capacity
-            while self.phi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
-                let _ = self.phi_attestation_buffer.pop_front();
+            while self.psi_attestation_buffer.len() > self.config.attestation_buffer_capacity {
+                let _ = self.psi_attestation_buffer.pop_front();
             }
         }
 
@@ -1605,8 +1606,11 @@ impl CognitiveLoopService {
                     }
 
                     // Resonator memory: store with bound attributes for factorized recall
+                    // Not urgency-gated: encoding is O(dim) and we don't want to drop
+                    // significant experiences during Cruise. Recall is gated in Phase 1a.1.
                     if let Some(ref mut res_mem) = resonator_memory {
-                        if prediction_error > 0.1 || pp_in_flow {
+                        let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
+                        if res_dim_ok && (prediction_error > 0.1 || pp_in_flow) {
                             // Quantize valence → nearest band
                             let val_label = if pp_emotional_valence > 0.3 {
                                 "positive"
@@ -1702,7 +1706,8 @@ impl CognitiveLoopService {
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut res_mem) = self.resonator_memory {
-            if self.stats.total_cycles % RESONATOR_CODEBOOK_GROWTH_INTERVAL == 0 {
+            let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
+            if res_dim_ok && self.stats.total_cycles % self.config.resonator_growth_interval == 0 {
                 if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
                     // Check novelty: max similarity to existing symbols
                     let max_sim = semantic_cb.symbols.iter()
@@ -1714,8 +1719,8 @@ impl CognitiveLoopService {
                         })
                         .fold(0.0f32, f32::max);
 
-                    if max_sim < RESONATOR_NOVELTY_THRESHOLD
-                        && semantic_cb.len() < RESONATOR_MAX_SEMANTIC_SYMBOLS
+                    if max_sim < self.config.resonator_novelty_threshold
+                        && semantic_cb.len() < self.config.resonator_max_symbols
                     {
                         semantic_cb.add(
                             &format!("learned_{}", self.stats.total_cycles),
@@ -1799,7 +1804,7 @@ impl CognitiveLoopService {
                         tracing::debug!(
                             episodes = result.episodes_replayed,
                             avg_loss = result.average_loss,
-                            avg_phi = result.average_psi,
+                            avg_psi = result.average_psi,
                             "Episodic replay session completed"
                         );
                     }
@@ -1812,7 +1817,7 @@ impl CognitiveLoopService {
             let coord_phi = self.coherence_bridge.smoothed_coherence() as f64;
             let coord_coherence = coherence as f64;
             self.memory_coordinator
-                .update_signals(coord_phi, coord_coherence);
+                .update_signals_with_sigma(coord_phi, coord_coherence, self.carryover.last_sigma);
 
             if let Some(ref mut replay) = self.phi_episodic_replay {
                 let graduated = self.memory_coordinator.process_graduations(replay);
@@ -3073,10 +3078,33 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         self.synergistic_integration.push(&encoding_result.hdv);
         let sigma = if self.stats.total_cycles % 50 == 0 {
-            self.synergistic_integration.compute().map(|r| r.sigma)
+            let s = self.synergistic_integration.compute().map(|r| r.sigma);
+            if s.is_some() {
+                self.carryover.last_sigma = s;
+            }
+            s
         } else {
-            None
+            self.carryover.last_sigma // Use cached value between computations
         };
+
+        // Soul experience integration: feed cycle outcome back into value learning.
+        // This closes the loop: Soul evaluates alignment (pre-cycle) → cognitive cycle
+        // → integrate experience (post-cycle) → Soul's essence evolves.
+        if let Some(ref mut soul) = self.soul {
+            let moral_score = self
+                .last_moral_judgment
+                .as_ref()
+                .map(|j| j.moral_score)
+                .unwrap_or(0.0);
+            let experience = crate::soul::Experience {
+                embedding: encoding_result.hdv.clone(),
+                value_alignment: moral_score,
+                emotional_valence: self.emotion_contagion.valence,
+                lessons: Vec::new(),
+                timestamp: self.stats.total_cycles as u64,
+            };
+            soul.integrate_experience(experience);
+        }
 
         // Build cycle metadata for observability
         let metadata = super::CycleMetadata {
@@ -3141,6 +3169,16 @@ impl CognitiveLoopService {
             support_federation_graduated,
             support_efe,
             sigma,
+            resonator_codebook_size: self.resonator_memory.as_ref()
+                .and_then(|m| m.resonator.codebooks.first())
+                .map(|cb| cb.len())
+                .unwrap_or(0),
+            resonator_episodes: self.resonator_memory.as_ref()
+                .map(|m| m.len())
+                .unwrap_or(0),
+            resonator_factorization_iters: self.resonator_memory.as_ref()
+                .map(|m| m.resonator.iterations())
+                .unwrap_or(0),
             module_timings_us: module_timings,
         };
 

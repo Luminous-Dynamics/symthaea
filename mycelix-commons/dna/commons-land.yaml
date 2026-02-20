@@ -1,0 +1,165 @@
+---
+# Mycelix Commons-Land DNA
+# Physical infrastructure domains: property + housing + water + food
+# 4 property + 6 housing + 5 water + 4 food = 19 domain + 1 bridge = 20 coordinator zomes
+#
+# Part of the commons sub-cluster split. Domains within this DNA use
+# CallTargetCell::Local for cross-domain calls. To reach care/mutualaid/
+# transport/support domains, use the commons_land_bridge which dispatches
+# via CallTargetCell::OtherRole("commons_care").
+
+manifest_version: "0"
+name: mycelix_commons_land
+
+integrity:
+  network_seed: "mycelix-commons-land-v1"
+  properties:
+    cross_domain_calls: true
+    sub_cluster: "land"
+
+  zomes:
+    # Property domain
+    - name: property_registry_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_registry_integrity.wasm
+    - name: property_transfer_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_transfer_integrity.wasm
+    - name: property_disputes_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_disputes_integrity.wasm
+    - name: property_commons_integrity
+      path: ../target/wasm32-unknown-unknown/release/property_commons_integrity.wasm
+
+    # Housing domain
+    - name: housing_units_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_units_integrity.wasm
+    - name: housing_membership_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_membership_integrity.wasm
+    - name: housing_finances_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_finances_integrity.wasm
+    - name: housing_maintenance_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_maintenance_integrity.wasm
+    - name: housing_clt_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_clt_integrity.wasm
+    - name: housing_governance_integrity
+      path: ../target/wasm32-unknown-unknown/release/housing_governance_integrity.wasm
+
+    # Water domain
+    - name: water_flow_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_flow_integrity.wasm
+    - name: water_purity_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_purity_integrity.wasm
+    - name: water_capture_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_capture_integrity.wasm
+    - name: water_steward_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_steward_integrity.wasm
+    - name: water_wisdom_integrity
+      path: ../target/wasm32-unknown-unknown/release/water_wisdom_integrity.wasm
+
+    # Food domain
+    - name: food_production_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_production_integrity.wasm
+    - name: food_distribution_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_distribution_integrity.wasm
+    - name: food_preservation_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_preservation_integrity.wasm
+    - name: food_knowledge_integrity
+      path: ../target/wasm32-unknown-unknown/release/food_knowledge_integrity.wasm
+
+    # Commons-Land bridge (shared integrity with commons bridge)
+    - name: commons_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/commons_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    # Property domain
+    - name: property_registry
+      path: ../target/wasm32-unknown-unknown/release/property_registry.wasm
+      dependencies:
+        - name: property_registry_integrity
+    - name: property_transfer
+      path: ../target/wasm32-unknown-unknown/release/property_transfer.wasm
+      dependencies:
+        - name: property_transfer_integrity
+        - name: property_registry_integrity
+    - name: property_disputes
+      path: ../target/wasm32-unknown-unknown/release/property_disputes.wasm
+      dependencies:
+        - name: property_disputes_integrity
+        - name: property_registry_integrity
+    - name: property_commons
+      path: ../target/wasm32-unknown-unknown/release/property_commons.wasm
+      dependencies:
+        - name: property_commons_integrity
+        - name: property_registry_integrity
+
+    # Housing domain
+    - name: housing_units
+      path: ../target/wasm32-unknown-unknown/release/housing_units.wasm
+      dependencies:
+        - name: housing_units_integrity
+    - name: housing_membership
+      path: ../target/wasm32-unknown-unknown/release/housing_membership.wasm
+      dependencies:
+        - name: housing_membership_integrity
+    - name: housing_finances
+      path: ../target/wasm32-unknown-unknown/release/housing_finances.wasm
+      dependencies:
+        - name: housing_finances_integrity
+    - name: housing_maintenance
+      path: ../target/wasm32-unknown-unknown/release/housing_maintenance.wasm
+      dependencies:
+        - name: housing_maintenance_integrity
+    - name: housing_clt
+      path: ../target/wasm32-unknown-unknown/release/housing_clt.wasm
+      dependencies:
+        - name: housing_clt_integrity
+        - name: property_registry_integrity
+    - name: housing_governance
+      path: ../target/wasm32-unknown-unknown/release/housing_governance.wasm
+      dependencies:
+        - name: housing_governance_integrity
+
+    # Water domain
+    - name: water_flow
+      path: ../target/wasm32-unknown-unknown/release/water_flow.wasm
+      dependencies:
+        - name: water_flow_integrity
+    - name: water_purity
+      path: ../target/wasm32-unknown-unknown/release/water_purity.wasm
+      dependencies:
+        - name: water_purity_integrity
+    - name: water_capture
+      path: ../target/wasm32-unknown-unknown/release/water_capture.wasm
+      dependencies:
+        - name: water_capture_integrity
+    - name: water_steward
+      path: ../target/wasm32-unknown-unknown/release/water_steward.wasm
+      dependencies:
+        - name: water_steward_integrity
+    - name: water_wisdom
+      path: ../target/wasm32-unknown-unknown/release/water_wisdom.wasm
+      dependencies:
+        - name: water_wisdom_integrity
+
+    # Food domain
+    - name: food_production
+      path: ../target/wasm32-unknown-unknown/release/food_production.wasm
+      dependencies:
+        - name: food_production_integrity
+    - name: food_distribution
+      path: ../target/wasm32-unknown-unknown/release/food_distribution.wasm
+      dependencies:
+        - name: food_distribution_integrity
+    - name: food_preservation
+      path: ../target/wasm32-unknown-unknown/release/food_preservation.wasm
+      dependencies:
+        - name: food_preservation_integrity
+    - name: food_knowledge
+      path: ../target/wasm32-unknown-unknown/release/food_knowledge.wasm
+      dependencies:
+        - name: food_knowledge_integrity
+
+    # Commons-Land bridge (reuses commons_bridge WASM with land-specific dispatch)
+    - name: commons_bridge
+      path: ../target/wasm32-unknown-unknown/release/commons_bridge.wasm
+      dependencies:
+        - name: commons_bridge_integrity

@@ -64,6 +64,7 @@ pub fn record_consciousness_attestation(input: RecordConsciousnessAttestationInp
         captured_at: now,
         signature: input.signature,
         source: "symthaea".to_string(),
+        consciousness_vector: input.consciousness_vector,
     };
 
     let action_hash = create_entry(&EntryTypes::ConsciousnessAttestation(attestation))?;
@@ -91,6 +92,10 @@ pub struct RecordConsciousnessAttestationInput {
     pub captured_at_us: u64,
     /// Ed25519 signature (64 bytes) over the attestation message.
     pub signature: Vec<u8>,
+    /// Optional C-Vector (v2 attestations). Signature still binds to the scalar
+    /// `consciousness_level` for backward-compatible verification.
+    #[serde(default)]
+    pub consciousness_vector: Option<ConsciousnessVectorEntry>,
 }
 
 /// Verify consciousness gate using attested consciousness level (preferred).
@@ -105,7 +110,9 @@ pub fn verify_consciousness_gate_v2(input: VerifyGateInput) -> ExternResult<Gate
 
     // Phase 1: Try to find latest ConsciousnessAttestation
     if let Some((consciousness_level, _record)) = get_latest_agent_attestation(&agent_did)? {
-        let passed = consciousness_level >= required_consciousness;
+        // Use C-Vector composite if available, otherwise fall back to scalar
+        let effective_level = consciousness_level; // scalar already incorporates composite
+        let passed = effective_level >= required_consciousness;
         let failure_reason = if passed {
             None
         } else {

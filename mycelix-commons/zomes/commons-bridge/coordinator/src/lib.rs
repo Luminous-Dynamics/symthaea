@@ -4,9 +4,23 @@
 //! Provides three integration patterns:
 //!
 //! 1. **dispatch_call** — synchronous RPC to any domain zome via
-//!    `call(CallTargetCell::Local, ...)`. The core value of clustering.
+//!    `call(CallTargetCell::Local, ...)` for local zomes, or
+//!    `call(CallTargetCell::OtherRole(...), ...)` for cross-DNA zomes.
 //! 2. **query_commons** — audited async query/response with auto-dispatch
 //! 3. **broadcast_event** — pub-sub event distribution across domains
+//!
+//! ## Sub-Cluster Architecture
+//!
+//! The Commons DNA is split into two sub-cluster DNAs to fit under
+//! Holochain's 16MB DNA limit:
+//!
+//! - **commons_land**: property + housing + water + food (physical infrastructure)
+//! - **commons_care**: care + mutualaid + transport + support + space (social/care)
+//!
+//! Both DNAs include this same bridge WASM. At runtime, the bridge reads
+//! `dna_info().modifiers.properties` to determine which sub-cluster it is
+//! running in, then routes calls to either `CallTargetCell::Local` (same DNA)
+//! or `CallTargetCell::OtherRole("commons_land"/"commons_care")` (other DNA).
 
 use commons_bridge_integrity::*;
 use commons_types::{CommonsQuery, CommonsEvent};
@@ -22,7 +36,66 @@ use mycelix_bridge_common::{
 };
 
 // ============================================================================
-// Allowed zome names — security boundary for dispatch
+// Sub-Cluster Membership — defines which zomes live in which DNA
+// ============================================================================
+
+/// Zomes that live in the commons_land DNA (physical infrastructure).
+const LAND_ZOMES: &[&str] = &[
+    // Property domain
+    "property_registry",
+    "property_transfer",
+    "property_disputes",
+    "property_commons",
+    // Housing domain
+    "housing_units",
+    "housing_membership",
+    "housing_finances",
+    "housing_maintenance",
+    "housing_clt",
+    "housing_governance",
+    // Water domain
+    "water_flow",
+    "water_purity",
+    "water_capture",
+    "water_steward",
+    "water_wisdom",
+    // Food domain
+    "food_production",
+    "food_distribution",
+    "food_preservation",
+    "food_knowledge",
+];
+
+/// Zomes that live in the commons_care DNA (social/care).
+const CARE_ZOMES: &[&str] = &[
+    // Care domain
+    "care_timebank",
+    "care_circles",
+    "care_matching",
+    "care_plans",
+    "care_credentials",
+    // Mutual aid domain
+    "mutualaid_needs",
+    "mutualaid_circles",
+    "mutualaid_governance",
+    "mutualaid_pools",
+    "mutualaid_requests",
+    "mutualaid_resources",
+    "mutualaid_timebank",
+    // Transport domain
+    "transport_routes",
+    "transport_sharing",
+    "transport_impact",
+    // Support domain
+    "support_knowledge",
+    "support_tickets",
+    "support_diagnostics",
+    // Space
+    "space",
+];
+
+// ============================================================================
+// Allowed zome names — security boundary for dispatch (union of both DNAs)
 // ============================================================================
 
 const ALLOWED_ZOMES: &[&str] = &[
@@ -67,7 +140,69 @@ const ALLOWED_ZOMES: &[&str] = &[
     "transport_routes",
     "transport_sharing",
     "transport_impact",
+    // Support domain
+    "support_knowledge",
+    "support_tickets",
+    "support_diagnostics",
+    // Space
+    "space",
 ];
+
+/// hApp role name for the commons_land DNA.
+const COMMONS_LAND_ROLE: &str = "commons_land";
+
+/// hApp role name for the commons_care DNA.
+const COMMONS_CARE_ROLE: &str = "commons_care";
+
+// ============================================================================
+// Sub-Cluster Detection
+// ============================================================================
+
+/// Which sub-cluster this bridge instance is running in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SubCluster {
+    Land,
+    Care,
+}
+
+/// Detect which sub-cluster DNA we are running in by reading DNA properties.
+///
+/// The DNA YAML sets `properties.sub_cluster` to either "land" or "care".
+/// Falls back to `Land` if properties cannot be parsed (e.g., running in
+/// the legacy single-DNA configuration for backward compatibility).
+fn detect_sub_cluster() -> SubCluster {
+    if let Ok(info) = dna_info() {
+        // Properties are serialized YAML; try to parse as JSON value
+        if let Ok(props) = serde_json::from_slice::<serde_json::Value>(
+            info.modifiers.properties.bytes()
+        ) {
+            if let Some(sc) = props.get("sub_cluster").and_then(|v| v.as_str()) {
+                return match sc {
+                    "care" => SubCluster::Care,
+                    _ => SubCluster::Land,
+                };
+            }
+        }
+    }
+    // Default: treat as land (backward compat with legacy single DNA)
+    SubCluster::Land
+}
+
+/// Check if a zome is local (in the same DNA) given our sub-cluster.
+fn is_local_zome(zome: &str, cluster: SubCluster) -> bool {
+    match cluster {
+        SubCluster::Land => LAND_ZOMES.contains(&zome),
+        SubCluster::Care => CARE_ZOMES.contains(&zome),
+    }
+}
+
+/// Get the OtherRole name for the sibling sub-cluster DNA.
+fn sibling_role(cluster: SubCluster) -> &'static str {
+    match cluster {
+        SubCluster::Land => COMMONS_CARE_ROLE,
+        SubCluster::Care => COMMONS_LAND_ROLE,
+    }
+}
 
 // ============================================================================
 // Helpers (use zome-specific EntryTypes for anchors)
@@ -124,11 +259,16 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
 // Cross-Domain Dispatch (synchronous RPC)
 // ============================================================================
 
-/// Dispatch a synchronous call to any domain zome within the Commons DNA.
+/// Dispatch a synchronous call to any domain zome within the Commons cluster.
 ///
 /// Rate-limited to 100 calls per 60 seconds per agent. Validates the target
-/// zome against an allowlist, then uses `call(CallTargetCell::Local, ...)` to
-/// invoke the function directly within the same DNA.
+/// zome against an allowlist, then routes the call:
+///
+/// - **Local zome** (same DNA): `call(CallTargetCell::Local, ...)`
+/// - **Sibling DNA zome**: `call(CallTargetCell::OtherRole("commons_land"/"commons_care"), ...)`
+///
+/// This transparent routing means callers do not need to know which DNA a
+/// zome lives in — the bridge handles it automatically.
 ///
 /// ## Example (from another coordinator zome or external client)
 /// ```ignore
@@ -142,7 +282,31 @@ fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
 #[hdk_extern]
 pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
     enforce_rate_limit(&input.zome)?;
-    bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
+
+    // Validate against the full allowlist (both sub-clusters)
+    if !ALLOWED_ZOMES.contains(&input.zome.as_str()) {
+        return Ok(DispatchResult {
+            success: false,
+            response: None,
+            error: Some(format!("Zome '{}' is not in the commons allowlist", input.zome)),
+        });
+    }
+
+    let cluster = detect_sub_cluster();
+
+    if is_local_zome(&input.zome, cluster) {
+        // Local dispatch — same DNA, zero overhead
+        bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
+    } else {
+        // Cross-DNA dispatch to sibling sub-cluster
+        let cross = CrossClusterDispatchInput {
+            role: sibling_role(cluster).to_string(),
+            zome: input.zome,
+            fn_name: input.fn_name,
+            payload: input.payload,
+        };
+        bridge::dispatch_call_cross_cluster(&cross, ALLOWED_ZOMES)
+    }
 }
 
 // ============================================================================
@@ -251,6 +415,12 @@ fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
             s if s.contains("impact") || s.contains("carbon") || s.contains("emission") => "transport_impact",
             _ => "transport_routes",
         },
+        "support" => match query_type {
+            s if s.contains("ticket") => "support_tickets",
+            s if s.contains("diagnostic") => "support_diagnostics",
+            _ => "support_knowledge",
+        },
+        "space" => "space",
         _ => return None,
     };
     Some(zome.to_string())
@@ -665,7 +835,7 @@ pub fn query_audit_trail(query: AuditTrailQuery) -> ExternResult<AuditTrailResul
 // Health Check
 // ============================================================================
 
-/// Network health check — returns status for all 5 domains
+/// Network health check — returns status for all commons domains
 #[hdk_extern]
 pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
     let caller = agent_info()?.agent_initial_pubkey;
@@ -685,6 +855,8 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
             "water".to_string(),
             "food".to_string(),
             "transport".to_string(),
+            "support".to_string(),
+            "space".to_string(),
         ],
     })
 }
@@ -696,6 +868,8 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
 /// Verify property ownership — housing/care/mutualaid can check before acting.
 ///
 /// Dispatches to `property_registry.verify_ownership` with typed input/output.
+/// Uses smart routing: if running in commons_care DNA, the call crosses to
+/// commons_land via `CallTargetCell::OtherRole`.
 #[hdk_extern]
 pub fn verify_property_ownership(input: PropertyOwnershipQuery) -> ExternResult<PropertyOwnershipResult> {
     enforce_rate_limit("property_registry")?;
@@ -706,7 +880,7 @@ pub fn verify_property_ownership(input: PropertyOwnershipQuery) -> ExternResult<
         fn_name: "verify_ownership".into(),
         payload: payload.0,
     };
-    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    let result = dispatch_call(dispatch)?;
     if result.success {
         if let Some(response) = result.response {
             let decoded: PropertyOwnershipResult = ExternIO(response).decode()
@@ -731,6 +905,8 @@ pub fn verify_property_ownership(input: PropertyOwnershipQuery) -> ExternResult<
 /// Check care provider availability — mutualaid can find matching caregivers.
 ///
 /// Dispatches to `care_matching.check_availability` with typed input/output.
+/// Uses smart routing: if running in commons_land DNA, the call crosses to
+/// commons_care via `CallTargetCell::OtherRole`.
 #[hdk_extern]
 pub fn check_care_availability(input: CareAvailabilityQuery) -> ExternResult<CareAvailabilityResult> {
     enforce_rate_limit("care_matching")?;
@@ -741,7 +917,7 @@ pub fn check_care_availability(input: CareAvailabilityQuery) -> ExternResult<Car
         fn_name: "check_availability".into(),
         payload: payload.0,
     };
-    let result = bridge::dispatch_call_checked(&dispatch, ALLOWED_ZOMES)?;
+    let result = dispatch_call(dispatch)?;
     if result.success {
         if let Some(response) = result.response {
             let decoded: CareAvailabilityResult = ExternIO(response).decode()
@@ -840,7 +1016,7 @@ mod tests {
 
     #[test]
     fn local_allowlist_covers_all_domains() {
-        // Verify ALLOWED_ZOMES has representatives from all 7 commons domains
+        // Verify ALLOWED_ZOMES has representatives from all 7+ commons domains
         let has_property = ALLOWED_ZOMES.iter().any(|z| z.starts_with("property_"));
         let has_housing = ALLOWED_ZOMES.iter().any(|z| z.starts_with("housing_"));
         let has_care = ALLOWED_ZOMES.iter().any(|z| z.starts_with("care_"));
@@ -848,6 +1024,8 @@ mod tests {
         let has_water = ALLOWED_ZOMES.iter().any(|z| z.starts_with("water_"));
         let has_food = ALLOWED_ZOMES.iter().any(|z| z.starts_with("food_"));
         let has_transport = ALLOWED_ZOMES.iter().any(|z| z.starts_with("transport_"));
+        let has_support = ALLOWED_ZOMES.iter().any(|z| z.starts_with("support_"));
+        let has_space = ALLOWED_ZOMES.contains(&"space");
         assert!(has_property, "ALLOWED_ZOMES missing property domain");
         assert!(has_housing, "ALLOWED_ZOMES missing housing domain");
         assert!(has_care, "ALLOWED_ZOMES missing care domain");
@@ -855,12 +1033,15 @@ mod tests {
         assert!(has_water, "ALLOWED_ZOMES missing water domain");
         assert!(has_food, "ALLOWED_ZOMES missing food domain");
         assert!(has_transport, "ALLOWED_ZOMES missing transport domain");
+        assert!(has_support, "ALLOWED_ZOMES missing support domain");
+        assert!(has_space, "ALLOWED_ZOMES missing space");
     }
 
     #[test]
     fn local_allowlist_has_expected_count() {
-        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food + 3 transport = 34
-        assert_eq!(ALLOWED_ZOMES.len(), 34);
+        // 4 property + 6 housing + 5 care + 7 mutualaid + 5 water + 4 food
+        // + 3 transport + 3 support + 1 space = 38
+        assert_eq!(ALLOWED_ZOMES.len(), 38);
     }
 
     #[test]
@@ -1238,6 +1419,8 @@ mod tests {
         let water_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("water_")).count();
         let food_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("food_")).count();
         let transport_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("transport_")).count();
+        let support_count = ALLOWED_ZOMES.iter().filter(|z| z.starts_with("support_")).count();
+        let space_count = ALLOWED_ZOMES.iter().filter(|z| *z == &"space").count();
         assert_eq!(property_count, 4, "Expected 4 property zomes");
         assert_eq!(housing_count, 6, "Expected 6 housing zomes");
         assert_eq!(care_count, 5, "Expected 5 care zomes");
@@ -1245,6 +1428,8 @@ mod tests {
         assert_eq!(water_count, 5, "Expected 5 water zomes");
         assert_eq!(food_count, 4, "Expected 4 food zomes");
         assert_eq!(transport_count, 3, "Expected 3 transport zomes");
+        assert_eq!(support_count, 3, "Expected 3 support zomes");
+        assert_eq!(space_count, 1, "Expected 1 space zome");
     }
 
     // ---- resolve_domain_zome outputs are in ALLOWED_ZOMES ----
@@ -1288,6 +1473,10 @@ mod tests {
             ("transport", "register_vehicle"),
             ("transport", "post_ride_share"),
             ("transport", "get_carbon_credits"),
+            ("support", "open_ticket"),
+            ("support", "run_diagnostic"),
+            ("support", "search_knowledge"),
+            ("space", "anything"),
         ];
         for (domain, query_type) in test_cases {
             let resolved = resolve_domain_zome(domain, query_type);
@@ -1317,6 +1506,8 @@ mod tests {
         assert_eq!(resolve_domain_zome("water", "").unwrap(), "water_flow");
         assert_eq!(resolve_domain_zome("food", "").unwrap(), "food_production");
         assert_eq!(resolve_domain_zome("transport", "").unwrap(), "transport_routes");
+        assert_eq!(resolve_domain_zome("support", "").unwrap(), "support_knowledge");
+        assert_eq!(resolve_domain_zome("space", "").unwrap(), "space");
     }
 
     #[test]
@@ -1374,11 +1565,12 @@ mod tests {
     // ---- Health check domain list ----
 
     #[test]
-    fn health_check_returns_exactly_seven_domains() {
-        // The health_check function hardcodes 7 domains; verify the list
+    fn health_check_returns_all_domains() {
+        // The health_check function lists all 9 commons domains; verify the list
         // is consistent with what resolve_domain_zome accepts.
         let expected_domains = vec![
             "property", "housing", "care", "mutualaid", "water", "food", "transport",
+            "support", "space",
         ];
         for domain in &expected_domains {
             assert!(
@@ -1548,5 +1740,163 @@ mod tests {
                 zome
             );
         }
+    }
+
+    // ============================================================================
+    // Sub-Cluster Routing Tests
+    // ============================================================================
+
+    // ---- LAND_ZOMES / CARE_ZOMES partitioning ----
+
+    #[test]
+    fn land_zomes_has_expected_count() {
+        // 4 property + 6 housing + 5 water + 4 food = 19
+        assert_eq!(LAND_ZOMES.len(), 19, "Expected 19 land zomes");
+    }
+
+    #[test]
+    fn care_zomes_has_expected_count() {
+        // 5 care + 7 mutualaid + 3 transport + 3 support + 1 space = 19
+        assert_eq!(CARE_ZOMES.len(), 19, "Expected 19 care zomes");
+    }
+
+    #[test]
+    fn land_and_care_zomes_are_disjoint() {
+        for zome in LAND_ZOMES {
+            assert!(
+                !CARE_ZOMES.contains(zome),
+                "Zome '{}' appears in both LAND_ZOMES and CARE_ZOMES",
+                zome
+            );
+        }
+    }
+
+    #[test]
+    fn land_plus_care_equals_allowed() {
+        // Every zome in ALLOWED_ZOMES must be in exactly one sub-cluster
+        let mut combined: Vec<&&str> = LAND_ZOMES.iter().chain(CARE_ZOMES.iter()).collect();
+        combined.sort();
+        let mut allowed: Vec<&&str> = ALLOWED_ZOMES.iter().collect();
+        allowed.sort();
+        assert_eq!(
+            combined, allowed,
+            "LAND_ZOMES + CARE_ZOMES must equal ALLOWED_ZOMES"
+        );
+    }
+
+    #[test]
+    fn land_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in LAND_ZOMES {
+            assert!(seen.insert(zome), "Duplicate in LAND_ZOMES: '{}'", zome);
+        }
+    }
+
+    #[test]
+    fn care_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in CARE_ZOMES {
+            assert!(seen.insert(zome), "Duplicate in CARE_ZOMES: '{}'", zome);
+        }
+    }
+
+    // ---- is_local_zome routing ----
+
+    #[test]
+    fn property_zomes_are_local_in_land() {
+        assert!(is_local_zome("property_registry", SubCluster::Land));
+        assert!(is_local_zome("property_transfer", SubCluster::Land));
+        assert!(is_local_zome("property_disputes", SubCluster::Land));
+        assert!(is_local_zome("property_commons", SubCluster::Land));
+    }
+
+    #[test]
+    fn property_zomes_are_remote_in_care() {
+        assert!(!is_local_zome("property_registry", SubCluster::Care));
+        assert!(!is_local_zome("property_transfer", SubCluster::Care));
+    }
+
+    #[test]
+    fn care_zomes_are_local_in_care() {
+        assert!(is_local_zome("care_timebank", SubCluster::Care));
+        assert!(is_local_zome("care_matching", SubCluster::Care));
+        assert!(is_local_zome("care_circles", SubCluster::Care));
+        assert!(is_local_zome("care_plans", SubCluster::Care));
+        assert!(is_local_zome("care_credentials", SubCluster::Care));
+    }
+
+    #[test]
+    fn care_zomes_are_remote_in_land() {
+        assert!(!is_local_zome("care_timebank", SubCluster::Land));
+        assert!(!is_local_zome("care_matching", SubCluster::Land));
+    }
+
+    #[test]
+    fn housing_zomes_are_local_in_land() {
+        assert!(is_local_zome("housing_units", SubCluster::Land));
+        assert!(is_local_zome("housing_clt", SubCluster::Land));
+        assert!(is_local_zome("housing_governance", SubCluster::Land));
+    }
+
+    #[test]
+    fn mutualaid_zomes_are_local_in_care() {
+        assert!(is_local_zome("mutualaid_needs", SubCluster::Care));
+        assert!(is_local_zome("mutualaid_pools", SubCluster::Care));
+        assert!(is_local_zome("mutualaid_timebank", SubCluster::Care));
+    }
+
+    #[test]
+    fn water_zomes_are_local_in_land() {
+        assert!(is_local_zome("water_flow", SubCluster::Land));
+        assert!(is_local_zome("water_purity", SubCluster::Land));
+    }
+
+    #[test]
+    fn food_zomes_are_local_in_land() {
+        assert!(is_local_zome("food_production", SubCluster::Land));
+        assert!(is_local_zome("food_distribution", SubCluster::Land));
+    }
+
+    #[test]
+    fn transport_zomes_are_local_in_care() {
+        assert!(is_local_zome("transport_routes", SubCluster::Care));
+        assert!(is_local_zome("transport_sharing", SubCluster::Care));
+        assert!(is_local_zome("transport_impact", SubCluster::Care));
+    }
+
+    #[test]
+    fn support_zomes_are_local_in_care() {
+        assert!(is_local_zome("support_knowledge", SubCluster::Care));
+        assert!(is_local_zome("support_tickets", SubCluster::Care));
+        assert!(is_local_zome("support_diagnostics", SubCluster::Care));
+    }
+
+    #[test]
+    fn space_is_local_in_care() {
+        assert!(is_local_zome("space", SubCluster::Care));
+    }
+
+    #[test]
+    fn unknown_zome_is_remote_in_both() {
+        assert!(!is_local_zome("nonexistent_zome", SubCluster::Land));
+        assert!(!is_local_zome("nonexistent_zome", SubCluster::Care));
+    }
+
+    // ---- sibling_role ----
+
+    #[test]
+    fn sibling_of_land_is_care() {
+        assert_eq!(sibling_role(SubCluster::Land), COMMONS_CARE_ROLE);
+    }
+
+    #[test]
+    fn sibling_of_care_is_land() {
+        assert_eq!(sibling_role(SubCluster::Care), COMMONS_LAND_ROLE);
+    }
+
+    #[test]
+    fn role_constants_are_correct() {
+        assert_eq!(COMMONS_LAND_ROLE, "commons_land");
+        assert_eq!(COMMONS_CARE_ROLE, "commons_care");
     }
 }

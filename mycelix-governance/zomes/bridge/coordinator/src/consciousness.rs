@@ -28,6 +28,7 @@ pub fn record_consciousness_snapshot(input: RecordSnapshotInput) -> ExternResult
         care_activation: input.care_activation,
         captured_at: now,
         source: input.source.unwrap_or_else(|| SYMTHAEA_SOURCE.to_string()),
+        consciousness_vector: None,
     };
 
     let action_hash = create_entry(&EntryTypes::ConsciousnessSnapshot(snapshot.clone()))?;

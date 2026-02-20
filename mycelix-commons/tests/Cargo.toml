@@ -24,5 +24,17 @@ name = "sweettest_integration"
 path = "sweettest_integration.rs"
 
 [[test]]
+name = "sweettest_property_bridge"
+path = "sweettest_property_bridge.rs"
+
+[[test]]
+name = "sweettest_food_transport"
+path = "sweettest_food_transport.rs"
+
+[[test]]
+name = "sweettest_dispatch_support"
+path = "sweettest_dispatch_support.rs"
+
+[[test]]
 name = "cross_domain_sweettest"
 path = "cross_domain_sweettest.rs"

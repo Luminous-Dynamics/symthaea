@@ -66,14 +66,14 @@ export interface DispatchResult {
 
 /** Input for an audited cross-domain query */
 export interface CommonsQueryInput {
-  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport';
+  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport' | 'support' | 'space';
   query_type: string;
   params: string;
 }
 
 /** Input for broadcasting a cross-domain event */
 export interface CommonsEventInput {
-  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport';
+  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport' | 'support' | 'space';
   event_type: string;
   payload: string;
   related_hashes?: string[];
@@ -202,21 +202,64 @@ interface ZomeCallable {
 // Constants
 // ============================================================================
 
-const COMMONS_ROLE = 'commons';
+/** @deprecated Use COMMONS_LAND_ROLE or COMMONS_CARE_ROLE instead */
+const COMMONS_ROLE = 'commons_land';
+
+/** hApp role for the commons-land DNA (property, housing, water, food) */
+const COMMONS_LAND_ROLE = 'commons_land';
+
+/** hApp role for the commons-care DNA (care, mutualaid, transport, support, space) */
+const COMMONS_CARE_ROLE = 'commons_care';
+
 const BRIDGE_ZOME = 'commons_bridge';
 
-/** All domain zomes available in the commons cluster */
-export const COMMONS_DOMAINS = ['property', 'housing', 'care', 'mutualaid', 'water', 'food', 'transport'] as const;
+/** All domain names available in the commons cluster */
+export const COMMONS_DOMAINS = ['property', 'housing', 'care', 'mutualaid', 'water', 'food', 'transport', 'support', 'space'] as const;
 
-export const COMMONS_ZOMES = [
+/** Zomes in the commons-land DNA */
+export const COMMONS_LAND_ZOMES = [
   'property_registry', 'property_transfer', 'property_disputes', 'property_commons',
   'housing_units', 'housing_membership', 'housing_finances', 'housing_maintenance', 'housing_clt', 'housing_governance',
-  'care_timebank', 'care_circles', 'care_matching', 'care_plans', 'care_credentials',
-  'mutualaid_needs', 'mutualaid_circles', 'mutualaid_governance', 'mutualaid_pools', 'mutualaid_requests', 'mutualaid_resources', 'mutualaid_timebank',
   'water_flow', 'water_purity', 'water_capture', 'water_steward', 'water_wisdom',
   'food_production', 'food_distribution', 'food_preservation', 'food_knowledge',
-  'transport_routes', 'transport_sharing', 'transport_impact',
 ] as const;
+
+/** Zomes in the commons-care DNA */
+export const COMMONS_CARE_ZOMES = [
+  'care_timebank', 'care_circles', 'care_matching', 'care_plans', 'care_credentials',
+  'mutualaid_needs', 'mutualaid_circles', 'mutualaid_governance', 'mutualaid_pools', 'mutualaid_requests', 'mutualaid_resources', 'mutualaid_timebank',
+  'transport_routes', 'transport_sharing', 'transport_impact',
+  'support_knowledge', 'support_tickets', 'support_diagnostics',
+  'space',
+] as const;
+
+/** All zomes across both commons DNAs (backward compatible) */
+export const COMMONS_ZOMES = [...COMMONS_LAND_ZOMES, ...COMMONS_CARE_ZOMES] as const;
+
+/** Domains that belong to the commons-land DNA */
+const LAND_DOMAINS = new Set(['property', 'housing', 'water', 'food']);
+
+/** Domains that belong to the commons-care DNA */
+const CARE_DOMAINS = new Set(['care', 'mutualaid', 'transport', 'support', 'space']);
+
+/** Zomes that belong to the commons-land DNA (for dispatch routing) */
+const LAND_ZOME_SET = new Set<string>(COMMONS_LAND_ZOMES);
+
+/**
+ * Determine the correct DNA role for a given zome name.
+ * The bridge handles cross-DNA routing transparently, but calling the
+ * bridge on the same DNA as the target zome avoids the extra hop.
+ */
+function roleForZome(zome: string): string {
+  return LAND_ZOME_SET.has(zome) ? COMMONS_LAND_ROLE : COMMONS_CARE_ROLE;
+}
+
+/**
+ * Determine the correct DNA role for a given domain name.
+ */
+function roleForDomain(domain: string): string {
+  return LAND_DOMAINS.has(domain) ? COMMONS_LAND_ROLE : COMMONS_CARE_ROLE;
+}
 
 // ============================================================================
 // Commons Bridge Client
@@ -226,17 +269,30 @@ export const COMMONS_ZOMES = [
  * Client for the commons-bridge coordinator zome.
  *
  * Provides cross-domain dispatch, audited queries, event broadcasting,
- * and health monitoring across all 5 commons domains.
+ * and health monitoring across all commons domains.
+ *
+ * ## Sub-Cluster Architecture
+ *
+ * The commons DNA is split into two sub-cluster DNAs:
+ * - **commons_land** (role: `commons_land`): property, housing, water, food
+ * - **commons_care** (role: `commons_care`): care, mutualaid, transport, support, space
+ *
+ * The client automatically routes calls to the correct DNA role based on the
+ * target zome or domain. The bridge handles transparent cross-DNA routing
+ * for calls that need to reach the sibling DNA.
  */
 export class CommonsBridgeClient {
   constructor(private readonly client: ZomeCallable) {}
 
   // --- Cross-Domain Dispatch ---
 
-  /** Dispatch a synchronous call to any domain zome in the commons cluster */
+  /**
+   * Dispatch a synchronous call to any domain zome in the commons cluster.
+   * Automatically routes to the correct sub-cluster DNA role.
+   */
   async dispatch(zome: string, fn_name: string, payload: Uint8Array): Promise<DispatchResult> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: roleForZome(zome),
       zome_name: BRIDGE_ZOME,
       fn_name: 'dispatch_call',
       payload: { zome, fn_name, payload: Array.from(payload) },
@@ -248,7 +304,7 @@ export class CommonsBridgeClient {
   /** Submit an audited cross-domain query with optional auto-dispatch */
   async query(input: CommonsQueryInput): Promise<unknown> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: roleForDomain(input.domain),
       zome_name: BRIDGE_ZOME,
       fn_name: 'query_commons',
       payload: {
@@ -266,8 +322,10 @@ export class CommonsBridgeClient {
 
   /** Resolve a pending query with a result */
   async resolveQuery(queryHash: Uint8Array, result: string, success: boolean): Promise<unknown> {
+    // Queries are stored on the DNA where they were created; we route to land
+    // by default since the caller should use the same role they created with.
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: COMMONS_LAND_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'resolve_query',
       payload: { query_hash: queryHash, result, success },
@@ -277,21 +335,30 @@ export class CommonsBridgeClient {
   /** Get all queries for a specific domain */
   async getDomainQueries(domain: string): Promise<unknown[]> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: roleForDomain(domain),
       zome_name: BRIDGE_ZOME,
       fn_name: 'get_domain_queries',
       payload: domain,
     });
   }
 
-  /** Get my queries */
+  /** Get my queries (calls both DNAs and merges results) */
   async getMyQueries(): Promise<unknown[]> {
-    return this.client.callZome({
-      role_name: COMMONS_ROLE,
-      zome_name: BRIDGE_ZOME,
-      fn_name: 'get_my_queries',
-      payload: null,
-    });
+    const [landQueries, careQueries] = await Promise.all([
+      this.client.callZome<unknown[]>({
+        role_name: COMMONS_LAND_ROLE,
+        zome_name: BRIDGE_ZOME,
+        fn_name: 'get_my_queries',
+        payload: null,
+      }),
+      this.client.callZome<unknown[]>({
+        role_name: COMMONS_CARE_ROLE,
+        zome_name: BRIDGE_ZOME,
+        fn_name: 'get_my_queries',
+        payload: null,
+      }),
+    ]);
+    return [...landQueries, ...careQueries];
   }
 
   // --- Event Broadcasting ---
@@ -299,7 +366,7 @@ export class CommonsBridgeClient {
   /** Broadcast a cross-domain event */
   async broadcastEvent(input: CommonsEventInput): Promise<unknown> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: roleForDomain(input.domain),
       zome_name: BRIDGE_ZOME,
       fn_name: 'broadcast_event',
       payload: {
@@ -316,7 +383,7 @@ export class CommonsBridgeClient {
   /** Get events for a specific domain */
   async getDomainEvents(domain: string): Promise<unknown[]> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: roleForDomain(domain),
       zome_name: BRIDGE_ZOME,
       fn_name: 'get_domain_events',
       payload: domain,
@@ -326,39 +393,58 @@ export class CommonsBridgeClient {
   /** Get events by type within a domain */
   async getEventsByType(query: EventTypeQuery): Promise<unknown[]> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: roleForDomain(query.domain),
       zome_name: BRIDGE_ZOME,
       fn_name: 'get_events_by_type',
       payload: query,
     });
   }
 
-  /** Get all events across all domains */
+  /** Get all events across all domains (merges results from both DNAs) */
   async getAllEvents(): Promise<unknown[]> {
-    return this.client.callZome({
-      role_name: COMMONS_ROLE,
-      zome_name: BRIDGE_ZOME,
-      fn_name: 'get_all_events',
-      payload: null,
-    });
+    const [landEvents, careEvents] = await Promise.all([
+      this.client.callZome<unknown[]>({
+        role_name: COMMONS_LAND_ROLE,
+        zome_name: BRIDGE_ZOME,
+        fn_name: 'get_all_events',
+        payload: null,
+      }),
+      this.client.callZome<unknown[]>({
+        role_name: COMMONS_CARE_ROLE,
+        zome_name: BRIDGE_ZOME,
+        fn_name: 'get_all_events',
+        payload: null,
+      }),
+    ]);
+    return [...landEvents, ...careEvents];
   }
 
-  /** Get my events */
+  /** Get my events (merges results from both DNAs) */
   async getMyEvents(): Promise<unknown[]> {
-    return this.client.callZome({
-      role_name: COMMONS_ROLE,
-      zome_name: BRIDGE_ZOME,
-      fn_name: 'get_my_events',
-      payload: null,
-    });
+    const [landEvents, careEvents] = await Promise.all([
+      this.client.callZome<unknown[]>({
+        role_name: COMMONS_LAND_ROLE,
+        zome_name: BRIDGE_ZOME,
+        fn_name: 'get_my_events',
+        payload: null,
+      }),
+      this.client.callZome<unknown[]>({
+        role_name: COMMONS_CARE_ROLE,
+        zome_name: BRIDGE_ZOME,
+        fn_name: 'get_my_events',
+        payload: null,
+      }),
+    ]);
+    return [...landEvents, ...careEvents];
   }
 
   // --- Cross-Cluster (Commons → Civic) ---
 
   /** Dispatch a call to any zome in the civic DNA (cross-cluster) */
   async dispatchCivicCall(zome: string, fn_name: string, payload: Uint8Array): Promise<DispatchResult> {
+    // Route through land bridge (either bridge can reach civic)
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: COMMONS_LAND_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'dispatch_civic_call',
       payload: { role: 'civic', zome, fn_name, payload: Array.from(payload) },
@@ -368,7 +454,7 @@ export class CommonsBridgeClient {
   /** Check if there are active emergencies near a lat/lon (queries civic emergency_incidents) */
   async checkEmergencyForArea(input: CheckEmergencyForAreaInput): Promise<EmergencyAreaCheckResult> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: COMMONS_LAND_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'check_emergency_for_area',
       payload: input,
@@ -378,7 +464,7 @@ export class CommonsBridgeClient {
   /** Check if there are pending justice disputes affecting a property (queries civic justice_cases) */
   async checkJusticeDisputesForProperty(input: CheckJusticeDisputesInput): Promise<JusticeDisputeCheckResult> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: COMMONS_LAND_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'check_justice_disputes_for_property',
       payload: input,
@@ -390,7 +476,7 @@ export class CommonsBridgeClient {
   /** Verify property ownership — typed wrapper for property_registry.verify_ownership */
   async verifyPropertyOwnership(input: PropertyOwnershipQuery): Promise<PropertyOwnershipResult> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: COMMONS_LAND_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'verify_property_ownership',
       payload: input,
@@ -400,7 +486,7 @@ export class CommonsBridgeClient {
   /** Check care provider availability — typed wrapper for care_matching.check_availability */
   async checkCareAvailability(input: CareAvailabilityQuery): Promise<CareAvailabilityResult> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: COMMONS_CARE_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'check_care_availability',
       payload: input,
@@ -411,8 +497,10 @@ export class CommonsBridgeClient {
 
   /** Query the bridge audit trail with time range and optional domain/type filters */
   async queryAuditTrail(query: AuditTrailQuery): Promise<AuditTrailResult> {
+    // Route to the DNA that owns the queried domain, or land by default
+    const role = query.domain ? roleForDomain(query.domain) : COMMONS_LAND_ROLE;
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: role,
       zome_name: BRIDGE_ZOME,
       fn_name: 'query_audit_trail',
       payload: {
@@ -426,10 +514,10 @@ export class CommonsBridgeClient {
 
   // --- Health ---
 
-  /** Health check across all 7 commons domains */
+  /** Health check across all commons domains */
   async healthCheck(): Promise<BridgeHealth> {
     return this.client.callZome({
-      role_name: COMMONS_ROLE,
+      role_name: COMMONS_LAND_ROLE,
       zome_name: BRIDGE_ZOME,
       fn_name: 'health_check',
       payload: null,

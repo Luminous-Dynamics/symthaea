@@ -1,0 +1,167 @@
+---
+# Mycelix Commons-Care DNA
+# Social/care domains: care + mutualaid + transport + support + space
+# 5 care + 7 mutualaid + 3 transport + 3 support + 1 space = 19 domain + 1 bridge = 20 coordinator zomes
+#
+# Part of the commons sub-cluster split. Domains within this DNA use
+# CallTargetCell::Local for cross-domain calls. To reach property/housing/
+# water/food domains, use the commons_bridge which dispatches via
+# CallTargetCell::OtherRole("commons_land").
+
+manifest_version: "0"
+name: mycelix_commons_care
+
+integrity:
+  network_seed: "mycelix-commons-care-v1"
+  properties:
+    cross_domain_calls: true
+    sub_cluster: "care"
+
+  zomes:
+    # Care domain
+    - name: care_timebank_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_timebank_integrity.wasm
+    - name: care_circles_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_circles_integrity.wasm
+    - name: care_matching_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_matching_integrity.wasm
+    - name: care_plans_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_plans_integrity.wasm
+    - name: care_credentials_integrity
+      path: ../target/wasm32-unknown-unknown/release/care_credentials_integrity.wasm
+
+    # Mutual Aid domain
+    - name: mutualaid_needs_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_needs_integrity.wasm
+    - name: mutualaid_circles_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_circles_integrity.wasm
+    - name: mutualaid_governance_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_governance_integrity.wasm
+    - name: mutualaid_pools_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_pools_integrity.wasm
+    - name: mutualaid_requests_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_requests_integrity.wasm
+    - name: mutualaid_resources_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_resources_integrity.wasm
+    - name: mutualaid_timebank_integrity
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_timebank_integrity.wasm
+
+    # Transport domain
+    - name: transport_routes_integrity
+      path: ../target/wasm32-unknown-unknown/release/transport_routes_integrity.wasm
+    - name: transport_sharing_integrity
+      path: ../target/wasm32-unknown-unknown/release/transport_sharing_integrity.wasm
+    - name: transport_impact_integrity
+      path: ../target/wasm32-unknown-unknown/release/transport_impact_integrity.wasm
+
+    # Support domain
+    - name: support_knowledge_integrity
+      path: ../target/wasm32-unknown-unknown/release/support_knowledge_integrity.wasm
+    - name: support_tickets_integrity
+      path: ../target/wasm32-unknown-unknown/release/support_tickets_integrity.wasm
+    - name: support_diagnostics_integrity
+      path: ../target/wasm32-unknown-unknown/release/support_diagnostics_integrity.wasm
+
+    # Space / membrane factory
+    - name: space_integrity
+      path: ../target/wasm32-unknown-unknown/release/space_integrity.wasm
+
+    # Commons-Care bridge (shared integrity with commons bridge)
+    - name: commons_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/commons_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    # Care domain
+    - name: care_timebank
+      path: ../target/wasm32-unknown-unknown/release/care_timebank.wasm
+      dependencies:
+        - name: care_timebank_integrity
+    - name: care_circles
+      path: ../target/wasm32-unknown-unknown/release/care_circles.wasm
+      dependencies:
+        - name: care_circles_integrity
+    - name: care_matching
+      path: ../target/wasm32-unknown-unknown/release/care_matching.wasm
+      dependencies:
+        - name: care_matching_integrity
+        - name: care_timebank_integrity
+    - name: care_plans
+      path: ../target/wasm32-unknown-unknown/release/care_plans.wasm
+      dependencies:
+        - name: care_plans_integrity
+        - name: care_timebank_integrity
+    - name: care_credentials
+      path: ../target/wasm32-unknown-unknown/release/care_credentials.wasm
+      dependencies:
+        - name: care_credentials_integrity
+
+    # Mutual Aid domain
+    - name: mutualaid_needs
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_needs.wasm
+      dependencies:
+        - name: mutualaid_needs_integrity
+    - name: mutualaid_circles
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_circles.wasm
+      dependencies:
+        - name: mutualaid_circles_integrity
+    - name: mutualaid_governance
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_governance.wasm
+      dependencies:
+        - name: mutualaid_governance_integrity
+    - name: mutualaid_pools
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_pools.wasm
+      dependencies:
+        - name: mutualaid_pools_integrity
+    - name: mutualaid_requests
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_requests.wasm
+      dependencies:
+        - name: mutualaid_requests_integrity
+    - name: mutualaid_resources
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_resources.wasm
+      dependencies:
+        - name: mutualaid_resources_integrity
+    - name: mutualaid_timebank
+      path: ../target/wasm32-unknown-unknown/release/mutualaid_timebank.wasm
+      dependencies:
+        - name: mutualaid_timebank_integrity
+
+    # Transport domain
+    - name: transport_routes
+      path: ../target/wasm32-unknown-unknown/release/transport_routes.wasm
+      dependencies:
+        - name: transport_routes_integrity
+    - name: transport_sharing
+      path: ../target/wasm32-unknown-unknown/release/transport_sharing.wasm
+      dependencies:
+        - name: transport_sharing_integrity
+    - name: transport_impact
+      path: ../target/wasm32-unknown-unknown/release/transport_impact.wasm
+      dependencies:
+        - name: transport_impact_integrity
+
+    # Support domain
+    - name: support_knowledge
+      path: ../target/wasm32-unknown-unknown/release/support_knowledge.wasm
+      dependencies:
+        - name: support_knowledge_integrity
+    - name: support_tickets
+      path: ../target/wasm32-unknown-unknown/release/support_tickets.wasm
+      dependencies:
+        - name: support_tickets_integrity
+    - name: support_diagnostics
+      path: ../target/wasm32-unknown-unknown/release/support_diagnostics.wasm
+      dependencies:
+        - name: support_diagnostics_integrity
+
+    # Space / membrane factory
+    - name: space
+      path: ../target/wasm32-unknown-unknown/release/space.wasm
+      dependencies:
+        - name: space_integrity
+
+    # Commons-Care bridge (reuses commons_bridge WASM with care-specific dispatch)
+    - name: commons_bridge
+      path: ../target/wasm32-unknown-unknown/release/commons_bridge.wasm
+      dependencies:
+        - name: commons_bridge_integrity

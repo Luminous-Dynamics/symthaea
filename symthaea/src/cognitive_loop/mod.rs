@@ -606,9 +606,9 @@ pub struct CognitiveLoopService {
     /// a phi_modulation factor that scales consciousness from somatic feedback.
     virtual_body: Option<virtual_body::VirtualBody>,
 
-    /// Buffer of PhiAttestationRecords ready for governance bridge consumption.
-    /// Populated when `config.enable_phi_attestation` is true.
-    phi_attestation_buffer: VecDeque<PhiAttestationRecord>,
+    /// Buffer of PsiAttestationRecords ready for governance bridge consumption.
+    /// Populated when `config.enable_psi_attestation` is true.
+    psi_attestation_buffer: VecDeque<PsiAttestationRecord>,
 
     /// Sliding window of FEP↔MCTS policy agreement for adaptive temperature control.
     /// Science: Friston & Parr (2020) — policy agreement modulates exploration/exploitation.

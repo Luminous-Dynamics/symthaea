@@ -188,6 +188,9 @@ pub struct ConsciousnessSnapshot {
     pub captured_at: Timestamp,
     /// Source system (e.g., "symthaea", "mycelix-local")
     pub source: String,
+    /// Optional C-Vector (v2 snapshots).
+    #[serde(default)]
+    pub consciousness_vector: Option<ConsciousnessVectorEntry>,
 }
 
 impl ConsciousnessSnapshot {
@@ -239,6 +242,71 @@ impl GovernanceActionType {
     }
 }
 
+/// Multi-dimensional consciousness vector stored on DHT (v2 attestations).
+///
+/// Parallel struct to `symthaea_mycelix_bridge::ConsciousnessVector` — governance
+/// zomes cannot depend on the bridge crate, so this is defined independently.
+/// Each dimension is `Option<f64>` for incremental population.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ConsciousnessVectorEntry {
+    /// Spectral connectivity (Fiedler value) [0,1]. NOT IIT Phi.
+    pub spectral_connectivity: Option<f64>,
+    /// True IIT Phi [0,1]. Expensive: only computed for small component counts.
+    pub true_phi: Option<f64>,
+    /// Fast Phi approximation via effective information [0,1].
+    pub phi_fast: Option<f64>,
+    /// Shannon entropy of state space [0,1] (normalized).
+    pub entropy: Option<f64>,
+    /// Internal coherence [0,1].
+    pub coherence: Option<f64>,
+    /// Epistemic confidence from validation metrics [0,1].
+    pub epistemic_confidence: Option<f64>,
+}
+
+impl ConsciousnessVectorEntry {
+    /// Best available phi: true_phi > phi_fast > spectral_connectivity.
+    pub fn best_phi(&self) -> f64 {
+        self.true_phi
+            .or(self.phi_fast)
+            .or(self.spectral_connectivity)
+            .unwrap_or(0.0)
+    }
+
+    /// Weighted composite matching bridge crate weights.
+    /// Weights: phi=0.35, coherence=0.20, entropy=0.15, epistemic=0.15, spectral=0.15
+    pub fn composite(&self) -> f64 {
+        let mut total = 0.0;
+        let mut weight_sum = 0.0;
+
+        if let Some(v) = self.true_phi.or(self.phi_fast) {
+            total += 0.35 * v;
+            weight_sum += 0.35;
+        }
+        if let Some(v) = self.coherence {
+            total += 0.20 * v;
+            weight_sum += 0.20;
+        }
+        if let Some(v) = self.entropy {
+            total += 0.15 * v;
+            weight_sum += 0.15;
+        }
+        if let Some(v) = self.epistemic_confidence {
+            total += 0.15 * v;
+            weight_sum += 0.15;
+        }
+        if let Some(v) = self.spectral_connectivity {
+            total += 0.15 * v;
+            weight_sum += 0.15;
+        }
+
+        if weight_sum > 0.0 {
+            (total / weight_sum).clamp(0.0, 1.0)
+        } else {
+            0.0
+        }
+    }
+}
+
 /// Authenticated consciousness attestation with agent signature.
 ///
 /// Unlike `ConsciousnessSnapshot`, this proves the consciousness level came from
@@ -249,16 +317,21 @@ impl GovernanceActionType {
 pub struct ConsciousnessAttestation {
     /// Agent DID
     pub agent_did: String,
-    /// Consciousness level [0.0, 1.0]
+    /// Consciousness level [0.0, 1.0] — scalar for backward compatibility
     pub consciousness_level: f64,
     /// Symthaea cognitive cycle number
     pub cycle_id: u64,
     /// Capture timestamp
     pub captured_at: Timestamp,
-    /// Agent-signed hash of (agent_did, phi, cycle_id, captured_at)
+    /// Agent-signed hash of (agent_did, consciousness_level, cycle_id, captured_at)
     pub signature: Vec<u8>,
     /// Source system — validated to be "symthaea"
     pub source: String,
+    /// Optional C-Vector (v2 attestations). When present, `consciousness_level`
+    /// equals `consciousness_vector.composite()`. Signature binds to the scalar
+    /// for backward-compatible verification.
+    #[serde(default)]
+    pub consciousness_vector: Option<ConsciousnessVectorEntry>,
 }
 
 /// How the consciousness value in a governance decision was obtained.
@@ -649,6 +722,15 @@ impl HolisticVotingWeight {
     /// Calculate weight without harmonic alignment (for general participation)
     pub fn calculate_base(reputation: f64, consciousness_level: f64) -> Self {
         Self::calculate(reputation, consciousness_level, 0.0)
+    }
+
+    /// Calculate weight from a C-Vector, using its composite as consciousness_level.
+    pub fn calculate_from_vector(
+        reputation: f64,
+        vector: &ConsciousnessVectorEntry,
+        harmonic_alignment: f64,
+    ) -> Self {
+        Self::calculate(reputation, vector.composite(), harmonic_alignment)
     }
 
     /// Check if a weight was capped
@@ -1225,6 +1307,14 @@ pub struct GovernanceConsciousnessConfig {
     #[serde(default = "default_max_voting_weight")]
     pub max_voting_weight: f64,
 
+    // --- Per-dimension C-Vector gates (optional) ---
+    /// Minimum true_phi for constitutional changes. If `None`, only composite gate applies.
+    #[serde(default)]
+    pub min_true_phi_constitutional: Option<f64>,
+    /// Minimum coherence for voting. If `None`, only composite gate applies.
+    #[serde(default)]
+    pub min_coherence_voting: Option<f64>,
+
     // --- Metadata ---
     /// Timestamp of last update
     pub updated_at: Timestamp,
@@ -1246,6 +1336,8 @@ impl GovernanceConsciousnessConfig {
             min_voter_consciousness_emergency: GOV_PROPOSAL,
             min_voter_consciousness_constitutional: GOV_VOTER_CONSTITUTIONAL,
             max_voting_weight: 1.5,
+            min_true_phi_constitutional: None,
+            min_coherence_voting: None,
             updated_at: now,
             changed_by_proposal: None,
         }
@@ -1307,6 +1399,17 @@ pub fn check_consciousness_config(config: &GovernanceConsciousnessConfig) -> Res
     // Max voting weight must be positive and reasonable (0.5 to 5.0)
     if config.max_voting_weight < 0.5 || config.max_voting_weight > 5.0 {
         return Err("max_voting_weight must be between 0.5 and 5.0".into());
+    }
+    // Per-dimension C-Vector gates (optional)
+    if let Some(v) = config.min_true_phi_constitutional {
+        if v < 0.0 || v > 1.0 {
+            return Err("min_true_phi_constitutional must be between 0.0 and 1.0".into());
+        }
+    }
+    if let Some(v) = config.min_coherence_voting {
+        if v < 0.0 || v > 1.0 {
+            return Err("min_coherence_voting must be between 0.0 and 1.0".into());
+        }
     }
     Ok(())
 }
@@ -2177,6 +2280,7 @@ mod consciousness_snapshot_tests {
             care_activation: 0.6,
             captured_at: Timestamp::from_micros(1000000),
             source: "symthaea".to_string(),
+            consciousness_vector: None,
         }
     }
 
@@ -2371,6 +2475,7 @@ mod consciousness_edge_case_tests {
             care_activation: 0.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".to_string(),
+            consciousness_vector: None,
         };
 
         assert_eq!(snapshot.quality_score(), 0.0);
@@ -2390,6 +2495,7 @@ mod consciousness_edge_case_tests {
             care_activation: 1.0,
             captured_at: Timestamp::from_micros(0),
             source: "test".to_string(),
+            consciousness_vector: None,
         };
 
         assert_eq!(snapshot.quality_score(), 1.0);

@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 description = "Sweettest integration tests for Mycelix ecosystem hApps"
+autotests = false
 
 # Note: These tests require:
 # 1. WASM zomes built: cargo build --release --target wasm32-unknown-unknown
@@ -102,3 +103,11 @@ path = "tests/personal_workflow.rs"
 [[test]]
 name = "phi_attestation_e2e"
 path = "tests/phi_attestation_e2e.rs"
+
+[[test]]
+name = "conductor_e2e"
+path = "tests/conductor_e2e.rs"
+
+[[test]]
+name = "cross_cluster_bridge"
+path = "tests/cross_cluster_bridge.rs"
