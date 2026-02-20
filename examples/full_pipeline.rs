@@ -84,7 +84,7 @@ fn main() {
             println!(
                 "{:<8} {:>10.4} {:>12.4} {:>10.4}",
                 i + 1,
-                s.unified_phi,
+                s.unified_psi,
                 s.temporal_coherence,
                 result.training_loss.unwrap_or(0.0),
             );
@@ -165,7 +165,7 @@ fn main() {
             println!(
                 "{:<8} {:>10.4} {:>12.4} {:>10.4}",
                 50 + i + 1,
-                s.unified_phi,
+                s.unified_psi,
                 s.temporal_coherence,
                 result.training_loss.unwrap_or(0.0),
             );
@@ -193,7 +193,7 @@ fn main() {
             println!(
                 "{:<8} {:>10.4} {:>12.4} {:>10.4}",
                 80 + i + 1,
-                s.unified_phi,
+                s.unified_psi,
                 s.temporal_coherence,
                 result.training_loss.unwrap_or(0.0),
             );
@@ -209,7 +209,7 @@ fn main() {
     println!("║                     Final Summary                           ║");
     println!("╠══════════════════════════════════════════════════════════════╣");
     println!("║  Total cycles:        {:<37}║", s.total_cycles);
-    println!("║  Final Phi:           {:<37.4}║", s.unified_phi);
+    println!("║  Final Phi:           {:<37.4}║", s.unified_psi);
     println!("║  Final coherence:     {:<37.4}║", s.temporal_coherence);
     println!("║  Avg prediction err:  {:<37.4}║", s.avg_prediction_error);
     println!("║  Compositions made:   {:<37}║", 3);

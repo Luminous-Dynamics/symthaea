@@ -273,7 +273,7 @@ fn run_shift_adaptation(
         recovery_pct,
         cycles_to_recover,
         surprise_triggers,
-        phi_final: service.unified_phi(),
+        phi_final: service.unified_psi(),
         wall_time_ms,
     }
 }
@@ -337,7 +337,7 @@ fn run_generalization(
         final_error,
         reduction_pct,
         learning_pct,
-        phi_final: service.unified_phi(),
+        phi_final: service.unified_psi(),
     }
 }
 
@@ -404,7 +404,7 @@ fn run_depth_assessment(
 
         // Sample Phi every 50 cycles
         if i > 0 && i % 50 == 0 {
-            phi_samples.push(service.unified_phi());
+            phi_samples.push(service.unified_psi());
         }
     }
 
@@ -415,7 +415,7 @@ fn run_depth_assessment(
         } else {
             phi_samples.iter().sum::<f64>() / phi_samples.len() as f64
         },
-        phi_final: service.unified_phi(),
+        phi_final: service.unified_psi(),
         mce_mean: if mce_samples.is_empty() {
             0.0
         } else {
