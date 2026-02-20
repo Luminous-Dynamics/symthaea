@@ -2653,6 +2653,65 @@ impl CognitiveLoopService {
         }
 
         // ═══════════════════════════════════════════════════════════════════════
+        // SYNTHETIC STATES NSM GROUNDING: Classify current consciousness state
+        // Maps current BinaryHV to closest consciousness state via NSM primitives.
+        // Science: Wierzbicka (1996) — Natural Semantic Metalanguage.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (consciousness_state_label, consciousness_state_level) =
+            if let Some(ref sg) = self.synthetic_grounding {
+                if self.stats.total_cycles % 100 == 0 {
+                    let similar = sg.find_similar(&hv16_cached, 0.1);
+                    if let Some((state_type, _sim)) = similar.first() {
+                        let label = format!("{:?}", state_type);
+                        let level = state_type.consciousness_level();
+                        self.carryover.last_consciousness_state = label.clone();
+                        (label, level)
+                    } else {
+                        (self.carryover.last_consciousness_state.clone(), 0.0)
+                    }
+                } else {
+                    (self.carryover.last_consciousness_state.clone(), 0.0)
+                }
+            } else {
+                (String::new(), 0.0)
+            };
+        module_timings.synthetic_grounding = _t.elapsed().as_micros() as u64;
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // EPISTEMIC DECISION GATE: Evaluate input through Graceful Ignorance
+        // Provides confidence-based gating before actions.
+        // Science: Kruger & Dunning (1999), Schwartz (2004) — epistemic humility.
+        // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
+        let (epistemic_gate_confidence, epistemic_gate_approved) =
+            if let Some(ref mut gate) = self.epistemic_gate {
+                if self.stats.total_cycles % 5 == 0 {
+                    let action_risk = (1.0 - self.prediction_confidence).clamp(0.0, 1.0);
+                    let decision = gate.evaluate(input, action_risk);
+                    let (confidence, approved) = match &decision {
+                        crate::consciousness::gis_integration::EpistemicDecision::Proceed { confidence } => (*confidence, true),
+                        crate::consciousness::gis_integration::EpistemicDecision::ProceedWithCaveat { confidence, .. } => (*confidence, true),
+                        crate::consciousness::gis_integration::EpistemicDecision::Defer { .. } => (0.0, false),
+                        crate::consciousness::gis_integration::EpistemicDecision::RequestGuidance { .. } => (0.0, false),
+                        crate::consciousness::gis_integration::EpistemicDecision::OutOfDomain { .. } => (0.0, false),
+                    };
+                    self.carryover.last_epistemic_confidence = confidence;
+                    (confidence, approved)
+                } else {
+                    (self.carryover.last_epistemic_confidence, true)
+                }
+            } else {
+                (0.5, true)
+            };
+        module_timings.epistemic_gate = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Low epistemic confidence reduces prediction confidence
+        if epistemic_gate_confidence < 0.3 && !epistemic_gate_approved {
+            self.prediction_confidence = (self.prediction_confidence - 0.03).max(0.0);
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
         if let Some(ref mut res_mem) = self.resonator_memory {
@@ -4189,6 +4248,10 @@ impl CognitiveLoopService {
             affect_consciousness_arousal: affect_cons_arousal,
             pipeline_consciousness,
             multimodal_integrated_phi,
+            consciousness_state_label,
+            consciousness_state_level,
+            epistemic_gate_confidence,
+            epistemic_gate_approved,
             metacognitive_anomaly,
             safety_blocked: false,
             safety_category: None,

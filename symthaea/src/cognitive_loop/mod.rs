@@ -635,6 +635,16 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     composition_rule_engine: Option<crate::consciousness::primitive_composition_rules::CompositionRuleEngine>,
 
+    /// Synthetic states NSM grounding: maps current BinaryHV to consciousness states
+    /// (Deep Anesthesia → Alert/Focused) via Natural Semantic Metalanguage primitives.
+    /// Co-gated with `enable_primitive_consciousness`.
+    synthetic_grounding: Option<crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding>,
+
+    /// Epistemic decision gate: evaluates input through Graceful Ignorance System
+    /// to determine confidence vs uncertainty before acting.
+    /// Co-gated with `enable_primitive_consciousness`.
+    epistemic_gate: Option<crate::consciousness::gis_integration::EpistemicDecisionGate>,
+
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
     /// that modulates future moral scores as a self-correcting mechanism.

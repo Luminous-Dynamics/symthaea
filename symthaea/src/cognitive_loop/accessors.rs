@@ -1013,6 +1013,16 @@ impl CognitiveLoopService {
         self.multi_modal_integrator.as_ref()
     }
 
+    /// Borrow the synthetic states NSM grounding (if enabled).
+    pub fn synthetic_grounding(&self) -> Option<&crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding> {
+        self.synthetic_grounding.as_ref()
+    }
+
+    /// Borrow the epistemic decision gate (if enabled).
+    pub fn epistemic_gate(&self) -> Option<&crate::consciousness::gis_integration::EpistemicDecisionGate> {
+        self.epistemic_gate.as_ref()
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     // EXPERIENCE BUS: Principled signals + Seven Harmonies
     // ═══════════════════════════════════════════════════════════════════════
