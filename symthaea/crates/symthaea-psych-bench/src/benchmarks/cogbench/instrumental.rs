@@ -130,6 +130,136 @@ impl PsychBenchmark for InstrumentalLearningBenchmark {
     }
 }
 
+// =========================================================================
+// Symthaea-backend: ContinuousMind-backed instrumental learning
+// =========================================================================
+
+/// Instrumental learning using Symthaea's ContinuousMind instead of FEP.
+///
+/// Tests asymmetric learning from positive vs negative outcomes.
+/// Learning rate is measured via WM similarity drift rather than
+/// prediction error reduction.
+#[cfg(feature = "symthaea-backend")]
+pub struct InstrumentalLearningMindBenchmark;
+
+#[cfg(feature = "symthaea-backend")]
+impl InstrumentalLearningMindBenchmark {
+    fn run_trial(
+        &self,
+        config: &BenchmarkConfig,
+        trial_idx: usize,
+    ) -> (f64, f64, f64) {
+        use super::mind_agent::CogBenchMindAgent;
+
+        let seed = config.trial_seed("cogbench", "instrumental_mind", trial_idx);
+        let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
+
+        let mut agent = CogBenchMindAgent::new(
+            2,
+            config.dimension,
+            config.working_memory_capacity,
+            config.action_temperature,
+            seed,
+        );
+
+        // Phase 1: Win condition (action 0 = 80% high reward, action 1 = 20%)
+        let mut win_consciousness: Vec<f64> = Vec::new();
+        for _ in 0..20 {
+            let action_result = agent.select_action();
+            let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
+
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+
+            let reward = if chosen == 0 {
+                if rng_state % 100 < 80 { 0.9 } else { 0.1 }
+            } else {
+                if rng_state % 100 < 20 { 0.9 } else { 0.1 }
+            };
+
+            agent.perceive_reward(chosen, reward);
+            win_consciousness.push(agent.consciousness_level());
+        }
+
+        // Phase 2: Loss condition (lower rewards overall)
+        let mut loss_consciousness: Vec<f64> = Vec::new();
+        for _ in 0..20 {
+            let action_result = agent.select_action();
+            let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
+
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+
+            let reward = if chosen == 0 {
+                if rng_state % 100 < 80 { 0.5 } else { 0.1 }
+            } else {
+                if rng_state % 100 < 20 { 0.5 } else { 0.1 }
+            };
+
+            agent.perceive_reward(chosen, reward);
+            loss_consciousness.push(agent.consciousness_level());
+        }
+
+        // Learning rate: consciousness level change over trials
+        // Higher consciousness → better integration → faster learning
+        let win_lr = if win_consciousness.len() >= 4 {
+            let early: f64 = win_consciousness[..4].iter().sum::<f64>() / 4.0;
+            let late: f64 = win_consciousness[win_consciousness.len() - 4..].iter().sum::<f64>() / 4.0;
+            (late - early).abs()
+        } else {
+            0.0
+        };
+
+        let loss_lr = if loss_consciousness.len() >= 4 {
+            let early: f64 = loss_consciousness[..4].iter().sum::<f64>() / 4.0;
+            let late: f64 = loss_consciousness[loss_consciousness.len() - 4..].iter().sum::<f64>() / 4.0;
+            (late - early).abs()
+        } else {
+            0.0
+        };
+
+        let overall_lr = (win_lr + loss_lr) / 2.0;
+        let optimism_bias = win_lr - loss_lr;
+        let final_consciousness = agent.consciousness_level();
+
+        (overall_lr, optimism_bias, final_consciousness)
+    }
+}
+
+#[cfg(feature = "symthaea-backend")]
+impl PsychBenchmark for InstrumentalLearningMindBenchmark {
+    fn name(&self) -> &str {
+        "CogBench::InstrumentalLearning[Mind]"
+    }
+
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+
+        let mut lrs = Vec::new();
+        let mut biases = Vec::new();
+        let mut consciousness_levels = Vec::new();
+
+        for trial in 0..config.trials_per_condition {
+            let (lr, bias, cl) = self.run_trial(config, trial);
+            lrs.push(lr);
+            biases.push(bias);
+            consciousness_levels.push(cl);
+        }
+
+        result.insert("learning_rate", MetricValue::from_samples(&lrs));
+        result.insert("optimism_bias", MetricValue::from_samples(&biases));
+        result.insert("final_consciousness_level", MetricValue::from_samples(&consciousness_levels));
+
+        result.conditions = 1;
+        result.trials_per_condition = config.trials_per_condition;
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -143,5 +273,19 @@ mod tests {
         let result = InstrumentalLearningBenchmark.run(&config);
         assert!(result.metrics.contains_key("learning_rate"));
         assert!(result.metrics.contains_key("optimism_bias"));
+    }
+
+    #[cfg(feature = "symthaea-backend")]
+    #[test]
+    fn test_instrumental_mind_runs() {
+        let config = BenchmarkConfig {
+            trials_per_condition: 3,
+            dimension: 256,
+            ..Default::default()
+        };
+        let result = InstrumentalLearningMindBenchmark.run(&config);
+        assert!(result.metrics.contains_key("learning_rate"));
+        assert!(result.metrics.contains_key("optimism_bias"));
+        assert!(result.metrics.contains_key("final_consciousness_level"));
     }
 }

@@ -3,6 +3,11 @@
 //! 7 experiments testing exploration, model-based reasoning, learning,
 //! temporal discounting, and risk-taking using `ActiveInferenceAgent`.
 //!
+//! With `--features symthaea-backend`, additional `[Mind]` variants of
+//! the Restless Bandit and Instrumental Learning benchmarks are available.
+//! These use Symthaea's `ContinuousMind` (working memory + consciousness
+//! monitoring) instead of FEP, testing WM-based decision-making.
+//!
 //! All benchmarks use stochastic action sampling from the agent's softmax
 //! distribution (the standard active inference formulation) rather than
 //! greedy argmax, ensuring genuine exploration/exploitation behavior.
@@ -10,6 +15,8 @@
 pub mod bart;
 pub mod horizon;
 pub mod instrumental;
+#[cfg(feature = "symthaea-backend")]
+pub mod mind_agent;
 pub mod probabilistic;
 pub mod restless_bandit;
 pub mod temporal_discounting;
@@ -42,3 +49,8 @@ pub use probabilistic::ProbabilisticReasoningBenchmark;
 pub use restless_bandit::RestlessBanditBenchmark;
 pub use temporal_discounting::TemporalDiscountingBenchmark;
 pub use two_step::TwoStepBenchmark;
+
+#[cfg(feature = "symthaea-backend")]
+pub use instrumental::InstrumentalLearningMindBenchmark;
+#[cfg(feature = "symthaea-backend")]
+pub use restless_bandit::RestlessBanditMindBenchmark;
