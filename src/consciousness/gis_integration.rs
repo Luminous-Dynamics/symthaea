@@ -40,7 +40,7 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 use crate::mycelix::gis::{
-    DarkSpotDHT, Domain, GracefulIgnoranceSystem, GracefulResponse, IgnoranceDetection,
+    DarkSpotDHT, GracefulIgnoranceSystem, GracefulResponse, IgnoranceDetection,
     IgnoranceType, KnowledgeMatch, Uncertainty3D,
 };
 
@@ -79,7 +79,7 @@ impl ConsciousUncertaintyState {
 
         Self {
             phi,
-            uncertainty: detection.uncertainty.clone(),
+            uncertainty: detection.uncertainty,
             ignorance_type: detection.ignorance_type,
             eig: detection.eig,
             is_grounded,
@@ -535,7 +535,7 @@ impl EpistemicBidContext {
         Self {
             query: detection.query.clone(),
             ignorance_type: detection.ignorance_type,
-            uncertainty: detection.uncertainty.clone(),
+            uncertainty: detection.uncertainty,
             eig: detection.eig,
             recommended_action,
         }
@@ -560,6 +560,7 @@ impl EpistemicBidContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mycelix::gis::Domain;
 
     #[test]
     fn test_conscious_uncertainty_state() {

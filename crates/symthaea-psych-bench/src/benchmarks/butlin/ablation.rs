@@ -126,30 +126,26 @@ fn extract_indicator_score(
 }
 
 /// Build a CognitiveLoopService with optional config mutation.
+///
+/// Both baseline and ablated paths use Standard profile (all mechanisms enabled)
+/// so that disabling a single mechanism produces a measurable indicator drop.
 fn build_loop(
     mutator: Option<fn(&mut symthaea::cognitive_loop::CognitiveLoopConfig)>,
 ) -> Result<symthaea::cognitive_loop::CognitiveLoopService, Box<dyn std::error::Error>> {
-    use symthaea::cognitive_loop::{CognitiveLoopBuilder, CognitiveLoopConfig, ConsciousnessProfile};
+    use symthaea::cognitive_loop::{CognitiveLoopConfig, ConsciousnessProfile};
 
     let mut config = CognitiveLoopConfig::from_profile(ConsciousnessProfile::Standard);
     config.genesis_phrase = Some("ablation-matrix-deterministic".to_string());
     config.async_training = false;
+    // Force predictive processing for PP-1 indicator
+    config.enable_predictive_processing = true;
 
     if let Some(m) = mutator {
         m(&mut config);
     }
 
-    let service = CognitiveLoopBuilder::new()
-        .seeded("ablation-matrix-deterministic")
-        .build()?;
-
-    // Re-build with the mutated config if we have a mutator
-    if mutator.is_some() {
-        // Build from config directly
-        return Ok(symthaea::cognitive_loop::CognitiveLoopService::new(config)?);
-    }
-
-    Ok(service)
+    // Always build from the (possibly mutated) Standard config
+    Ok(symthaea::cognitive_loop::CognitiveLoopService::new(config)?)
 }
 
 /// Run N cycles and return the average indicator score for a given indicator.
@@ -187,14 +183,14 @@ fn measure_indicator(
 /// Run the full ablation matrix.
 ///
 /// For each of the 5 ablation rows:
-/// 1. Build with default config → run 10 cycles → measure indicator (baseline)
-/// 2. Build with ablated config → run 10 cycles → measure indicator (ablated)
+/// 1. Build with Standard config → run 100 cycles → measure indicator (baseline)
+/// 2. Build with ablated config → run 100 cycles → measure indicator (ablated)
 /// 3. Run downstream benchmark with default → measure accuracy (baseline)
 /// 4. Run downstream benchmark with ablated config → measure accuracy (ablated)
 /// 5. Assert: indicator dropped AND benchmark degraded
 pub fn run_ablation_matrix(_config: &BenchmarkConfig) -> Vec<AblationResult> {
     let specs = ablation_specs();
-    let num_cycles = 10;
+    let num_cycles = 100;
     let mut results = Vec::with_capacity(specs.len());
 
     for spec in &specs {

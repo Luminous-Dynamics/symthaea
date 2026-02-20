@@ -1,0 +1,505 @@
+//! # Spectral MIP Finder — O(n³) via Fiedler Ordering + Bordered Cholesky
+//!
+//! Scales MIP search from O(2^n) exhaustive to O(n³) by exploiting the spectral
+//! structure of the mutual information graph:
+//!
+//! 1. Build MI Laplacian from covariance of HDC state snapshots
+//! 2. Fiedler vector (2nd eigenvector of Laplacian) → spectral ordering
+//! 3. Sweep n-1 contiguous bipartitions with bordered Cholesky updates
+//!
+//! ## Key Insight
+//!
+//! The Fiedler vector of the MI Laplacian transforms MIP search from NP-hard
+//! graph bisection into finding the weakest link in a 1D chain. Contiguous cuts
+//! are nested (each adds one row/col), so bordered Cholesky update is O(k²) per
+//! step → O(n³) total.
+//!
+//! ## References
+//!
+//! - Fiedler (1973), "Algebraic connectivity of graphs"
+//! - Kitazono et al. (2018), "Efficient Algorithms for Searching the MIP in IIT"
+//! - Oizumi et al. (2016), "Measuring Integrated Information from the Decoding Perspective"
+
+use std::collections::VecDeque;
+
+use crate::hdc::unified_hv::ContinuousHV;
+
+use super::TruePartition;
+
+/// Configuration for spectral MIP computation.
+#[derive(Debug, Clone)]
+pub struct SpectralMIPConfig {
+    /// Number of HDC components to track (subsample from full dimension).
+    /// Default: 128
+    pub num_components: usize,
+    /// Sliding window size (number of state snapshots). Default: 50
+    pub window_size: usize,
+    /// Minimum window fill before computing. Default: 10
+    pub min_samples: usize,
+    /// Regularization added to covariance diagonal. Default: 1e-6
+    pub regularization: f64,
+}
+
+impl Default for SpectralMIPConfig {
+    fn default() -> Self {
+        Self {
+            num_components: 128,
+            window_size: 50,
+            min_samples: 10,
+            regularization: 1e-6,
+        }
+    }
+}
+
+/// Result of a spectral MIP computation.
+#[derive(Debug, Clone)]
+pub struct SpectralMIPResult {
+    /// Phi via spectral MIP (non-negative)
+    pub phi: f64,
+    /// Total Gaussian MI of the system
+    pub total_mi: f64,
+    /// MI at the minimum information partition cut
+    pub mip_mi: f64,
+    /// The partition found (original indices)
+    pub mip: TruePartition,
+    /// Fiedler-sorted dimension indices
+    pub spectral_order: Vec<usize>,
+    /// Cut position in spectral order (left block = 0..=mip_bond)
+    pub mip_bond: usize,
+    /// Where the Fiedler vector changes sign
+    pub fiedler_zero_crossing: usize,
+    /// MI at each of n-1 contiguous cuts (diagnostic)
+    pub cut_mis: Vec<f64>,
+    /// Number of snapshots used
+    pub window_used: usize,
+    /// Number of dimensions tracked
+    pub num_components: usize,
+}
+
+/// Spectral MIP Finder — O(n³) MIP search via Fiedler ordering + bordered Cholesky.
+pub struct SpectralMIPFinder {
+    window: VecDeque<Vec<f64>>,
+    config: SpectralMIPConfig,
+}
+
+impl SpectralMIPFinder {
+    /// Create a new spectral MIP finder with the given configuration.
+    pub fn new(config: SpectralMIPConfig) -> Self {
+        Self {
+            window: VecDeque::with_capacity(config.window_size),
+            config,
+        }
+    }
+
+    /// Create with default configuration (128 components, 50-sample window).
+    pub fn with_defaults() -> Self {
+        Self::new(SpectralMIPConfig::default())
+    }
+
+    /// Feed a new HDC state snapshot into the sliding window.
+    pub fn push(&mut self, state: &ContinuousHV) {
+        let dim = state.dim();
+        let n = self.config.num_components.min(dim);
+        let stride = if n > 1 { dim / n } else { 1 };
+
+        let snapshot: Vec<f64> = (0..n)
+            .map(|i| state.values[i * stride] as f64)
+            .collect();
+
+        if self.window.len() >= self.config.window_size {
+            self.window.pop_front();
+        }
+        self.window.push_back(snapshot);
+    }
+
+    /// Whether we have enough samples to compute.
+    pub fn ready(&self) -> bool {
+        self.window.len() >= self.config.min_samples
+    }
+
+    /// Compute spectral MIP from the current window.
+    pub fn compute(&self) -> Option<SpectralMIPResult> {
+        if !self.ready() {
+            return None;
+        }
+
+        let n = self.config.num_components;
+        let t = self.window.len();
+        let cov = self.build_covariance_matrix(n, t);
+        self.compute_from_covariance(&cov, n, t)
+    }
+
+    /// Compute spectral MIP from a pre-built covariance matrix (flat row-major, n×n).
+    pub fn compute_from_covariance(
+        &self,
+        cov: &[f64],
+        n: usize,
+        window_used: usize,
+    ) -> Option<SpectralMIPResult> {
+        if n < 2 || cov.len() != n * n {
+            return None;
+        }
+
+        // Step 1: Build MI Laplacian
+        let (mi_weights, laplacian) = build_mi_laplacian(cov, n);
+
+        // Step 2: Fiedler ordering
+        let (spectral_order, fiedler_zero_crossing) =
+            compute_fiedler_order(&laplacian, &mi_weights, n);
+
+        // Step 3: Reorder covariance by spectral order
+        let reordered = reorder_matrix(cov, n, &spectral_order);
+
+        // Step 4: Sweep contiguous cuts with bordered Cholesky
+        let cut_mis = sweep_contiguous_cuts(&reordered, n);
+
+        // Step 5: Find MIP (minimum cut MI)
+        let (mip_bond, mip_mi) = cut_mis
+            .iter()
+            .enumerate()
+            .min_by(|(_, a), (_, b)| a.total_cmp(b))
+            .map(|(i, &v)| (i, v))
+            .unwrap_or((0, 0.0));
+
+        // Step 6: Total MI
+        let total_mi = gaussian_mi_total(cov, n);
+
+        // Step 7: Build partition in original indices
+        let part_a: Vec<usize> = spectral_order[..=mip_bond].to_vec();
+        let part_b: Vec<usize> = spectral_order[mip_bond + 1..].to_vec();
+
+        let phi = (total_mi - mip_mi).max(0.0);
+
+        Some(SpectralMIPResult {
+            phi,
+            total_mi,
+            mip_mi,
+            mip: TruePartition { part_a, part_b },
+            spectral_order,
+            mip_bond,
+            fiedler_zero_crossing,
+            cut_mis,
+            window_used,
+            num_components: n,
+        })
+    }
+
+    /// Reset the sliding window.
+    pub fn reset(&mut self) {
+        self.window.clear();
+    }
+
+    /// Number of snapshots currently in the window.
+    pub fn window_len(&self) -> usize {
+        self.window.len()
+    }
+
+    // ─── Internal helpers ──────────────────────────────────────────────
+
+    /// Build n×n covariance matrix from sliding window.
+    fn build_covariance_matrix(&self, n: usize, t: usize) -> Vec<f64> {
+        let mut means = vec![0.0f64; n];
+        for snap in &self.window {
+            for (i, &v) in snap.iter().enumerate().take(n) {
+                means[i] += v;
+            }
+        }
+        for m in &mut means {
+            *m /= t as f64;
+        }
+
+        let mut cov = vec![0.0f64; n * n];
+        for snap in &self.window {
+            for i in 0..n {
+                let di = snap[i] - means[i];
+                for j in i..n {
+                    let dj = snap[j] - means[j];
+                    cov[i * n + j] += di * dj;
+                }
+            }
+        }
+        for i in 0..n {
+            for j in i..n {
+                cov[i * n + j] /= t as f64;
+                if j > i {
+                    cov[j * n + i] = cov[i * n + j];
+                }
+            }
+            cov[i * n + i] += self.config.regularization;
+        }
+        cov
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// FREE FUNCTIONS (used by both SpectralMIPFinder and tests)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Build the MI weight matrix and graph Laplacian from a covariance matrix.
+///
+/// Pairwise Gaussian MI: `MI(i,j) = -0.5 * ln(1 - r_ij²)` where r_ij is correlation.
+/// Laplacian: `L = D - W` where D is diagonal degree matrix.
+fn build_mi_laplacian(cov: &[f64], n: usize) -> (Vec<f64>, Vec<f64>) {
+    let mut weights = vec![0.0f64; n * n];
+
+    for i in 0..n {
+        for j in (i + 1)..n {
+            let var_i = cov[i * n + i];
+            let var_j = cov[j * n + j];
+            let cov_ij = cov[i * n + j];
+            let denom = var_i * var_j;
+            if denom <= 0.0 {
+                continue;
+            }
+            let r_sq = (cov_ij * cov_ij / denom).min(1.0 - 1e-15);
+            // MI(i,j) = -0.5 * ln(1 - r²)
+            let mi = -0.5 * (1.0 - r_sq).ln();
+            weights[i * n + j] = mi;
+            weights[j * n + i] = mi;
+        }
+    }
+
+    // Laplacian: L = D - W
+    let mut laplacian = vec![0.0f64; n * n];
+    for i in 0..n {
+        let degree: f64 = (0..n).map(|j| weights[i * n + j]).sum();
+        for j in 0..n {
+            if i == j {
+                laplacian[i * n + j] = degree;
+            } else {
+                laplacian[i * n + j] = -weights[i * n + j];
+            }
+        }
+    }
+
+    (weights, laplacian)
+}
+
+/// Compute Fiedler ordering: sort indices by the second eigenvector of the Laplacian.
+///
+/// Returns (spectral_order, fiedler_zero_crossing).
+fn compute_fiedler_order(
+    laplacian: &[f64],
+    _mi_weights: &[f64],
+    n: usize,
+) -> (Vec<usize>, usize) {
+    use nalgebra::DMatrix;
+
+    let lap_matrix = DMatrix::from_row_slice(n, n, laplacian);
+    let eigen = nalgebra::SymmetricEigen::new(lap_matrix);
+
+    // Sort eigenvalues to find the second-smallest
+    let mut eigen_indices: Vec<usize> = (0..n).collect();
+    let eigenvalues = &eigen.eigenvalues;
+    eigen_indices.sort_by(|&a, &b| eigenvalues[a].total_cmp(&eigenvalues[b]));
+
+    // Fiedler vector = eigenvector for 2nd-smallest eigenvalue
+    let fiedler_idx = eigen_indices[1];
+    let fiedler_vec: Vec<f64> = (0..n).map(|i| eigen.eigenvectors[(i, fiedler_idx)]).collect();
+
+    // Sort indices by Fiedler vector value
+    let mut order: Vec<usize> = (0..n).collect();
+    order.sort_by(|&a, &b| fiedler_vec[a].total_cmp(&fiedler_vec[b]));
+
+    // Find zero-crossing in sorted Fiedler values
+    let sorted_fiedler: Vec<f64> = order.iter().map(|&i| fiedler_vec[i]).collect();
+    let zero_crossing = sorted_fiedler
+        .windows(2)
+        .position(|w| w[0] <= 0.0 && w[1] > 0.0)
+        .unwrap_or(n / 2);
+
+    (order, zero_crossing)
+}
+
+/// Reorder a matrix by permuting both rows and columns according to `order`.
+fn reorder_matrix(matrix: &[f64], n: usize, order: &[usize]) -> Vec<f64> {
+    let mut reordered = vec![0.0f64; n * n];
+    for (new_i, &old_i) in order.iter().enumerate() {
+        for (new_j, &old_j) in order.iter().enumerate() {
+            reordered[new_i * n + new_j] = matrix[old_i * n + old_j];
+        }
+    }
+    reordered
+}
+
+/// Sweep all n-1 contiguous bipartitions using bordered Cholesky updates.
+///
+/// For each cut k (left = 0..=k, right = k+1..n-1):
+///   cut_mi[k] = mi_left[k] + mi_right[k]
+///
+/// Uses O(k²) bordered Cholesky per step → O(n³) total.
+fn sweep_contiguous_cuts(cov: &[f64], n: usize) -> Vec<f64> {
+    if n < 2 {
+        return vec![];
+    }
+
+    // ─── Left sweep: grow block from left ───
+    // l_factors[k] stores the flat lower-triangular Cholesky factor for cov[0..=k, 0..=k]
+    let mut left_ln_det = vec![0.0f64; n];
+    let mut left_sum_ln_var = vec![0.0f64; n];
+    // We store the Cholesky factor as a flat Vec growing incrementally
+    let mut left_factor: Vec<f64> = Vec::with_capacity(n * n);
+
+    // k=0: single element
+    let d0 = cov[0].max(1e-30);
+    left_factor.push(d0.sqrt());
+    left_ln_det[0] = d0.sqrt().ln() * 2.0;
+    left_sum_ln_var[0] = d0.ln();
+
+    for k in 1..n {
+        // Extract column: cov[0..k, k]
+        let col: Vec<f64> = (0..k).map(|i| cov[i * n + k]).collect();
+        let diag = cov[k * n + k];
+
+        let (x, l_new) = bordered_cholesky_step(&left_factor, k, &col, diag);
+
+        // Append new row to factor: [x[0], x[1], ..., x[k-1], l_new]
+        // The factor is stored as rows of increasing size: row 0 has 1 elem, row 1 has 2, etc.
+        // Actually, let's store as a flat (k+1)×(k+1) lower triangular in row-major with stride (k+1).
+        // But that's complex to maintain. Instead, store rows packed: row i has i+1 elements.
+        left_factor.extend_from_slice(&x);
+        left_factor.push(l_new);
+
+        left_ln_det[k] = left_ln_det[k - 1] + 2.0 * l_new.max(1e-300).ln();
+        left_sum_ln_var[k] = left_sum_ln_var[k - 1] + cov[k * n + k].max(1e-30).ln();
+    }
+
+    // ─── Right sweep: grow block from right ───
+    let mut right_ln_det = vec![0.0f64; n];
+    let mut right_sum_ln_var = vec![0.0f64; n];
+    let mut right_factor: Vec<f64> = Vec::with_capacity(n * n);
+
+    // k=n-1: single element (rightmost)
+    let dn = cov[(n - 1) * n + (n - 1)].max(1e-30);
+    right_factor.push(dn.sqrt());
+    right_ln_det[n - 1] = dn.sqrt().ln() * 2.0;
+    right_sum_ln_var[n - 1] = dn.ln();
+
+    // Grow rightward: for position p from n-2 down to 0, the right block is [p..n-1]
+    // We build incrementally: at step s, the block has s+1 elements (indices n-1-s..n-1)
+    for s in 1..n {
+        let p = n - 1 - s; // the new element to add
+        // The right block so far is [p+1..n-1], reindexed as 0..s-1
+        // New column: cov[p+1..n-1, p] reindexed relative to the existing right block
+        // The existing right block is ordered [n-1, n-2, ..., p+1] (reversed, since we built from right)
+        // Actually, let's be precise: the right factor covers elements in the order they were added:
+        // step 0: element n-1
+        // step 1: element n-2
+        // ...
+        // step s: element p = n-1-s
+        //
+        // So the sub-covariance for the right block uses elements in reverse order.
+        // Element at right-index r corresponds to original index (n-1-r).
+        let col: Vec<f64> = (0..s)
+            .map(|r| {
+                let orig_r = n - 1 - r;
+                cov[orig_r * n + p]
+            })
+            .collect();
+        let diag = cov[p * n + p];
+
+        let (x, l_new) = bordered_cholesky_step(&right_factor, s, &col, diag);
+
+        right_factor.extend_from_slice(&x);
+        right_factor.push(l_new);
+
+        right_ln_det[p] = right_ln_det[p + 1] + 2.0 * l_new.max(1e-300).ln();
+        right_sum_ln_var[p] = right_sum_ln_var[p + 1] + cov[p * n + p].max(1e-30).ln();
+    }
+
+    // ─── Combine: for cut at k, left = [0..=k], right = [k+1..n-1] ───
+    let mut cut_mis = Vec::with_capacity(n - 1);
+    for k in 0..(n - 1) {
+        let mi_left = if k == 0 {
+            0.0 // single-element partition has zero MI
+        } else {
+            0.5 * (left_sum_ln_var[k] - left_ln_det[k])
+        };
+        let mi_right = if k == n - 2 {
+            0.0 // single-element partition
+        } else {
+            0.5 * (right_sum_ln_var[k + 1] - right_ln_det[k + 1])
+        };
+        cut_mis.push(mi_left + mi_right);
+    }
+
+    cut_mis
+}
+
+/// Bordered Cholesky update: extend a k×k Cholesky factor by one row/column.
+///
+/// Given L (k×k lower-triangular, packed row-major: row i has i+1 elements),
+/// the new column `col` = C[0..k, k], and diagonal `diag` = C[k, k],
+/// compute the new row x and diagonal l_new such that:
+///   L' = [[L, 0], [x^T, l_new]]
+///
+/// Forward substitution: L * x = col → O(k²)
+pub(crate) fn bordered_cholesky_step(factor: &[f64], k: usize, col: &[f64], diag: f64) -> (Vec<f64>, f64) {
+    let mut x = vec![0.0f64; k];
+
+    // Forward substitution on packed lower-triangular factor
+    // Row i of the factor starts at offset i*(i+1)/2
+    for i in 0..k {
+        let row_start = i * (i + 1) / 2;
+        let mut sum = 0.0;
+        for j in 0..i {
+            sum += factor[row_start + j] * x[j];
+        }
+        let l_ii = factor[row_start + i];
+        x[i] = if l_ii.abs() > 1e-30 {
+            (col[i] - sum) / l_ii
+        } else {
+            0.0
+        };
+    }
+
+    let x_sq: f64 = x.iter().map(|v| v * v).sum();
+    let l_new = (diag - x_sq).max(1e-30).sqrt();
+
+    (x, l_new)
+}
+
+/// Total Gaussian MI of a system: MI = 0.5 * (Σ ln(σ²_i) - ln(det(Σ)))
+fn gaussian_mi_total(cov: &[f64], n: usize) -> f64 {
+    let sum_ln_var: f64 = (0..n).map(|i| cov[i * n + i].max(1e-30).ln()).sum();
+    let ln_det = ln_determinant_cholesky(cov, n);
+    0.5 * (sum_ln_var - ln_det)
+}
+
+/// ln(det(M)) via Cholesky decomposition. Falls back to diagonal if not PD.
+pub(crate) fn ln_determinant_cholesky(matrix: &[f64], n: usize) -> f64 {
+    let mut l = vec![0.0f64; n * n];
+    let mut ok = true;
+    for i in 0..n {
+        for j in 0..=i {
+            let mut sum = 0.0;
+            for p in 0..j {
+                sum += l[i * n + p] * l[j * n + p];
+            }
+            if i == j {
+                let diag = matrix[i * n + i] - sum;
+                if diag <= 0.0 {
+                    ok = false;
+                    break;
+                }
+                l[i * n + j] = diag.sqrt();
+            } else {
+                l[i * n + j] = (matrix[i * n + j] - sum) / l[j * n + j];
+            }
+        }
+        if !ok {
+            break;
+        }
+    }
+    if ok {
+        let mut result = 0.0;
+        for i in 0..n {
+            result += l[i * n + i].ln();
+        }
+        2.0 * result
+    } else {
+        (0..n).map(|i| matrix[i * n + i].max(1e-30).ln()).sum()
+    }
+}
+
+// Tests in consciousness_metrics/tests/spectral_mip_tests.rs

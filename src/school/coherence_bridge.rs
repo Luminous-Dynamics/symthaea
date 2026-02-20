@@ -47,11 +47,11 @@
 //! ```
 
 use super::{
-    Curriculum, LearningObjective, LearningResult, Recommendation, School, SchoolConfig,
+    Curriculum, LearningObjective, LearningResult, Recommendation, School,
     SchoolStats,
 };
 use crate::physiology::coherence::{
-    CoherenceConfig, CoherenceError, CoherenceField, CoherenceState, TaskComplexity,
+    CoherenceError, CoherenceField, CoherenceState, TaskComplexity,
 };
 use crate::physiology::endocrine::HormoneState;
 use crate::wisdom::autopoiesis::{AutopoieticMonitor, OperationalClosure, SelfProductionMetrics};
@@ -875,7 +875,7 @@ pub struct CoherenceBridgedStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::school::{CurriculumType, Difficulty, Domain};
+    use crate::school::{CurriculumType, Difficulty, Domain, SchoolConfig};
 
     fn create_test_school() -> School {
         let mut school = School::new(SchoolConfig::fast()).unwrap();
@@ -1055,14 +1055,17 @@ mod tests {
 }
 
 // Helper trait for cloning School (for tests)
+#[cfg(test)]
 trait TryClone {
     fn try_clone(&self) -> Result<Self>
     where
         Self: Sized;
 }
 
+#[cfg(test)]
 impl TryClone for School {
     fn try_clone(&self) -> Result<Self> {
+        use crate::school::SchoolConfig;
         // Create a fresh school with the same config
         // This is a simplified clone - doesn't preserve curricula
         School::new(SchoolConfig::fast())

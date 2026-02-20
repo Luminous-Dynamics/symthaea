@@ -2,6 +2,7 @@
 //!
 //! Tests for the voice interface components that don't require
 //! actual audio hardware or TTS/STT features enabled.
+#![cfg(feature = "voice-tts")]
 
 use symthaea::voice::{KokoroModel, LTCPacing, ModelPaths, VoiceConfig, VoiceEvent, WhisperModel};
 

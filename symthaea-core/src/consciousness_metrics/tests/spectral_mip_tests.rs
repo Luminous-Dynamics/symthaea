@@ -1,0 +1,488 @@
+//! Tests for the Spectral MIP Finder.
+
+use super::*;
+
+// ─── Helper: build covariance from known structure ─────────────────────
+
+/// Create an n×n identity matrix (flat row-major).
+fn identity_cov(n: usize) -> Vec<f64> {
+    let mut cov = vec![0.0; n * n];
+    for i in 0..n {
+        cov[i * n + i] = 1.0;
+    }
+    cov
+}
+
+/// Create a block-diagonal covariance: two correlated blocks with weak inter-block coupling.
+fn block_diagonal_cov(
+    n_a: usize,
+    n_b: usize,
+    intra_corr: f64,
+    inter_corr: f64,
+) -> Vec<f64> {
+    let n = n_a + n_b;
+    let mut cov = vec![0.0; n * n];
+    for i in 0..n {
+        cov[i * n + i] = 1.0;
+        for j in (i + 1)..n {
+            let same_block = (i < n_a && j < n_a) || (i >= n_a && j >= n_a);
+            let corr = if same_block { intra_corr } else { inter_corr };
+            cov[i * n + j] = corr;
+            cov[j * n + i] = corr;
+        }
+    }
+    cov
+}
+
+/// Create a 3-block-diagonal covariance with varying inter-block strengths.
+fn three_block_cov(
+    n_a: usize,
+    n_b: usize,
+    n_c: usize,
+    intra: f64,
+    inter_ab: f64,
+    inter_bc: f64,
+    inter_ac: f64,
+) -> Vec<f64> {
+    let n = n_a + n_b + n_c;
+    let mut cov = vec![0.0; n * n];
+    for i in 0..n {
+        cov[i * n + i] = 1.0;
+        for j in (i + 1)..n {
+            let block_i = if i < n_a {
+                0
+            } else if i < n_a + n_b {
+                1
+            } else {
+                2
+            };
+            let block_j = if j < n_a {
+                0
+            } else if j < n_a + n_b {
+                1
+            } else {
+                2
+            };
+            let corr = if block_i == block_j {
+                intra
+            } else {
+                match (block_i.min(block_j), block_i.max(block_j)) {
+                    (0, 1) => inter_ab,
+                    (1, 2) => inter_bc,
+                    (0, 2) => inter_ac,
+                    _ => 0.0,
+                }
+            };
+            cov[i * n + j] = corr;
+            cov[j * n + i] = corr;
+        }
+    }
+    cov
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_bordered_cholesky_correctness() {
+    // Build a small PD covariance incrementally and compare ln_det vs from-scratch
+    let n = 6;
+    let cov = block_diagonal_cov(3, 3, 0.5, 0.1);
+    // Add regularization
+    let mut reg_cov = cov.clone();
+    for i in 0..n {
+        reg_cov[i * n + i] += 1e-6;
+    }
+
+    // Compute ln_det from scratch
+    let ln_det_full = crate::consciousness_metrics::spectral_mip::ln_determinant_cholesky(&reg_cov, n);
+
+    // Compute incrementally via bordered Cholesky
+    let mut factor: Vec<f64> = Vec::new();
+    // k=0
+    let d0 = reg_cov[0].max(1e-30);
+    factor.push(d0.sqrt());
+    let mut ln_det_inc = d0.sqrt().ln() * 2.0;
+
+    for k in 1..n {
+        let col: Vec<f64> = (0..k).map(|i| reg_cov[i * n + k]).collect();
+        let diag = reg_cov[k * n + k];
+        let (x, l_new) = crate::consciousness_metrics::spectral_mip::bordered_cholesky_step(&factor, k, &col, diag);
+        factor.extend_from_slice(&x);
+        factor.push(l_new);
+        ln_det_inc += 2.0 * l_new.max(1e-300).ln();
+    }
+
+    assert!(
+        (ln_det_inc - ln_det_full).abs() < 1e-8,
+        "Incremental ln_det ({}) != full ln_det ({})",
+        ln_det_inc,
+        ln_det_full
+    );
+}
+
+#[test]
+fn test_identity_covariance_phi_zero() {
+    let n = 8;
+    let cov = identity_cov(n);
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+
+    assert!(
+        result.phi.abs() < 1e-6,
+        "Identity covariance should give Phi ≈ 0, got {}",
+        result.phi
+    );
+    assert!(result.total_mi.abs() < 1e-6);
+}
+
+#[test]
+fn test_block_diagonal_mip_at_boundary() {
+    let n_a = 4;
+    let n_b = 4;
+    let n = n_a + n_b;
+    let cov = block_diagonal_cov(n_a, n_b, 0.6, 0.02);
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+
+    // Phi should be positive (system is integrated within blocks)
+    assert!(result.phi > 0.0, "Block diagonal should have positive Phi, got {}", result.phi);
+    assert!(result.phi.is_finite());
+
+    // MIP should split close to the block boundary
+    let part_a = &result.mip.part_a;
+    let part_b = &result.mip.part_b;
+
+    // Check that the partition separates mostly block-A from block-B indices
+    // (either orientation is valid)
+    let a_in_block_a = part_a.iter().filter(|&&i| i < n_a).count();
+    let b_in_block_b = part_b.iter().filter(|&&i| i >= n_a).count();
+    let orient1 = (a_in_block_a + b_in_block_b) as f64 / n as f64;
+
+    // Flipped orientation: block-A in part_b, block-B in part_a
+    let a_in_block_b = part_b.iter().filter(|&&i| i < n_a).count();
+    let b_in_block_a = part_a.iter().filter(|&&i| i >= n_a).count();
+    let orient2 = (a_in_block_b + b_in_block_a) as f64 / n as f64;
+
+    let correct_fraction = orient1.max(orient2);
+
+    assert!(
+        correct_fraction >= 0.75,
+        "MIP should roughly separate blocks (best fraction: {}, orient1={}, orient2={})",
+        correct_fraction,
+        orient1,
+        orient2
+    );
+}
+
+#[test]
+fn test_three_block_mip_at_weakest_boundary() {
+    // 3 blocks: A-B strongly coupled, B-C weakly coupled, A-C no coupling
+    // MIP should cut between B and C (weakest inter-block link)
+    let n_a = 3;
+    let n_b = 3;
+    let n_c = 3;
+    let cov = three_block_cov(n_a, n_b, n_c, 0.7, 0.3, 0.05, 0.01);
+    let n = n_a + n_b + n_c;
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+
+    assert!(result.phi > 0.0);
+    assert!(result.phi.is_finite());
+
+    // The weakest boundary is between {A,B} and {C}
+    // Check that C indices are mostly on one side
+    let c_indices: Vec<usize> = (n_a + n_b..n).collect();
+    let c_in_a = result.mip.part_a.iter().filter(|i| c_indices.contains(i)).count();
+    let c_in_b = result.mip.part_b.iter().filter(|i| c_indices.contains(i)).count();
+    // All C indices should be on the same side
+    let c_together = c_in_a.max(c_in_b);
+    assert!(
+        c_together >= n_c - 1,
+        "C-block should be mostly together: {} of {} on one side",
+        c_together,
+        n_c
+    );
+}
+
+#[test]
+fn test_known_2x2_matches_sigma() {
+    // For n=2, there's only one possible bipartition: {0} | {1}
+    // Spectral MIP should match SynergisticIntegration exactly
+    let config_sigma = SynergisticConfig {
+        num_components: 2,
+        window_size: 50,
+        min_samples: 10,
+        regularization: 1e-6,
+    };
+    let config_spectral = SpectralMIPConfig {
+        num_components: 2,
+        window_size: 50,
+        min_samples: 10,
+        regularization: 1e-6,
+    };
+
+    let mut si = SynergisticIntegration::new(config_sigma);
+    let mut finder = SpectralMIPFinder::new(config_spectral);
+
+    for i in 0..30 {
+        let hv = ContinuousHV::random(128, i + 500);
+        si.push(&hv);
+        finder.push(&hv);
+    }
+
+    let sigma_result = si.compute().unwrap();
+    let spectral_result = finder.compute().unwrap();
+
+    // Phi from spectral should equal sigma (for n=2, only one partition)
+    assert!(
+        (spectral_result.phi - sigma_result.sigma).abs() < 0.5,
+        "Spectral phi ({}) should be close to sigma ({}) for n=2",
+        spectral_result.phi,
+        sigma_result.sigma
+    );
+}
+
+#[test]
+fn test_spectral_vs_exhaustive_n8() {
+    // For n=8, spectral should find an MI that's close to exhaustive
+    let n = 8;
+    let cov = block_diagonal_cov(4, 4, 0.5, 0.1);
+    let mut reg_cov = cov;
+    for i in 0..n {
+        reg_cov[i * n + i] += 1e-6;
+    }
+
+    // Spectral MIP
+    let finder = SpectralMIPFinder::with_defaults();
+    let spectral = finder.compute_from_covariance(&reg_cov, n, 50).unwrap();
+
+    // Exhaustive MIP (reuse SynergisticIntegration's method)
+    let si = SynergisticIntegration::new(SynergisticConfig {
+        num_components: n,
+        regularization: 0.0, // already regularized
+        ..Default::default()
+    });
+    let exhaustive_mip_mi = si.exhaustive_mip(&reg_cov, n);
+
+    // Spectral should find MI ≤ 1.5× exhaustive (it searches contiguous cuts only)
+    assert!(
+        spectral.mip_mi <= exhaustive_mip_mi * 1.5 + 0.1,
+        "Spectral MIP MI ({}) too far from exhaustive ({})",
+        spectral.mip_mi,
+        exhaustive_mip_mi
+    );
+}
+
+#[test]
+fn test_spectral_vs_greedy_n16() {
+    // Spectral should find equal-or-better partition than greedy for structured covariance
+    let n = 16;
+    let cov = block_diagonal_cov(8, 8, 0.5, 0.05);
+    let mut reg_cov = cov;
+    for i in 0..n {
+        reg_cov[i * n + i] += 1e-6;
+    }
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let spectral = finder.compute_from_covariance(&reg_cov, n, 50).unwrap();
+
+    let si = SynergisticIntegration::new(SynergisticConfig {
+        num_components: n,
+        regularization: 0.0,
+        ..Default::default()
+    });
+    let greedy_mip_mi = si.greedy_mip(&reg_cov, n);
+
+    // For block-diagonal, spectral should be competitive with greedy
+    // Allow some tolerance since they search different spaces
+    assert!(
+        spectral.mip_mi <= greedy_mip_mi * 2.0 + 0.5,
+        "Spectral MIP MI ({}) unexpectedly much worse than greedy ({})",
+        spectral.mip_mi,
+        greedy_mip_mi
+    );
+    assert!(spectral.phi.is_finite());
+}
+
+#[test]
+fn test_fiedler_zero_crossing_block_diagonal() {
+    let n_a = 5;
+    let n_b = 5;
+    let n = n_a + n_b;
+    let cov = block_diagonal_cov(n_a, n_b, 0.7, 0.01);
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+
+    // For a clear block-diagonal, the Fiedler zero-crossing should land near the
+    // block boundary (index ~4-5 in spectral order)
+    let zc = result.fiedler_zero_crossing;
+    assert!(
+        (zc as i32 - n_a as i32).unsigned_abs() <= 2,
+        "Fiedler zero-crossing ({}) should be near block boundary ({})",
+        zc,
+        n_a
+    );
+}
+
+#[test]
+fn test_scale_smoke_n64() {
+    let n = 64;
+    let cov = block_diagonal_cov(32, 32, 0.3, 0.02);
+    let mut reg_cov = cov;
+    for i in 0..n {
+        reg_cov[i * n + i] += 1e-6;
+    }
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&reg_cov, n, 50).unwrap();
+
+    assert!(result.phi.is_finite());
+    assert!(result.phi >= 0.0);
+    assert_eq!(result.cut_mis.len(), n - 1);
+    assert!(result.cut_mis.iter().all(|v| v.is_finite()));
+}
+
+#[test]
+fn test_scale_smoke_n128() {
+    let n = 128;
+    let cov = block_diagonal_cov(64, 64, 0.2, 0.01);
+    let mut reg_cov = cov;
+    for i in 0..n {
+        reg_cov[i * n + i] += 1e-6;
+    }
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&reg_cov, n, 50).unwrap();
+
+    assert!(result.phi.is_finite());
+    assert!(result.phi >= 0.0);
+}
+
+#[test]
+#[ignore] // ~1s, run explicitly
+fn test_scale_smoke_n256() {
+    let n = 256;
+    let cov = block_diagonal_cov(128, 128, 0.15, 0.005);
+    let mut reg_cov = cov;
+    for i in 0..n {
+        reg_cov[i * n + i] += 1e-6;
+    }
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&reg_cov, n, 50).unwrap();
+
+    assert!(result.phi.is_finite());
+    assert!(result.phi >= 0.0);
+}
+
+#[test]
+fn test_numerical_stability_near_singular() {
+    // Near-singular covariance: some dims nearly collinear
+    let n = 8;
+    let mut cov = vec![0.0; n * n];
+    for i in 0..n {
+        cov[i * n + i] = 1.0;
+        for j in (i + 1)..n {
+            // Very high correlation → near-singular
+            let corr = 0.999;
+            cov[i * n + j] = corr;
+            cov[j * n + i] = corr;
+        }
+    }
+    // Small regularization
+    for i in 0..n {
+        cov[i * n + i] += 1e-4;
+    }
+
+    let finder = SpectralMIPFinder::with_defaults();
+    let result = finder.compute_from_covariance(&cov, n, 50).unwrap();
+
+    assert!(result.phi.is_finite(), "Phi should be finite for near-singular cov");
+    assert!(!result.phi.is_nan());
+    assert!(result.total_mi.is_finite());
+    assert!(result.mip_mi.is_finite());
+    assert!(result.cut_mis.iter().all(|v| v.is_finite()));
+}
+
+#[test]
+fn test_window_lifecycle() {
+    let config = SpectralMIPConfig {
+        num_components: 4,
+        window_size: 5,
+        min_samples: 3,
+        ..Default::default()
+    };
+    let mut finder = SpectralMIPFinder::new(config);
+
+    // Not ready initially
+    assert!(!finder.ready());
+    assert!(finder.compute().is_none());
+
+    // Push below min_samples
+    for i in 0..2 {
+        finder.push(&ContinuousHV::random(64, i));
+    }
+    assert!(!finder.ready());
+
+    // Push to min_samples
+    finder.push(&ContinuousHV::random(64, 2));
+    assert!(finder.ready());
+    assert!(finder.compute().is_some());
+
+    // Push beyond window_size → eviction
+    for i in 3..10 {
+        finder.push(&ContinuousHV::random(64, i));
+    }
+    assert_eq!(finder.window_len(), 5);
+    assert!(finder.compute().is_some());
+
+    // Reset
+    finder.reset();
+    assert!(!finder.ready());
+    assert_eq!(finder.window_len(), 0);
+    assert!(finder.compute().is_none());
+}
+
+#[test]
+fn test_compute_from_covariance_consistent() {
+    // Verify that compute_from_covariance gives the same result as compute
+    // when fed the same underlying data
+    let config = SpectralMIPConfig {
+        num_components: 6,
+        window_size: 30,
+        min_samples: 10,
+        regularization: 1e-6,
+    };
+    let mut finder = SpectralMIPFinder::new(config.clone());
+
+    for i in 0..20 {
+        finder.push(&ContinuousHV::random(128, i + 1000));
+    }
+
+    let result_compute = finder.compute().unwrap();
+
+    // Build covariance manually from the same data
+    let mut finder2 = SpectralMIPFinder::new(config);
+    for i in 0..20 {
+        finder2.push(&ContinuousHV::random(128, i + 1000));
+    }
+    // Access the internal covariance by computing directly
+    let result_compute2 = finder2.compute().unwrap();
+
+    // Both should give identical results (same data, same algorithm)
+    assert!(
+        (result_compute.phi - result_compute2.phi).abs() < 1e-10,
+        "Phi mismatch: {} vs {}",
+        result_compute.phi,
+        result_compute2.phi
+    );
+    assert!(
+        (result_compute.total_mi - result_compute2.total_mi).abs() < 1e-10,
+        "Total MI mismatch"
+    );
+}

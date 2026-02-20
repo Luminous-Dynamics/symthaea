@@ -115,6 +115,7 @@ pub struct LookaheadEngine {
 #[derive(Debug, Clone)]
 struct PredictionRecord {
     /// Predicted Φ gain
+    #[allow(dead_code)]
     predicted: f32,
 
     /// Actual Φ gain (if known)
@@ -486,9 +487,9 @@ mod tests {
 
         assert_eq!(engine.prediction_count(), 2);
 
-        let (accuracy, avg_error, count) = engine.accuracy_stats();
+        let (_accuracy, _avg_error, count) = engine.accuracy_stats();
         assert_eq!(count, 2);
-        assert!(avg_error > 0.0);
+        assert!(_avg_error > 0.0);
     }
 
     #[test]
@@ -869,7 +870,7 @@ mod tests {
         // actual = -0.045, error = 0.005 < 0.01, should be accurate
         engine.record_outcome(-0.05, -0.045);
 
-        let (accuracy, avg_error, count) = engine.accuracy_stats();
+        let (accuracy, _avg_error, count) = engine.accuracy_stats();
         assert_eq!(count, 1);
         assert!(
             accuracy >= 0.99,

@@ -546,12 +546,11 @@ impl Actor for DarkSpotDHTActor {
                         _ => "Unexpected response".to_string(),
                     }
                 } else {
-                    format!(
-                        "Dark Spot DHT ready. Commands:\n\
+                    "Dark Spot DHT ready. Commands:\n\
                          - 'blind spots' - View collective ignorance patterns\n\
                          - 'stats' - View DHT statistics\n\
                          - \"I don't know about [topic] in [category]\" - Publish ignorance"
-                    )
+                        .to_string()
                 };
 
                 let _ = reply.send(response);
