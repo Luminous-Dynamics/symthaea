@@ -408,6 +408,13 @@ pub struct CycleMetadata {
     /// Harmonies integrator: whether the current action was approved.
     pub harmonies_approved: bool,
 
+    /// Empathic unification: compassion level for current input (0.0–1.0, 0.0 when off).
+    pub empathic_compassion: f64,
+    /// Empathic unification: patience adjustment (-1.0 to 1.0, 0.0 = neutral).
+    pub empathic_tone_adj: f64,
+    /// Multi-objective evolution: Pareto frontier size (0 when not run this cycle).
+    pub multi_obj_frontier_size: usize,
+
     // ── Session 2: Consciousness Profile + Synergies + Context ─────────────
     /// Multi-dimensional consciousness composite score (0.0 when off).
     pub consciousness_profile_composite: f64,
@@ -498,6 +505,13 @@ pub struct CycleMetadata {
     pub epistemic_gate_confidence: f32,
     /// Whether epistemic gate approved the current cycle's action.
     pub epistemic_gate_approved: bool,
+
+    /// Meta-cognitive reasoning confidence (0.0–1.0, 0.5 when off or not evaluated).
+    pub meta_reasoning_confidence: f64,
+    /// Number of meta-learning insights discovered this cycle.
+    pub meta_reasoning_insights: usize,
+    /// Number of code-tier primitives selected (0 when input is non-code).
+    pub code_primitives_selected: usize,
 
     /// Whether metacognitive monitoring detected a Phi trajectory anomaly.
     pub metacognitive_anomaly: bool,
@@ -669,6 +683,10 @@ pub struct ModuleTimings {
     pub semantic_value_embedder: u64,
     pub composition_rules: u64,
     pub harmonies_integration: u64,
+    pub meta_cognitive_reasoning: u64,
+    pub code_primitive_routing: u64,
+    pub empathic_unification: u64,
+    pub multi_objective_evolution: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

@@ -645,6 +645,28 @@ pub struct CognitiveLoopService {
     /// Co-gated with `enable_primitive_consciousness`.
     epistemic_gate: Option<crate::consciousness::gis_integration::EpistemicDecisionGate>,
 
+    /// Meta-cognitive reasoner: reflects on its own reasoning context, evaluates
+    /// strategy effectiveness, and learns meta-patterns across reasoning episodes.
+    /// Co-gated with `enable_primitive_consciousness`.
+    meta_cognitive_reasoner: Option<crate::consciousness::meta_reasoning::MetaCognitiveReasoner>,
+
+    /// Code primitive router: consciousness-aware code reasoning via HDC primitives.
+    /// Selects and caches code-tier primitives for code-related cognitive tasks.
+    /// Co-gated with `enable_primitive_consciousness`.
+    code_primitive_router: Option<crate::consciousness::code_primitives::CodePrimitiveRouter>,
+
+    /// Empathic unification: resonant empathy via user state inference + mirroring.
+    /// Processes input text to infer user emotional state, generates compassionate
+    /// response modulation (tone, support intent, patience scaling).
+    /// Co-gated with `enable_primitive_consciousness`.
+    empathic_unification: Option<crate::consciousness::empathic_unification::EmpathicUnification>,
+
+    /// Multi-objective evolution: Pareto-frontier consciousness optimization.
+    /// Evolves primitives across 5 consciousness dimensions (Φ, ∇Φ, Entropy,
+    /// Complexity, Coherence) using NSGA-II-inspired selection.
+    /// Co-gated with `enable_primitive_consciousness`. Very expensive — runs rarely.
+    multi_objective_evolution: Option<crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution>,
+
     /// Value feedback loop for TD-learning on moral alignment.
     /// Records per-cycle moral assessments and provides a moving trend
     /// that modulates future moral scores as a self-correcting mechanism.

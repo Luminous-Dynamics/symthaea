@@ -486,3 +486,138 @@ fn test_compute_from_covariance_consistent() {
         "Total MI mismatch"
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// PROPTEST: Property-based fuzzing for numerical robustness
+// ═══════════════════════════════════════════════════════════════════════════
+
+mod proptests {
+    use super::*;
+    use proptest::prelude::*;
+
+    /// Generate a random valid positive-definite covariance matrix of size n.
+    /// Strategy: C = A^T A + εI where A is random, guaranteeing PD.
+    fn random_pd_covariance(n: usize) -> impl Strategy<Value = Vec<f64>> {
+        proptest::collection::vec(-1.0f64..1.0, n * n).prop_map(move |a_flat| {
+            let mut cov = vec![0.0; n * n];
+            // C = A^T * A  (Gram matrix, always PSD)
+            for i in 0..n {
+                for j in 0..n {
+                    let mut dot = 0.0;
+                    for k in 0..n {
+                        dot += a_flat[k * n + i] * a_flat[k * n + j];
+                    }
+                    cov[i * n + j] = dot;
+                }
+            }
+            // Regularize diagonal for strict PD
+            for i in 0..n {
+                cov[i * n + i] += 1e-4;
+            }
+            cov
+        })
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(20))]
+
+        /// Phi is always finite and non-negative for any valid PD covariance.
+        #[test]
+        fn prop_phi_nonnegative_n8(cov in random_pd_covariance(8)) {
+            let finder = SpectralMIPFinder::with_defaults();
+            let result = finder.compute_from_covariance(&cov, 8, 30);
+            if let Some(r) = result {
+                prop_assert!(r.phi.is_finite(), "Phi must be finite, got {}", r.phi);
+                prop_assert!(r.phi >= -1e-10, "Phi must be >= 0, got {}", r.phi);
+            }
+        }
+
+        /// Total MI is always finite for valid PD covariance.
+        #[test]
+        fn prop_total_mi_finite_n8(cov in random_pd_covariance(8)) {
+            let finder = SpectralMIPFinder::with_defaults();
+            let result = finder.compute_from_covariance(&cov, 8, 30);
+            if let Some(r) = result {
+                prop_assert!(r.total_mi.is_finite(), "Total MI must be finite, got {}", r.total_mi);
+                prop_assert!(r.total_mi >= -1e-10, "Total MI must be >= 0, got {}", r.total_mi);
+            }
+        }
+
+        /// Partition always produces exactly two non-empty sets.
+        #[test]
+        fn prop_partition_valid_n16(cov in random_pd_covariance(16)) {
+            let finder = SpectralMIPFinder::with_defaults();
+            let result = finder.compute_from_covariance(&cov, 16, 30);
+            if let Some(r) = result {
+                let (a, b) = &r.partition;
+                prop_assert!(!a.is_empty(), "Partition part A must be non-empty");
+                prop_assert!(!b.is_empty(), "Partition part B must be non-empty");
+                prop_assert_eq!(
+                    a.len() + b.len(), 16,
+                    "Partition must cover all {} elements", 16
+                );
+                // No overlaps
+                for idx in a {
+                    prop_assert!(!b.contains(idx), "Partition parts must not overlap at {}", idx);
+                }
+            }
+        }
+
+        /// cut_mis always has n-1 entries, all finite.
+        #[test]
+        fn prop_cut_mis_valid_n32(cov in random_pd_covariance(32)) {
+            let finder = SpectralMIPFinder::with_defaults();
+            let result = finder.compute_from_covariance(&cov, 32, 50);
+            if let Some(r) = result {
+                prop_assert_eq!(r.cut_mis.len(), 31, "Should have n-1 cut MIs");
+                for (i, &mi) in r.cut_mis.iter().enumerate() {
+                    prop_assert!(mi.is_finite(), "cut_mi[{}] must be finite, got {}", i, mi);
+                }
+            }
+        }
+
+        /// MIP MI is always <= total MI (the minimum cut can't exceed the whole).
+        #[test]
+        fn prop_mip_mi_leq_total_mi_n8(cov in random_pd_covariance(8)) {
+            let finder = SpectralMIPFinder::with_defaults();
+            let result = finder.compute_from_covariance(&cov, 8, 30);
+            if let Some(r) = result {
+                prop_assert!(
+                    r.mip_mi <= r.total_mi + 1e-6,
+                    "MIP MI ({}) must be <= total MI ({})",
+                    r.mip_mi, r.total_mi
+                );
+            }
+        }
+
+        /// Bordered Cholesky determinants are always finite for PD matrices.
+        #[test]
+        fn prop_bordered_cholesky_finite_n16(cov in random_pd_covariance(16)) {
+            let n = 16;
+            // Test that ln_determinant_cholesky produces finite values
+            // for every prefix of the covariance matrix
+            for k in 2..=n {
+                let mut sub_cov = vec![0.0; k * k];
+                for i in 0..k {
+                    for j in 0..k {
+                        sub_cov[i * k + j] = cov[i * n + j];
+                    }
+                }
+                let det = ln_determinant_cholesky(&sub_cov, k);
+                prop_assert!(det.is_finite(), "ln_det for {}x{} sub-matrix must be finite", k, k);
+            }
+        }
+
+        /// Spectral order is always a valid permutation.
+        #[test]
+        fn prop_spectral_order_is_permutation_n8(cov in random_pd_covariance(8)) {
+            let finder = SpectralMIPFinder::with_defaults();
+            let result = finder.compute_from_covariance(&cov, 8, 30);
+            if let Some(r) = result {
+                let mut order = r.spectral_order.clone();
+                order.sort();
+                prop_assert_eq!(order, (0..8).collect::<Vec<_>>(), "Spectral order must be a permutation");
+            }
+        }
+    }
+}

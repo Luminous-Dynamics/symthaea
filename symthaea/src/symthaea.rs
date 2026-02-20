@@ -67,6 +67,10 @@ pub struct ProcessResponse {
     pub translation_verified: bool,
     /// The structured thought that was translated (for debugging/introspection).
     pub structured_thought: Option<StructuredThought>,
+    /// Consciousness level (Ψ) at time of processing (0.0-1.0).
+    pub consciousness_level: f64,
+    /// Memory coordinator sigma (spectral MIP phi when available).
+    pub sigma: Option<f64>,
 }
 
 /// Result of introspecting the current consciousness state.
@@ -976,6 +980,8 @@ impl Symthaea {
             steps_to_emergence,
             translation_verified,
             structured_thought: Some(thought),
+            consciousness_level: snapshot.consciousness_level as f64,
+            sigma: None, // Spectral MIP phi available via CognitiveLoopService path
         })
     }
 

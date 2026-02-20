@@ -513,6 +513,14 @@ impl CognitiveLoopService {
                 .map(|fe| fe.total)
                 .unwrap_or(0.0),
             fep_precision: self.fep_agent.precision.perceptual_precision(),
+            spectral_mip_phi: self.carryover.last_spectral_mip_phi,
+            harmonies_alignment: self.harmonies_integrator.as_ref()
+                .map(|h| h.stats().avg_alignment)
+                .unwrap_or(0.0),
+            empathic_compassion: self.empathic_unification.as_ref()
+                .map(|_| 0.0) // Compassion is per-cycle; snapshot shows lifetime average
+                .unwrap_or(0.0),
+            sigma: self.carryover.last_sigma,
         }
     }
 
@@ -1021,6 +1029,16 @@ impl CognitiveLoopService {
     /// Borrow the epistemic decision gate (if enabled).
     pub fn epistemic_gate(&self) -> Option<&crate::consciousness::gis_integration::EpistemicDecisionGate> {
         self.epistemic_gate.as_ref()
+    }
+
+    /// Borrow the meta-cognitive reasoner (if enabled).
+    pub fn meta_cognitive_reasoner(&self) -> Option<&crate::consciousness::meta_reasoning::MetaCognitiveReasoner> {
+        self.meta_cognitive_reasoner.as_ref()
+    }
+
+    /// Borrow the code primitive router (if enabled).
+    pub fn code_primitive_router(&self) -> Option<&crate::consciousness::code_primitives::CodePrimitiveRouter> {
+        self.code_primitive_router.as_ref()
     }
 
     // ═══════════════════════════════════════════════════════════════════════

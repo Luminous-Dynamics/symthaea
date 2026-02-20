@@ -509,12 +509,51 @@ impl CognitiveLoopService {
         // (co-gated with primitive consciousness)
         let (synthetic_grounding, epistemic_gate) = if primitive_processor.is_some() {
             let sg = crate::consciousness::synthetic_states::SyntheticStatesNSMGrounding::new(
-                &symthaea_core::hdc::primitive_system::PrimitiveSystem::global(),
+                symthaea_core::hdc::primitive_system::PrimitiveSystem::global(),
             );
             let eg = crate::consciousness::gis_integration::EpistemicDecisionGate::new();
             (Some(sg), Some(eg))
         } else {
             (None, None)
+        };
+
+        // Build optional meta-cognitive reasoner (co-gated with primitive consciousness)
+        let meta_cognitive_reasoner = if primitive_processor.is_some() {
+            crate::consciousness::meta_reasoning::MetaCognitiveReasoner::new(
+                crate::consciousness::primitive_evolution::EvolutionConfig::default(),
+                crate::consciousness::meta_reasoning::MetaReasoningConfig::default(),
+            )
+            .ok()
+        } else {
+            None
+        };
+
+        // Build optional code primitive router (co-gated with primitive consciousness)
+        let code_primitive_router = if primitive_processor.is_some() {
+            let mut router = crate::consciousness::code_primitives::CodePrimitiveRouter::new(
+                config.cfc_config.input_dim,
+            );
+            router.cache_primitives();
+            Some(router)
+        } else {
+            None
+        };
+
+        // Build optional empathic unification (co-gated with primitive consciousness)
+        let empathic_unification = if primitive_processor.is_some() {
+            Some(crate::consciousness::empathic_unification::EmpathicUnification::new())
+        } else {
+            None
+        };
+
+        // Build optional multi-objective evolution (co-gated with primitive consciousness)
+        let multi_objective_evolution = if primitive_processor.is_some() {
+            crate::consciousness::multi_objective_evolution::MultiObjectiveEvolution::new(
+                crate::consciousness::primitive_evolution::EvolutionConfig::default(),
+            )
+            .ok()
+        } else {
+            None
         };
 
         // Build optional episodic replay (needs config fields before move)
@@ -729,6 +768,10 @@ impl CognitiveLoopService {
             hierarchical_ltc,
             synthetic_grounding,
             epistemic_gate,
+            meta_cognitive_reasoner,
+            code_primitive_router,
+            empathic_unification,
+            multi_objective_evolution,
             holographic_analyzer,
             differentiable_consciousness,
             affective_consciousness,
