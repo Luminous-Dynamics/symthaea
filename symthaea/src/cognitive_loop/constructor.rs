@@ -418,6 +418,16 @@ impl CognitiveLoopService {
             None
         };
 
+        // Build optional context-aware optimizer (co-gated with primitive consciousness)
+        let context_optimizer = if primitive_processor.is_some() {
+            crate::consciousness::context_aware_evolution::ContextAwareOptimizer::new(
+                crate::consciousness::primitive_evolution::EvolutionConfig::default(),
+            )
+            .ok()
+        } else {
+            None
+        };
+
         // Build optional dissipative consciousness + epistemic conflict + equation v2 + hierarchical LTC
         // (all co-gated with primitive consciousness — NO feature gate)
         let (dissipative_consciousness, epistemic_conflict_detector, theory_calibrator,
@@ -634,6 +644,7 @@ impl CognitiveLoopService {
             adaptive_reasoner,
             phi_validation,
             causal_explainer,
+            context_optimizer,
             dissipative_consciousness,
             epistemic_conflict_detector,
             theory_calibrator,
@@ -666,6 +677,7 @@ impl CognitiveLoopService {
             embodied_cognition,
             narrative_gwt,
             synergistic_integration: symthaea_core::consciousness_metrics::SynergisticIntegration::default_config(),
+            spectral_mip_finder: symthaea_core::consciousness_metrics::SpectralMIPFinder::with_defaults(),
             soul: Some(crate::soul::Soul::new(crate::soul::SoulConfig {
                 dimension: symthaea_core::hdc::unified_hv::HDC_DIMENSION,
                 ..Default::default()

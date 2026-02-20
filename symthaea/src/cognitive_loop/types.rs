@@ -56,6 +56,8 @@ pub(crate) struct CycleCarryover {
     /// Σ is only computed every N cycles, so we cache the most recent value
     /// for use by subsystems (memory coordinator, consciousness gating) in between.
     pub(crate) last_sigma: Option<f64>,
+    /// Last spectral MIP Phi — cached for inter-cycle use.
+    pub(crate) last_spectral_mip_phi: Option<f64>,
     /// Number of detected causal chains (cached from last analysis, every 50 cycles).
     pub(crate) causal_chain_count: usize,
     /// Temporal continuity ratio (0.0–1.0, cached from last analysis, every 100 cycles).
@@ -73,6 +75,9 @@ pub(crate) struct CycleCarryover {
     pub(crate) last_phi_eff: f64,
     /// Last consciousness equation v2 result (cached, updated every 25 cycles).
     pub(crate) last_equation_v2_consciousness: f64,
+    /// Recent BinaryHV ring buffer for multi-component consciousness profile.
+    /// Holds last 4 cycle BinaryHVs to make gradient/diversity/coherence meaningful.
+    pub(crate) recent_hvs: Vec<crate::hdc::BinaryHV>,
 }
 
 impl Default for CycleCarryover {
@@ -96,6 +101,7 @@ impl Default for CycleCarryover {
             consciousness_level: 0.0,
             subsystem_lr_factor: 1.0,
             last_sigma: None,
+            last_spectral_mip_phi: None,
             causal_chain_count: 0,
             temporal_continuity: 0.0,
             last_harmonic_coherence: 0.0,
@@ -104,6 +110,7 @@ impl Default for CycleCarryover {
             last_dissipative_health: 0.0,
             last_phi_eff: 0.0,
             last_equation_v2_consciousness: 0.0,
+            recent_hvs: Vec::with_capacity(4),
         }
     }
 }
@@ -373,9 +380,17 @@ pub struct CycleMetadata {
     /// Value evaluator decision this cycle ("" when off).
     pub value_evaluator_decision: String,
 
-    // ── Session 2: Consciousness Profile + Harmonics ───────────────────────
+    // ── Session 2: Consciousness Profile + Synergies + Context ─────────────
     /// Multi-dimensional consciousness composite score (0.0 when off).
     pub consciousness_profile_composite: f64,
+    /// Synergy-enhanced composite (non-linear dimension interactions, 0.0 when off).
+    pub synergy_enhanced_composite: f64,
+    /// Number of emergent consciousness properties detected (0 when off).
+    pub emergent_properties_count: usize,
+    /// Current reasoning context detected from input (empty when off).
+    pub reasoning_context: String,
+    /// Context-aware Phi weight for current context (0.0 when off).
+    pub context_phi_weight: f64,
     /// Harmonic field coherence — geometric mean of all 7 harmonics (0.0 when off).
     pub harmonic_field_coherence: f64,
     /// Infinite Love resonance — emergent unity measure (0.0 when off).
@@ -464,6 +479,10 @@ pub struct CycleMetadata {
     /// Σ (Sigma) — Synergistic integration via covariance-based Phi* (Layer 2).
     /// `None` when not computed this cycle (only computed every N cycles).
     pub sigma: Option<f64>,
+
+    /// Spectral MIP Phi — O(n³) Fiedler-ordered MIP approximation (Layer 2+).
+    /// `None` when not computed this cycle (only computed every 50 cycles).
+    pub spectral_mip_phi: Option<f64>,
 
     /// Number of symbols in the resonator semantic codebook (0 when disabled).
     pub resonator_codebook_size: usize,
