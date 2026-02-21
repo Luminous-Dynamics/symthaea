@@ -115,7 +115,7 @@ impl PackedBipolar {
     /// Uses hardware popcount for counting differing bits.
     #[inline]
     pub fn xor_similarity(&self, other: &PackedBipolar) -> f32 {
-        debug_assert_eq!(self.dimension, other.dimension);
+        assert_eq!(self.dimension, other.dimension, "xor_similarity: dimension mismatch {} vs {}", self.dimension, other.dimension);
 
         let mut diff_bits: u32 = 0;
 
@@ -179,7 +179,7 @@ impl PackedBipolar {
     /// of bipolar vectors: (+1)*(-1) = -1 = 0, (+1)*(+1) = +1 = 1
     #[inline]
     pub fn bind(&self, other: &PackedBipolar) -> PackedBipolar {
-        debug_assert_eq!(self.dimension, other.dimension);
+        assert_eq!(self.dimension, other.dimension, "bind: dimension mismatch {} vs {}", self.dimension, other.dimension);
 
         let words: Vec<u64> = self
             .words

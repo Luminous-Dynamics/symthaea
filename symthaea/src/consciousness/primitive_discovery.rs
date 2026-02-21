@@ -848,7 +848,9 @@ impl PrimitiveDiscoveryService {
                 primitive,
                 metadata: HashMap::new(),
             };
-            let _ = sender.send(event);
+            if sender.send(event).is_err() {
+                tracing::warn!("Primitive discovery event dropped — no receiver");
+            }
         }
     }
 

@@ -108,11 +108,11 @@ impl Complex {
     /// Multiplicative inverse: 1/z = conj(z) / |z|^2.
     ///
     /// # Panics
-    /// Panics in debug mode if z is zero.
+    /// Panics if z is zero.
     #[inline]
     pub fn reciprocal(&self) -> Self {
         let mag_sq = self.magnitude_sq();
-        debug_assert!(mag_sq > 0.0, "Cannot compute reciprocal of zero");
+        assert!(mag_sq > 0.0, "Complex::reciprocal: cannot compute reciprocal of zero (|z|²={})", mag_sq);
         Self {
             re: self.re / mag_sq,
             im: -self.im / mag_sq,
@@ -152,11 +152,11 @@ impl Complex {
     /// ln(z) = ln|z| + i*arg(z).
     ///
     /// # Panics
-    /// Panics in debug mode if z is zero.
+    /// Panics if z is zero.
     #[inline]
     pub fn ln(&self) -> Self {
         let mag = self.magnitude();
-        debug_assert!(mag > 0.0, "Cannot compute ln of zero");
+        assert!(mag > 0.0, "Complex::ln: cannot compute ln of zero (|z|={})", mag);
         Self {
             re: mag.ln(),
             im: self.phase(),
@@ -287,7 +287,7 @@ impl Div for Complex {
     #[inline]
     fn div(self, rhs: Self) -> Self {
         let denom = rhs.magnitude_sq();
-        debug_assert!(denom > 0.0, "Division by zero complex number");
+        assert!(denom > 0.0, "Complex::div: division by zero (|rhs|²={})", denom);
         Self {
             re: (self.re * rhs.re + self.im * rhs.im) / denom,
             im: (self.im * rhs.re - self.re * rhs.im) / denom,

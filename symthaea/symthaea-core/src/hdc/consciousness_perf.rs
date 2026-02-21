@@ -62,8 +62,8 @@ pub fn batch_similarity_matrix(hvs: &[&BinaryHV]) -> Vec<f32> {
 /// For a matrix of N elements, index of (i,j) = i*(2*N-i-1)/2 + j - i - 1
 #[inline]
 pub fn similarity_index(n: usize, i: usize, j: usize) -> usize {
-    debug_assert!(i < j, "i must be less than j");
-    debug_assert!(j < n, "j must be less than n");
+    assert!(i < j, "similarity_index: i ({}) must be less than j ({})", i, j);
+    assert!(j < n, "similarity_index: j ({}) must be less than n ({})", j, n);
     i * (2 * n - i - 1) / 2 + j - i - 1
 }
 
