@@ -316,6 +316,9 @@ impl BulletproofRangeProof {
 
         // Normalize value to [0, 2^32 - 1]
         let range_size = range.1 - range.0;
+        if range_size <= 0.0 {
+            return None;
+        }
         let normalized = ((value - range.0) / range_size * (u32::MAX as f32)) as u32;
 
         // Bit decomposition

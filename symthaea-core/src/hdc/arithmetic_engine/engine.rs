@@ -612,6 +612,7 @@ impl ArithmeticEngine {
         }
 
         // Calculate expected value for verification
+        assert!(n <= 20, "factorial overflow: {n}! exceeds u64");
         let expected: u64 = (1..=n).product();
         let direct = self.number(expected);
         let vt = VerificationThreshold::for_binary_hv();

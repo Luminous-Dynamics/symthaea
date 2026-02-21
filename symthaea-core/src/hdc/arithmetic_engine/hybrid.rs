@@ -752,6 +752,7 @@ impl HybridArithmeticEngine {
                 }
             }
             ComputationPath::Fast => {
+                assert!(n <= 20, "factorial overflow: {n}! exceeds u64");
                 let value = (1..=n).product();
                 let phi = if self.config.estimate_phi {
                     self.estimate_phi(ArithmeticOp::Factorial, n, 0)

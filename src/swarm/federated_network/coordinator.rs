@@ -240,7 +240,9 @@ impl FederatedCoordinator {
             );
 
             // Also remove from backend routing
-            let _ = self.backend.unregister_node(node_id).await;
+            if let Err(e) = self.backend.unregister_node(node_id).await {
+                tracing::warn!("Failed to unregister node {}: {}", hex::encode(&node_id[..8]), e);
+            }
 
             let _ = self.event_tx.send(CoordinatorEvent::NodeLeft {
                 node_id: *node_id,
@@ -545,7 +547,9 @@ impl FederatedCoordinator {
             reason: "Coordinator shutdown".to_string(),
         };
 
-        let _ = self.backend.broadcast(leave_msg).await;
+        if let Err(e) = self.backend.broadcast(leave_msg).await {
+            tracing::warn!("Failed to broadcast leave message: {}", e);
+        }
 
         // Take and drop the shutdown sender
         if let Some(tx) = self.shutdown_tx.take() {

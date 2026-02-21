@@ -142,10 +142,12 @@ impl CsrMatrix {
     /// - SIMD-friendly inner loop (can be auto-vectorized)
     #[inline]
     pub fn spmv(&self, x: &[f32]) -> Vec<f32> {
-        debug_assert_eq!(
+        assert_eq!(
             x.len(),
             self.cols,
-            "Vector length must match matrix columns"
+            "spmv: vector length {} must match matrix columns {}",
+            x.len(),
+            self.cols
         );
 
         let mut result = vec![0.0f32; self.rows];
@@ -169,12 +171,20 @@ impl CsrMatrix {
     /// Sparse matrix-vector multiplication with bias: y = self * x + bias
     #[inline]
     pub fn spmv_bias(&self, x: &[f32], bias: &[f32]) -> Vec<f32> {
-        debug_assert_eq!(
+        assert_eq!(
             x.len(),
             self.cols,
-            "Vector length must match matrix columns"
+            "spmv_bias: vector length {} must match matrix columns {}",
+            x.len(),
+            self.cols
         );
-        debug_assert_eq!(bias.len(), self.rows, "Bias length must match matrix rows");
+        assert_eq!(
+            bias.len(),
+            self.rows,
+            "spmv_bias: bias length {} must match matrix rows {}",
+            bias.len(),
+            self.rows
+        );
 
         let mut result = vec![0.0f32; self.rows];
 
@@ -265,7 +275,13 @@ fn fast_sigmoid(x: f32) -> f32 {
 /// Vectorized fast sigmoid for arrays
 #[inline]
 fn fast_sigmoid_vec(input: &[f32], output: &mut [f32]) {
-    debug_assert_eq!(input.len(), output.len());
+    assert_eq!(
+        input.len(),
+        output.len(),
+        "fast_sigmoid_vec: input length {} must match output length {}",
+        input.len(),
+        output.len()
+    );
     for (i, &x) in input.iter().enumerate() {
         output[i] = fast_sigmoid(x);
     }
