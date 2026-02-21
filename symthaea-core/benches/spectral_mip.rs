@@ -88,10 +88,35 @@ fn bench_push(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_hierarchical(c: &mut Criterion) {
+    let mut group = c.benchmark_group("spectral_mip_hierarchical");
+
+    for &n in &[64, 128] {
+        let config = SpectralMIPConfig {
+            num_components: n,
+            window_size: 50,
+            min_samples: 10,
+            regularization: 1e-6,
+        };
+
+        let mut finder = SpectralMIPFinder::new(config);
+        for i in 0..50 {
+            finder.push(&ContinuousHV::random(HDC_DIMENSION, i));
+        }
+
+        group.bench_with_input(BenchmarkId::new("n", n), &n, |b, _| {
+            b.iter(|| black_box(finder.compute_hierarchical()))
+        });
+    }
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     bench_compute_from_covariance,
     bench_full_pipeline,
     bench_push,
+    bench_hierarchical,
 );
 criterion_main!(benches);

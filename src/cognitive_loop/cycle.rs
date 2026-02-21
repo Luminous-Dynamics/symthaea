@@ -2481,6 +2481,18 @@ impl CognitiveLoopService {
             };
         module_timings.consciousness_equation_v2 = _t.elapsed().as_micros() as u64;
 
+        // FEEDBACK: Unified consciousness score modulates confidence + exploration
+        // Science: High C(t) = strong integration across theories → confident, less exploration needed
+        if equation_v2_consciousness > 0.6 {
+            let boost = (equation_v2_consciousness - 0.6) * 0.08; // up to +3.2%
+            self.prediction_confidence =
+                (self.prediction_confidence + boost as f32).clamp(0.0, 1.0);
+        } else if equation_v2_consciousness > 0.0 && equation_v2_consciousness < 0.3 {
+            // Low consciousness → boost exploration to find better integration
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
+        }
+
         // ═══════════════════════════════════════════════════════════════════════
         // HIERARCHICAL LTC: Distributed temporal processing with local circuits
         // Local circuits + global integrator. Step propagates temporal dynamics;
@@ -2504,6 +2516,14 @@ impl CognitiveLoopService {
                 0.0
             };
         module_timings.hierarchical_ltc = _t.elapsed().as_micros() as u64;
+
+        // FEEDBACK: Hierarchical LTC Phi cross-validates spectral MIP
+        // Science: Independent Phi estimates should converge; divergence signals instability
+        if hierarchical_ltc_phi > 0.3 {
+            let hltc_boost = (hierarchical_ltc_phi - 0.3).min(0.2) * 0.05;
+            self.prediction_confidence =
+                (self.prediction_confidence + hltc_boost as f32).clamp(0.0, 1.0);
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // EVOLUTION COORDINATOR: Stateful co-evolution of primitives + architecture
@@ -2564,6 +2584,14 @@ impl CognitiveLoopService {
         if holographic_unity > 0.7 {
             let unity_boost = (holographic_unity - 0.7) * 0.03;
             self.prediction_confidence = (self.prediction_confidence + unity_boost as f32).clamp(0.0, 1.0);
+        }
+        // FEEDBACK: Binding strength modulates learning rate
+        // Strong binding = coherent representations → safe to learn faster
+        if holographic_binding > 0.7 {
+            self.carryover.learning.subsystem_lr_factor *= 1.01;
+        } else if holographic_binding > 0.0 && holographic_binding < 0.3 {
+            // Weak binding = fragmented representations → dampen learning
+            self.carryover.learning.subsystem_lr_factor *= 0.99;
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -2809,6 +2837,19 @@ impl CognitiveLoopService {
             } else {
                 self.primitive_validation_result.unwrap_or((0.0, 1.0))
             };
+
+        // FEEDBACK: Validated primitives boost LR; falsified primitives dampen it
+        // Science: Popper (1959) — if primitives don't improve Φ, reduce their influence
+        if let Some((phi_gain, p_value)) = self.primitive_validation_result {
+            if p_value < 0.05 && phi_gain > 0.0 {
+                // Significant positive effect → boost primitive subsystem LR
+                self.carryover.learning.subsystem_lr_factor *=
+                    1.0 + (phi_gain * 0.02).min(0.03) as f32;
+            } else if p_value < 0.05 && phi_gain < 0.0 {
+                // Significant negative effect → dampen primitive processing
+                self.carryover.learning.subsystem_lr_factor *= 0.98;
+            }
+        }
 
         // ═══════════════════════════════════════════════════════════════════════
         // CROSS-MODULE FEEDBACK: Modules inform each other for emergent behavior

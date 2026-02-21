@@ -5,6 +5,8 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --json
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --csv
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --json-output /tmp/bench.json
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --snapshot baselines/v0.5.0.json
+//!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --compare baselines/v0.5.0.json
 
 use std::path::PathBuf;
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
@@ -29,7 +31,9 @@ use symthaea_psych_bench::benchmarks::worm::{
     BindingBenchmark, ChangeDetectionBenchmark, NBackBenchmark, SerialRecallBenchmark,
     SpatialUpdatingBenchmark,
 };
-use symthaea_psych_bench::harness::{BenchmarkConfig, BenchmarkReport, PsychBenchmark};
+use symthaea_psych_bench::harness::{
+    BenchmarkConfig, BenchmarkReport, PsychBenchmark, RegressionReport, RegressionSnapshot,
+};
 
 fn main() {
     let args: Vec<String> = std::env::args().collect();
@@ -43,6 +47,14 @@ fn main() {
         .windows(2)
         .find(|w| w[0] == "--filter")
         .map(|w| w[1].to_lowercase());
+    let snapshot_path: Option<PathBuf> = args
+        .windows(2)
+        .find(|w| w[0] == "--snapshot")
+        .map(|w| PathBuf::from(&w[1]));
+    let compare_path: Option<PathBuf> = args
+        .windows(2)
+        .find(|w| w[0] == "--compare")
+        .map(|w| PathBuf::from(&w[1]));
 
     let config = BenchmarkConfig {
         dimension: 512,
@@ -107,6 +119,40 @@ fn main() {
             .to_json_file(path)
             .expect("failed to write JSON output file");
         eprintln!("JSON written to {}", path.display());
+    }
+
+    // Save regression snapshot if --snapshot was specified
+    if let Some(ref path) = snapshot_path {
+        let git_hash = std::process::Command::new("git")
+            .args(["rev-parse", "--short", "HEAD"])
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string());
+        let mut snapshot = RegressionSnapshot::from_report(&report, "baseline");
+        if let Some(hash) = git_hash {
+            snapshot = snapshot.with_git_hash(hash);
+        }
+        snapshot.config_summary = format!(
+            "dim={}, trials={}, seed={}",
+            config.dimension, config.trials_per_condition, config.seed
+        );
+        snapshot
+            .save(path)
+            .expect("failed to save regression snapshot");
+        eprintln!("Snapshot saved to {}", path.display());
+    }
+
+    // Compare against baseline if --compare was specified
+    if let Some(ref path) = compare_path {
+        let baseline =
+            RegressionSnapshot::load(path).expect("failed to load baseline snapshot");
+        let current = RegressionSnapshot::from_report(&report, "current");
+        let regression = RegressionReport::compare(&baseline, &current, 0.05, 0.10);
+        println!("\n{}", regression.format_summary());
+        if regression.has_critical() {
+            std::process::exit(1);
+        }
     }
 
     if output_json {
