@@ -28,6 +28,9 @@ pub struct Decision {
     pub options: Vec<String>,
     /// When voting closes.
     pub deadline: Timestamp,
+    /// Optional quorum in basis points (0-10000). None = no quorum required.
+    #[serde(default)]
+    pub quorum_bp: Option<u32>,
     /// Current status of the decision.
     pub status: DecisionStatus,
     /// Agent who created this decision.
@@ -164,6 +167,13 @@ pub fn validate_decision(decision: &Decision) -> ExternResult<ValidateCallbackRe
             "Decision must have at least 1 eligible role".into(),
         ));
     }
+    if let Some(q) = decision.quorum_bp {
+        if q > 10000 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Decision quorum_bp must be <= 10000".into(),
+            ));
+        }
+    }
     // Validate individual option strings
     for opt in &decision.options {
         if opt.is_empty() {
@@ -244,6 +254,7 @@ mod tests {
             eligible_roles: vec![MemberRole::Adult, MemberRole::Elder],
             options: options.into_iter().map(String::from).collect(),
             deadline: Timestamp::from_micros(2_000_000),
+            quorum_bp: None,
             status: DecisionStatus::Open,
             created_by: fake_agent(),
             created_at: fake_timestamp(),
@@ -378,6 +389,57 @@ mod tests {
         }
     }
 
+    // ---- Decision Quorum Validation ----
+
+    #[test]
+    fn quorum_none_passes() {
+        let d = make_decision("Test", vec!["A", "B"]);
+        assert!(matches!(
+            validate_decision(&d).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn quorum_0_passes() {
+        let mut d = make_decision("Test", vec!["A", "B"]);
+        d.quorum_bp = Some(0);
+        assert!(matches!(
+            validate_decision(&d).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn quorum_10000_passes() {
+        let mut d = make_decision("Test", vec!["A", "B"]);
+        d.quorum_bp = Some(10000);
+        assert!(matches!(
+            validate_decision(&d).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn quorum_10001_rejected() {
+        let mut d = make_decision("Test", vec!["A", "B"]);
+        d.quorum_bp = Some(10001);
+        match validate_decision(&d).unwrap() {
+            ValidateCallbackResult::Invalid(msg) => assert!(msg.contains("<= 10000")),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn quorum_5000_passes() {
+        let mut d = make_decision("Test", vec!["A", "B"]);
+        d.quorum_bp = Some(5000);
+        assert!(matches!(
+            validate_decision(&d).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
     #[test]
     fn decision_empty_option_string_rejected() {
         let d = make_decision("Title", vec!["Good", ""]);
@@ -509,6 +571,17 @@ mod tests {
         let json = serde_json::to_string(&d).unwrap();
         let back: Decision = serde_json::from_str(&json).unwrap();
         assert_eq!(back, d);
+    }
+
+    #[test]
+    fn decision_serde_backward_compat_no_quorum() {
+        // Serialize a Decision with quorum_bp, then strip it from JSON to simulate legacy
+        let d = make_decision("Test", vec!["A", "B"]);
+        let mut json_val: serde_json::Value = serde_json::to_value(&d).unwrap();
+        json_val.as_object_mut().unwrap().remove("quorum_bp");
+        let back: Decision = serde_json::from_value(json_val).unwrap();
+        assert_eq!(back.quorum_bp, None);
+        assert_eq!(back.title, "Test");
     }
 
     #[test]

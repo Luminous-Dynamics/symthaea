@@ -19,6 +19,7 @@ pub struct CreateDecisionInput {
     pub eligible_roles: Vec<MemberRole>,
     pub options: Vec<String>,
     pub deadline: Timestamp,
+    pub quorum_bp: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,6 +32,18 @@ pub struct CastVoteInput {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FinalizeDecisionInput {
     pub decision_hash: ActionHash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CloseDecisionInput {
+    pub decision_hash: ActionHash,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AmendVoteInput {
+    pub decision_hash: ActionHash,
+    pub choice: u32,
+    pub reasoning: Option<String>,
 }
 
 // ============================================================================
@@ -71,6 +84,11 @@ fn is_decision_votable(status: &DecisionStatus) -> bool {
     *status == DecisionStatus::Open
 }
 
+/// Check whether a decision can be manually closed (must be Open).
+fn is_decision_closeable(status: &DecisionStatus) -> bool {
+    *status == DecisionStatus::Open
+}
+
 /// Check whether the current time is at or past the deadline.
 fn is_deadline_passed(now: &Timestamp, deadline: &Timestamp) -> bool {
     now >= deadline
@@ -83,6 +101,50 @@ fn participation_rate_bp(voter_count: u32, active_members: u32) -> u32 {
         return 0;
     }
     ((voter_count as u64 * 10000) / active_members as u64).min(10000) as u32
+}
+
+/// Find an existing vote by this agent on the given decision.
+/// Searches the agent's vote links and returns the vote's ActionHash if found.
+fn find_existing_vote_for_decision(
+    _agent: &AgentPubKey,
+    decision_hash: &ActionHash,
+    agent_vote_links: &[Link],
+) -> ExternResult<Option<ActionHash>> {
+    for link in agent_vote_links {
+        let target =
+            link.target
+                .clone()
+                .into_action_hash()
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Link target is not an ActionHash".into()
+                )))?;
+        if let Some(record) = get(target.clone(), GetOptions::default())? {
+            let existing_vote: Vote = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Failed to deserialize vote: {e}"
+                    )))
+                })?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Vote entry is missing".into()
+                )))?;
+            if existing_vote.decision_hash == *decision_hash {
+                return Ok(Some(target));
+            }
+        }
+    }
+    Ok(None)
+}
+
+/// Check whether the quorum requirement is met.
+/// Returns true if no quorum is required (None) or if participation meets the threshold.
+fn is_quorum_met(participation_rate_bp: u32, quorum_bp: Option<u32>) -> bool {
+    match quorum_bp {
+        None => true,
+        Some(q) => participation_rate_bp >= q,
+    }
 }
 
 // ============================================================================
@@ -104,6 +166,7 @@ pub fn create_decision(input: CreateDecisionInput) -> ExternResult<Record> {
         eligible_roles: input.eligible_roles,
         options: input.options,
         deadline: input.deadline,
+        quorum_bp: input.quorum_bp,
         status: DecisionStatus::Open,
         created_by: agent,
         created_at: now,
@@ -179,31 +242,10 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
         LinkQuery::try_new(agent.clone(), LinkTypes::AgentToVotes)?,
         GetStrategy::default(),
     )?;
-    for link in my_vote_links {
-        let target = link
-            .target
-            .into_action_hash()
-            .ok_or(wasm_error!(WasmErrorInner::Guest(
-                "Link target is not an ActionHash".into()
-            )))?;
-        if let Some(record) = get(target, GetOptions::default())? {
-            let existing_vote: Vote = record
-                .entry()
-                .to_app_option()
-                .map_err(|e| {
-                    wasm_error!(WasmErrorInner::Guest(format!(
-                        "Failed to deserialize vote: {e}"
-                    )))
-                })?
-                .ok_or(wasm_error!(WasmErrorInner::Guest(
-                    "Vote entry is missing".into()
-                )))?;
-            if existing_vote.decision_hash == input.decision_hash {
-                return Err(wasm_error!(WasmErrorInner::Guest(
-                    "You have already voted on this decision".into()
-                )));
-            }
-        }
+    if find_existing_vote_for_decision(&agent, &input.decision_hash, &my_vote_links)?.is_some() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "You have already voted on this decision".into()
+        )));
     }
 
     // 5. Eligible role — get caller's role via kinship cross-zome call
@@ -369,6 +411,15 @@ pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
 
     let participation_rate_bp = participation_rate_bp(voter_count, active_members);
 
+    // 3. Quorum must be met (if set)
+    if !is_quorum_met(participation_rate_bp, decision.quorum_bp) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot finalize: quorum not met (participation {}bp < required {}bp)",
+            participation_rate_bp,
+            decision.quorum_bp.unwrap_or(0)
+        ))));
+    }
+
     // Create the outcome
     let outcome = DecisionOutcome {
         decision_hash: input.decision_hash.clone(),
@@ -392,6 +443,204 @@ pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
 
     let record = get(outcome_hash, GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Could not find the newly created DecisionOutcome".into())
+    ))?;
+
+    Ok(record)
+}
+
+/// Close a decision before its deadline.
+/// Auth: the decision creator OR any guardian-level member of the hearth.
+#[hdk_extern]
+pub fn close_decision(input: CloseDecisionInput) -> ExternResult<Record> {
+    let agent = agent_info()?.agent_initial_pubkey;
+
+    let decision_record = get(input.decision_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Decision not found".into())),
+    )?;
+    let mut decision: Decision = decision_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize decision: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Decision entry is missing".into()
+        )))?;
+
+    // 1. Decision must be Open
+    if !is_decision_closeable(&decision.status) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot close a decision with status {:?} (must be Open)",
+            decision.status
+        ))));
+    }
+
+    // 2. Auth: creator OR guardian
+    if agent != decision.created_by {
+        let caller_role: Option<MemberRole> = decode_zome_response(
+            call(
+                CallTargetCell::Local,
+                ZomeName::new("hearth_kinship"),
+                FunctionName::new("get_caller_role"),
+                None,
+                decision.hearth_hash.clone(),
+            )?,
+            "get_caller_role",
+        )?;
+
+        let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "You are not an active member of this hearth".into()
+        )))?;
+
+        if !role.is_guardian() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only the decision creator or a guardian can close a decision".into()
+            )));
+        }
+    }
+
+    // 3. Close the decision
+    decision.status = DecisionStatus::Closed;
+    update_entry(input.decision_hash.clone(), &decision)?;
+
+    let record = get(input.decision_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find the updated Decision".into())
+    ))?;
+
+    Ok(record)
+}
+
+/// Amend an existing vote on a decision (link-swap pattern).
+/// The old vote entry remains on the DHT as an audit trail; its links are deleted
+/// and replaced with links to the new vote entry.
+#[hdk_extern]
+pub fn amend_vote(input: AmendVoteInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let agent = agent_info()?.agent_initial_pubkey;
+
+    // Get the decision
+    let decision_record = get(input.decision_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Decision not found".into())),
+    )?;
+    let decision: Decision = decision_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize decision: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Decision entry is missing".into()
+        )))?;
+
+    // 1. Decision must be Open
+    if !is_decision_votable(&decision.status) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot amend vote on a decision with status {:?} (must be Open)",
+            decision.status
+        ))));
+    }
+
+    // 2. Deadline must not have passed
+    if is_deadline_passed(&now, &decision.deadline) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot amend vote: the decision deadline has passed".into()
+        )));
+    }
+
+    // 3. Choice must be within bounds
+    if !is_choice_valid(input.choice, decision.options.len()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid choice {}: decision has {} options (0..{})",
+            input.choice,
+            decision.options.len(),
+            decision.options.len().saturating_sub(1)
+        ))));
+    }
+
+    // 4. Must have an existing vote to amend
+    let my_vote_links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToVotes)?,
+        GetStrategy::default(),
+    )?;
+    let _existing_vote_hash =
+        find_existing_vote_for_decision(&agent, &input.decision_hash, &my_vote_links)?.ok_or(
+            wasm_error!(WasmErrorInner::Guest(
+                "No existing vote to amend on this decision".into()
+            )),
+        )?;
+
+    // 5. Delete old links (DecisionToVotes and AgentToVotes)
+    let decision_vote_links = get_links(
+        LinkQuery::try_new(input.decision_hash.clone(), LinkTypes::DecisionToVotes)?,
+        GetStrategy::default(),
+    )?;
+    for link in &decision_vote_links {
+        if let Some(target) = link.target.clone().into_action_hash() {
+            if target == _existing_vote_hash {
+                delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+            }
+        }
+    }
+    for link in &my_vote_links {
+        if let Some(target) = link.target.clone().into_action_hash() {
+            if target == _existing_vote_hash {
+                delete_link(link.create_link_hash.clone(), GetOptions::default())?;
+            }
+        }
+    }
+
+    // 6. Get caller role + eligible check
+    let caller_role: Option<MemberRole> = decode_zome_response(
+        call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_kinship"),
+            FunctionName::new("get_caller_role"),
+            None,
+            decision.hearth_hash,
+        )?,
+        "get_caller_role",
+    )?;
+
+    let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "You are not an active member of this hearth".into()
+    )))?;
+
+    if !is_role_eligible(&role, &decision.eligible_roles) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Your role {:?} is not eligible for this decision (eligible: {:?})",
+            role, decision.eligible_roles
+        ))));
+    }
+
+    let weight_bp = role.default_vote_weight_bp();
+
+    // 7. Create new vote entry + links
+    let vote = Vote {
+        decision_hash: input.decision_hash.clone(),
+        voter: agent.clone(),
+        choice: input.choice,
+        weight_bp,
+        reasoning: input.reasoning,
+        created_at: now,
+    };
+
+    let vote_hash = create_entry(&EntryTypes::Vote(vote))?;
+
+    create_link(
+        input.decision_hash,
+        vote_hash.clone(),
+        LinkTypes::DecisionToVotes,
+        (),
+    )?;
+
+    create_link(agent, vote_hash.clone(), LinkTypes::AgentToVotes, ())?;
+
+    let record = get(vote_hash, GetOptions::default())?.ok_or(wasm_error!(
+        WasmErrorInner::Guest("Could not find the newly created Vote".into())
     ))?;
 
     Ok(record)
@@ -548,6 +797,7 @@ mod tests {
             eligible_roles: vec![MemberRole::Adult, MemberRole::Elder],
             options: vec!["Pizza".into(), "Tacos".into()],
             deadline: Timestamp::from_micros(2_000_000),
+            quorum_bp: None,
         };
         let json = serde_json::to_string(&input).unwrap();
         let back: CreateDecisionInput = serde_json::from_str(&json).unwrap();
@@ -589,6 +839,92 @@ mod tests {
         let _back: FinalizeDecisionInput = serde_json::from_str(&json).unwrap();
     }
 
+    // ---- AmendVoteInput Serde ----
+
+    #[test]
+    fn amend_vote_input_serde_roundtrip() {
+        let input = AmendVoteInput {
+            decision_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            choice: 2,
+            reasoning: Some("Changed my mind".into()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: AmendVoteInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.choice, 2);
+        assert_eq!(back.reasoning.unwrap(), "Changed my mind");
+    }
+
+    #[test]
+    fn amend_vote_input_no_reasoning() {
+        let input = AmendVoteInput {
+            decision_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            choice: 0,
+            reasoning: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: AmendVoteInput = serde_json::from_str(&json).unwrap();
+        assert!(back.reasoning.is_none());
+    }
+
+    #[test]
+    fn amend_vote_input_with_reasoning() {
+        let input = AmendVoteInput {
+            decision_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            choice: 5,
+            reasoning: Some("After further thought".into()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: AmendVoteInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.choice, 5);
+        assert!(back.reasoning.is_some());
+    }
+
+    // ---- CloseDecisionInput Serde ----
+
+    #[test]
+    fn close_decision_input_serde_roundtrip() {
+        let input = CloseDecisionInput {
+            decision_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CloseDecisionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.decision_hash, input.decision_hash);
+    }
+
+    // ---- Pure helper: is_decision_closeable ----
+
+    #[test]
+    fn closeable_open() {
+        assert!(is_decision_closeable(&DecisionStatus::Open));
+    }
+
+    #[test]
+    fn not_closeable_closed() {
+        assert!(!is_decision_closeable(&DecisionStatus::Closed));
+    }
+
+    #[test]
+    fn not_closeable_finalized() {
+        assert!(!is_decision_closeable(&DecisionStatus::Finalized));
+    }
+
+    #[test]
+    fn closeable_matches_votable() {
+        // Closeable and votable have the same predicate (Open)
+        for status in &[
+            DecisionStatus::Open,
+            DecisionStatus::Closed,
+            DecisionStatus::Finalized,
+        ] {
+            assert_eq!(
+                is_decision_closeable(status),
+                is_decision_votable(status),
+                "mismatch for {:?}",
+                status
+            );
+        }
+    }
+
     #[test]
     fn create_decision_input_all_types() {
         let types = vec![
@@ -606,6 +942,7 @@ mod tests {
                 eligible_roles: vec![MemberRole::Adult],
                 options: vec!["A".into(), "B".into()],
                 deadline: Timestamp::from_micros(2_000_000),
+                quorum_bp: None,
             };
             let json = serde_json::to_string(&input).unwrap();
             let _back: CreateDecisionInput = serde_json::from_str(&json).unwrap();
@@ -631,6 +968,7 @@ mod tests {
             eligible_roles: roles,
             options: vec!["A".into(), "B".into()],
             deadline: Timestamp::from_micros(2_000_000),
+            quorum_bp: None,
         };
         let json = serde_json::to_string(&input).unwrap();
         let back: CreateDecisionInput = serde_json::from_str(&json).unwrap();
@@ -648,6 +986,7 @@ mod tests {
             eligible_roles: vec![MemberRole::Adult],
             options,
             deadline: Timestamp::from_micros(2_000_000),
+            quorum_bp: None,
         };
         let json = serde_json::to_string(&input).unwrap();
         let back: CreateDecisionInput = serde_json::from_str(&json).unwrap();
@@ -789,5 +1128,210 @@ mod tests {
     fn participation_capped_at_10000() {
         // More voters than members shouldn't exceed 10000
         assert_eq!(participation_rate_bp(15, 10), 10000);
+    }
+
+    // ---- Pure helper: is_quorum_met ----
+
+    #[test]
+    fn quorum_none_always_met() {
+        assert!(is_quorum_met(0, None));
+        assert!(is_quorum_met(5000, None));
+        assert!(is_quorum_met(10000, None));
+    }
+
+    #[test]
+    fn quorum_exact_threshold_met() {
+        assert!(is_quorum_met(5000, Some(5000)));
+    }
+
+    #[test]
+    fn quorum_exceeds_threshold() {
+        assert!(is_quorum_met(7500, Some(5000)));
+    }
+
+    #[test]
+    fn quorum_not_met() {
+        assert!(!is_quorum_met(4999, Some(5000)));
+    }
+
+    #[test]
+    fn quorum_zero_threshold_always_met() {
+        assert!(is_quorum_met(0, Some(0)));
+        assert!(is_quorum_met(10000, Some(0)));
+    }
+
+    #[test]
+    fn quorum_full_participation_required() {
+        assert!(is_quorum_met(10000, Some(10000)));
+        assert!(!is_quorum_met(9999, Some(10000)));
+    }
+
+    #[test]
+    fn create_decision_input_with_quorum_serde() {
+        let input = CreateDecisionInput {
+            hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            title: "Quorum vote".into(),
+            description: "Needs 50% participation".into(),
+            decision_type: DecisionType::MajorityVote,
+            eligible_roles: vec![MemberRole::Adult],
+            options: vec!["Yes".into(), "No".into()],
+            deadline: Timestamp::from_micros(2_000_000),
+            quorum_bp: Some(5000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreateDecisionInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.quorum_bp, Some(5000));
+    }
+
+    // ========================================================================
+    // Scenario-Based Integration Tests (pure function decision tree)
+    // ========================================================================
+
+    // ---- Status Lifecycle ----
+
+    #[test]
+    fn lifecycle_open_is_votable_and_closeable() {
+        let status = DecisionStatus::Open;
+        assert!(is_decision_votable(&status));
+        assert!(is_decision_closeable(&status));
+    }
+
+    #[test]
+    fn lifecycle_closed_blocks_voting_and_closing() {
+        let status = DecisionStatus::Closed;
+        assert!(!is_decision_votable(&status));
+        assert!(!is_decision_closeable(&status));
+    }
+
+    #[test]
+    fn lifecycle_finalized_blocks_everything() {
+        let status = DecisionStatus::Finalized;
+        assert!(!is_decision_votable(&status));
+        assert!(!is_decision_closeable(&status));
+    }
+
+    // ---- Combined Validation Scenarios ----
+
+    #[test]
+    fn scenario_vote_valid_open_before_deadline_eligible() {
+        let status = DecisionStatus::Open;
+        let now = Timestamp::from_micros(1_000_000);
+        let deadline = Timestamp::from_micros(2_000_000);
+        let role = MemberRole::Adult;
+        let eligible = vec![MemberRole::Adult, MemberRole::Elder];
+
+        assert!(is_decision_votable(&status));
+        assert!(!is_deadline_passed(&now, &deadline));
+        assert!(is_choice_valid(0, 3));
+        assert!(is_role_eligible(&role, &eligible));
+    }
+
+    #[test]
+    fn scenario_vote_rejected_past_deadline_even_if_open() {
+        let status = DecisionStatus::Open;
+        let now = Timestamp::from_micros(3_000_000);
+        let deadline = Timestamp::from_micros(2_000_000);
+
+        assert!(is_decision_votable(&status));
+        assert!(is_deadline_passed(&now, &deadline));
+        // Vote should be rejected despite Open status
+    }
+
+    #[test]
+    fn scenario_vote_rejected_closed_before_deadline() {
+        let status = DecisionStatus::Closed;
+        let now = Timestamp::from_micros(1_000_000);
+        let deadline = Timestamp::from_micros(2_000_000);
+
+        assert!(!is_decision_votable(&status));
+        assert!(!is_deadline_passed(&now, &deadline));
+        // Vote should be rejected despite deadline not passed
+    }
+
+    #[test]
+    fn scenario_finalize_requires_deadline_passed() {
+        let status = DecisionStatus::Open;
+        let now = Timestamp::from_micros(3_000_000);
+        let deadline = Timestamp::from_micros(2_000_000);
+
+        assert!(is_decision_votable(&status));
+        assert!(is_deadline_passed(&now, &deadline));
+        // Finalization should proceed
+    }
+
+    #[test]
+    fn scenario_finalize_rejects_pre_deadline() {
+        let status = DecisionStatus::Open;
+        let now = Timestamp::from_micros(1_000_000);
+        let deadline = Timestamp::from_micros(2_000_000);
+
+        assert!(is_decision_votable(&status));
+        assert!(!is_deadline_passed(&now, &deadline));
+        // Finalization should be rejected
+    }
+
+    #[test]
+    fn scenario_finalize_quorum_met() {
+        // 8 of 10 members voted = 8000bp, quorum = 5000bp
+        let rate = participation_rate_bp(8, 10);
+        assert_eq!(rate, 8000);
+        assert!(is_quorum_met(rate, Some(5000)));
+    }
+
+    #[test]
+    fn scenario_finalize_quorum_not_met() {
+        // 2 of 10 members voted = 2000bp, quorum = 5000bp
+        let rate = participation_rate_bp(2, 10);
+        assert_eq!(rate, 2000);
+        assert!(!is_quorum_met(rate, Some(5000)));
+    }
+
+    #[test]
+    fn scenario_finalize_no_quorum_always_passes() {
+        // Even with 0 voters, no quorum means it passes
+        let rate = participation_rate_bp(0, 10);
+        assert_eq!(rate, 0);
+        assert!(is_quorum_met(rate, None));
+    }
+
+    #[test]
+    fn scenario_all_roles_weight_check() {
+        let roles = vec![
+            (MemberRole::Founder, 10000u32),
+            (MemberRole::Elder, 10000),
+            (MemberRole::Adult, 10000),
+            (MemberRole::Youth, 5000),
+            (MemberRole::Child, 0),
+            (MemberRole::Guest, 0),
+            (MemberRole::Ancestor, 0),
+        ];
+        for (role, expected_weight) in roles {
+            assert_eq!(
+                role.default_vote_weight_bp(),
+                expected_weight,
+                "unexpected weight for {:?}",
+                role
+            );
+        }
+    }
+
+    #[test]
+    fn scenario_choice_boundary_max_options() {
+        // Decision with exactly 20 options (max allowed)
+        assert!(is_choice_valid(0, 20));
+        assert!(is_choice_valid(19, 20));
+        assert!(!is_choice_valid(20, 20));
+    }
+
+    #[test]
+    fn scenario_participation_edge_cases() {
+        // Single voter, single member = 100%
+        assert_eq!(participation_rate_bp(1, 1), 10000);
+        // 1 voter, 3 members = 33.33% ≈ 3333bp
+        assert_eq!(participation_rate_bp(1, 3), 3333);
+        // 2 voters, 3 members = 66.66% ≈ 6666bp
+        assert_eq!(participation_rate_bp(2, 3), 6666);
+        // All edge: 0 voters, 0 members = 0
+        assert_eq!(participation_rate_bp(0, 0), 0);
     }
 }
