@@ -115,7 +115,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
         FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
             EntryTypes::Decision(decision) => validate_decision(&decision),
             EntryTypes::Vote(_) => {
-                // Votes are immutable once cast.
+                // INVARIANT: Vote immutability — once a vote is cast on a decision,
+                // it cannot be modified or retracted. This ensures that tallied results
+                // remain stable and that members cannot retroactively change outcomes.
                 Ok(ValidateCallbackResult::Invalid(
                     "Votes cannot be updated once cast".into(),
                 ))

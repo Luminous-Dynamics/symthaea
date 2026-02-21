@@ -241,17 +241,58 @@ pub fn get_hearth_circles(hearth_hash: ActionHash) -> ExternResult<Vec<Record>> 
     records_from_links(links)
 }
 
-/// Placeholder for H2 weekly gratitude digest rollup.
-/// Will aggregate gratitude expressions for the past week into a summary.
+/// Epoch window input for digest creation.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DigestEpochInput {
+    pub hearth_hash: ActionHash,
+    pub epoch_start: Timestamp,
+    pub epoch_end: Timestamp,
+}
+
+/// Create a gratitude digest: query HearthToGratitude links, filter by
+/// created_at within the epoch window, aggregate per (from, to) pair.
+/// Returns Vec<GratitudeSummary> for inclusion in the WeeklyDigest.
 #[hdk_extern]
-pub fn create_gratitude_digest(hearth_hash: ActionHash) -> ExternResult<()> {
-    // H2: Weekly rollup — aggregate gratitude expressions from the past 7 days
-    // into a GratitudeSummary for the WeeklyDigest. For now, this is a
-    // placeholder that validates the hearth exists.
-    let _record = get(hearth_hash, GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Hearth not found for digest".into())
-    ))?;
-    Ok(())
+pub fn create_gratitude_digest(input: DigestEpochInput) -> ExternResult<Vec<GratitudeSummary>> {
+    let links = get_links(
+        LinkQuery::try_new(input.hearth_hash, LinkTypes::HearthToGratitude)?,
+        GetStrategy::default(),
+    )?;
+
+    // Aggregate gratitude expressions per (from_agent, to_agent) pair
+    let mut pair_counts: std::collections::HashMap<(AgentPubKey, AgentPubKey), u32> =
+        std::collections::HashMap::new();
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            let expr: GratitudeExpression = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid gratitude entry".into()
+                )))?;
+
+            // Filter by epoch window
+            if expr.created_at >= input.epoch_start && expr.created_at <= input.epoch_end {
+                let key = (expr.from_agent, expr.to_agent);
+                *pair_counts.entry(key).or_insert(0) += 1;
+            }
+        }
+    }
+
+    let summaries: Vec<GratitudeSummary> = pair_counts
+        .into_iter()
+        .map(|((from_agent, to_agent), count)| GratitudeSummary {
+            from_agent,
+            to_agent,
+            count,
+        })
+        .collect();
+
+    Ok(summaries)
 }
 
 // ============================================================================

@@ -75,6 +75,7 @@ pub fn create_care_schedule(input: CreateCareScheduleInput) -> ExternResult<Reco
         recurrence: input.recurrence,
         notes: input.notes,
         status: CareScheduleStatus::Active,
+        completed_at: None,
     };
 
     let action_hash = create_entry(&EntryTypes::CareSchedule(schedule))?;
@@ -100,9 +101,12 @@ pub fn create_care_schedule(input: CreateCareScheduleInput) -> ExternResult<Reco
     )))
 }
 
-/// Signal that a care task has been completed (H2: signal, not DHT write).
+/// Mark a care task as completed. Sets completed_at timestamp on the entry
+/// and emits a CareTaskCompleted signal.
 #[hdk_extern]
 pub fn complete_task(input: CompleteTaskInput) -> ExternResult<()> {
+    let now = sys_time()?;
+
     let record = get(input.schedule_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Care schedule not found".into())
     ))?;
@@ -116,6 +120,14 @@ pub fn complete_task(input: CompleteTaskInput) -> ExternResult<()> {
         )))?;
 
     let caller = agent_info()?.agent_initial_pubkey;
+
+    // Update the entry with completed_at timestamp
+    let updated = CareSchedule {
+        completed_at: Some(now),
+        status: CareScheduleStatus::Completed,
+        ..schedule.clone()
+    };
+    update_entry(input.schedule_hash.clone(), &EntryTypes::CareSchedule(updated))?;
 
     let signal = HearthSignal::CareTaskCompleted {
         assignee: caller,
@@ -248,23 +260,64 @@ pub fn get_hearth_meal_plans(hearth_hash: ActionHash) -> ExternResult<Vec<Record
     records_from_links(links)
 }
 
-/// Placeholder for H2 weekly care digest rollup.
-/// Will aggregate care completion signals into a WeeklyDigest entry.
+/// Epoch window input for digest creation.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DigestEpochInput {
+    pub hearth_hash: ActionHash,
+    pub epoch_start: Timestamp,
+    pub epoch_end: Timestamp,
+}
+
+/// Create a care digest: query HearthToSchedules links, filter schedules
+/// with completed_at within the epoch window, aggregate per assignee.
+/// Returns Vec<CareSummary> for inclusion in the WeeklyDigest.
 #[hdk_extern]
-pub fn create_care_digest(hearth_hash: ActionHash) -> ExternResult<()> {
-    // H2: Collect care completion signals from the past week,
-    // aggregate into a CareSummary, and write to the WeeklyDigest.
-    // For now, just emit a signal indicating the digest was requested.
-    let caller = agent_info()?.agent_initial_pubkey;
+pub fn create_care_digest(input: DigestEpochInput) -> ExternResult<Vec<CareSummary>> {
+    let links = get_links(
+        LinkQuery::try_new(input.hearth_hash, LinkTypes::HearthToSchedules)?,
+        GetStrategy::default(),
+    )?;
 
-    let signal = HearthSignal::CareTaskCompleted {
-        assignee: caller,
-        schedule_hash: hearth_hash,
-        care_type: CareType::Custom("weekly-digest-request".to_string()),
-    };
-    emit_signal(&signal)?;
+    // Aggregate completed tasks per assignee
+    let mut assignee_stats: std::collections::HashMap<AgentPubKey, (u32, u32)> =
+        std::collections::HashMap::new();
 
-    Ok(())
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            let schedule: CareSchedule = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid care schedule entry".into()
+                )))?;
+
+            // Filter by completed_at within epoch window
+            if let Some(completed_at) = schedule.completed_at {
+                if completed_at >= input.epoch_start && completed_at <= input.epoch_end {
+                    let entry = assignee_stats.entry(schedule.assigned_to).or_insert((0, 0));
+                    entry.0 += 1; // tasks_completed
+                    // hours_hundredths: estimate 1 hour (100 hundredths) per task
+                    entry.1 += 100;
+                }
+            }
+        }
+    }
+
+    let summaries: Vec<CareSummary> = assignee_stats
+        .into_iter()
+        .map(
+            |(assignee, (tasks_completed, hours_hundredths))| CareSummary {
+                assignee,
+                tasks_completed,
+                hours_hundredths,
+            },
+        )
+        .collect();
+
+    Ok(summaries)
 }
 
 // ============================================================================

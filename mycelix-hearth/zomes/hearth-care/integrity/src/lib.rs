@@ -29,6 +29,9 @@ pub struct CareSchedule {
     pub notes: String,
     /// Current status of the schedule.
     pub status: CareScheduleStatus,
+    /// When this task was completed (set by complete_task).
+    /// Used by care digest to determine which tasks were completed in a given epoch.
+    pub completed_at: Option<Timestamp>,
 }
 
 /// A request to swap a care task between two members.
@@ -309,6 +312,7 @@ mod tests {
             recurrence: Recurrence::Daily,
             notes: "Pack lunches before leaving".to_string(),
             status: CareScheduleStatus::Active,
+            completed_at: None,
         }
     }
 

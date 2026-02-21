@@ -104,6 +104,7 @@ pub enum EntryTypes {
     KinshipBond(KinshipBond),
     HearthInvitation(HearthInvitation),
     Anchor(Anchor),
+    WeeklyDigest(WeeklyDigest),
 }
 
 #[hdk_link_types]
@@ -124,6 +125,8 @@ pub enum LinkTypes {
     HearthToInvitations,
     /// AgentPubKey -> HearthInvitation
     AgentToInvitations,
+    /// Hearth -> WeeklyDigest (H2 epoch rollups)
+    HearthToDigests,
 }
 
 // ============================================================================
@@ -147,6 +150,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::KinshipBond(bond) => validate_bond(&bond),
             EntryTypes::HearthInvitation(invitation) => validate_invitation(&invitation),
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            EntryTypes::WeeklyDigest(digest) => validate_weekly_digest(&digest),
         },
         FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
             EntryTypes::Hearth(hearth) => validate_hearth(&hearth),
@@ -154,6 +158,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::KinshipBond(bond) => validate_bond(&bond),
             EntryTypes::HearthInvitation(invitation) => validate_invitation(&invitation),
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
+            EntryTypes::WeeklyDigest(digest) => validate_weekly_digest(&digest),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
@@ -216,6 +221,24 @@ pub fn validate_bond(bond: &KinshipBond) -> ExternResult<ValidateCallbackResult>
     if bond.member_a == bond.member_b {
         return Ok(ValidateCallbackResult::Invalid(
             "Bond member_a and member_b must be different agents (no self-bonds)".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+pub fn validate_weekly_digest(digest: &WeeklyDigest) -> ExternResult<ValidateCallbackResult> {
+    // epoch_end must be after epoch_start
+    if digest.epoch_end <= digest.epoch_start {
+        return Ok(ValidateCallbackResult::Invalid(
+            "WeeklyDigest epoch_end must be after epoch_start".into(),
+        ));
+    }
+    // epoch_end - epoch_start must be <= 8 days (691_200_000_000 microseconds)
+    let duration_micros = digest.epoch_end.as_micros() - digest.epoch_start.as_micros();
+    let eight_days_micros: i64 = 8 * 24 * 60 * 60 * 1_000_000;
+    if duration_micros > eight_days_micros {
+        return Ok(ValidateCallbackResult::Invalid(
+            "WeeklyDigest epoch window must be <= 8 days".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -728,6 +751,7 @@ mod tests {
         let _type = LinkTypes::TypeToHearths;
         let _invitations = LinkTypes::HearthToInvitations;
         let _agent_inv = LinkTypes::AgentToInvitations;
+        let _digests = LinkTypes::HearthToDigests;
     }
 
     // ---- Edge Cases ----
@@ -795,5 +819,82 @@ mod tests {
             validate_membership(&m).unwrap(),
             ValidateCallbackResult::Valid
         ));
+    }
+
+    // ---- WeeklyDigest Validation ----
+
+    fn make_digest(start_micros: i64, end_micros: i64) -> WeeklyDigest {
+        WeeklyDigest {
+            hearth_hash: fake_action_hash(),
+            epoch_start: Timestamp::from_micros(start_micros),
+            epoch_end: Timestamp::from_micros(end_micros),
+            bond_updates: vec![],
+            care_summary: vec![],
+            gratitude_summary: vec![],
+            rhythm_summary: vec![],
+            created_by: fake_agent_a(),
+            created_at: Timestamp::from_micros(end_micros),
+        }
+    }
+
+    #[test]
+    fn weekly_digest_entry_type_exists() {
+        let _v = UnitEntryTypes::WeeklyDigest;
+    }
+
+    #[test]
+    fn valid_weekly_digest_passes() {
+        // 7 days = 604_800_000_000 micros
+        let d = make_digest(0, 604_800_000_000);
+        assert!(matches!(
+            validate_weekly_digest(&d).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn weekly_digest_end_before_start_rejected() {
+        let d = make_digest(1_000_000, 500_000);
+        match validate_weekly_digest(&d).unwrap() {
+            ValidateCallbackResult::Invalid(msg) => assert!(msg.contains("after epoch_start")),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn weekly_digest_equal_start_end_rejected() {
+        let d = make_digest(1_000_000, 1_000_000);
+        match validate_weekly_digest(&d).unwrap() {
+            ValidateCallbackResult::Invalid(msg) => assert!(msg.contains("after epoch_start")),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn weekly_digest_8_days_passes() {
+        // 8 days = 691_200_000_000 micros
+        let d = make_digest(0, 691_200_000_000);
+        assert!(matches!(
+            validate_weekly_digest(&d).unwrap(),
+            ValidateCallbackResult::Valid
+        ));
+    }
+
+    #[test]
+    fn weekly_digest_over_8_days_rejected() {
+        // 8 days + 1 second
+        let d = make_digest(0, 691_201_000_000);
+        match validate_weekly_digest(&d).unwrap() {
+            ValidateCallbackResult::Invalid(msg) => assert!(msg.contains("<= 8 days")),
+            other => panic!("expected Invalid, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn weekly_digest_serde_roundtrip() {
+        let d = make_digest(0, 604_800_000_000);
+        let json = serde_json::to_string(&d).unwrap();
+        let back: WeeklyDigest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, d);
     }
 }

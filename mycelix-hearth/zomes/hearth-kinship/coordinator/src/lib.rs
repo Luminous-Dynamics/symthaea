@@ -331,10 +331,15 @@ pub fn accept_invitation(input: AcceptInvitationInput) -> ExternResult<Record> {
 
     // Emit signal
     emit_signal(&HearthSignal::MemberJoined {
-        hearth_hash,
+        hearth_hash: hearth_hash.clone(),
         agent: agent.clone(),
-        role: proposed_role,
+        role: proposed_role.clone(),
     })?;
+
+    // H4: Re-evaluate auto social recovery if the new member is a guardian
+    if proposed_role.is_guardian() {
+        let _ = propose_auto_recovery(&hearth_hash);
+    }
 
     get(membership_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created membership".into()
@@ -649,6 +654,40 @@ pub fn get_bond_health(input: GetBondHealthInput) -> ExternResult<u32> {
 }
 
 // ============================================================================
+// Weekly Digest (H2 Epoch Rollups)
+// ============================================================================
+
+/// Create a weekly digest entry and link it to the hearth.
+#[hdk_extern]
+pub fn create_weekly_digest(input: WeeklyDigest) -> ExternResult<Record> {
+    let hearth_hash = input.hearth_hash.clone();
+
+    let action_hash = create_entry(&EntryTypes::WeeklyDigest(input))?;
+
+    // Link: Hearth -> Digest
+    create_link(
+        hearth_hash,
+        action_hash.clone(),
+        LinkTypes::HearthToDigests,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not retrieve created weekly digest".into()
+    )))
+}
+
+/// Get all weekly digests for a hearth.
+#[hdk_extern]
+pub fn get_weekly_digests(hearth_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(hearth_hash, LinkTypes::HearthToDigests)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+// ============================================================================
 // Authorization Helpers (cross-zome callable)
 // ============================================================================
 
@@ -661,6 +700,58 @@ pub fn is_guardian(hearth_hash: ActionHash) -> ExternResult<bool> {
         Ok(_) => Ok(true),
         Err(_) => Ok(false),
     }
+}
+
+/// H4: Propose auto social recovery if the hearth has >= 3 adult-level members.
+/// Cross-cluster call to identity cluster is best-effort (don't block on failure).
+fn propose_auto_recovery(hearth_hash: &ActionHash) -> ExternResult<()> {
+    let links = get_links(
+        LinkQuery::try_new(hearth_hash.clone(), LinkTypes::HearthToMembers)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut adult_agents: Vec<AgentPubKey> = Vec::new();
+    for link in links {
+        let target = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(target, GetOptions::default())? {
+            let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
+            if membership.status == MembershipStatus::Active && membership.role.is_guardian() {
+                adult_agents.push(membership.agent);
+            }
+        }
+    }
+
+    // Need at least 3 adults for social recovery quorum
+    if adult_agents.len() < 3 {
+        return Ok(());
+    }
+
+    // Compute threshold: 60% rounded up
+    let threshold = (adult_agents.len() * 60 + 99) / 100;
+
+    // Best-effort cross-cluster call to identity recovery
+    #[derive(Serialize)]
+    struct SetupRecoveryInput {
+        trustees: Vec<AgentPubKey>,
+        threshold: usize,
+    }
+
+    let recovery_input = SetupRecoveryInput {
+        trustees: adult_agents,
+        threshold,
+    };
+
+    // Best-effort: don't block hearth operations on recovery setup failure
+    let _ = call(
+        CallTargetCell::OtherRole(RoleName::from("identity")),
+        ZomeName::new("recovery"),
+        FunctionName::new("setup_recovery"),
+        None,
+        recovery_input,
+    );
+
+    Ok(())
 }
 
 // ============================================================================
@@ -731,6 +822,46 @@ pub fn get_neglected_bonds(hearth_hash: ActionHash) -> ExternResult<Vec<Record>>
     }
 
     Ok(neglected)
+}
+
+/// Get bond snapshots for a hearth, computing current decayed strength.
+/// Used by the bridge for weekly digest assembly.
+#[hdk_extern]
+pub fn get_bond_snapshots(hearth_hash: ActionHash) -> ExternResult<Vec<BondUpdate>> {
+    let now = sys_time()?;
+    let now_micros: i64 = now.as_micros();
+    let micros_per_day: u64 = 86_400_000_000;
+
+    let links = get_links(
+        LinkQuery::try_new(hearth_hash, LinkTypes::HearthToBonds)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut snapshots = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            let bond: KinshipBond = entry_from_record(&record, "KinshipBond")?;
+            let last_tended_micros: i64 = bond.last_tended.as_micros();
+            let elapsed_micros: u64 = if now_micros > last_tended_micros {
+                (now_micros - last_tended_micros) as u64
+            } else {
+                0u64
+            };
+            let days_inactive = (elapsed_micros / micros_per_day) as u32;
+            let current_strength = decayed_strength(bond.strength_bp, days_inactive);
+
+            snapshots.push(BondUpdate {
+                member_a: bond.member_a,
+                member_b: bond.member_b,
+                co_creation_count: 0,
+                quality_sum_bp: current_strength,
+            });
+        }
+    }
+
+    Ok(snapshots)
 }
 
 // ============================================================================
@@ -922,5 +1053,50 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let back: GetBondHealthInput = serde_json::from_str(&json).unwrap();
         assert_eq!(back.bond_hash, ActionHash::from_raw_36(vec![0u8; 36]));
+    }
+
+    // ---- WeeklyDigest serde ----
+
+    #[test]
+    fn weekly_digest_input_serde_roundtrip() {
+        let digest = WeeklyDigest {
+            hearth_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            epoch_start: Timestamp::from_micros(0),
+            epoch_end: Timestamp::from_micros(604_800_000_000),
+            bond_updates: vec![BondUpdate {
+                member_a: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                member_b: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                co_creation_count: 3,
+                quality_sum_bp: 24000,
+            }],
+            care_summary: vec![CareSummary {
+                assignee: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                tasks_completed: 5,
+                hours_hundredths: 1200,
+            }],
+            gratitude_summary: vec![GratitudeSummary {
+                from_agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+                to_agent: AgentPubKey::from_raw_36(vec![1u8; 36]),
+                count: 7,
+            }],
+            rhythm_summary: vec![RhythmSummary {
+                rhythm_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+                occurrences: 3,
+                avg_participation_bp: 8000,
+            }],
+            created_by: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            created_at: Timestamp::from_micros(604_800_000_000),
+        };
+        let json = serde_json::to_string(&digest).unwrap();
+        let back: WeeklyDigest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.bond_updates.len(), 1);
+        assert_eq!(back.care_summary.len(), 1);
+        assert_eq!(back.gratitude_summary.len(), 1);
+        assert_eq!(back.rhythm_summary.len(), 1);
+    }
+
+    #[test]
+    fn link_types_hearth_to_digests_exists() {
+        let _v = LinkTypes::HearthToDigests;
     }
 }

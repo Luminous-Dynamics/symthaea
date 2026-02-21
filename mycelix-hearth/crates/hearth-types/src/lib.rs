@@ -493,7 +493,10 @@ pub fn decayed_strength(initial_bp: u32, days_inactive: u32) -> u32 {
 
 /// Weekly digest summarizing high-frequency activity.
 /// Written to DHT once per week (or on-demand sync).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Uses #[hdk_entry_helper] so it can be registered as an entry type
+/// in kinship integrity (the core hearth zome).
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
 pub struct WeeklyDigest {
     pub hearth_hash: ActionHash,
     pub epoch_start: Timestamp,
@@ -507,7 +510,7 @@ pub struct WeeklyDigest {
 }
 
 /// Bond update within a weekly digest.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct BondUpdate {
     pub member_a: AgentPubKey,
     pub member_b: AgentPubKey,
@@ -516,7 +519,7 @@ pub struct BondUpdate {
 }
 
 /// Care summary within a weekly digest.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CareSummary {
     pub assignee: AgentPubKey,
     pub tasks_completed: u32,
@@ -524,7 +527,7 @@ pub struct CareSummary {
 }
 
 /// Gratitude summary within a weekly digest.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GratitudeSummary {
     pub from_agent: AgentPubKey,
     pub to_agent: AgentPubKey,
@@ -532,7 +535,7 @@ pub struct GratitudeSummary {
 }
 
 /// Rhythm summary within a weekly digest.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RhythmSummary {
     pub rhythm_hash: ActionHash,
     pub occurrences: u32,

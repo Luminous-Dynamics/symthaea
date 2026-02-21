@@ -171,10 +171,51 @@ pub fn request_capability(input: RequestCapabilityInput) -> ExternResult<Record>
 }
 
 /// Approve a capability request (guardian action).
+/// Only guardians (Founder, Elder, or Adult) can approve/deny capabilities.
 #[hdk_extern]
 pub fn approve_capability(input: ApproveCapabilityInput) -> ExternResult<Record> {
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
+
+    // Get the request to find its hearth_hash for guardian verification
+    let request_record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Autonomy request not found".into())),
+    )?;
+    let mut request: AutonomyRequest = request_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid autonomy request entry".into()
+        )))?;
+
+    // Verify the caller has a guardian-level role in this hearth.
+    let guardian_response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_kinship"),
+        FunctionName::new("is_guardian"),
+        None,
+        request.hearth_hash.clone(),
+    )?;
+    let is_guardian: bool = match guardian_response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode is_guardian response: {}",
+                e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cross-zome call to is_guardian failed: {:?}",
+                other
+            ))))
+        }
+    };
+    if !is_guardian {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only guardians (Founder, Elder, or Adult) can approve capabilities".into()
+        )));
+    }
 
     let approval = GuardianApproval {
         request_hash: input.request_hash.clone(),
@@ -194,25 +235,12 @@ pub fn approve_capability(input: ApproveCapabilityInput) -> ExternResult<Record>
         (),
     )?;
 
-    // If approved, update the request status
+    // Update the request status
     let new_status = if input.approved {
         AutonomyRequestStatus::Approved
     } else {
         AutonomyRequestStatus::Denied
     };
-
-    let request_record = get(input.request_hash.clone(), GetOptions::default())?.ok_or(
-        wasm_error!(WasmErrorInner::Guest("Autonomy request not found".into())),
-    )?;
-
-    let mut request: AutonomyRequest = request_record
-        .entry()
-        .to_app_option()
-        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
-        .ok_or(wasm_error!(WasmErrorInner::Guest(
-            "Invalid autonomy request entry".into()
-        )))?;
-
     request.status = new_status;
     update_entry(input.request_hash, &EntryTypes::AutonomyRequest(request))?;
 
@@ -272,6 +300,9 @@ pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
 
     let action_hash = create_entry(&EntryTypes::TierTransition(transition))?;
 
+    // Save hearth_hash for potential H3 severance before ownership transfer
+    let hearth_hash = profile.hearth_hash.clone();
+
     // Link hearth -> transition
     create_link(
         profile.hearth_hash,
@@ -288,12 +319,24 @@ pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
         (),
     )?;
 
-    // If advancing to Autonomous, trigger severance check placeholder.
-    // In H3, this will initiate data export for coming-of-age.
+    // H3: If advancing to Autonomous, trigger severance for coming-of-age data migration.
     if input.new_tier == AutonomyTier::Autonomous {
-        // H3 placeholder: severance check would go here.
-        // For now, this is a no-op acknowledgment that the
-        // coming-of-age data migration pathway exists.
+        let severance_input = SeveranceInput {
+            hearth_hash,
+            member_hash: input.profile_hash.clone(),
+            export_milestones: true,
+            export_care_history: true,
+            export_bond_snapshot: true,
+            new_role: MemberRole::Adult,
+        };
+        // Best-effort: don't block tier advancement on severance failure
+        let _ = call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_bridge"),
+            FunctionName::new("initiate_severance"),
+            None,
+            severance_input,
+        );
     }
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(

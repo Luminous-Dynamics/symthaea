@@ -12,7 +12,10 @@
 
 use hdk::prelude::*;
 use hearth_bridge_integrity::*;
-use hearth_types::{SeveranceInput, SeveranceSummaryData};
+use hearth_types::{
+    BondUpdate, CareSummary, GratitudeSummary, MemberRole, RhythmSummary, SeveranceInput,
+    SeveranceSummaryData, WeeklyDigest,
+};
 use mycelix_bridge_common::{
     self as bridge, check_rate_limit_count, BridgeHealth, CrossClusterDispatchInput, DispatchInput,
     DispatchResult, EventTypeQuery, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
@@ -525,11 +528,63 @@ pub fn initiate_severance(input: SeveranceInput) -> ExternResult<Record> {
 // Epoch Sync (H2: Weekly digest rollup)
 // ============================================================================
 
+/// Input for hearth epoch sync.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthSyncInput {
+    pub hearth_hash: ActionHash,
+    pub epoch_start: Timestamp,
+    pub epoch_end: Timestamp,
+}
+
+/// Epoch input for domain digest functions (matches each coordinator's DigestEpochInput).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct DigestEpochInput {
+    pub hearth_hash: ActionHash,
+    pub epoch_start: Timestamp,
+    pub epoch_end: Timestamp,
+}
+
+/// Decode a typed response from a DispatchResult.
+fn decode_dispatch_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    result: &DispatchResult,
+    context: &str,
+) -> ExternResult<T> {
+    if !result.success {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "{} dispatch failed: {}",
+            context,
+            result.error.as_deref().unwrap_or("unknown error")
+        ))));
+    }
+    let response_bytes = result.response.as_ref().ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "{} dispatch returned no response",
+            context
+        )))
+    })?;
+    let extern_io = ExternIO(response_bytes.clone());
+    extern_io.decode().map_err(|e| {
+        wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to decode {} response: {}",
+            context, e
+        )))
+    })
+}
+
 /// Trigger epoch sync for a hearth: calls digest creation on gratitude,
-/// care, and rhythm zomes.
+/// care, and rhythm zomes, queries bond snapshots, assembles a WeeklyDigest,
+/// and stores it via kinship.
 #[hdk_extern]
-pub fn hearth_sync(hearth_hash: ActionHash) -> ExternResult<()> {
-    let hash_payload = ExternIO::encode(hearth_hash.clone())
+pub fn hearth_sync(input: HearthSyncInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    let epoch_input = DigestEpochInput {
+        hearth_hash: input.hearth_hash.clone(),
+        epoch_start: input.epoch_start,
+        epoch_end: input.epoch_end,
+    };
+    let epoch_payload = ExternIO::encode(epoch_input)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .0;
 
@@ -537,27 +592,115 @@ pub fn hearth_sync(hearth_hash: ActionHash) -> ExternResult<()> {
     let gratitude_dispatch = DispatchInput {
         zome: "hearth_gratitude".to_string(),
         fn_name: "create_gratitude_digest".to_string(),
-        payload: hash_payload.clone(),
+        payload: epoch_payload.clone(),
     };
-    let _ = bridge::dispatch_call_checked(&gratitude_dispatch, ALLOWED_ZOMES);
+    let gratitude_result = bridge::dispatch_call_checked(&gratitude_dispatch, ALLOWED_ZOMES)?;
+    let gratitude_summary: Vec<GratitudeSummary> =
+        decode_dispatch_response(&gratitude_result, "gratitude_digest")?;
 
     // Call create_care_digest
     let care_dispatch = DispatchInput {
         zome: "hearth_care".to_string(),
         fn_name: "create_care_digest".to_string(),
-        payload: hash_payload.clone(),
+        payload: epoch_payload.clone(),
     };
-    let _ = bridge::dispatch_call_checked(&care_dispatch, ALLOWED_ZOMES);
+    let care_result = bridge::dispatch_call_checked(&care_dispatch, ALLOWED_ZOMES)?;
+    let care_summary: Vec<CareSummary> =
+        decode_dispatch_response(&care_result, "care_digest")?;
 
     // Call create_rhythm_digest
     let rhythm_dispatch = DispatchInput {
         zome: "hearth_rhythms".to_string(),
         fn_name: "create_rhythm_digest".to_string(),
-        payload: hash_payload,
+        payload: epoch_payload,
     };
-    let _ = bridge::dispatch_call_checked(&rhythm_dispatch, ALLOWED_ZOMES);
+    let rhythm_result = bridge::dispatch_call_checked(&rhythm_dispatch, ALLOWED_ZOMES)?;
+    let rhythm_summary: Vec<RhythmSummary> =
+        decode_dispatch_response(&rhythm_result, "rhythm_digest")?;
 
-    Ok(())
+    // Get bond snapshots via cross-zome call to kinship
+    let bond_response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_kinship"),
+        FunctionName::new("get_bond_snapshots"),
+        None,
+        input.hearth_hash.clone(),
+    )?;
+    let bond_updates: Vec<BondUpdate> = match bond_response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode bond snapshots: {}",
+                e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Cross-zome call to get_bond_snapshots failed: {:?}",
+                other
+            ))))
+        }
+    };
+
+    // Assemble the WeeklyDigest
+    let digest = WeeklyDigest {
+        hearth_hash: input.hearth_hash,
+        epoch_start: input.epoch_start,
+        epoch_end: input.epoch_end,
+        bond_updates,
+        care_summary,
+        gratitude_summary,
+        rhythm_summary,
+        created_by: caller,
+        created_at: now,
+    };
+
+    // Store via kinship's create_weekly_digest
+    let digest_response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_kinship"),
+        FunctionName::new("create_weekly_digest"),
+        None,
+        digest,
+    )?;
+    match digest_response {
+        ZomeCallResponse::Ok(extern_io) => {
+            let record: Record = extern_io.decode().map_err(|e| {
+                wasm_error!(WasmErrorInner::Guest(format!(
+                    "Failed to decode created digest: {}",
+                    e
+                )))
+            })?;
+            Ok(record)
+        }
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to create_weekly_digest failed: {:?}",
+            other
+        )))),
+    }
+}
+
+/// Get all weekly digests for a hearth (delegates to kinship).
+#[hdk_extern]
+pub fn get_weekly_digests(hearth_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_kinship"),
+        FunctionName::new("get_weekly_digests"),
+        None,
+        hearth_hash,
+    )?;
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode weekly digests: {}",
+                e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to get_weekly_digests failed: {:?}",
+            other
+        )))),
+    }
 }
 
 // ============================================================================
@@ -598,7 +741,6 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hearth_types::MemberRole;
 
     // ---- Allowlist validation ----
 
@@ -814,6 +956,20 @@ mod tests {
         for zome in ALLOWED_CIVIC_ZOMES {
             assert!(seen.insert(zome), "Duplicate: '{}'", zome);
         }
+    }
+
+    // ---- HearthSyncInput serde ----
+
+    #[test]
+    fn hearth_sync_input_serde_roundtrip() {
+        let input = HearthSyncInput {
+            hearth_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            epoch_start: Timestamp::from_micros(0),
+            epoch_end: Timestamp::from_micros(604_800_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: HearthSyncInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.hearth_hash, input.hearth_hash);
     }
 
     // ---- SeveranceInput serde ----

@@ -184,17 +184,101 @@ pub fn get_hearth_presence(hearth_hash: ActionHash) -> ExternResult<Vec<Record>>
     records_from_links(links)
 }
 
-/// Placeholder for H2 weekly rhythm digest rollup.
-/// Will aggregate rhythm occurrences for the past week into a summary.
+/// Input for epoch-based digest queries.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct DigestEpochInput {
+    pub hearth_hash: ActionHash,
+    pub epoch_start: Timestamp,
+    pub epoch_end: Timestamp,
+}
+
+/// Create a rhythm digest for the given epoch window.
+/// Two-hop query: HearthToRhythms → RhythmToOccurrences, filter by created_at
+/// within epoch, aggregate per rhythm into RhythmSummary.
 #[hdk_extern]
-pub fn create_rhythm_digest(hearth_hash: ActionHash) -> ExternResult<()> {
-    // H2: Weekly rollup — aggregate rhythm occurrences from the past 7 days
-    // into a RhythmSummary for the WeeklyDigest. For now, this is a
-    // placeholder that validates the hearth exists.
-    let _record = get(hearth_hash, GetOptions::default())?.ok_or(wasm_error!(
-        WasmErrorInner::Guest("Hearth not found for rhythm digest".into())
-    ))?;
-    Ok(())
+pub fn create_rhythm_digest(input: DigestEpochInput) -> ExternResult<Vec<RhythmSummary>> {
+    let epoch_start_micros = input.epoch_start.as_micros();
+    let epoch_end_micros = input.epoch_end.as_micros();
+
+    // Get all rhythms linked to this hearth
+    let rhythm_links = get_links(
+        LinkQuery::try_new(input.hearth_hash, LinkTypes::HearthToRhythms)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut summaries = Vec::new();
+
+    for rhythm_link in rhythm_links {
+        let rhythm_hash = ActionHash::try_from(rhythm_link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid rhythm link target".into())))?;
+
+        // Get the rhythm record to know expected participant count
+        let rhythm_record = match get(rhythm_hash.clone(), GetOptions::default())? {
+            Some(r) => r,
+            None => continue,
+        };
+        let rhythm: Rhythm = rhythm_record
+            .entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Invalid rhythm entry".into()
+            )))?;
+
+        let expected_participants = rhythm.participants.len() as u32;
+
+        // Get all occurrences for this rhythm
+        let occurrence_links = get_links(
+            LinkQuery::try_new(rhythm_hash.clone(), LinkTypes::RhythmToOccurrences)?,
+            GetStrategy::default(),
+        )?;
+
+        let mut occurrence_count: u32 = 0;
+        let mut participation_sum: u64 = 0;
+
+        for occ_link in occurrence_links {
+            let occ_hash = ActionHash::try_from(occ_link.target).map_err(|_| {
+                wasm_error!(WasmErrorInner::Guest(
+                    "Invalid occurrence link target".into()
+                ))
+            })?;
+
+            let occ_record = match get(occ_hash, GetOptions::default())? {
+                Some(r) => r,
+                None => continue,
+            };
+            let occurrence: RhythmOccurrence = occ_record
+                .entry()
+                .to_app_option()
+                .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Invalid rhythm occurrence entry".into()
+                )))?;
+
+            let created_micros = occurrence.created_at.as_micros();
+            if created_micros >= epoch_start_micros && created_micros < epoch_end_micros {
+                occurrence_count += 1;
+                let participation_bp = if expected_participants > 0 {
+                    ((occurrence.participants_present.len() as u64) * 10000
+                        / expected_participants as u64) as u32
+                } else {
+                    10000
+                };
+                participation_sum += participation_bp as u64;
+            }
+        }
+
+        if occurrence_count > 0 {
+            let avg_participation_bp = (participation_sum / occurrence_count as u64) as u32;
+            summaries.push(RhythmSummary {
+                rhythm_hash,
+                occurrences: occurrence_count,
+                avg_participation_bp: avg_participation_bp.min(10000),
+            });
+        }
+    }
+
+    Ok(summaries)
 }
 
 // ============================================================================
@@ -356,6 +440,24 @@ mod tests {
         let back: Rhythm = serde_json::from_str(&json).unwrap();
         assert_eq!(back, r);
     }
+
+    // ---- DigestEpochInput serde ----
+
+    #[test]
+    fn digest_epoch_input_serde_roundtrip() {
+        let input = DigestEpochInput {
+            hearth_hash: fake_action_hash(),
+            epoch_start: Timestamp::from_micros(0),
+            epoch_end: Timestamp::from_micros(604_800_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: DigestEpochInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.hearth_hash, input.hearth_hash);
+        assert_eq!(back.epoch_start, input.epoch_start);
+        assert_eq!(back.epoch_end, input.epoch_end);
+    }
+
+    // ---- Entry serde roundtrips ----
 
     #[test]
     fn rhythm_occurrence_entry_serde_roundtrip() {
