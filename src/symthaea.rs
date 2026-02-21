@@ -1000,7 +1000,7 @@ impl Symthaea {
             steps_to_emergence,
             translation_verified,
             structured_thought: Some(thought),
-            consciousness_level: snapshot.consciousness_level as f64,
+            consciousness_level: snapshot.consciousness_level,
             sigma: None, // Spectral MIP phi available via CognitiveLoopService path
         })
     }

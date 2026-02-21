@@ -2522,7 +2522,7 @@ impl CognitiveLoopService {
         if hierarchical_ltc_phi > 0.3 {
             let hltc_boost = (hierarchical_ltc_phi - 0.3).min(0.2) * 0.05;
             self.prediction_confidence =
-                (self.prediction_confidence + hltc_boost as f32).clamp(0.0, 1.0);
+                (self.prediction_confidence + hltc_boost).clamp(0.0, 1.0);
         }
 
         // ═══════════════════════════════════════════════════════════════════════

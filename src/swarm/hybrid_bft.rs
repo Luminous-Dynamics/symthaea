@@ -276,4 +276,36 @@ mod tests {
         let result = hybrid_trimmed_mean(&contributions, &HybridBftConfig::default());
         assert!(result.is_none(), "All below min rep should return None");
     }
+
+    #[test]
+    fn test_invalid_contributions_filtered() {
+        // 3 valid contributions
+        let valid1 = make_gradient(1, vec![0.10, 0.20, 0.30], 0.9);
+        let valid2 = make_gradient(7, vec![0.12, 0.21, 0.29], 0.85);
+        let valid3 = make_gradient(8, vec![0.11, 0.19, 0.31], 0.88);
+
+        // Invalid: NaN reputation
+        let nan_rep = make_gradient(2, vec![0.1, 0.2, 0.3], f32::NAN);
+        // Invalid: negative reputation
+        let neg_rep = make_gradient(3, vec![0.1, 0.2, 0.3], -0.5);
+        // Invalid: reputation > 1.0
+        let high_rep = make_gradient(4, vec![0.1, 0.2, 0.3], 1.5);
+        // Invalid: infinity reputation
+        let inf_rep = make_gradient(5, vec![0.1, 0.2, 0.3], f32::INFINITY);
+
+        let contributions = vec![valid1, valid2, valid3, nan_rep, neg_rep, high_rep, inf_rep];
+
+        let config = HybridBftConfig {
+            min_reputation: 0.0,
+            ..Default::default()
+        };
+
+        let result = hybrid_trimmed_mean(&contributions, &config).unwrap();
+        // Only the 3 valid contributions should pass our pre-filter
+        assert_eq!(
+            result.gated_count, 3,
+            "Only 3 valid contributions should pass validation, got {}",
+            result.gated_count
+        );
+    }
 }
