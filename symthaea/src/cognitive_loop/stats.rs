@@ -300,4 +300,12 @@ pub struct LoopStats {
 
     /// Moral: Whether current action needs ethical review
     pub moral_review_needed: bool,
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
+    // ═══════════════════════════════════════════════════════════════════════════
+    /// Cached lattice height (0 = not yet computed)
+    pub lattice_height_cached: usize,
+    /// Cached lattice width (0 = not yet computed)
+    pub lattice_width_cached: usize,
 }
