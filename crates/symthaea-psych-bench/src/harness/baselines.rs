@@ -174,6 +174,16 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
             population: "human adults",
         },
     );
+    // Reversal learning perseverative errors (distinct from WCST)
+    // Binary reversal: ~3 perseverative errors per reversal × ~5 reversals
+    m.insert(
+        "reversal_perseverative_errors",
+        Baseline {
+            value: 15.0,
+            source: "Cools et al. (2002); Clark et al. (2004), binary reversal paradigm",
+            population: "human adults",
+        },
+    );
 
     m
 }

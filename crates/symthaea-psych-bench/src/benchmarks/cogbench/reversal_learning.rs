@@ -49,7 +49,7 @@ impl ReversalLearningBenchmark {
         let criterion = 8; // consecutive correct to trigger reversal
         let max_trials = 200;
         let learning_rate = 0.35f32; // how fast associations update
-        let loss_learning_rate = 0.7f32; // asymmetric: losses update much faster (Behrens et al. 2007)
+        let loss_learning_rate = 0.85f32; // asymmetric: losses update much faster (Behrens et al. 2007)
 
         // Current contingency: true = A rewarded, false = B rewarded
         let mut a_rewarded = true;
@@ -80,7 +80,7 @@ impl ReversalLearningBenchmark {
 
             // Softmax action selection — wider temperature allows more exploration
             // post-reversal, reducing perseveration
-            let temp = config.action_temperature.max(0.1) as f64 * 0.3;
+            let temp = config.action_temperature.max(0.1) as f64 * 0.15;
             let max_score = score_a.max(score_b);
             let exp_a = ((score_a - max_score) / temp).exp();
             let exp_b = ((score_b - max_score) / temp).exp();
@@ -130,7 +130,7 @@ impl ReversalLearningBenchmark {
             // partially reset associations toward neutral. This models the
             // "aha" moment when the agent detects a regime change.
             // (Behrens et al. 2007 — volatility-driven learning rate increase)
-            if consecutive_errors >= 3 {
+            if consecutive_errors >= 2 {
                 let reset_strength = 0.4f32;
                 let neutral = ContinuousHV::weighted_bundle(
                     &[&reward_hv, &no_reward_hv],

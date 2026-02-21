@@ -240,9 +240,8 @@ impl BenchmarkReport {
             ("hinting_accuracy", "hinting_accuracy", tom_bl),
             ("overall_retrieval_accuracy", "accurate_retrieval", mem_bl),
             ("correction_accuracy", "test_time_learning", mem_bl),
-            // Executive
+            // Executive (WCST-specific perseverative_errors handled below)
             ("categories_completed", "wcst_categories_completed", exec_bl),
-            ("perseverative_errors", "wcst_perseverative_errors", exec_bl),
             ("trials_to_first_category", "wcst_trials_to_first", exec_bl),
             ("overall_net_score", "igt_overall_net_score", exec_bl),
             ("deck_preference_good", "igt_deck_preference_good", exec_bl),
@@ -334,6 +333,12 @@ impl BenchmarkReport {
         if benchmark.contains("Flanker") {
             push_specific("congruent_accuracy", "flanker_congruent_accuracy", exec_bl);
             push_specific("incongruent_accuracy", "flanker_incongruent_accuracy", exec_bl);
+        }
+        if benchmark.contains("Wisconsin") {
+            push_specific("perseverative_errors", "wcst_perseverative_errors", exec_bl);
+        }
+        if benchmark.contains("Reversal") {
+            push_specific("perseverative_errors", "reversal_perseverative_errors", cog_bl);
         }
 
         // Only return comparisons relevant to this benchmark
