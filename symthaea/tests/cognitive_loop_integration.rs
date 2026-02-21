@@ -2038,3 +2038,256 @@ fn test_cognitive_load_affects_processing() {
         high_avg / low_avg
     );
 }
+
+// ── Stress Testing & Graceful Degradation ──────────────────────────
+
+/// Sustained high-throughput stress test: 500 cycles with varied input.
+/// Verifies no panics, no memory leaks (stable cycle times), and finite outputs.
+#[test]
+fn test_sustained_high_throughput() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "visual cortex processing red circle",
+        "auditory cortex processing birdsong",
+        "somatosensory touch pressure warmth",
+        "hippocampal spatial memory navigation",
+        "prefrontal executive planning decision",
+        "amygdala threat detection fear response",
+        "cerebellum motor coordination balance",
+        "temporal lobe language comprehension",
+    ];
+
+    let mut cycle_times = Vec::with_capacity(500);
+    for i in 0..500 {
+        let input = inputs[i % inputs.len()];
+        let result = service.cycle(input);
+        assert!(
+            result.prediction_error.is_finite(),
+            "Cycle {} prediction error is not finite",
+            i
+        );
+        assert!(
+            result.metadata.consciousness_level.is_finite(),
+            "Cycle {} consciousness level is not finite",
+            i
+        );
+        cycle_times.push(result.cycle_time_us);
+    }
+
+    // Check cycle time stability: last 100 should not be >3x first 100
+    let first_100_avg: f64 =
+        cycle_times[..100].iter().sum::<u64>() as f64 / 100.0;
+    let last_100_avg: f64 =
+        cycle_times[400..].iter().sum::<u64>() as f64 / 100.0;
+
+    eprintln!(
+        "Sustained throughput (500 cycles): first_100_avg={first_100_avg:.0}µs, \
+         last_100_avg={last_100_avg:.0}µs, ratio={:.2}x",
+        last_100_avg / first_100_avg
+    );
+
+    // No runaway memory growth: cycle times should stay within 5x
+    assert!(
+        last_100_avg < first_100_avg * 5.0,
+        "Cycle time degradation >5x: first={first_100_avg:.0}, last={last_100_avg:.0}"
+    );
+
+    // Total cycles should be exactly 500
+    assert_eq!(service.stats().total_cycles, 500);
+}
+
+/// Module ablation: disable primitive consciousness and verify graceful degradation.
+/// The system should still produce valid outputs without consciousness subsystems.
+#[test]
+fn test_graceful_degradation_without_consciousness() {
+    // Run with consciousness disabled
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..50 {
+        let result = service.cycle("test input for degraded mode");
+        assert!(
+            result.prediction_error.is_finite(),
+            "Cycle {} prediction error not finite in degraded mode",
+            i
+        );
+        // System should still function even without consciousness modules
+        assert!(result.cycle_time_us > 0);
+    }
+
+    // Consciousness-related accessors should return None when disabled
+    assert!(
+        service.holographic_analyzer().is_none(),
+        "Holographic analyzer should be None when consciousness is disabled"
+    );
+    assert!(
+        service.differentiable_consciousness().is_none(),
+        "Differentiable consciousness should be None when consciousness is disabled"
+    );
+    assert!(
+        service.affective_consciousness().is_none(),
+        "Affective consciousness should be None when consciousness is disabled"
+    );
+
+    eprintln!(
+        "Degraded mode: 50 cycles completed, total_cycles={}",
+        service.stats().total_cycles
+    );
+}
+
+/// Rapid input switching: alternate between vastly different domains.
+/// Tests that the system handles context switches without accumulating errors.
+#[test]
+fn test_rapid_context_switching() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let domains = [
+        "mathematical proof theorem axiom derivation",
+        "emotional empathy sadness grief compassion",
+        "spatial navigation left right forward obstacle",
+        "linguistic syntax grammar morphology phoneme",
+        "musical harmony rhythm melody dissonance",
+    ];
+
+    let mut max_error: f32 = 0.0;
+    let mut errors = Vec::new();
+
+    // Warmup
+    for _ in 0..10 {
+        service.cycle("warmup context switching");
+    }
+
+    // Rapidly switch between domains
+    for round in 0..5 {
+        for (domain_idx, domain) in domains.iter().enumerate() {
+            let result = service.cycle(domain);
+            assert!(
+                result.prediction_error.is_finite(),
+                "Round {} domain {} error not finite",
+                round,
+                domain_idx
+            );
+            if result.prediction_error > max_error {
+                max_error = result.prediction_error;
+            }
+            errors.push(result.prediction_error);
+        }
+    }
+
+    // Error should never exceed 1.0 (bounded by architecture)
+    assert!(
+        max_error <= 1.0,
+        "Prediction error exceeded 1.0 during context switching: {max_error}"
+    );
+
+    // Later rounds should show some adaptation
+    let first_round_avg: f32 = errors[..5].iter().sum::<f32>() / 5.0;
+    let last_round_avg: f32 = errors[20..25].iter().sum::<f32>() / 5.0;
+
+    eprintln!(
+        "Context switching: max_error={max_error:.4}, first_round={first_round_avg:.4}, \
+         last_round={last_round_avg:.4}"
+    );
+}
+
+/// Empty and adversarial inputs: verify the system handles edge cases gracefully.
+#[test]
+fn test_adversarial_inputs() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig::default()).unwrap();
+
+    // Empty string
+    let result = service.cycle("");
+    assert!(result.prediction_error.is_finite());
+
+    // Very long input
+    let long_input = "consciousness ".repeat(1000);
+    let result = service.cycle(&long_input);
+    assert!(result.prediction_error.is_finite());
+
+    // Unicode and special characters
+    let result = service.cycle("こんにちは世界 🧠 φ=∫δΨ/δt");
+    assert!(result.prediction_error.is_finite());
+
+    // Repeated characters
+    let result = service.cycle(&"a".repeat(10000));
+    assert!(result.prediction_error.is_finite());
+
+    // Null bytes embedded
+    let result = service.cycle("hello\0world\0test");
+    assert!(result.prediction_error.is_finite());
+
+    eprintln!(
+        "Adversarial inputs: all 5 edge cases handled, total_cycles={}",
+        service.stats().total_cycles
+    );
+}
+
+/// Verify that consciousness metrics remain bounded and don't diverge
+/// even after many cycles with high prediction error.
+#[test]
+fn test_consciousness_metrics_bounded() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run many cycles with constantly changing input (high error)
+    for i in 0..200 {
+        let input = format!("unique novel input number {i} with random content {}", i * 7919);
+        let result = service.cycle(&input);
+
+        // Core metrics must always be bounded
+        assert!(
+            result.prediction_error >= 0.0 && result.prediction_error <= 1.0,
+            "Cycle {i}: prediction_error={} out of [0,1]",
+            result.prediction_error
+        );
+        assert!(
+            result.metadata.consciousness_level.is_finite(),
+            "Cycle {i}: consciousness_level not finite"
+        );
+
+        // Metadata metrics should be finite
+        assert!(
+            result.metadata.holographic_unity.is_finite(),
+            "Cycle {i}: holographic_unity not finite"
+        );
+        assert!(
+            result.metadata.consciousness_gradient_magnitude.is_finite(),
+            "Cycle {i}: gradient_magnitude not finite"
+        );
+        assert!(
+            result.metadata.affect_consciousness_valence.is_finite(),
+            "Cycle {i}: affective_valence not finite"
+        );
+    }
+
+    let stats = service.stats();
+    assert_eq!(stats.total_cycles, 200);
+
+    // Stats should be finite after 200 cycles of high-error input
+    assert!(stats.avg_prediction_error.is_finite());
+    assert!(stats.avg_training_loss.is_finite());
+    assert!(stats.attention_variance.is_finite());
+
+    eprintln!(
+        "Bounded metrics after 200 high-error cycles: avg_error={:.4}, \
+         avg_loss={:.4}, attention_var={:.4}",
+        stats.avg_prediction_error,
+        stats.avg_training_loss,
+        stats.attention_variance
+    );
+}

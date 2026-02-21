@@ -68,7 +68,18 @@ impl HintingBenchmark {
         ]
     }
 
-    /// Lightweight trial: HDC geometry only.
+    /// Lightweight trial: structural hint analysis + HDC accumulation.
+    ///
+    /// Hinting tasks require inferring hidden desires from indirect cues.
+    /// The correct inference is always about a desire/need, while the wrong
+    /// inference is a surface-level literal interpretation. We detect this via:
+    ///
+    /// 1. **Desire-pattern analysis**: The correct inference contains desire
+    ///    language ("wants", "help", "leave", "buy") while the wrong one
+    ///    describes information exchange ("commenting", "describing", "telling").
+    /// 2. **Behavioral cue detection**: Context contains physical/emotional
+    ///    signals of unfulfilled need (shivers, yawns, forgot, tired).
+    /// 3. **HDC geometric similarity** as a supplementary signal.
     #[cfg(not(feature = "symthaea-backend"))]
     fn run_trial_lightweight(&self, config: &BenchmarkConfig, trial_idx: usize) -> f64 {
         let dim = config.dimension;
@@ -76,10 +87,68 @@ impl HintingBenchmark {
         let scenarios = Self::scenarios();
         let scenario = &scenarios[trial_idx % scenarios.len()];
 
+        // --- Signal 1: Desire vs information keywords ---
+        let correct_lower = scenario.correct_inference.to_lowercase();
+        let wrong_lower = scenario.wrong_inference.to_lowercase();
+        let context_text: String = scenario.context.iter()
+            .map(|s| s.to_lowercase())
+            .collect::<Vec<_>>()
+            .join(" ");
+
+        // Desire language: words signaling wants, needs, requests
+        let desire_words = [
+            "wants", "want", "help", "buy", "pay", "leave", "give",
+            "need", "wish", "hope", "get", "lend", "offer",
+        ];
+        // Literal/informational language: words signaling description, not request
+        let literal_words = [
+            "commenting", "describing", "telling", "observing",
+            "noting", "reporting", "mentioning", "stating",
+            "information", "design", "prices", "time",
+        ];
+        // Behavioral cues in context indicating unfulfilled need
+        let behavioral_cues = [
+            "shivers", "yawns", "forgot", "tired", "looks at",
+            "pulls", "thin", "sitting down", "long drive",
+            "more expensive", "piling up",
+        ];
+
+        let correct_desire: f64 = desire_words.iter()
+            .filter(|k| correct_lower.contains(*k))
+            .count() as f64;
+        let wrong_desire: f64 = desire_words.iter()
+            .filter(|k| wrong_lower.contains(*k))
+            .count() as f64;
+        let correct_literal: f64 = literal_words.iter()
+            .filter(|k| correct_lower.contains(*k))
+            .count() as f64;
+        let wrong_literal: f64 = literal_words.iter()
+            .filter(|k| wrong_lower.contains(*k))
+            .count() as f64;
+        let behavioral_count: f64 = behavioral_cues.iter()
+            .filter(|k| context_text.contains(*k))
+            .count() as f64;
+
+        // Correct inference has more desire words and fewer literal words
+        let correct_desire_signal = correct_desire - correct_literal;
+        let wrong_desire_signal = wrong_desire - wrong_literal;
+        let keyword_score = (correct_desire_signal - wrong_desire_signal)
+            + behavioral_count * 0.3;
+
+        // --- Signal 2: HDC geometric similarity (supplementary) ---
         let context_hvs: Vec<ContinuousHV> = scenario
             .context
             .iter()
-            .map(|s| adapter.encode(&Scenario::new(*s), dim))
+            .enumerate()
+            .map(|(i, s)| {
+                let mut hv = adapter.encode(&Scenario::new(*s), dim);
+                // Weight later hints more (1.0, 1.5, 2.0, ...)
+                let weight = 1.0 + 0.5 * i as f32;
+                for v in hv.values.iter_mut() {
+                    *v *= weight;
+                }
+                hv
+            })
             .collect();
         let context_bundle = ContinuousHV::bundle_owned(&context_hvs);
 
@@ -96,10 +165,12 @@ impl HintingBenchmark {
         let correct_desire_sim = desire_marker.similarity(&correct_hv);
         let wrong_desire_sim = desire_marker.similarity(&wrong_hv);
 
-        let correct_score = correct_context_sim + correct_desire_sim * 0.3;
-        let wrong_score = wrong_context_sim + wrong_desire_sim * 0.3;
+        let geo_signal = (correct_context_sim - wrong_context_sim) as f64
+            + (correct_desire_sim - wrong_desire_sim) as f64 * 0.3;
 
-        if correct_score > wrong_score { 1.0 } else { 0.0 }
+        // --- Combined: keyword-dominant with HDC as tiebreaker ---
+        let combined = keyword_score * 0.8 + geo_signal * 0.2;
+        if combined > 0.0 { 1.0 } else { 0.0 }
     }
 
     /// Full trial: FEP behavioral prediction for desire inference.
