@@ -1,65 +1,108 @@
 # Φ (Phi) Integration in Symthaea
 
-## What Phi Actually Does
+## Overview
 
-Phi (Φ) is computed as a unified consciousness metric combining temporal coherence,
-voice feedback quality, and flow state. However, its actual behavioral influence
-is **intentionally minimal** - it serves primarily as an observability metric.
+Phi (Φ) is computed at multiple scales in the cognitive loop and drives behavioral
+modulation across consciousness subsystems. Since v0.5.0, Phi has evolved from a
+simple observability metric to a first-class cognitive signal with feedback loops.
 
-### Decision Points Where Phi Affects Behavior
+## Phi Computation Layers
 
-| Location | Effect | Threshold |
-|----------|--------|-----------|
-| `select_strategy()` | High Φ → Exploratory mode, Low Φ → Supportive mode | ≥0.6 / <0.3 |
-| `is_conscious()` | Binary consciousness check | >0.3 |
-| `episodic_memory.encode()` | Phi passed as context when storing memories | N/A |
+### Layer 1: Primitive Φ (per-cycle)
 
-### What Phi Does NOT Affect
+Fast Phi computed from the primitive consciousness processor. Measures integration
+of currently active primitives:
 
-Despite some documentation suggesting otherwise, Phi does **not** currently:
-- Modulate learning rate (that's handled by semantic memory lr_factor, flow state, curiosity)
-- Drive adaptive HDC dimensionality (that's based on prediction error directly)
-- Affect attention priority in the cognitive loop (attention is bid-based)
-
-### Why This Is Intentional
-
-The current minimal Phi integration is a deliberate design choice:
-
-1. **Avoid consciousness theater** - Adding Phi to every decision would be complexity
-   without clear benefit. The Q-learning + semantic memory approach is more directly useful.
-
-2. **Observability value** - Phi provides a single number to monitor system health,
-   which is valuable even without driving every decision.
-
-3. **Strategy gating is sufficient** - The high-Φ → exploratory, low-Φ → supportive
-   mapping captures the intuition that confident systems explore while uncertain
-   systems play it safe.
-
-### Phi Computation
-
-Phi is computed in `CognitiveLoopService::step()` as:
-
-```rust
-let unified_phi = (coherence_phi + voice_phi + flow_phi).clamp(0.0, 1.0);
+```
+primitive_phi = primitive_processor.compute_phi(&active_primitives)
 ```
 
-Where:
-- `coherence_phi`: CfC temporal coherence from the coherence bridge
-- `voice_phi`: Voice synthesis quality feedback
-- `flow_phi`: Flow state intensity
+**Cost**: ~10μs per cycle. Used for: primitive selection, composition rule gating.
 
-### Future Considerations
+### Layer 2: Spectral MIP Φ (every 50 cycles)
 
-If deeper Phi integration is desired, candidate areas include:
-- Attention bid weighting (PhiAwareScoring exists but isn't wired to main loop)
-- Memory consolidation priority
-- Exploration/exploitation balance in primitive discovery
+The primary Phi metric. Uses the **Spectral MIP Finder** — an O(n³) algorithm based
+on Fiedler ordering and bordered Cholesky sweeps. Tracks 128 of 16,384 HDC dimensions
+over a sliding window of 50 state snapshots.
 
-However, each addition should demonstrate measurable improvement over simpler
-alternatives before being adopted.
+```
+Φ_spectral = MI_total(X) - MI(X_A; X_B)
+where (A, B) = spectral MIP of the covariance structure
+```
 
-## Summary
+**Cost**: ~5.5ms every 50 cycles (110μs amortized). Cached in `carryover.last_spectral_mip_phi`.
 
-Phi is primarily an **observability metric** with light behavioral influence
-through strategy selection. This is honest and intentional - more integration
-would add complexity without proven benefit.
+See [SPECTRAL_MIP_ALGORITHM.md](SPECTRAL_MIP_ALGORITHM.md) for the full algorithm specification.
+
+### Layer 3: Multimodal Integrated Φ (every 25 cycles)
+
+Phi computed from cross-modal binding — measures how well different modalities
+(vision, language, embodiment) integrate into a unified experience.
+
+```
+multimodal_phi = multi_modal_integrator.integrated_phi()
+```
+
+**Cost**: ~200μs every 25 cycles. Used for: confidence modulation, learning rate.
+
+### Layer 4: Holographic Unity (every 25 cycles)
+
+Holographic consciousness analysis providing a unity measure (0.0-1.0).
+
+```
+holographic_unity = holographic_analyzer.unity_score()
+```
+
+**Cost**: ~150μs every 25 cycles. Used for: confidence feedback, FEP prior weighting.
+
+## Where Phi Drives Behavior
+
+| Location | Signal | Effect |
+|----------|--------|--------|
+| Strategy selection | Spectral Φ | High → Exploratory, Low → Supportive |
+| Learning rate | Multimodal Φ | High integration → faster learning |
+| Exploration | Quantum coherence | High coherence → more exploration |
+| FEP prior | Holographic unity | High unity → stronger priors |
+| Memory gating | Spectral Φ (as σ) | Modulates memory coordinator thresholds |
+| Moral sensitivity | Narrative self-Φ | High coherence → stable values |
+| Confidence | Multiple Φ signals | Combined into `prediction_confidence` |
+| Episodic encoding | Primitive Φ | Priority-weights episodic memories |
+
+## Feedback Loops
+
+Phi participates in several closed feedback loops:
+
+1. **Φ → LR → Φ**: Higher integrated Phi → increased learning rate → faster convergence → higher Phi
+2. **Φ → Confidence → Strategy → Φ**: Higher Phi → more confidence → exploratory strategy → potentially higher Phi
+3. **Φ → FEP → Prediction → Φ**: Phi modulates free energy precision → affects prediction quality → affects future Phi
+4. **Φ → Memory → Priming → Φ**: High-Phi episodes stored → recalled when similar → primes toward high-Phi states
+
+## CycleMetadata Phi Fields
+
+```rust
+pub spectral_mip_phi: Option<f64>,      // Layer 2: spectral MIP Φ
+pub primitive_phi: f64,                   // Layer 1: primitive Φ
+pub multimodal_integrated_phi: f64,       // Layer 3: cross-modal Φ
+pub holographic_unity: f64,               // Layer 4: holographic unity
+pub hierarchical_ltc_phi: f32,            // Hierarchical LTC network Φ
+pub adaptive_reasoning_phi: f64,          // RL-guided reasoning Φ
+pub evolution_phi_delta: f64,             // Φ change from evolution
+pub context_phi_weight: f64,              // Context-weighted Φ
+pub epistemic_phi_eff: f64,               // Effective Φ after epistemic gating
+```
+
+## ConsciousnessSnapshot Phi Fields
+
+```rust
+pub consciousness_level: f32,            // Composite consciousness level
+pub spectral_mip_phi: Option<f64>,       // Cached spectral MIP Φ
+pub sigma: Option<f64>,                  // σ (backward compat alias for spectral Φ)
+```
+
+## Design Philosophy
+
+Phi integration follows three principles:
+
+1. **Tiered computation**: Cheap metrics run every cycle, expensive ones are amortized
+2. **Principled measurement**: Spectral MIP Φ is mathematically grounded in IIT
+3. **Behavioral grounding**: Every Phi signal connects to a concrete behavioral effect

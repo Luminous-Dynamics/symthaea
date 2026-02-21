@@ -1,11 +1,17 @@
 //! # Spectral MIP Finder — O(n³) via Fiedler Ordering + Bordered Cholesky
 //!
-//! Scales MIP search from O(2^n) exhaustive to O(n³) by exploiting the spectral
-//! structure of the mutual information graph:
+//! Scales MIP search from O(2^n) exhaustive to **O(n³)** by exploiting the spectral
+//! structure of the mutual information graph.
 //!
-//! 1. Build MI Laplacian from covariance of HDC state snapshots
-//! 2. Fiedler vector (2nd eigenvector of Laplacian) → spectral ordering
-//! 3. Sweep n-1 contiguous bipartitions with bordered Cholesky updates
+//! ## Algorithm (5 steps)
+//!
+//! 1. **Covariance estimation**: Sliding window of T HDC snapshots → n×n Σ̂ + εI
+//! 2. **MI Laplacian**: Pairwise Gaussian MI → graph Laplacian L = D - W
+//! 3. **Fiedler ordering**: 2nd eigenvector of L via shifted inverse iteration with
+//!    deflation (O(n³/6) Cholesky + 30 × O(n²) solves)
+//! 4. **Bordered Cholesky sweep**: n-1 contiguous cuts with O(k²) Cholesky updates,
+//!    left/right sweeps in parallel via `rayon::join` → O(n³/6) wall time
+//! 5. **MIP selection**: `Φ = MI_total - min_k MI_cut(k)`
 //!
 //! ## Key Insight
 //!
@@ -14,11 +20,22 @@
 //! are nested (each adds one row/col), so bordered Cholesky update is O(k²) per
 //! step → O(n³) total.
 //!
+//! ## Performance
+//!
+//! | Operation | n=128 | n=256 |
+//! |-----------|-------|-------|
+//! | push      | 442ns | 772ns |
+//! | pipeline  | 5.5ms | —     |
+//!
+//! Well within the 20ms (50Hz) cognitive loop budget.
+//!
 //! ## References
 //!
 //! - Fiedler (1973), "Algebraic connectivity of graphs"
 //! - Kitazono et al. (2018), "Efficient Algorithms for Searching the MIP in IIT"
 //! - Oizumi et al. (2016), "Measuring Integrated Information from the Decoding Perspective"
+//!
+//! Full documentation: `docs/architecture/SPECTRAL_MIP_ALGORITHM.md`
 
 use std::collections::VecDeque;
 
