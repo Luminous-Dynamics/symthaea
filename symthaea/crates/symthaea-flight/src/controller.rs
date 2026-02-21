@@ -112,10 +112,10 @@ impl FlightController {
         }
     }
 
-    /// Train the output projection and network weights via BPTT.
+    /// Train the output projection and network weights via full BPTT.
     ///
     /// Uses `target` as the ground-truth command (from PD baseline).
-    /// Backpropagates through the output projection, then through the network.
+    /// Backpropagates through the output projection, then through ALL network layers.
     pub fn train_step(
         &mut self,
         sensor_hv: &ContinuousHV,
@@ -186,14 +186,38 @@ impl FlightController {
                 grad_hv_values[j] += d_raw[i] * self.output_weights[row_offset + j];
             }
         }
-        let target_hv = output_hv.add(&ContinuousHV::from_vec(grad_hv_values).scale(-1.0));
 
-        // BPTT through the last layer neurons
-        let last_layer_idx = self.network.n_layers() - 1;
-        if let Some(layer) = self.network.layer_mut(last_layer_idx) {
-            for neuron in layer.iter_mut() {
-                let grads = neuron.backward(sensor_hv, &target_hv, dt);
-                neuron.apply_gradients(&grads, lr);
+        // Full BPTT: iterate from last layer backward through all layers
+        let n_layers = self.network.n_layers();
+        let mut target_hv = output_hv.add(&ContinuousHV::from_vec(grad_hv_values).scale(-1.0));
+
+        for layer_idx in (0..n_layers).rev() {
+            let layer_input = self.network.layer_input(layer_idx, sensor_hv);
+
+            // Get the layer output before this layer's update (for propagation)
+            let layer_output = if layer_idx > 0 {
+                self.network
+                    .output_at_layer(layer_idx - 1)
+                    .cloned()
+            } else {
+                None
+            };
+
+            if let Some(layer) = self.network.layer_mut(layer_idx) {
+                for neuron in layer.iter_mut() {
+                    let grads = neuron.backward(&layer_input, &target_hv, dt);
+                    neuron.apply_gradients(&grads, lr);
+                }
+            }
+
+            // Propagate target to previous layer using difference-target approximation
+            if let Some(prev_output) = layer_output {
+                let current_output_at_layer = self.network
+                    .output_at_layer(layer_idx)
+                    .cloned()
+                    .unwrap_or_else(|| ContinuousHV::zero(dim));
+                let diff = target_hv.subtract(&current_output_at_layer);
+                target_hv = prev_output.add(&diff.scale(0.5));
             }
         }
     }
@@ -202,30 +226,18 @@ impl FlightController {
     ///
     /// - `factor < 1.0`: faster adaptation (high surprise)
     /// - `factor > 1.0`: slower, more stable (low surprise)
+    ///
+    /// Directly sets `tau_base` on each neuron via `set_tau_base()`.
     pub fn modulate_tau(&mut self, factor: f32) {
-        let factor = factor.clamp(0.3, 3.0); // Safety bounds
+        let factor = factor.clamp(0.3, 3.0);
         for layer_idx in 0..self.network.n_layers() {
             if let Some(layer) = self.network.layer_mut(layer_idx) {
                 for neuron in layer.iter_mut() {
-                    let current_tau = neuron.config().tau_base;
-                    let new_config = UnifiedConfig {
-                        tau_base: (current_tau * factor).clamp(0.01, 1.0),
-                        ..neuron.config().clone()
-                    };
-                    // We can't directly set config, but we can modify through the mutable reference
-                    // Use the weight_hv as a proxy: scale tau_modulator
-                    // Actually, the config is inside the neuron — we need a different approach.
-                    // For now, we scale the tau_modulator HV which affects effective_tau()
-                    let _ = new_config; // Config is immutable per-neuron
+                    let new_tau = neuron.config().tau_base * factor;
+                    neuron.set_tau_base(new_tau);
                 }
             }
         }
-        // Tau modulation through the tau_modulator HV: scaling it changes effective_tau
-        // effective_tau = tau_base * (1 + backbone * ||x||) * (1 + dot(tau_mod, input))
-        // We can scale the weight to indirectly affect dynamics speed
-        // Alternative: modulate via input signal characteristics
-        // For V1, we track the factor and apply it to the learning rate instead
-        self.learning_rate *= factor.recip().sqrt(); // High tau → lower LR, low tau → higher LR
     }
 
     /// Set the learning rate directly.

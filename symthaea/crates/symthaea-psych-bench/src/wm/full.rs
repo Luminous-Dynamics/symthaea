@@ -62,8 +62,12 @@ impl WorkingMemory {
     }
 
     /// Add an item to working memory via `ContinuousMind::perceive()`.
+    ///
+    /// Auto-ticks after perceive so items are immediately available in
+    /// `contents()`, matching the lightweight backend's API contract.
     pub fn perceive(&mut self, hv: ContinuousHV) {
         self.mind.perceive(hv);
+        let _ = self.mind.tick();
     }
 
     /// Advance one tick via `ContinuousMind::tick()`.

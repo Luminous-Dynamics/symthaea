@@ -9,14 +9,21 @@
 //!   cargo run -p symthaea-psych-bench --example run_psych_benchmarks -- --compare baselines/v0.5.0.json
 
 use std::path::PathBuf;
+use symthaea_psych_bench::benchmarks::affect::{
+    MoodCongruentRecallBenchmark, ValenceClassificationBenchmark,
+};
 use symthaea_psych_bench::benchmarks::butlin::ButlinIndicatorSuite;
 use symthaea_psych_bench::benchmarks::cogbench::{
     BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
-    ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, TemporalDiscountingBenchmark,
-    TwoStepBenchmark,
+    ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
+    TemporalDiscountingBenchmark, TwoStepBenchmark,
+};
+use symthaea_psych_bench::benchmarks::creativity::{
+    AlternateUsesBenchmark, RemoteAssociatesBenchmark,
 };
 use symthaea_psych_bench::benchmarks::executive::{
-    IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark, WisconsinCardSortingBenchmark,
+    FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
+    StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
 };
 use symthaea_psych_bench::benchmarks::memory_agent::{
     AccurateRetrievalBenchmark, ConflictResolutionBenchmark, LongRangeBenchmark,
@@ -28,8 +35,8 @@ use symthaea_psych_bench::benchmarks::tombench::{
     StrangeStoryBenchmark,
 };
 use symthaea_psych_bench::benchmarks::worm::{
-    BindingBenchmark, ChangeDetectionBenchmark, NBackBenchmark, SerialRecallBenchmark,
-    SpatialUpdatingBenchmark,
+    BindingBenchmark, ChangeDetectionBenchmark, DigitSpanBenchmark, NBackBenchmark,
+    SerialRecallBenchmark, SpatialUpdatingBenchmark,
 };
 use symthaea_psych_bench::harness::{
     BenchmarkConfig, BenchmarkReport, PsychBenchmark, RegressionReport, RegressionSnapshot,
@@ -39,6 +46,11 @@ fn main() {
     let args: Vec<String> = std::env::args().collect();
     let output_json = args.iter().any(|a| a == "--json");
     let output_csv = args.iter().any(|a| a == "--csv");
+    let output_profile = args.iter().any(|a| a == "--profile");
+    let paper_table = args.iter().any(|a| a == "--paper-table");
+    let paper_latex = args
+        .windows(2)
+        .any(|w| w[0] == "--paper-table" && w[1] == "latex");
     let json_output_path: Option<PathBuf> = args
         .windows(2)
         .find(|w| w[0] == "--json-output")
@@ -71,6 +83,7 @@ fn main() {
         Box::new(SerialRecallBenchmark),
         Box::new(SpatialUpdatingBenchmark),
         Box::new(BindingBenchmark),
+        Box::new(DigitSpanBenchmark),
         // CogBench
         Box::new(ProbabilisticReasoningBenchmark),
         Box::new(HorizonBenchmark),
@@ -79,10 +92,14 @@ fn main() {
         Box::new(TwoStepBenchmark),
         Box::new(TemporalDiscountingBenchmark),
         Box::new(BartBenchmark),
+        Box::new(ReversalLearningBenchmark),
         // Executive
         Box::new(WisconsinCardSortingBenchmark),
         Box::new(IowaGamblingBenchmark),
         Box::new(RavensProgressiveMatricesBenchmark),
+        Box::new(StroopBenchmark),
+        Box::new(FlankerBenchmark),
+        Box::new(TowerOfLondonBenchmark),
         // Metacognition
         Box::new(MetacognitiveCalibrationBenchmark),
         // Butlin
@@ -98,6 +115,12 @@ fn main() {
         Box::new(TestTimeLearningBenchmark),
         Box::new(LongRangeBenchmark),
         Box::new(ConflictResolutionBenchmark),
+        // Affect
+        Box::new(ValenceClassificationBenchmark),
+        Box::new(MoodCongruentRecallBenchmark),
+        // Creativity
+        Box::new(RemoteAssociatesBenchmark),
+        Box::new(AlternateUsesBenchmark),
     ];
 
     eprintln!("Running {} benchmarks...", benchmarks.len());
@@ -155,10 +178,18 @@ fn main() {
         }
     }
 
+    if output_profile {
+        println!("\n{}", report.format_profile());
+    }
+
     if output_json {
         println!("{}", report.to_json().expect("JSON serialization"));
     } else if output_csv {
         println!("{}", report.to_csv().expect("CSV serialization"));
+    } else if paper_latex {
+        println!("{}", report.paper_summary_latex());
+    } else if paper_table {
+        println!("{}", report.paper_summary());
     } else {
         println!("\n{}", report.summary());
     }

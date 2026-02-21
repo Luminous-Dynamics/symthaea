@@ -717,6 +717,13 @@ impl HdcLtcUnifiedNeuron {
         &self.config
     }
 
+    /// Set the base time constant τ₀ directly.
+    ///
+    /// Clamped to [0.01, 1.0] to prevent degenerate dynamics.
+    pub fn set_tau_base(&mut self, tau: f32) {
+        self.config.tau_base = tau.clamp(0.01, 1.0);
+    }
+
     /// Get total time evolved
     pub fn total_time(&self) -> f64 {
         self.total_time
@@ -1417,6 +1424,11 @@ impl HdcLtcUnifiedNetwork {
     /// Get mutable layer by index
     pub fn layer_mut(&mut self, idx: usize) -> Option<&mut Vec<HdcLtcUnifiedNeuron>> {
         self.layers.get_mut(idx)
+    }
+
+    /// Get the bundled output of a specific layer.
+    pub fn output_at_layer(&self, idx: usize) -> Option<&ContinuousHV> {
+        self.layer_outputs.get(idx)
     }
 
     /// Get network statistics

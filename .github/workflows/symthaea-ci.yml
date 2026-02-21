@@ -190,6 +190,19 @@ jobs:
           - magi_loop
           - full_language
           - support
+          # Database & specialized features
+          - lancedb-backend
+          - school_learning
+          - benchmarks
+          - physics
+          - full_perception
+          # Cross-domain multi-feature combinations (test interactions)
+          - identity,lancedb-backend
+          - lancedb-backend,reasoning_engine
+          - lancedb-backend,full_consciousness
+          - lancedb-backend,full_consciousness,reasoning_engine
+          - observability_module,reasoning_engine
+          - support,observability_module
     defaults:
       run:
         working-directory: symthaea

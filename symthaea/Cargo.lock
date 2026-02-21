@@ -12791,6 +12791,7 @@ dependencies = [
  "symthaea-factor-graph",
  "symthaea-fep",
  "symthaea-field-dynamics",
+ "symthaea-flight",
  "symthaea-hodge",
  "symthaea-narrative-self",
  "symthaea-nix",
@@ -12940,6 +12941,18 @@ name = "symthaea-field-dynamics"
 version = "0.1.0"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "symthaea-flight"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "rand 0.8.5",
+ "serde",
+ "serde_json",
+ "symthaea-core",
+ "symthaea-fep",
 ]
 
 [[package]]

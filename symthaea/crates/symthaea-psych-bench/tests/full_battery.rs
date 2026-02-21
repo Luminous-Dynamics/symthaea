@@ -1,15 +1,17 @@
 //! Full psychological benchmark battery with human baseline comparisons.
 //!
-//! Runs all 31 benchmarks across 7 suites and generates a report comparing
+//! Runs all 35 benchmarks across 9 suites and generates a report comparing
 //! Symthaea's performance against published human norms.
 
 use symthaea_psych_bench::benchmarks::{
+    affect::{MoodCongruentRecallBenchmark, ValenceClassificationBenchmark},
     butlin::ButlinIndicatorSuite,
     cogbench::{
         BartBenchmark, HorizonBenchmark, InstrumentalLearningBenchmark,
         ProbabilisticReasoningBenchmark, RestlessBanditBenchmark, ReversalLearningBenchmark,
         TemporalDiscountingBenchmark, TwoStepBenchmark,
     },
+    creativity::{AlternateUsesBenchmark, RemoteAssociatesBenchmark},
     executive::{
         FlankerBenchmark, IowaGamblingBenchmark, RavensProgressiveMatricesBenchmark,
         StroopBenchmark, TowerOfLondonBenchmark, WisconsinCardSortingBenchmark,
@@ -92,14 +94,22 @@ fn full_battery_report() {
     // ── Metacognition ──
     report.add(MetacognitiveCalibrationBenchmark.run(&config));
 
+    // ── Affect ──
+    report.add(ValenceClassificationBenchmark.run(&config));
+    report.add(MoodCongruentRecallBenchmark.run(&config));
+
+    // ── Creativity ──
+    report.add(RemoteAssociatesBenchmark.run(&config));
+    report.add(AlternateUsesBenchmark.run(&config));
+
     // ── Butlin Consciousness Indicators ──
     report.add(ButlinIndicatorSuite.run(&config));
 
-    // Verify all 31 benchmarks produced results
+    // Verify all 35 benchmarks produced results
     assert_eq!(
         report.results.len(),
-        31,
-        "Expected 31 benchmark results, got {}",
+        35,
+        "Expected 35 benchmark results, got {}",
         report.results.len()
     );
 

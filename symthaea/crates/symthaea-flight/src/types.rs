@@ -283,6 +283,8 @@ pub struct FlightConfig {
     pub train_every: usize,
     /// Genesis seed phrase for deterministic initialization.
     pub genesis_phrase: String,
+    /// Whether to collect per-step telemetry during episodes (default: false).
+    pub collect_telemetry: bool,
 }
 
 impl Default for FlightConfig {
@@ -298,6 +300,7 @@ impl Default for FlightConfig {
             steps_per_episode: 2000, // 4s at 500Hz
             train_every: 4,          // 125Hz training
             genesis_phrase: "symthaea-flight-quadrotor".to_string(),
+            collect_telemetry: false,
         }
     }
 }

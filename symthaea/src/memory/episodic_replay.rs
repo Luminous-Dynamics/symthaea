@@ -709,6 +709,26 @@ impl EpisodicMemory {
         self.episodes.extend(all);
     }
 
+    /// Boost consolidation strength of the most recent episodes.
+    ///
+    /// Called when consciousness score is high — conscious moments are
+    /// preferentially consolidated (Dehaene 2014, GWT predicts conscious
+    /// access correlates with memory formation).
+    pub fn boost_recent_consolidation(&mut self, boost: f64) {
+        if boost <= 0.0 || self.episodes.is_empty() {
+            return;
+        }
+        let mut all: Vec<PrioritizedEpisode> = self.episodes.drain().collect();
+        // Boost the 3 most recent episodes (by timestamp)
+        all.sort_by(|a, b| b.episode.timestamp.cmp(&a.episode.timestamp));
+        for pe in all.iter_mut().take(3) {
+            pe.episode.consolidation_strength =
+                (pe.episode.consolidation_strength + boost).min(5.0);
+            pe.score = pe.episode.priority_score(self.current_cycle, self.config.recency_weight);
+        }
+        self.episodes.extend(all);
+    }
+
     /// Get all episodes sorted by Phi (highest first)
     pub fn get_top_episodes(&self, n: usize) -> Vec<Episode> {
         let mut sorted: Vec<_> = self.episodes.iter().collect();

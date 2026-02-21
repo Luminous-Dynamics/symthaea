@@ -5,7 +5,10 @@
 //! modulates controller parameters: τ (time constants), learning rate, and
 //! prior precision — true Active Inference as precision-weighted meta-learning.
 
-use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
+use symthaea_fep::{
+    ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation,
+    TemporalDifferenceLearningConfig,
+};
 
 use crate::types::{FlightState, FlightSetpoint, QuadrotorCommand};
 
@@ -82,6 +85,12 @@ pub struct FlightFepConfig {
     pub exploration_patience: usize,
     /// Magnitude of exploration noise (fraction of max command range).
     pub exploration_magnitude: f32,
+    /// Whether to enable temporal difference learning (default: true).
+    pub enable_td_learning: bool,
+    /// TD discount factor γ (default: 0.99).
+    pub td_discount: f64,
+    /// TD eligibility trace λ (default: 0.8).
+    pub td_lambda: f64,
 }
 
 impl Default for FlightFepConfig {
@@ -92,6 +101,9 @@ impl Default for FlightFepConfig {
             exploration_fe_threshold: 2.0,
             exploration_patience: 10,
             exploration_magnitude: 0.1,
+            enable_td_learning: true,
+            td_discount: 0.99,
+            td_lambda: 0.8,
         }
     }
 }
@@ -112,22 +124,35 @@ pub struct ActiveInferenceFlightAgent {
     high_fe_ticks: usize,
     /// Running prediction error for trend detection.
     prev_prediction_error: f64,
+    /// Exponential moving average of applied tau factors.
+    tau_ema: f64,
+    /// Current free energy (for surprise rate computation).
+    current_fe: f64,
+    /// Previous free energy.
+    prev_fe: f64,
 }
 
 impl ActiveInferenceFlightAgent {
     /// Create a new flight FEP agent.
     pub fn new(config: FlightFepConfig) -> Self {
+        let td_config = TemporalDifferenceLearningConfig {
+            gamma: config.td_discount,
+            lambda: config.td_lambda,
+            use_eligibility_traces: true,
+            ..TemporalDifferenceLearningConfig::default()
+        };
+
         let agent_config = ActiveInferenceAgentConfig {
-            state_dim: 3,       // position_error, attitude_error, velocity_error
-            obs_dim: 3,
+            state_dim: 8,       // expanded observation space
+            obs_dim: 8,
             num_actions: 6,     // The 6 FlightActions
             inference_iterations: config.inference_iterations,
             belief_learning_rate: 0.1,
             planning_horizon: 1, // Single-step (fast cognitive tick)
             action_temperature: config.action_temperature,
             enable_model_learning: true,
-            enable_td_learning: false,
-            ..ActiveInferenceAgentConfig::default()
+            enable_td_learning: config.enable_td_learning,
+            td_config,
         };
 
         let agent = ActiveInferenceAgent::new(agent_config);
@@ -137,7 +162,48 @@ impl ActiveInferenceFlightAgent {
             config,
             high_fe_ticks: 0,
             prev_prediction_error: 0.0,
+            tau_ema: 1.0,
+            current_fe: 0.0,
+            prev_fe: 0.0,
         }
+    }
+
+    /// Build the 8D observation vector from flight state.
+    fn build_observation(&self, state: &FlightState, setpoint: &FlightSetpoint) -> Vec<f64> {
+        let pos_err = setpoint.position_error_magnitude(state);
+        let (roll, pitch, _yaw) = state.euler_angles();
+        let att_err = (roll * roll + pitch * pitch).sqrt();
+        let vel_err = state.speed();
+
+        // Original 3 channels
+        let norm_pos = (pos_err / 1.0).min(1.0);
+        let norm_att = (att_err / 1.0).min(1.0);
+        let norm_vel = (vel_err / 5.0).min(1.0);
+
+        // New channels
+        let pe_trend = if self.prev_prediction_error > 0.0 {
+            let delta = pos_err - self.prev_prediction_error;
+            ((delta / 0.5) + 0.5).clamp(0.0, 1.0) // >0.5 = getting worse
+        } else {
+            0.5
+        };
+        let tau_ema_norm = (self.tau_ema / 3.0).clamp(0.0, 1.0);
+        let surprise_rate = if self.prev_fe > 0.0 {
+            let delta = self.current_fe - self.prev_fe;
+            ((delta / 2.0) + 0.5).clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+        let alt_err_signed = {
+            let raw = state.altitude() - setpoint.position[2]; // positive = above
+            ((raw / 1.0) + 0.5).clamp(0.0, 1.0)
+        };
+        let angular_speed = (state.angular_speed() / 20.0).min(1.0);
+
+        vec![
+            norm_pos, norm_att, norm_vel,
+            pe_trend, tau_ema_norm, surprise_rate, alt_err_signed, angular_speed,
+        ]
     }
 
     /// Perform a cognitive tick: observe errors, update beliefs, select action.
@@ -148,19 +214,10 @@ impl ActiveInferenceFlightAgent {
         state: &FlightState,
         setpoint: &FlightSetpoint,
     ) -> FlightFepResult {
-        // Compute normalized error channels
-        let pos_err = setpoint.position_error_magnitude(state);
-        let (roll, pitch, _yaw) = state.euler_angles();
-        let att_err = (roll * roll + pitch * pitch).sqrt();
-        let vel_err = state.speed();
-
-        // Normalize to [0, 1] with reasonable scales
-        let norm_pos = (pos_err / 1.0).min(1.0);      // 1m = max
-        let norm_att = (att_err / 1.0).min(1.0);       // 1 rad = max
-        let norm_vel = (vel_err / 5.0).min(1.0);       // 5 m/s = max
+        let obs_values = self.build_observation(state, setpoint);
 
         let obs = Observation::new(
-            vec![norm_pos, norm_att, norm_vel],
+            obs_values,
             1.0, // Full precision
             "flight",
         );
@@ -170,8 +227,9 @@ impl ActiveInferenceFlightAgent {
         let free_energy = perception.free_energy.total;
         let prediction_error = perception.free_energy.prediction_error;
 
-        // Select action
+        // Select action and register it for TD transitions
         let action_result = self.agent.select_action();
+        self.agent.act(action_result.action);
         let action = FlightAction::from_index(action_result.action);
 
         // Build result based on selected action
@@ -236,7 +294,12 @@ impl ActiveInferenceFlightAgent {
             self.agent.learn_from_outcome(action_result.action, &obs);
         }
 
-        self.prev_prediction_error = prediction_error;
+        // Update tracking state
+        self.prev_prediction_error = setpoint.position_error_magnitude(state);
+        self.tau_ema = 0.8 * self.tau_ema + 0.2 * result.tau_factor as f64;
+        self.prev_fe = self.current_fe;
+        self.current_fe = free_energy;
+
         result
     }
 
@@ -254,6 +317,9 @@ impl ActiveInferenceFlightAgent {
         self.agent.reset();
         self.high_fe_ticks = 0;
         self.prev_prediction_error = 0.0;
+        self.tau_ema = 1.0;
+        self.current_fe = 0.0;
+        self.prev_fe = 0.0;
     }
 
     /// Get the current free energy.
