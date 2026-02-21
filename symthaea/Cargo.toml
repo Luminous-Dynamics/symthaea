@@ -350,6 +350,7 @@ code_generation = ["tree-sitter-rust", "tree-sitter-python"]
 
 # ── Example & module build gates ───────────────────────────────────
 # These gate cfg blocks in src/ code and/or examples.
+school_learning = []            # Anticipatory curriculum learning (CfC lookahead, mastery tracking)
 integration_module = []         # Integration module (cfg-gated in lib.rs)
 observability_module = ["dep:symthaea-observability"]  # Observability (cfg-gated in gwt_integration + lib.rs)
 support = ["dep:symthaea-support"]                     # IT support intelligence (triage, diagnostics, knowledge, privacy, actions, prediction)
@@ -448,6 +449,7 @@ name = "nixos_assistant_demo"
 
 [[example]]
 name = "school_o1_benchmark"
+required-features = ["school_learning"]
 
 [[example]]
 name = "semantic_consciousness"
@@ -470,6 +472,7 @@ name = "meta_conscious_ollama_demo"
 
 [[example]]
 name = "school_coherence_integration"
+required-features = ["school_learning"]
 
 [[example]]
 name = "cfc_learning_lookahead_prototype"
@@ -488,6 +491,7 @@ name = "conscious_learning_demo"
 
 [[example]]
 name = "embodied_consciousness_learning"
+required-features = ["school_learning"]
 
 [[example]]
 name = "primitive_decomposition_test"

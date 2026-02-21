@@ -312,7 +312,7 @@ fn test_mce_consciousness_boosts_learning_rate() {
 }
 
 #[test]
-fn test_narrative_self_phi_modulates_confidence() {
+fn test_narrative_self_psi_modulates_confidence() {
     let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
         enable_narrative_self: true,
         learning_threshold: 0.0,
@@ -460,9 +460,9 @@ fn test_cycle_with_cross_modal_binding() {
     );
     // Cross-modal Phi should be finite and non-negative
     assert!(
-        result.metadata.cross_modal_phi.is_finite() && result.metadata.cross_modal_phi >= 0.0,
+        result.metadata.cross_modal_psi.is_finite() && result.metadata.cross_modal_psi >= 0.0,
         "Cross-modal Phi should be finite and >= 0: {}",
-        result.metadata.cross_modal_phi
+        result.metadata.cross_modal_psi
     );
 }
 
@@ -489,7 +489,7 @@ fn test_predictive_affective_crossmodal_synergy() {
     assert!(result.metadata.predictive_free_energy.is_finite());
     assert!(result.metadata.predictive_phi_modulation.is_finite());
     assert!(result.metadata.cross_modal_binding_strength.is_finite());
-    assert!(result.metadata.cross_modal_phi.is_finite());
+    assert!(result.metadata.cross_modal_psi.is_finite());
     assert!(result.metadata.affective_valence >= -1.0 && result.metadata.affective_valence <= 1.0);
     assert!(result.metadata.affective_arousal >= 0.0 && result.metadata.affective_arousal <= 1.0);
 }

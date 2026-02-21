@@ -21,7 +21,7 @@ impl RestlessBanditBenchmark {
         let seed = config.trial_seed("cogbench", "restless", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
         let num_arms = 4;
-        let num_trials = 50;
+        let num_trials = 100; // More trials for better learning
 
         // Hybrid: FEP agent for belief updating + explicit EMA for action selection
         let agent_config = ActiveInferenceAgentConfig {
@@ -49,9 +49,9 @@ impl RestlessBanditBenchmark {
         let mut unconfident_correct = 0u64;
         let mut unconfident_total = 0u64;
 
-        // Exponential moving average of arm values for action selection + confidence
+        // Higher alpha EMA tracks drift faster
         let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
-        let ema_alpha = 0.3;
+        let ema_alpha = 0.6; // High alpha = fast drift tracking
         // Track pull count per arm (UCB-style exploration bonus)
         let mut arm_pulls: Vec<u64> = vec![0; num_arms];
 
@@ -65,39 +65,28 @@ impl RestlessBanditBenchmark {
                 *val = (*val + drift).clamp(0.0, 1.0);
             }
 
-            // Action selection: softmax over EMA values with UCB exploration bonus
-            let total_pulls: u64 = arm_pulls.iter().sum::<u64>().max(1);
-            let scores: Vec<f64> = (0..num_arms)
-                .map(|i| {
-                    let exploit = arm_ema[i];
-                    let explore = if arm_pulls[i] > 0 {
-                        (2.0 * (total_pulls as f64).ln() / arm_pulls[i] as f64).sqrt() * 0.3
-                    } else {
-                        1.0 // Strong bonus for unvisited arms
-                    };
-                    exploit + explore
-                })
-                .collect();
-
-            // Softmax with temperature
-            let temp = config.action_temperature.max(0.5);
-            let max_score = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let exp_scores: Vec<f64> = scores.iter().map(|s| ((s - max_score) / temp).exp()).collect();
-            let exp_sum: f64 = exp_scores.iter().sum();
-
+            // Action selection: epsilon-greedy with forced exploration early on
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
             let roll = (rng_state % 10000) as f64 / 10000.0;
-            let mut cumsum = 0.0;
-            let mut chosen_arm = 0;
-            for (i, e) in exp_scores.iter().enumerate() {
-                cumsum += e / exp_sum;
-                if roll < cumsum {
-                    chosen_arm = i;
-                    break;
-                }
-            }
+
+            let chosen_arm = if trial < num_arms {
+                // Phase 1: sample each arm once
+                trial
+            } else if roll < 0.1 {
+                // Phase 2: 10% epsilon-greedy exploration
+                rng_state ^= rng_state << 13;
+                rng_state ^= rng_state >> 7;
+                rng_state ^= rng_state << 17;
+                (rng_state as usize) % num_arms
+            } else {
+                // Phase 2: exploit — pick arm with highest EMA
+                arm_ema.iter().enumerate()
+                    .max_by(|(_, a), (_, b)| a.total_cmp(b))
+                    .map(|(i, _)| i)
+                    .unwrap_or(0)
+            };
 
             arm_pulls[chosen_arm] += 1;
 

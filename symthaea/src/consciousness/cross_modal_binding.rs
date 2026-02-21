@@ -650,7 +650,7 @@ impl CrossModalBinder {
     ///
     /// Measures how much information is integrated across modalities by computing
     /// average pairwise similarity of modal representations in the bound space.
-    pub fn cross_modal_phi(&self) -> f64 {
+    pub fn cross_modal_psi(&self) -> f64 {
         let modality_hvs: Vec<&ContinuousHV> = self
             .representations
             .values()

@@ -34,7 +34,7 @@ use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, Instant};
 
-use super::{PhiEngine, PhiMethod, PhiResult};
+use super::{PhiCategory, PhiEngine, PhiMethod, PhiResult};
 use crate::hdc::unified_hv::ContinuousHV;
 
 /// Cache entry for Φ results
@@ -139,6 +139,7 @@ impl CachedPhiEngine {
             return PhiResult {
                 phi: entry.phi,
                 method: entry.method,
+                category: PhiCategory::SpectralConnectivity,
                 computation_time: Duration::from_micros(10), // Cache lookup time
                 n_nodes: entry.n_nodes,
                 limiting_partition: None,

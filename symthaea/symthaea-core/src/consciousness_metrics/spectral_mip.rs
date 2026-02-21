@@ -94,17 +94,37 @@ pub struct SpectralMIPResult {
 }
 
 /// Spectral MIP Finder — O(n³) MIP search via Fiedler ordering + bordered Cholesky.
+///
+/// Supports **adaptive dimension selection**: after each compute, `adapt()` uses the
+/// Fiedler ordering to concentrate tracked dimensions around the MIP boundary where
+/// they are most informative, while maintaining exploration via evenly-spaced and
+/// random dimensions. Adaptation flushes the window (new dims = new column semantics).
 pub struct SpectralMIPFinder {
     window: VecDeque<Vec<f64>>,
     config: SpectralMIPConfig,
+    /// Indices into the full HDC dimension space that we're tracking.
+    /// `None` = evenly-spaced (default behavior).
+    active_dims: Option<Vec<usize>>,
+    /// Full dimension of the HDC state (set on first push).
+    full_dim: usize,
+    /// Running sum of component values (for online mean computation).
+    sum: Vec<f64>,
+    /// Running sum of outer products, upper triangular packed as n×n flat array.
+    /// `cross_sum[i*n+j]` = Σ_t x_t[i]*x_t[j] for j >= i.
+    cross_sum: Vec<f64>,
 }
 
 impl SpectralMIPFinder {
     /// Create a new spectral MIP finder with the given configuration.
     pub fn new(config: SpectralMIPConfig) -> Self {
+        let n = config.num_components;
         Self {
             window: VecDeque::with_capacity(config.window_size),
+            sum: vec![0.0; n],
+            cross_sum: vec![0.0; n * n],
             config,
+            active_dims: None,
+            full_dim: 0,
         }
     }
 
@@ -114,18 +134,44 @@ impl SpectralMIPFinder {
     }
 
     /// Feed a new HDC state snapshot into the sliding window.
+    ///
+    /// Maintains online running sums for O(1) covariance matrix construction.
+    /// If `active_dims` is set (after adaptation), reads those specific dimensions.
+    /// Otherwise uses evenly-spaced subsampling.
     pub fn push(&mut self, state: &ContinuousHV) {
         let dim = state.dim();
+        self.full_dim = dim;
         let n = self.config.num_components.min(dim);
-        let stride = if n > 1 { dim / n } else { 1 };
 
-        let snapshot: Vec<f64> = (0..n)
-            .map(|i| state.values[i * stride] as f64)
-            .collect();
+        let snapshot: Vec<f64> = if let Some(ref indices) = self.active_dims {
+            indices.iter().take(n).map(|&i| {
+                state.values[i.min(dim - 1)] as f64
+            }).collect()
+        } else {
+            let stride = if n > 1 { dim / n } else { 1 };
+            (0..n).map(|i| state.values[i * stride] as f64).collect()
+        };
 
+        // If window full, subtract outgoing snapshot from running sums
         if self.window.len() >= self.config.window_size {
-            self.window.pop_front();
+            if let Some(old) = self.window.pop_front() {
+                for i in 0..n.min(old.len()) {
+                    self.sum[i] -= old[i];
+                    for j in i..n.min(old.len()) {
+                        self.cross_sum[i * n + j] -= old[i] * old[j];
+                    }
+                }
+            }
         }
+
+        // Add incoming snapshot to running sums
+        for i in 0..n.min(snapshot.len()) {
+            self.sum[i] += snapshot[i];
+            for j in i..n.min(snapshot.len()) {
+                self.cross_sum[i * n + j] += snapshot[i] * snapshot[j];
+            }
+        }
+
         self.window.push_back(snapshot);
     }
 
@@ -201,9 +247,11 @@ impl SpectralMIPFinder {
         })
     }
 
-    /// Reset the sliding window.
+    /// Reset the sliding window and running statistics.
     pub fn reset(&mut self) {
         self.window.clear();
+        self.sum.fill(0.0);
+        self.cross_sum.fill(0.0);
     }
 
     /// Number of snapshots currently in the window.
@@ -211,35 +259,116 @@ impl SpectralMIPFinder {
         self.window.len()
     }
 
+    /// Whether adaptive dimension selection is active.
+    pub fn is_adapted(&self) -> bool {
+        self.active_dims.is_some()
+    }
+
+    /// Current active dimension indices (into the full HDC space), if adapted.
+    pub fn active_dim_indices(&self) -> Option<&[usize]> {
+        self.active_dims.as_deref()
+    }
+
+    /// Adapt dimension selection based on a previous MIP result.
+    ///
+    /// Concentrates 60% of tracked dimensions near the MIP boundary (where
+    /// partition decisions are most sensitive), 20% evenly spaced (coverage),
+    /// and 20% random (exploration). Flushes the window since column semantics
+    /// change.
+    ///
+    /// Call this every 2nd compute (e.g. every 100 cycles) to balance
+    /// adaptation frequency with window stability.
+    pub fn adapt(&mut self, result: &SpectralMIPResult) {
+        let n = self.config.num_components;
+        let dim = self.full_dim;
+        if dim == 0 || n < 4 || result.spectral_order.len() != n {
+            return;
+        }
+
+        // Map current spectral order back to full-space dimension indices
+        let current_dims: Vec<usize> = self.active_dims.clone().unwrap_or_else(|| {
+            let stride = if n > 1 { dim / n } else { 1 };
+            (0..n).map(|i| (i * stride).min(dim - 1)).collect()
+        });
+
+        // Fiedler-ordered full-space indices
+        let spectral_full: Vec<usize> = result.spectral_order.iter()
+            .map(|&i| current_dims[i.min(current_dims.len() - 1)])
+            .collect();
+
+        // Budget: 60% boundary, 20% coverage, 20% exploration
+        let n_boundary = (n * 6 / 10).max(4);
+        let n_coverage = (n * 2 / 10).max(2);
+
+        let mut new_dims: Vec<usize> = Vec::with_capacity(n);
+        let mut used = vec![false; dim]; // track used full-space indices
+
+        // 1. Boundary: dims centered on mip_bond in Fiedler order
+        let mip_bond = result.mip_bond.min(spectral_full.len() - 1);
+        let half = n_boundary / 2;
+        let start = mip_bond.saturating_sub(half);
+        let end = (start + n_boundary).min(spectral_full.len());
+        let start = end.saturating_sub(n_boundary);
+        for &idx in &spectral_full[start..end] {
+            if idx < dim && !used[idx] {
+                new_dims.push(idx);
+                used[idx] = true;
+            }
+        }
+
+        // 2. Coverage: evenly spaced across full dimension space
+        let cov_stride = dim / n_coverage.max(1);
+        for i in 0..n_coverage {
+            let idx = (i * cov_stride).min(dim - 1);
+            if !used[idx] {
+                new_dims.push(idx);
+                used[idx] = true;
+            }
+        }
+
+        // 3. Exploration: deterministic pseudo-random dims not already tracked
+        let mut rng_state = result.phi.to_bits() ^ (result.mip_bond as u64).wrapping_mul(0x9E3779B97F4A7C15);
+        let mut attempts = 0u32;
+        while new_dims.len() < n && attempts < n as u32 * 10 {
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let idx = (rng_state as usize) % dim;
+            if !used[idx] {
+                new_dims.push(idx);
+                used[idx] = true;
+            }
+            attempts += 1;
+        }
+
+        // Sort for cache-friendly access during push()
+        new_dims.sort_unstable();
+        new_dims.truncate(n);
+
+        self.active_dims = Some(new_dims);
+        self.window.clear(); // column semantics changed — invalidate window
+        self.sum.fill(0.0);
+        self.cross_sum.fill(0.0);
+    }
+
     // ─── Internal helpers ──────────────────────────────────────────────
 
-    /// Build n×n covariance matrix from sliding window.
+    /// Build n×n covariance matrix from online running sums.
+    ///
+    /// Uses `cov[i,j] = cross_sum[i,j]/T - mean[i]*mean[j]` — O(n²) from
+    /// pre-computed sums, vs O(n²·T) for full window iteration.
     fn build_covariance_matrix(&self, n: usize, t: usize) -> Vec<f64> {
-        let mut means = vec![0.0f64; n];
-        for snap in &self.window {
-            for (i, &v) in snap.iter().enumerate().take(n) {
-                means[i] += v;
-            }
-        }
-        for m in &mut means {
-            *m /= t as f64;
-        }
-
+        let inv_t = 1.0 / t as f64;
         let mut cov = vec![0.0f64; n * n];
-        for snap in &self.window {
-            for i in 0..n {
-                let di = snap[i] - means[i];
-                for j in i..n {
-                    let dj = snap[j] - means[j];
-                    cov[i * n + j] += di * dj;
-                }
-            }
-        }
+
         for i in 0..n {
+            let mean_i = self.sum[i] * inv_t;
             for j in i..n {
-                cov[i * n + j] /= t as f64;
+                let mean_j = self.sum[j] * inv_t;
+                let c = self.cross_sum[i * n + j] * inv_t - mean_i * mean_j;
+                cov[i * n + j] = c;
                 if j > i {
-                    cov[j * n + i] = cov[i * n + j];
+                    cov[j * n + i] = c;
                 }
             }
             cov[i * n + i] += self.config.regularization;

@@ -808,14 +808,34 @@ impl Symthaea {
         // ====================================================================
         // PHASE 6.5: RESONANT SPEECH (User-adaptive polishing)
         // ====================================================================
-        // Modulate response based on estimated cognitive load.
-        // Uses consciousness level as a proxy for user engagement:
-        // high Psi → user is engaged → can handle detail,
-        // low Psi → simplify output.
+        // Modulate response using all available cognitive/emotional signals.
+        // Previously only used Psi → cognitive load; now wires emotional tone,
+        // meta-awareness, trust, and epistemic status for richer adaptation.
         let response_text = {
             let load = crate::resonant_speech::CognitiveLoad::from_level(thought.psi);
             let mut user_state = crate::resonant_speech::UserState::default();
             user_state.cognitive_load = load;
+
+            // Emotional tone → frustration (negative valence signals frustration)
+            user_state.frustration = ((-thought.emotional_tone.valence).max(0.0)).min(1.0);
+
+            // Meta-awareness → confidence (higher awareness = higher confidence)
+            user_state.confidence = thought.meta_awareness.clamp(0.0, 1.0);
+
+            // Trust from relationship context
+            user_state.trust_in_sophia = thought.trust as f64;
+
+            // High arousal + low coherence → user appears rushed
+            user_state.is_rushed = thought.emotional_tone.arousal > 0.7
+                && thought.coherence < 0.4;
+
+            // Epistemic status → learning mode (uncertain/unknown = still learning)
+            user_state.is_learning = matches!(
+                thought.epistemic_status,
+                crate::mind::structured_thought::EpistemicStatus::Uncertain
+                    | crate::mind::structured_thought::EpistemicStatus::Unknown
+            );
+
             self.resonant_speech.update_state(user_state);
             self.resonant_speech.generate(&generation.text, content)
         };

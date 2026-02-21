@@ -862,6 +862,9 @@ mod tests {
         // Compute variance for each dimension
         for dim in 0..4 {
             let values: Vec<f32> = samples.iter().map(|s| s[dim]).collect();
+            if values.is_empty() {
+                continue;
+            }
             let mean: f32 = values.iter().sum::<f32>() / values.len() as f32;
             let variance: f32 =
                 values.iter().map(|v| (v - mean).powi(2)).sum::<f32>() / values.len() as f32;
@@ -900,6 +903,7 @@ mod tests {
         );
 
         // Direction should be preserved
+        assert!(gradient[1].abs() > 1e-10, "gradient[1] too close to zero for ratio test");
         let ratio = gradient[0] / gradient[1];
         assert!((ratio - 0.75).abs() < 1e-6, "Direction should be preserved");
     }

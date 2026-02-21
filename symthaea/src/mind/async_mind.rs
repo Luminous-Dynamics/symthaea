@@ -68,71 +68,111 @@ impl AsyncMindHandle {
     /// the channel round-trip, not on the actual computation.
     pub async fn tick(&self) -> Option<MindOutput> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let _ = self.tx.send(MindCommand::Tick(resp_tx)).await;
+        if self.tx.send(MindCommand::Tick(resp_tx)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — tick command dropped");
+            return None;
+        }
         resp_rx.await.unwrap_or(None)
     }
 
     /// Add a perception input.
     pub async fn perceive(&self, content: ContinuousHV) {
-        let _ = self.tx.send(MindCommand::Perceive(content)).await;
+        if self.tx.send(MindCommand::Perceive(content)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — perceive command dropped");
+        }
     }
 
     /// Add a text perception.
     pub async fn perceive_text(&self, text: String, embedding: ContinuousHV) {
-        let _ = self
+        if self
             .tx
             .send(MindCommand::PerceiveText(text, embedding))
-            .await;
+            .await
+            .is_err()
+        {
+            tracing::warn!("AsyncMind actor has stopped — perceive_text command dropped");
+        }
     }
 
     /// Add a raw input.
     pub async fn input(&self, input: MindInput) {
-        let _ = self.tx.send(MindCommand::Input(input)).await;
+        if self.tx.send(MindCommand::Input(input)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — input command dropped");
+        }
     }
 
     /// Set a goal.
     pub async fn set_goal(&self, description: String, embedding: ContinuousHV, priority: f32) {
-        let _ = self
+        if self
             .tx
             .send(MindCommand::SetGoal(description, embedding, priority))
-            .await;
+            .await
+            .is_err()
+        {
+            tracing::warn!("AsyncMind actor has stopped — set_goal command dropped");
+        }
     }
 
     /// Activate the mind.
     pub async fn activate(&self) {
-        let _ = self.tx.send(MindCommand::Activate).await;
+        if self.tx.send(MindCommand::Activate).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — activate command dropped");
+        }
     }
 
     /// Get a snapshot of the current mind state.
     pub async fn snapshot(&self) -> MindState {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let _ = self.tx.send(MindCommand::Snapshot(resp_tx)).await;
+        if self.tx.send(MindCommand::Snapshot(resp_tx)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — snapshot command dropped");
+            return MindState::default();
+        }
         resp_rx.await.unwrap_or_default()
     }
 
     /// Get mind statistics.
     pub async fn stats(&self) -> MindStats {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let _ = self.tx.send(MindCommand::Stats(resp_tx)).await;
+        if self.tx.send(MindCommand::Stats(resp_tx)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — stats command dropped");
+            return MindStats::default();
+        }
         resp_rx.await.unwrap_or_default()
     }
 
     /// Send a social message to this mind (from a peer).
     pub async fn receive_social(&self, msg: SocialMessage) {
-        let _ = self.tx.send(MindCommand::ReceiveSocial(msg)).await;
+        if self.tx.send(MindCommand::ReceiveSocial(msg)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — receive_social command dropped");
+        }
     }
 
     /// Drain outgoing social messages (for broadcasting to peers).
     pub async fn drain_social_outbox(&self) -> Vec<SocialMessage> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let _ = self.tx.send(MindCommand::DrainSocialOutbox(resp_tx)).await;
+        if self
+            .tx
+            .send(MindCommand::DrainSocialOutbox(resp_tx))
+            .await
+            .is_err()
+        {
+            tracing::warn!("AsyncMind actor has stopped — drain_social_outbox command dropped");
+            return Vec::new();
+        }
         resp_rx.await.unwrap_or_default()
     }
 
     /// Seed working memory with domain knowledge.
     pub async fn seed_memory(&self) -> super::SeedingResult {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let _ = self.tx.send(MindCommand::SeedMemory(resp_tx)).await;
+        if self.tx.send(MindCommand::SeedMemory(resp_tx)).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — seed_memory command dropped");
+            return super::SeedingResult {
+                prototypes_seeded: 0,
+                categories: Vec::new(),
+                avg_magnitude: 0.0,
+            };
+        }
         resp_rx.await.unwrap_or(super::SeedingResult {
             prototypes_seeded: 0,
             categories: Vec::new(),
@@ -142,7 +182,9 @@ impl AsyncMindHandle {
 
     /// Request graceful shutdown.
     pub async fn shutdown(&self) {
-        let _ = self.tx.send(MindCommand::Shutdown).await;
+        if self.tx.send(MindCommand::Shutdown).await.is_err() {
+            tracing::warn!("AsyncMind actor has stopped — shutdown command dropped");
+        }
     }
 
     /// Check if the actor task is still alive.

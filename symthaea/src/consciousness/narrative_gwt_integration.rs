@@ -1021,7 +1021,7 @@ impl NarrativeGWTIntegration {
             self_phi: self.narrative_self.self_phi(),
             phi_delta: self.phi_history.back().map(|r| r.phi_delta).unwrap_or(0.0),
             coherence: self.narrative_self.coherence(),
-            cross_modal_phi: self.cross_modal.as_ref().map(|cm| cm.cross_modal_phi()),
+            cross_modal_psi: self.cross_modal.as_ref().map(|cm| cm.cross_modal_psi()),
             // **REVOLUTIONARY IMPROVEMENT #74**: Add predictive insights
             prediction_accuracy: self.prediction_accuracy(),
             counterfactuals_available: self
@@ -1127,8 +1127,8 @@ impl NarrativeGWTIntegration {
     }
 
     /// Get cross-modal Φ (if available)
-    pub fn cross_modal_phi(&self) -> Option<f64> {
-        self.cross_modal.as_ref().map(|cm| cm.cross_modal_phi())
+    pub fn cross_modal_psi(&self) -> Option<f64> {
+        self.cross_modal.as_ref().map(|cm| cm.cross_modal_psi())
     }
 
     /// Generate integration report
@@ -1175,7 +1175,7 @@ impl NarrativeGWTIntegration {
             self.narrative_self.coherence(),
             self.cross_modal
                 .as_ref()
-                .map(|cm| format!("{:.4}", cm.cross_modal_phi()))
+                .map(|cm| format!("{:.4}", cm.cross_modal_psi()))
                 .unwrap_or_else(|| "N/A".to_string()),
             if self.is_coherent() {
                 "YES ✓"
@@ -1215,7 +1215,7 @@ pub struct NarrativeGWTProcessResult {
     pub coherence: f64,
 
     /// Cross-modal Φ (if enabled)
-    pub cross_modal_phi: Option<f64>,
+    pub cross_modal_psi: Option<f64>,
 
     // **REVOLUTIONARY IMPROVEMENT #74**: Predictive Insights
     /// Prediction accuracy (0-1)
@@ -1348,7 +1348,7 @@ mod tests {
         let result = integration.process();
 
         // Cross-modal Φ should be available
-        assert!(result.cross_modal_phi.is_some());
+        assert!(result.cross_modal_psi.is_some());
     }
 
     #[test]

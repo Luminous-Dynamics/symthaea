@@ -55,34 +55,45 @@ impl IowaGamblingBenchmark {
             &[1.0, 0.5],
         );
 
-        // Deck memory: exponentially weighted bundle of past outcomes
+        // Deck memory: exponentially weighted bundle of past outcomes (HDC path)
         let mut deck_memory: Vec<ContinuousHV> = (0..4)
             .map(|_| ContinuousHV::zero(dim))
             .collect();
 
+        // Somatic markers: scalar EMA of net value per deck (gradual learning)
+        // Calibrated to match human learning curves (slow early, convergent late)
+        let mut deck_somatic: [f64; 4] = [0.0; 4];
+        let somatic_alpha = 0.10; // Gradual learning — human-like acquisition curve
+
         let mut deck_draw_count = [0u32; 4];
         let mut block_net_scores = [0i32; 5]; // (C+D) - (A+B) per block
         let mut total_net_score = 0i32;
-        let ema_decay = 0.7f32;
-        let loss_aversion = 2.0f32; // Losses weighted 2x (Kahneman & Tversky)
+        let ema_decay = 0.6f32; // Moderate HDC learning
+        let loss_aversion = 2.5f32; // Between K&T's 2.25 and amplified 3.0
 
         let num_trials = 100;
 
         for trial in 0..num_trials {
             let block = trial / 20;
 
-            // Compute deck preference via similarity to desirable outcome
+            // Blend HDC similarity with somatic marker for deck scoring
             let deck_scores: Vec<f32> = deck_hvs
                 .iter()
                 .enumerate()
                 .map(|(i, dhv)| {
-                    let combined = ContinuousHV::bundle(&[dhv, &deck_memory[i]]);
-                    combined.similarity(&desirable)
+                    let hdc_score = {
+                        let combined = ContinuousHV::bundle(&[dhv, &deck_memory[i]]);
+                        combined.similarity(&desirable) as f64
+                    };
+                    // Somatic marker contributes gradually as experience accumulates
+                    let somatic_weight = (deck_draw_count[i] as f64 / 12.0).min(0.35);
+                    let blended = (1.0 - somatic_weight) * hdc_score + somatic_weight * deck_somatic[i];
+                    blended as f32
                 })
                 .collect();
 
-            // Softmax selection
-            let temp = 0.5f32;
+            // Softmax selection — warm temp for human-like exploration noise
+            let temp = 0.6f32;
             let max_score = deck_scores.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
             let exp_scores: Vec<f32> = deck_scores.iter().map(|s| ((s - max_score) / temp).exp()).collect();
             let exp_sum: f32 = exp_scores.iter().sum();
@@ -134,11 +145,17 @@ impl IowaGamblingBenchmark {
                 &[1.0, -1.0], // Loss subtracts from desirability
             );
 
-            // EMA update of deck memory
+            // EMA update of deck memory (HDC path)
             deck_memory[chosen] = ContinuousHV::weighted_bundle(
                 &[&deck_memory[chosen], &outcome_hv],
                 &[ema_decay, 1.0 - ema_decay],
             );
+
+            // Somatic marker update: net value normalized to [-1, 1]
+            // Losses are amplified by loss_aversion factor
+            let net_value = (gain - loss.abs() * loss_aversion as f64) / 200.0;
+            deck_somatic[chosen] = (1.0 - somatic_alpha) * deck_somatic[chosen]
+                + somatic_alpha * net_value;
         }
 
         // Deck preference in last 40 trials

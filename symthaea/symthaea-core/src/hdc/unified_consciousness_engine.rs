@@ -270,7 +270,7 @@ impl UnifiedConsciousnessEngine {
     /// Uses the engine's ConnectivityCalculator to measure integrated information
     /// across the adaptive topology's process states. This provides a unified
     /// consciousness metric that considers all active processes.
-    fn compute_unified_phi(&self) -> f64 {
+    fn compute_unified_psi(&self) -> f64 {
         // Gather all process state representations from the adaptive topology
         let representations: Vec<ContinuousHV> = self
             .adaptive
@@ -295,7 +295,7 @@ impl UnifiedConsciousnessEngine {
 
         // 2. Compute Φ using the engine's ConnectivityCalculator for unified measurement
         //    This computes Φ across all process representations in the topology
-        let phi = self.compute_unified_phi();
+        let phi = self.compute_unified_psi();
 
         // 3. Analyze topological state
         let topo_metrics = self.synergy.analyze_adaptive(&self.adaptive);

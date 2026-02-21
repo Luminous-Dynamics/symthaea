@@ -299,15 +299,26 @@ fn parse_npy<R: Read>(reader: &mut R) -> Result<(Vec<usize>, Vec<f32>)> {
         bail!("Fortran order arrays not supported");
     }
 
-    // Calculate number of elements
-    let n_elements: usize = shape.iter().product();
+    // Calculate number of elements (with overflow protection)
+    let n_elements: usize = shape
+        .iter()
+        .try_fold(1usize, |acc, &dim| acc.checked_mul(dim))
+        .ok_or_else(|| anyhow::anyhow!("NumPy shape overflow: {:?}", shape))?;
+
+    if n_elements > 100_000_000 {
+        anyhow::bail!("NumPy array too large: {} elements", n_elements);
+    }
+
+    let byte_count = n_elements
+        .checked_mul(4)
+        .ok_or_else(|| anyhow::anyhow!("Byte count overflow for {} elements", n_elements))?;
 
     // Read data (float32 little-endian)
     let mut data = vec![0.0f32; n_elements];
 
     // Read as bytes and transmute (safe because we control the layout)
     let data_bytes =
-        unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, n_elements * 4) };
+        unsafe { std::slice::from_raw_parts_mut(data.as_mut_ptr() as *mut u8, byte_count) };
     reader.read_exact(data_bytes)?;
 
     // Convert from little-endian if needed (no-op on little-endian systems)

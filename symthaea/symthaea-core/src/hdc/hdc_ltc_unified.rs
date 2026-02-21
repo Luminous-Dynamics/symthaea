@@ -481,7 +481,8 @@ impl HdcLtcUnifiedNeuron {
         let tau = self.compute_tau(input);
 
         // Pure exponential decay: σ = 1 - exp(-dt/τ)
-        let decay = (-dt / tau).exp();
+        // Clamp exponent to prevent f32 underflow (ln(f32::MIN_POSITIVE) ≈ -87.3)
+        let decay = (-dt / tau).max(-87.0).exp();
         let sigma = 1.0 - decay;
 
         // Analytical solution (exact only if x_∞ were constant)
@@ -527,8 +528,8 @@ impl HdcLtcUnifiedNeuron {
             let x_inf = self.compute_equilibrium(input);
             let tau = self.compute_tau(input);
 
-            // Apply exponential decay
-            let decay = (-sub_dt / tau).exp();
+            // Apply exponential decay (clamped to prevent f32 underflow)
+            let decay = (-sub_dt / tau).max(-87.0).exp();
             let weighted_equilibrium = x_inf.scale(1.0 - decay);
             let weighted_current = self.state.scale(decay);
             self.state = weighted_equilibrium.add(&weighted_current);
@@ -1749,5 +1750,35 @@ mod tests {
             output.norm() > 0.0,
             "Network should produce output after evolution"
         );
+    }
+
+    #[test]
+    fn test_extreme_dt_no_underflow() {
+        // dt=100.0, tau=0.01 → exponent = -10_000 → would underflow without clamp
+        let mut neuron = HdcLtcUnifiedNeuron::new_default(42);
+        let input = ContinuousHV::random_default(123);
+
+        // First evolve to a non-zero state
+        for _ in 0..10 {
+            neuron.evolve_closed_form(0.1, &input);
+        }
+
+        // Now apply extreme dt — should not produce NaN/Inf
+        neuron.evolve_closed_form(100.0, &input);
+        let state = neuron.state();
+        assert!(state.norm().is_finite(), "State norm must be finite after extreme dt");
+
+        // Also test the iterative path
+        neuron.evolve_closed_form_iterative(100.0, &input);
+        let state = neuron.state();
+        assert!(
+            state.norm().is_finite(),
+            "State norm must be finite after extreme dt (iterative)"
+        );
+
+        // Verify decay > 0 invariant: with tau=0.01 and sub_dt as small as possible,
+        // the clamped exponent (-87.0) gives exp(-87) ≈ 1.6e-38 > 0
+        let decay = (-100.0_f32 / 0.01).max(-87.0).exp();
+        assert!(decay > 0.0, "Decay must be strictly positive, got {}", decay);
     }
 }

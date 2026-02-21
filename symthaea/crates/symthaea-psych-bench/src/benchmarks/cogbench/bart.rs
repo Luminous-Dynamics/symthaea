@@ -70,34 +70,57 @@ impl BartBenchmark {
             rng_state ^= rng_state << 17;
             let pop_threshold = (rng_state % (max_pumps as u64 - 5)) as usize + 5;
 
-            // Target-pump model: compute optimal stop point from EV, then execute.
-            // Avoids geometric decay of per-step stochastic decisions.
-            let base_pop_rate = if experienced_balloons > 2 {
-                experienced_pops as f64 / experienced_balloons as f64
+            // Target-pump model: compute optimal stop via total EV.
+            //
+            // Pop threshold is uniform in [min_pop, max_pumps]. If we pump to T:
+            //   P(survive) = max(0, max_pumps - T) / (max_pumps - min_pop)
+            //   EV(T) = T * reward_per_pump * P(survive)
+            // Optimal T maximizes EV(T) = T * (max_pumps - T) / range.
+            // This gives T_opt = max_pumps / 2 (≈32 for max_pumps=64).
+            //
+            // The agent learns from experience: track observed pop thresholds
+            // and estimate the min/max range adaptively.
+            let reward_per_pump = 0.15;
+            let min_pop_estimate = 5.0; // prior: balloons survive at least 5 pumps
+            let max_pop_estimate = if experienced_balloons > 3 {
+                // After pops, estimate max range from pop rate
+                let pop_rate = experienced_pops as f64 / experienced_balloons as f64;
+                // If pop_rate is high, range is small; if low, range is large
+                let avg_pumped = if experienced_balloons > experienced_pops {
+                    total_pumps as f64 / (experienced_balloons - experienced_pops).max(1) as f64
+                } else {
+                    20.0
+                };
+                // Estimate max: roughly 2 * avg_pumped (since pop is ~uniform)
+                (avg_pumped * 2.0).min(max_pumps as f64).max(20.0)
             } else {
-                0.15 // prior
+                max_pumps as f64 // prior: full range
             };
 
-            // Find pump count where marginal EV turns negative
-            let mut target_pumps = 0usize;
-            for p in 1..max_pumps {
-                let inflation = p as f64 / max_pumps as f64;
-                let accumulated = p as f64 * 0.15;
-                let pop_prob = (base_pop_rate * (1.0 + inflation * 2.0)).min(0.95);
-                let marginal_gain = 0.15 * (1.0 - pop_prob);
-                let marginal_risk = accumulated * pop_prob * 0.1;
-                if marginal_gain > marginal_risk {
-                    target_pumps = p;
-                } else {
-                    break;
+            let range = (max_pop_estimate - min_pop_estimate).max(1.0);
+
+            // Find pump count that maximizes total EV
+            let mut best_ev = 0.0;
+            let mut target_pumps = 1usize;
+            for t in 1..max_pumps {
+                let survive_prob = ((max_pop_estimate - t as f64) / range).clamp(0.0, 1.0);
+                let ev = t as f64 * reward_per_pump * survive_prob;
+                if ev > best_ev {
+                    best_ev = ev;
+                    target_pumps = t;
                 }
             }
 
             // FEP agent modulates target
             let inflation_at_target = target_pumps as f64 / max_pumps as f64;
+            let pop_rate_so_far = if experienced_balloons > 0 {
+                experienced_pops as f64 / experienced_balloons as f64
+            } else {
+                0.3
+            };
             let obs = Observation::new(
-                vec![inflation_at_target, (target_pumps as f64 * 0.15 / 3.0).min(1.0),
-                     1.0 - inflation_at_target, base_pop_rate],
+                vec![inflation_at_target, (target_pumps as f64 * reward_per_pump / 3.0).min(1.0),
+                     1.0 - inflation_at_target, pop_rate_so_far.min(1.0)],
                 1.0,
                 "bart",
             );
