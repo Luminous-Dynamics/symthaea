@@ -97,8 +97,8 @@ impl WisconsinCardSortingBenchmark {
 
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
         let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
-        let lr_correct = 0.3; // Reinforce winning hypothesis
-        let lr_error = 0.8;   // Shift away from wrong hypothesis on error (fast switching)
+        let lr_correct = 0.2; // Moderate reinforcement (lower cap = less needed)
+        let lr_error = 0.5;   // Error penalty (additive)
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];
@@ -191,7 +191,10 @@ impl WisconsinCardSortingBenchmark {
                 }
                 consecutive_correct = 0;
 
-                // Penalize the chosen hypothesis, boost alternatives
+                // Multiplicative decay + additive penalty for faster switching.
+                // Halving the wrong hypothesis' confidence is faster than subtracting
+                // a fixed amount when confidence is high.
+                rule_confidence[chosen_rule_idx] *= 0.4; // Rapid decay
                 rule_confidence[chosen_rule_idx] -= lr_error;
                 for (i, c) in rule_confidence.iter_mut().enumerate() {
                     if i != chosen_rule_idx {
@@ -200,9 +203,9 @@ impl WisconsinCardSortingBenchmark {
                 }
             }
 
-            // Clamp confidences to [0, 5] for stability
+            // Clamp confidences to [0, 2.5] — lower cap = less momentum to overcome
             for c in &mut rule_confidence {
-                *c = c.clamp(0.0, 5.0);
+                *c = c.clamp(0.0, 2.5);
             }
 
             // Rule switch after 10 consecutive correct
@@ -214,7 +217,11 @@ impl WisconsinCardSortingBenchmark {
                 prev_rule = Some(current_rule);
                 current_rule = current_rule.cycle();
                 consecutive_correct = 0;
-                // Don't reset confidences — agent must detect the shift via errors
+                // Dampen all confidences after category completion.
+                // Agent "expects" rule may change, reducing perseveration.
+                for c in &mut rule_confidence {
+                    *c *= 0.5;
+                }
             }
         }
 

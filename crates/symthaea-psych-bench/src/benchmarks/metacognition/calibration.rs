@@ -57,7 +57,7 @@ impl MetacognitiveCalibrationBenchmark {
                 ..Default::default()
             });
 
-            for _item_trial in 0..items_per_difficulty {
+            for item_trial in 0..items_per_difficulty {
                 // Generate items to store
                 let items: Vec<ContinuousHV> = (0..diff.num_items)
                     .map(|i| {
@@ -91,6 +91,24 @@ impl MetacognitiveCalibrationBenchmark {
                 rng ^= rng << 17;
                 let target_idx = (rng % diff.num_items as u64) as usize;
                 let target = items[target_idx].clone();
+
+                // Retrieval lure: on some trials, inject a similar-but-wrong item
+                // into WM. This creates "high confidence but wrong" cases that
+                // prevent degenerate gamma=1.0.
+                let inject_lure = item_trial % 3 == 0; // Every 3rd trial
+                if inject_lure {
+                    rng ^= rng << 13;
+                    rng ^= rng >> 7;
+                    rng ^= rng << 17;
+                    let lure_noise = ContinuousHV::random(dim, rng.wrapping_add(7777));
+                    // Lure is 70-80% similar to target (confusable but wrong)
+                    let lure_weight = 0.25 + 0.05 * diff.num_items as f32;
+                    let lure = ContinuousHV::weighted_bundle(
+                        &[&target, &lure_noise],
+                        &[1.0 - lure_weight, lure_weight],
+                    );
+                    wm.perceive(lure);
+                }
 
                 // Delay: push intervening distractors
                 for d in 0..diff.delay {
