@@ -281,9 +281,9 @@ impl CognitiveLoopService {
         // contribution. High-Phi signals get boosted, low-Phi get attenuated.
         // ═══════════════════════════════════════════════════════════════════════
         let phi_attention_weight = if let Some(ref mut gate) = self.phi_attention_gate {
-            let inputs = [encoding_result.hdv.clone()];
             let phi_vals = [self.stats.unified_psi as f64];
-            let result = gate.forward(&inputs, &phi_vals);
+            // Avoid cloning 64KB ContinuousHV — forward() takes &[ContinuousHV]
+            let result = gate.forward(std::slice::from_ref(&encoding_result.hdv), &phi_vals);
             result.weights.first().copied().unwrap_or(1.0)
         } else {
             1.0
@@ -392,6 +392,8 @@ impl CognitiveLoopService {
         // factorized valence/phi components are cleaner than raw averages.
         // Science: Kent et al. (2020) — Resonator Networks for O(log N) factorization
         // Urgency-gated: Critical=always, Normal=always, Cruise=every 4th
+        let mut resonator_wm_primed = false;
+        let mut resonator_reconsolidated: usize = 0;
         if urgency.should_run(self.stats.total_cycles, 1, 1, 4) {
         if let Some(ref mut res_mem) = self.resonator_memory {
             let res_start = Instant::now();
@@ -403,24 +405,49 @@ impl CognitiveLoopService {
                 if let Ok(matches) = res_mem.retrieve(&[("content", &compressed_state)]) {
                     let top_matches: Vec<_> = matches.into_iter().take(MEMORY_RECALL_TOP_K).collect();
 
-                    if top_matches.len() >= 2 {
-                        // Bundle top matches into superposed state
+                    // Extract ALL owned data from borrowed episodes before releasing
+                    // res_mem borrow. retrieve() returns Vec<&Episode>, so we must
+                    // copy what we need before calling query_factorize(&mut res_mem).
+                    let best_match_sim = top_matches.iter()
+                        .map(|m| {
+                            let dot: f32 = compressed_state.iter()
+                                .zip(m.hv.iter())
+                                .map(|(a, b)| a * b)
+                                .sum();
+                            let na: f32 = compressed_state.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            let nb: f32 = m.hv.iter().map(|x| x * x).sum::<f32>().sqrt();
+                            if na > 0.0 && nb > 0.0 { dot / (na * nb) } else { 0.0 }
+                        })
+                        .fold(0.0f32, f32::max);
+                    let match_timestamps: Vec<u64> = top_matches.iter()
+                        .map(|m| m.timestamp)
+                        .collect();
+
+                    // Pre-compute bundled vector while we still hold episode references
+                    let bundled = if top_matches.len() >= 2 {
                         let dim = compressed_state.len();
-                        let mut bundled = vec![0.0f32; dim];
+                        let mut b = vec![0.0f32; dim];
                         let n = top_matches.len() as f32;
                         for ep in &top_matches {
                             for (j, &v) in ep.hv.iter().take(dim).enumerate() {
-                                bundled[j] += v;
+                                b[j] += v;
                             }
                         }
-                        for v in &mut bundled { *v /= n; }
+                        for v in &mut b { *v /= n; }
+                        Some(b)
+                    } else {
+                        None
+                    };
 
-                        // Factorize: unbind content, decompose residual into valence + phi
+                    // Drop episode references — releases the &mut res_mem borrow
+                    drop(top_matches);
+
+                    // Now safe to call query_factorize (no outstanding borrows on res_mem)
+                    if let Some(bundled) = bundled {
                         if let Ok(factors) = res_mem.query_factorize(
                             &bundled,
                             &[("content", &compressed_state)],
                         ) {
-                            // Extract factorized valence/phi for enhanced priming
                             for (label, _hv) in &factors {
                                 match label.as_str() {
                                     "positive" => {
@@ -438,6 +465,24 @@ impl CognitiveLoopService {
                                     _ => {} // neutral, medium, proto_N — no bias
                                 }
                             }
+                        }
+                    }
+
+                    // Track 3a: Resonator recall → confidence priming
+                    // Science: Tulving (1983) — episodic retrieval primes processing
+                    if best_match_sim > 0.3 {
+                        self.prediction_confidence =
+                            (self.prediction_confidence + best_match_sim * 0.02).clamp(0.0, 1.0);
+                        resonator_wm_primed = true;
+                    }
+
+                    // Track 3b: Resonator recall → episodic reconsolidation
+                    // Science: Nader (2003) — retrieval destabilizes then strengthens memories
+                    // match_timestamps is owned Vec<u64>, so phi_episodic_replay access is safe
+                    if !match_timestamps.is_empty() {
+                        if let Some(ref mut replay) = self.phi_episodic_replay {
+                            replay.boost_causal_consolidation(&match_timestamps, 0.05);
+                            resonator_reconsolidated = match_timestamps.len();
                         }
                     }
                 }
@@ -526,8 +571,8 @@ impl CognitiveLoopService {
         );
         module_timings.core_semantic_lookup = _t_core.elapsed().as_micros() as u64;
 
-        // 3. Convert to ndarray for CfC
-        let input_array = Array1::from_vec(compressed_state.clone());
+        // 3. Convert to ndarray for CfC (copy elements directly — avoids Vec clone)
+        let input_array: Array1<f32> = compressed_state.iter().copied().collect();
 
         // 4. Step CfC forward with current input
         // FEEDBACK: Resonance frequency modulates CfC time constant (prev cycle)
@@ -569,7 +614,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 6b. World Model: Update hierarchical world model with sensory input
         // ═══════════════════════════════════════════════════════════════════════
-
+        let _t = Instant::now();
         self.world_model.update_sensory(&compressed_state);
 
         // FEEDBACK: World model stiffness modulates FEP learning rate (meta-learning)
@@ -605,6 +650,7 @@ impl CognitiveLoopService {
             // Perceptual mismatch flag — applied after from_consciousness_state() + strategy reset
             wm_sensory_mismatch = sensory_error > abstract_error * 2.0 && sensory_error > 0.1;
         }
+        module_timings.world_model = _t.elapsed().as_micros() as u64;
 
         // 7. Send prediction to encoder for next cycle
         self.encoder.set_prediction(prediction.clone());
@@ -766,6 +812,56 @@ impl CognitiveLoopService {
                                 .clamp(0.0, 1.0);
                     }
                     _ => {}
+                }
+            }
+        }
+
+        // ── FEP Free Energy Decomposition → targeted modulation ──────────
+        // Science: Friston (2010) — accuracy, complexity, surprise drive distinct responses
+        let (fep_accuracy, fep_complexity, fep_surprise, fep_td_error) =
+            if let Some(ref fe) = self.fep_agent.last_fe_components {
+                // High accuracy → stabilize (model fits well)
+                if fe.accuracy > 0.5 {
+                    self.prediction_confidence =
+                        (self.prediction_confidence + 0.01).clamp(0.0, 1.0);
+                }
+                // High complexity → reduce LR (Occam's razor: penalize overfitting)
+                if fe.complexity > 1.0 {
+                    self.fep_lr_boost =
+                        (self.fep_lr_boost * (1.0 - ((fe.complexity - 1.0).min(0.5) * 0.1) as f32))
+                            .max(1.0);
+                }
+                // High surprise → boost exploration (complement existing is_surprised gate)
+                if fe.surprise > 0.8 {
+                    let s_explore = ((fe.surprise - 0.8) * 0.1).min(0.05) as f32;
+                    self.curiosity_drive.exploration_urge =
+                        (self.curiosity_drive.exploration_urge + s_explore).clamp(0.0, 1.0);
+                }
+                (fe.accuracy, fe.complexity, fe.surprise, fe.prediction_error)
+            } else {
+                (0.0, 0.0, 0.0, 0.0)
+            };
+
+        // ── FEP Pragmatic value → consolidation vs exploration balance ───
+        // Science: Friston (2015) — pragmatic value drives goal-directed behavior
+        let fep_pragmatic_value = action_result.pragmatic_value;
+        if fep_pragmatic_value > 0.7 {
+            // High pragmatic: exploit — reduce exploration
+            self.curiosity_drive.exploration_urge *=
+                (1.0 - (fep_pragmatic_value - 0.7) * 0.3) as f32;
+        } else if fep_pragmatic_value < 0.3 && fep_pragmatic_value > 0.0 {
+            // Low pragmatic: explore — model needs updating
+            let p_explore = ((0.3 - fep_pragmatic_value) * 0.15).min(0.05) as f32;
+            self.curiosity_drive.exploration_urge =
+                (self.curiosity_drive.exploration_urge + p_explore).clamp(0.0, 1.0);
+        }
+
+        // ── FEP TD error → causal discovery trigger ──────────────────────
+        // Science: Schultz (1997) — large prediction errors signal state transitions
+        if fep_td_error.abs() > 0.5 {
+            if let Some(ref mut enhancer) = self.causal_enhancer {
+                if enhancer.should_discover() {
+                    let _graph = enhancer.run_discovery();
                 }
             }
         }
@@ -1261,16 +1357,16 @@ impl CognitiveLoopService {
         {
             self.stats.learning_cycles += 1;
 
-            // Build training sample
+            // Build training sample (copy elements directly — avoids Vec clone)
             let (train_input, train_target, lr) = if let Some(prev) = previous_state {
                 (
                     Array1::from_vec(prev),
-                    Array1::from_vec(compressed_state.clone()),
+                    compressed_state.iter().copied().collect(),
                     effective_lr,
                 )
             } else {
                 // First cycle: bootstrap with self-prediction
-                let current_array = Array1::from_vec(compressed_state.clone());
+                let current_array: Array1<f32> = compressed_state.iter().copied().collect();
                 (current_array.clone(), current_array, effective_lr * 0.1)
             };
 
@@ -1459,10 +1555,6 @@ impl CognitiveLoopService {
             }
             module_timings.stability_regime = _t_stability.elapsed().as_micros() as u64;
 
-            // Pre-compute hdv_sample for episodic encoding (64-dim subsample of compressed state)
-            let hdv_sample: Vec<f32> =
-                compressed_state[..64.min(compressed_state.len())].to_vec();
-
             rayon_join(
                 // -- Branch A: Semantic Memory + Causal Enhancement --
                 || {
@@ -1496,9 +1588,12 @@ impl CognitiveLoopService {
                 || {
                     // Episodic memory: encode significant experiences
                     if prediction_error > 0.1 || pp_in_flow {
+                        // Compute hdv_sample inside closure — avoids clone (only used here)
+                        let hdv_sample: Vec<f32> =
+                            compressed_state[..64.min(compressed_state.len())].to_vec();
                         episodic_memory.encode(
                             input,
-                            hdv_sample.clone(),
+                            hdv_sample,
                             pp_emotional_valence,
                             pp_phi,
                             pp_total_cycles,
@@ -2880,6 +2975,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // RESONATOR CODEBOOK GROWTH: add novel patterns to semantic codebook
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         if let Some(ref mut res_mem) = self.resonator_memory {
             let res_dim_ok = compressed_state.len() == res_mem.resonator.config.dim;
             if res_dim_ok && self.stats.total_cycles % self.config.resonator_growth_interval == 0 {
@@ -2945,6 +3041,48 @@ impl CognitiveLoopService {
             }
         }
 
+        module_timings.resonator_codebook = _t.elapsed().as_micros() as u64;
+
+        // Track 3c: High-Phi episodes → resonator codebook promotion
+        // Science: Dehaene (2014) — conscious access creates durable representations
+        // Co-prime cadence (97 cycles) avoids interference with other periodic tasks
+        let _t = Instant::now();
+        let mut resonator_promotions: usize = 0;
+        if self.stats.total_cycles % 97 == 0 && self.stats.total_cycles > 0 {
+            let top_eps = self
+                .phi_episodic_replay
+                .as_ref()
+                .map(|replay| replay.get_top_episodes(3))
+                .unwrap_or_default();
+
+            if !top_eps.is_empty() {
+                if let Some(ref mut res_mem) = self.resonator_memory {
+                    if let Some(ref mut semantic_cb) = res_mem.resonator.codebooks.get_mut(0) {
+                        for ep in &top_eps {
+                            if ep.psi > 0.5
+                                && semantic_cb.len() < self.config.resonator_max_symbols
+                            {
+                                let ep_vec = &ep.input.values;
+                                if ep_vec.len() == res_mem.resonator.config.dim {
+                                    semantic_cb.add(
+                                        &format!(
+                                            "phi_{:.0}_{}",
+                                            ep.psi * 100.0,
+                                            ep.timestamp
+                                        ),
+                                        ep_vec.clone(),
+                                    );
+                                    resonator_promotions += 1;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        module_timings.high_phi_promotion = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // DEMAND-DRIVEN CONSOLIDATION TRIGGERS
         // ═══════════════════════════════════════════════════════════════════════
@@ -2952,6 +3090,7 @@ impl CognitiveLoopService {
         //   (a) prediction error spikes >2x the moving average, or
         //   (b) semantic memory returned zero hits (retrieval miss)
         // The periodic 100-cycle floor is still enforced by should_replay().
+        let _t = Instant::now();
         if let Some(ref mut replay) = self.phi_episodic_replay {
             let avg_err = self.stats.avg_prediction_error;
             let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
@@ -2970,12 +3109,15 @@ impl CognitiveLoopService {
             }
         }
 
+        module_timings.demand_consolidation = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // SEQUENTIAL: Episodic replay + Memory coordinator
         // ═══════════════════════════════════════════════════════════════════════
         // These remain sequential because:
         // - Episodic replay needs &mut temporal_network for CfC retraining
         // - Memory coordinator needs &mut phi_episodic_replay after replay completes
+        let _t = Instant::now();
         if let Some(ref mut replay) = self.phi_episodic_replay {
             let coherence_summary = self.coherence_bridge.summary();
             let current_phi = coherence_summary.smoothed_coherence as f64;
@@ -3038,9 +3180,12 @@ impl CognitiveLoopService {
             }
         }
 
+        module_timings.episodic_replay = _t.elapsed().as_micros() as u64;
+
         // ═══════════════════════════════════════════════════════════════════════
         // SUPPORT INTELLIGENCE: Triage + Knowledge + Predictive + Federation
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         #[cfg(feature = "support")]
         let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) = {
             self.support_cycle_counter += 1;
@@ -3116,6 +3261,7 @@ impl CognitiveLoopService {
         #[cfg(not(feature = "support"))]
         let (support_triage_count, support_alert_fired, support_federation_graduated, support_efe) =
             (0u32, false, 0usize, 0.0f64);
+        module_timings.support_intelligence = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // DREAM ENGINE: Record surprise events + dream during Cruise
@@ -4341,6 +4487,9 @@ impl CognitiveLoopService {
         // sigma derived from spectral_mip_phi for backward compatibility.
         // ═══════════════════════════════════════════════════════════════════════
         self.spectral_mip_finder.push(&encoding_result.hdv);
+        // Move hdv out now — only peak_attention (Copy) and detected_primitives are needed later.
+        // Avoids a 64KB ContinuousHV clone for soul experience integration below.
+        let encoding_hdv = encoding_result.hdv;
         let spectral_mip_phi = if self.stats.total_cycles % 47 == 0 {
             let result = self.spectral_mip_finder.compute();
             let phi = result.as_ref().map(|r| r.phi);
@@ -4380,7 +4529,7 @@ impl CognitiveLoopService {
                 .map(|j| j.moral_score)
                 .unwrap_or(0.0);
             let experience = crate::soul::Experience {
-                embedding: encoding_result.hdv.clone(),
+                embedding: encoding_hdv,
                 value_alignment: moral_score,
                 emotional_valence: self.emotion_contagion.valence,
                 lessons: Vec::new(),
@@ -4542,7 +4691,21 @@ impl CognitiveLoopService {
             phi_attention_weight,
             guiding_question,
             dominant_harmonic,
+            resonator_wm_primed,
+            resonator_reconsolidated,
+            resonator_promotions,
+            fep_pragmatic_value,
+            fep_accuracy,
+            fep_complexity,
+            fep_surprise,
+            fep_td_error,
         };
+
+        // Update cumulative stats for resonator-memory loop diagnostics
+        if resonator_wm_primed {
+            self.stats.resonator_wm_primed_count += 1;
+        }
+        self.stats.resonator_promotions_total += resonator_promotions as u64;
 
         tracing::debug!(
             surprise = metadata.surprise_triggered,
@@ -4564,7 +4727,7 @@ impl CognitiveLoopService {
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(output.clone()).ok();
+        let signed_output = self.mfdi_bridge.sign_output(&output).ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 

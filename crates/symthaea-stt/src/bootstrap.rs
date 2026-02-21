@@ -187,8 +187,8 @@ impl TrainedPrototypes {
                 let labels: Vec<String> = self.prototypes.keys().cloned().collect();
                 for i in 0..labels.len() {
                     for j in (i + 1)..labels.len() {
-                        let proto_i = self.prototypes.get(&labels[i]).unwrap();
-                        let proto_j = self.prototypes.get(&labels[j]).unwrap();
+                        let Some(proto_i) = self.prototypes.get(&labels[i]) else { continue; };
+                        let Some(proto_j) = self.prototypes.get(&labels[j]) else { continue; };
                         let sim = proto_i.similarity(proto_j);
                         if sim > 0.99 {
                             eprintln!(

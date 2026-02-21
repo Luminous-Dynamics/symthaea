@@ -871,4 +871,116 @@ mod tests {
         assert_eq!(evolver.stats().total_cycles, 5);
         assert_eq!(evolver.history().len(), 5);
     }
+
+    #[test]
+    fn test_gene_gradient_update_clamps_within_bounds() {
+        let mut gene = Gene::new(0.5, 0.0, 1.0);
+
+        // Large positive gradient should not exceed max
+        gene.gradient_update(1000.0, 1.0);
+        assert!(gene.value <= gene.max, "gene value {:.3} exceeds max {:.3}", gene.value, gene.max);
+        assert!(gene.value >= gene.min, "gene value {:.3} below min {:.3}", gene.value, gene.min);
+
+        // phi_sensitivity should have been updated (EMA)
+        assert!(gene.phi_sensitivity > 0.0, "phi_sensitivity should increase from gradient");
+
+        // Large negative gradient should not go below min
+        let mut gene2 = Gene::new(0.5, 0.0, 1.0);
+        gene2.gradient_update(-1000.0, 1.0);
+        assert!(gene2.value >= gene2.min);
+        assert!(gene2.value <= gene2.max);
+    }
+
+    #[test]
+    fn test_gene_phi_sensitivity_ema_update() {
+        let mut gene = Gene::new(0.5, 0.0, 1.0);
+        assert_eq!(gene.phi_sensitivity, 0.0);
+
+        // Apply several gradient updates and check sensitivity converges
+        for _ in 0..20 {
+            gene.gradient_update(0.5, 0.001); // small LR to avoid clamping
+        }
+
+        // EMA of abs(0.5) with alpha=0.1 should converge toward 0.5
+        assert!(gene.phi_sensitivity > 0.0, "sensitivity should be positive after positive gradients");
+        assert!(gene.phi_sensitivity <= 1.0, "sensitivity should be clamped to [0,1]");
+    }
+
+    #[test]
+    fn test_oracle_ema_smoothing() {
+        let mut oracle = ConsciousnessOracle::new(OracleConfig {
+            smoothing_alpha: 0.5,
+            ..Default::default()
+        });
+
+        // Take multiple measurements and verify EMA is tracked
+        for i in 0..5 {
+            let sample = oracle.measure_phi(&format!("measure_{}", i));
+            assert!(sample.phi.is_finite(), "phi must be finite");
+        }
+
+        let stats = oracle.stats();
+        assert_eq!(stats.total_measurements, 5);
+        assert!(stats.current_phi_ema.is_finite(), "EMA should be finite");
+        assert!(stats.avg_phi.is_finite(), "avg_phi should be finite");
+        assert!(stats.max_phi >= stats.min_phi, "max >= min invariant");
+    }
+
+    #[test]
+    fn test_oracle_phi_gradient_with_empty_history() {
+        let mut oracle = ConsciousnessOracle::new(OracleConfig::default());
+
+        // With no history, gradient estimation should return default sensitivity * delta
+        let gradient = oracle.estimate_phi_gradient(0.01);
+        assert!(gradient.is_finite(), "gradient should be finite even with empty history");
+        // Default sensitivity is 0.1, so gradient ~= 0.1 * 0.01 = 0.001
+        let expected = 0.1 * 0.01;
+        assert!((gradient - expected).abs() < 1e-9, "expected ~{:.6}, got {:.6}", expected, gradient);
+    }
+
+    #[test]
+    fn test_genome_all_default_genes_in_valid_range() {
+        let genome = ArchitecturalGenome::default();
+
+        assert_eq!(genome.generation, 0);
+        assert_eq!(genome.fitness, 0.0);
+        assert_eq!(genome.genes.len(), 7, "default genome should have 7 genes");
+
+        for (name, gene) in &genome.genes {
+            assert!(
+                gene.value >= gene.min && gene.value <= gene.max,
+                "gene '{}' value {:.3} outside [{:.3}, {:.3}]",
+                name, gene.value, gene.min, gene.max,
+            );
+            assert!(gene.mutation_rate > 0.0, "gene '{}' should have positive mutation_rate", name);
+        }
+    }
+
+    #[test]
+    fn test_evolver_genome_generation_increments() {
+        let mut evolver = ConsciousnessDrivenEvolver::new(EvolverConfig::default());
+        assert_eq!(evolver.genome().generation, 0);
+
+        evolver.evolve_cycle().unwrap();
+        assert_eq!(evolver.genome().generation, 1);
+
+        evolver.evolve_cycle().unwrap();
+        assert_eq!(evolver.genome().generation, 2);
+    }
+
+    #[test]
+    fn test_evolver_stats_best_phi_is_nondecreasing() {
+        let mut evolver = ConsciousnessDrivenEvolver::new(EvolverConfig {
+            max_cycles: 20,
+            ..Default::default()
+        });
+
+        let mut prev_best = 0.0_f64;
+        for _ in 0..10 {
+            evolver.evolve_cycle().unwrap();
+            let best = evolver.stats().best_phi;
+            assert!(best >= prev_best, "best_phi should never decrease: {} < {}", best, prev_best);
+            prev_best = best;
+        }
+    }
 }

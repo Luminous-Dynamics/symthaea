@@ -1061,7 +1061,7 @@ impl UnifiedImprovementController {
         self.active_trajectories.sort_by(|a, b| {
             b.effective_priority()
                 .partial_cmp(&a.effective_priority())
-                .unwrap()
+                .unwrap_or(std::cmp::Ordering::Equal)
         });
 
         // Get actions from highest priority trajectory

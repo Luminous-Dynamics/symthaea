@@ -178,7 +178,8 @@ impl PredictiveMonitor {
         }
 
         // Clone the last telemetry to avoid borrow conflict
-        let last_telemetry = self.history.last().unwrap().2.clone();
+        let Some(last_entry) = self.history.last() else { return None; };
+        let last_telemetry = last_entry.2.clone();
         let last_input = self.encode_telemetry(&last_telemetry);
 
         let mut future_neuron = self.neuron.clone();
@@ -395,7 +396,9 @@ impl PredictiveMonitor {
         }
 
         let (first_time, _, first) = &self.history[0];
-        let (last_time, _, last) = self.history.last().unwrap();
+        let Some((last_time, _, last)) = self.history.last() else {
+            return TelemetryTrend::default();
+        };
         let hours = last_time.duration_since(*first_time).as_secs_f64() / 3600.0;
 
         if hours < 0.001 {

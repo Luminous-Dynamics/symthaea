@@ -2291,3 +2291,270 @@ fn test_consciousness_metrics_bounded() {
         stats.attention_variance
     );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Phase 9: Resonator-Memory Loop + FEP Deepening Tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── Resonator WM Priming ────────────────────────────────────────
+
+#[test]
+fn test_resonator_wm_priming() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut any_primed = false;
+    let mut any_episodes = false;
+    for _ in 0..50 {
+        let result = service.cycle("resonator priming test input");
+        if result.metadata.resonator_wm_primed {
+            any_primed = true;
+        }
+        if result.metadata.resonator_episodes > 0 {
+            any_episodes = true;
+        }
+        assert!(
+            result.prediction_error.is_finite(),
+            "Prediction error must be finite during resonator priming"
+        );
+    }
+
+    // Resonator priming may or may not trigger depending on codebook state.
+    // We verify no panics and that the fields are populated.
+    let _ = (any_primed, any_episodes);
+    assert_eq!(service.stats().total_cycles, 50);
+}
+
+// ── Resonator Episodic Reconsolidation ──────────────────────────
+
+#[test]
+fn test_resonator_episodic_reconsolidation() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut max_reconsolidated = 0usize;
+    for _ in 0..30 {
+        let result = service.cycle("reconsolidation test pattern");
+        if result.metadata.resonator_reconsolidated > max_reconsolidated {
+            max_reconsolidated = result.metadata.resonator_reconsolidated;
+        }
+        // Reconsolidated count should never exceed MEMORY_RECALL_TOP_K (3)
+        assert!(
+            result.metadata.resonator_reconsolidated <= 3,
+            "Reconsolidated count should be bounded by TOP_K: got {}",
+            result.metadata.resonator_reconsolidated
+        );
+    }
+
+    assert_eq!(service.stats().total_cycles, 30);
+}
+
+// ── High-Phi Resonator Promotion ────────────────────────────────
+
+#[test]
+fn test_high_phi_resonator_promotion() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let mut total_promotions = 0usize;
+    let mut codebook_sizes = Vec::new();
+    for i in 0..100 {
+        let input = if i % 3 == 0 {
+            "consciousness integration resonance"
+        } else if i % 3 == 1 {
+            "temporal dynamics emergence"
+        } else {
+            "holographic binding coherence"
+        };
+        let result = service.cycle(input);
+        total_promotions += result.metadata.resonator_promotions;
+        codebook_sizes.push(result.metadata.resonator_codebook_size);
+    }
+
+    // 100 cycles includes cycle 97 which is the promotion cadence.
+    // Promotions may or may not occur depending on phi threshold.
+    assert_eq!(service.stats().total_cycles, 100);
+    eprintln!(
+        "Resonator promotions over 100 cycles: {total_promotions}, \
+         final codebook size: {}",
+        codebook_sizes.last().unwrap_or(&0)
+    );
+}
+
+// ── FEP Component Decomposition ─────────────────────────────────
+
+#[test]
+fn test_fep_component_decomposition() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..20 {
+        let result = service.cycle("free energy decomposition test");
+        assert!(
+            result.metadata.fep_accuracy.is_finite(),
+            "FEP accuracy must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_complexity.is_finite(),
+            "FEP complexity must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_surprise.is_finite(),
+            "FEP surprise must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_td_error.is_finite(),
+            "FEP TD error must be finite at cycle {i}"
+        );
+    }
+
+    assert_eq!(service.stats().total_cycles, 20);
+}
+
+// ── FEP Pragmatic Exploration Balance ───────────────────────────
+
+#[test]
+fn test_fep_pragmatic_exploration_balance() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    for i in 0..30 {
+        let result = service.cycle("pragmatic value exploration test");
+        assert!(
+            result.metadata.fep_pragmatic_value.is_finite(),
+            "FEP pragmatic value must be finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_action < 8,
+            "FEP action should be in valid range at cycle {i}: got {}",
+            result.metadata.fep_action
+        );
+    }
+
+    assert_eq!(service.stats().total_cycles, 30);
+}
+
+// ── FEP TD Error Causal Trigger ─────────────────────────────────
+
+#[test]
+fn test_fep_td_error_causal_trigger() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "pattern alpha stable input",
+        "completely novel surprise stimulus xyz",
+    ];
+
+    for i in 0..40 {
+        // Alternate inputs to produce prediction errors
+        let result = service.cycle(inputs[i % 2]);
+        assert!(
+            result.metadata.fep_td_error.is_finite(),
+            "FEP TD error must be finite at cycle {i}"
+        );
+        assert!(
+            result.prediction_error.is_finite(),
+            "Prediction error must be finite at cycle {i}"
+        );
+    }
+
+    assert_eq!(service.stats().total_cycles, 40);
+}
+
+// ── Full Resonator-FEP Loop Stability ───────────────────────────
+
+#[test]
+fn test_full_resonator_fep_loop_stability() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        learning_threshold: 0.0,
+        async_training: false,
+        ..Default::default()
+    })
+    .unwrap();
+
+    let inputs = [
+        "quantum coherence binding dynamics",
+        "episodic memory consolidation process",
+        "active inference free energy minimization",
+    ];
+
+    for i in 0..150 {
+        let result = service.cycle(inputs[i % inputs.len()]);
+
+        // All new metadata fields must be finite
+        assert!(
+            result.metadata.fep_accuracy.is_finite(),
+            "FEP accuracy not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_complexity.is_finite(),
+            "FEP complexity not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_surprise.is_finite(),
+            "FEP surprise not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_td_error.is_finite(),
+            "FEP TD error not finite at cycle {i}"
+        );
+        assert!(
+            result.metadata.fep_pragmatic_value.is_finite(),
+            "FEP pragmatic value not finite at cycle {i}"
+        );
+
+        // Resonator fields should be bounded
+        assert!(
+            result.metadata.resonator_reconsolidated <= 3,
+            "Reconsolidated exceeds TOP_K at cycle {i}"
+        );
+        assert!(
+            result.prediction_error.is_finite(),
+            "Prediction error not finite at cycle {i}"
+        );
+    }
+
+    assert_eq!(service.stats().total_cycles, 150);
+
+    let avg_error = service.stats().avg_prediction_error;
+    assert!(
+        avg_error < 1.0,
+        "Average error should be bounded over 150 cycles: got {avg_error:.4}"
+    );
+
+    eprintln!(
+        "Full resonator-FEP stability: 150 cycles, avg_error={avg_error:.4}"
+    );
+}

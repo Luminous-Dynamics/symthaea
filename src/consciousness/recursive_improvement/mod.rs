@@ -55,7 +55,10 @@ pub mod constraint_gate;
 pub mod dream_feedback;
 pub mod magi_integration;
 pub mod persistence;
-pub mod resolution;
+// DEAD CODE: not imported anywhere outside recursive_improvement/. Candidate for removal.
+// The resolution execution system (TestSuite, ExitCode, ResourceState, HumanConfirmation
+// resolvers) has zero external callers. Its ResolutionResult type is not re-exported.
+// pub mod resolution;
 pub mod runtime;
 pub mod world_prediction;
 
@@ -142,85 +145,130 @@ pub use dream_feedback::{
 };
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Legacy Modules - Gated behind full_consciousness feature flag
+// Legacy Modules - All gated behind full_consciousness feature flag
+//
+// DEAD CODE AUDIT (2026-02-21): Every module below has ZERO external callers
+// outside of recursive_improvement/ itself. The only references are:
+//   - brain/consciousness_bridge.rs and brain/hippocampus_bridge.rs import
+//     world_model types, but those files are orphaned (not declared in brain/mod.rs)
+//   - consciousness_driven_evolution.rs imports gradient_optimizer and
+//     recursive_optimizer, but it is itself cfg-gated on full_consciousness
+//   - All other references are internal to recursive_improvement/
+//
+// These modules are candidates for removal. Commenting out all pub mod
+// declarations and re-exports to reduce dead code surface.
 // ═══════════════════════════════════════════════════════════════════════════
 
-// World modeling and routing - these compile cleanly
-#[cfg(feature = "full_consciousness")]
-pub mod routers;
-#[cfg(feature = "full_consciousness")]
-pub mod world_model;
+// DEAD CODE: world_model - Consciousness latent space model. Only callers are
+// orphaned brain bridge files (not in brain/mod.rs). Types collide with
+// dynamics::world_model::WorldModelConfig (the live version).
+// #[cfg(feature = "full_consciousness")]
+// pub mod world_model;
 
-// Self-improvement modules that compile cleanly
-#[cfg(feature = "full_consciousness")]
-pub mod intrinsic_motivation;
-#[cfg(feature = "full_consciousness")]
-pub mod meta_cognitive;
-#[cfg(feature = "full_consciousness")]
-pub mod self_model;
+// DEAD CODE: routers - ConsciousnessRouter variants (Direct, Exploratory, etc.).
+// Only used by routing_hub.rs and benchmark_suite.rs (also dead).
+// #[cfg(feature = "full_consciousness")]
+// pub mod routers;
 
-// TODO: These modules have deep structural mismatches with core types and
-// need significant refactoring before they can be re-enabled.
-//
-// architectural_graph - FIXED: ComponentId function calls now include ()
-#[cfg(feature = "full_consciousness")]
-pub mod architectural_graph;
-//
-// gradient_optimizer - FIXED: ComponentId pattern matching now uses as_str(),
-//   record_phi signature corrected, ComponentId function calls added ()
-#[cfg(feature = "full_consciousness")]
-pub mod gradient_optimizer;
-//
-// improvement_generator - ImprovementType now has struct variants (fixed in core.rs)
-#[cfg(feature = "full_consciousness")]
-pub mod improvement_generator;
-//
-// recursive_optimizer - depends on improvement_generator and safe_experiment
-#[cfg(feature = "full_consciousness")]
-pub mod recursive_optimizer;
-//
-// safe_experiment - ImprovementType struct patterns now match
-#[cfg(feature = "full_consciousness")]
-pub mod safe_experiment;
+// DEAD CODE: intrinsic_motivation - Curiosity/competence/autonomy drives.
+// Only used internally by self_model.rs (also dead).
+// #[cfg(feature = "full_consciousness")]
+// pub mod intrinsic_motivation;
 
-// Previously fixed modules
-#[cfg(feature = "full_consciousness")]
-pub mod dream_mode;
-#[cfg(feature = "full_consciousness")]
-pub mod naming_ceremony;
-#[cfg(feature = "full_consciousness")]
-pub mod semantic_bridge;
+// DEAD CODE: meta_cognitive - Resource allocation controller (GWT/ACT-R inspired).
+// Only re-exported in mod.rs, zero external callers.
+// #[cfg(feature = "full_consciousness")]
+// pub mod meta_cognitive;
 
-// These 3 modules need SemanticPrimitiveEncoder type stubs before they can compile.
-// Folded into full_consciousness (formerly recursive_improvement_advanced).
-#[cfg(feature = "full_consciousness")]
-pub mod benchmark_suite;
-#[cfg(feature = "full_consciousness")]
-pub mod primitive_semantic_bridge;
-#[cfg(feature = "full_consciousness")]
-pub mod routing_hub;
+// DEAD CODE: self_model - Self-modeling with bottleneck detection.
+// Only re-exported in mod.rs, zero external callers.
+// #[cfg(feature = "full_consciousness")]
+// pub mod self_model;
 
-// ── Conditional re-exports for compiled legacy modules ──
+// DEAD CODE: architectural_graph - Component dependency graph for optimization.
+// Only used internally by byzantine_collective (also gated/dead).
+// #[cfg(feature = "full_consciousness")]
+// pub mod architectural_graph;
 
-#[cfg(feature = "full_consciousness")]
-pub use world_model::{
-    ActionType, ConsciousnessAction, ConsciousnessStateDelta, ConsciousnessTransition,
-    ConsciousnessWorldModel, LatentConsciousnessState, WorldModelConfig, WorldModelStats,
-};
+// DEAD CODE: gradient_optimizer - Adam optimizer for Phi maximization.
+// Only caller is consciousness_driven_evolution.rs (itself cfg-gated, no loop callers).
+// #[cfg(feature = "full_consciousness")]
+// pub mod gradient_optimizer;
 
-#[cfg(feature = "full_consciousness")]
-pub use routers::{
-    ConsciousnessRouter, ConsolidatingRouter, DirectRouter, ExploratoryRouter, PhiMaximizingRouter,
-    RouterType, RoutingDecision,
-};
+// DEAD CODE: improvement_generator - Generates improvement proposals.
+// Only used by recursive_optimizer.rs and meta_cognitive.rs (internal).
+// #[cfg(feature = "full_consciousness")]
+// pub mod improvement_generator;
 
-#[cfg(feature = "full_consciousness")]
-pub use intrinsic_motivation::{IntrinsicMotivationSystem, MotivationConfig};
-#[cfg(feature = "full_consciousness")]
-pub use meta_cognitive::{MetaCognitiveConfig, MetaCognitiveController};
-#[cfg(feature = "full_consciousness")]
-pub use self_model::{SelfModel, SelfModelConfig};
-// semantic_bridge disabled - see module comment above
+// DEAD CODE: recursive_optimizer - Orchestrates improvement cycle.
+// Only caller is consciousness_driven_evolution.rs (cfg-gated).
+// #[cfg(feature = "full_consciousness")]
+// pub mod recursive_optimizer;
+
+// DEAD CODE: safe_experiment - Sandboxed experiment runner.
+// Zero external callers.
+// #[cfg(feature = "full_consciousness")]
+// pub mod safe_experiment;
+
+// DEAD CODE: dream_mode - Dream-state exploration mode.
+// Zero external callers.
+// #[cfg(feature = "full_consciousness")]
+// pub mod dream_mode;
+
+// DEAD CODE: naming_ceremony - Concept naming/labeling.
+// Zero external callers.
+// #[cfg(feature = "full_consciousness")]
+// pub mod naming_ceremony;
+
+// DEAD CODE: semantic_bridge - Semantic processing bridge.
+// Zero external callers. Re-exports were already disabled.
+// #[cfg(feature = "full_consciousness")]
+// pub mod semantic_bridge;
+
+// DEAD CODE: benchmark_suite - Consciousness benchmark harness.
+// Zero external callers. Needs SemanticPrimitiveEncoder stubs.
+// #[cfg(feature = "full_consciousness")]
+// pub mod benchmark_suite;
+
+// DEAD CODE: primitive_semantic_bridge - Primitive-to-semantic mapping.
+// Zero external callers. Needs SemanticPrimitiveEncoder stubs.
+// #[cfg(feature = "full_consciousness")]
+// pub mod primitive_semantic_bridge;
+
+// DEAD CODE: routing_hub - Unified routing coordinator.
+// Zero external callers. Depends on routers (also dead).
+// #[cfg(feature = "full_consciousness")]
+// pub mod routing_hub;
+
+// ── Conditional re-exports DISABLED (all source modules commented out above) ──
+
+// DEAD CODE: world_model re-exports
+// #[cfg(feature = "full_consciousness")]
+// pub use world_model::{
+//     ActionType, ConsciousnessAction, ConsciousnessStateDelta, ConsciousnessTransition,
+//     ConsciousnessWorldModel, LatentConsciousnessState, WorldModelConfig, WorldModelStats,
+// };
+
+// DEAD CODE: routers re-exports
+// #[cfg(feature = "full_consciousness")]
+// pub use routers::{
+//     ConsciousnessRouter, ConsolidatingRouter, DirectRouter, ExploratoryRouter, PhiMaximizingRouter,
+//     RouterType, RoutingDecision,
+// };
+
+// DEAD CODE: intrinsic_motivation re-exports
+// #[cfg(feature = "full_consciousness")]
+// pub use intrinsic_motivation::{IntrinsicMotivationSystem, MotivationConfig};
+
+// DEAD CODE: meta_cognitive re-exports
+// #[cfg(feature = "full_consciousness")]
+// pub use meta_cognitive::{MetaCognitiveConfig, MetaCognitiveController};
+
+// DEAD CODE: self_model re-exports
+// #[cfg(feature = "full_consciousness")]
+// pub use self_model::{SelfModel, SelfModelConfig};
+
+// DEAD CODE: semantic_bridge re-exports (were already disabled)
 // #[cfg(feature = "full_consciousness")]
 // pub use semantic_bridge::{
 //     SemanticBridge, SemanticBridgeConfig, SemanticBridgeStats,

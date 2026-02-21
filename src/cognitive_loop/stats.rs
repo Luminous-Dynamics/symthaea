@@ -301,6 +301,12 @@ pub struct LoopStats {
     /// Moral: Whether current action needs ethical review
     pub moral_review_needed: bool,
 
+    /// Number of cycles where resonator recall primed working memory confidence.
+    pub resonator_wm_primed_count: u64,
+
+    /// Number of high-Phi episodes promoted to resonator codebook (cumulative).
+    pub resonator_promotions_total: u64,
+
     // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════

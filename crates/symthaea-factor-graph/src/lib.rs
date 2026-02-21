@@ -648,14 +648,15 @@ impl FactorGraph {
 
         for v in 0..self.variables.len() {
             let belief = self.compute_belief(v);
-            let (best_state, &best_val) = belief
+            if let Some((best_state, &best_val)) = belief
                 .iter()
                 .enumerate()
                 .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                .unwrap();
-            assignment[v] = best_state;
-            if best_val > 0.0 {
-                log_prob += best_val.ln();
+            {
+                assignment[v] = best_state;
+                if best_val > 0.0 {
+                    log_prob += best_val.ln();
+                }
             }
             self.variables[v].belief = belief;
         }

@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use super::{
     ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleResult, Experience, LoopStats,
-    MoralJudgmentSummary,
+    MoralJudgmentSummary, ResponseStrategy,
 };
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -33,6 +33,28 @@ const MEMORY_CONTEXT_BOOST_SCALE: f32 = 0.1;
 
 // -- Surprise & exploration --
 const SURPRISE_BOREDOM_DAMPEN: f32 = 0.7;
+
+// -- Psi synthesis --
+const FLOW_PSI_WEIGHT: f32 = 0.2;
+const RELATIONAL_PSI_WEIGHT: f32 = 0.15;
+const BODY_PSI_WEIGHT: f64 = 0.1;
+const EMBODIED_PSI_WEIGHT: f64 = 0.05;
+
+// -- Strategy modulation --
+const STRATEGY_EXPLORATORY_FACTOR: f32 = 0.8;
+const STRATEGY_DETAILED_SENSITIVITY: f32 = 1.2;
+const STRATEGY_CONCISE_SPEECH_RATE: f32 = 1.2;
+const STRATEGY_CLARIFYING_FACTOR: f32 = 0.5;
+const STRATEGY_SUPPORTIVE_PAUSE: f32 = 1.3;
+
+// -- Reward computation (RL) --
+const REWARD_GOOD_BASE: f32 = 0.5;
+const REWARD_GOOD_CONFIDENCE_SCALE: f32 = 0.5;
+const REWARD_BAD_BASE: f32 = -0.3;
+const REWARD_BAD_SCALE: f32 = -0.2;
+const REWARD_MID_BASE: f32 = 0.2;
+const REWARD_MID_SCALE: f32 = -0.5;
+const REWARD_EXTERNAL_BLEND: f32 = 0.5;
 
 impl CognitiveLoopService {
     /// Process a pre-computed text embedding through the neural bridge and
@@ -933,5 +955,125 @@ impl CognitiveLoopService {
         }
 
         (surprise_triggered, exploration_action)
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Extracted helpers from cycle() — Phase 3 (MEDIUM risk)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Compute unified Psi (Layer 1 consciousness estimate) from subsystem contributions.
+    ///
+    /// Combines: temporal coherence + voice quality + flow state + relational
+    /// dyad + interoceptive body + embodied cognition. Clamps to [0.0, 1.0].
+    /// Updates the unification engine with the result.
+    pub(super) fn compute_unified_psi(&mut self) -> f64 {
+        let coherence_psi = self.coherence_bridge.phi_contribution();
+        let voice_psi = self.voice_feedback_bridge.summary().phi_adjustment;
+        let flow_psi = if self.flow_state.in_flow {
+            self.flow_state.intensity * FLOW_PSI_WEIGHT
+        } else {
+            0.0
+        };
+        let relational_psi_contrib = if self.relational_psi > 0.0 {
+            self.relational_psi as f32 * RELATIONAL_PSI_WEIGHT
+        } else {
+            0.0
+        };
+        let body_psi_contrib =
+            (self.carryover.consciousness.body_phi_modulation - 1.0) * BODY_PSI_WEIGHT;
+        let embodied_psi_contrib =
+            (self.carryover.consciousness.embodied_phi_modulation - 1.0) * EMBODIED_PSI_WEIGHT;
+        let unified_psi = (coherence_psi
+            + voice_psi
+            + flow_psi
+            + relational_psi_contrib
+            + body_psi_contrib as f32
+            + embodied_psi_contrib as f32)
+            .clamp(0.0, 1.0) as f64;
+        self.unification_engine.update_psi(unified_psi);
+        unified_psi
+    }
+
+    /// Compute the cycle reward signal for reinforcement learning.
+    ///
+    /// Blends internal reward (based on prediction error vs learning threshold)
+    /// with any pending external reward. Consumes the external reward.
+    /// Returns the clamped reward in [-1.0, 1.0].
+    pub(super) fn compute_reward_signal(
+        &mut self,
+        prediction_error: f32,
+        learning_threshold: f32,
+    ) -> f32 {
+        let internal_reward = if prediction_error < learning_threshold {
+            REWARD_GOOD_BASE + REWARD_GOOD_CONFIDENCE_SCALE * self.prediction_confidence
+        } else if prediction_error > 0.5 {
+            REWARD_BAD_BASE + REWARD_BAD_SCALE * (prediction_error - 0.5)
+        } else {
+            REWARD_MID_BASE + REWARD_MID_SCALE * prediction_error
+        };
+        let cycle_reward = if self.external_reward.abs() > f32::EPSILON {
+            let blended = internal_reward * REWARD_EXTERNAL_BLEND
+                + self.external_reward * REWARD_EXTERNAL_BLEND;
+            self.external_reward = 0.0; // consume
+            blended
+        } else {
+            internal_reward
+        };
+        cycle_reward.clamp(-1.0, 1.0)
+    }
+
+    /// Apply initial strategy modulation to adaptive behavior.
+    ///
+    /// Sets exploration factor, attention sensitivity, speech rate, or pause
+    /// multiplier based on the selected response strategy.
+    pub(super) fn apply_strategy_modulation(&mut self, strategy: ResponseStrategy) {
+        match strategy {
+            ResponseStrategy::Exploratory => {
+                self.adaptive_behavior.exploration_factor = STRATEGY_EXPLORATORY_FACTOR;
+            }
+            ResponseStrategy::Detailed => {
+                self.adaptive_behavior.attention_sensitivity = STRATEGY_DETAILED_SENSITIVITY;
+            }
+            ResponseStrategy::Concise => {
+                self.adaptive_behavior.speech_rate_multiplier = STRATEGY_CONCISE_SPEECH_RATE;
+            }
+            ResponseStrategy::Clarifying => {
+                self.adaptive_behavior.exploration_factor = STRATEGY_CLARIFYING_FACTOR;
+            }
+            ResponseStrategy::Supportive => {
+                self.adaptive_behavior.pause_multiplier = STRATEGY_SUPPORTIVE_PAUSE;
+            }
+        }
+    }
+
+    /// Re-apply strategy modulations ON TOP of consciousness-derived base.
+    ///
+    /// Uses max/min/multiply to merge strategy with consciousness state,
+    /// preserving the stronger signal. Called after `from_consciousness_state()`
+    /// resets adaptive behavior.
+    pub(super) fn reapply_strategy_modulation(&mut self, strategy: ResponseStrategy) {
+        match strategy {
+            ResponseStrategy::Exploratory => {
+                self.adaptive_behavior.exploration_factor =
+                    self.adaptive_behavior.exploration_factor.max(STRATEGY_EXPLORATORY_FACTOR);
+            }
+            ResponseStrategy::Detailed => {
+                self.adaptive_behavior.attention_sensitivity *= STRATEGY_DETAILED_SENSITIVITY;
+            }
+            ResponseStrategy::Concise => {
+                self.adaptive_behavior.speech_rate_multiplier = self
+                    .adaptive_behavior
+                    .speech_rate_multiplier
+                    .max(STRATEGY_CONCISE_SPEECH_RATE);
+            }
+            ResponseStrategy::Clarifying => {
+                self.adaptive_behavior.exploration_factor =
+                    self.adaptive_behavior.exploration_factor.min(STRATEGY_CLARIFYING_FACTOR);
+            }
+            ResponseStrategy::Supportive => {
+                self.adaptive_behavior.pause_multiplier =
+                    self.adaptive_behavior.pause_multiplier.max(STRATEGY_SUPPORTIVE_PAUSE);
+            }
+        }
     }
 }

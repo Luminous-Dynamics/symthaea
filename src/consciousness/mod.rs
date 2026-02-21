@@ -464,9 +464,12 @@ pub mod context_aware_evolution;
 pub mod temporal_consciousness;
 pub mod unified_consciousness_pipeline;
 
-/// Gated: depends on recursive_optimizer and gradient_optimizer (require full_consciousness)
-#[cfg(feature = "full_consciousness")]
-pub mod consciousness_driven_evolution;
+// DEAD CODE: consciousness_driven_evolution - Phi-guided architecture evolution.
+// Depends on recursive_improvement::{gradient_optimizer, recursive_optimizer} which are
+// now commented out (zero external callers). Only referenced internally, never wired
+// into cognitive_loop. Candidate for removal.
+// #[cfg(feature = "full_consciousness")]
+// pub mod consciousness_driven_evolution;
 
 /// Gated: depends on autopoietic_consciousness::LifeState (not in src version)
 #[cfg(feature = "full_consciousness")]

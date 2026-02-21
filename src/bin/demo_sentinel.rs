@@ -460,9 +460,9 @@ impl SentinelDemo {
             let first_char = cmd.chars().next();
 
             match first_char {
-                Some('A'..='F') => {
+                Some(c @ 'A'..='F') => {
                     // Learn pattern A-F
-                    self.run_learning(first_char.unwrap())?;
+                    self.run_learning(c)?;
                 }
                 Some('D') if cmd == "D" => {
                     self.running.store(true, Ordering::Relaxed);

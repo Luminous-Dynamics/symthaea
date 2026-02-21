@@ -52,7 +52,7 @@ impl HV16 {
 
         let mut words = [0u128; HDC_WORDS];
         for (i, chunk) in output.chunks_exact(16).enumerate() {
-            words[i] = u128::from_le_bytes(chunk.try_into().unwrap());
+            words[i] = u128::from_le_bytes(chunk.try_into().unwrap_or([0u8; 16]));
         }
 
         Self { words }
@@ -62,7 +62,7 @@ impl HV16 {
     pub fn from_bytes(bytes: &[u8; 256]) -> Self {
         let mut words = [0u128; HDC_WORDS];
         for (i, chunk) in bytes.chunks_exact(16).enumerate() {
-            words[i] = u128::from_le_bytes(chunk.try_into().unwrap());
+            words[i] = u128::from_le_bytes(chunk.try_into().unwrap_or([0u8; 16]));
         }
         Self { words }
     }

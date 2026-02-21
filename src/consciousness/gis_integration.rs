@@ -660,4 +660,127 @@ mod tests {
         assert_eq!(context.ignorance_type, IgnoranceType::KnownUnknown);
         assert_eq!(context.attention_modifier(), 0.7);
     }
+
+    #[test]
+    fn test_effective_consciousness_scales_with_uncertainty() {
+        // Zero uncertainty => effective == phi
+        let detection_none = IgnoranceDetection {
+            query: "trivial".to_string(),
+            ignorance_type: IgnoranceType::None,
+            uncertainty: Uncertainty3D::new(0.0, 0.0, 0.0),
+            domain: Domain::General,
+            eig: 0.0,
+            detected_at: SystemTime::now(),
+        };
+        let state_none = ConsciousUncertaintyState::from_phi_and_detection(0.9, &detection_none);
+        assert!((state_none.effective_consciousness() - 0.9).abs() < 1e-5,
+            "zero uncertainty should give effective == phi");
+        assert!(state_none.is_grounded, "zero uncertainty + IgnoranceType::None should be grounded");
+
+        // High uncertainty => effective << phi
+        let detection_high = IgnoranceDetection {
+            query: "deep unknown".to_string(),
+            ignorance_type: IgnoranceType::Unknown,
+            uncertainty: Uncertainty3D::new(0.8, 0.5, 0.3),
+            domain: Domain::General,
+            eig: 0.9,
+            detected_at: SystemTime::now(),
+        };
+        let state_high = ConsciousUncertaintyState::from_phi_and_detection(0.9, &detection_high);
+        assert!(state_high.effective_consciousness() < 0.5,
+            "high uncertainty should significantly reduce effective consciousness");
+        assert!(!state_high.is_grounded, "high uncertainty + Unknown should not be grounded");
+    }
+
+    #[test]
+    fn test_should_proceed_risk_threshold() {
+        let detection = IgnoranceDetection {
+            query: "moderate question".to_string(),
+            ignorance_type: IgnoranceType::Known,
+            uncertainty: Uncertainty3D::new(0.3, 0.1, 0.1),
+            domain: Domain::General,
+            eig: 0.2,
+            detected_at: SystemTime::now(),
+        };
+        let state = ConsciousUncertaintyState::from_phi_and_detection(0.7, &detection);
+        let conf = state.epistemic_confidence;
+
+        // Should proceed when action risk is below confidence
+        assert!(state.should_proceed(conf - 0.1), "should proceed when risk < confidence");
+
+        // Should not proceed when action risk is above confidence
+        assert!(!state.should_proceed(conf + 0.1), "should not proceed when risk > confidence");
+
+        // Edge: exactly equal
+        assert!(state.should_proceed(conf), "should proceed when risk == confidence");
+    }
+
+    #[test]
+    fn test_epistemic_gate_custom_thresholds() {
+        // Very permissive gate
+        let mut permissive = EpistemicDecisionGate::with_thresholds(0.1, 0.01);
+        let d1 = permissive.evaluate("anything at all", 0.0);
+        // With near-zero thresholds, should not defer
+        assert!(!matches!(d1, EpistemicDecision::Defer { .. }),
+            "permissive gate with zero-risk should not defer");
+
+        // Very strict gate
+        let mut strict = EpistemicDecisionGate::with_thresholds(0.99, 0.95);
+        let d2 = strict.evaluate("anything at all", 0.99);
+        // With near-one thresholds and high risk, should not Proceed without caveat
+        assert!(!matches!(d2, EpistemicDecision::Proceed { .. }),
+            "strict gate with high-risk should not cleanly proceed");
+    }
+
+    #[test]
+    fn test_attention_modifier_all_ignorance_types() {
+        // Verify all ignorance types produce the documented attention modifiers
+        let cases = vec![
+            (IgnoranceType::None, 1.0),
+            (IgnoranceType::Known, 0.9),
+            (IgnoranceType::KnownUnknown, 0.7),
+            (IgnoranceType::Unknown, 0.5),
+            (IgnoranceType::Impossible, 0.1),
+        ];
+
+        for (ignorance_type, expected_modifier) in cases {
+            let detection = IgnoranceDetection {
+                query: "test".to_string(),
+                ignorance_type,
+                uncertainty: Uncertainty3D::new(0.1, 0.1, 0.1),
+                domain: Domain::General,
+                eig: 0.1,
+                detected_at: SystemTime::now(),
+            };
+            let context = EpistemicBidContext::from_detection(&detection, 0.5);
+            assert!(
+                (context.attention_modifier() - expected_modifier).abs() < 1e-5,
+                "{:?} should give modifier {}, got {}",
+                ignorance_type, expected_modifier, context.attention_modifier(),
+            );
+        }
+    }
+
+    #[test]
+    fn test_empty_statistics() {
+        let gate = EpistemicDecisionGate::new();
+        let stats = gate.statistics();
+
+        assert_eq!(stats.total_decisions, 0);
+        assert_eq!(stats.proceed_rate, 0.0);
+        assert_eq!(stats.caveat_rate, 0.0);
+        assert_eq!(stats.defer_rate, 0.0);
+        assert_eq!(stats.out_of_domain_rate, 0.0);
+        assert_eq!(stats.guidance_rate, 0.0);
+    }
+
+    #[test]
+    fn test_dark_spot_network_default_trait() {
+        let network = ConsciousDarkSpotNetwork::default();
+        let stats = network.statistics();
+        assert_eq!(stats.published_count, 0);
+        assert_eq!(stats.resolved_count, 0);
+        assert_eq!(stats.contributed_count, 0);
+        assert_eq!(stats.queries_made, 0);
+    }
 }

@@ -447,8 +447,8 @@ impl LiquidNetwork {
 
         // Compute weighted input using sparse matrix-vector multiply: Wx + b
         // This is O(nnz) instead of O(n²) for dense matrices
-        let state_slice = self.state.as_slice().unwrap();
-        let bias_slice = self.bias.as_slice().unwrap();
+        let state_slice = self.state.as_slice().unwrap_or(&[]);
+        let bias_slice = self.bias.as_slice().unwrap_or(&[]);
         let weighted_input = self.weights.spmv_bias(state_slice, bias_slice);
 
         // Apply fast sigmoid activation (2-3x faster than standard exp-based sigmoid)

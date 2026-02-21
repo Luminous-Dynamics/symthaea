@@ -334,12 +334,9 @@ impl CausalEmergenceAnalyzer {
         let macro_discrete = self.discretizer.to_macro(macro_state);
 
         // Record transitions from previous state
-        if !self.micro_history.is_empty() {
+        if let Some(prev_micro_state) = self.micro_history.last() {
             // For micro: use aggregate state (sum of discrete values)
-            let prev_micro: usize = self
-                .micro_history
-                .last()
-                .unwrap()
+            let prev_micro: usize = prev_micro_state
                 .iter()
                 .map(|&v| self.discretizer.to_micro(v))
                 .sum::<usize>()
@@ -354,10 +351,8 @@ impl CausalEmergenceAnalyzer {
             self.micro_total += 1;
         }
 
-        if !self.macro_history.is_empty() {
-            let prev_macro = self
-                .discretizer
-                .to_macro(*self.macro_history.last().unwrap());
+        if let Some(&last_macro) = self.macro_history.last() {
+            let prev_macro = self.discretizer.to_macro(last_macro);
             *self
                 .macro_transitions
                 .entry((prev_macro, macro_discrete))
