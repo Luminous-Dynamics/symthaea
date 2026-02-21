@@ -15,6 +15,7 @@
 use std::collections::{HashMap, VecDeque};
 
 use ndarray::Array1;
+use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use symthaea_core::hdc::hdc_ltc_unified::{HdcLtcUnifiedNeuron, UnifiedConfig};
@@ -449,43 +450,44 @@ impl StabilityRegimeProcessor {
         let cycle = self.global_cycle;
         let config_clone = self.config.clone();
 
-        let mut transitions = Vec::new();
+        // 2 & 3. Evolve all primitives in parallel, update activation, track counts, transition regimes
+        // Each primitive is independent (no cross-primitive data deps), so rayon can process
+        // ~75-250 CfC neurons across cores. With adaptive culling, only non-dormant primitives
+        // perform the expensive 16,384D evolution.
+        let transitions: Vec<RegimeTransition> = self
+            .primitives
+            .par_iter_mut()
+            .filter_map(|(_name, cfc)| {
+                let params = config_clone.params(cfc.regime).clone();
 
-        // 2 & 3. Evolve all primitives, update activation, track counts, transition regimes
-        for cfc in self.primitives.values_mut() {
-            let params = config_clone.params(cfc.regime).clone();
+                // Adaptive culling: skip evolution for dormant primitives
+                // (inactive + near-zero activation + idle for 5+ cycles)
+                // Saves ~1.5ms per skipped primitive (bind/bundle/activate on 16,384D)
+                let dormant = !cfc.is_active
+                    && cfc.activation.abs() < 0.01
+                    && cycle.saturating_sub(cfc.last_activated_cycle) >= 5;
 
-            // Adaptive culling: skip evolution for dormant primitives
-            // (inactive + near-zero activation + idle for 5+ cycles)
-            // Saves ~1.5ms per skipped primitive (bind/bundle/activate on 16,384D)
-            let dormant = !cfc.is_active
-                && cfc.activation.abs() < 0.01
-                && cycle.saturating_sub(cfc.last_activated_cycle) >= 5;
+                if !dormant {
+                    cfc.evolve(dt, &continuous_input, &params);
+                }
 
-            if !dormant {
-                cfc.evolve(dt, &continuous_input, &params);
-            }
+                let was_active = cfc.is_active;
+                cfc.update_active_status(&params);
 
-            let was_active = cfc.is_active;
-            cfc.update_active_status(&params);
+                // Track per-primitive activation counts
+                if cfc.is_active && !was_active {
+                    cfc.total_activation_count += 1;
+                    cfc.last_activated_cycle = cycle;
+                } else if cfc.is_active {
+                    cfc.last_activated_cycle = cycle;
+                }
 
-            // Track per-primitive activation counts
-            if cfc.is_active && !was_active {
-                // Fresh activation this cycle
-                cfc.total_activation_count += 1;
-                cfc.last_activated_cycle = cycle;
-            } else if cfc.is_active {
-                // Still active — keep last_activated_cycle current
-                cfc.last_activated_cycle = cycle;
-            }
-
-            // Dynamic regime transitions (and decrystallization)
-            if let Some(transition) = cfc.update_regime(cycle, &config_clone) {
-                transitions.push(transition);
-            }
-
-            cfc.record_history(timestamp, config_clone.history_len);
-        }
+                // Dynamic regime transitions (and decrystallization)
+                let transition = cfc.update_regime(cycle, &config_clone);
+                cfc.record_history(timestamp, config_clone.history_len);
+                transition
+            })
+            .collect();
 
         // 4. Build consciousness state from active primitives
         let mut state = PrimitiveConsciousnessState::new(timestamp);

@@ -161,63 +161,19 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.1: Safety Pre-check (fast amygdala veto)
         // ═══════════════════════════════════════════════════════════════════════
-        // Fast regex + HDC forbidden-subspace check BEFORE expensive encoding.
-        // Short-circuits dangerous inputs with a safe default response.
-        if let Some(ref mut gateway) = self.safety_gateway {
-            let decision = gateway.check(crate::safety::SafetyCheck::Query(input));
-            if !decision.allowed {
-                let mut metadata = super::CycleMetadata::default();
-                metadata.safety_blocked = true;
-                metadata.safety_category = decision.category.map(|c| format!("{c:?}"));
-                metadata.urgency = self.carryover.urgency.urgency;
-                tracing::warn!(
-                    target: "cognitive_loop::safety",
-                    category = ?decision.category,
-                    message = ?decision.message,
-                    "Safety gateway blocked input — returning safe default"
-                );
-                return CycleResult {
-                    output: vec![0.0; self.config.cfc_config.num_neurons],
-                    prediction_error: 0.0,
-                    peak_attention: 0.0,
-                    detected_primitives: vec![],
-                    learning_occurred: false,
-                    training_loss: None,
-                    cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
-                    metadata,
-                    #[cfg(feature = "identity")]
-                    signed_output: None,
-                    #[cfg(feature = "identity")]
-                    assurance_level: crate::identity::AssuranceLevel::E0Anonymous,
-                };
-            }
+        if let Some(blocked) = self.safety_precheck(input, cycle_start) {
+            return blocked;
         }
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0: Thalamic Routing (Cognitive Depth Selection)
         // ═══════════════════════════════════════════════════════════════════════
-        // Determine how deep to process BEFORE encoding, based on prior state
-
-        let prior_pattern = self.temporal_signature_encoder.classify_state().0;
-        let prior_valence = self.emotion_contagion.prosody_valence();
-        let prior_error = self.stats.avg_prediction_error;
-
-        self.cognitive_depth =
-            self.thalamic_router
-                .route_from_cycle(prior_error, prior_pattern, prior_valence);
+        self.update_cognitive_depth();
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.3: Negation Detection (guards moral evaluation)
         // ═══════════════════════════════════════════════════════════════════════
-        // Detects logical negation so "not harmful" ≠ "harmful".
-        // Science: Wason (1959) — negation processing in human reasoning
-        let input_negation_polarity = if let Some(ref detector) = self.negation_detector {
-            detector.get_polarity(input, "harmful")
-                .max(detector.get_polarity(input, "dangerous"))
-                .max(detector.get_polarity(input, "unethical"))
-        } else {
-            0.0
-        };
+        let input_negation_polarity = self.detect_negation_polarity(input);
 
         // ═══════════════════════════════════════════════════════════════════════
         // PHASE 0.4: Moral Evaluation (throttled: every 5th cycle or on new input)
@@ -1445,25 +1401,8 @@ impl CognitiveLoopService {
             }
         }
 
-        // Get adaptive learning rate (respects pause_learning and all modulations)
-        // Include flow state boost, curiosity novelty bonus, and semantic context
-        let base_lr = self.combined_learning_rate();
-        let adaptive_lr = self.adaptive_behavior.effective_learning_rate(base_lr);
-        let flow_lr = self.flow_state.effective_learning_multiplier(adaptive_lr);
-        // Apply semantic memory modulation: boost learning when similar inputs had high error
-        // Also apply reasoning engine reliability factor (low reliability = cautious learning)
-        let semantic_modulated_lr = flow_lr * semantic_lr_factor * reasoning_lr_factor;
-        // Apply subsystem LR factor from PREVIOUS cycle (meta-cognition, predictive processing,
-        // predictive self, phenomenal binding, consciousness thermodynamics). Reset for next cycle.
-        let subsystem_lr = self.carryover.learning.subsystem_lr_factor.clamp(0.5, 2.0);
-        self.carryover.learning.subsystem_lr_factor = 1.0; // reset for this cycle's accumulation
-        let effective_lr = (self
-            .curiosity_drive
-            .effective_learning_rate(semantic_modulated_lr)
-            * self.fep_lr_boost
-            * (1.0 + self.carryover.learning.mce_lr_boost)
-            * subsystem_lr)
-            .clamp(0.0, 0.01); // Hard cap: reduced from 0.05 to 0.01 to prevent oscillation with cyclic patterns
+        // Compose effective LR from all modulation sources (flow, curiosity, FEP, MCE, subsystem)
+        let effective_lr = self.compose_effective_lr(semantic_lr_factor, reasoning_lr_factor);
 
         // 11. Learn if error is significant AND we have a previous state AND not paused
         // FEEDBACK: Narrative-GWT veto suppresses learning (consciousness governance)
@@ -4305,6 +4244,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // UNIFIED LIVING MIND: life-mind continuity (full_consciousness only)
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         // Integrates autopoietic self-maintenance, enactive sense-making, and
         // predictive processing into a unified vitality/coherence measure.
         #[cfg(feature = "full_consciousness")]
@@ -4379,10 +4319,12 @@ impl CognitiveLoopService {
 
         #[cfg(not(feature = "full_consciousness"))]
         let (living_mind_vitality, living_mind_coherence) = (0.0, 0.0);
+        module_timings.living_mind = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // MASTER CONSCIOUSNESS EQUATION: comprehensive consciousness metric
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
         // Run every 10th cycle to amortize cost. Maps cognitive loop signals to
         // the 8-factor ConsciousnessInputs: Phi, Broadcast, WorkingMemory,
         // Attention, Recurrence, Embodiment, Knowledge, Synchrony.
@@ -4433,10 +4375,12 @@ impl CognitiveLoopService {
         // Store resonance frequency and quantum coherence for next cycle's feedback
         self.carryover.history.resonance_frequency = resonance_frequency;
         self.carryover.consciousness.quantum_coherence = quantum_coherence_level;
+        module_timings.master_consciousness_equation = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // END-OF-CYCLE HOMEOSTASIS: Prevent asymmetric drift and runaway spirals
         // ═══════════════════════════════════════════════════════════════════════
+        let _t = Instant::now();
 
         // Guard: clamp total per-cycle confidence drift to ±15%.
         // prediction_confidence is modified ~25 times per cycle by different subsystems,
@@ -4488,9 +4432,11 @@ impl CognitiveLoopService {
 
         // Store urgency for next cycle's hysteresis
         self.carryover.urgency.urgency = urgency;
+        module_timings.homeostasis = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
         // SPECTRAL MIP — O(n³) Fiedler-ordered MIP search (Layer 2)
+        let _t = Instant::now();
         // Replaces SynergisticIntegration: 128 dims (vs 64), better MIP via
         // Fiedler ordering + bordered Cholesky. Computed every 47 cycles (co-prime).
         // sigma derived from spectral_mip_phi for backward compatibility.
@@ -4522,8 +4468,10 @@ impl CognitiveLoopService {
             self.carryover.consciousness.last_spectral_mip_phi
         };
         let sigma = self.carryover.consciousness.last_sigma;
+        module_timings.spectral_mip = _t.elapsed().as_micros() as u64;
 
         // Soul experience integration: feed cycle outcome back into value learning.
+        let _t = Instant::now();
         // This closes the loop: Soul evaluates alignment (pre-cycle) → cognitive cycle
         // → integrate experience (post-cycle) → Soul's essence evolves.
         if let Some(ref mut soul) = self.soul {
@@ -4541,8 +4489,14 @@ impl CognitiveLoopService {
             };
             soul.integrate_experience(experience);
         }
+        module_timings.soul_experience = _t.elapsed().as_micros() as u64;
+
+        // Pre-compute formatted strings to avoid format!() inside struct literal
+        let circadian_phase_str = format!("{:?}", self.biorhythm.phase);
+        let selected_strategy_str = format!("{:?}", selected_strategy);
 
         // Build cycle metadata for observability
+        let _t = Instant::now();
         let metadata = super::CycleMetadata {
             surprise_triggered,
             prefrontal_veto,
@@ -4655,7 +4609,7 @@ impl CognitiveLoopService {
             safety_category: None,
             negation_polarity: input_negation_polarity,
             moral_score,
-            selected_strategy: format!("{:?}", selected_strategy),
+            selected_strategy: selected_strategy_str,
             actual_effective_lr: if learning_occurred { effective_lr } else { 0.0 },
             cycle_reward,
             fep_action: fep_action_idx,
@@ -4679,8 +4633,11 @@ impl CognitiveLoopService {
             resonator_factorization_iters: self.resonator_memory.as_ref()
                 .map(|m| m.resonator.iterations())
                 .unwrap_or(0),
-            module_timings_us: module_timings,
-            circadian_phase: format!("{:?}", self.biorhythm.phase),
+            module_timings_us: {
+                module_timings.metadata_assembly = _t.elapsed().as_micros() as u64;
+                module_timings
+            },
+            circadian_phase: circadian_phase_str,
             circadian_plasticity: self.biorhythm.plasticity_mod as f32,
             phi_attention_weight,
             guiding_question,

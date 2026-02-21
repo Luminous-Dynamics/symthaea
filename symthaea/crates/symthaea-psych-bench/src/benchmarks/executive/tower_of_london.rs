@@ -249,26 +249,62 @@ impl TowerOfLondonBenchmark {
                 let mut moves_taken = 0u32;
                 let mut visited_count = 0u32;
 
-                // HDC-guided greedy search with 1-step lookahead
+                // HDC-guided search with 3-step lookahead.
+                // For each legal move, recursively evaluate the best
+                // 2-step continuation, picking the path with highest
+                // final similarity to goal. Bounded: ~6^3 = 216 nodes max.
                 while current != problem.goal && moves_taken < max_search_depth as u32 {
                     let legal = current.legal_moves();
                     if legal.is_empty() {
                         break;
                     }
 
-                    // Score each move by resulting state's similarity to goal
+                    // Score each move by the best reachable state within 3 steps
                     let mut scored: Vec<(usize, usize, f32)> = legal
                         .iter()
                         .map(|&(from, to)| {
-                            let next = current.apply_move(from, to);
-                            let next_hv = next.encode(&disc_hvs, &peg_hvs, &height_hvs);
-                            let sim = next_hv.similarity(&goal_hv);
-                            (from, to, sim)
+                            let s1 = current.apply_move(from, to);
+                            if s1 == problem.goal {
+                                return (from, to, 1.0f32);
+                            }
+                            let s1_sim = s1.encode(&disc_hvs, &peg_hvs, &height_hvs)
+                                .similarity(&goal_hv);
+
+                            // 2-step lookahead from s1
+                            let mut best_2 = s1_sim;
+                            for &(f2, t2) in &s1.legal_moves() {
+                                let s2 = s1.apply_move(f2, t2);
+                                if s2 == problem.goal {
+                                    best_2 = 1.0;
+                                    break;
+                                }
+                                let s2_sim = s2.encode(&disc_hvs, &peg_hvs, &height_hvs)
+                                    .similarity(&goal_hv);
+
+                                // 3-step lookahead from s2
+                                let mut best_3 = s2_sim;
+                                for &(f3, t3) in &s2.legal_moves() {
+                                    let s3 = s2.apply_move(f3, t3);
+                                    let s3_sim = if s3 == problem.goal {
+                                        1.0
+                                    } else {
+                                        s3.encode(&disc_hvs, &peg_hvs, &height_hvs)
+                                            .similarity(&goal_hv)
+                                    };
+                                    if s3_sim > best_3 {
+                                        best_3 = s3_sim;
+                                    }
+                                }
+                                if best_3 > best_2 {
+                                    best_2 = best_3;
+                                }
+                            }
+                            (from, to, best_2)
                         })
                         .collect();
 
                     // Sort by similarity descending
-                    scored.sort_by(|a, b| b.2.partial_cmp(&a.2).unwrap_or(std::cmp::Ordering::Equal));
+                    scored.sort_by(|a, b| b.2.total_cmp(&a.2));
 
                     // Softmax selection from top candidates
                     let temperature: f64 = 0.15;

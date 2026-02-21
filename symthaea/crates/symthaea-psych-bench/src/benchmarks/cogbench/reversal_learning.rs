@@ -48,8 +48,8 @@ impl ReversalLearningBenchmark {
 
         let criterion = 8; // consecutive correct to trigger reversal
         let max_trials = 200;
-        let learning_rate = 0.4f32; // how fast associations update (faster = quicker reversal detection)
-        let loss_learning_rate = 0.5f32; // asymmetric: losses update faster than wins
+        let learning_rate = 0.35f32; // how fast associations update
+        let loss_learning_rate = 0.7f32; // asymmetric: losses update much faster (Behrens et al. 2007)
 
         // Current contingency: true = A rewarded, false = B rewarded
         let mut a_rewarded = true;
@@ -61,6 +61,7 @@ impl ReversalLearningBenchmark {
         let mut perseverative_errors = 0u32;
         let mut total_errors = 0u32;
         let mut in_reversal = false; // are we in a post-reversal phase?
+        let mut consecutive_errors = 0u32; // for surprise-driven belief reset
 
         // Win-stay / lose-shift tracking
         let mut prev_choice: Option<bool> = None; // true = chose A
@@ -77,8 +78,9 @@ impl ReversalLearningBenchmark {
             let score_a = assoc_a.similarity(&reward_hv) as f64;
             let score_b = assoc_b.similarity(&reward_hv) as f64;
 
-            // Softmax action selection
-            let temp = config.action_temperature.max(0.1) as f64 * 0.15;
+            // Softmax action selection — wider temperature allows more exploration
+            // post-reversal, reducing perseveration
+            let temp = config.action_temperature.max(0.1) as f64 * 0.3;
             let max_score = score_a.max(score_b);
             let exp_a = ((score_a - max_score) / temp).exp();
             let exp_b = ((score_b - max_score) / temp).exp();
@@ -110,8 +112,10 @@ impl ReversalLearningBenchmark {
 
             if correct {
                 consecutive_correct += 1;
+                consecutive_errors = 0;
             } else {
                 total_errors += 1;
+                consecutive_errors += 1;
                 if in_reversal {
                     // Perseverative = choosing the previously-rewarded stimulus
                     // after reversal (first few errors post-reversal)
@@ -122,12 +126,33 @@ impl ReversalLearningBenchmark {
                 consecutive_correct = 0;
             }
 
+            // Surprise-driven belief reset: after 3+ consecutive errors,
+            // partially reset associations toward neutral. This models the
+            // "aha" moment when the agent detects a regime change.
+            // (Behrens et al. 2007 — volatility-driven learning rate increase)
+            if consecutive_errors >= 3 {
+                let reset_strength = 0.4f32;
+                let neutral = ContinuousHV::weighted_bundle(
+                    &[&reward_hv, &no_reward_hv],
+                    &[0.5, 0.5],
+                );
+                assoc_a = ContinuousHV::weighted_bundle(
+                    &[&assoc_a, &neutral],
+                    &[1.0 - reset_strength, reset_strength],
+                );
+                assoc_b = ContinuousHV::weighted_bundle(
+                    &[&assoc_b, &neutral],
+                    &[1.0 - reset_strength, reset_strength],
+                );
+                consecutive_errors = 0; // reset counter after applying
+            }
+
             // Deliver reward/punishment and update associations
             let rewarded = correct;
             prev_choice = Some(chose_a);
             prev_rewarded = Some(rewarded);
 
-            // Asymmetric learning: losses update faster than wins
+            // Asymmetric learning: losses update much faster than wins
             // (Behrens et al. 2007 — loss-driven flexibility)
             let lr = if rewarded { learning_rate } else { loss_learning_rate };
             if chose_a {

@@ -45,10 +45,44 @@ impl TwoStepBenchmark {
         let mut prev_common = false;
         let mut prev_rewarded = false;
 
-        for _ in 0..num_episodes {
-            // Stage 1: choose action
+        // Explicit transition model: counts of action→state transitions.
+        // This enables model-based action selection alongside FEP.
+        // transition_counts[action][state] = number of times action led to state.
+        let mut transition_counts = [[1.0f64; 2]; 2]; // Laplace prior
+        // Reward model: EMA of rewards in each state
+        let mut state_reward = [0.5f64; 2]; // prior: 0.5
+        let reward_lr = 0.3;
+
+        for ep in 0..num_episodes {
+            // Stage 1: blend FEP action selection with model-based values.
+            // As the agent learns transitions, the model-based signal grows.
             let stage1_result = agent.select_action();
-            let stage1_action = sample_action(&stage1_result.action_probabilities, &mut rng_state);
+            let fep_probs = &stage1_result.action_probabilities;
+
+            // Model-based action values: E[reward | action] = Σ_s P(s|a) * V(s)
+            let mb_values: Vec<f64> = (0..2).map(|a| {
+                let total = transition_counts[a][0] + transition_counts[a][1];
+                let p0 = transition_counts[a][0] / total;
+                let p1 = transition_counts[a][1] / total;
+                p0 * state_reward[0] + p1 * state_reward[1]
+            }).collect();
+
+            // Softmax over model-based values
+            let mb_temp = 0.3;
+            let mb_max = mb_values[0].max(mb_values[1]);
+            let mb_exp: Vec<f64> = mb_values.iter().map(|v| ((v - mb_max) / mb_temp).exp()).collect();
+            let mb_sum: f64 = mb_exp.iter().sum();
+            let mb_probs: Vec<f64> = mb_exp.iter().map(|e| e / mb_sum).collect();
+
+            // Blend: ramp model-based weight from 0.1 to 0.5 as episodes progress
+            let mb_weight = 0.1 + 0.4 * (ep as f64 / num_episodes as f64);
+            let blended_probs: Vec<f64> = (0..2).map(|a| {
+                (1.0 - mb_weight) * fep_probs[a] + mb_weight * mb_probs[a]
+            }).collect();
+            let prob_sum: f64 = blended_probs.iter().sum();
+            let final_probs: Vec<f64> = blended_probs.iter().map(|p| p / prob_sum).collect();
+
+            let stage1_action = sample_action(&final_probs, &mut rng_state);
 
             // Transition: 70% common, 30% rare
             rng_state ^= rng_state << 13;
@@ -60,6 +94,9 @@ impl TwoStepBenchmark {
             } else {
                 1 - stage1_action // rare transition
             };
+
+            // Update transition model: track which state each action leads to
+            transition_counts[stage1_action][stage2_state] += 1.0;
 
             // Observe stage 2 state
             let stage2_obs = vec![stage2_state as f64 * 0.8 + 0.1; 4];
@@ -75,6 +112,10 @@ impl TwoStepBenchmark {
             let reward_val = if rewarded { 0.9 } else { 0.1 };
             let reward_obs = Observation::new(vec![reward_val; 4], 1.0, "reward");
             agent.perceive(&reward_obs);
+
+            // Update reward model: EMA of rewards per state
+            state_reward[stage2_state] = (1.0 - reward_lr) * state_reward[stage2_state]
+                + reward_lr * reward_val;
 
             // Track stay/switch behavior relative to previous trial
             if let Some(prev_a) = prev_action {

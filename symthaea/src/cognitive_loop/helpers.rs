@@ -11,10 +11,7 @@ use anyhow::Result;
 use ndarray::Array1;
 use std::time::{Duration, Instant};
 
-use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, Experience, LoopStats};
-// CycleResult is used by process_text_input (neural-bridge feature)
-#[cfg(feature = "neural-bridge")]
-use super::CycleResult;
+use super::{ActionHint, AdaptiveBehavior, CognitiveLoopService, CycleResult, Experience, LoopStats};
 
 impl CognitiveLoopService {
     /// Process a pre-computed text embedding through the neural bridge and
@@ -625,5 +622,103 @@ impl CognitiveLoopService {
         }
         // Note: predictive_phi_modulation and cross_modal_psi already reset
         // via self.carryover = CycleCarryover::default() above.
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // Extracted helpers from cycle() — Phase 1 (LOW risk, &self / &mut self)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /// Safety pre-check: fast amygdala veto before expensive encoding.
+    ///
+    /// Returns `Some(CycleResult)` with a safe default response if the safety
+    /// gateway blocks the input, or `None` if the input is allowed.
+    pub(super) fn safety_precheck(&mut self, input: &str, cycle_start: Instant) -> Option<CycleResult> {
+        let gateway = self.safety_gateway.as_mut()?;
+        let decision = gateway.check(crate::safety::SafetyCheck::Query(input));
+        if decision.allowed {
+            return None;
+        }
+        let mut metadata = super::CycleMetadata::default();
+        metadata.safety_blocked = true;
+        metadata.safety_category = decision.category.map(|c| format!("{c:?}"));
+        metadata.urgency = self.carryover.urgency.urgency;
+        tracing::warn!(
+            target: "cognitive_loop::safety",
+            category = ?decision.category,
+            message = ?decision.message,
+            "Safety gateway blocked input — returning safe default"
+        );
+        Some(CycleResult {
+            output: vec![0.0; self.config.cfc_config.num_neurons],
+            prediction_error: 0.0,
+            peak_attention: 0.0,
+            detected_primitives: vec![],
+            learning_occurred: false,
+            training_loss: None,
+            cycle_time_us: u64::try_from(cycle_start.elapsed().as_micros()).unwrap_or(u64::MAX),
+            metadata,
+            #[cfg(feature = "identity")]
+            signed_output: None,
+            #[cfg(feature = "identity")]
+            assurance_level: crate::identity::AssuranceLevel::E0Anonymous,
+        })
+    }
+
+    /// Thalamic routing: determine cognitive depth from prior state.
+    ///
+    /// Uses temporal signature pattern, prosody valence, and average prediction
+    /// error to select Reflex / Cortical / DeepThought processing depth.
+    pub(super) fn update_cognitive_depth(&mut self) {
+        let prior_pattern = self.temporal_signature_encoder.classify_state().0;
+        let prior_valence = self.emotion_contagion.prosody_valence();
+        let prior_error = self.stats.avg_prediction_error;
+        self.cognitive_depth =
+            self.thalamic_router
+                .route_from_cycle(prior_error, prior_pattern, prior_valence);
+    }
+
+    /// Detect negation polarity across safety-critical terms.
+    ///
+    /// Returns the max polarity score across "harmful", "dangerous", "unethical".
+    /// Returns 0.0 if no negation detector is configured.
+    /// Science: Wason (1959) — negation processing in human reasoning.
+    pub(super) fn detect_negation_polarity(&self, input: &str) -> f32 {
+        if let Some(ref detector) = self.negation_detector {
+            detector.get_polarity(input, "harmful")
+                .max(detector.get_polarity(input, "dangerous"))
+                .max(detector.get_polarity(input, "unethical"))
+        } else {
+            0.0
+        }
+    }
+
+    /// Compose the effective learning rate from all modulation sources.
+    ///
+    /// Combines: base coherence LR → adaptive behavior → flow state → semantic
+    /// context → reasoning reliability → curiosity novelty → FEP boost →
+    /// MCE consciousness boost → subsystem LR factor (from previous cycle).
+    ///
+    /// Resets `carryover.learning.subsystem_lr_factor` for the next cycle's
+    /// accumulation. Hard-capped to [0.0, 0.01].
+    pub(super) fn compose_effective_lr(
+        &mut self,
+        semantic_lr_factor: f32,
+        reasoning_lr_factor: f32,
+    ) -> f32 {
+        let base_lr = self.combined_learning_rate();
+        let adaptive_lr = self.adaptive_behavior.effective_learning_rate(base_lr);
+        let flow_lr = self.flow_state.effective_learning_multiplier(adaptive_lr);
+        let semantic_modulated_lr = flow_lr * semantic_lr_factor * reasoning_lr_factor;
+        // Apply subsystem LR factor from PREVIOUS cycle (meta-cognition, predictive processing,
+        // predictive self, phenomenal binding, consciousness thermodynamics). Reset for next cycle.
+        let subsystem_lr = self.carryover.learning.subsystem_lr_factor.clamp(0.5, 2.0);
+        self.carryover.learning.subsystem_lr_factor = 1.0;
+        (self
+            .curiosity_drive
+            .effective_learning_rate(semantic_modulated_lr)
+            * self.fep_lr_boost
+            * (1.0 + self.carryover.learning.mce_lr_boost)
+            * subsystem_lr)
+            .clamp(0.0, 0.01)
     }
 }
