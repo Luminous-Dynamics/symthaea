@@ -462,6 +462,75 @@ mod tests {
     }
 
     #[test]
+    fn test_npy_shape_overflow_protection() {
+        use std::io::Cursor;
+
+        // Build a minimal .npy v1.0 with shape that overflows usize on multiply
+        let header_content =
+            format!("{{'descr': '<f4', 'fortran_order': False, 'shape': ({}, 2), }}", usize::MAX);
+
+        // Pad to align (npy spec: header_len + magic(6) + version(2) + len_field(2) = multiple of 64)
+        let preamble_len = 6 + 2 + 2; // magic + version + header_len field
+        let total_unpadded = preamble_len + header_content.len() + 1; // +1 for newline
+        let padded_total = ((total_unpadded + 63) / 64) * 64;
+        let pad_len = padded_total - total_unpadded;
+
+        let mut header_bytes = header_content.into_bytes();
+        header_bytes.extend(std::iter::repeat(b' ').take(pad_len));
+        header_bytes.push(b'\n');
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"\x93NUMPY");
+        buf.extend_from_slice(&[1u8, 0u8]); // version 1.0
+        buf.extend_from_slice(&(header_bytes.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&header_bytes);
+
+        let mut cursor = Cursor::new(buf);
+        let result = parse_npy(&mut cursor);
+        assert!(result.is_err(), "Should fail on overflowing shape");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("overflow") || err_msg.contains("too large"),
+            "Error should mention overflow, got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
+    fn test_npy_too_large_array() {
+        use std::io::Cursor;
+
+        // Shape that doesn't overflow but exceeds the 100M element sanity cap
+        let header_content =
+            "{'descr': '<f4', 'fortran_order': False, 'shape': (200000000, 1), }";
+
+        let preamble_len = 6 + 2 + 2;
+        let total_unpadded = preamble_len + header_content.len() + 1;
+        let padded_total = ((total_unpadded + 63) / 64) * 64;
+        let pad_len = padded_total - total_unpadded;
+
+        let mut header_bytes = header_content.as_bytes().to_vec();
+        header_bytes.extend(std::iter::repeat(b' ').take(pad_len));
+        header_bytes.push(b'\n');
+
+        let mut buf = Vec::new();
+        buf.extend_from_slice(b"\x93NUMPY");
+        buf.extend_from_slice(&[1u8, 0u8]);
+        buf.extend_from_slice(&(header_bytes.len() as u16).to_le_bytes());
+        buf.extend_from_slice(&header_bytes);
+
+        let mut cursor = Cursor::new(buf);
+        let result = parse_npy(&mut cursor);
+        assert!(result.is_err(), "Should reject array > 100M elements");
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("too large"),
+            "Error should mention 'too large', got: {}",
+            err_msg
+        );
+    }
+
+    #[test]
     fn test_projection_correctness() {
         // Hand-compute expected result
         let input_dim = 2;

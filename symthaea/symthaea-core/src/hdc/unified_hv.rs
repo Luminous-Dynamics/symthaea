@@ -405,7 +405,13 @@ impl ContinuousHV {
     /// Element-wise addition
     #[inline]
     pub fn add(&self, other: &Self) -> Self {
-        debug_assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
+        assert_eq!(
+            self.values.len(),
+            other.values.len(),
+            "Dimension mismatch in add(): {} vs {}",
+            self.values.len(),
+            other.values.len()
+        );
 
         Self {
             values: self
@@ -420,7 +426,13 @@ impl ContinuousHV {
     /// Element-wise subtraction
     #[inline]
     pub fn subtract(&self, other: &Self) -> Self {
-        debug_assert_eq!(self.values.len(), other.values.len(), "Dimension mismatch");
+        assert_eq!(
+            self.values.len(),
+            other.values.len(),
+            "Dimension mismatch in subtract(): {} vs {}",
+            self.values.len(),
+            other.values.len()
+        );
 
         Self {
             values: self
