@@ -1,7 +1,7 @@
 //! CogBench: Cognitive psychology experiments via FEP active inference.
 //!
-//! 7 experiments testing exploration, model-based reasoning, learning,
-//! temporal discounting, and risk-taking using `ActiveInferenceAgent`.
+//! 8 experiments testing exploration, model-based reasoning, learning,
+//! temporal discounting, risk-taking, and cognitive flexibility.
 //!
 //! With `--features symthaea-backend`, additional `[Mind]` variants of
 //! the Restless Bandit and Instrumental Learning benchmarks are available.
@@ -19,6 +19,7 @@ pub mod instrumental;
 pub mod mind_agent;
 pub mod probabilistic;
 pub mod restless_bandit;
+pub mod reversal_learning;
 pub mod temporal_discounting;
 pub mod two_step;
 
@@ -47,6 +48,7 @@ pub use horizon::HorizonBenchmark;
 pub use instrumental::InstrumentalLearningBenchmark;
 pub use probabilistic::ProbabilisticReasoningBenchmark;
 pub use restless_bandit::RestlessBanditBenchmark;
+pub use reversal_learning::ReversalLearningBenchmark;
 pub use temporal_discounting::TemporalDiscountingBenchmark;
 pub use two_step::TwoStepBenchmark;
 

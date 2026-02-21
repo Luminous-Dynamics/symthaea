@@ -5,15 +5,18 @@
 //! - **Raven's** — Progressive Matrices (fluid intelligence, pattern completion)
 //! - **Stroop** — Color-Word Interference (inhibitory control, selective attention)
 //! - **Flanker** — Eriksen Flanker Task (spatial attention filtering, response inhibition)
+//! - **Tower of London** — Multi-step planning (executive planning, lookahead depth)
 
 pub mod flanker;
 pub mod iowa_gambling;
 pub mod ravens;
 pub mod stroop;
+pub mod tower_of_london;
 pub mod wisconsin;
 
 pub use flanker::FlankerBenchmark;
 pub use iowa_gambling::IowaGamblingBenchmark;
 pub use ravens::RavensProgressiveMatricesBenchmark;
 pub use stroop::StroopBenchmark;
+pub use tower_of_london::TowerOfLondonBenchmark;
 pub use wisconsin::WisconsinCardSortingBenchmark;

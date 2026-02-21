@@ -157,6 +157,24 @@ pub fn cogbench_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Reversal learning (Cools et al. 2002; Clark et al. 2004)
+    m.insert(
+        "reversal_win_stay",
+        Baseline {
+            value: 0.85,
+            source: "Cools et al. (2002), Defining the neural mechanisms of probabilistic reversal learning",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "reversal_lose_shift",
+        Baseline {
+            value: 0.70,
+            source: "Cools et al. (2002), Defining the neural mechanisms of probabilistic reversal learning",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -311,6 +329,24 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         Baseline {
             value: 0.07,
             source: "Eriksen & Eriksen (1974), accuracy-based flanker effect",
+            population: "human adults",
+        },
+    );
+
+    // Tower of London (Shallice, 1982; Kaller et al., 2016)
+    m.insert(
+        "tol_overall_optimal_rate",
+        Baseline {
+            value: 0.63,
+            source: "Kaller et al. (2016), TOL-F norms",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "tol_planning_efficiency",
+        Baseline {
+            value: 0.82,
+            source: "Kaller et al. (2016), optimal/actual moves ratio",
             population: "human adults",
         },
     );
