@@ -41,6 +41,44 @@ pub struct CheckInInput {
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/// Decode a typed value from a ZomeCallResponse.
+fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    response: ZomeCallResponse,
+    context: &str,
+) -> ExternResult<T> {
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode {} response: {}", context, e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to {} failed: {:?}", context, other
+        )))),
+    }
+}
+
+/// Check whether an alert can be resolved (resolved_at must be None).
+fn is_alert_resolvable(alert: &EmergencyAlert) -> bool {
+    alert.resolved_at.is_none()
+}
+
+/// Check whether an alert severity is critical (Medical or Fire).
+#[allow(dead_code)]
+fn is_severity_critical(severity: &AlertSeverity) -> bool {
+    matches!(severity, AlertSeverity::Critical)
+}
+
+/// Check whether an alert type is inherently life-threatening (Medical or Fire).
+#[allow(dead_code)]
+fn is_alert_type_life_threatening(alert_type: &AlertType) -> bool {
+    matches!(alert_type, AlertType::Medical | AlertType::Fire)
+}
+
+// ============================================================================
 // Extern Functions
 // ============================================================================
 
@@ -186,6 +224,9 @@ pub fn check_in(input: CheckInInput) -> ExternResult<Record> {
 }
 
 /// Resolve an active alert by setting resolved_at to now.
+///
+/// Auth: only the original reporter or a guardian can resolve an alert.
+/// Status: only unresolved alerts (resolved_at is None) can be resolved.
 #[hdk_extern]
 pub fn resolve_alert(alert_hash: ActionHash) -> ExternResult<Record> {
     let now = sys_time()?;
@@ -203,6 +244,38 @@ pub fn resolve_alert(alert_hash: ActionHash) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Alert entry is missing".into()
         )))?;
+
+    // 1. Status check: cannot resolve an already-resolved alert
+    if !is_alert_resolvable(&alert) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Alert is already resolved".into()
+        )));
+    }
+
+    // 2. Auth: caller must be the original reporter OR a guardian
+    let caller = agent_info()?.agent_initial_pubkey;
+    if caller != alert.reporter {
+        let caller_role: Option<MemberRole> = decode_zome_response(
+            call(
+                CallTargetCell::Local,
+                ZomeName::new("hearth_kinship"),
+                FunctionName::new("get_caller_role"),
+                None,
+                alert.hearth_hash.clone(),
+            )?,
+            "get_caller_role",
+        )?;
+
+        let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "You are not an active member of this hearth".into()
+        )))?;
+
+        if !role.is_guardian() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only the original reporter or a guardian can resolve an alert".into()
+            )));
+        }
+    }
 
     alert.resolved_at = Some(now);
 
@@ -444,5 +517,300 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let back: RaiseAlertInput = serde_json::from_str(&json).unwrap();
         assert_eq!(back.location_hint.unwrap(), "Second floor bedroom");
+    }
+
+    // ====================================================================
+    // Pure helper: is_alert_resolvable
+    // ====================================================================
+
+    fn make_unresolved_alert() -> EmergencyAlert {
+        EmergencyAlert {
+            hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            alert_type: AlertType::Medical,
+            severity: AlertSeverity::High,
+            message: "Test alert".into(),
+            reporter: AgentPubKey::from_raw_36(vec![0xAAu8; 36]),
+            location_hint: None,
+            created_at: Timestamp::from_micros(1_000_000),
+            resolved_at: None,
+        }
+    }
+
+    fn make_resolved_alert() -> EmergencyAlert {
+        EmergencyAlert {
+            hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            alert_type: AlertType::Medical,
+            severity: AlertSeverity::High,
+            message: "Test alert".into(),
+            reporter: AgentPubKey::from_raw_36(vec![0xAAu8; 36]),
+            location_hint: None,
+            created_at: Timestamp::from_micros(1_000_000),
+            resolved_at: Some(Timestamp::from_micros(2_000_000)),
+        }
+    }
+
+    #[test]
+    fn alert_resolvable_when_unresolved() {
+        let alert = make_unresolved_alert();
+        assert!(is_alert_resolvable(&alert));
+    }
+
+    #[test]
+    fn alert_not_resolvable_when_already_resolved() {
+        let alert = make_resolved_alert();
+        assert!(!is_alert_resolvable(&alert));
+    }
+
+    #[test]
+    fn alert_resolvable_all_types_unresolved() {
+        let types = vec![
+            AlertType::Medical,
+            AlertType::Natural,
+            AlertType::Security,
+            AlertType::Missing,
+            AlertType::Fire,
+            AlertType::Custom("Flood".into()),
+        ];
+        for at in types {
+            let mut alert = make_unresolved_alert();
+            alert.alert_type = at;
+            assert!(
+                is_alert_resolvable(&alert),
+                "unresolved alert should be resolvable regardless of type"
+            );
+        }
+    }
+
+    #[test]
+    fn alert_not_resolvable_all_types_resolved() {
+        let types = vec![
+            AlertType::Medical,
+            AlertType::Natural,
+            AlertType::Security,
+            AlertType::Missing,
+            AlertType::Fire,
+            AlertType::Custom("Flood".into()),
+        ];
+        for at in types {
+            let mut alert = make_resolved_alert();
+            alert.alert_type = at;
+            assert!(
+                !is_alert_resolvable(&alert),
+                "resolved alert should not be resolvable regardless of type"
+            );
+        }
+    }
+
+    // ====================================================================
+    // Pure helper: is_severity_critical
+    // ====================================================================
+
+    #[test]
+    fn severity_critical_is_critical() {
+        assert!(is_severity_critical(&AlertSeverity::Critical));
+    }
+
+    #[test]
+    fn severity_high_is_not_critical() {
+        assert!(!is_severity_critical(&AlertSeverity::High));
+    }
+
+    #[test]
+    fn severity_medium_is_not_critical() {
+        assert!(!is_severity_critical(&AlertSeverity::Medium));
+    }
+
+    #[test]
+    fn severity_low_is_not_critical() {
+        assert!(!is_severity_critical(&AlertSeverity::Low));
+    }
+
+    #[test]
+    fn severity_critical_exhaustive() {
+        let severities = vec![
+            (AlertSeverity::Low, false),
+            (AlertSeverity::Medium, false),
+            (AlertSeverity::High, false),
+            (AlertSeverity::Critical, true),
+        ];
+        for (severity, expected) in severities {
+            assert_eq!(
+                is_severity_critical(&severity),
+                expected,
+                "mismatch for {:?}",
+                severity
+            );
+        }
+    }
+
+    // ====================================================================
+    // Pure helper: is_alert_type_life_threatening
+    // ====================================================================
+
+    #[test]
+    fn medical_is_life_threatening() {
+        assert!(is_alert_type_life_threatening(&AlertType::Medical));
+    }
+
+    #[test]
+    fn fire_is_life_threatening() {
+        assert!(is_alert_type_life_threatening(&AlertType::Fire));
+    }
+
+    #[test]
+    fn natural_is_not_life_threatening() {
+        assert!(!is_alert_type_life_threatening(&AlertType::Natural));
+    }
+
+    #[test]
+    fn security_is_not_life_threatening() {
+        assert!(!is_alert_type_life_threatening(&AlertType::Security));
+    }
+
+    #[test]
+    fn missing_is_not_life_threatening() {
+        assert!(!is_alert_type_life_threatening(&AlertType::Missing));
+    }
+
+    #[test]
+    fn custom_is_not_life_threatening() {
+        assert!(!is_alert_type_life_threatening(&AlertType::Custom(
+            "Flood".into()
+        )));
+    }
+
+    // ====================================================================
+    // Scenario tests: alert lifecycle
+    // ====================================================================
+
+    #[test]
+    fn scenario_new_alert_is_resolvable() {
+        // A freshly raised alert (resolved_at = None) should be resolvable
+        let alert = make_unresolved_alert();
+        assert!(is_alert_resolvable(&alert));
+    }
+
+    #[test]
+    fn scenario_resolved_alert_cannot_be_re_resolved() {
+        // Once resolved, alert should not be resolvable again (idempotency guard)
+        let alert = make_resolved_alert();
+        assert!(!is_alert_resolvable(&alert));
+    }
+
+    #[test]
+    fn scenario_critical_medical_alert_lifecycle() {
+        // Medical + Critical: life-threatening and critical severity
+        let alert = EmergencyAlert {
+            hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            alert_type: AlertType::Medical,
+            severity: AlertSeverity::Critical,
+            message: "Heart attack".into(),
+            reporter: AgentPubKey::from_raw_36(vec![0xAAu8; 36]),
+            location_hint: Some("Living room".into()),
+            created_at: Timestamp::from_micros(1_000_000),
+            resolved_at: None,
+        };
+
+        assert!(is_alert_resolvable(&alert));
+        assert!(is_severity_critical(&alert.severity));
+        assert!(is_alert_type_life_threatening(&alert.alert_type));
+
+        // After resolution
+        let mut resolved = alert;
+        resolved.resolved_at = Some(Timestamp::from_micros(2_000_000));
+        assert!(!is_alert_resolvable(&resolved));
+    }
+
+    #[test]
+    fn scenario_low_severity_security_alert() {
+        // Security + Low: not life-threatening, not critical
+        let alert = EmergencyAlert {
+            hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            alert_type: AlertType::Security,
+            severity: AlertSeverity::Low,
+            message: "Suspicious car parked outside".into(),
+            reporter: AgentPubKey::from_raw_36(vec![0xAAu8; 36]),
+            location_hint: None,
+            created_at: Timestamp::from_micros(1_000_000),
+            resolved_at: None,
+        };
+
+        assert!(is_alert_resolvable(&alert));
+        assert!(!is_severity_critical(&alert.severity));
+        assert!(!is_alert_type_life_threatening(&alert.alert_type));
+    }
+
+    #[test]
+    fn scenario_fire_high_severity() {
+        // Fire + High: life-threatening but not Critical severity
+        let alert = EmergencyAlert {
+            hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            alert_type: AlertType::Fire,
+            severity: AlertSeverity::High,
+            message: "Smoke in the garage".into(),
+            reporter: AgentPubKey::from_raw_36(vec![0xAAu8; 36]),
+            location_hint: Some("Garage".into()),
+            created_at: Timestamp::from_micros(1_000_000),
+            resolved_at: None,
+        };
+
+        assert!(is_alert_resolvable(&alert));
+        assert!(!is_severity_critical(&alert.severity));
+        assert!(is_alert_type_life_threatening(&alert.alert_type));
+    }
+
+    #[test]
+    fn scenario_guardian_auth_roles() {
+        // Verify which roles count as guardian (used for auth fallback in resolve)
+        assert!(MemberRole::Founder.is_guardian());
+        assert!(MemberRole::Elder.is_guardian());
+        assert!(MemberRole::Adult.is_guardian());
+        assert!(!MemberRole::Youth.is_guardian());
+        assert!(!MemberRole::Child.is_guardian());
+        assert!(!MemberRole::Guest.is_guardian());
+        assert!(!MemberRole::Ancestor.is_guardian());
+    }
+
+    #[test]
+    fn scenario_all_severity_levels_with_medical_type() {
+        // Medical alerts at all severity levels are life-threatening
+        let severities = vec![
+            AlertSeverity::Low,
+            AlertSeverity::Medium,
+            AlertSeverity::High,
+            AlertSeverity::Critical,
+        ];
+        for sev in severities {
+            let alert = EmergencyAlert {
+                hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+                alert_type: AlertType::Medical,
+                severity: sev.clone(),
+                message: "Medical issue".into(),
+                reporter: AgentPubKey::from_raw_36(vec![0xAAu8; 36]),
+                location_hint: None,
+                created_at: Timestamp::from_micros(1_000_000),
+                resolved_at: None,
+            };
+            assert!(is_alert_type_life_threatening(&alert.alert_type));
+            assert!(is_alert_resolvable(&alert));
+        }
+    }
+
+    #[test]
+    fn scenario_resolved_at_blocks_regardless_of_severity() {
+        // Even a Critical alert, once resolved, cannot be re-resolved
+        let alert = EmergencyAlert {
+            hearth_hash: ActionHash::from_raw_36(vec![0xABu8; 36]),
+            alert_type: AlertType::Fire,
+            severity: AlertSeverity::Critical,
+            message: "House fire".into(),
+            reporter: AgentPubKey::from_raw_36(vec![0xAAu8; 36]),
+            location_hint: None,
+            created_at: Timestamp::from_micros(1_000_000),
+            resolved_at: Some(Timestamp::from_micros(2_000_000)),
+        };
+        assert!(!is_alert_resolvable(&alert));
+        assert!(is_severity_critical(&alert.severity));
+        assert!(is_alert_type_life_threatening(&alert.alert_type));
     }
 }

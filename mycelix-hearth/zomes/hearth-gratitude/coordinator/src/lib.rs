@@ -173,13 +173,23 @@ pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
 
 /// Complete an appreciation circle by setting its status to Completed
 /// and recording the completion timestamp.
+/// Only the circle creator (action author) can complete it.
 #[hdk_extern]
 pub fn complete_circle(circle_hash: ActionHash) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
     let record = get(circle_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Circle not found".into())
     ))?;
+
+    // Auth: only the original creator (action author) can complete the circle
+    let creator = record.action().author().clone();
+    if !can_complete_circle(&caller, &creator) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the circle creator can complete it".into()
+        )));
+    }
 
     let mut circle: AppreciationCircle = record
         .entry()
@@ -189,9 +199,9 @@ pub fn complete_circle(circle_hash: ActionHash) -> ExternResult<Record> {
             "Invalid circle entry".into()
         )))?;
 
-    if circle.status == CircleStatus::Completed {
+    if !is_circle_open(&circle.status) {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Circle is already completed".into()
+            "Circle is not open and cannot be completed".into()
         )));
     }
 
@@ -296,6 +306,17 @@ pub fn create_gratitude_digest(input: DigestEpochInput) -> ExternResult<Vec<Grat
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/// Check whether a circle is in Open status (can still accept changes).
+fn is_circle_open(status: &CircleStatus) -> bool {
+    *status == CircleStatus::Open
+}
+
+/// Check whether the caller is authorized to complete the circle.
+/// Only the original creator (action author) can complete it.
+fn can_complete_circle(caller: &AgentPubKey, creator: &AgentPubKey) -> bool {
+    caller == creator
+}
 
 fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
@@ -504,5 +525,91 @@ mod tests {
         assert_eq!(decoded.total_given, 0);
         assert_eq!(decoded.total_received, 0);
         assert_eq!(decoded.current_streak_days, 0);
+    }
+
+    // ---- is_circle_open helper ----
+
+    #[test]
+    fn circle_open_status_is_open() {
+        assert!(is_circle_open(&CircleStatus::Open));
+    }
+
+    #[test]
+    fn circle_in_progress_not_open() {
+        assert!(!is_circle_open(&CircleStatus::InProgress));
+    }
+
+    #[test]
+    fn circle_completed_not_open() {
+        assert!(!is_circle_open(&CircleStatus::Completed));
+    }
+
+    // ---- can_complete_circle helper ----
+
+    #[test]
+    fn can_complete_circle_creator_matches() {
+        let creator = fake_agent();
+        assert!(can_complete_circle(&creator, &creator));
+    }
+
+    #[test]
+    fn can_complete_circle_different_agent_rejected() {
+        let caller = fake_agent();
+        let creator = fake_agent_b();
+        assert!(!can_complete_circle(&caller, &creator));
+    }
+
+    // ---- Signal serde roundtrips ----
+
+    #[test]
+    fn signal_gratitude_expressed_serde_roundtrip() {
+        let sig = HearthSignal::GratitudeExpressed {
+            from_agent: fake_agent(),
+            to_agent: fake_agent_b(),
+            message: "Thanks for dinner".to_string(),
+            gratitude_type: GratitudeType::Appreciation,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::GratitudeExpressed {
+                message,
+                gratitude_type,
+                ..
+            } => {
+                assert_eq!(message, "Thanks for dinner");
+                assert_eq!(gratitude_type, GratitudeType::Appreciation);
+            }
+            _ => panic!("Expected GratitudeExpressed signal"),
+        }
+    }
+
+    #[test]
+    fn signal_gratitude_expressed_all_types_serde() {
+        let types = vec![
+            GratitudeType::Appreciation,
+            GratitudeType::Acknowledgment,
+            GratitudeType::Celebration,
+            GratitudeType::Blessing,
+            GratitudeType::Custom("Heartfelt".to_string()),
+        ];
+        for gt in types {
+            let sig = HearthSignal::GratitudeExpressed {
+                from_agent: fake_agent(),
+                to_agent: fake_agent_b(),
+                message: "Test".to_string(),
+                gratitude_type: gt.clone(),
+            };
+            let json = serde_json::to_string(&sig).unwrap();
+            let back: HearthSignal = serde_json::from_str(&json).unwrap();
+            match back {
+                HearthSignal::GratitudeExpressed {
+                    gratitude_type, ..
+                } => {
+                    assert_eq!(gratitude_type, gt);
+                }
+                _ => panic!("Expected GratitudeExpressed signal"),
+            }
+        }
     }
 }

@@ -662,6 +662,50 @@ pub enum HearthSignal {
         chosen_option: u32,
         participation_rate_bp: u32,
     },
+    /// A new family story was created.
+    StoryCreated {
+        hearth_hash: ActionHash,
+        story_hash: ActionHash,
+        storyteller: AgentPubKey,
+        story_type: StoryType,
+    },
+    /// A story was updated by its storyteller.
+    StoryUpdated {
+        story_hash: ActionHash,
+        updated_by: AgentPubKey,
+    },
+    /// A family tradition was observed.
+    TraditionObserved {
+        tradition_hash: ActionHash,
+        observed_by: AgentPubKey,
+    },
+    /// A shared resource was lent to a member.
+    ResourceLent {
+        resource_hash: ActionHash,
+        borrower: AgentPubKey,
+        due_date: Timestamp,
+    },
+    /// A borrowed resource was returned.
+    ResourceReturned {
+        loan_hash: ActionHash,
+        borrower: AgentPubKey,
+    },
+    /// An expense was logged against a budget category.
+    ExpenseLogged {
+        budget_hash: ActionHash,
+        amount_cents: u64,
+    },
+    /// A milestone was recorded in a family timeline.
+    MilestoneRecorded {
+        hearth_hash: ActionHash,
+        milestone_hash: ActionHash,
+        milestone_type: MilestoneType,
+    },
+    /// A life transition advanced to a new phase.
+    TransitionAdvanced {
+        transition_hash: ActionHash,
+        new_phase: TransitionPhase,
+    },
 }
 
 #[cfg(test)]

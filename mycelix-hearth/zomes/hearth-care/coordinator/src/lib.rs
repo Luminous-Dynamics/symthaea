@@ -59,6 +59,33 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     Ok(records)
 }
 
+/// Decode a typed value from a ZomeCallResponse.
+fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    response: ZomeCallResponse,
+    context: &str,
+) -> ExternResult<T> {
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode {} response: {}", context, e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to {} failed: {:?}", context, other
+        )))),
+    }
+}
+
+/// Check whether a care schedule can be completed (must be Active).
+fn is_schedule_completable(status: &CareScheduleStatus) -> bool {
+    *status == CareScheduleStatus::Active
+}
+
+/// Check whether a swap is in a state that can be accepted or declined (must be Proposed).
+fn is_swap_pending(status: &SwapStatus) -> bool {
+    *status == SwapStatus::Proposed
+}
+
 // ============================================================================
 // Extern Functions
 // ============================================================================
@@ -103,6 +130,9 @@ pub fn create_care_schedule(input: CreateCareScheduleInput) -> ExternResult<Reco
 
 /// Mark a care task as completed. Sets completed_at timestamp on the entry,
 /// emits a CareTaskCompleted signal, and returns the updated record.
+///
+/// Auth: only the assignee or a guardian can complete a task.
+/// Status: only Active schedules can be completed.
 #[hdk_extern]
 pub fn complete_task(input: CompleteTaskInput) -> ExternResult<Record> {
     let now = sys_time()?;
@@ -119,7 +149,39 @@ pub fn complete_task(input: CompleteTaskInput) -> ExternResult<Record> {
             "Invalid care schedule entry".into()
         )))?;
 
+    // 1. Status check: only Active schedules can be completed
+    if !is_schedule_completable(&schedule.status) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot complete a schedule with status {:?} (must be Active)",
+            schedule.status
+        ))));
+    }
+
     let caller = agent_info()?.agent_initial_pubkey;
+
+    // 2. Auth: caller must be the assignee OR a guardian
+    if caller != schedule.assigned_to {
+        let caller_role: Option<MemberRole> = decode_zome_response(
+            call(
+                CallTargetCell::Local,
+                ZomeName::new("hearth_kinship"),
+                FunctionName::new("get_caller_role"),
+                None,
+                schedule.hearth_hash.clone(),
+            )?,
+            "get_caller_role",
+        )?;
+
+        let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "You are not an active member of this hearth".into()
+        )))?;
+
+        if !role.is_guardian() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only the assignee or a guardian can complete a care task".into()
+            )));
+        }
+    }
 
     // Update the entry with completed_at timestamp
     let updated = CareSchedule {
@@ -196,12 +258,18 @@ pub fn propose_swap(input: ProposeSwapInput) -> ExternResult<Record> {
 }
 
 /// Accept a proposed care swap.
+///
+/// Auth: only the swap's responder (target) or a guardian can accept.
+/// Status: only Proposed swaps can be accepted.
 #[hdk_extern]
 pub fn accept_swap(swap_hash: ActionHash) -> ExternResult<Record> {
     update_swap_status(swap_hash, SwapStatus::Accepted)
 }
 
 /// Decline a proposed care swap.
+///
+/// Auth: only the swap's responder (target) or a guardian can decline.
+/// Status: only Proposed swaps can be declined.
 #[hdk_extern]
 pub fn decline_swap(swap_hash: ActionHash) -> ExternResult<Record> {
     update_swap_status(swap_hash, SwapStatus::Declined)
@@ -338,6 +406,39 @@ fn update_swap_status(swap_hash: ActionHash, new_status: SwapStatus) -> ExternRe
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Invalid care swap entry".into()
         )))?;
+
+    // 1. Status check: only Proposed swaps can be accepted/declined
+    if !is_swap_pending(&swap.status) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot change a swap with status {:?} (must be Proposed)",
+            swap.status
+        ))));
+    }
+
+    // 2. Auth: caller must be the responder (target) OR a guardian
+    let caller = agent_info()?.agent_initial_pubkey;
+    if caller != swap.responder {
+        let caller_role: Option<MemberRole> = decode_zome_response(
+            call(
+                CallTargetCell::Local,
+                ZomeName::new("hearth_kinship"),
+                FunctionName::new("get_caller_role"),
+                None,
+                swap.hearth_hash.clone(),
+            )?,
+            "get_caller_role",
+        )?;
+
+        let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+            "You are not an active member of this hearth".into()
+        )))?;
+
+        if !role.is_guardian() {
+            return Err(wasm_error!(WasmErrorInner::Guest(
+                "Only the swap responder or a guardian can accept/decline a swap".into()
+            )));
+        }
+    }
 
     swap.status = new_status;
 
@@ -546,5 +647,192 @@ mod tests {
             let back: CreateCareScheduleInput = serde_json::from_str(&json).unwrap();
             assert_eq!(back.care_type, ct);
         }
+    }
+
+    // ====================================================================
+    // Pure helper: is_schedule_completable
+    // ====================================================================
+
+    #[test]
+    fn schedule_completable_active() {
+        assert!(is_schedule_completable(&CareScheduleStatus::Active));
+    }
+
+    #[test]
+    fn schedule_not_completable_paused() {
+        assert!(!is_schedule_completable(&CareScheduleStatus::Paused));
+    }
+
+    #[test]
+    fn schedule_not_completable_completed() {
+        assert!(!is_schedule_completable(&CareScheduleStatus::Completed));
+    }
+
+    #[test]
+    fn schedule_completable_exhaustive() {
+        let statuses = vec![
+            (CareScheduleStatus::Active, true),
+            (CareScheduleStatus::Paused, false),
+            (CareScheduleStatus::Completed, false),
+        ];
+        for (status, expected) in statuses {
+            assert_eq!(
+                is_schedule_completable(&status),
+                expected,
+                "mismatch for {:?}",
+                status
+            );
+        }
+    }
+
+    // ====================================================================
+    // Pure helper: is_swap_pending
+    // ====================================================================
+
+    #[test]
+    fn swap_pending_proposed() {
+        assert!(is_swap_pending(&SwapStatus::Proposed));
+    }
+
+    #[test]
+    fn swap_not_pending_accepted() {
+        assert!(!is_swap_pending(&SwapStatus::Accepted));
+    }
+
+    #[test]
+    fn swap_not_pending_declined() {
+        assert!(!is_swap_pending(&SwapStatus::Declined));
+    }
+
+    #[test]
+    fn swap_not_pending_completed() {
+        assert!(!is_swap_pending(&SwapStatus::Completed));
+    }
+
+    #[test]
+    fn swap_pending_exhaustive() {
+        let statuses = vec![
+            (SwapStatus::Proposed, true),
+            (SwapStatus::Accepted, false),
+            (SwapStatus::Declined, false),
+            (SwapStatus::Completed, false),
+        ];
+        for (status, expected) in statuses {
+            assert_eq!(
+                is_swap_pending(&status),
+                expected,
+                "mismatch for {:?}",
+                status
+            );
+        }
+    }
+
+    // ====================================================================
+    // Scenario tests: care task lifecycle
+    // ====================================================================
+
+    #[test]
+    fn scenario_active_schedule_can_be_completed() {
+        // A new schedule starts Active and should be completable
+        let status = CareScheduleStatus::Active;
+        assert!(is_schedule_completable(&status));
+    }
+
+    #[test]
+    fn scenario_completed_schedule_cannot_be_re_completed() {
+        // Once completed, cannot complete again (idempotency guard)
+        let status = CareScheduleStatus::Completed;
+        assert!(!is_schedule_completable(&status));
+    }
+
+    #[test]
+    fn scenario_paused_schedule_cannot_be_completed() {
+        // A paused schedule must be re-activated before completion
+        let status = CareScheduleStatus::Paused;
+        assert!(!is_schedule_completable(&status));
+    }
+
+    // ====================================================================
+    // Scenario tests: swap lifecycle
+    // ====================================================================
+
+    #[test]
+    fn scenario_proposed_swap_can_be_accepted() {
+        let status = SwapStatus::Proposed;
+        assert!(is_swap_pending(&status));
+    }
+
+    #[test]
+    fn scenario_proposed_swap_can_be_declined() {
+        let status = SwapStatus::Proposed;
+        assert!(is_swap_pending(&status));
+    }
+
+    #[test]
+    fn scenario_accepted_swap_cannot_be_declined() {
+        // Once accepted, the swap is settled
+        let status = SwapStatus::Accepted;
+        assert!(!is_swap_pending(&status));
+    }
+
+    #[test]
+    fn scenario_declined_swap_cannot_be_accepted() {
+        // Once declined, the swap is settled
+        let status = SwapStatus::Declined;
+        assert!(!is_swap_pending(&status));
+    }
+
+    #[test]
+    fn scenario_completed_swap_is_terminal() {
+        // Completed swaps are terminal state
+        let status = SwapStatus::Completed;
+        assert!(!is_swap_pending(&status));
+    }
+
+    // ====================================================================
+    // Scenario tests: combined lifecycle flows
+    // ====================================================================
+
+    #[test]
+    fn scenario_full_care_lifecycle() {
+        // Create -> Active -> Complete
+        let initial = CareScheduleStatus::Active;
+        assert!(is_schedule_completable(&initial));
+
+        // After completion, cannot complete again
+        let final_status = CareScheduleStatus::Completed;
+        assert!(!is_schedule_completable(&final_status));
+    }
+
+    #[test]
+    fn scenario_full_swap_lifecycle_accept() {
+        // Propose -> Proposed -> Accept -> Accepted (terminal)
+        let proposed = SwapStatus::Proposed;
+        assert!(is_swap_pending(&proposed));
+
+        let accepted = SwapStatus::Accepted;
+        assert!(!is_swap_pending(&accepted));
+    }
+
+    #[test]
+    fn scenario_full_swap_lifecycle_decline() {
+        // Propose -> Proposed -> Decline -> Declined (terminal)
+        let proposed = SwapStatus::Proposed;
+        assert!(is_swap_pending(&proposed));
+
+        let declined = SwapStatus::Declined;
+        assert!(!is_swap_pending(&declined));
+    }
+
+    #[test]
+    fn scenario_guardian_auth_roles() {
+        // Verify which roles count as guardian (used for auth fallback)
+        assert!(MemberRole::Founder.is_guardian());
+        assert!(MemberRole::Elder.is_guardian());
+        assert!(MemberRole::Adult.is_guardian());
+        assert!(!MemberRole::Youth.is_guardian());
+        assert!(!MemberRole::Child.is_guardian());
+        assert!(!MemberRole::Guest.is_guardian());
+        assert!(!MemberRole::Ancestor.is_guardian());
     }
 }

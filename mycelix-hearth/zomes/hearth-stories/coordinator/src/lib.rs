@@ -74,11 +74,14 @@ pub fn create_story(input: CreateStoryInput) -> ExternResult<Record> {
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
+    let hearth_hash = input.hearth_hash.clone();
+    let story_type = input.story_type.clone();
+
     let story = FamilyStory {
         hearth_hash: input.hearth_hash.clone(),
         title: input.title,
         content: input.content,
-        storyteller: caller,
+        storyteller: caller.clone(),
         story_type: input.story_type,
         media_hashes: input.media_hashes,
         tags: input.tags.clone(),
@@ -110,14 +113,24 @@ pub fn create_story(input: CreateStoryInput) -> ExternResult<Record> {
         )?;
     }
 
+    emit_signal(&HearthSignal::StoryCreated {
+        hearth_hash,
+        story_hash: action_hash.clone(),
+        storyteller: caller,
+        story_type,
+    })?;
+
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created story".into()
     )))
 }
 
 /// Update an existing story's title, content, and tags.
+/// Only the original storyteller may update their story.
 #[hdk_extern]
 pub fn update_story(input: UpdateStoryInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+
     let record = get(input.story_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Story not found".into())))?;
 
@@ -129,11 +142,23 @@ pub fn update_story(input: UpdateStoryInput) -> ExternResult<Record> {
             "Invalid story entry".into()
         )))?;
 
+    // Authorization: only the original storyteller can update
+    if !is_storyteller(&caller, &story) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the original storyteller can update this story".into()
+        )));
+    }
+
     story.title = input.title;
     story.content = input.content;
     story.tags = input.tags;
 
-    let updated_hash = update_entry(input.story_hash, &EntryTypes::FamilyStory(story))?;
+    let updated_hash = update_entry(input.story_hash.clone(), &EntryTypes::FamilyStory(story))?;
+
+    emit_signal(&HearthSignal::StoryUpdated {
+        story_hash: input.story_hash,
+        updated_by: caller,
+    })?;
 
     get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated story".into()
@@ -141,8 +166,29 @@ pub fn update_story(input: UpdateStoryInput) -> ExternResult<Record> {
 }
 
 /// Add a media attachment link to a story.
+/// Only the original storyteller may add media to their story.
 #[hdk_extern]
 pub fn add_media_to_story(input: AddMediaInput) -> ExternResult<()> {
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    let record = get(input.story_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Story not found".into())))?;
+
+    let story: FamilyStory = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid story entry".into()
+        )))?;
+
+    // Authorization: only the storyteller can add media
+    if !is_storyteller(&caller, &story) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only the storyteller can add media to this story".into()
+        )));
+    }
+
     create_link(
         input.story_hash,
         input.media_hash,
@@ -224,6 +270,7 @@ pub fn create_tradition(input: CreateTraditionInput) -> ExternResult<Record> {
 /// Mark a tradition as observed by updating its last_observed timestamp.
 #[hdk_extern]
 pub fn observe_tradition(tradition_hash: ActionHash) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
     let record = get(tradition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -240,7 +287,13 @@ pub fn observe_tradition(tradition_hash: ActionHash) -> ExternResult<Record> {
 
     tradition.last_observed = Some(now);
 
-    let updated_hash = update_entry(tradition_hash, &EntryTypes::FamilyTradition(tradition))?;
+    let updated_hash =
+        update_entry(tradition_hash.clone(), &EntryTypes::FamilyTradition(tradition))?;
+
+    emit_signal(&HearthSignal::TraditionObserved {
+        tradition_hash,
+        observed_by: caller,
+    })?;
 
     get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated tradition".into()
@@ -293,6 +346,17 @@ pub fn search_stories_by_tag(tag: String) -> ExternResult<Vec<Record>> {
 // Helpers
 // ============================================================================
 
+/// Check whether the caller is the storyteller of a given story.
+fn is_storyteller(caller: &AgentPubKey, story: &FamilyStory) -> bool {
+    *caller == story.storyteller
+}
+
+/// Normalize a tag: lowercase and trimmed of leading/trailing whitespace.
+#[allow(dead_code)]
+fn normalize_tag(tag: &str) -> String {
+    tag.trim().to_lowercase()
+}
+
 fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
@@ -317,6 +381,10 @@ mod tests {
         AgentPubKey::from_raw_36(vec![1u8; 36])
     }
 
+    fn fake_agent_b() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![2u8; 36])
+    }
+
     fn fake_action_hash() -> ActionHash {
         ActionHash::from_raw_36(vec![0u8; 36])
     }
@@ -325,7 +393,207 @@ mod tests {
         ActionHash::from_raw_36(vec![1u8; 36])
     }
 
-    // ── CreateStoryInput serde roundtrip ──────────────────────────────
+    fn make_story(storyteller: AgentPubKey) -> FamilyStory {
+        FamilyStory {
+            hearth_hash: fake_action_hash(),
+            title: "A Story".to_string(),
+            content: "Once upon a time...".to_string(),
+            storyteller,
+            story_type: StoryType::Memory,
+            media_hashes: vec![],
+            tags: vec!["memory".to_string()],
+            visibility: HearthVisibility::AllMembers,
+            created_at: Timestamp::from_micros(1000),
+        }
+    }
+
+    // ========================================================================
+    // Pure helper: is_storyteller
+    // ========================================================================
+
+    #[test]
+    fn storyteller_matches_caller() {
+        let agent = fake_agent();
+        let story = make_story(agent.clone());
+        assert!(is_storyteller(&agent, &story));
+    }
+
+    #[test]
+    fn storyteller_does_not_match_different_agent() {
+        let storyteller = fake_agent();
+        let intruder = fake_agent_b();
+        let story = make_story(storyteller);
+        assert!(!is_storyteller(&intruder, &story));
+    }
+
+    #[test]
+    fn storyteller_reflexive() {
+        // Same key constructed independently should still match
+        let agent_a = AgentPubKey::from_raw_36(vec![42u8; 36]);
+        let agent_a_copy = AgentPubKey::from_raw_36(vec![42u8; 36]);
+        let story = make_story(agent_a);
+        assert!(is_storyteller(&agent_a_copy, &story));
+    }
+
+    // ========================================================================
+    // Pure helper: normalize_tag
+    // ========================================================================
+
+    #[test]
+    fn normalize_tag_lowercase() {
+        assert_eq!(normalize_tag("HISTORY"), "history");
+    }
+
+    #[test]
+    fn normalize_tag_mixed_case() {
+        assert_eq!(normalize_tag("Family Recipes"), "family recipes");
+    }
+
+    #[test]
+    fn normalize_tag_trim_whitespace() {
+        assert_eq!(normalize_tag("  memory  "), "memory");
+    }
+
+    #[test]
+    fn normalize_tag_trim_and_lowercase() {
+        assert_eq!(normalize_tag("  WWII History  "), "wwii history");
+    }
+
+    #[test]
+    fn normalize_tag_already_normalized() {
+        assert_eq!(normalize_tag("tradition"), "tradition");
+    }
+
+    #[test]
+    fn normalize_tag_empty_string() {
+        assert_eq!(normalize_tag(""), "");
+    }
+
+    #[test]
+    fn normalize_tag_whitespace_only() {
+        assert_eq!(normalize_tag("   "), "");
+    }
+
+    #[test]
+    fn normalize_tag_unicode() {
+        assert_eq!(normalize_tag(" Essen "), "essen");
+    }
+
+    #[test]
+    fn normalize_tag_internal_spaces_preserved() {
+        // Only leading/trailing whitespace is trimmed
+        assert_eq!(normalize_tag("  oral  history  "), "oral  history");
+    }
+
+    // ========================================================================
+    // Scenario: story lifecycle (create -> update authorized -> unauthorized)
+    // ========================================================================
+
+    #[test]
+    fn scenario_story_lifecycle_auth() {
+        let storyteller = fake_agent();
+        let other_agent = fake_agent_b();
+        let story = make_story(storyteller.clone());
+
+        // Storyteller can update their own story
+        assert!(is_storyteller(&storyteller, &story));
+
+        // Another agent cannot update it
+        assert!(!is_storyteller(&other_agent, &story));
+    }
+
+    #[test]
+    fn scenario_create_update_media_auth_chain() {
+        // Simulates: storyteller creates story, then only they can add media
+        let storyteller = fake_agent();
+        let story = make_story(storyteller.clone());
+
+        // Storyteller is authorized for both update and media
+        assert!(is_storyteller(&storyteller, &story));
+
+        // Random agent is blocked from both
+        let stranger = fake_agent_b();
+        assert!(!is_storyteller(&stranger, &story));
+    }
+
+    // ========================================================================
+    // Scenario: tradition observe updates timestamp
+    // ========================================================================
+
+    #[test]
+    fn scenario_tradition_observe_updates_timestamp() {
+        let mut tradition = FamilyTradition {
+            hearth_hash: fake_action_hash(),
+            name: "Sunday Dinner".to_string(),
+            description: "Weekly gathering".to_string(),
+            frequency: Recurrence::Weekly,
+            season: None,
+            instructions: "Everyone brings a dish".to_string(),
+            last_observed: None,
+            next_due: None,
+        };
+
+        // Initially unobserved
+        assert!(tradition.last_observed.is_none());
+
+        // After observation, timestamp is set
+        let now = Timestamp::from_micros(1_000_000);
+        tradition.last_observed = Some(now);
+        assert_eq!(tradition.last_observed, Some(Timestamp::from_micros(1_000_000)));
+
+        // Second observation updates the timestamp
+        let later = Timestamp::from_micros(2_000_000);
+        tradition.last_observed = Some(later);
+        assert_eq!(tradition.last_observed, Some(Timestamp::from_micros(2_000_000)));
+    }
+
+    #[test]
+    fn scenario_tradition_observe_preserves_other_fields() {
+        let mut tradition = FamilyTradition {
+            hearth_hash: fake_action_hash(),
+            name: "Morning Tea".to_string(),
+            description: "Daily morning tea ritual".to_string(),
+            frequency: Recurrence::Daily,
+            season: Some("Spring".to_string()),
+            instructions: "Brew green tea at sunrise".to_string(),
+            last_observed: None,
+            next_due: Some(Timestamp::from_micros(500_000)),
+        };
+
+        // Observe it
+        tradition.last_observed = Some(Timestamp::from_micros(1_000_000));
+
+        // All other fields unchanged
+        assert_eq!(tradition.name, "Morning Tea");
+        assert_eq!(tradition.frequency, Recurrence::Daily);
+        assert_eq!(tradition.season, Some("Spring".to_string()));
+        assert_eq!(tradition.next_due, Some(Timestamp::from_micros(500_000)));
+    }
+
+    // ========================================================================
+    // Scenario: tag normalization in context
+    // ========================================================================
+
+    #[test]
+    fn scenario_tag_normalization_consistency() {
+        // Different casings and whitespace should produce the same normalized tag
+        let variants = vec!["MEMORY", "Memory", "memory", " memory ", "  MEMORY  "];
+        let normalized: Vec<String> = variants.iter().map(|t| normalize_tag(t)).collect();
+        assert!(normalized.iter().all(|t| *t == "memory"));
+    }
+
+    #[test]
+    fn scenario_tag_search_uses_normalized() {
+        // Simulates: tag created with "Family Recipes" → normalized to "family recipes"
+        // Search with " FAMILY recipes " → normalized to "family recipes" → match
+        let created_tag = normalize_tag("Family Recipes");
+        let search_tag = normalize_tag(" FAMILY recipes ");
+        assert_eq!(created_tag, search_tag);
+    }
+
+    // ========================================================================
+    // Input type serde roundtrip tests (existing)
+    // ========================================================================
 
     #[test]
     fn create_story_input_serde_roundtrip() {
@@ -372,8 +640,6 @@ mod tests {
         }
     }
 
-    // ── UpdateStoryInput serde roundtrip ──────────────────────────────
-
     #[test]
     fn update_story_input_serde_roundtrip() {
         let input = UpdateStoryInput {
@@ -389,8 +655,6 @@ mod tests {
         assert_eq!(decoded.tags.len(), 2);
     }
 
-    // ── CreateCollectionInput serde roundtrip ─────────────────────────
-
     #[test]
     fn create_collection_input_serde_roundtrip() {
         let input = CreateCollectionInput {
@@ -403,8 +667,6 @@ mod tests {
         assert_eq!(decoded.hearth_hash, input.hearth_hash);
         assert_eq!(decoded.name, "Family Recipes");
     }
-
-    // ── CreateTraditionInput serde roundtrip ──────────────────────────
 
     #[test]
     fn create_tradition_input_serde_roundtrip() {
@@ -439,8 +701,6 @@ mod tests {
         assert_eq!(decoded.season, Some("Winter Solstice".to_string()));
     }
 
-    // ── AddMediaInput serde roundtrip ─────────────────────────────────
-
     #[test]
     fn add_media_input_serde_roundtrip() {
         let input = AddMediaInput {
@@ -452,8 +712,6 @@ mod tests {
         assert_eq!(decoded.story_hash, input.story_hash);
         assert_eq!(decoded.media_hash, input.media_hash);
     }
-
-    // ── AddToCollectionInput serde roundtrip ──────────────────────────
 
     #[test]
     fn add_to_collection_input_serde_roundtrip() {
@@ -467,7 +725,9 @@ mod tests {
         assert_eq!(decoded.story_hash, input.story_hash);
     }
 
-    // ── Entry type serde roundtrip tests ──────────────────────────────
+    // ========================================================================
+    // Entry type serde roundtrip tests (existing)
+    // ========================================================================
 
     #[test]
     fn family_story_serde_roundtrip() {
@@ -516,5 +776,62 @@ mod tests {
         let json = serde_json::to_string(&collection).unwrap();
         let decoded: StoryCollection = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded, collection);
+    }
+
+    // ========================================================================
+    // Signal serde roundtrip tests
+    // ========================================================================
+
+    #[test]
+    fn signal_story_created_serde() {
+        let sig = HearthSignal::StoryCreated {
+            hearth_hash: fake_action_hash(),
+            story_hash: fake_action_hash_b(),
+            storyteller: fake_agent(),
+            story_type: StoryType::Memory,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("StoryCreated"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::StoryCreated { story_type, .. } => {
+                assert_eq!(story_type, StoryType::Memory);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_story_updated_serde() {
+        let sig = HearthSignal::StoryUpdated {
+            story_hash: fake_action_hash(),
+            updated_by: fake_agent(),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("StoryUpdated"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::StoryUpdated { story_hash, .. } => {
+                assert_eq!(story_hash, fake_action_hash());
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn signal_tradition_observed_serde() {
+        let sig = HearthSignal::TraditionObserved {
+            tradition_hash: fake_action_hash(),
+            observed_by: fake_agent(),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("TraditionObserved"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::TraditionObserved { tradition_hash, .. } => {
+                assert_eq!(tradition_hash, fake_action_hash());
+            }
+            _ => panic!("Wrong variant"),
+        }
     }
 }

@@ -53,11 +53,12 @@ pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
         created_at: now,
     };
 
+    let milestone_type_clone = milestone.milestone_type.clone();
     let action_hash = create_entry(&EntryTypes::Milestone(milestone))?;
 
     // Link hearth -> milestone
     create_link(
-        input.hearth_hash,
+        input.hearth_hash.clone(),
         action_hash.clone(),
         LinkTypes::HearthToMilestones,
         (),
@@ -70,6 +71,12 @@ pub fn record_milestone(input: RecordMilestoneInput) -> ExternResult<Record> {
         LinkTypes::AgentToMilestones,
         (),
     )?;
+
+    emit_signal(&HearthSignal::MilestoneRecorded {
+        hearth_hash: input.hearth_hash,
+        milestone_hash: action_hash.clone(),
+        milestone_type: milestone_type_clone,
+    })?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created milestone".into()
@@ -121,6 +128,7 @@ pub fn begin_transition(input: BeginTransitionInput) -> ExternResult<Record> {
 /// Phase progression: PreLiminal -> Liminal -> PostLiminal -> Integrated.
 /// Sets `recategorization_blocked = false` only when reaching Integrated.
 /// Returns an error if the transition is already Integrated.
+/// Only guardians (Founder, Elder, Adult) can advance transitions.
 #[hdk_extern]
 pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
     let record = get(transition_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -135,16 +143,11 @@ pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
             "Invalid transition entry".into()
         )))?;
 
-    let next_phase = match transition.current_phase {
-        TransitionPhase::PreLiminal => TransitionPhase::Liminal,
-        TransitionPhase::Liminal => TransitionPhase::PostLiminal,
-        TransitionPhase::PostLiminal => TransitionPhase::Integrated,
-        TransitionPhase::Integrated => {
-            return Err(wasm_error!(WasmErrorInner::Guest(
-                "Transition is already Integrated and cannot be advanced further".into()
-            )));
-        }
-    };
+    // Guardian auth: only guardians can advance transitions
+    require_guardian(&transition.hearth_hash)?;
+
+    // Compute next phase (errors if already Integrated)
+    let next_phase = next_phase_for(&transition.current_phase)?;
 
     transition.current_phase = next_phase.clone();
 
@@ -153,7 +156,12 @@ pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
         transition.recategorization_blocked = false;
     }
 
-    let updated_hash = update_entry(transition_hash, &EntryTypes::LifeTransition(transition))?;
+    let updated_hash = update_entry(transition_hash.clone(), &EntryTypes::LifeTransition(transition))?;
+
+    emit_signal(&HearthSignal::TransitionAdvanced {
+        transition_hash,
+        new_phase: next_phase,
+    })?;
 
     get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated transition".into()
@@ -161,7 +169,8 @@ pub fn advance_transition(transition_hash: ActionHash) -> ExternResult<Record> {
 }
 
 /// Complete a transition by setting completed_at to now.
-/// The transition must already be in the Integrated phase.
+/// The transition must already be in the Integrated phase (PostLiminal must be
+/// completed first). Only guardians can complete transitions.
 #[hdk_extern]
 pub fn complete_transition(transition_hash: ActionHash) -> ExternResult<Record> {
     let now = sys_time()?;
@@ -178,9 +187,12 @@ pub fn complete_transition(transition_hash: ActionHash) -> ExternResult<Record> 
             "Invalid transition entry".into()
         )))?;
 
-    if transition.current_phase != TransitionPhase::Integrated {
+    // Guardian auth: only guardians can complete transitions
+    require_guardian(&transition.hearth_hash)?;
+
+    if !is_transition_completable(&transition.current_phase) {
         return Err(wasm_error!(WasmErrorInner::Guest(
-            "Transition must be in Integrated phase before completion".into()
+            "Transition must be in PostLiminal phase before completion".into()
         )));
     }
 
@@ -190,9 +202,16 @@ pub fn complete_transition(transition_hash: ActionHash) -> ExternResult<Record> 
         )));
     }
 
+    transition.current_phase = TransitionPhase::Integrated;
+    transition.recategorization_blocked = false;
     transition.completed_at = Some(now);
 
-    let updated_hash = update_entry(transition_hash, &EntryTypes::LifeTransition(transition))?;
+    let updated_hash = update_entry(transition_hash.clone(), &EntryTypes::LifeTransition(transition))?;
+
+    emit_signal(&HearthSignal::TransitionAdvanced {
+        transition_hash,
+        new_phase: TransitionPhase::Integrated,
+    })?;
 
     get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated transition".into()
@@ -246,6 +265,66 @@ pub fn get_active_transitions(hearth_hash: ActionHash) -> ExternResult<Vec<Recor
 // ============================================================================
 // Helpers
 // ============================================================================
+
+/// Check if a phase progression is valid: only forward, one step at a time.
+/// PreLiminal -> Liminal -> PostLiminal -> Integrated.
+#[allow(dead_code)]
+fn is_valid_phase_progression(current: &TransitionPhase, next: &TransitionPhase) -> bool {
+    matches!(
+        (current, next),
+        (TransitionPhase::PreLiminal, TransitionPhase::Liminal)
+            | (TransitionPhase::Liminal, TransitionPhase::PostLiminal)
+            | (TransitionPhase::PostLiminal, TransitionPhase::Integrated)
+    )
+}
+
+/// Check if a transition can be completed (must be in PostLiminal phase).
+fn is_transition_completable(phase: &TransitionPhase) -> bool {
+    *phase == TransitionPhase::PostLiminal
+}
+
+/// Get the next phase for a given current phase. Returns an error if already Integrated.
+fn next_phase_for(current: &TransitionPhase) -> ExternResult<TransitionPhase> {
+    match current {
+        TransitionPhase::PreLiminal => Ok(TransitionPhase::Liminal),
+        TransitionPhase::Liminal => Ok(TransitionPhase::PostLiminal),
+        TransitionPhase::PostLiminal => Ok(TransitionPhase::Integrated),
+        TransitionPhase::Integrated => Err(wasm_error!(WasmErrorInner::Guest(
+            "Transition is already Integrated and cannot be advanced further".into()
+        ))),
+    }
+}
+
+/// Require the caller to be a guardian of the hearth. Cross-zome call to kinship.
+fn require_guardian(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_kinship"),
+        FunctionName::new("get_caller_role"),
+        None,
+        hearth_hash.clone(),
+    )?;
+    let caller_role: Option<MemberRole> = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!("Failed to decode role: {e}")))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "get_caller_role call failed: {:?}",
+                other
+            ))));
+        }
+    };
+    let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "You are not an active member of this hearth".into()
+    )))?;
+    if !role.is_guardian() {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Only guardians can advance or complete transitions".into()
+        )));
+    }
+    Ok(role)
+}
 
 fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
@@ -444,5 +523,215 @@ mod tests {
         let decoded: RecordMilestoneInput = serde_json::from_str(&json).unwrap();
         assert!(decoded.witnesses.is_empty());
         assert!(decoded.media_hashes.is_empty());
+    }
+
+    // ---- Phase progression helpers ----
+
+    #[test]
+    fn phase_progression_prelim_to_liminal_valid() {
+        assert!(is_valid_phase_progression(
+            &TransitionPhase::PreLiminal,
+            &TransitionPhase::Liminal
+        ));
+    }
+
+    #[test]
+    fn phase_progression_liminal_to_postliminal_valid() {
+        assert!(is_valid_phase_progression(
+            &TransitionPhase::Liminal,
+            &TransitionPhase::PostLiminal
+        ));
+    }
+
+    #[test]
+    fn phase_progression_postliminal_to_integrated_valid() {
+        assert!(is_valid_phase_progression(
+            &TransitionPhase::PostLiminal,
+            &TransitionPhase::Integrated
+        ));
+    }
+
+    #[test]
+    fn phase_progression_backward_liminal_to_prelim_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::Liminal,
+            &TransitionPhase::PreLiminal
+        ));
+    }
+
+    #[test]
+    fn phase_progression_backward_postliminal_to_liminal_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::PostLiminal,
+            &TransitionPhase::Liminal
+        ));
+    }
+
+    #[test]
+    fn phase_progression_backward_integrated_to_postliminal_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::Integrated,
+            &TransitionPhase::PostLiminal
+        ));
+    }
+
+    #[test]
+    fn phase_progression_skip_prelim_to_postliminal_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::PreLiminal,
+            &TransitionPhase::PostLiminal
+        ));
+    }
+
+    #[test]
+    fn phase_progression_skip_prelim_to_integrated_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::PreLiminal,
+            &TransitionPhase::Integrated
+        ));
+    }
+
+    #[test]
+    fn phase_progression_skip_liminal_to_integrated_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::Liminal,
+            &TransitionPhase::Integrated
+        ));
+    }
+
+    #[test]
+    fn phase_progression_same_phase_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::Liminal,
+            &TransitionPhase::Liminal
+        ));
+    }
+
+    #[test]
+    fn phase_progression_integrated_to_integrated_invalid() {
+        assert!(!is_valid_phase_progression(
+            &TransitionPhase::Integrated,
+            &TransitionPhase::Integrated
+        ));
+    }
+
+    // ---- Transition completability ----
+
+    #[test]
+    fn completable_only_postliminal() {
+        assert!(!is_transition_completable(&TransitionPhase::PreLiminal));
+        assert!(!is_transition_completable(&TransitionPhase::Liminal));
+        assert!(is_transition_completable(&TransitionPhase::PostLiminal));
+        assert!(!is_transition_completable(&TransitionPhase::Integrated));
+    }
+
+    // ---- Signal serde roundtrips ----
+
+    #[test]
+    fn signal_milestone_recorded_serde_roundtrip() {
+        let sig = HearthSignal::MilestoneRecorded {
+            hearth_hash: fake_action_hash(),
+            milestone_hash: ActionHash::from_raw_36(vec![3u8; 36]),
+            milestone_type: MilestoneType::Birth,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::MilestoneRecorded {
+                milestone_type, ..
+            } => {
+                assert_eq!(milestone_type, MilestoneType::Birth);
+            }
+            _ => panic!("Expected MilestoneRecorded signal"),
+        }
+    }
+
+    #[test]
+    fn signal_milestone_recorded_custom_type_serde() {
+        let sig = HearthSignal::MilestoneRecorded {
+            hearth_hash: fake_action_hash(),
+            milestone_hash: ActionHash::from_raw_36(vec![4u8; 36]),
+            milestone_type: MilestoneType::Custom("Adoption Day".into()),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::MilestoneRecorded {
+                milestone_type, ..
+            } => {
+                assert_eq!(milestone_type, MilestoneType::Custom("Adoption Day".into()));
+            }
+            _ => panic!("Expected MilestoneRecorded signal"),
+        }
+    }
+
+    #[test]
+    fn signal_transition_advanced_serde_roundtrip() {
+        let sig = HearthSignal::TransitionAdvanced {
+            transition_hash: fake_action_hash(),
+            new_phase: TransitionPhase::Liminal,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::TransitionAdvanced { new_phase, .. } => {
+                assert_eq!(new_phase, TransitionPhase::Liminal);
+            }
+            _ => panic!("Expected TransitionAdvanced signal"),
+        }
+    }
+
+    #[test]
+    fn signal_transition_advanced_all_phases_serde() {
+        for phase in &[
+            TransitionPhase::PreLiminal,
+            TransitionPhase::Liminal,
+            TransitionPhase::PostLiminal,
+            TransitionPhase::Integrated,
+        ] {
+            let sig = HearthSignal::TransitionAdvanced {
+                transition_hash: fake_action_hash(),
+                new_phase: phase.clone(),
+            };
+            let json = serde_json::to_string(&sig).unwrap();
+            let back: HearthSignal = serde_json::from_str(&json).unwrap();
+            match back {
+                HearthSignal::TransitionAdvanced { new_phase, .. } => {
+                    assert_eq!(new_phase, *phase);
+                }
+                _ => panic!("Expected TransitionAdvanced signal"),
+            }
+        }
+    }
+
+    // ---- next_phase_for helper ----
+
+    #[test]
+    fn next_phase_for_preliminal() {
+        assert_eq!(
+            next_phase_for(&TransitionPhase::PreLiminal).unwrap(),
+            TransitionPhase::Liminal
+        );
+    }
+
+    #[test]
+    fn next_phase_for_liminal() {
+        assert_eq!(
+            next_phase_for(&TransitionPhase::Liminal).unwrap(),
+            TransitionPhase::PostLiminal
+        );
+    }
+
+    #[test]
+    fn next_phase_for_postliminal() {
+        assert_eq!(
+            next_phase_for(&TransitionPhase::PostLiminal).unwrap(),
+            TransitionPhase::Integrated
+        );
+    }
+
+    #[test]
+    fn next_phase_for_integrated_errors() {
+        assert!(next_phase_for(&TransitionPhase::Integrated).is_err());
     }
 }
