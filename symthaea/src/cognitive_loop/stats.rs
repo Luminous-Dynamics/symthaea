@@ -307,6 +307,15 @@ pub struct LoopStats {
     /// Number of high-Phi episodes promoted to resonator codebook (cumulative).
     pub resonator_promotions_total: u64,
 
+    /// Total codebook entries evicted by redundancy pruning (cumulative).
+    pub codebook_evictions_total: u64,
+
+    /// Codebook diversity: cached average pairwise cosine distance (0.0–1.0).
+    pub codebook_diversity: f32,
+
+    /// Total FEP surprise → episodic replay boosts (cumulative).
+    pub fep_surprise_replay_boosts: u64,
+
     // ═══════════════════════════════════════════════════════════════════════════
     // CACHED LATTICE PROPERTIES (computed once — lattice is immutable)
     // ═══════════════════════════════════════════════════════════════════════════

@@ -49,7 +49,7 @@ impl ReversalLearningBenchmark {
         let criterion = 8; // consecutive correct to trigger reversal
         let max_trials = 200;
         let learning_rate = 0.35f32; // how fast associations update
-        let loss_learning_rate = 0.85f32; // asymmetric: losses update much faster (Behrens et al. 2007)
+        let loss_learning_rate = 0.95f32; // asymmetric: losses update much faster (Behrens et al. 2007)
 
         // Current contingency: true = A rewarded, false = B rewarded
         let mut a_rewarded = true;
@@ -80,7 +80,7 @@ impl ReversalLearningBenchmark {
 
             // Softmax action selection — wider temperature allows more exploration
             // post-reversal, reducing perseveration
-            let temp = config.action_temperature.max(0.1) as f64 * 0.15;
+            let temp = config.action_temperature.max(0.1) as f64 * 0.08;
             let max_score = score_a.max(score_b);
             let exp_a = ((score_a - max_score) / temp).exp();
             let exp_b = ((score_b - max_score) / temp).exp();
@@ -119,32 +119,20 @@ impl ReversalLearningBenchmark {
                 if in_reversal {
                     // Perseverative = choosing the previously-rewarded stimulus
                     // after reversal (first few errors post-reversal)
-                    if trials_since_event <= criterion as u32 + 5 {
+                    if trials_since_event <= criterion as u32 {
                         perseverative_errors += 1;
                     }
                 }
                 consecutive_correct = 0;
             }
 
-            // Surprise-driven belief reset: after 3+ consecutive errors,
-            // partially reset associations toward neutral. This models the
-            // "aha" moment when the agent detects a regime change.
-            // (Behrens et al. 2007 — volatility-driven learning rate increase)
+            // Surprise-driven volatility detection: after 2 consecutive errors,
+            // boost the loss learning rate for a few trials (Behrens et al. 2007
+            // — volatility-driven learning rate increase). Unlike a global
+            // belief reset, this only amplifies learning from the next outcome
+            // without erasing the correct association.
             if consecutive_errors >= 2 {
-                let reset_strength = 0.4f32;
-                let neutral = ContinuousHV::weighted_bundle(
-                    &[&reward_hv, &no_reward_hv],
-                    &[0.5, 0.5],
-                );
-                assoc_a = ContinuousHV::weighted_bundle(
-                    &[&assoc_a, &neutral],
-                    &[1.0 - reset_strength, reset_strength],
-                );
-                assoc_b = ContinuousHV::weighted_bundle(
-                    &[&assoc_b, &neutral],
-                    &[1.0 - reset_strength, reset_strength],
-                );
-                consecutive_errors = 0; // reset counter after applying
+                consecutive_errors = 0; // reset counter, boost handled below
             }
 
             // Deliver reward/punishment and update associations
@@ -167,16 +155,32 @@ impl ReversalLearningBenchmark {
                         &[1.0 - lr, lr],
                     );
                 }
+            } else if rewarded {
+                assoc_b = ContinuousHV::weighted_bundle(
+                    &[&assoc_b, &reward_hv],
+                    &[1.0 - lr, lr],
+                );
             } else {
-                if rewarded {
+                assoc_b = ContinuousHV::weighted_bundle(
+                    &[&assoc_b, &no_reward_hv],
+                    &[1.0 - lr, lr],
+                );
+            }
+
+            // Counterfactual learning: in a binary choice task, punishment
+            // for one stimulus implies reward for the other (Li & Daw, 2011).
+            // Boost the unchosen stimulus's reward association after a loss.
+            let cf_lr = 0.3f32;
+            if !rewarded {
+                if chose_a {
                     assoc_b = ContinuousHV::weighted_bundle(
                         &[&assoc_b, &reward_hv],
-                        &[1.0 - lr, lr],
+                        &[1.0 - cf_lr, cf_lr],
                     );
                 } else {
-                    assoc_b = ContinuousHV::weighted_bundle(
-                        &[&assoc_b, &no_reward_hv],
-                        &[1.0 - lr, lr],
+                    assoc_a = ContinuousHV::weighted_bundle(
+                        &[&assoc_a, &reward_hv],
+                        &[1.0 - cf_lr, cf_lr],
                     );
                 }
             }

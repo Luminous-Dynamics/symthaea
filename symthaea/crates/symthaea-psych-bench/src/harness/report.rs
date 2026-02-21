@@ -513,7 +513,7 @@ pub fn domain_of(benchmark: &str) -> &str {
 /// Map each benchmark to its primary metric for paper-table output.
 pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
     match benchmark {
-        b if b.contains("NBack") => "nback_2::accuracy",
+        b if b.contains("NBack") || b.contains("N-back") => "nback_2::accuracy",
         b if b.contains("ChangeDetection") => "set_size_4::accuracy",
         b if b.contains("SerialRecall") => "primacy_advantage",
         b if b.contains("SpatialUpdating") => "overall_accuracy",
@@ -521,8 +521,8 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("DigitSpan") => "forward_span",
         b if b.contains("Stroop") && !b.contains("Strange") => "stroop_effect",
         b if b.contains("Flanker") => "flanker_effect",
-        b if b.contains("Wisconsin") => "categories_completed",
-        b if b.contains("Iowa") => "overall_net_score",
+        b if b.contains("Wisconsin") || b.contains("WCST") => "categories_completed",
+        b if b.contains("Iowa") || b.contains("IGT") => "overall_net_score",
         b if b.contains("Ravens") => "overall_accuracy",
         b if b.contains("TowerOfLondon") => "overall_optimal_rate",
         b if b.contains("Probabilistic") => "correct_rate",
@@ -531,7 +531,7 @@ pub fn key_metric_for_benchmark(benchmark: &str) -> &str {
         b if b.contains("Instrumental") => "instrumental_sensitivity",
         b if b.contains("TwoStep") => "beta3_model_basedness",
         b if b.contains("Temporal") => "discounting_score_S",
-        b if b.contains("Bart") => "average_pumps",
+        b if b.contains("Bart") || b.contains("BART") => "average_pumps",
         b if b.contains("Reversal") => "win_stay_rate",
         b if b.contains("FalseBelief") => "false_belief_accuracy",
         b if b.contains("FauxPas") => "faux_pas_accuracy",
