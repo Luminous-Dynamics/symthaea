@@ -9,9 +9,10 @@
 //!   spatial updating, binding, digit span)
 //! - **CogBench** — Cognitive psychology experiments via FEP active inference
 //!   (probabilistic reasoning, exploration, bandits, instrumental learning,
-//!   two-step task, temporal discounting, BART)
+//!   two-step task, temporal discounting, BART, reversal learning)
 //! - **Executive** — Executive function (WCST rule-shifting, Iowa Gambling Task
-//!   loss aversion, Raven's Progressive Matrices, Stroop interference, Flanker)
+//!   loss aversion, Raven's Progressive Matrices, Stroop interference, Flanker,
+//!   Tower of London planning)
 //! - **Metacognition** — Metacognitive calibration (confidence-accuracy covariance)
 //! - **Butlin** — Consciousness indicators from 6 theories (RPT, GWT, HOT, PP, AST, IIT)
 //! - **ToMBench** — Theory of Mind tasks (false belief, faux-pas, persuasion,

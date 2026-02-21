@@ -236,9 +236,15 @@ impl BenchmarkReport {
             ("stroop_effect", "stroop_effect", exec_bl),
             // Flanker-specific
             ("flanker_effect", "flanker_effect", exec_bl),
+            // Tower of London
+            ("overall_optimal_rate", "tol_overall_optimal_rate", exec_bl),
+            ("planning_efficiency", "tol_planning_efficiency", exec_bl),
             // Digit Span
             ("forward_span", "digit_span_forward", worm_bl),
             ("backward_span", "digit_span_backward", worm_bl),
+            // Reversal Learning
+            ("win_stay_rate", "reversal_win_stay", cog_bl),
+            ("lose_shift_rate", "reversal_lose_shift", cog_bl),
             // Metacognition
             ("calibration_error_ece", "calibration_error_ece", meta_bl),
             ("discrimination_gamma", "discrimination_gamma", meta_bl),
