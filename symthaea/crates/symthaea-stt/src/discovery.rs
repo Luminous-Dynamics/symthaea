@@ -427,12 +427,10 @@ impl OnlineClusterer {
                 let id1 = &unit_ids[i];
                 let id2 = &unit_ids[j];
 
-                let sim = self
-                    .units
-                    .get(id1)
-                    .unwrap()
-                    .centroid
-                    .similarity(&self.units.get(id2).unwrap().centroid);
+                let sim = match (self.units.get(id1), self.units.get(id2)) {
+                    (Some(u1), Some(u2)) => u1.centroid.similarity(&u2.centroid),
+                    _ => continue,
+                };
 
                 if sim > threshold {
                     to_merge.push((id1.clone(), id2.clone()));

@@ -635,4 +635,150 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_hv16_to_real_hv_conversion() {
+        // Create a known BinaryHV and verify the bipolar encoding
+        let hv = BinaryHV::random(42);
+        let real = hv16_to_real_hv(&hv);
+
+        // BinaryHV is 2048 bytes = 16384 bits => ContinuousHV should have 16384 dims
+        assert_eq!(real.dim(), 16384, "converted HV should be 16384-dimensional");
+
+        // Every value should be exactly -1.0 or +1.0 (bipolar encoding)
+        for (i, &val) in real.as_slice().iter().enumerate() {
+            assert!(
+                val == -1.0 || val == 1.0,
+                "dimension {} has value {} (expected -1.0 or 1.0)",
+                i, val,
+            );
+        }
+    }
+
+    #[test]
+    fn test_hv16_to_real_hv_different_seeds_differ() {
+        let hv_a = BinaryHV::random(1);
+        let hv_b = BinaryHV::random(2);
+        let real_a = hv16_to_real_hv(&hv_a);
+        let real_b = hv16_to_real_hv(&hv_b);
+
+        // Two different random BinaryHVs should produce different ContinuousHVs
+        // Cosine similarity should be near 0 (quasi-orthogonal in high dimensions)
+        let sim = real_a.similarity(&real_b);
+        assert!(
+            sim.abs() < 0.1,
+            "different random HVs should be quasi-orthogonal, got similarity {}",
+            sim,
+        );
+    }
+
+    #[test]
+    fn test_compose_primitives_empty_input() {
+        let router = CodePrimitiveRouter::new(256);
+
+        // Empty primitives should return a random HV of the configured dimension
+        let composed = router.compose_primitives(&[]);
+        assert_eq!(
+            composed.dim(), 256,
+            "composing empty primitives should return HV with router dim"
+        );
+    }
+
+    #[test]
+    fn test_router_with_custom_config() {
+        let config = CodePrimitiveConfig {
+            similarity_threshold: 0.5,
+            max_primitives: 3,
+            cross_tier_enabled: false,
+            phi_threshold: 0.6,
+        };
+        let mut router = CodePrimitiveRouter::with_config(1024, config);
+        router.cache_primitives();
+
+        // With max_primitives=3 and cross_tier disabled, should get at most 3
+        let prims = router.select_primitives(CodeOperation::Generate);
+        assert!(
+            prims.len() <= 3,
+            "should select at most max_primitives={}, got {}",
+            3,
+            prims.len(),
+        );
+    }
+
+    #[test]
+    fn test_executor_all_operations_succeed() {
+        let executor = CodePrimitiveExecutor::new(512);
+
+        let operations = [
+            CodeOperation::Parse,
+            CodeOperation::Encode,
+            CodeOperation::Generate,
+            CodeOperation::Modify,
+            CodeOperation::Explain,
+            CodeOperation::FindSimilar,
+            CodeOperation::Refactor,
+            CodeOperation::Debug,
+            CodeOperation::Verify,
+        ];
+
+        for op in operations {
+            let result = executor.execute(op);
+            assert!(result.success, "{:?} execution should succeed", op);
+            assert!(result.phi.is_finite(), "{:?} phi should be finite", op);
+            assert!(result.phi >= 0.0 && result.phi <= 1.0,
+                "{:?} phi should be in [0, 1], got {}", op, result.phi);
+            assert!(!result.diagnostics.is_empty(), "{:?} should produce diagnostics", op);
+        }
+    }
+
+    #[test]
+    fn test_cross_tier_execution() {
+        let executor = CodePrimitiveExecutor::new(512);
+
+        // Execute with consciousness tier
+        let result = executor.execute_with_consciousness(CodeOperation::Generate);
+        assert!(result.code_phi.is_finite(), "code_phi should be finite");
+        assert!(result.cross_phi.is_finite(), "cross_phi should be finite");
+        assert!(result.combined_phi.is_finite(), "combined_phi should be finite");
+        assert!(result.combined_phi >= 0.0 && result.combined_phi <= 1.0,
+            "combined_phi should be in [0, 1], got {}", result.combined_phi);
+
+        // Execute with metacognitive tier
+        let meta_result = executor.execute_with_metacognitive(CodeOperation::Debug);
+        assert!(meta_result.code_phi.is_finite());
+        assert!(meta_result.cross_phi.is_finite());
+    }
+
+    #[test]
+    fn test_task_type_is_code() {
+        assert_eq!(CodePrimitiveRouter::task_type(), TaskType::Code);
+    }
+
+    #[test]
+    fn test_all_operations_have_supporting_and_cross_tier() {
+        let operations = [
+            CodeOperation::Parse,
+            CodeOperation::Encode,
+            CodeOperation::Generate,
+            CodeOperation::Modify,
+            CodeOperation::Explain,
+            CodeOperation::FindSimilar,
+            CodeOperation::Refactor,
+            CodeOperation::Debug,
+            CodeOperation::Verify,
+        ];
+
+        for op in operations {
+            assert!(
+                !op.supporting_primitives().is_empty(),
+                "{:?} has no supporting primitives",
+                op,
+            );
+            assert!(
+                !op.cross_tier_primitives().is_empty(),
+                "{:?} has no cross-tier primitives",
+                op,
+            );
+        }
+    }
 }

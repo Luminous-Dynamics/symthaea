@@ -895,8 +895,10 @@ impl WorldGroundedSelfModel {
 
         // If there is a strongest and weakest domain, compose a fallback
         // so the strong domain backs up the weak one.
-        if domains.len() >= 2 {
-            let _ = engine.compose_fallback(&domains[0], domains.last().unwrap(), 0.6);
+        if let (Some(first), Some(last)) = (domains.first(), domains.last()) {
+            if domains.len() >= 2 {
+                let _ = engine.compose_fallback(first, last, 0.6);
+            }
         }
     }
 

@@ -681,6 +681,24 @@ pub struct CycleMetadata {
 
     /// Dominant harmonic mode (e.g., "Wisdom", "Play", "Coherence").
     pub dominant_harmonic: String,
+
+    // ── Phase 9: Resonator-Memory Loop + FEP Deepening ──────────────
+    /// Whether resonator recall primed working memory confidence this cycle.
+    pub resonator_wm_primed: bool,
+    /// Number of episodes reconsolidated via resonator recall this cycle.
+    pub resonator_reconsolidated: usize,
+    /// Number of high-Phi episodes promoted to resonator codebook this cycle.
+    pub resonator_promotions: usize,
+    /// FEP pragmatic value for selected action (0.0 when not computed).
+    pub fep_pragmatic_value: f64,
+    /// FEP accuracy component (expected log likelihood, 0.0 when not computed).
+    pub fep_accuracy: f64,
+    /// FEP complexity component (KL from prior, 0.0 when not computed).
+    pub fep_complexity: f64,
+    /// FEP surprise component (negative log evidence, 0.0 when not computed).
+    pub fep_surprise: f64,
+    /// FEP TD error magnitude (0.0 when not computed).
+    pub fep_td_error: f64,
 }
 
 /// Compact subset of CycleMetadata with the most essential telemetry fields.
@@ -702,6 +720,10 @@ pub struct CycleMetadataCompact {
     pub affective_valence: f32,
     pub affective_arousal: f32,
     pub prediction_error_trend: f32,
+    /// FEP TD error magnitude (0.0 when not computed).
+    pub fep_td_error: f64,
+    /// FEP pragmatic value for selected action (0.0 when not computed).
+    pub fep_pragmatic_value: f64,
 }
 
 impl CycleMetadata {
@@ -720,6 +742,8 @@ impl CycleMetadata {
             affective_valence: self.affective_valence,
             affective_arousal: self.affective_arousal,
             prediction_error_trend: 0.0, // caller fills from CycleResult
+            fep_td_error: self.fep_td_error,
+            fep_pragmatic_value: self.fep_pragmatic_value,
         }
     }
 }
@@ -809,6 +833,17 @@ pub struct ModuleTimings {
     pub soul_experience: u64,
     /// CycleMetadata struct construction + format!() serialization
     pub metadata_assembly: u64,
+    // ── Mid-cycle sections (Session 10 instrumentation) ──
+    /// World model: sensory update + stiffness/level-error feedback
+    pub world_model: u64,
+    /// Resonator codebook: novelty check + symbol addition + causal chain entries
+    pub resonator_codebook: u64,
+    /// High-phi episode → resonator codebook promotion (every 97 cycles)
+    pub high_phi_promotion: u64,
+    /// Demand-driven consolidation trigger (error spike or semantic miss)
+    pub demand_consolidation: u64,
+    /// Episodic replay CfC retraining + memory coordinator graduations
+    pub episodic_replay: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

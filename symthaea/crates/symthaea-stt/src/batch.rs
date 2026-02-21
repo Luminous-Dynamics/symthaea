@@ -151,7 +151,7 @@ impl BatchProcessor {
             // Simple shuffle using hash
             work_files.sort_by_key(|p| {
                 let hash = blake3::hash(p.to_string_lossy().as_bytes());
-                u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap())
+                u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap_or([0u8; 8]))
             });
         }
 

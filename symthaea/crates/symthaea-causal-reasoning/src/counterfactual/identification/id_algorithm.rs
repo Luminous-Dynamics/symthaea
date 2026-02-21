@@ -509,8 +509,14 @@ impl IDAlgorithm {
                     // Direct confounding: single treatment X and single outcome Y
                     // both in same C-component, with no mediator in the path
                     // Check if there's a direct edge X → Y
-                    let x_node = *x.iter().next().unwrap();
-                    let s_node = *s.iter().next().unwrap();
+                    // x.len() == 1 and s.len() == 1 guaranteed by x_only_in_c_prime check above
+                    let (&x_node, &s_node) = match (x.iter().next(), s.iter().next()) {
+                        (Some(xn), Some(sn)) => (xn, sn),
+                        _ => return Ok(CausalExpression::Probability {
+                            outcome: s.iter().copied().collect(),
+                            conditioning: Vec::new(),
+                        }),
+                    };
                     let direct_edge = graph
                         .directed
                         .iter()
