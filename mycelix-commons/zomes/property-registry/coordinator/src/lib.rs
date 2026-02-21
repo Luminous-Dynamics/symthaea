@@ -2,6 +2,75 @@
 use hdk::prelude::*;
 use property_registry_integrity::*;
 use commons_types::batch::links_to_records;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal, requirement_for_voting,
+    requirement_for_constitutional,
+};
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+/// Fetch the calling agent's consciousness credential via the commons bridge
+/// and evaluate it against the given governance requirement.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort)
+    let audit = GateAuditInput {
+        action_name: action_name.to_string(),
+        zome_name: zome_info()?.name.to_string(),
+        eligible: eligibility.eligible,
+        actual_tier: format!("{:?}", eligibility.tier),
+        required_tier: format!("{:?}", requirement.min_tier),
+        weight_bp: eligibility.weight_bp,
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("log_governance_gate"),
+        None,
+        audit,
+    ) {
+        Ok(_) => {},
+        Err(e) => { debug!("Audit log failed: {:?}", e); },
+    }
+
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 /// Get or create an anchor entry and return its EntryHash for use as link base
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -12,6 +81,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn register_property(input: RegisterPropertyInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "register_property")?;
     let now = sys_time()?;
     let property = Property {
         id: format!("property:{}:{}", input.owner_did, now.as_micros()),
@@ -89,6 +159,7 @@ pub fn get_owner_properties(did: String) -> ExternResult<Vec<Record>> {
 
 #[hdk_extern]
 pub fn add_encumbrance(input: AddEncumbranceInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "add_encumbrance")?;
     let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TitleDeed)?)).include_entries(true);
     for record in query(filter)? {
         if let Some(deed) = record.entry().to_app_option::<TitleDeed>().ok().flatten() {
@@ -172,6 +243,7 @@ pub fn get_property_deeds(property_id: String) -> ExternResult<Vec<Record>> {
 /// Update property metadata
 #[hdk_extern]
 pub fn update_property_metadata(input: UpdateMetadataInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "update_property_metadata")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Property)?))
         .include_entries(true);
@@ -206,6 +278,7 @@ pub struct UpdateMetadataInput {
 /// Remove an encumbrance (when paid off)
 #[hdk_extern]
 pub fn remove_encumbrance(input: RemoveEncumbranceInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "remove_encumbrance")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::TitleDeed)?))
         .include_entries(true);
@@ -255,6 +328,7 @@ pub fn get_properties_by_type(property_type: PropertyType) -> ExternResult<Vec<R
 /// Add a co-owner to property
 #[hdk_extern]
 pub fn add_co_owner(input: AddCoOwnerInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_co_owner")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Property)?))
         .include_entries(true);
@@ -295,6 +369,7 @@ pub struct AddCoOwnerInput {
 /// Remove a co-owner from property
 #[hdk_extern]
 pub fn remove_co_owner(input: RemoveCoOwnerInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "remove_co_owner")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Property)?))
         .include_entries(true);
@@ -374,6 +449,7 @@ pub fn has_clear_title(property_id: String) -> ExternResult<bool> {
 /// 5. Updates owner links
 #[hdk_extern]
 pub fn transfer_ownership(input: TransferOwnershipInput) -> ExternResult<TransferOwnershipResult> {
+    let _eligibility = require_consciousness(&requirement_for_constitutional(), "transfer_ownership")?;
     let now = sys_time()?;
 
     // 1. Get the current property

@@ -12,6 +12,7 @@
 
 use hdk::prelude::*;
 use hearth_bridge_integrity::*;
+use hearth_coordinator_common::decode_zome_response;
 use hearth_types::{
     BondUpdate, CareSummary, DigestEpochInput, GratitudeSummary, RhythmSummary, SeveranceInput,
     SeveranceSummaryData, WeeklyDigest,
@@ -557,25 +558,6 @@ pub struct HearthSyncInput {
     pub epoch_end: Timestamp,
 }
 
-/// Decode a typed value from a ZomeCallResponse (for direct cross-zome calls).
-fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
-    response: ZomeCallResponse,
-    context: &str,
-) -> ExternResult<T> {
-    match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode {} response: {}",
-                context, e
-            )))
-        }),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-zome call to {} failed: {:?}",
-            context, other
-        )))),
-    }
-}
-
 /// Decode a typed response from a DispatchResult.
 fn decode_dispatch_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
     result: &DispatchResult,
@@ -738,12 +720,22 @@ const CREDENTIAL_CACHE_TTL_US: i64 = 600_000_000;
 fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredential>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        LinkQuery::try_new(agent, LinkTypes::AgentToCredentialCache)?,
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToCredentialCache)?,
         GetStrategy::Local,
     )?;
 
     if links.is_empty() {
         return Ok(None);
+    }
+
+    // Clean up stale links (>1 hour old)
+    const CACHE_STALE_CLEANUP_US: i64 = 3_600_000_000;
+    let now_cleanup = sys_time()?.as_micros();
+    let stale_cutoff = Timestamp::from_micros(now_cleanup - CACHE_STALE_CLEANUP_US);
+    for link in &links {
+        if link.timestamp < stale_cutoff {
+            let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+        }
     }
 
     let link = links.into_iter().max_by_key(|l| l.timestamp)

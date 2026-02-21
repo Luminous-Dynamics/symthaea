@@ -3,6 +3,75 @@
 
 use housing_finances_integrity::*;
 use hdk::prelude::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_basic, requirement_for_proposal,
+    requirement_for_voting, requirement_for_constitutional,
+};
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+/// Fetch the calling agent's consciousness credential via the commons bridge
+/// and evaluate it against the given governance requirement.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort)
+    let audit = GateAuditInput {
+        action_name: action_name.to_string(),
+        zome_name: zome_info()?.name.to_string(),
+        eligible: eligibility.eligible,
+        actual_tier: format!("{:?}", eligibility.tier),
+        required_tier: format!("{:?}", requirement.min_tier),
+        weight_bp: eligibility.weight_bp,
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("log_governance_gate"),
+        None,
+        audit,
+    ) {
+        Ok(_) => {},
+        Err(e) => { debug!("Audit log failed: {:?}", e); },
+    }
+
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -29,6 +98,7 @@ pub struct MemberChargeInfo {
 /// Generate monthly charges for all specified members
 #[hdk_extern]
 pub fn generate_monthly_charges(input: GenerateChargesInput) -> ExternResult<Vec<Record>> {
+    let _eligibility = require_consciousness(&requirement_for_constitutional(), "generate_monthly_charges")?;
     let period_anchor = format!("period:{}:{:02}", input.period_year, input.period_month);
     create_entry(&EntryTypes::Anchor(Anchor(period_anchor.clone())))?;
 
@@ -81,6 +151,7 @@ pub fn generate_monthly_charges(input: GenerateChargesInput) -> ExternResult<Vec
 /// Record a payment
 #[hdk_extern]
 pub fn record_payment(payment: Payment) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "record_payment")?;
     let action_hash = create_entry(&EntryTypes::Payment(payment.clone()))?;
 
     // Link member to payment
@@ -129,6 +200,7 @@ pub fn get_member_payments(member: AgentPubKey) -> ExternResult<Vec<Record>> {
 /// Create a reserve fund
 #[hdk_extern]
 pub fn create_reserve_fund(fund: ReserveFund) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "create_reserve_fund")?;
     if fund.name.len() > 256 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Fund name must be at most 256 characters".into()
@@ -159,6 +231,7 @@ pub struct DepositToReserveInput {
 /// Deposit funds into a reserve
 #[hdk_extern]
 pub fn deposit_to_reserve(input: DepositToReserveInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "deposit_to_reserve")?;
     if input.amount_cents == 0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Deposit amount must be greater than 0".into()
@@ -189,6 +262,7 @@ pub fn deposit_to_reserve(input: DepositToReserveInput) -> ExternResult<Record> 
 /// Create an annual budget
 #[hdk_extern]
 pub fn create_budget(budget: Budget) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "create_budget")?;
     let action_hash = create_entry(&EntryTypes::Budget(budget.clone()))?;
 
     let year_anchor = format!("fiscal_year:{}", budget.fiscal_year);
@@ -213,6 +287,7 @@ pub struct ApproveBudgetInput {
 /// Approve a budget
 #[hdk_extern]
 pub fn approve_budget(input: ApproveBudgetInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_constitutional(), "approve_budget")?;
     let record = get(input.budget_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Budget not found".into())
     ))?;

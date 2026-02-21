@@ -4,6 +4,7 @@
 //! This is the CORE membership and relationship zome for the Hearth cluster.
 
 use hdk::prelude::*;
+use hearth_coordinator_common::records_from_links;
 use hearth_kinship_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
@@ -73,19 +74,6 @@ pub struct GetBondHealthInput {
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
-}
-
-/// Collect records from a list of links (resolving each target ActionHash).
-fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
-    let mut records = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            records.push(record);
-        }
-    }
-    Ok(records)
 }
 
 /// Extract a typed entry from a Record.
@@ -1510,5 +1498,267 @@ mod tests {
     #[test]
     fn find_role_empty_list() {
         assert_eq!(find_member_role(&fake_agent_a(), &[]), None);
+    }
+
+    // ====================================================================
+    // Complex business logic scenario tests
+    // ====================================================================
+
+    /// Test default_vote_weight_bp() for all MemberRole variants.
+    /// Verify the ordering: Founder = Elder = Adult > Youth > Child = Guest = Ancestor.
+    #[test]
+    fn scenario_role_hierarchy_vote_weights() {
+        // Guardian-level roles all get full weight (10000 bp = 100%)
+        assert_eq!(MemberRole::Founder.default_vote_weight_bp(), 10000);
+        assert_eq!(MemberRole::Elder.default_vote_weight_bp(), 10000);
+        assert_eq!(MemberRole::Adult.default_vote_weight_bp(), 10000);
+
+        // Youth gets reduced weight (5000 bp = 50%)
+        assert_eq!(MemberRole::Youth.default_vote_weight_bp(), 5000);
+
+        // Child, Guest, Ancestor get no weight (0 bp)
+        assert_eq!(MemberRole::Child.default_vote_weight_bp(), 0);
+        assert_eq!(MemberRole::Guest.default_vote_weight_bp(), 0);
+        assert_eq!(MemberRole::Ancestor.default_vote_weight_bp(), 0);
+
+        // Verify ordering: guardian > youth > non-voting
+        let guardian_weight = MemberRole::Adult.default_vote_weight_bp();
+        let youth_weight = MemberRole::Youth.default_vote_weight_bp();
+        let child_weight = MemberRole::Child.default_vote_weight_bp();
+
+        assert!(
+            guardian_weight > youth_weight,
+            "Guardian weight ({}) should exceed Youth weight ({})",
+            guardian_weight,
+            youth_weight
+        );
+        assert!(
+            youth_weight > child_weight,
+            "Youth weight ({}) should exceed Child weight ({})",
+            youth_weight,
+            child_weight
+        );
+
+        // Verify all three guardian roles have equal weight
+        assert_eq!(
+            MemberRole::Founder.default_vote_weight_bp(),
+            MemberRole::Elder.default_vote_weight_bp()
+        );
+        assert_eq!(
+            MemberRole::Elder.default_vote_weight_bp(),
+            MemberRole::Adult.default_vote_weight_bp()
+        );
+
+        // Verify all non-voting roles have equal weight (0)
+        assert_eq!(
+            MemberRole::Child.default_vote_weight_bp(),
+            MemberRole::Guest.default_vote_weight_bp()
+        );
+        assert_eq!(
+            MemberRole::Guest.default_vote_weight_bp(),
+            MemberRole::Ancestor.default_vote_weight_bp()
+        );
+    }
+
+    /// Test the vote weight lookup helper with a realistic multi-member hearth.
+    #[test]
+    fn scenario_vote_weight_multi_member_hearth() {
+        let agent_c = AgentPubKey::from_raw_36(vec![3u8; 36]);
+        let agent_d = AgentPubKey::from_raw_36(vec![4u8; 36]);
+        let agent_e = AgentPubKey::from_raw_36(vec![5u8; 36]);
+
+        let memberships = vec![
+            make_membership(&fake_agent_a(), MemberRole::Founder, MembershipStatus::Active),
+            make_membership(&fake_agent_b(), MemberRole::Elder, MembershipStatus::Active),
+            make_membership(&agent_c, MemberRole::Adult, MembershipStatus::Active),
+            make_membership(&agent_d, MemberRole::Youth, MembershipStatus::Active),
+            make_membership(&agent_e, MemberRole::Child, MembershipStatus::Active),
+        ];
+
+        // Check each member's vote weight
+        assert_eq!(find_member_vote_weight(&fake_agent_a(), &memberships), 10000);
+        assert_eq!(find_member_vote_weight(&fake_agent_b(), &memberships), 10000);
+        assert_eq!(find_member_vote_weight(&agent_c, &memberships), 10000);
+        assert_eq!(find_member_vote_weight(&agent_d, &memberships), 5000);
+        assert_eq!(find_member_vote_weight(&agent_e, &memberships), 0);
+
+        // Non-member gets 0
+        let outsider = AgentPubKey::from_raw_36(vec![99u8; 36]);
+        assert_eq!(find_member_vote_weight(&outsider, &memberships), 0);
+
+        // Total active members
+        assert_eq!(count_active_memberships(&memberships), 5);
+    }
+
+    /// Test bond health decay over time using the decayed_strength function.
+    /// Verifies that bonds weaken over time but never go below BOND_MIN,
+    /// and that fresh bonds retain full strength.
+    #[test]
+    fn scenario_bond_health_decay_over_time() {
+        let initial = BOND_BASE_FAMILY; // 7000 bp
+
+        // Day 0: no decay
+        assert_eq!(decayed_strength(initial, 0), initial);
+
+        // Day 1: slight decay
+        let day1 = decayed_strength(initial, 1);
+        assert!(day1 < initial, "Bond should decay after 1 day");
+        assert!(day1 > 6800, "Day 1 decay should be small");
+
+        // Day 7: modest decay
+        let day7 = decayed_strength(initial, 7);
+        assert!(day7 < day1, "Bond should decay more after 7 days");
+
+        // Day 30: significant decay
+        let day30 = decayed_strength(initial, 30);
+        assert!(day30 < day7, "Bond should decay significantly after 30 days");
+
+        // Day 90: heavy decay
+        let day90 = decayed_strength(initial, 90);
+        assert!(day90 < day30, "Bond should decay heavily after 90 days");
+
+        // Day 365: near minimum, but never below BOND_MIN
+        let day365 = decayed_strength(initial, 365);
+        assert!(
+            day365 >= BOND_MIN,
+            "Bond should never decay below BOND_MIN ({}), got {}",
+            BOND_MIN,
+            day365
+        );
+
+        // Day 500 (beyond table): still at or above BOND_MIN
+        let day500 = decayed_strength(initial, 500);
+        assert!(
+            day500 >= BOND_MIN,
+            "Bond at 500 days should still be >= BOND_MIN"
+        );
+
+        // Verify monotonic decay
+        let checkpoints = [0, 1, 7, 14, 30, 60, 90, 120, 180, 270, 365];
+        let mut prev = initial;
+        for &day in &checkpoints {
+            let current = decayed_strength(initial, day);
+            assert!(
+                current <= prev,
+                "Decay should be monotonic: day {} ({}) > day {} ({})",
+                day,
+                current,
+                if day > 0 { day - 1 } else { 0 },
+                prev
+            );
+            prev = current;
+        }
+    }
+
+    /// Test that bonds at or below BOND_MIN do not decay further.
+    /// Bonds below BOND_MIN should not inflate to BOND_MIN.
+    #[test]
+    fn scenario_bond_floor_behavior() {
+        // Bond exactly at BOND_MIN: decayed_strength clamps to BOND_MIN
+        let at_min = decayed_strength(BOND_MIN, 30);
+        assert_eq!(
+            at_min, BOND_MIN,
+            "Bond at BOND_MIN should stay at BOND_MIN after decay"
+        );
+
+        // Bond below BOND_MIN: should stay unchanged (no inflation)
+        let below_min = decayed_strength(500, 30);
+        assert_eq!(
+            below_min, 500,
+            "Bond below BOND_MIN should stay unchanged (no inflation)"
+        );
+
+        // Bond at 0: should stay at 0
+        let zero = decayed_strength(0, 30);
+        assert_eq!(zero, 0, "Zero bond should stay at zero");
+    }
+
+    /// Test the recovery_threshold function for the 60% quorum rule.
+    /// Verify it always rounds up and maintains at least 60% requirement.
+    #[test]
+    fn scenario_recovery_threshold_60_percent() {
+        // 3 adults: 60% = 1.8 -> ceil = 2
+        assert_eq!(recovery_threshold(3), 2);
+
+        // 4 adults: 60% = 2.4 -> ceil = 3
+        assert_eq!(recovery_threshold(4), 3);
+
+        // 5 adults: 60% = 3.0 -> ceil = 3
+        assert_eq!(recovery_threshold(5), 3);
+
+        // 10 adults: 60% = 6.0 -> ceil = 6
+        assert_eq!(recovery_threshold(10), 6);
+
+        // Verify for all sizes 3..=20 that threshold is always >= 60%
+        for n in 3..=20 {
+            let t = recovery_threshold(n);
+            // t/n >= 0.6 means t * 100 >= n * 60
+            assert!(
+                t * 100 >= n * 60,
+                "threshold {} for {} adults is below 60%",
+                t,
+                n
+            );
+            // Also verify it is the minimal such value (ceiling behavior)
+            if t > 1 {
+                assert!(
+                    (t - 1) * 100 < n * 60,
+                    "threshold {} for {} adults is not minimal: {} would also work",
+                    t,
+                    n,
+                    t - 1
+                );
+            }
+        }
+    }
+
+    /// Test the find_member_role helper with departed and mixed-status members.
+    #[test]
+    fn scenario_role_lookup_with_mixed_statuses() {
+        let agent_c = AgentPubKey::from_raw_36(vec![3u8; 36]);
+
+        let memberships = vec![
+            // Active founder
+            make_membership(&fake_agent_a(), MemberRole::Founder, MembershipStatus::Active),
+            // Departed elder (should not be found)
+            make_membership(
+                &fake_agent_b(),
+                MemberRole::Elder,
+                MembershipStatus::Departed,
+            ),
+            // Active youth
+            make_membership(&agent_c, MemberRole::Youth, MembershipStatus::Active),
+        ];
+
+        // Active founder: found
+        assert_eq!(
+            find_member_role(&fake_agent_a(), &memberships),
+            Some(MemberRole::Founder)
+        );
+
+        // Departed elder: not found (departed members are invisible)
+        assert_eq!(
+            find_member_role(&fake_agent_b(), &memberships),
+            None,
+            "Departed members should not be found"
+        );
+
+        // Active youth: found
+        assert_eq!(
+            find_member_role(&agent_c, &memberships),
+            Some(MemberRole::Youth)
+        );
+
+        // Vote weight reflects the same: departed member gets 0
+        assert_eq!(find_member_vote_weight(&fake_agent_a(), &memberships), 10000);
+        assert_eq!(
+            find_member_vote_weight(&fake_agent_b(), &memberships),
+            0,
+            "Departed member should have 0 vote weight"
+        );
+        assert_eq!(find_member_vote_weight(&agent_c, &memberships), 5000);
+
+        // Active count: only 2 (founder + youth)
+        assert_eq!(count_active_memberships(&memberships), 2);
     }
 }

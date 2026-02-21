@@ -3,6 +3,75 @@
 
 use hdk::prelude::*;
 use housing_membership_integrity::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_basic, requirement_for_proposal,
+    requirement_for_voting,
+};
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+/// Fetch the calling agent's consciousness credential via the commons bridge
+/// and evaluate it against the given governance requirement.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort)
+    let audit = GateAuditInput {
+        action_name: action_name.to_string(),
+        zome_name: zome_info()?.name.to_string(),
+        eligible: eligibility.eligible,
+        actual_tier: format!("{:?}", eligibility.tier),
+        required_tier: format!("{:?}", requirement.min_tier),
+        weight_bp: eligibility.weight_bp,
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("log_governance_gate"),
+        None,
+        audit,
+    ) {
+        Ok(_) => {},
+        Err(e) => { debug!("Audit log failed: {:?}", e); },
+    }
+
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
@@ -12,6 +81,7 @@ fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
 /// Submit a new membership application
 #[hdk_extern]
 pub fn submit_application(app: MemberApplication) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "submit_application")?;
     for reference in &app.references {
         if reference.len() > 512 {
             return Err(wasm_error!(WasmErrorInner::Guest(
@@ -53,6 +123,7 @@ pub struct ReviewApplicationInput {
 /// Review an application (change its status)
 #[hdk_extern]
 pub fn review_application(input: ReviewApplicationInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "review_application")?;
     let record = get(input.application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Application not found".into())
     ))?;
@@ -86,6 +157,7 @@ pub struct ApproveMemberInput {
 /// Approve an application and create a member record
 #[hdk_extern]
 pub fn approve_member(input: ApproveMemberInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "approve_member")?;
     let record = get(input.application_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Application not found".into())
     ))?;
@@ -162,6 +234,7 @@ pub struct AddToWaitlistInput {
 /// Add an applicant to the waitlist
 #[hdk_extern]
 pub fn add_to_waitlist(input: AddToWaitlistInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_to_waitlist")?;
     let now = sys_time()?;
 
     // Determine position by counting existing waitlist entries
@@ -245,6 +318,7 @@ pub struct CreateRentToOwnInput {
 /// Create a rent-to-own agreement
 #[hdk_extern]
 pub fn create_rent_to_own(input: CreateRentToOwnInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "create_rent_to_own")?;
     let now = sys_time()?;
 
     let agreement = RentToOwnAgreement {
@@ -291,6 +365,7 @@ pub struct RecordRentPaymentInput {
 /// Record a rent payment and update accumulated equity
 #[hdk_extern]
 pub fn record_rent_payment(input: RecordRentPaymentInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_basic(), "record_rent_payment")?;
     let record = get(input.agreement_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Agreement not found".into())
     ))?;

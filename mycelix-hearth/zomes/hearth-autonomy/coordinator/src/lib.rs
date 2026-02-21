@@ -5,6 +5,9 @@
 
 use hdk::prelude::*;
 use hearth_autonomy_integrity::*;
+use hearth_coordinator_common::{
+    decode_zome_response, records_from_links, require_guardian, require_membership,
+};
 use hearth_types::*;
 use mycelix_bridge_common::{
     ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
@@ -56,53 +59,6 @@ pub struct CheckCapabilityInput {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/// Decode a typed value from a ZomeCallResponse.
-fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
-    response: ZomeCallResponse,
-    context: &str,
-) -> ExternResult<T> {
-    match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode {} response: {}",
-                context, e
-            )))
-        }),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-zome call to {} failed: {:?}",
-            context, other
-        )))),
-    }
-}
-
-/// Verify the caller is an active member of the given hearth.
-fn require_membership(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
-    let response = call(
-        CallTargetCell::Local,
-        ZomeName::new("hearth_kinship"),
-        FunctionName::new("get_caller_role"),
-        None,
-        hearth_hash,
-    )?;
-    let role: Option<MemberRole> = decode_zome_response(response, "get_caller_role")?;
-    role.ok_or_else(|| {
-        wasm_error!(WasmErrorInner::Guest(
-            "You are not an active member of this hearth".into()
-        ))
-    })
-}
-
-/// Verify the caller is a guardian (Founder, Elder, or Adult) of the given hearth.
-fn require_guardian(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
-    let role = require_membership(hearth_hash)?;
-    if !role.is_guardian() {
-        return Err(wasm_error!(WasmErrorInner::Guest(
-            "Only guardians (Founder, Elder, or Adult) can perform this action".into()
-        )));
-    }
-    Ok(role)
-}
 
 /// Check whether a tier advancement is valid (forward-only).
 #[allow(dead_code)]
@@ -200,18 +156,6 @@ fn require_consciousness(
         ))));
     }
     Ok(eligibility)
-}
-
-fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
-    let mut records = Vec::new();
-    for link in links {
-        let action_hash = ActionHash::try_from(link.target)
-            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
-        if let Some(record) = get(action_hash, GetOptions::default())? {
-            records.push(record);
-        }
-    }
-    Ok(records)
 }
 
 // ============================================================================
@@ -367,6 +311,19 @@ pub fn approve_capability(input: ApproveCapabilityInput) -> ExternResult<Record>
         AutonomyRequestStatus::Denied
     };
     request.status = new_status;
+
+    if input.approved {
+        emit_signal(&HearthSignal::CapabilityApproved {
+            request_hash: input.request_hash.clone(),
+            capability: request.capability.clone(),
+        })?;
+    } else {
+        emit_signal(&HearthSignal::CapabilityDenied {
+            request_hash: input.request_hash.clone(),
+            capability: request.capability.clone(),
+        })?;
+    }
+
     update_entry(input.request_hash, &EntryTypes::AutonomyRequest(request))?;
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -429,6 +386,12 @@ pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
     };
 
     let action_hash = create_entry(&EntryTypes::TierTransition(transition))?;
+
+    emit_signal(&HearthSignal::TierAdvanced {
+        profile_hash: input.profile_hash.clone(),
+        from_tier: profile.current_tier.clone(),
+        to_tier: input.new_tier.clone(),
+    })?;
 
     // Save hearth_hash for potential H3 severance before ownership transfer
     let hearth_hash = profile.hearth_hash.clone();
@@ -549,7 +512,12 @@ pub fn progress_transition(transition_hash: ActionHash) -> ExternResult<Record> 
         }
     }
 
-    let updated_hash = update_entry(transition_hash, &EntryTypes::TierTransition(transition))?;
+    let updated_hash = update_entry(transition_hash.clone(), &EntryTypes::TierTransition(transition))?;
+
+    emit_signal(&HearthSignal::TransitionProgressed {
+        transition_hash: transition_hash.clone(),
+        new_phase: next_phase.clone(),
+    })?;
 
     get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find updated tier transition".into()
@@ -1066,5 +1034,222 @@ mod tests {
                 );
             }
         }
+    }
+
+    // ====================================================================
+    // Complex business logic scenario tests
+    // ====================================================================
+
+    /// Walk through all 5 tiers from Dependent to Autonomous, verifying
+    /// each single-step advancement is valid and the next step is also valid.
+    /// Then verify that Autonomous cannot advance further.
+    #[test]
+    fn scenario_full_tier_advancement_journey() {
+        let tiers = [
+            AutonomyTier::Dependent,
+            AutonomyTier::Supervised,
+            AutonomyTier::Guided,
+            AutonomyTier::SemiAutonomous,
+            AutonomyTier::Autonomous,
+        ];
+
+        // Each consecutive step must be valid
+        for i in 0..tiers.len() - 1 {
+            assert!(
+                is_valid_tier_advancement(&tiers[i], &tiers[i + 1]),
+                "Step {:?} -> {:?} should be valid",
+                tiers[i],
+                tiers[i + 1]
+            );
+
+            // Verify the NEXT step from the new tier is also valid
+            // (except when we are at SemiAutonomous -> Autonomous, there is no further step)
+            if i + 2 < tiers.len() {
+                assert!(
+                    is_valid_tier_advancement(&tiers[i + 1], &tiers[i + 2]),
+                    "Following step {:?} -> {:?} should also be valid",
+                    tiers[i + 1],
+                    tiers[i + 2]
+                );
+            }
+        }
+
+        // Autonomous cannot advance further: no tier is above it
+        for tier in &tiers {
+            assert!(
+                !is_valid_tier_advancement(&AutonomyTier::Autonomous, tier),
+                "Autonomous should not be able to advance to {:?}",
+                tier
+            );
+        }
+    }
+
+    /// Test that a Pending request can be approved, and after approval
+    /// cannot be approved again. Same for denial.
+    #[test]
+    fn scenario_guardian_approval_lifecycle() {
+        // Step 1: Start with Pending request
+        let initial = AutonomyRequestStatus::Pending;
+        assert!(
+            can_approve_request(&initial),
+            "Pending request should be approvable"
+        );
+
+        // Step 2a: Approve it -> now Approved, cannot approve again
+        let approved = AutonomyRequestStatus::Approved;
+        assert!(
+            !can_approve_request(&approved),
+            "Approved request must not be re-approved"
+        );
+
+        // Step 2b: Or deny it -> now Denied, cannot approve/deny again
+        let denied = AutonomyRequestStatus::Denied;
+        assert!(
+            !can_approve_request(&denied),
+            "Denied request must not be re-approved"
+        );
+
+        // Verify the terminal states are truly terminal:
+        // neither Approved nor Denied can transition back to an approvable state
+        assert!(!can_approve_request(&AutonomyRequestStatus::Approved));
+        assert!(!can_approve_request(&AutonomyRequestStatus::Denied));
+    }
+
+    /// As a member progresses through tiers, their capability set should grow.
+    /// Dependent: minimal caps, many restrictions.
+    /// Supervised: a few more caps, some restrictions lifted.
+    /// Guided: broader caps, fewer restrictions.
+    /// SemiAutonomous: most caps, very few restrictions.
+    /// Autonomous: full caps, no restrictions.
+    #[test]
+    fn scenario_capability_accumulation() {
+        // Dependent tier: 1 capability, 4 restrictions
+        let dep_caps: Vec<String> = vec!["play_inside".into()];
+        let dep_restrict: Vec<String> = vec![
+            "use_stove".into(),
+            "drive_car".into(),
+            "manage_finances".into(),
+            "go_out_alone".into(),
+        ];
+        assert!(is_capability_granted("play_inside", &dep_caps, &dep_restrict));
+        assert!(!is_capability_granted("use_stove", &dep_caps, &dep_restrict));
+        assert!(!is_capability_granted("drive_car", &dep_caps, &dep_restrict));
+
+        // Supervised tier: 2 capabilities, 3 restrictions
+        let sup_caps: Vec<String> = vec!["play_inside".into(), "use_stove".into()];
+        let sup_restrict: Vec<String> = vec![
+            "drive_car".into(),
+            "manage_finances".into(),
+            "go_out_alone".into(),
+        ];
+        assert!(is_capability_granted("play_inside", &sup_caps, &sup_restrict));
+        assert!(is_capability_granted("use_stove", &sup_caps, &sup_restrict));
+        assert!(!is_capability_granted("drive_car", &sup_caps, &sup_restrict));
+
+        // Guided tier: 3 capabilities, 2 restrictions
+        let gui_caps: Vec<String> = vec![
+            "play_inside".into(),
+            "use_stove".into(),
+            "go_out_alone".into(),
+        ];
+        let gui_restrict: Vec<String> = vec!["drive_car".into(), "manage_finances".into()];
+        assert!(is_capability_granted("go_out_alone", &gui_caps, &gui_restrict));
+        assert!(!is_capability_granted("drive_car", &gui_caps, &gui_restrict));
+
+        // SemiAutonomous tier: 4 capabilities, 1 restriction
+        let semi_caps: Vec<String> = vec![
+            "play_inside".into(),
+            "use_stove".into(),
+            "go_out_alone".into(),
+            "drive_car".into(),
+        ];
+        let semi_restrict: Vec<String> = vec!["manage_finances".into()];
+        assert!(is_capability_granted("drive_car", &semi_caps, &semi_restrict));
+        assert!(!is_capability_granted("manage_finances", &semi_caps, &semi_restrict));
+
+        // Autonomous tier: 5 capabilities, 0 restrictions
+        let auto_caps: Vec<String> = vec![
+            "play_inside".into(),
+            "use_stove".into(),
+            "go_out_alone".into(),
+            "drive_car".into(),
+            "manage_finances".into(),
+        ];
+        let auto_restrict: Vec<String> = vec![];
+        assert!(is_capability_granted("manage_finances", &auto_caps, &auto_restrict));
+        assert!(is_capability_granted("drive_car", &auto_caps, &auto_restrict));
+
+        // Verify capability count grows monotonically
+        assert!(dep_caps.len() < sup_caps.len());
+        assert!(sup_caps.len() < gui_caps.len());
+        assert!(gui_caps.len() < semi_caps.len());
+        assert!(semi_caps.len() < auto_caps.len());
+
+        // Verify restriction count shrinks monotonically
+        assert!(dep_restrict.len() > sup_restrict.len());
+        assert!(sup_restrict.len() > gui_restrict.len());
+        assert!(gui_restrict.len() > semi_restrict.len());
+        assert!(semi_restrict.len() > auto_restrict.len());
+    }
+
+    /// Walk through all 4 transition phases. In PreLiminal/Liminal/PostLiminal,
+    /// the phase can still progress (recategorization is blocked during these
+    /// active phases). Only at Integrated is recategorization unblocked.
+    #[test]
+    fn scenario_transition_phase_recategorization_blocking() {
+        let mut phase = TransitionPhase::PreLiminal;
+
+        // PreLiminal: can progress, recategorization should be blocked
+        assert!(can_progress_phase(&phase), "PreLiminal should be progressable");
+
+        // Advance to Liminal
+        phase = next_transition_phase(&phase).expect("PreLiminal should have a next phase");
+        assert_eq!(phase, TransitionPhase::Liminal);
+        assert!(can_progress_phase(&phase), "Liminal should be progressable");
+
+        // Advance to PostLiminal
+        phase = next_transition_phase(&phase).expect("Liminal should have a next phase");
+        assert_eq!(phase, TransitionPhase::PostLiminal);
+        assert!(can_progress_phase(&phase), "PostLiminal should be progressable");
+
+        // Advance to Integrated
+        phase = next_transition_phase(&phase).expect("PostLiminal should have a next phase");
+        assert_eq!(phase, TransitionPhase::Integrated);
+        assert!(
+            !can_progress_phase(&phase),
+            "Integrated should NOT be progressable"
+        );
+
+        // Integrated has no next phase
+        assert_eq!(
+            next_transition_phase(&phase),
+            None,
+            "Integrated should have no next phase"
+        );
+
+        // Total of 3 progressions from PreLiminal to Integrated
+        let mut count = 0;
+        let mut p = TransitionPhase::PreLiminal;
+        while let Some(next) = next_transition_phase(&p) {
+            count += 1;
+            // During all intermediate phases, can_progress should be true
+            assert!(
+                can_progress_phase(&p),
+                "Phase {:?} before Integrated should allow progress",
+                p
+            );
+            p = next;
+        }
+        assert_eq!(count, 3);
+        assert_eq!(p, TransitionPhase::Integrated);
+    }
+
+    /// Verify that Autonomous -> Autonomous tier advancement is rejected.
+    #[test]
+    fn scenario_autonomous_to_autonomous_rejected() {
+        assert!(
+            !is_valid_tier_advancement(&AutonomyTier::Autonomous, &AutonomyTier::Autonomous),
+            "Same-tier advancement (Autonomous -> Autonomous) must be rejected"
+        );
     }
 }

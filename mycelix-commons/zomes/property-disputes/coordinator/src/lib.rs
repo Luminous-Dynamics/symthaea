@@ -1,6 +1,74 @@
 //! Property Disputes Coordinator Zome
 use hdk::prelude::*;
 use property_disputes_integrity::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal, requirement_for_voting,
+};
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+/// Fetch the calling agent's consciousness credential via the commons bridge
+/// and evaluate it against the given governance requirement.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+    action_name: &str,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort)
+    let audit = GateAuditInput {
+        action_name: action_name.to_string(),
+        zome_name: zome_info()?.name.to_string(),
+        eligible: eligibility.eligible,
+        actual_tier: format!("{:?}", eligibility.tier),
+        required_tier: format!("{:?}", requirement.min_tier),
+        weight_bp: eligibility.weight_bp,
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("log_governance_gate"),
+        None,
+        audit,
+    ) {
+        Ok(_) => {},
+        Err(e) => { debug!("Audit log failed: {:?}", e); },
+    }
+
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 /// Get or create an anchor entry and return its EntryHash for use as link base
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -13,6 +81,7 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn file_dispute(input: FileDisputeInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "file_dispute")?;
     let now = sys_time()?;
     let dispute = PropertyDispute {
         id: format!("dispute:{}:{}", input.property_id, now.as_micros()),
@@ -46,6 +115,7 @@ pub struct FileDisputeInput {
 
 #[hdk_extern]
 pub fn file_ownership_claim(input: FileClaimInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "file_ownership_claim")?;
     let now = sys_time()?;
     let claim = OwnershipClaim {
         id: format!("claim:{}:{}", input.property_id, now.as_micros()),
@@ -72,6 +142,7 @@ pub struct FileClaimInput {
 
 #[hdk_extern]
 pub fn escalate_to_justice(input: EscalateInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "escalate_to_justice")?;
     let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?)).include_entries(true);
     for record in query(filter)? {
         if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
@@ -98,6 +169,7 @@ pub struct EscalateInput {
 
 #[hdk_extern]
 pub fn resolve_dispute(input: ResolveDisputeInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "resolve_dispute")?;
     let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?)).include_entries(true);
     for record in query(filter)? {
         if let Some(dispute) = record.entry().to_app_option::<PropertyDispute>().ok().flatten() {
@@ -177,6 +249,7 @@ pub fn get_property_claims(property_id: String) -> ExternResult<Vec<Record>> {
 /// Update dispute status
 #[hdk_extern]
 pub fn update_dispute_status(input: UpdateDisputeStatusInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "update_dispute_status")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?))
         .include_entries(true);
@@ -205,6 +278,7 @@ pub struct UpdateDisputeStatusInput {
 /// Update ownership claim status
 #[hdk_extern]
 pub fn update_claim_status(input: UpdateClaimStatusInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting(), "update_claim_status")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::OwnershipClaim)?))
         .include_entries(true);
@@ -233,6 +307,7 @@ pub struct UpdateClaimStatusInput {
 /// Add evidence to a dispute
 #[hdk_extern]
 pub fn add_dispute_evidence(input: AddEvidenceInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_dispute_evidence")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::PropertyDispute)?))
         .include_entries(true);
@@ -302,6 +377,7 @@ pub fn get_ownership_claim(claim_id: String) -> ExternResult<Option<Record>> {
 /// Add supporting document to ownership claim
 #[hdk_extern]
 pub fn add_claim_document(input: AddDocumentInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "add_claim_document")?;
     let filter = ChainQueryFilter::new()
         .entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::OwnershipClaim)?))
         .include_entries(true);

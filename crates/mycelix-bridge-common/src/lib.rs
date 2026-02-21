@@ -19,8 +19,8 @@ pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 pub mod consciousness_profile;
 pub use consciousness_profile::{
     ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
-    GovernanceEligibility, GovernanceRequirement, evaluate_governance,
-    requirement_for_basic, requirement_for_constitutional,
+    GateAuditInput, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_basic, requirement_for_constitutional,
     requirement_for_proposal, requirement_for_voting,
 };
 

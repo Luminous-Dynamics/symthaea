@@ -3,10 +3,11 @@
 //! Provides CRUD operations for decisions, voting, tallying, and finalization.
 
 use hdk::prelude::*;
+use hearth_coordinator_common::decode_zome_response;
 use hearth_decisions_integrity::*;
 use hearth_types::*;
 use mycelix_bridge_common::{
-    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
     evaluate_governance, requirement_for_basic, requirement_for_proposal,
     requirement_for_voting,
 };
@@ -54,25 +55,6 @@ pub struct AmendVoteInput {
 // ============================================================================
 // Helpers
 // ============================================================================
-
-/// Decode a typed value from a ZomeCallResponse.
-fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
-    response: ZomeCallResponse,
-    context: &str,
-) -> ExternResult<T> {
-    match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode {} response: {}",
-                context, e
-            )))
-        }),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-zome call to {} failed: {:?}",
-            context, other
-        )))),
-    }
-}
 
 /// Check whether a choice index is within the valid range of options.
 fn is_choice_valid(choice: u32, option_count: usize) -> bool {
@@ -183,6 +165,7 @@ fn requirement_for_decision_type(dt: &DecisionType) -> GovernanceRequirement {
 /// and evaluate it against the given governance requirement.
 fn require_consciousness(
     requirement: &GovernanceRequirement,
+    action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
     let agent = agent_info()?.agent_initial_pubkey;
     let did = format!("did:mycelix:{}", agent);
@@ -210,6 +193,27 @@ fn require_consciousness(
 
     let now_us = sys_time()?.as_micros() as u64;
     let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort)
+    let audit = GateAuditInput {
+        action_name: action_name.to_string(),
+        zome_name: zome_info()?.name.to_string(),
+        eligible: eligibility.eligible,
+        actual_tier: format!("{:?}", eligibility.tier),
+        required_tier: format!("{:?}", requirement.min_tier),
+        weight_bp: eligibility.weight_bp,
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_bridge"),
+        FunctionName::new("log_governance_gate"),
+        None,
+        audit,
+    ) {
+        Ok(_) => {},
+        Err(e) => { debug!("Audit log failed: {:?}", e); },
+    }
+
     if !eligibility.eligible {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Consciousness gate: tier {:?} insufficient. Reasons: {}",
@@ -248,7 +252,7 @@ fn winning_option(tallies: &[(u32, u32)]) -> u32 {
 #[hdk_extern]
 pub fn create_decision(input: CreateDecisionInput) -> ExternResult<Record> {
     // Consciousness gate: requirement depends on decision type
-    let _eligibility = require_consciousness(&requirement_for_decision_type(&input.decision_type))?;
+    let _eligibility = require_consciousness(&requirement_for_decision_type(&input.decision_type), "create_decision")?;
 
     let now = sys_time()?;
     let agent = agent_info()?.agent_initial_pubkey;
@@ -368,7 +372,7 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
 
     // Consciousness gate: requirement depends on decision type.
     // Progressive weight composes with role-based weight.
-    let eligibility = require_consciousness(&requirement_for_decision_type(&decision.decision_type))?;
+    let eligibility = require_consciousness(&requirement_for_decision_type(&decision.decision_type), "cast_vote")?;
     let role_weight_bp = role.default_vote_weight_bp();
     let weight_bp = compose_weights(role_weight_bp, eligibility.weight_bp);
 
@@ -831,7 +835,7 @@ pub fn amend_vote(input: AmendVoteInput) -> ExternResult<Record> {
     }
 
     // Consciousness gate + progressive weight (same as cast_vote)
-    let eligibility = require_consciousness(&requirement_for_decision_type(&decision.decision_type))?;
+    let eligibility = require_consciousness(&requirement_for_decision_type(&decision.decision_type), "amend_vote")?;
     let role_weight_bp = role.default_vote_weight_bp();
     let weight_bp = compose_weights(role_weight_bp, eligibility.weight_bp);
 

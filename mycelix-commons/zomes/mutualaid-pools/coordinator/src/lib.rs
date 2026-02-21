@@ -10,12 +10,14 @@ use mutualaid_pools_integrity::{
     MutualAidPool, PoolMembership, PoolStatus,
 };
 use mycelix_bridge_common::{
-    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
-    evaluate_governance, requirement_for_proposal, requirement_for_voting,
+    ConsciousnessCredential, GateAuditInput, GovernanceEligibility,
+    GovernanceRequirement, evaluate_governance, requirement_for_proposal,
+    requirement_for_voting,
 };
 
 fn require_consciousness(
     requirement: &GovernanceRequirement,
+    action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
     let agent = agent_info()?.agent_initial_pubkey;
     let did = format!("did:mycelix:{}", agent);
@@ -38,7 +40,29 @@ fn require_consciousness(
             ))));
         }
     };
-    let eligibility = evaluate_governance(&credential.profile, requirement);
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort)
+    let audit = GateAuditInput {
+        action_name: action_name.to_string(),
+        zome_name: zome_info()?.name.to_string(),
+        eligible: eligibility.eligible,
+        actual_tier: format!("{:?}", eligibility.tier),
+        required_tier: format!("{:?}", requirement.min_tier),
+        weight_bp: eligibility.weight_bp,
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("log_governance_gate"),
+        None,
+        audit,
+    ) {
+        Ok(_) => {},
+        Err(e) => { debug!("Audit log failed: {:?}", e); },
+    }
+
     if !eligibility.eligible {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Consciousness gate: tier {:?} insufficient. Reasons: {}",
@@ -417,7 +441,7 @@ pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> 
 /// Request a disbursement from a pool
 #[hdk_extern]
 pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<DisbursementWithHash> {
-    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "request_disbursement")?;
 
     let now = sys_time()?;
     let id = generate_id("disb")?;
@@ -497,7 +521,7 @@ pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<Dis
 /// Vote on a disbursement request
 #[hdk_extern]
 pub fn vote_disbursement(input: VoteDisbursementInput) -> ExternResult<DisbursementWithHash> {
-    let _eligibility = require_consciousness(&requirement_for_voting())?;
+    let _eligibility = require_consciousness(&requirement_for_voting(), "vote_disbursement")?;
 
     // Get the current disbursement
     let record = get(input.disbursement_hash.clone(), GetOptions::default())?

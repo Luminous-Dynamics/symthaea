@@ -6,7 +6,7 @@
 use hdk::prelude::*;
 use justice_arbitration_integrity::*;
 use mycelix_bridge_common::{
-    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    ConsciousnessCredential, GateAuditInput, GovernanceEligibility, GovernanceRequirement,
     evaluate_governance, requirement_for_proposal, requirement_for_voting,
 };
 
@@ -18,6 +18,7 @@ use mycelix_bridge_common::{
 /// and evaluate it against the given governance requirement.
 fn require_consciousness(
     requirement: &GovernanceRequirement,
+    action_name: &str,
 ) -> ExternResult<GovernanceEligibility> {
     let agent = agent_info()?.agent_initial_pubkey;
     let did = format!("did:mycelix:{}", agent);
@@ -43,7 +44,29 @@ fn require_consciousness(
         }
     };
 
-    let eligibility = evaluate_governance(&credential.profile, requirement);
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
+
+    // Fire audit log (best-effort)
+    let audit = GateAuditInput {
+        action_name: action_name.to_string(),
+        zome_name: zome_info()?.name.to_string(),
+        eligible: eligibility.eligible,
+        actual_tier: format!("{:?}", eligibility.tier),
+        required_tier: format!("{:?}", requirement.min_tier),
+        weight_bp: eligibility.weight_bp,
+    };
+    match call(
+        CallTargetCell::Local,
+        ZomeName::new("civic_bridge"),
+        FunctionName::new("log_governance_gate"),
+        None,
+        audit,
+    ) {
+        Ok(_) => {},
+        Err(e) => { debug!("Audit log failed: {:?}", e); },
+    }
+
     if !eligibility.eligible {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Consciousness gate: tier {:?} insufficient. Reasons: {}",
@@ -58,7 +81,7 @@ fn require_consciousness(
 #[hdk_extern]
 pub fn create_arbitration(arbitration: Arbitration) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
-    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "create_arbitration")?;
 
     let action_hash = create_entry(&EntryTypes::Arbitration(arbitration.clone()))?;
     let record = get(action_hash.clone(), GetOptions::default())?
@@ -169,7 +192,7 @@ pub struct ArbitratorResponseInput {
 #[hdk_extern]
 pub fn render_decision(decision: Decision) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = require_consciousness(&requirement_for_voting())?;
+    let _eligibility = require_consciousness(&requirement_for_voting(), "render_decision")?;
 
     let action_hash = create_entry(&EntryTypes::Decision(decision.clone()))?;
     let record = get(action_hash.clone(), GetOptions::default())?
@@ -212,7 +235,7 @@ pub fn get_case_decisions(case_id: String) -> ExternResult<Vec<Record>> {
 #[hdk_extern]
 pub fn file_appeal(appeal: Appeal) -> ExternResult<Record> {
     // Consciousness gate: Participant tier + identity >= 0.25
-    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+    let _eligibility = require_consciousness(&requirement_for_proposal(), "file_appeal")?;
 
     let action_hash = create_entry(&EntryTypes::Appeal(appeal.clone()))?;
     let record = get(action_hash.clone(), GetOptions::default())?
@@ -280,7 +303,7 @@ pub struct UpdateAppealStatusInput {
 #[hdk_extern]
 pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
     // Consciousness gate: Citizen tier + identity >= 0.25
-    let _eligibility = require_consciousness(&requirement_for_voting())?;
+    let _eligibility = require_consciousness(&requirement_for_voting(), "finalize_decision")?;
 
     let record = get(input.decision_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Decision not found".into())))?;

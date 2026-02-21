@@ -967,12 +967,22 @@ const CREDENTIAL_CACHE_TTL_US: i64 = 600_000_000;
 fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredential>> {
     let agent = agent_info()?.agent_initial_pubkey;
     let links = get_links(
-        LinkQuery::try_new(agent, LinkTypes::AgentToCredentialCache)?,
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToCredentialCache)?,
         GetStrategy::Local,
     )?;
 
     if links.is_empty() {
         return Ok(None);
+    }
+
+    // Clean up stale links (>1 hour old)
+    const CACHE_STALE_CLEANUP_US: i64 = 3_600_000_000;
+    let now = sys_time()?.as_micros();
+    let stale_cutoff = Timestamp::from_micros(now - CACHE_STALE_CLEANUP_US);
+    for link in &links {
+        if link.timestamp < stale_cutoff {
+            let _ = delete_link(link.create_link_hash.clone(), GetOptions::default());
+        }
     }
 
     // Get the most recent link
@@ -987,12 +997,15 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
             .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in cached credential record".into())))?;
 
         if cached.did == did {
-            let now = sys_time()?.as_micros();
             if now - cached.cached_at_us < CREDENTIAL_CACHE_TTL_US {
                 let credential: ConsciousnessCredential = serde_json::from_str(&cached.credential_json)
                     .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
                         "Credential cache decode error: {}", e
                     ))))?;
+                // Check credential expiry — don't serve expired credentials from cache
+                if credential.is_expired(now as u64) {
+                    return Ok(None);
+                }
                 return Ok(Some(credential));
             }
         }

@@ -222,19 +222,57 @@ pub struct GovernanceEligibility {
 }
 
 // ============================================================================
+// Gate audit input
+// ============================================================================
+
+/// Input for logging a governance gate decision via the bridge's
+/// `log_governance_gate` extern.
+///
+/// Each gated coordinator constructs this after `evaluate_governance()`
+/// and fires it as a best-effort cross-zome call to the cluster bridge.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GateAuditInput {
+    /// The extern function that triggered the gate check.
+    pub action_name: String,
+    /// The zome that performed the check.
+    pub zome_name: String,
+    /// Whether the agent met all requirements.
+    pub eligible: bool,
+    /// The agent's derived consciousness tier (Debug-formatted).
+    pub actual_tier: String,
+    /// The minimum tier required by the governance action (Debug-formatted).
+    pub required_tier: String,
+    /// Progressive vote weight in basis points (0–10000).
+    pub weight_bp: u32,
+}
+
+// ============================================================================
 // Evaluation (pure functions — no HDK dependency)
 // ============================================================================
 
-/// Evaluate a consciousness profile against a governance requirement.
+/// Evaluate a consciousness credential against a governance requirement.
 ///
-/// This is the core gating function. It's pure — no HDK calls, no
-/// side effects. Governance zomes call this after obtaining a
-/// `ConsciousnessCredential` from their local bridge.
+/// This is the core gating function. It checks credential expiry first,
+/// then evaluates the embedded profile against tier/dimension requirements.
+/// Pure — no HDK calls, no side effects.
 pub fn evaluate_governance(
-    profile: &ConsciousnessProfile,
+    credential: &ConsciousnessCredential,
     requirement: &GovernanceRequirement,
+    now_us: u64,
 ) -> GovernanceEligibility {
-    let clamped = profile.clamped();
+    if credential.is_expired(now_us) {
+        return GovernanceEligibility {
+            eligible: false,
+            weight_bp: 0,
+            tier: ConsciousnessTier::Observer,
+            profile: credential.profile.clone(),
+            reasons: vec![format!(
+                "Credential expired at {} (now {})",
+                credential.expires_at, now_us
+            )],
+        };
+    }
+    let clamped = credential.profile.clamped();
     let tier = clamped.tier();
     let mut reasons = Vec::new();
 
@@ -336,6 +374,22 @@ pub fn requirement_for_constitutional() -> GovernanceRequirement {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Convenience: a non-expired timestamp 24 hours in the future.
+    const NOW: u64 = 1_000_000_000_000;
+
+    /// Build a fresh (non-expired) credential wrapping the given profile.
+    fn fresh_credential(profile: ConsciousnessProfile) -> ConsciousnessCredential {
+        let tier = profile.clamped().tier();
+        ConsciousnessCredential {
+            did: "did:test:alice".to_string(),
+            profile,
+            tier,
+            issued_at: NOW - 60_000_000,
+            expires_at: NOW + 86_400_000_000,
+            issuer: "test".to_string(),
+        }
+    }
 
     // -- ConsciousnessProfile --
 
@@ -557,7 +611,7 @@ mod tests {
     #[test]
     fn evaluate_observer_rejected_for_basic() {
         let profile = ConsciousnessProfile::zero();
-        let result = evaluate_governance(&profile, &requirement_for_basic());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
         assert!(!result.eligible);
         assert_eq!(result.weight_bp, 0);
         assert_eq!(result.tier, ConsciousnessTier::Observer);
@@ -572,7 +626,7 @@ mod tests {
             community: 0.3,
             engagement: 0.3,
         };
-        let result = evaluate_governance(&profile, &requirement_for_basic());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
         assert!(result.eligible);
         assert_eq!(result.weight_bp, 5000);
         assert_eq!(result.tier, ConsciousnessTier::Participant);
@@ -587,7 +641,7 @@ mod tests {
             community: 0.3,
             engagement: 0.3,
         };
-        let result = evaluate_governance(&profile, &requirement_for_voting());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_voting(), NOW);
         assert!(!result.eligible);
         assert!(!result.reasons.is_empty());
     }
@@ -600,7 +654,7 @@ mod tests {
             community: 0.4,
             engagement: 0.2,
         };
-        let result = evaluate_governance(&profile, &requirement_for_voting());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_voting(), NOW);
         assert!(result.eligible);
         assert_eq!(result.weight_bp, 7500); // Citizen weight
         assert_eq!(result.tier, ConsciousnessTier::Citizen);
@@ -615,7 +669,7 @@ mod tests {
             community: 0.5,
             engagement: 0.5,
         };
-        let result = evaluate_governance(&profile, &requirement_for_proposal());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_proposal(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons.iter().any(|r| r.contains("Identity")));
     }
@@ -629,7 +683,7 @@ mod tests {
             community: 0.8,
             engagement: 0.8,
         };
-        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
         assert!(!result.eligible);
         assert!(result.reasons.iter().any(|r| r.contains("Identity")));
     }
@@ -644,7 +698,7 @@ mod tests {
             engagement: 0.8,
         };
         // combined = 0.1875+0.175+0.03+0.16 = 0.5525 → Citizen (not Steward!)
-        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
         assert!(!result.eligible);
         // Should fail on tier AND community
         assert!(result.reasons.iter().any(|r| r.contains("Community") || r.contains("Tier")));
@@ -658,7 +712,7 @@ mod tests {
             community: 0.8,
             engagement: 0.7,
         };
-        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
         assert!(result.eligible);
         assert_eq!(result.weight_bp, 10000);
         assert_eq!(result.tier, ConsciousnessTier::Guardian);
@@ -672,7 +726,7 @@ mod tests {
             community: 2.0,
             engagement: 2.0,
         };
-        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
         assert!(result.eligible);
         // Clamped to 1.0 each → combined = 1.0 → Guardian
         assert_eq!(result.tier, ConsciousnessTier::Guardian);
@@ -682,7 +736,7 @@ mod tests {
     #[test]
     fn evaluate_multiple_failure_reasons() {
         let profile = ConsciousnessProfile::zero();
-        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_constitutional(), NOW);
         assert!(!result.eligible);
         // Should fail on tier, identity, and community
         assert!(result.reasons.len() >= 3, "Expected 3+ reasons, got: {:?}", result.reasons);
@@ -810,7 +864,7 @@ mod tests {
             community: 0.4,
             engagement: 0.2,
         };
-        let eligibility = evaluate_governance(&profile, &requirement_for_voting());
+        let eligibility = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_voting(), NOW);
         let json = serde_json::to_string(&eligibility).unwrap();
         let e2: GovernanceEligibility = serde_json::from_str(&json).unwrap();
         assert_eq!(e2.eligible, eligibility.eligible);
@@ -828,7 +882,7 @@ mod tests {
             community: -0.1,
             engagement: -999.0,
         };
-        let result = evaluate_governance(&profile, &requirement_for_basic());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
         assert!(!result.eligible);
         assert_eq!(result.profile.identity, 0.0);
         assert_eq!(result.profile.reputation, 0.0);
@@ -846,7 +900,7 @@ mod tests {
             engagement: 0.3,
         };
         assert_eq!(profile.tier(), ConsciousnessTier::Participant);
-        let result = evaluate_governance(&profile, &requirement_for_basic());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
         assert!(result.eligible);
     }
 
@@ -861,7 +915,7 @@ mod tests {
         };
         // 0.29 * (0.25+0.25+0.30+0.20) = 0.29 * 1.0 = 0.29
         assert_eq!(profile.tier(), ConsciousnessTier::Observer);
-        let result = evaluate_governance(&profile, &requirement_for_basic());
+        let result = evaluate_governance(&fresh_credential(profile.clone()), &requirement_for_basic(), NOW);
         assert!(!result.eligible);
     }
 
@@ -969,6 +1023,51 @@ mod tests {
             issuer: "did:mycelix:issuer".into(),
         };
         assert!(cred.is_expired(u64::MAX));
+    }
+
+    // -- evaluate_governance expiry integration --
+
+    #[test]
+    fn evaluate_governance_rejects_expired_credential() {
+        let profile = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 1.0,
+            community: 1.0,
+            engagement: 1.0,
+        };
+        let mut cred = fresh_credential(profile);
+        cred.expires_at = NOW - 1; // expired
+        let result = evaluate_governance(&cred, &requirement_for_basic(), NOW);
+        assert!(!result.eligible);
+        assert!(result.reasons[0].contains("expired"));
+    }
+
+    #[test]
+    fn evaluate_governance_accepts_fresh_credential() {
+        let profile = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 1.0,
+            community: 1.0,
+            engagement: 1.0,
+        };
+        let cred = fresh_credential(profile);
+        let result = evaluate_governance(&cred, &requirement_for_constitutional(), NOW);
+        assert!(result.eligible);
+    }
+
+    #[test]
+    fn evaluate_governance_rejects_at_expiry_boundary() {
+        let profile = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 1.0,
+            community: 1.0,
+            engagement: 1.0,
+        };
+        let mut cred = fresh_credential(profile);
+        cred.expires_at = NOW; // expires exactly at NOW
+        let result = evaluate_governance(&cred, &requirement_for_basic(), NOW);
+        assert!(!result.eligible);
+        assert!(result.reasons[0].contains("expired"));
     }
 
     // -- Progressive weight composition edge cases --
