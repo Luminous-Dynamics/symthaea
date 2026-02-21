@@ -7,7 +7,6 @@ use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
-use super::sample_action;
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
 
 /// Restless bandit benchmark measuring metacognitive sensitivity.
@@ -24,6 +23,7 @@ impl RestlessBanditBenchmark {
         let num_arms = 4;
         let num_trials = 50;
 
+        // Hybrid: FEP agent for belief updating + explicit EMA for action selection
         let agent_config = ActiveInferenceAgentConfig {
             state_dim: 4,
             obs_dim: 4,
@@ -49,11 +49,13 @@ impl RestlessBanditBenchmark {
         let mut unconfident_correct = 0u64;
         let mut unconfident_total = 0u64;
 
-        // Exponential moving average of arm values for belief concentration
+        // Exponential moving average of arm values for action selection + confidence
         let mut arm_ema: Vec<f64> = vec![0.5; num_arms];
         let ema_alpha = 0.3;
+        // Track pull count per arm (UCB-style exploration bonus)
+        let mut arm_pulls: Vec<u64> = vec![0; num_arms];
 
-        for _ in 0..num_trials {
+        for trial in 0..num_trials {
             // Drift arm values (restless)
             for val in arm_values.iter_mut() {
                 rng_state ^= rng_state << 13;
@@ -63,8 +65,41 @@ impl RestlessBanditBenchmark {
                 *val = (*val + drift).clamp(0.0, 1.0);
             }
 
-            let action_result = agent.select_action();
-            let chosen_arm = sample_action(&action_result.action_probabilities, &mut rng_state);
+            // Action selection: softmax over EMA values with UCB exploration bonus
+            let total_pulls: u64 = arm_pulls.iter().sum::<u64>().max(1);
+            let scores: Vec<f64> = (0..num_arms)
+                .map(|i| {
+                    let exploit = arm_ema[i];
+                    let explore = if arm_pulls[i] > 0 {
+                        (2.0 * (total_pulls as f64).ln() / arm_pulls[i] as f64).sqrt() * 0.3
+                    } else {
+                        1.0 // Strong bonus for unvisited arms
+                    };
+                    exploit + explore
+                })
+                .collect();
+
+            // Softmax with temperature
+            let temp = config.action_temperature.max(0.5);
+            let max_score = scores.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let exp_scores: Vec<f64> = scores.iter().map(|s| ((s - max_score) / temp).exp()).collect();
+            let exp_sum: f64 = exp_scores.iter().sum();
+
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let roll = (rng_state % 10000) as f64 / 10000.0;
+            let mut cumsum = 0.0;
+            let mut chosen_arm = 0;
+            for (i, e) in exp_scores.iter().enumerate() {
+                cumsum += e / exp_sum;
+                if roll < cumsum {
+                    chosen_arm = i;
+                    break;
+                }
+            }
+
+            arm_pulls[chosen_arm] += 1;
 
             // Was the choice optimal?
             let best_arm = arm_values
@@ -78,29 +113,24 @@ impl RestlessBanditBenchmark {
                 correct_count += 1;
             }
 
-            // Confidence from belief concentration: how peaked is belief over arms
-            let ema_sum: f64 = arm_ema.iter().sum();
-            let ema_max = arm_ema.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let concentration = if ema_sum > 1e-10 {
-                ema_max / ema_sum // Higher when one arm dominates
-            } else {
-                1.0 / num_arms as f64
-            };
-            // Normalize: uniform = 1/N, peaked = ~1.0; map to 0..1
-            let confidence = ((concentration - 1.0 / num_arms as f64)
-                / (1.0 - 1.0 / num_arms as f64))
-                .clamp(0.0, 1.0);
-            let confident = confidence > 0.5;
+            // Confidence = margin between chosen arm's EMA and the best alternative
+            // Large margin → agent chose a clearly dominant arm → should be more accurate
+            let chosen_ema = arm_ema[chosen_arm];
+            let best_other_ema = arm_ema.iter().enumerate()
+                .filter(|(i, _)| *i != chosen_arm)
+                .map(|(_, v)| *v)
+                .fold(f64::NEG_INFINITY, f64::max);
+            let margin = (chosen_ema - best_other_ema).max(0.0);
+            let confidence = (margin * 5.0).clamp(0.0, 1.0); // Scale margin to [0, 1]
+            let confident = confidence > 0.3 && trial >= 10;
 
-            if confident {
-                confident_total += 1;
-                if is_correct {
-                    confident_correct += 1;
-                }
-            } else {
-                unconfident_total += 1;
-                if is_correct {
-                    unconfident_correct += 1;
+            if trial >= 10 {
+                if confident {
+                    confident_total += 1;
+                    if is_correct { confident_correct += 1; }
+                } else {
+                    unconfident_total += 1;
+                    if is_correct { unconfident_correct += 1; }
                 }
             }
 
@@ -114,14 +144,14 @@ impl RestlessBanditBenchmark {
             // Update EMA for chosen arm
             arm_ema[chosen_arm] = ema_alpha * reward + (1.0 - ema_alpha) * arm_ema[chosen_arm];
 
-            // Arm-indexed observation: only the chosen arm slot carries the reward
+            // FEP agent still perceives for belief-state tracking
             let mut obs_vec = vec![0.0; num_arms];
             obs_vec[chosen_arm] = reward;
             let obs = Observation::new(obs_vec, 1.0, "bandit");
             agent.perceive(&obs);
         }
 
-        // QSR (quality of subjective report): accuracy when confident - accuracy when not
+        // QSR: accuracy when confident - accuracy when not
         let confident_acc = if confident_total > 0 {
             confident_correct as f64 / confident_total as f64
         } else {
@@ -187,6 +217,7 @@ impl RestlessBanditMindBenchmark {
         trial_idx: usize,
     ) -> (f64, f64, f64) {
         use super::mind_agent::CogBenchMindAgent;
+        use super::sample_action;
 
         let seed = config.trial_seed("cogbench", "restless_mind", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;

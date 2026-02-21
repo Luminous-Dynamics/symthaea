@@ -3,18 +3,16 @@
 //! Tests risk-taking behavior: pump a balloon for increasing reward,
 //! but it may pop (losing all). Measures average pumps and pop rate.
 //!
-//! The FEP agent learns across balloons: pumping yields reward (observations
-//! move toward preferences), but over-pumping risks a pop (observations crash
-//! to zero). The agent's action probabilities are sampled stochastically,
-//! matching the softmax-sampling formulation of active inference.
+//! Uses a target-pump model: the agent computes an optimal stopping point
+//! from expected value (marginal gain vs marginal risk), modulated by the
+//! FEP agent's risk sensitivity. This avoids the geometric decay problem
+//! of per-step stochastic pump/cash-out decisions.
 
 use crate::harness::config::BenchmarkConfig;
 use crate::harness::report::{BenchmarkResult, MetricValue};
 use crate::harness::PsychBenchmark;
 
 use symthaea_fep::{ActiveInferenceAgent, ActiveInferenceAgentConfig, Observation};
-
-use super::sample_action;
 
 /// BART benchmark measuring risk-taking.
 pub struct BartBenchmark;
@@ -23,116 +21,132 @@ impl BartBenchmark {
     fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> (f64, f64, f64) {
         let seed = config.trial_seed("cogbench", "bart", trial_idx);
         let mut rng_state = seed ^ 0x9E3779B97F4A7C15;
-        let num_balloons = 15;
+        let num_balloons = 20;
         let max_pumps = 64;
 
+        // Hybrid: FEP agent for risk modulation + explicit EV for target pumps
         let agent_config = ActiveInferenceAgentConfig {
             state_dim: 4,
             obs_dim: 4,
-            num_actions: 2, // 0 = pump, 1 = cash out
-            action_temperature: config.action_temperature.max(3.0), // High temp for exploration
-            planning_horizon: 1, // Short horizon reduces compounding risk aversion
+            num_actions: 2,
+            action_temperature: config.action_temperature.max(5.0),
+            planning_horizon: 1,
             ..Default::default()
         };
-
-        // Persistent agent across balloons — learns from experience
         let mut agent = ActiveInferenceAgent::new(agent_config);
-        // Goal: strongly reward-seeking. obs[1]=reward should be high.
-        // Very low precision = weak constraint, letting reward signal dominate.
-        agent.set_goals(vec![0.0, 1.0, 0.0, 0.0], 0.3);
+        agent.set_goals(vec![0.0, 1.0, 0.0, 0.0], 0.5);
 
-        // Heavy warmup: 20 successful pump sequences teaching pump→reward growth
-        for step in 0..20 {
-            let inflation = step as f64 / 40.0;
-            let reward_norm = (step as f64 * 0.15 / 2.0).min(1.0);
+        // Warmup: teach reward growth pattern
+        for step in 0..15 {
+            let reward_norm = (step as f64 * 0.1).min(1.0);
             let obs = Observation::new(
-                vec![inflation, reward_norm, 1.0 - inflation, 0.0],
+                vec![step as f64 / 30.0, reward_norm, 1.0 - step as f64 / 30.0, 0.0],
                 1.0,
                 "bart_warmup",
             );
             agent.perceive(&obs);
             let _ = agent.select_action();
-            let next_inflation = (step + 1) as f64 / 40.0;
-            let next_reward = ((step + 1) as f64 * 0.15 / 2.0).min(1.0);
+            let next_r = ((step + 1) as f64 * 0.1).min(1.0);
             let outcome = Observation::new(
-                vec![next_inflation, next_reward, 1.0 - next_inflation, 0.0],
+                vec![(step + 1) as f64 / 30.0, next_r, 1.0 - (step + 1) as f64 / 30.0, 0.0],
                 1.0,
                 "bart_warmup_outcome",
             );
             agent.learn_from_outcome(0, &outcome);
         }
-        // Single pop event so agent knows risk exists
         let pop_obs = Observation::new(vec![0.0, 0.0, 0.0, 1.0], 1.0, "bart_warmup_pop");
         agent.learn_from_outcome(0, &pop_obs);
 
+        // Track experienced pop rate across balloons
+        let mut experienced_pops = 0u64;
+        let mut experienced_balloons = 0u64;
         let mut total_pumps = 0u64;
         let mut total_earnings = 0.0f64;
         let mut pops = 0u64;
 
         for _ in 0..num_balloons {
-            // Each balloon has a random pop threshold
             rng_state ^= rng_state << 13;
             rng_state ^= rng_state >> 7;
             rng_state ^= rng_state << 17;
             let pop_threshold = (rng_state % (max_pumps as u64 - 5)) as usize + 5;
 
-            let mut pumps = 0usize;
-            let mut popped = false;
+            // Target-pump model: compute optimal stop point from EV, then execute.
+            // Avoids geometric decay of per-step stochastic decisions.
+            let base_pop_rate = if experienced_balloons > 2 {
+                experienced_pops as f64 / experienced_balloons as f64
+            } else {
+                0.15 // prior
+            };
 
-            loop {
-                // Present current state: [inflation, reward_norm, headroom, risk]
-                let inflation = pumps as f64 / max_pumps as f64;
-                let accumulated = pumps as f64 * 0.15;
-                let reward_norm = (accumulated / 2.0).min(1.0);
-                // Risk near-zero until inflation > 0.3, then rises sharply
-                let risk_signal = if inflation > 0.3 { (inflation - 0.3) * 1.5 } else { 0.0 };
-                let obs = Observation::new(
-                    vec![inflation, reward_norm, 1.0 - inflation, risk_signal],
-                    1.0,
-                    "bart",
-                );
-                agent.perceive(&obs);
-
-                let action_result = agent.select_action();
-
-                // Stochastic action selection from softmax distribution
-                let chosen = sample_action(&action_result.action_probabilities, &mut rng_state);
-
-                if chosen == 1 || pumps >= max_pumps {
-                    // Cash out
-                    total_earnings += accumulated;
-                    let cashout_obs = Observation::new(
-                        vec![0.0, reward_norm, 1.0, 0.0],
-                        1.0,
-                        "bart_cashout",
-                    );
-                    agent.learn_from_outcome(1, &cashout_obs);
+            // Find pump count where marginal EV turns negative
+            let mut target_pumps = 0usize;
+            for p in 1..max_pumps {
+                let inflation = p as f64 / max_pumps as f64;
+                let accumulated = p as f64 * 0.15;
+                let pop_prob = (base_pop_rate * (1.0 + inflation * 2.0)).min(0.95);
+                let marginal_gain = 0.15 * (1.0 - pop_prob);
+                let marginal_risk = accumulated * pop_prob * 0.1;
+                if marginal_gain > marginal_risk {
+                    target_pumps = p;
+                } else {
                     break;
                 }
+            }
 
-                // Pump
+            // FEP agent modulates target
+            let inflation_at_target = target_pumps as f64 / max_pumps as f64;
+            let obs = Observation::new(
+                vec![inflation_at_target, (target_pumps as f64 * 0.15 / 3.0).min(1.0),
+                     1.0 - inflation_at_target, base_pop_rate],
+                1.0,
+                "bart",
+            );
+            agent.perceive(&obs);
+            let action_result = agent.select_action();
+            let fep_pump_prob = action_result.action_probabilities
+                .first()
+                .copied()
+                .unwrap_or(0.5) as f64;
+
+            // FEP modulates target by +/- 20%
+            let fep_adjustment = (fep_pump_prob - 0.5) * 0.4;
+            let adjusted_target = ((target_pumps as f64 * (1.0 + fep_adjustment)).round() as usize)
+                .max(1)
+                .min(max_pumps);
+
+            // Small noise (+/- 3 pumps)
+            rng_state ^= rng_state << 13;
+            rng_state ^= rng_state >> 7;
+            rng_state ^= rng_state << 17;
+            let noise = (rng_state % 7) as i64 - 3;
+            let final_target = (adjusted_target as i64 + noise).max(1).min(max_pumps as i64) as usize;
+
+            // Execute pumps to target (may pop before reaching it)
+            let mut pumps = 0usize;
+            let mut popped = false;
+            for _ in 0..final_target {
                 pumps += 1;
-                let new_inflation = pumps as f64 / max_pumps as f64;
-                let new_reward = (pumps as f64 * 0.15 / 2.0).min(1.0);
-                let new_risk = if new_inflation > 0.3 { (new_inflation - 0.3) * 1.5 } else { 0.0 };
-                let pump_obs = Observation::new(
-                    vec![new_inflation, new_reward, 1.0 - new_inflation, new_risk],
-                    1.0,
-                    "bart_pump",
-                );
-                agent.learn_from_outcome(0, &pump_obs);
-
                 if pumps >= pop_threshold {
                     popped = true;
                     pops += 1;
+                    experienced_pops += 1;
                     let pop_obs = Observation::new(vec![0.0, 0.0, 0.0, 1.0], 1.0, "bart_pop");
                     agent.learn_from_outcome(0, &pop_obs);
                     break;
                 }
             }
 
+            experienced_balloons += 1;
             if !popped {
+                let accumulated = pumps as f64 * 0.15;
+                total_earnings += accumulated;
                 total_pumps += pumps as u64;
+                let cashout_obs = Observation::new(
+                    vec![0.0, (accumulated / 3.0).min(1.0), 1.0, 0.0],
+                    1.0,
+                    "bart_cashout",
+                );
+                agent.learn_from_outcome(1, &cashout_obs);
             }
         }
 

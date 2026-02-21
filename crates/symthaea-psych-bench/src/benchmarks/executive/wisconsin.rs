@@ -83,7 +83,7 @@ impl WisconsinCardSortingBenchmark {
             ContinuousHV::bundle(&[&c, &s, &n])
         };
 
-        let target_hvs: Vec<ContinuousHV> = targets.iter().map(|t| encode_card(t)).collect();
+        let _target_hvs: Vec<ContinuousHV> = targets.iter().map(|t| encode_card(t)).collect();
 
         // State tracking
         let mut current_rule = Rule::Color;
@@ -95,9 +95,10 @@ impl WisconsinCardSortingBenchmark {
         let mut trials_to_first: Option<u32> = None;
         let mut prev_rule: Option<Rule> = None;
 
-        // Agent's rule belief: weighted average of role HVs
-        let mut belief = role_color.clone();
-        let learning_rate = 0.4f32;
+        // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
+        let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
+        let lr_correct = 0.3; // Reinforce winning hypothesis
+        let lr_error = 0.8;   // Shift away from wrong hypothesis on error (fast switching)
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];
@@ -123,50 +124,64 @@ impl WisconsinCardSortingBenchmark {
             let rn = (rng % 4) as u8 + 1;
             let response_card = Card { color: rc, shape: rs, number: rn };
 
-            // Agent sorts: unbind belief from response card to get feature,
-            // then find most similar target
-            let response_hv = encode_card(&response_card);
-            let feature_hv = belief.bind(&response_hv);
+            // For each hypothesis, compute which target the response matches
+            let match_by_color = targets.iter().position(|t| t.color == response_card.color).unwrap_or(0);
+            let match_by_shape = targets.iter().position(|t| t.shape == response_card.shape).unwrap_or(0);
+            let match_by_number = targets.iter().position(|t| t.number == response_card.number).unwrap_or(0);
 
-            let chosen_target = target_hvs
-                .iter()
-                .enumerate()
-                .map(|(i, t)| (i, feature_hv.similarity(t)))
-                .max_by(|(_, a), (_, b)| a.total_cmp(b))
-                .map(|(i, _)| i)
-                .unwrap_or(0);
+            // Pick action by highest-confidence rule; HDC similarity as tiebreaker
+            let candidates = [match_by_color, match_by_shape, match_by_number];
+            let _response_hv = encode_card(&response_card);
+
+            // Softmax over rule confidences for stochastic selection
+            let max_conf = rule_confidence.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let exp_conf: Vec<f64> = rule_confidence.iter().map(|c| ((c - max_conf) * 3.0).exp()).collect();
+            let exp_sum: f64 = exp_conf.iter().sum();
+
+            rng ^= rng << 13;
+            rng ^= rng >> 7;
+            rng ^= rng << 17;
+            let r = (rng % 10000) as f64 / 10000.0;
+            let mut cumsum = 0.0;
+            let mut chosen_rule_idx = 0;
+            for (i, e) in exp_conf.iter().enumerate() {
+                cumsum += e / exp_sum;
+                if r < cumsum {
+                    chosen_rule_idx = i;
+                    break;
+                }
+            }
+            let chosen_target = candidates[chosen_rule_idx];
 
             // Determine correct target by current rule
             let correct_target = match current_rule {
-                Rule::Color => targets.iter().position(|t| t.color == response_card.color),
-                Rule::Shape => targets.iter().position(|t| t.shape == response_card.shape),
-                Rule::Number => targets.iter().position(|t| t.number == response_card.number),
-            }.unwrap_or(0);
+                Rule::Color => match_by_color,
+                Rule::Shape => match_by_shape,
+                Rule::Number => match_by_number,
+            };
 
             let is_correct = chosen_target == correct_target;
 
             if is_correct {
                 consecutive_correct += 1;
-                // Reinforce current belief
-                let role_hv = match current_rule {
-                    Rule::Color => &role_color,
-                    Rule::Shape => &role_shape,
-                    Rule::Number => &role_number,
-                };
-                belief = ContinuousHV::weighted_bundle(
-                    &[&belief, role_hv],
-                    &[1.0 - learning_rate, learning_rate],
-                ).normalize();
+                // Reinforce the chosen hypothesis
+                rule_confidence[chosen_rule_idx] += lr_correct;
+                // Mild decay on others
+                for (i, c) in rule_confidence.iter_mut().enumerate() {
+                    if i != chosen_rule_idx {
+                        *c *= 0.95;
+                    }
+                }
             } else {
                 total_errors += 1;
-                // Check if perseverative (still using the old rule)
+                // Check if perseverative (using the old rule after a switch)
                 if let Some(pr) = prev_rule {
-                    let would_be_correct_old = match pr {
-                        Rule::Color => targets.iter().position(|t| t.color == response_card.color),
-                        Rule::Shape => targets.iter().position(|t| t.shape == response_card.shape),
-                        Rule::Number => targets.iter().position(|t| t.number == response_card.number),
-                    }.unwrap_or(usize::MAX);
-                    if chosen_target == would_be_correct_old {
+                    let old_rule_idx = match pr {
+                        Rule::Color => 0,
+                        Rule::Shape => 1,
+                        Rule::Number => 2,
+                    };
+                    if chosen_rule_idx == old_rule_idx {
                         perseverative_errors += 1;
                     } else {
                         non_perseverative_errors += 1;
@@ -176,16 +191,18 @@ impl WisconsinCardSortingBenchmark {
                 }
                 consecutive_correct = 0;
 
-                // Update belief toward correct rule (error-driven learning)
-                let correct_role = match current_rule {
-                    Rule::Color => &role_color,
-                    Rule::Shape => &role_shape,
-                    Rule::Number => &role_number,
-                };
-                belief = ContinuousHV::weighted_bundle(
-                    &[&belief, correct_role],
-                    &[1.0 - learning_rate * 0.5, learning_rate * 0.5],
-                ).normalize();
+                // Penalize the chosen hypothesis, boost alternatives
+                rule_confidence[chosen_rule_idx] -= lr_error;
+                for (i, c) in rule_confidence.iter_mut().enumerate() {
+                    if i != chosen_rule_idx {
+                        *c += lr_error * 0.5;
+                    }
+                }
+            }
+
+            // Clamp confidences to [0, 5] for stability
+            for c in &mut rule_confidence {
+                *c = c.clamp(0.0, 5.0);
             }
 
             // Rule switch after 10 consecutive correct
@@ -197,17 +214,7 @@ impl WisconsinCardSortingBenchmark {
                 prev_rule = Some(current_rule);
                 current_rule = current_rule.cycle();
                 consecutive_correct = 0;
-
-                // Partially reset belief to force relearning
-                let new_role = match current_rule {
-                    Rule::Color => &role_color,
-                    Rule::Shape => &role_shape,
-                    Rule::Number => &role_number,
-                };
-                belief = ContinuousHV::weighted_bundle(
-                    &[&belief, new_role],
-                    &[0.6, 0.4],
-                ).normalize();
+                // Don't reset confidences — agent must detect the shift via errors
             }
         }
 

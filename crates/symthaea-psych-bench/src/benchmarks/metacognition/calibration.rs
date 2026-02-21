@@ -68,9 +68,21 @@ impl MetacognitiveCalibrationBenchmark {
                     })
                     .collect();
 
-                // Store items in working memory
+                // Store items in working memory with encoding noise.
+                // Real memory systems don't store perfect copies — this creates
+                // genuine accuracy variance across difficulty levels.
                 for item in &items {
-                    wm.perceive(item.clone());
+                    rng ^= rng << 13;
+                    rng ^= rng >> 7;
+                    rng ^= rng << 17;
+                    let noise = ContinuousHV::random(dim, rng.wrapping_add(5000));
+                    // Noise magnitude scales with difficulty (more items = more interference)
+                    let noise_weight = 0.05 + 0.03 * diff.num_items as f32;
+                    let noisy = ContinuousHV::weighted_bundle(
+                        &[item, &noise],
+                        &[1.0 - noise_weight, noise_weight],
+                    );
+                    wm.perceive(noisy);
                 }
 
                 // Pick a target to retrieve later

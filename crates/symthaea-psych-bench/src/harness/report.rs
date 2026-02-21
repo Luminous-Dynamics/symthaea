@@ -229,8 +229,8 @@ impl BenchmarkReport {
             ("trials_to_first_category", "wcst_trials_to_first", exec_bl),
             ("overall_net_score", "igt_overall_net_score", exec_bl),
             ("deck_preference_good", "igt_deck_preference_good", exec_bl),
-            ("overall_accuracy", "ravens_overall_accuracy", exec_bl),
-            ("easy_accuracy", "ravens_easy_accuracy", exec_bl),
+            // Note: overall_accuracy and easy_accuracy are Raven's-specific;
+            // matched below only for Executive::Ravens benchmarks
             // Metacognition
             ("calibration_error_ece", "calibration_error_ece", meta_bl),
             ("discrimination_gamma", "discrimination_gamma", meta_bl),
@@ -253,6 +253,28 @@ impl BenchmarkReport {
                             ratio,
                         },
                     ));
+                }
+            }
+        }
+
+        // Benchmark-specific metrics (avoid cross-benchmark collisions)
+        if benchmark.contains("Ravens") {
+            if let Some(metric) = result.metrics.get("overall_accuracy") {
+                if let Some(bl) = exec_bl.get("ravens_overall_accuracy") {
+                    let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
+                    comps.push(("overall_accuracy".to_string(), BaselineComparison {
+                        human_value: bl.value, source: bl.source.to_string(),
+                        population: bl.population.to_string(), ratio,
+                    }));
+                }
+            }
+            if let Some(metric) = result.metrics.get("easy_accuracy") {
+                if let Some(bl) = exec_bl.get("ravens_easy_accuracy") {
+                    let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
+                    comps.push(("easy_accuracy".to_string(), BaselineComparison {
+                        human_value: bl.value, source: bl.source.to_string(),
+                        population: bl.population.to_string(), ratio,
+                    }));
                 }
             }
         }
