@@ -198,11 +198,8 @@ pub fn create_hearth(input: CreateHearthInput) -> ExternResult<Record> {
         (),
     )?;
 
-    // H4 placeholder: auto-recovery proposal for hearths with >= 3 adults
-    // TODO: Cross-cluster call to identity cluster for auto-recovery when wired.
-    // if adult_count >= 3 {
-    //     propose_auto_recovery(&hearth_hash)?;
-    // }
+    // H4: Evaluate auto social recovery (will fire when >= 3 guardians exist)
+    let _ = propose_auto_recovery(&hearth_hash);
 
     get(hearth_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not retrieve created hearth".into()
@@ -702,6 +699,11 @@ pub fn is_guardian(hearth_hash: ActionHash) -> ExternResult<bool> {
     }
 }
 
+/// Compute the recovery threshold: 60% of adult_count, rounded up.
+fn recovery_threshold(adult_count: usize) -> usize {
+    (adult_count * 60).div_ceil(100)
+}
+
 /// H4: Propose auto social recovery if the hearth has >= 3 adult-level members.
 /// Cross-cluster call to identity cluster is best-effort (don't block on failure).
 fn propose_auto_recovery(hearth_hash: &ActionHash) -> ExternResult<()> {
@@ -728,10 +730,10 @@ fn propose_auto_recovery(hearth_hash: &ActionHash) -> ExternResult<()> {
     }
 
     // Compute threshold: 60% rounded up
-    let threshold = (adult_agents.len() * 60 + 99) / 100;
+    let threshold = recovery_threshold(adult_agents.len());
 
     // Best-effort cross-cluster call to identity recovery
-    #[derive(Serialize)]
+    #[derive(Serialize, Debug)]
     struct SetupRecoveryInput {
         trustees: Vec<AgentPubKey>,
         threshold: usize,
@@ -1098,5 +1100,55 @@ mod tests {
     #[test]
     fn link_types_hearth_to_digests_exists() {
         let _v = LinkTypes::HearthToDigests;
+    }
+
+    // ---- Recovery threshold math ----
+
+    #[test]
+    fn recovery_threshold_3_adults() {
+        // 3 * 60 / 100 = 1.8, ceil = 2
+        assert_eq!(recovery_threshold(3), 2);
+    }
+
+    #[test]
+    fn recovery_threshold_4_adults() {
+        // 4 * 60 / 100 = 2.4, ceil = 3
+        assert_eq!(recovery_threshold(4), 3);
+    }
+
+    #[test]
+    fn recovery_threshold_5_adults() {
+        // 5 * 60 / 100 = 3.0, ceil = 3
+        assert_eq!(recovery_threshold(5), 3);
+    }
+
+    #[test]
+    fn recovery_threshold_6_adults() {
+        // 6 * 60 / 100 = 3.6, ceil = 4
+        assert_eq!(recovery_threshold(6), 4);
+    }
+
+    #[test]
+    fn recovery_threshold_7_adults() {
+        // 7 * 60 / 100 = 4.2, ceil = 5
+        assert_eq!(recovery_threshold(7), 5);
+    }
+
+    #[test]
+    fn recovery_threshold_10_adults() {
+        // 10 * 60 / 100 = 6.0, ceil = 6
+        assert_eq!(recovery_threshold(10), 6);
+    }
+
+    #[test]
+    fn recovery_threshold_always_at_least_60_percent() {
+        for n in 3..=20 {
+            let t = recovery_threshold(n);
+            // t/n >= 0.6 => t * 100 >= n * 60
+            assert!(
+                t * 100 >= n * 60,
+                "threshold {t} for {n} adults is below 60%"
+            );
+        }
     }
 }

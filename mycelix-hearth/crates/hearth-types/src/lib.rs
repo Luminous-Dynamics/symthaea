@@ -546,6 +546,15 @@ pub struct RhythmSummary {
 // Cross-Zome DTOs
 // ============================================================================
 
+/// Input for epoch-based digest queries used by gratitude, care, rhythms,
+/// and bridge coordinators.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DigestEpochInput {
+    pub hearth_hash: ActionHash,
+    pub epoch_start: Timestamp,
+    pub epoch_end: Timestamp,
+}
+
 // NOTE: Anchor is NOT defined here. Each integrity zome defines its own
 // Anchor entry type using #[hdk_entry_helper] (required for Holochain validation).
 // Having Anchor in shared types caused ambiguity with glob imports.
@@ -1035,6 +1044,22 @@ mod tests {
         let json = serde_json::to_string(&rt).unwrap();
         let back: RhythmType = serde_json::from_str(&json).unwrap();
         assert_eq!(back, rt);
+    }
+
+    // ---- DigestEpochInput ----
+
+    #[test]
+    fn digest_epoch_input_serde_roundtrip() {
+        let input = DigestEpochInput {
+            hearth_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            epoch_start: Timestamp::from_micros(1_000_000),
+            epoch_end: Timestamp::from_micros(604_800_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: DigestEpochInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.hearth_hash, input.hearth_hash);
+        assert_eq!(back.epoch_start, input.epoch_start);
+        assert_eq!(back.epoch_end, input.epoch_end);
     }
 
     #[test]

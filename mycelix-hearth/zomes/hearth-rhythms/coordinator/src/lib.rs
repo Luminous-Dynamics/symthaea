@@ -184,19 +184,17 @@ pub fn get_hearth_presence(hearth_hash: ActionHash) -> ExternResult<Vec<Record>>
     records_from_links(links)
 }
 
-/// Input for epoch-based digest queries.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DigestEpochInput {
-    pub hearth_hash: ActionHash,
-    pub epoch_start: Timestamp,
-    pub epoch_end: Timestamp,
-}
-
 /// Create a rhythm digest for the given epoch window.
 /// Two-hop query: HearthToRhythms → RhythmToOccurrences, filter by created_at
 /// within epoch, aggregate per rhythm into RhythmSummary.
 #[hdk_extern]
 pub fn create_rhythm_digest(input: DigestEpochInput) -> ExternResult<Vec<RhythmSummary>> {
+    if input.epoch_start >= input.epoch_end {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "epoch_start must be before epoch_end".into()
+        )));
+    }
+
     let epoch_start_micros = input.epoch_start.as_micros();
     let epoch_end_micros = input.epoch_end.as_micros();
 

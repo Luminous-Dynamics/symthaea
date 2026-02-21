@@ -101,10 +101,10 @@ pub fn create_care_schedule(input: CreateCareScheduleInput) -> ExternResult<Reco
     )))
 }
 
-/// Mark a care task as completed. Sets completed_at timestamp on the entry
-/// and emits a CareTaskCompleted signal.
+/// Mark a care task as completed. Sets completed_at timestamp on the entry,
+/// emits a CareTaskCompleted signal, and returns the updated record.
 #[hdk_extern]
-pub fn complete_task(input: CompleteTaskInput) -> ExternResult<()> {
+pub fn complete_task(input: CompleteTaskInput) -> ExternResult<Record> {
     let now = sys_time()?;
 
     let record = get(input.schedule_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
@@ -127,7 +127,10 @@ pub fn complete_task(input: CompleteTaskInput) -> ExternResult<()> {
         status: CareScheduleStatus::Completed,
         ..schedule.clone()
     };
-    update_entry(input.schedule_hash.clone(), &EntryTypes::CareSchedule(updated))?;
+    let updated_hash = update_entry(
+        input.schedule_hash.clone(),
+        &EntryTypes::CareSchedule(updated),
+    )?;
 
     let signal = HearthSignal::CareTaskCompleted {
         assignee: caller,
@@ -137,7 +140,9 @@ pub fn complete_task(input: CompleteTaskInput) -> ExternResult<()> {
 
     emit_signal(&signal)?;
 
-    Ok(())
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not retrieve updated care schedule".into()
+    )))
 }
 
 /// Propose a care task swap with another hearth member.
@@ -260,19 +265,17 @@ pub fn get_hearth_meal_plans(hearth_hash: ActionHash) -> ExternResult<Vec<Record
     records_from_links(links)
 }
 
-/// Epoch window input for digest creation.
-#[derive(Serialize, Deserialize, Debug)]
-pub struct DigestEpochInput {
-    pub hearth_hash: ActionHash,
-    pub epoch_start: Timestamp,
-    pub epoch_end: Timestamp,
-}
-
 /// Create a care digest: query HearthToSchedules links, filter schedules
 /// with completed_at within the epoch window, aggregate per assignee.
 /// Returns Vec<CareSummary> for inclusion in the WeeklyDigest.
 #[hdk_extern]
 pub fn create_care_digest(input: DigestEpochInput) -> ExternResult<Vec<CareSummary>> {
+    if input.epoch_start >= input.epoch_end {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "epoch_start must be before epoch_end".into()
+        )));
+    }
+
     let links = get_links(
         LinkQuery::try_new(input.hearth_hash, LinkTypes::HearthToSchedules)?,
         GetStrategy::default(),
@@ -294,13 +297,12 @@ pub fn create_care_digest(input: DigestEpochInput) -> ExternResult<Vec<CareSumma
                     "Invalid care schedule entry".into()
                 )))?;
 
-            // Filter by completed_at within epoch window
+            // Filter by completed_at within half-open epoch window [start, end)
             if let Some(completed_at) = schedule.completed_at {
-                if completed_at >= input.epoch_start && completed_at <= input.epoch_end {
+                if completed_at >= input.epoch_start && completed_at < input.epoch_end {
                     let entry = assignee_stats.entry(schedule.assigned_to).or_insert((0, 0));
                     entry.0 += 1; // tasks_completed
-                    // hours_hundredths: estimate 1 hour (100 hundredths) per task
-                    entry.1 += 100;
+                    entry.1 += 100; // hours_hundredths: estimate 1 hour per task
                 }
             }
         }

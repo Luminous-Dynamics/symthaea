@@ -262,7 +262,7 @@ pub fn deny_capability(input: ApproveCapabilityInput) -> ExternResult<Record> {
 
 /// Advance a member's autonomy tier. Creates a TierTransition with PreLiminal
 /// phase and recategorization_blocked=true. If advancing to Autonomous,
-/// a severance check placeholder is triggered.
+/// triggers severance via cross-zome call to hearth_bridge.
 #[hdk_extern]
 pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
     let now = sys_time()?;

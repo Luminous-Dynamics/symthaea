@@ -241,19 +241,17 @@ pub fn get_hearth_circles(hearth_hash: ActionHash) -> ExternResult<Vec<Record>> 
     records_from_links(links)
 }
 
-/// Epoch window input for digest creation.
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DigestEpochInput {
-    pub hearth_hash: ActionHash,
-    pub epoch_start: Timestamp,
-    pub epoch_end: Timestamp,
-}
-
 /// Create a gratitude digest: query HearthToGratitude links, filter by
 /// created_at within the epoch window, aggregate per (from, to) pair.
 /// Returns Vec<GratitudeSummary> for inclusion in the WeeklyDigest.
 #[hdk_extern]
 pub fn create_gratitude_digest(input: DigestEpochInput) -> ExternResult<Vec<GratitudeSummary>> {
+    if input.epoch_start >= input.epoch_end {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "epoch_start must be before epoch_end".into()
+        )));
+    }
+
     let links = get_links(
         LinkQuery::try_new(input.hearth_hash, LinkTypes::HearthToGratitude)?,
         GetStrategy::default(),
@@ -275,8 +273,8 @@ pub fn create_gratitude_digest(input: DigestEpochInput) -> ExternResult<Vec<Grat
                     "Invalid gratitude entry".into()
                 )))?;
 
-            // Filter by epoch window
-            if expr.created_at >= input.epoch_start && expr.created_at <= input.epoch_end {
+            // Filter by half-open epoch window [start, end)
+            if expr.created_at >= input.epoch_start && expr.created_at < input.epoch_end {
                 let key = (expr.from_agent, expr.to_agent);
                 *pair_counts.entry(key).or_insert(0) += 1;
             }

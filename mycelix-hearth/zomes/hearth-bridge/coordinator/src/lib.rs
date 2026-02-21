@@ -13,7 +13,7 @@
 use hdk::prelude::*;
 use hearth_bridge_integrity::*;
 use hearth_types::{
-    BondUpdate, CareSummary, GratitudeSummary, RhythmSummary, SeveranceInput,
+    BondUpdate, CareSummary, DigestEpochInput, GratitudeSummary, RhythmSummary, SeveranceInput,
     SeveranceSummaryData, WeeklyDigest,
 };
 use mycelix_bridge_common::{
@@ -536,14 +536,6 @@ pub struct HearthSyncInput {
     pub epoch_end: Timestamp,
 }
 
-/// Epoch input for domain digest functions (matches each coordinator's DigestEpochInput).
-#[derive(Serialize, Deserialize, Debug, Clone)]
-struct DigestEpochInput {
-    pub hearth_hash: ActionHash,
-    pub epoch_start: Timestamp,
-    pub epoch_end: Timestamp,
-}
-
 /// Decode a typed response from a DispatchResult.
 fn decode_dispatch_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
     result: &DispatchResult,
@@ -605,8 +597,7 @@ pub fn hearth_sync(input: HearthSyncInput) -> ExternResult<Record> {
         payload: epoch_payload.clone(),
     };
     let care_result = bridge::dispatch_call_checked(&care_dispatch, ALLOWED_ZOMES)?;
-    let care_summary: Vec<CareSummary> =
-        decode_dispatch_response(&care_result, "care_digest")?;
+    let care_summary: Vec<CareSummary> = decode_dispatch_response(&care_result, "care_digest")?;
 
     // Call create_rhythm_digest
     let rhythm_dispatch = DispatchInput {
@@ -741,6 +732,7 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use hearth_types::MemberRole;
 
     // ---- Allowlist validation ----
 
@@ -970,6 +962,88 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let back: HearthSyncInput = serde_json::from_str(&json).unwrap();
         assert_eq!(back.hearth_hash, input.hearth_hash);
+    }
+
+    // ---- HearthSyncInput epoch fields ----
+
+    #[test]
+    fn hearth_sync_input_preserves_epoch_fields() {
+        let input = HearthSyncInput {
+            hearth_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            epoch_start: Timestamp::from_micros(1_000_000),
+            epoch_end: Timestamp::from_micros(604_801_000_000),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: HearthSyncInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.epoch_start, Timestamp::from_micros(1_000_000));
+        assert_eq!(back.epoch_end, Timestamp::from_micros(604_801_000_000));
+    }
+
+    // ---- decode_dispatch_response ----
+
+    #[test]
+    fn decode_dispatch_response_success() {
+        let payload: Vec<u32> = vec![1, 2, 3];
+        let encoded = ExternIO::encode(payload.clone()).unwrap();
+        let result = DispatchResult {
+            success: true,
+            response: Some(encoded.0),
+            error: None,
+        };
+        let decoded: Vec<u32> = decode_dispatch_response(&result, "test").unwrap();
+        assert_eq!(decoded, payload);
+    }
+
+    #[test]
+    fn decode_dispatch_response_failure_returns_error() {
+        let result = DispatchResult {
+            success: false,
+            response: None,
+            error: Some("something broke".to_string()),
+        };
+        let err = decode_dispatch_response::<Vec<u32>>(&result, "test_ctx").unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("test_ctx"), "error should contain context");
+        assert!(
+            msg.contains("something broke"),
+            "error should contain original message"
+        );
+    }
+
+    #[test]
+    fn decode_dispatch_response_failure_no_error_message() {
+        let result = DispatchResult {
+            success: false,
+            response: None,
+            error: None,
+        };
+        let err = decode_dispatch_response::<Vec<u32>>(&result, "ctx").unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("unknown error"));
+    }
+
+    #[test]
+    fn decode_dispatch_response_success_but_no_response() {
+        let result = DispatchResult {
+            success: true,
+            response: None,
+            error: None,
+        };
+        let err = decode_dispatch_response::<Vec<u32>>(&result, "ctx").unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("no response"));
+    }
+
+    #[test]
+    fn decode_dispatch_response_malformed_bytes() {
+        let result = DispatchResult {
+            success: true,
+            response: Some(vec![0xFF, 0xFE, 0xFD]),
+            error: None,
+        };
+        let err = decode_dispatch_response::<Vec<u32>>(&result, "ctx").unwrap_err();
+        let msg = format!("{}", err);
+        assert!(msg.contains("decode"));
     }
 
     // ---- SeveranceInput serde ----
