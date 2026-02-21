@@ -611,6 +611,116 @@ fn test_adapt_noop_on_small_n() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// HIERARCHICAL SPECTRAL MIP
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn test_hierarchical_block_diagonal() {
+    // Large enough to produce multiple hierarchical levels (32, 64)
+    let config = SpectralMIPConfig {
+        num_components: 64,
+        window_size: 30,
+        min_samples: 10,
+        regularization: 1e-6,
+    };
+    let mut finder = SpectralMIPFinder::new(config);
+
+    // Build block-diagonal state: first 32 dims correlated, second 32 dims correlated,
+    // weak inter-block coupling
+    for i in 0..20 {
+        let values: Vec<f32> = (0..256)
+            .map(|j| {
+                let block = if j < 128 { 0 } else { 1 };
+                let base = (i as f32 * 0.1 + j as f32 * 0.01).sin();
+                if block == 0 {
+                    base + (i as f32 * 0.3).cos() * 0.5
+                } else {
+                    base + (i as f32 * 0.7).sin() * 0.5
+                }
+            })
+            .collect();
+        finder.push(&ContinuousHV::from_slice(&values));
+    }
+
+    let result = finder.compute_hierarchical().expect("should compute hierarchical");
+    assert!(result.phi.is_finite(), "phi should be finite");
+    assert!(!result.levels.is_empty(), "should have at least one level");
+    assert!(!result.scales.is_empty(), "should have at least one scale");
+
+    // All levels should have finite phi
+    for (i, level) in result.levels.iter().enumerate() {
+        assert!(
+            level.phi.is_finite(),
+            "level {} phi should be finite, got {}",
+            i,
+            level.phi
+        );
+    }
+}
+
+#[test]
+fn test_hierarchical_single_scale() {
+    // With n=16, only one scale (16 itself, since 32 > 16)
+    let config = SpectralMIPConfig {
+        num_components: 16,
+        window_size: 20,
+        min_samples: 5,
+        regularization: 1e-6,
+    };
+    let mut finder = SpectralMIPFinder::new(config);
+
+    for i in 0..10 {
+        let values: Vec<f32> = (0..64)
+            .map(|j| ((i + j) as f32 * 0.1).sin())
+            .collect();
+        finder.push(&ContinuousHV::from_slice(&values));
+    }
+
+    let result = finder.compute_hierarchical().expect("should compute");
+    // Single scale: should match regular compute
+    assert_eq!(result.levels.len(), 1);
+    let regular = finder.compute().expect("regular compute");
+    assert!(
+        (result.phi - regular.phi).abs() < 1e-10,
+        "single-scale hierarchical should match regular: {} vs {}",
+        result.phi,
+        regular.phi
+    );
+}
+
+#[test]
+fn test_hierarchical_phi_monotonic_refinement() {
+    // Each level should produce a reasonable phi (not necessarily monotonic,
+    // but all finite and non-negative)
+    let config = SpectralMIPConfig {
+        num_components: 128,
+        window_size: 40,
+        min_samples: 15,
+        regularization: 1e-6,
+    };
+    let mut finder = SpectralMIPFinder::new(config);
+
+    for i in 0..25 {
+        let values: Vec<f32> = (0..512)
+            .map(|j| {
+                let block = j / 128;
+                (i as f32 * 0.1 + block as f32).sin() * (1.0 + block as f32 * 0.2)
+            })
+            .collect();
+        finder.push(&ContinuousHV::from_slice(&values));
+    }
+
+    let result = finder.compute_hierarchical().expect("should compute");
+    assert!(result.scales.len() >= 2, "should have at least 2 scales: {:?}", result.scales);
+
+    for (i, level) in result.levels.iter().enumerate() {
+        assert!(level.phi >= 0.0, "level {} phi should be non-negative: {}", i, level.phi);
+        assert!(level.phi.is_finite(), "level {} phi should be finite", i);
+        assert!(level.total_mi.is_finite(), "level {} total_mi should be finite", i);
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // PROPTEST: Property-based fuzzing for numerical robustness
 // ═══════════════════════════════════════════════════════════════════════════
 

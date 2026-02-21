@@ -3,9 +3,13 @@
 pub mod baselines;
 pub mod config;
 pub mod report;
+pub mod snapshot;
 
 pub use config::{AblationConfig, AblationPreset, BenchmarkConfig};
 pub use report::{BaselineComparison, BenchmarkReport, BenchmarkResult, MetricValue};
+pub use snapshot::{
+    RegressionReport, RegressionResult, RegressionSeverity, RegressionSnapshot, RegressionSummary,
+};
 
 /// A runnable psychological benchmark.
 pub trait PsychBenchmark {

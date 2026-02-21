@@ -93,6 +93,20 @@ pub struct SpectralMIPResult {
     pub num_components: usize,
 }
 
+/// Result of hierarchical (multi-scale) spectral MIP computation.
+///
+/// Contains results at each scale level, from coarsest to finest.
+/// The final level's phi is the most precise estimate.
+#[derive(Debug, Clone)]
+pub struct HierarchicalMIPResult {
+    /// Final (finest-scale) phi
+    pub phi: f64,
+    /// Scales used (number of components at each level)
+    pub scales: Vec<usize>,
+    /// Results at each scale, from coarsest to finest (indices mapped to full-n space)
+    pub levels: Vec<SpectralMIPResult>,
+}
+
 /// Spectral MIP Finder — O(n³) MIP search via Fiedler ordering + bordered Cholesky.
 ///
 /// Supports **adaptive dimension selection**: after each compute, `adapt()` uses the
@@ -349,6 +363,114 @@ impl SpectralMIPFinder {
         self.window.clear(); // column semantics changed — invalidate window
         self.sum.fill(0.0);
         self.cross_sum.fill(0.0);
+    }
+
+    /// Compute hierarchical (multi-scale) spectral MIP.
+    ///
+    /// Runs spectral MIP at increasing resolutions (e.g., 32 → 64 → n),
+    /// using each level's Fiedler ordering to focus the next level's component
+    /// selection on the MIP boundary region. Returns results at every scale.
+    ///
+    /// The covariance is built once from the window; each level extracts a
+    /// submatrix at different granularity. Final-level phi is the most precise.
+    pub fn compute_hierarchical(&self) -> Option<HierarchicalMIPResult> {
+        if !self.ready() {
+            return None;
+        }
+
+        let n = self.config.num_components;
+        let t = self.window.len();
+        let cov = self.build_covariance_matrix(n, t);
+
+        // Build scale ladder: 32, 64, 128, ... up to n (deduplicated)
+        let mut scales: Vec<usize> = Vec::new();
+        let mut s = 32_usize.min(n);
+        while s < n {
+            if s >= 4 {
+                scales.push(s);
+            }
+            s *= 2;
+        }
+        scales.push(n);
+        scales.dedup();
+
+        // If n is small enough for a single pass, just return that
+        if scales.len() <= 1 {
+            let result = self.compute_from_covariance(&cov, n, t)?;
+            return Some(HierarchicalMIPResult {
+                phi: result.phi,
+                scales: vec![n],
+                levels: vec![result],
+            });
+        }
+
+        let mut levels = Vec::with_capacity(scales.len());
+        let mut focused_indices: Option<Vec<usize>> = None;
+
+        for &scale in &scales {
+            // Select which of the n components to use at this scale
+            let indices: Vec<usize> = if scale == n {
+                (0..n).collect()
+            } else if let Some(ref prev) = focused_indices {
+                // Focus around previous MIP boundary + coverage + exploration
+                prev.iter().copied().take(scale).collect()
+            } else {
+                // Evenly spaced for first (coarsest) level
+                let stride = (n / scale).max(1);
+                (0..scale).map(|i| (i * stride).min(n - 1)).collect()
+            };
+
+            let actual_scale = indices.len();
+            if actual_scale < 4 {
+                continue;
+            }
+
+            // Extract sub-covariance matrix
+            let sub_cov = extract_submatrix(&cov, n, &indices);
+
+            // Run spectral MIP at this scale
+            if let Some(mut result) = self.compute_from_covariance(&sub_cov, actual_scale, t) {
+                // Map spectral_order and partition back to full-n index space
+                result.spectral_order = result
+                    .spectral_order
+                    .iter()
+                    .map(|&i| indices[i.min(indices.len() - 1)])
+                    .collect();
+                result.mip.part_a = result
+                    .mip
+                    .part_a
+                    .iter()
+                    .map(|&i| indices[i.min(indices.len() - 1)])
+                    .collect();
+                result.mip.part_b = result
+                    .mip
+                    .part_b
+                    .iter()
+                    .map(|&i| indices[i.min(indices.len() - 1)])
+                    .collect();
+
+                // Build focused indices for next scale: 60% boundary, 40% coverage
+                if scale < n {
+                    let next_scale = scales
+                        .iter()
+                        .find(|&&s| s > scale)
+                        .copied()
+                        .unwrap_or(n);
+                    focused_indices =
+                        Some(focus_dims_for_next_level(n, next_scale, &result));
+                }
+
+                levels.push(result);
+            }
+        }
+
+        let phi = levels.last().map(|l| l.phi).unwrap_or(0.0);
+
+        Some(HierarchicalMIPResult {
+            phi,
+            scales,
+            levels,
+        })
     }
 
     // ─── Internal helpers ──────────────────────────────────────────────
@@ -710,6 +832,76 @@ pub(crate) fn ln_determinant_cholesky(matrix: &[f64], n: usize) -> f64 {
     } else {
         (0..n).map(|i| matrix[i * n + i].max(1e-30).ln()).sum()
     }
+}
+
+/// Extract a submatrix from an n×n matrix given a list of row/column indices.
+fn extract_submatrix(matrix: &[f64], n: usize, indices: &[usize]) -> Vec<f64> {
+    let m = indices.len();
+    let mut sub = vec![0.0f64; m * m];
+    for (new_i, &old_i) in indices.iter().enumerate() {
+        for (new_j, &old_j) in indices.iter().enumerate() {
+            sub[new_i * m + new_j] = matrix[old_i * n + old_j];
+        }
+    }
+    sub
+}
+
+/// Build focused dimension indices for the next hierarchical level.
+///
+/// 60% from the MIP boundary region in Fiedler order, 40% evenly spaced coverage.
+fn focus_dims_for_next_level(
+    full_n: usize,
+    target_count: usize,
+    result: &SpectralMIPResult,
+) -> Vec<usize> {
+    let target = target_count.min(full_n);
+    let n_boundary = (target * 6 / 10).max(4);
+    let n_coverage = target.saturating_sub(n_boundary);
+
+    let mut dims: Vec<usize> = Vec::with_capacity(target);
+    let mut used = vec![false; full_n];
+
+    // 1. Boundary: dims centered on mip_bond in spectral order (already mapped to full-n)
+    let spectral = &result.spectral_order;
+    if !spectral.is_empty() {
+        let mip_bond = result.mip_bond.min(spectral.len() - 1);
+        let half = n_boundary / 2;
+        let start = mip_bond.saturating_sub(half);
+        let end = (start + n_boundary).min(spectral.len());
+        let start = end.saturating_sub(n_boundary);
+        for &idx in &spectral[start..end] {
+            if idx < full_n && !used[idx] {
+                dims.push(idx);
+                used[idx] = true;
+            }
+        }
+    }
+
+    // 2. Coverage: evenly spaced across full range
+    if n_coverage > 0 {
+        let stride = full_n / n_coverage.max(1);
+        for i in 0..n_coverage {
+            let idx = (i * stride).min(full_n - 1);
+            if !used[idx] {
+                dims.push(idx);
+                used[idx] = true;
+            }
+        }
+    }
+
+    // Fill remaining if needed
+    let mut next = 0;
+    while dims.len() < target && next < full_n {
+        if !used[next] {
+            dims.push(next);
+            used[next] = true;
+        }
+        next += 1;
+    }
+
+    dims.sort_unstable();
+    dims.truncate(target);
+    dims
 }
 
 // Tests in consciousness_metrics/tests/spectral_mip_tests.rs

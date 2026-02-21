@@ -736,6 +736,8 @@ impl CognitiveLoopService {
             primitive_belief_bridge: PrimitiveBeliefBridge::new(),
             prev_primitive_state: None,
             dream_engine,
+            #[cfg(any(feature = "full_consciousness", feature = "magi_loop"))]
+            dream_feedback_bridge: crate::consciousness::recursive_improvement::DreamFeedbackBridge::new(),
             predictive_mind,
             cross_modal_binder,
             affective_bridge,
