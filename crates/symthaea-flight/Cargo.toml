@@ -1,0 +1,26 @@
+[package]
+name = "symthaea-flight"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+authors = ["Luminous Dynamics <tristan.stoltz@evolvingresonantcocreationism.com>"]
+description = "Unified HDC-LTC + FEP Active Inference quadrotor flight control via MuJoCo"
+license = "MIT"
+repository = "https://github.com/Luminous-Dynamics/symthaea"
+homepage = "https://luminousdynamics.org"
+keywords = ["flight-control", "active-inference", "hdc", "quadrotor", "mujoco"]
+categories = ["science", "algorithms", "simulation"]
+
+[dependencies]
+symthaea-core = { path = "../../symthaea-core" }
+symthaea-fep = { path = "../symthaea-fep" }
+serde = { workspace = true }
+rand = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+
+[features]
+default = []
+mujoco = []  # Gate MuJoCo-dependent code (simulator module)
