@@ -127,6 +127,122 @@ pub fn get_route_stops(route_hash: ActionHash) -> ExternResult<Vec<Record>> {
     records_from_links(links)
 }
 
+// ============================================================================
+// MAINTENANCE MANAGEMENT
+// ============================================================================
+
+#[hdk_extern]
+pub fn log_maintenance(record_entry: MaintenanceRecord) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::MaintenanceRecord(record_entry.clone()))?;
+
+    create_link(
+        record_entry.vehicle_hash,
+        action_hash.clone(),
+        LinkTypes::VehicleToMaintenance,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created maintenance record".into())))
+}
+
+#[hdk_extern]
+pub fn get_vehicle_maintenance(vehicle_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(vehicle_hash, LinkTypes::VehicleToMaintenance)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn set_vehicle_features(features: VehicleFeatures) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::VehicleFeatures(features.clone()))?;
+
+    create_link(
+        features.vehicle_hash,
+        action_hash.clone(),
+        LinkTypes::VehicleToFeatures,
+        (),
+    )?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vehicle features".into())))
+}
+
+#[hdk_extern]
+pub fn get_accessible_vehicles(_: ()) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_vehicles")?, LinkTypes::AllVehicles)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut accessible = Vec::new();
+    for link in links {
+        let vehicle_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        // Check if this vehicle has features with wheelchair_accessible = true
+        let feature_links = get_links(
+            LinkQuery::try_new(vehicle_hash.clone(), LinkTypes::VehicleToFeatures)?,
+            GetStrategy::default(),
+        )?;
+
+        for flink in feature_links {
+            let feat_hash = ActionHash::try_from(flink.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+            if let Some(feat_record) = get(feat_hash, GetOptions::default())? {
+                if let Ok(Some(features)) = feat_record.entry().to_app_option::<VehicleFeatures>() {
+                    if features.wheelchair_accessible {
+                        if let Some(record) = get(vehicle_hash.clone(), GetOptions::default())? {
+                            accessible.push(record);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    Ok(accessible)
+}
+
+#[hdk_extern]
+pub fn get_vehicles_needing_maintenance(current_time: u64) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_vehicles")?, LinkTypes::AllVehicles)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut needing_maintenance = Vec::new();
+    for link in links {
+        let vehicle_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+
+        let maint_links = get_links(
+            LinkQuery::try_new(vehicle_hash.clone(), LinkTypes::VehicleToMaintenance)?,
+            GetStrategy::default(),
+        )?;
+
+        for mlink in maint_links {
+            let maint_hash = ActionHash::try_from(mlink.target)
+                .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+            if let Some(maint_record) = get(maint_hash, GetOptions::default())? {
+                if let Ok(Some(maintenance)) = maint_record.entry().to_app_option::<MaintenanceRecord>() {
+                    if let Some(next_due) = maintenance.next_due {
+                        if next_due <= current_time {
+                            if let Some(record) = get(vehicle_hash.clone(), GetOptions::default())? {
+                                needing_maintenance.push(record);
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(needing_maintenance)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,12 +287,13 @@ mod tests {
     #[test]
     fn vehicle_type_all_variants_serialize() {
         let types = vec![
-            VehicleType::Car,
-            VehicleType::Van,
-            VehicleType::Bike,
-            VehicleType::Bus,
-            VehicleType::Cargo,
-            VehicleType::ElectricScooter,
+            VehicleType::Car, VehicleType::Van, VehicleType::Bike,
+            VehicleType::Bus, VehicleType::Cargo, VehicleType::ElectricScooter,
+            VehicleType::Helicopter, VehicleType::EVTOL, VehicleType::AirTaxi,
+            VehicleType::Ferry, VehicleType::Boat,
+            VehicleType::Train, VehicleType::Tram,
+            VehicleType::Skateboard, VehicleType::Wheelchair, VehicleType::Segway,
+            VehicleType::AutonomousVehicle, VehicleType::Drone,
         ];
         for vt in types {
             let json = serde_json::to_string(&vt).unwrap();
@@ -192,11 +309,10 @@ mod tests {
     #[test]
     fn transport_mode_all_variants_serde_roundtrip() {
         let variants = vec![
-            TransportMode::Driving,
-            TransportMode::Cycling,
-            TransportMode::Walking,
-            TransportMode::Transit,
-            TransportMode::Mixed,
+            TransportMode::Driving, TransportMode::Cycling,
+            TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
+            TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
+            TransportMode::Micromobility, TransportMode::Autonomous,
         ];
         for variant in variants {
             let json = serde_json::to_string(&variant).unwrap();
@@ -288,11 +404,10 @@ mod tests {
     #[test]
     fn route_serde_all_modes() {
         for mode in [
-            TransportMode::Driving,
-            TransportMode::Cycling,
-            TransportMode::Walking,
-            TransportMode::Transit,
-            TransportMode::Mixed,
+            TransportMode::Driving, TransportMode::Cycling,
+            TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
+            TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
+            TransportMode::Micromobility, TransportMode::Autonomous,
         ] {
             let route = Route {
                 id: "rt-mode".to_string(),
@@ -550,5 +665,98 @@ mod tests {
         assert_eq!(decoded.lat, -90.0);
         assert_eq!(decoded.lon, -180.0);
         assert_eq!(decoded.label, Some("Edge of the world".to_string()));
+    }
+
+    // ========================================================================
+    // MaintenanceRecord serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn maintenance_record_serde_roundtrip() {
+        let m = MaintenanceRecord {
+            id: "m-42".to_string(),
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            maintenance_type: MaintenanceType::Scheduled,
+            description: "Oil change and filter replacement".to_string(),
+            cost: 89.99,
+            completed_at: 1700000000,
+            next_due: Some(1703000000),
+            mechanic_notes: "Everything looks good".to_string(),
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        let decoded: MaintenanceRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.id, "m-42");
+        assert_eq!(decoded.maintenance_type, MaintenanceType::Scheduled);
+        assert_eq!(decoded.cost, 89.99);
+        assert_eq!(decoded.next_due, Some(1703000000));
+    }
+
+    #[test]
+    fn maintenance_record_serde_no_next_due() {
+        let m = MaintenanceRecord {
+            id: "m-43".to_string(),
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            maintenance_type: MaintenanceType::Repair,
+            description: "Flat tire repair".to_string(),
+            cost: 25.0,
+            completed_at: 1700000000,
+            next_due: None,
+            mechanic_notes: String::new(),
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        let decoded: MaintenanceRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.next_due, None);
+        assert_eq!(decoded.mechanic_notes, "");
+    }
+
+    #[test]
+    fn maintenance_type_all_variants_serde() {
+        for mt in [MaintenanceType::Scheduled, MaintenanceType::Repair, MaintenanceType::Inspection] {
+            let json = serde_json::to_string(&mt).unwrap();
+            let decoded: MaintenanceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, mt);
+        }
+    }
+
+    // ========================================================================
+    // VehicleFeatures serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn vehicle_features_serde_roundtrip() {
+        let f = VehicleFeatures {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            wheelchair_accessible: true,
+            child_seat: true,
+            pet_friendly: false,
+            air_conditioning: true,
+            bike_rack: false,
+            luggage_capacity_liters: 350,
+        };
+        let json = serde_json::to_string(&f).unwrap();
+        let decoded: VehicleFeatures = serde_json::from_str(&json).unwrap();
+        assert!(decoded.wheelchair_accessible);
+        assert!(decoded.child_seat);
+        assert!(!decoded.pet_friendly);
+        assert!(decoded.air_conditioning);
+        assert!(!decoded.bike_rack);
+        assert_eq!(decoded.luggage_capacity_liters, 350);
+    }
+
+    #[test]
+    fn vehicle_features_serde_all_false() {
+        let f = VehicleFeatures {
+            vehicle_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            wheelchair_accessible: false,
+            child_seat: false,
+            pet_friendly: false,
+            air_conditioning: false,
+            bike_rack: false,
+            luggage_capacity_liters: 0,
+        };
+        let json = serde_json::to_string(&f).unwrap();
+        let decoded: VehicleFeatures = serde_json::from_str(&json).unwrap();
+        assert!(!decoded.wheelchair_accessible);
+        assert_eq!(decoded.luggage_capacity_liters, 0);
     }
 }

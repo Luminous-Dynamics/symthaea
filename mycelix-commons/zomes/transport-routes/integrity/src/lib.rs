@@ -19,6 +19,23 @@ pub enum VehicleType {
     Bus,
     Cargo,
     ElectricScooter,
+    // Flying
+    Helicopter,
+    EVTOL,
+    AirTaxi,
+    // Water
+    Ferry,
+    Boat,
+    // Rail
+    Train,
+    Tram,
+    // Micromobility
+    Skateboard,
+    Wheelchair,
+    Segway,
+    // Autonomous
+    AutonomousVehicle,
+    Drone,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -51,6 +68,11 @@ pub enum TransportMode {
     Walking,
     Transit,
     Mixed,
+    Flying,
+    Water,
+    Rail,
+    Micromobility,
+    Autonomous,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
@@ -94,6 +116,46 @@ pub struct Stop {
 }
 
 // ============================================================================
+// MAINTENANCE RECORD
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum MaintenanceType {
+    Scheduled,
+    Repair,
+    Inspection,
+}
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct MaintenanceRecord {
+    pub id: String,
+    pub vehicle_hash: ActionHash,
+    pub maintenance_type: MaintenanceType,
+    pub description: String,
+    pub cost: f64,
+    pub completed_at: u64,
+    pub next_due: Option<u64>,
+    pub mechanic_notes: String,
+}
+
+// ============================================================================
+// VEHICLE FEATURES (accessibility metadata)
+// ============================================================================
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct VehicleFeatures {
+    pub vehicle_hash: ActionHash,
+    pub wheelchair_accessible: bool,
+    pub child_seat: bool,
+    pub pet_friendly: bool,
+    pub air_conditioning: bool,
+    pub bike_rack: bool,
+    pub luggage_capacity_liters: u32,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -104,6 +166,8 @@ pub enum EntryTypes {
     Vehicle(Vehicle),
     Route(Route),
     Stop(Stop),
+    MaintenanceRecord(MaintenanceRecord),
+    VehicleFeatures(VehicleFeatures),
 }
 
 #[hdk_link_types]
@@ -113,6 +177,8 @@ pub enum LinkTypes {
     OwnerToVehicle,
     RouteToStop,
     VehicleToRoute,
+    VehicleToMaintenance,
+    VehicleToFeatures,
 }
 
 // ============================================================================
@@ -128,6 +194,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Vehicle(v) => validate_vehicle(v),
                 EntryTypes::Route(r) => validate_route(r),
                 EntryTypes::Stop(s) => validate_stop(s),
+                EntryTypes::MaintenanceRecord(m) => validate_maintenance(m),
+                EntryTypes::VehicleFeatures(_) => Ok(ValidateCallbackResult::Valid),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Vehicle(v) => validate_vehicle(v),
@@ -178,6 +246,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::VehicleToMaintenance => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "VehicleToMaintenance link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::VehicleToFeatures => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "VehicleToFeatures link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -223,6 +307,35 @@ fn validate_stop(s: Stop) -> ExternResult<ValidateCallbackResult> {
     }
     if s.location_lon < -180.0 || s.location_lon > 180.0 {
         return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_maintenance(m: MaintenanceRecord) -> ExternResult<ValidateCallbackResult> {
+    if m.id.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Maintenance ID cannot be empty".into()));
+    }
+    if m.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("Maintenance ID too long (max 256 chars)".into()));
+    }
+    if m.description.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Description cannot be empty".into()));
+    }
+    if m.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Description too long (max 4096 chars)".into()));
+    }
+    if m.cost < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Cost cannot be negative".into()));
+    }
+    if m.mechanic_notes.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid("Mechanic notes too long (max 4096 chars)".into()));
+    }
+    if let Some(next_due) = m.next_due {
+        if next_due <= m.completed_at {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Next due date must be after completed date".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -308,6 +421,11 @@ mod tests {
         let types = vec![
             VehicleType::Car, VehicleType::Van, VehicleType::Bike,
             VehicleType::Bus, VehicleType::Cargo, VehicleType::ElectricScooter,
+            VehicleType::Helicopter, VehicleType::EVTOL, VehicleType::AirTaxi,
+            VehicleType::Ferry, VehicleType::Boat,
+            VehicleType::Train, VehicleType::Tram,
+            VehicleType::Skateboard, VehicleType::Wheelchair, VehicleType::Segway,
+            VehicleType::AutonomousVehicle, VehicleType::Drone,
         ];
         for t in &types {
             let json = serde_json::to_string(t).unwrap();
@@ -334,6 +452,8 @@ mod tests {
         let modes = vec![
             TransportMode::Driving, TransportMode::Cycling,
             TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
+            TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
+            TransportMode::Micromobility, TransportMode::Autonomous,
         ];
         for m in &modes {
             let json = serde_json::to_string(m).unwrap();
@@ -448,7 +568,12 @@ mod tests {
     #[test]
     fn all_vehicle_types_valid() {
         for vt in [VehicleType::Car, VehicleType::Van, VehicleType::Bike,
-                    VehicleType::Bus, VehicleType::Cargo, VehicleType::ElectricScooter] {
+                    VehicleType::Bus, VehicleType::Cargo, VehicleType::ElectricScooter,
+                    VehicleType::Helicopter, VehicleType::EVTOL, VehicleType::AirTaxi,
+                    VehicleType::Ferry, VehicleType::Boat,
+                    VehicleType::Train, VehicleType::Tram,
+                    VehicleType::Skateboard, VehicleType::Wheelchair, VehicleType::Segway,
+                    VehicleType::AutonomousVehicle, VehicleType::Drone] {
             let mut v = valid_vehicle();
             v.vehicle_type = vt;
             assert_valid(validate_vehicle(v));
@@ -595,7 +720,9 @@ mod tests {
     #[test]
     fn route_all_transport_modes_valid() {
         for mode in [TransportMode::Driving, TransportMode::Cycling,
-                     TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed] {
+                     TransportMode::Walking, TransportMode::Transit, TransportMode::Mixed,
+                     TransportMode::Flying, TransportMode::Water, TransportMode::Rail,
+                     TransportMode::Micromobility, TransportMode::Autonomous] {
             let mut r = valid_route();
             r.mode = mode;
             assert_valid(validate_route(r));
@@ -781,7 +908,9 @@ mod tests {
             | LinkTypes::AllRoutes
             | LinkTypes::OwnerToVehicle
             | LinkTypes::RouteToStop
-            | LinkTypes::VehicleToRoute => 256,
+            | LinkTypes::VehicleToRoute
+            | LinkTypes::VehicleToMaintenance
+            | LinkTypes::VehicleToFeatures => 256,
         };
         let name = match link_type {
             LinkTypes::AllVehicles => "AllVehicles",
@@ -789,6 +918,8 @@ mod tests {
             LinkTypes::OwnerToVehicle => "OwnerToVehicle",
             LinkTypes::RouteToStop => "RouteToStop",
             LinkTypes::VehicleToRoute => "VehicleToRoute",
+            LinkTypes::VehicleToMaintenance => "VehicleToMaintenance",
+            LinkTypes::VehicleToFeatures => "VehicleToFeatures",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -857,5 +988,218 @@ mod tests {
     fn test_link_vehicle_to_route_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::VehicleToRoute, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_vehicle_to_maintenance_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::VehicleToMaintenance, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_vehicle_to_maintenance_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::VehicleToMaintenance, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_vehicle_to_features_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::VehicleToFeatures, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_vehicle_to_features_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::VehicleToFeatures, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Serde roundtrip: new types ─────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_maintenance_type() {
+        let types = vec![MaintenanceType::Scheduled, MaintenanceType::Repair, MaintenanceType::Inspection];
+        for t in &types {
+            let json = serde_json::to_string(t).unwrap();
+            let back: MaintenanceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, t);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_maintenance_record() {
+        let m = valid_maintenance();
+        let json = serde_json::to_string(&m).unwrap();
+        let back: MaintenanceRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, m);
+    }
+
+    #[test]
+    fn serde_roundtrip_maintenance_record_no_next_due() {
+        let mut m = valid_maintenance();
+        m.next_due = None;
+        let json = serde_json::to_string(&m).unwrap();
+        let back: MaintenanceRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.next_due, None);
+    }
+
+    #[test]
+    fn serde_roundtrip_vehicle_features() {
+        let f = VehicleFeatures {
+            vehicle_hash: fake_action_hash(),
+            wheelchair_accessible: true,
+            child_seat: false,
+            pet_friendly: true,
+            air_conditioning: true,
+            bike_rack: false,
+            luggage_capacity_liters: 200,
+        };
+        let json = serde_json::to_string(&f).unwrap();
+        let back: VehicleFeatures = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, f);
+    }
+
+    // ── validate_maintenance tests ─────────────────────────────────────
+
+    fn valid_maintenance() -> MaintenanceRecord {
+        MaintenanceRecord {
+            id: "m-1".into(),
+            vehicle_hash: fake_action_hash(),
+            maintenance_type: MaintenanceType::Scheduled,
+            description: "Oil change".into(),
+            cost: 45.0,
+            completed_at: 1700000000,
+            next_due: Some(1703000000),
+            mechanic_notes: "All good".into(),
+        }
+    }
+
+    #[test]
+    fn valid_maintenance_passes() {
+        assert_valid(validate_maintenance(valid_maintenance()));
+    }
+
+    #[test]
+    fn maintenance_empty_id_rejected() {
+        let mut m = valid_maintenance();
+        m.id = String::new();
+        assert_invalid(validate_maintenance(m), "Maintenance ID cannot be empty");
+    }
+
+    #[test]
+    fn maintenance_whitespace_id_rejected() {
+        let mut m = valid_maintenance();
+        m.id = "  ".into();
+        assert_invalid(validate_maintenance(m), "Maintenance ID cannot be empty");
+    }
+
+    #[test]
+    fn maintenance_id_too_long_rejected() {
+        let mut m = valid_maintenance();
+        m.id = "x".repeat(257);
+        assert_invalid(validate_maintenance(m), "Maintenance ID too long");
+    }
+
+    #[test]
+    fn maintenance_id_at_max_valid() {
+        let mut m = valid_maintenance();
+        m.id = "x".repeat(256);
+        assert_valid(validate_maintenance(m));
+    }
+
+    #[test]
+    fn maintenance_empty_description_rejected() {
+        let mut m = valid_maintenance();
+        m.description = String::new();
+        assert_invalid(validate_maintenance(m), "Description cannot be empty");
+    }
+
+    #[test]
+    fn maintenance_whitespace_description_rejected() {
+        let mut m = valid_maintenance();
+        m.description = "  ".into();
+        assert_invalid(validate_maintenance(m), "Description cannot be empty");
+    }
+
+    #[test]
+    fn maintenance_description_too_long_rejected() {
+        let mut m = valid_maintenance();
+        m.description = "x".repeat(4097);
+        assert_invalid(validate_maintenance(m), "Description too long");
+    }
+
+    #[test]
+    fn maintenance_description_at_max_valid() {
+        let mut m = valid_maintenance();
+        m.description = "x".repeat(4096);
+        assert_valid(validate_maintenance(m));
+    }
+
+    #[test]
+    fn maintenance_negative_cost_rejected() {
+        let mut m = valid_maintenance();
+        m.cost = -0.01;
+        assert_invalid(validate_maintenance(m), "Cost cannot be negative");
+    }
+
+    #[test]
+    fn maintenance_zero_cost_valid() {
+        let mut m = valid_maintenance();
+        m.cost = 0.0;
+        assert_valid(validate_maintenance(m));
+    }
+
+    #[test]
+    fn maintenance_mechanic_notes_too_long_rejected() {
+        let mut m = valid_maintenance();
+        m.mechanic_notes = "x".repeat(4097);
+        assert_invalid(validate_maintenance(m), "Mechanic notes too long");
+    }
+
+    #[test]
+    fn maintenance_mechanic_notes_at_max_valid() {
+        let mut m = valid_maintenance();
+        m.mechanic_notes = "x".repeat(4096);
+        assert_valid(validate_maintenance(m));
+    }
+
+    #[test]
+    fn maintenance_next_due_before_completed_rejected() {
+        let mut m = valid_maintenance();
+        m.completed_at = 1700000000;
+        m.next_due = Some(1699999999);
+        assert_invalid(validate_maintenance(m), "Next due date must be after completed date");
+    }
+
+    #[test]
+    fn maintenance_next_due_equal_completed_rejected() {
+        let mut m = valid_maintenance();
+        m.completed_at = 1700000000;
+        m.next_due = Some(1700000000);
+        assert_invalid(validate_maintenance(m), "Next due date must be after completed date");
+    }
+
+    #[test]
+    fn maintenance_next_due_after_completed_valid() {
+        let mut m = valid_maintenance();
+        m.completed_at = 1700000000;
+        m.next_due = Some(1700000001);
+        assert_valid(validate_maintenance(m));
+    }
+
+    #[test]
+    fn maintenance_no_next_due_valid() {
+        let mut m = valid_maintenance();
+        m.next_due = None;
+        assert_valid(validate_maintenance(m));
+    }
+
+    #[test]
+    fn maintenance_all_types_valid() {
+        for mt in [MaintenanceType::Scheduled, MaintenanceType::Repair, MaintenanceType::Inspection] {
+            let mut m = valid_maintenance();
+            m.maintenance_type = mt;
+            assert_valid(validate_maintenance(m));
+        }
     }
 }

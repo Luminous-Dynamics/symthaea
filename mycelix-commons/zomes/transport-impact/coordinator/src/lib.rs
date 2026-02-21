@@ -35,12 +35,17 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 /// Average CO2 emissions per km by mode (kg CO2/km)
 fn emissions_factor(mode: &TripMode) -> f64 {
     match mode {
-        TripMode::Driving => 0.21,          // Average car
+        TripMode::Driving => 0.21,           // Average car
         TripMode::ElectricVehicle => 0.05,   // EV with average grid
         TripMode::Transit => 0.089,          // Bus/train average
         TripMode::Carpool => 0.07,           // Car split among passengers
         TripMode::Cycling => 0.0,
         TripMode::Walking => 0.0,
+        TripMode::Flying => 0.255,           // Helicopter/eVTOL average
+        TripMode::Water => 0.19,             // Ferry average
+        TripMode::Rail => 0.041,             // Train/tram average
+        TripMode::Micromobility => 0.0,      // Human-powered / negligible electric
+        TripMode::Autonomous => 0.05,        // Autonomous EV
     }
 }
 
@@ -72,11 +77,11 @@ pub fn log_trip(mut trip: TripLog) -> ExternResult<Record> {
     let saved = baseline_emissions - trip.emissions_kg_co2;
     if saved > 0.0 {
         let credit_source = match trip.mode {
-            TripMode::Cycling => CreditSource::Cycling,
+            TripMode::Cycling | TripMode::Micromobility => CreditSource::Cycling,
             TripMode::Walking => CreditSource::Walking,
-            TripMode::Transit => CreditSource::Transit,
+            TripMode::Transit | TripMode::Rail | TripMode::Water => CreditSource::Transit,
             TripMode::Carpool => CreditSource::Carpool,
-            TripMode::ElectricVehicle => CreditSource::ElectricVehicle,
+            TripMode::ElectricVehicle | TripMode::Autonomous => CreditSource::ElectricVehicle,
             _ => CreditSource::Transit,
         };
 
@@ -162,6 +167,93 @@ pub fn calculate_emissions(input: EmissionsCalcInput) -> ExternResult<EmissionsC
         emissions_kg_co2: emissions,
         baseline_emissions: baseline,
         savings_kg_co2: (baseline - emissions).max(0.0),
+    })
+}
+
+// ============================================================================
+// CREDIT REDEMPTION
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct RedeemInput {
+    pub credits_redeemed: f64,
+    pub redeemed_for: String,
+}
+
+#[hdk_extern]
+pub fn redeem_credits(input: RedeemInput) -> ExternResult<Record> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?.as_micros() / 1_000_000;
+
+    let redemption = CreditRedemption {
+        holder: agent.clone(),
+        credits_redeemed: input.credits_redeemed,
+        redeemed_for: input.redeemed_for,
+        redeemed_at: now as u64,
+    };
+
+    let action_hash = create_entry(&EntryTypes::CreditRedemption(redemption))?;
+    create_link(agent, action_hash.clone(), LinkTypes::AgentToRedemptions, ())?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created redemption".into())))
+}
+
+#[hdk_extern]
+pub fn get_my_redemptions(_: ()) -> ExternResult<Vec<Record>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToRedemptions)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CarbonBalance {
+    pub total_earned: f64,
+    pub total_redeemed: f64,
+    pub balance: f64,
+}
+
+#[hdk_extern]
+pub fn get_agent_carbon_balance(agent: AgentPubKey) -> ExternResult<CarbonBalance> {
+    // Sum earned credits
+    let credit_links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToCredit)?,
+        GetStrategy::default(),
+    )?;
+    let mut total_earned = 0.0;
+    for link in credit_links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(credit)) = record.entry().to_app_option::<CarbonCredit>() {
+                total_earned += credit.credits_kg_co2;
+            }
+        }
+    }
+
+    // Sum redeemed credits
+    let redemption_links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToRedemptions)?,
+        GetStrategy::default(),
+    )?;
+    let mut total_redeemed = 0.0;
+    for link in redemption_links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(redemption)) = record.entry().to_app_option::<CreditRedemption>() {
+                total_redeemed += redemption.credits_redeemed;
+            }
+        }
+    }
+
+    Ok(CarbonBalance {
+        total_earned,
+        total_redeemed,
+        balance: total_earned - total_redeemed,
     })
 }
 
@@ -285,6 +377,41 @@ mod tests {
         assert!((emissions_factor(&TripMode::Carpool) - 0.07).abs() < f64::EPSILON);
     }
 
+    #[test]
+    fn emissions_factor_flying_value() {
+        assert!((emissions_factor(&TripMode::Flying) - 0.255).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn emissions_factor_water_value() {
+        assert!((emissions_factor(&TripMode::Water) - 0.19).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn emissions_factor_rail_value() {
+        assert!((emissions_factor(&TripMode::Rail) - 0.041).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn emissions_factor_micromobility_is_zero() {
+        assert_eq!(emissions_factor(&TripMode::Micromobility), 0.0);
+    }
+
+    #[test]
+    fn emissions_factor_autonomous_value() {
+        assert!((emissions_factor(&TripMode::Autonomous) - 0.05).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn emissions_factor_flying_higher_than_driving() {
+        assert!(emissions_factor(&TripMode::Flying) > emissions_factor(&TripMode::Driving));
+    }
+
+    #[test]
+    fn emissions_factor_rail_lower_than_driving() {
+        assert!(emissions_factor(&TripMode::Rail) < emissions_factor(&TripMode::Driving));
+    }
+
     // ========================================================================
     // Pure function: calculate_trip_emissions tests
     // ========================================================================
@@ -383,12 +510,10 @@ mod tests {
     #[test]
     fn emissions_calc_input_all_modes() {
         for mode in [
-            TripMode::Driving,
-            TripMode::Cycling,
-            TripMode::Walking,
-            TripMode::Transit,
-            TripMode::Carpool,
-            TripMode::ElectricVehicle,
+            TripMode::Driving, TripMode::Cycling, TripMode::Walking,
+            TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle,
+            TripMode::Flying, TripMode::Water, TripMode::Rail,
+            TripMode::Micromobility, TripMode::Autonomous,
         ] {
             let input = EmissionsCalcInput {
                 distance_km: 10.0,
@@ -591,5 +716,104 @@ mod tests {
         assert!(decoded.event_type.is_empty());
         assert!(decoded.source_zome.is_empty());
         assert!(decoded.payload.is_empty());
+    }
+
+    // ========================================================================
+    // RedeemInput serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn redeem_input_serde_roundtrip() {
+        let input = RedeemInput {
+            credits_redeemed: 5.0,
+            redeemed_for: "Transit pass discount".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RedeemInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.credits_redeemed, 5.0);
+        assert_eq!(decoded.redeemed_for, "Transit pass discount");
+    }
+
+    #[test]
+    fn redeem_input_serde_small_credits() {
+        let input = RedeemInput {
+            credits_redeemed: 0.001,
+            redeemed_for: "Micro reward".to_string(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RedeemInput = serde_json::from_str(&json).unwrap();
+        assert!((decoded.credits_redeemed - 0.001).abs() < 1e-9);
+    }
+
+    // ========================================================================
+    // CarbonBalance serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn carbon_balance_serde_roundtrip() {
+        let balance = CarbonBalance {
+            total_earned: 100.0,
+            total_redeemed: 30.0,
+            balance: 70.0,
+        };
+        let json = serde_json::to_string(&balance).unwrap();
+        let decoded: CarbonBalance = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.total_earned, 100.0);
+        assert_eq!(decoded.total_redeemed, 30.0);
+        assert_eq!(decoded.balance, 70.0);
+    }
+
+    #[test]
+    fn carbon_balance_serde_zero_balance() {
+        let balance = CarbonBalance {
+            total_earned: 0.0,
+            total_redeemed: 0.0,
+            balance: 0.0,
+        };
+        let json = serde_json::to_string(&balance).unwrap();
+        let decoded: CarbonBalance = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance, 0.0);
+    }
+
+    #[test]
+    fn carbon_balance_serde_negative_balance() {
+        let balance = CarbonBalance {
+            total_earned: 10.0,
+            total_redeemed: 15.0,
+            balance: -5.0,
+        };
+        let json = serde_json::to_string(&balance).unwrap();
+        let decoded: CarbonBalance = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.balance, -5.0);
+    }
+
+    // ========================================================================
+    // CreditRedemption serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn credit_redemption_serde_roundtrip() {
+        let r = CreditRedemption {
+            holder: fake_agent(),
+            credits_redeemed: 10.5,
+            redeemed_for: "Bike share membership".to_string(),
+            redeemed_at: 1700000000,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let decoded: CreditRedemption = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded, r);
+    }
+
+    #[test]
+    fn credit_redemption_serde_max_u64_time() {
+        let r = CreditRedemption {
+            holder: fake_agent(),
+            credits_redeemed: 1.0,
+            redeemed_for: "Test".to_string(),
+            redeemed_at: u64::MAX,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let decoded: CreditRedemption = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.redeemed_at, u64::MAX);
     }
 }

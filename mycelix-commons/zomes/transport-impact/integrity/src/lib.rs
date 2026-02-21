@@ -19,6 +19,11 @@ pub enum TripMode {
     Transit,
     Carpool,
     ElectricVehicle,
+    Flying,
+    Water,
+    Rail,
+    Micromobility,
+    Autonomous,
 }
 
 #[hdk_entry_helper]
@@ -57,6 +62,19 @@ pub struct CarbonCredit {
 }
 
 // ============================================================================
+// CREDIT REDEMPTION
+// ============================================================================
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct CreditRedemption {
+    pub holder: AgentPubKey,
+    pub credits_redeemed: f64,
+    pub redeemed_for: String,
+    pub redeemed_at: u64,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -66,6 +84,7 @@ pub enum EntryTypes {
     Anchor(Anchor),
     TripLog(TripLog),
     CarbonCredit(CarbonCredit),
+    CreditRedemption(CreditRedemption),
 }
 
 #[hdk_link_types]
@@ -74,6 +93,7 @@ pub enum LinkTypes {
     AgentToTrip,
     AgentToCredit,
     VehicleToTrip,
+    AgentToRedemptions,
 }
 
 // ============================================================================
@@ -88,11 +108,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::TripLog(t) => validate_trip(t),
                 EntryTypes::CarbonCredit(c) => validate_credit(c),
+                EntryTypes::CreditRedemption(r) => validate_redemption(r),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::TripLog(t) => validate_trip(t),
                 EntryTypes::CarbonCredit(c) => validate_credit(c),
+                EntryTypes::CreditRedemption(r) => validate_redemption(r),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -130,6 +152,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::AgentToRedemptions => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToRedemptions link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -153,6 +183,19 @@ fn validate_trip(t: TripLog) -> ExternResult<ValidateCallbackResult> {
 fn validate_credit(c: CarbonCredit) -> ExternResult<ValidateCallbackResult> {
     if c.credits_kg_co2 <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Credits must be positive".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_redemption(r: CreditRedemption) -> ExternResult<ValidateCallbackResult> {
+    if r.credits_redeemed <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Credits redeemed must be positive".into()));
+    }
+    if r.redeemed_for.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Redeemed-for description cannot be empty".into()));
+    }
+    if r.redeemed_for.len() > 1024 {
+        return Ok(ValidateCallbackResult::Invalid("Redeemed-for description too long (max 1024 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -221,6 +264,8 @@ mod tests {
         let modes = vec![
             TripMode::Driving, TripMode::Cycling, TripMode::Walking,
             TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle,
+            TripMode::Flying, TripMode::Water, TripMode::Rail,
+            TripMode::Micromobility, TripMode::Autonomous,
         ];
         for mode in &modes {
             let json = serde_json::to_string(mode).unwrap();
@@ -345,7 +390,9 @@ mod tests {
     #[test]
     fn all_trip_modes_valid() {
         for mode in [TripMode::Driving, TripMode::Cycling, TripMode::Walking,
-                      TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle] {
+                      TripMode::Transit, TripMode::Carpool, TripMode::ElectricVehicle,
+                      TripMode::Flying, TripMode::Water, TripMode::Rail,
+                      TripMode::Micromobility, TripMode::Autonomous] {
             let mut t = valid_trip();
             t.mode = mode;
             assert_valid(validate_trip(t));
@@ -536,13 +583,15 @@ mod tests {
             LinkTypes::AllTrips
             | LinkTypes::AgentToTrip
             | LinkTypes::AgentToCredit
-            | LinkTypes::VehicleToTrip => 256,
+            | LinkTypes::VehicleToTrip
+            | LinkTypes::AgentToRedemptions => 256,
         };
         let name = match link_type {
             LinkTypes::AllTrips => "AllTrips",
             LinkTypes::AgentToTrip => "AgentToTrip",
             LinkTypes::AgentToCredit => "AgentToCredit",
             LinkTypes::VehicleToTrip => "VehicleToTrip",
+            LinkTypes::AgentToRedemptions => "AgentToRedemptions",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -599,5 +648,92 @@ mod tests {
     fn test_link_vehicle_to_trip_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::VehicleToTrip, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_agent_to_redemptions_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AgentToRedemptions, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_agent_to_redemptions_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AgentToRedemptions, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Serde roundtrip: CreditRedemption ──────────────────────────────
+
+    fn valid_redemption() -> CreditRedemption {
+        CreditRedemption {
+            holder: fake_agent(),
+            credits_redeemed: 5.0,
+            redeemed_for: "Transit pass discount".into(),
+            redeemed_at: 1700000000,
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_credit_redemption() {
+        let r = valid_redemption();
+        let json = serde_json::to_string(&r).unwrap();
+        let back: CreditRedemption = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    // ── validate_redemption tests ──────────────────────────────────────
+
+    #[test]
+    fn valid_redemption_passes() {
+        assert_valid(validate_redemption(valid_redemption()));
+    }
+
+    #[test]
+    fn redemption_zero_credits_rejected() {
+        let mut r = valid_redemption();
+        r.credits_redeemed = 0.0;
+        assert_invalid(validate_redemption(r), "Credits redeemed must be positive");
+    }
+
+    #[test]
+    fn redemption_negative_credits_rejected() {
+        let mut r = valid_redemption();
+        r.credits_redeemed = -1.0;
+        assert_invalid(validate_redemption(r), "Credits redeemed must be positive");
+    }
+
+    #[test]
+    fn redemption_barely_positive_valid() {
+        let mut r = valid_redemption();
+        r.credits_redeemed = 0.001;
+        assert_valid(validate_redemption(r));
+    }
+
+    #[test]
+    fn redemption_empty_redeemed_for_rejected() {
+        let mut r = valid_redemption();
+        r.redeemed_for = String::new();
+        assert_invalid(validate_redemption(r), "Redeemed-for description cannot be empty");
+    }
+
+    #[test]
+    fn redemption_whitespace_redeemed_for_rejected() {
+        let mut r = valid_redemption();
+        r.redeemed_for = "  ".into();
+        assert_invalid(validate_redemption(r), "Redeemed-for description cannot be empty");
+    }
+
+    #[test]
+    fn redemption_redeemed_for_too_long_rejected() {
+        let mut r = valid_redemption();
+        r.redeemed_for = "x".repeat(1025);
+        assert_invalid(validate_redemption(r), "Redeemed-for description too long");
+    }
+
+    #[test]
+    fn redemption_redeemed_for_at_max_valid() {
+        let mut r = valid_redemption();
+        r.redeemed_for = "x".repeat(1024);
+        assert_valid(validate_redemption(r));
     }
 }

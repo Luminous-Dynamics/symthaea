@@ -152,6 +152,115 @@ pub fn post_cargo_offer(cargo: CargoOffer) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created cargo offer".into())))
 }
 
+// ============================================================================
+// REVIEWS
+// ============================================================================
+
+#[hdk_extern]
+pub fn review_ride(review: RideReview) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::RideReview(review.clone()))?;
+
+    create_link(review.match_hash, action_hash.clone(), LinkTypes::MatchToReviews, ())?;
+    create_link(review.reviewer, action_hash.clone(), LinkTypes::AgentToReviews, ())?;
+
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created review".into())))
+}
+
+#[hdk_extern]
+pub fn get_ride_reviews(match_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(match_hash, LinkTypes::MatchToReviews)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DriverRating {
+    pub average_rating: f64,
+    pub total_reviews: u32,
+}
+
+#[hdk_extern]
+pub fn get_driver_rating(agent: AgentPubKey) -> ExternResult<DriverRating> {
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToReviews)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut total: u64 = 0;
+    let mut count: u32 = 0;
+
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash, GetOptions::default())? {
+            if let Ok(Some(review)) = record.entry().to_app_option::<RideReview>() {
+                total += review.rating as u64;
+                count += 1;
+            }
+        }
+    }
+
+    let average = if count > 0 { total as f64 / count as f64 } else { 0.0 };
+    Ok(DriverRating {
+        average_rating: average,
+        total_reviews: count,
+    })
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct FindNearbyInput {
+    pub origin_lat: f64,
+    pub origin_lon: f64,
+    pub radius_km: f64,
+}
+
+#[hdk_extern]
+pub fn find_nearby_rides(input: FindNearbyInput) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_offers")?, LinkTypes::AllOffers)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut nearby = Vec::new();
+    for link in links {
+        let action_hash = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(action_hash.clone(), GetOptions::default())? {
+            // Check if it's a RideOffer — we can't filter by location on RideOffer
+            // since it only has route_hash, but we can return all offers within
+            // the system for now and let the client filter by route details.
+            // For CargoOffer, we can filter by origin coordinates.
+            if let Ok(Some(cargo)) = record.entry().to_app_option::<CargoOffer>() {
+                let dist = haversine_km(
+                    input.origin_lat, input.origin_lon,
+                    cargo.origin_lat, cargo.origin_lon,
+                );
+                if dist <= input.radius_km {
+                    nearby.push(record);
+                }
+            }
+        }
+    }
+    Ok(nearby)
+}
+
+fn haversine_km(lat1: f64, lon1: f64, lat2: f64, lon2: f64) -> f64 {
+    let r = 6371.0; // Earth radius in km
+    let dlat = (lat2 - lat1).to_radians();
+    let dlon = (lon2 - lon1).to_radians();
+    let a = (dlat / 2.0).sin().powi(2)
+        + lat1.to_radians().cos() * lat2.to_radians().cos() * (dlon / 2.0).sin().powi(2);
+    let c = 2.0 * a.sqrt().asin();
+    r * c
+}
+
+// ============================================================================
+// MY RIDES
+// ============================================================================
+
 #[hdk_extern]
 pub fn get_my_rides(_: ()) -> ExternResult<Vec<Record>> {
     let agent = agent_info()?.agent_initial_pubkey;
@@ -619,5 +728,118 @@ mod tests {
         let json = serde_json::to_string(&ride_match).unwrap();
         let decoded: RideMatch = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.offer_hash, decoded.request_hash);
+    }
+
+    // ========================================================================
+    // RideReview serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn ride_review_serde_roundtrip() {
+        let review = RideReview {
+            match_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            reviewer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            role: ReviewerRole::Passenger,
+            rating: 5,
+            comment: "Excellent ride!".to_string(),
+            safety_concern: false,
+            created_at: 1700000000,
+        };
+        let json = serde_json::to_string(&review).unwrap();
+        let decoded: RideReview = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.rating, 5);
+        assert_eq!(decoded.comment, "Excellent ride!");
+        assert!(!decoded.safety_concern);
+        assert_eq!(decoded.role, ReviewerRole::Passenger);
+    }
+
+    #[test]
+    fn ride_review_serde_driver_role_with_safety_concern() {
+        let review = RideReview {
+            match_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            reviewer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            role: ReviewerRole::Driver,
+            rating: 2,
+            comment: "Passenger was disruptive".to_string(),
+            safety_concern: true,
+            created_at: 1700000000,
+        };
+        let json = serde_json::to_string(&review).unwrap();
+        let decoded: RideReview = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.role, ReviewerRole::Driver);
+        assert!(decoded.safety_concern);
+        assert_eq!(decoded.rating, 2);
+    }
+
+    #[test]
+    fn reviewer_role_all_variants_serde() {
+        for role in [ReviewerRole::Driver, ReviewerRole::Passenger] {
+            let json = serde_json::to_string(&role).unwrap();
+            let decoded: ReviewerRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, role);
+        }
+    }
+
+    // ========================================================================
+    // DriverRating serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn driver_rating_serde_roundtrip() {
+        let rating = DriverRating {
+            average_rating: 4.5,
+            total_reviews: 10,
+        };
+        let json = serde_json::to_string(&rating).unwrap();
+        let decoded: DriverRating = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.average_rating, 4.5);
+        assert_eq!(decoded.total_reviews, 10);
+    }
+
+    #[test]
+    fn driver_rating_serde_no_reviews() {
+        let rating = DriverRating {
+            average_rating: 0.0,
+            total_reviews: 0,
+        };
+        let json = serde_json::to_string(&rating).unwrap();
+        let decoded: DriverRating = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.average_rating, 0.0);
+        assert_eq!(decoded.total_reviews, 0);
+    }
+
+    // ========================================================================
+    // FindNearbyInput serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn find_nearby_input_serde_roundtrip() {
+        let input = FindNearbyInput {
+            origin_lat: 32.95,
+            origin_lon: -96.73,
+            radius_km: 10.0,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FindNearbyInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.origin_lat, 32.95);
+        assert_eq!(decoded.origin_lon, -96.73);
+        assert_eq!(decoded.radius_km, 10.0);
+    }
+
+    // ========================================================================
+    // Haversine pure function tests
+    // ========================================================================
+
+    #[test]
+    fn haversine_same_point_is_zero() {
+        let dist = haversine_km(32.95, -96.73, 32.95, -96.73);
+        assert!(dist.abs() < 0.001);
+    }
+
+    #[test]
+    fn haversine_known_distance() {
+        // Richardson TX to Dallas TX ≈ ~20 km
+        let dist = haversine_km(32.95, -96.73, 32.78, -96.80);
+        assert!(dist > 15.0 && dist < 25.0, "Expected ~20km, got {dist}");
     }
 }

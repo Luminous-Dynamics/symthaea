@@ -96,6 +96,28 @@ pub struct CargoOffer {
 }
 
 // ============================================================================
+// RIDE REVIEW
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum ReviewerRole {
+    Driver,
+    Passenger,
+}
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct RideReview {
+    pub match_hash: ActionHash,
+    pub reviewer: AgentPubKey,
+    pub role: ReviewerRole,
+    pub rating: u8,
+    pub comment: String,
+    pub safety_concern: bool,
+    pub created_at: u64,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -107,6 +129,7 @@ pub enum EntryTypes {
     RideRequest(RideRequest),
     RideMatch(RideMatch),
     CargoOffer(CargoOffer),
+    RideReview(RideReview),
 }
 
 #[hdk_link_types]
@@ -117,6 +140,8 @@ pub enum LinkTypes {
     RequesterToRequest,
     OfferToMatch,
     RequestToMatch,
+    MatchToReviews,
+    AgentToReviews,
 }
 
 // ============================================================================
@@ -133,6 +158,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::RideRequest(r) => validate_ride_request(r),
                 EntryTypes::RideMatch(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::CargoOffer(c) => validate_cargo_offer(c),
+                EntryTypes::RideReview(rev) => validate_ride_review(rev),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::RideOffer(o) => validate_ride_offer(o),
@@ -191,6 +217,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::MatchToReviews => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "MatchToReviews link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AgentToReviews => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AgentToReviews link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -220,6 +262,19 @@ fn validate_ride_request(r: RideRequest) -> ExternResult<ValidateCallbackResult>
     }
     if r.origin_lon < -180.0 || r.origin_lon > 180.0 || r.destination_lon < -180.0 || r.destination_lon > 180.0 {
         return Ok(ValidateCallbackResult::Invalid("Longitude must be between -180 and 180".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_ride_review(rev: RideReview) -> ExternResult<ValidateCallbackResult> {
+    if rev.rating < 1 || rev.rating > 5 {
+        return Ok(ValidateCallbackResult::Invalid("Rating must be between 1 and 5".into()));
+    }
+    if rev.comment.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("Comment cannot be empty".into()));
+    }
+    if rev.comment.len() > 2048 {
+        return Ok(ValidateCallbackResult::Invalid("Comment too long (max 2048 chars)".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -872,7 +927,9 @@ mod tests {
             LinkTypes::AllOffers
             | LinkTypes::AllRequests
             | LinkTypes::DriverToOffer
-            | LinkTypes::RequesterToRequest => 256,
+            | LinkTypes::RequesterToRequest
+            | LinkTypes::MatchToReviews
+            | LinkTypes::AgentToReviews => 256,
             LinkTypes::OfferToMatch
             | LinkTypes::RequestToMatch => 512,
         };
@@ -883,6 +940,8 @@ mod tests {
             LinkTypes::RequesterToRequest => "RequesterToRequest",
             LinkTypes::OfferToMatch => "OfferToMatch",
             LinkTypes::RequestToMatch => "RequestToMatch",
+            LinkTypes::MatchToReviews => "MatchToReviews",
+            LinkTypes::AgentToReviews => "AgentToReviews",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -963,5 +1022,140 @@ mod tests {
     fn test_link_request_to_match_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::RequestToMatch, 513);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_match_to_reviews_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::MatchToReviews, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_match_to_reviews_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::MatchToReviews, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_agent_to_reviews_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AgentToReviews, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_agent_to_reviews_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AgentToReviews, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Serde roundtrip: new types ─────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_reviewer_role() {
+        let roles = vec![ReviewerRole::Driver, ReviewerRole::Passenger];
+        for r in &roles {
+            let json = serde_json::to_string(r).unwrap();
+            let back: ReviewerRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, r);
+        }
+    }
+
+    #[test]
+    fn serde_roundtrip_ride_review() {
+        let rev = valid_ride_review();
+        let json = serde_json::to_string(&rev).unwrap();
+        let back: RideReview = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, rev);
+    }
+
+    // ── validate_ride_review tests ─────────────────────────────────────
+
+    fn valid_ride_review() -> RideReview {
+        RideReview {
+            match_hash: fake_action_hash(),
+            reviewer: fake_agent(),
+            role: ReviewerRole::Passenger,
+            rating: 4,
+            comment: "Great ride, very smooth".into(),
+            safety_concern: false,
+            created_at: 1700000000,
+        }
+    }
+
+    #[test]
+    fn valid_ride_review_passes() {
+        assert_valid(validate_ride_review(valid_ride_review()));
+    }
+
+    #[test]
+    fn ride_review_rating_zero_rejected() {
+        let mut rev = valid_ride_review();
+        rev.rating = 0;
+        assert_invalid(validate_ride_review(rev), "Rating must be between 1 and 5");
+    }
+
+    #[test]
+    fn ride_review_rating_six_rejected() {
+        let mut rev = valid_ride_review();
+        rev.rating = 6;
+        assert_invalid(validate_ride_review(rev), "Rating must be between 1 and 5");
+    }
+
+    #[test]
+    fn ride_review_rating_one_valid() {
+        let mut rev = valid_ride_review();
+        rev.rating = 1;
+        assert_valid(validate_ride_review(rev));
+    }
+
+    #[test]
+    fn ride_review_rating_five_valid() {
+        let mut rev = valid_ride_review();
+        rev.rating = 5;
+        assert_valid(validate_ride_review(rev));
+    }
+
+    #[test]
+    fn ride_review_empty_comment_rejected() {
+        let mut rev = valid_ride_review();
+        rev.comment = String::new();
+        assert_invalid(validate_ride_review(rev), "Comment cannot be empty");
+    }
+
+    #[test]
+    fn ride_review_whitespace_comment_rejected() {
+        let mut rev = valid_ride_review();
+        rev.comment = "   ".into();
+        assert_invalid(validate_ride_review(rev), "Comment cannot be empty");
+    }
+
+    #[test]
+    fn ride_review_comment_too_long_rejected() {
+        let mut rev = valid_ride_review();
+        rev.comment = "x".repeat(2049);
+        assert_invalid(validate_ride_review(rev), "Comment too long");
+    }
+
+    #[test]
+    fn ride_review_comment_at_max_valid() {
+        let mut rev = valid_ride_review();
+        rev.comment = "x".repeat(2048);
+        assert_valid(validate_ride_review(rev));
+    }
+
+    #[test]
+    fn ride_review_both_roles_valid() {
+        for role in [ReviewerRole::Driver, ReviewerRole::Passenger] {
+            let mut rev = valid_ride_review();
+            rev.role = role;
+            assert_valid(validate_ride_review(rev));
+        }
+    }
+
+    #[test]
+    fn ride_review_safety_concern_true_valid() {
+        let mut rev = valid_ride_review();
+        rev.safety_concern = true;
+        assert_valid(validate_ride_review(rev));
     }
 }
