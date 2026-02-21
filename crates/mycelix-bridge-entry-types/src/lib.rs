@@ -177,8 +177,14 @@ mod tests {
     }
 
     const DOMAINS: &[&str] = &[
-        "property", "housing", "care", "justice",
-        "mutualaid", "water", "food", "transport",
+        "property",
+        "housing",
+        "care",
+        "justice",
+        "mutualaid",
+        "water",
+        "food",
+        "transport",
     ];
 
     // ---- validate_query_fields ----
@@ -193,7 +199,11 @@ mod tests {
     fn query_all_valid_domains_accepted() {
         for domain in DOMAINS {
             let q = make_query(domain, "{}");
-            assert!(validate_query_fields(&q, DOMAINS).is_ok(), "domain '{}' should be valid", domain);
+            assert!(
+                validate_query_fields(&q, DOMAINS).is_ok(),
+                "domain '{}' should be valid",
+                domain
+            );
         }
     }
 
@@ -361,7 +371,11 @@ mod tests {
     fn query_all_domains_accepted() {
         for domain in DOMAINS {
             let q = make_query(domain, "{}");
-            assert!(validate_query_fields(&q, DOMAINS).is_ok(), "domain '{}' should be valid", domain);
+            assert!(
+                validate_query_fields(&q, DOMAINS).is_ok(),
+                "domain '{}' should be valid",
+                domain
+            );
         }
     }
 
@@ -369,7 +383,11 @@ mod tests {
     fn event_all_domains_accepted() {
         for domain in DOMAINS {
             let e = make_event(domain, "{}");
-            assert!(validate_event_fields(&e, DOMAINS).is_ok(), "domain '{}' should be valid", domain);
+            assert!(
+                validate_event_fields(&e, DOMAINS).is_ok(),
+                "domain '{}' should be valid",
+                domain
+            );
         }
     }
 
@@ -432,11 +450,12 @@ mod tests {
     #[test]
     fn event_unicode_edge_cases_serde_roundtrip() {
         let unicode_payload = concat!(
-            r#"{"emoji":"#, r#""🌟🔮🧘🕸️","#,           // emoji
-            r#""cjk":"你好世界","#,                        // CJK characters
-            r#""rtl":"مرحبا","#,                           // RTL Arabic text
-            r#""zwj":"a\u200Bb\u200Cc\uFEFFd","#,         // zero-width chars (ZWSP, ZWNJ, BOM)
-            r#""combining":"e\u0301""#,                    // combining accent (é as e + ◌́)
+            r#"{"emoji":"#,
+            r#""🌟🔮🧘🕸️","#,                     // emoji
+            r#""cjk":"你好世界","#,               // CJK characters
+            r#""rtl":"مرحبا","#,                  // RTL Arabic text
+            r#""zwj":"a\u200Bb\u200Cc\uFEFFd","#, // zero-width chars (ZWSP, ZWNJ, BOM)
+            r#""combining":"e\u0301""#,           // combining accent (é as e + ◌́)
             r#"}"#
         );
         // Verify the string is valid JSON before constructing the entry
@@ -465,13 +484,19 @@ mod tests {
         assert!(serde_json::from_str::<serde_json::Value>(&json).is_ok());
 
         let q = make_query("property", &json);
-        assert!(validate_query_fields(&q, DOMAINS).is_ok(), "exactly 8192 bytes should pass");
+        assert!(
+            validate_query_fields(&q, DOMAINS).is_ok(),
+            "exactly 8192 bytes should pass"
+        );
 
         // One byte over the limit must fail
         let one_over = format!(r#"{{"d":"{}"}}"#, "a".repeat(padding_len + 1));
         assert_eq!(one_over.len(), 8193);
         let q_over = make_query("property", &one_over);
-        assert!(validate_query_fields(&q_over, DOMAINS).is_err(), "8193 bytes should be rejected");
+        assert!(
+            validate_query_fields(&q_over, DOMAINS).is_err(),
+            "8193 bytes should be rejected"
+        );
     }
 
     #[test]
@@ -479,7 +504,10 @@ mod tests {
         let mut e = make_event("justice", r#"{"case":"boundary"}"#);
         e.related_hashes = (0..20).map(|i| format!("hash_{:04}", i)).collect();
         assert_eq!(e.related_hashes.len(), 20);
-        assert!(validate_event_fields(&e, DOMAINS).is_ok(), "exactly 20 hashes should pass");
+        assert!(
+            validate_event_fields(&e, DOMAINS).is_ok(),
+            "exactly 20 hashes should pass"
+        );
 
         // Serde roundtrip preserves all 20 hashes
         let bytes = serde_json::to_vec(&e).unwrap();
@@ -491,7 +519,10 @@ mod tests {
         let mut e_over = e.clone();
         e_over.related_hashes.push("hash_overflow".into());
         assert_eq!(e_over.related_hashes.len(), 21);
-        assert!(validate_event_fields(&e_over, DOMAINS).is_err(), "21 hashes should be rejected");
+        assert!(
+            validate_event_fields(&e_over, DOMAINS).is_err(),
+            "21 hashes should be rejected"
+        );
     }
 
     #[test]
