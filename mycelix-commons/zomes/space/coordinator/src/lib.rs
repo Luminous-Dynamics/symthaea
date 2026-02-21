@@ -397,6 +397,368 @@ pub fn get_space(space_id: String) -> ExternResult<Option<Record>> {
     Ok(None)
 }
 
+/// Approve a pending invitation
+///
+/// Increments the approval count. If threshold is met, auto-creates membership.
+#[hdk_extern]
+pub fn approve_invitation(input: ApproveInvitationInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    // Verify caller is an active member of the space
+    let record = get(input.invitation_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invitation not found".into()
+        )))?;
+
+    let mut invitation: SpaceInvitation = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse invitation".into()
+        )))?;
+
+    if invitation.status != InvitationStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invitation is not pending".into()
+        )));
+    }
+
+    verify_membership(&invitation.space_id, &caller, true)?;
+
+    // Prevent double-approval
+    if invitation.approved_by.contains(&caller) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Already approved this invitation".into()
+        )));
+    }
+
+    invitation.approvals += 1;
+    invitation.approved_by.push(caller.clone());
+
+    // Check if threshold is met
+    let space = get_space_by_id(&invitation.space_id)?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Space not found".into())))?;
+
+    if invitation.approvals >= space.approval_threshold {
+        invitation.status = InvitationStatus::Approved;
+        update_entry(
+            input.invitation_hash,
+            &EntryTypes::SpaceInvitation(invitation.clone()),
+        )?;
+
+        // Auto-create membership
+        return add_member_directly(
+            &invitation.space_id,
+            &invitation.invitee,
+            &invitation.inviter,
+            now,
+        );
+    }
+
+    let new_hash = update_entry(
+        input.invitation_hash,
+        &EntryTypes::SpaceInvitation(invitation),
+    )?;
+
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not retrieve updated invitation".into()
+        )))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ApproveInvitationInput {
+    pub invitation_hash: ActionHash,
+}
+
+/// Reject a pending invitation
+#[hdk_extern]
+pub fn reject_invitation(invitation_hash: ActionHash) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    let record = get(invitation_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invitation not found".into()
+        )))?;
+
+    let mut invitation: SpaceInvitation = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse invitation".into()
+        )))?;
+
+    if invitation.status != InvitationStatus::Pending {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invitation is not pending".into()
+        )));
+    }
+
+    verify_membership(&invitation.space_id, &caller, true)?;
+
+    invitation.status = InvitationStatus::Rejected;
+    let new_hash = update_entry(
+        invitation_hash,
+        &EntryTypes::SpaceInvitation(invitation),
+    )?;
+
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not retrieve updated invitation".into()
+        )))
+}
+
+/// Book a shared resource within a space
+#[hdk_extern]
+pub fn book_resource(input: BookResourceInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    verify_membership(&input.space_id, &caller, true)?;
+
+    let booking_id = format!("booking:{}:{}:{}", input.space_id, input.resource_name, now.as_micros());
+
+    let booking = ResourceBooking {
+        id: booking_id,
+        space_id: input.space_id.clone(),
+        resource_name: input.resource_name,
+        booked_by: caller.clone(),
+        start_time: input.start_time,
+        end_time: input.end_time,
+        status: BookingStatus::Pending,
+        notes: input.notes.unwrap_or_default(),
+        created_at: now,
+    };
+
+    let booking_hash = create_entry(&EntryTypes::ResourceBooking(booking))?;
+
+    // Link space to booking
+    let space_anchor = format!("space:{}", input.space_id);
+    create_link(
+        anchor_hash(&space_anchor)?,
+        booking_hash.clone(),
+        LinkTypes::SpaceToBookings,
+        (),
+    )?;
+
+    // Link agent to booking
+    create_link(
+        AnyLinkableHash::from(caller),
+        booking_hash.clone(),
+        LinkTypes::AgentToBookings,
+        (),
+    )?;
+
+    get(booking_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Booking not found".into()
+        )))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct BookResourceInput {
+    pub space_id: String,
+    pub resource_name: String,
+    pub start_time: u64,
+    pub end_time: u64,
+    pub notes: Option<String>,
+}
+
+/// Cancel a resource booking
+#[hdk_extern]
+pub fn cancel_booking(booking_hash: ActionHash) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    let record = get(booking_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Booking not found".into()
+        )))?;
+
+    let mut booking: ResourceBooking = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not parse booking".into()
+        )))?;
+
+    if booking.booked_by != caller {
+        // Allow admins to cancel too
+        verify_admin(&booking.space_id, &caller)?;
+    }
+
+    if booking.status == BookingStatus::Cancelled {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Booking is already cancelled".into()
+        )));
+    }
+
+    booking.status = BookingStatus::Cancelled;
+    let new_hash = update_entry(booking_hash, &EntryTypes::ResourceBooking(booking))?;
+
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Could not retrieve updated booking".into()
+        )))
+}
+
+/// Get all bookings for a space
+#[hdk_extern]
+pub fn get_space_bookings(space_id: String) -> ExternResult<Vec<Record>> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    verify_membership(&space_id, &caller, false)?;
+
+    let space_anchor = format!("space:{}", space_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&space_anchor)?, LinkTypes::SpaceToBookings)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut bookings = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            bookings.push(record);
+        }
+    }
+
+    Ok(bookings)
+}
+
+/// Create a recurring schedule/event for a space
+#[hdk_extern]
+pub fn create_schedule(input: CreateScheduleInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let caller = agent_info()?.agent_initial_pubkey;
+
+    verify_membership(&input.space_id, &caller, true)?;
+
+    let schedule_id = format!("sched:{}:{}:{}", input.space_id, input.title, now.as_micros());
+
+    let schedule = SpaceSchedule {
+        id: schedule_id,
+        space_id: input.space_id.clone(),
+        title: input.title,
+        description: input.description.unwrap_or_default(),
+        recurrence: input.recurrence,
+        next_occurrence: input.next_occurrence,
+        duration_minutes: input.duration_minutes,
+        creator: caller,
+        created_at: now,
+    };
+
+    let sched_hash = create_entry(&EntryTypes::SpaceSchedule(schedule))?;
+
+    // Link space to schedule
+    let space_anchor = format!("space:{}", input.space_id);
+    create_link(
+        anchor_hash(&space_anchor)?,
+        sched_hash.clone(),
+        LinkTypes::SpaceToSchedules,
+        (),
+    )?;
+
+    get(sched_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Schedule not found".into()
+        )))
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CreateScheduleInput {
+    pub space_id: String,
+    pub title: String,
+    pub description: Option<String>,
+    pub recurrence: Recurrence,
+    pub next_occurrence: u64,
+    pub duration_minutes: u32,
+}
+
+/// Get all schedules for a space
+#[hdk_extern]
+pub fn get_space_schedules(space_id: String) -> ExternResult<Vec<Record>> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    verify_membership(&space_id, &caller, false)?;
+
+    let space_anchor = format!("space:{}", space_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&space_anchor)?, LinkTypes::SpaceToSchedules)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut schedules = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            schedules.push(record);
+        }
+    }
+
+    Ok(schedules)
+}
+
+/// Check whether an agent has a valid (non-expired, non-revoked) capability for a function
+#[hdk_extern]
+pub fn check_capability(input: CheckCapabilityInput) -> ExternResult<bool> {
+    let now = sys_time()?;
+    let caps = get_space_capability_records(&input.space_id)?;
+
+    for (_record, cap) in caps {
+        if cap.grantee != input.agent {
+            continue;
+        }
+        if cap.revoked {
+            continue;
+        }
+        if let Some(expires) = cap.expires_at {
+            if expires < now {
+                continue;
+            }
+        }
+        if cap.allowed_functions.contains(&input.function_name) {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct CheckCapabilityInput {
+    pub space_id: String,
+    pub agent: AgentPubKey,
+    pub function_name: String,
+}
+
+/// Get pending invitations for a space
+#[hdk_extern]
+pub fn get_space_invitations(space_id: String) -> ExternResult<Vec<Record>> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    verify_membership(&space_id, &caller, true)?;
+
+    let space_anchor = format!("space:{}", space_id);
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&space_anchor)?, LinkTypes::SpaceToInvitations)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut invitations = Vec::new();
+    for link in links {
+        let ah = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(ah, GetOptions::default())? {
+            invitations.push(record);
+        }
+    }
+
+    Ok(invitations)
+}
+
 // =============================================================================
 // Helper functions
 // =============================================================================
@@ -637,5 +999,90 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         assert!(json.contains("space:test:123"));
+    }
+
+    #[test]
+    fn approve_invitation_input_serde() {
+        let input = ApproveInvitationInput {
+            invitation_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: ApproveInvitationInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(input.invitation_hash, back.invitation_hash);
+    }
+
+    #[test]
+    fn book_resource_input_serde() {
+        let input = BookResourceInput {
+            space_id: "space:test:123".into(),
+            resource_name: "Meeting Room A".into(),
+            start_time: 1000000,
+            end_time: 2000000,
+            notes: Some("Team standup".into()),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: BookResourceInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.resource_name, "Meeting Room A");
+        assert_eq!(back.start_time, 1000000);
+        assert_eq!(back.end_time, 2000000);
+    }
+
+    #[test]
+    fn book_resource_input_no_notes_serde() {
+        let input = BookResourceInput {
+            space_id: "space:test:123".into(),
+            resource_name: "Projector".into(),
+            start_time: 500,
+            end_time: 1000,
+            notes: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: BookResourceInput = serde_json::from_str(&json).unwrap();
+        assert!(back.notes.is_none());
+    }
+
+    #[test]
+    fn create_schedule_input_serde() {
+        let input = CreateScheduleInput {
+            space_id: "space:test:123".into(),
+            title: "Weekly Sync".into(),
+            description: Some("Team sync meeting".into()),
+            recurrence: Recurrence::Weekly,
+            next_occurrence: 1000000,
+            duration_minutes: 60,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreateScheduleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.title, "Weekly Sync");
+        assert_eq!(back.recurrence, Recurrence::Weekly);
+        assert_eq!(back.duration_minutes, 60);
+    }
+
+    #[test]
+    fn create_schedule_input_no_description_serde() {
+        let input = CreateScheduleInput {
+            space_id: "space:test:123".into(),
+            title: "Daily Standup".into(),
+            description: None,
+            recurrence: Recurrence::Daily,
+            next_occurrence: 500000,
+            duration_minutes: 15,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CreateScheduleInput = serde_json::from_str(&json).unwrap();
+        assert!(back.description.is_none());
+        assert_eq!(back.recurrence, Recurrence::Daily);
+    }
+
+    #[test]
+    fn check_capability_input_serde() {
+        let input = CheckCapabilityInput {
+            space_id: "space:test:123".into(),
+            agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            function_name: "read_data".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: CheckCapabilityInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.function_name, "read_data");
     }
 }

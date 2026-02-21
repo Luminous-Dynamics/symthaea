@@ -136,6 +136,71 @@ pub enum InvitationStatus {
     Expired,
 }
 
+/// A booking for a shared resource within a space
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ResourceBooking {
+    /// Unique booking identifier
+    pub id: String,
+    /// Reference to parent space
+    pub space_id: String,
+    /// Name of the resource being booked (room, tool, equipment)
+    pub resource_name: String,
+    /// Agent who made the booking
+    pub booked_by: AgentPubKey,
+    /// Start time (microseconds since epoch)
+    pub start_time: u64,
+    /// End time (microseconds since epoch)
+    pub end_time: u64,
+    /// Current booking status
+    pub status: BookingStatus,
+    /// Optional notes about the booking
+    pub notes: String,
+    /// Creation timestamp
+    pub created_at: Timestamp,
+}
+
+/// Booking status
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum BookingStatus {
+    Pending,
+    Confirmed,
+    Cancelled,
+}
+
+/// A recurring schedule/event within a space
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SpaceSchedule {
+    /// Unique schedule identifier
+    pub id: String,
+    /// Reference to parent space
+    pub space_id: String,
+    /// Event/meeting title
+    pub title: String,
+    /// Description of the event
+    pub description: String,
+    /// How often this recurs
+    pub recurrence: Recurrence,
+    /// Next occurrence (microseconds since epoch)
+    pub next_occurrence: u64,
+    /// Duration in minutes
+    pub duration_minutes: u32,
+    /// Agent who created the schedule
+    pub creator: AgentPubKey,
+    /// Creation timestamp
+    pub created_at: Timestamp,
+}
+
+/// Recurrence pattern for schedules
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum Recurrence {
+    Once,
+    Daily,
+    Weekly,
+    Monthly,
+}
+
 #[hdk_entry_types]
 #[unit_enum(UnitEntryTypes)]
 pub enum EntryTypes {
@@ -144,6 +209,8 @@ pub enum EntryTypes {
     Membership(Membership),
     SpaceCapability(SpaceCapability),
     SpaceInvitation(SpaceInvitation),
+    ResourceBooking(ResourceBooking),
+    SpaceSchedule(SpaceSchedule),
 }
 
 #[hdk_link_types]
@@ -160,6 +227,12 @@ pub enum LinkTypes {
     AgentToSpaces,
     /// Space type anchor → spaces of that type
     TypeToSpaces,
+    /// Space → resource bookings
+    SpaceToBookings,
+    /// Space → scheduled events
+    SpaceToSchedules,
+    /// Agent → their bookings
+    AgentToBookings,
 }
 
 /// Validation callback
@@ -175,6 +248,12 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 EntryTypes::SpaceCapability(cap) => validate_create_capability(action, cap),
                 EntryTypes::SpaceInvitation(inv) => validate_create_invitation(action, inv),
+                EntryTypes::ResourceBooking(booking) => {
+                    validate_create_booking(action, booking)
+                }
+                EntryTypes::SpaceSchedule(schedule) => {
+                    validate_create_schedule(action, schedule)
+                }
             },
             OpEntry::UpdateEntry {
                 app_entry, action, ..
@@ -184,6 +263,8 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Membership(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::SpaceCapability(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::SpaceInvitation(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::ResourceBooking(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::SpaceSchedule(_) => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -305,6 +386,100 @@ fn validate_create_invitation(
     Ok(ValidateCallbackResult::Valid)
 }
 
+fn validate_create_booking(
+    _action: Create,
+    booking: ResourceBooking,
+) -> ExternResult<ValidateCallbackResult> {
+    validate_booking(booking)
+}
+
+fn validate_booking(booking: ResourceBooking) -> ExternResult<ValidateCallbackResult> {
+    if booking.id.is_empty() || booking.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Booking ID must be 1-256 characters".into(),
+        ));
+    }
+
+    if booking.space_id.is_empty() || booking.space_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Space ID must be 1-256 characters".into(),
+        ));
+    }
+
+    if booking.resource_name.is_empty() || booking.resource_name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Resource name must be 1-256 characters".into(),
+        ));
+    }
+
+    if booking.end_time <= booking.start_time {
+        return Ok(ValidateCallbackResult::Invalid(
+            "End time must be after start time".into(),
+        ));
+    }
+
+    if booking.notes.len() > 1024 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Notes must be at most 1024 characters".into(),
+        ));
+    }
+
+    if booking.status != BookingStatus::Pending {
+        return Ok(ValidateCallbackResult::Invalid(
+            "New bookings must start with Pending status".into(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_create_schedule(
+    _action: Create,
+    schedule: SpaceSchedule,
+) -> ExternResult<ValidateCallbackResult> {
+    validate_schedule(schedule)
+}
+
+fn validate_schedule(schedule: SpaceSchedule) -> ExternResult<ValidateCallbackResult> {
+    if schedule.id.is_empty() || schedule.id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule ID must be 1-256 characters".into(),
+        ));
+    }
+
+    if schedule.space_id.is_empty() || schedule.space_id.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Space ID must be 1-256 characters".into(),
+        ));
+    }
+
+    if schedule.title.is_empty() || schedule.title.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Schedule title must be 1-256 characters".into(),
+        ));
+    }
+
+    if schedule.description.len() > 4096 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Description must be at most 4096 characters".into(),
+        ));
+    }
+
+    if schedule.duration_minutes == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Duration must be greater than 0 minutes".into(),
+        ));
+    }
+
+    if schedule.duration_minutes > 1440 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Duration cannot exceed 24 hours (1440 minutes)".into(),
+        ));
+    }
+
+    Ok(ValidateCallbackResult::Valid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -347,5 +522,200 @@ mod tests {
             let back: InvitationStatus = serde_json::from_str(&json).unwrap();
             assert_eq!(s, back);
         }
+    }
+
+    #[test]
+    fn booking_status_serde_roundtrip() {
+        let statuses = vec![
+            BookingStatus::Pending,
+            BookingStatus::Confirmed,
+            BookingStatus::Cancelled,
+        ];
+        for s in statuses {
+            let json = serde_json::to_string(&s).unwrap();
+            let back: BookingStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(s, back);
+        }
+    }
+
+    #[test]
+    fn recurrence_serde_roundtrip() {
+        let variants = vec![
+            Recurrence::Once,
+            Recurrence::Daily,
+            Recurrence::Weekly,
+            Recurrence::Monthly,
+        ];
+        for v in variants {
+            let json = serde_json::to_string(&v).unwrap();
+            let back: Recurrence = serde_json::from_str(&json).unwrap();
+            assert_eq!(v, back);
+        }
+    }
+
+    fn agent_1() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![0xaa; 36])
+    }
+
+    fn valid_booking() -> ResourceBooking {
+        ResourceBooking {
+            id: "booking_001".to_string(),
+            space_id: "space:test:123".to_string(),
+            resource_name: "Meeting Room A".to_string(),
+            booked_by: agent_1(),
+            start_time: 1000000,
+            end_time: 2000000,
+            status: BookingStatus::Pending,
+            notes: "Team standup".to_string(),
+            created_at: Timestamp::from_micros(1000000),
+        }
+    }
+
+    fn valid_schedule() -> SpaceSchedule {
+        SpaceSchedule {
+            id: "sched_001".to_string(),
+            space_id: "space:test:123".to_string(),
+            title: "Weekly Sync".to_string(),
+            description: "Weekly team synchronization".to_string(),
+            recurrence: Recurrence::Weekly,
+            next_occurrence: 1000000,
+            duration_minutes: 60,
+            creator: agent_1(),
+            created_at: Timestamp::from_micros(1000000),
+        }
+    }
+
+    #[test]
+    fn booking_serde_roundtrip() {
+        let b = valid_booking();
+        let json = serde_json::to_string(&b).unwrap();
+        let back: ResourceBooking = serde_json::from_str(&json).unwrap();
+        assert_eq!(b.id, back.id);
+        assert_eq!(b.resource_name, back.resource_name);
+    }
+
+    #[test]
+    fn schedule_serde_roundtrip() {
+        let s = valid_schedule();
+        let json = serde_json::to_string(&s).unwrap();
+        let back: SpaceSchedule = serde_json::from_str(&json).unwrap();
+        assert_eq!(s.id, back.id);
+        assert_eq!(s.recurrence, back.recurrence);
+    }
+
+    #[test]
+    fn validate_booking_valid() {
+        let result = validate_booking(valid_booking());
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn validate_booking_empty_id() {
+        let mut b = valid_booking();
+        b.id = "".to_string();
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_booking_empty_resource_name() {
+        let mut b = valid_booking();
+        b.resource_name = "".to_string();
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_booking_end_before_start() {
+        let mut b = valid_booking();
+        b.end_time = b.start_time;
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_booking_notes_too_long() {
+        let mut b = valid_booking();
+        b.notes = "x".repeat(1025);
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_booking_wrong_initial_status() {
+        let mut b = valid_booking();
+        b.status = BookingStatus::Confirmed;
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_schedule_valid() {
+        let result = validate_schedule(valid_schedule());
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn validate_schedule_empty_title() {
+        let mut s = valid_schedule();
+        s.title = "".to_string();
+        let result = validate_schedule(s);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_schedule_zero_duration() {
+        let mut s = valid_schedule();
+        s.duration_minutes = 0;
+        let result = validate_schedule(s);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_schedule_excessive_duration() {
+        let mut s = valid_schedule();
+        s.duration_minutes = 1441;
+        let result = validate_schedule(s);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_schedule_max_duration() {
+        let mut s = valid_schedule();
+        s.duration_minutes = 1440;
+        let result = validate_schedule(s);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn validate_schedule_description_too_long() {
+        let mut s = valid_schedule();
+        s.description = "x".repeat(4097);
+        let result = validate_schedule(s);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
+    }
+
+    #[test]
+    fn validate_booking_notes_at_limit() {
+        let mut b = valid_booking();
+        b.notes = "x".repeat(1024);
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn validate_booking_id_at_limit() {
+        let mut b = valid_booking();
+        b.id = "x".repeat(256);
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Valid)));
+    }
+
+    #[test]
+    fn validate_booking_id_over_limit() {
+        let mut b = valid_booking();
+        b.id = "x".repeat(257);
+        let result = validate_booking(b);
+        assert!(matches!(result, Ok(ValidateCallbackResult::Invalid(_))));
     }
 }
