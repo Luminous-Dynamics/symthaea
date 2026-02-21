@@ -58,6 +58,7 @@ export interface DecisionOutcome {
   chosen_option: number;
   participation_rate_bp: number;
   resolved_at: Timestamp;
+  quorum_bp?: number;
 }
 
 // ============================================================================
@@ -94,3 +95,43 @@ export interface AmendVoteInput {
   choice: number;
   reasoning?: string;
 }
+
+// ============================================================================
+// Signal Types (mirrors Rust HearthSignal decision variants)
+// ============================================================================
+
+export interface VoteCastSignal {
+  type: 'VoteCast';
+  decision_hash: ActionHash;
+  voter: AgentPubKey;
+  choice: number;
+}
+
+export interface VoteAmendedSignal {
+  type: 'VoteAmended';
+  decision_hash: ActionHash;
+  voter: AgentPubKey;
+  old_choice: number;
+  new_choice: number;
+}
+
+export interface DecisionClosedSignal {
+  type: 'DecisionClosed';
+  decision_hash: ActionHash;
+  closed_by: AgentPubKey;
+}
+
+export interface DecisionFinalizedSignal {
+  type: 'DecisionFinalized';
+  decision_hash: ActionHash;
+  chosen_option: number;
+  participation_rate_bp: number;
+}
+
+export type DecisionSignal =
+  | VoteCastSignal
+  | VoteAmendedSignal
+  | DecisionClosedSignal
+  | DecisionFinalizedSignal;
+
+export type DecisionSignalType = DecisionSignal['type'];

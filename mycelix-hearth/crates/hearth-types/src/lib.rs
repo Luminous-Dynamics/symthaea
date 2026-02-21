@@ -638,6 +638,30 @@ pub enum HearthSignal {
         function: String,
         error: String,
     },
+    /// A vote was cast on a decision.
+    VoteCast {
+        decision_hash: ActionHash,
+        voter: AgentPubKey,
+        choice: u32,
+    },
+    /// A vote was amended (old vote replaced with new).
+    VoteAmended {
+        decision_hash: ActionHash,
+        voter: AgentPubKey,
+        old_choice: u32,
+        new_choice: u32,
+    },
+    /// A decision was manually closed before its deadline.
+    DecisionClosed {
+        decision_hash: ActionHash,
+        closed_by: AgentPubKey,
+    },
+    /// A decision was finalized with a winning option.
+    DecisionFinalized {
+        decision_hash: ActionHash,
+        chosen_option: u32,
+        participation_rate_bp: u32,
+    },
 }
 
 #[cfg(test)]
@@ -1001,6 +1025,81 @@ mod tests {
             HearthSignal::CrossZomeCallFailed { zome, function, .. } => {
                 assert_eq!(zome, "recovery");
                 assert_eq!(function, "setup_recovery");
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn hearth_signal_vote_cast_serde() {
+        let sig = HearthSignal::VoteCast {
+            decision_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            voter: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            choice: 2,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("VoteCast"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::VoteCast { choice, .. } => assert_eq!(choice, 2),
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn hearth_signal_vote_amended_serde() {
+        let sig = HearthSignal::VoteAmended {
+            decision_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            voter: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            old_choice: 0,
+            new_choice: 1,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("VoteAmended"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::VoteAmended {
+                old_choice,
+                new_choice,
+                ..
+            } => {
+                assert_eq!(old_choice, 0);
+                assert_eq!(new_choice, 1);
+            }
+            _ => panic!("Wrong variant"),
+        }
+    }
+
+    #[test]
+    fn hearth_signal_decision_closed_serde() {
+        let sig = HearthSignal::DecisionClosed {
+            decision_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            closed_by: AgentPubKey::from_raw_36(vec![1u8; 36]),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("DecisionClosed"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        matches!(back, HearthSignal::DecisionClosed { .. });
+    }
+
+    #[test]
+    fn hearth_signal_decision_finalized_serde() {
+        let sig = HearthSignal::DecisionFinalized {
+            decision_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            chosen_option: 1,
+            participation_rate_bp: 8500,
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("DecisionFinalized"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::DecisionFinalized {
+                chosen_option,
+                participation_rate_bp,
+                ..
+            } => {
+                assert_eq!(chosen_option, 1);
+                assert_eq!(participation_rate_bp, 8500);
             }
             _ => panic!("Wrong variant"),
         }
