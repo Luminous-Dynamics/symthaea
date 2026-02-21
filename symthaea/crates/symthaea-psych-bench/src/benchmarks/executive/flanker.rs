@@ -1,0 +1,239 @@
+//! Eriksen Flanker Task.
+//!
+//! Tests selective attention and response inhibition. The system must identify
+//! the direction of a central target arrow flanked by congruent or incongruent
+//! distractors.
+//!
+//! HDC implementation: models the flanker effect as attention leakage.
+//! The target and flanker directions are combined as a weighted sum, where
+//! flanker weight represents imperfect spatial attention filtering.
+//! Response is selected via softmax over similarities to direction candidates.
+//!
+//! Conditions:
+//! - Congruent: >>>>> (flankers reinforce target)
+//! - Incongruent: >><>> (flankers compete with target)
+//! - Neutral: --<-- (flankers carry no directional information)
+//!
+//! Human baselines (Eriksen & Eriksen, 1974; Ridderinkhof et al., 2021):
+//! - congruent_accuracy: 0.97
+//! - incongruent_accuracy: 0.90
+//! - flanker_effect: 0.07 (congruent - incongruent accuracy)
+
+use crate::harness::config::BenchmarkConfig;
+use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::PsychBenchmark;
+use symthaea_core::hdc::ContinuousHV;
+
+/// Eriksen Flanker Task benchmark.
+pub struct FlankerBenchmark;
+
+#[derive(Clone, Copy)]
+enum Condition {
+    Congruent,
+    Incongruent,
+    Neutral,
+}
+
+impl FlankerBenchmark {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let dim = config.dimension;
+        let seed = config.trial_seed("executive", "flanker", trial_idx);
+        let mut rng = seed ^ 0x9E3779B97F4A7C15;
+
+        let xor_shift = |s: &mut u64| {
+            *s ^= *s << 13;
+            *s ^= *s >> 7;
+            *s ^= *s << 17;
+        };
+
+        // Direction HVs: left, right
+        let dir_left = ContinuousHV::random(dim, seed.wrapping_add(100));
+        let dir_right = ContinuousHV::random(dim, seed.wrapping_add(101));
+        let dir_neutral = ContinuousHV::random(dim, seed.wrapping_add(102));
+        let directions = [&dir_left, &dir_right];
+
+        // Attention leakage: how much flanker direction bleeds into the
+        // response activation. In humans, spatial filtering is imperfect,
+        // especially at close spacing (Eriksen & Eriksen, 1974).
+        let attention_leak: f32 = 0.5;
+
+        // Decision temperature: controls stochasticity of response selection.
+        let temperature: f64 = 0.25;
+
+        let trials_per_condition = 40;
+        let mut congruent_correct = 0u32;
+        let mut incongruent_correct = 0u32;
+        let mut neutral_correct = 0u32;
+
+        for trial in 0..(trials_per_condition * 3) {
+            let condition = match trial % 3 {
+                0 => Condition::Congruent,
+                1 => Condition::Incongruent,
+                _ => Condition::Neutral,
+            };
+
+            // Random target direction (0=left, 1=right)
+            xor_shift(&mut rng);
+            let target_idx = (rng % 2) as usize;
+            let target_dir = directions[target_idx];
+
+            // Build combined activation: target + attention_leak * flanker
+            let combined = match condition {
+                Condition::Congruent => {
+                    // Flankers same direction: reinforcement
+                    target_dir.scale(1.0 + attention_leak)
+                }
+                Condition::Incongruent => {
+                    // Flankers opposite direction: competition
+                    let flanker_dir = directions[1 - target_idx];
+                    let flanker_act = flanker_dir.scale(attention_leak);
+                    ContinuousHV::bundle(&[target_dir, &flanker_act])
+                }
+                Condition::Neutral => {
+                    // Flankers non-directional: mild noise
+                    let noise_act = dir_neutral.scale(attention_leak * 0.3);
+                    ContinuousHV::bundle(&[target_dir, &noise_act])
+                }
+            };
+
+            // Compute similarity to each direction candidate
+            let sim_left = combined.similarity(&dir_left) as f64;
+            let sim_right = combined.similarity(&dir_right) as f64;
+            let sims = [sim_left, sim_right];
+
+            // Softmax response selection with temperature
+            let max_sim = sim_left.max(sim_right);
+            let exp_sims: Vec<f64> = sims
+                .iter()
+                .map(|s| ((s - max_sim) / temperature).exp())
+                .collect();
+            let exp_sum: f64 = exp_sims.iter().sum();
+
+            xor_shift(&mut rng);
+            let r = (rng % 10000) as f64 / 10000.0;
+            let response_idx = if r < exp_sims[0] / exp_sum { 0 } else { 1 };
+
+            let correct = response_idx == target_idx;
+            match condition {
+                Condition::Congruent => {
+                    if correct {
+                        congruent_correct += 1;
+                    }
+                }
+                Condition::Incongruent => {
+                    if correct {
+                        incongruent_correct += 1;
+                    }
+                }
+                Condition::Neutral => {
+                    if correct {
+                        neutral_correct += 1;
+                    }
+                }
+            }
+        }
+
+        let cong_acc = congruent_correct as f64 / trials_per_condition as f64;
+        let incong_acc = incongruent_correct as f64 / trials_per_condition as f64;
+        let neut_acc = neutral_correct as f64 / trials_per_condition as f64;
+
+        TrialResult {
+            congruent_accuracy: cong_acc,
+            incongruent_accuracy: incong_acc,
+            neutral_accuracy: neut_acc,
+            flanker_effect: cong_acc - incong_acc,
+        }
+    }
+}
+
+struct TrialResult {
+    congruent_accuracy: f64,
+    incongruent_accuracy: f64,
+    neutral_accuracy: f64,
+    flanker_effect: f64,
+}
+
+impl PsychBenchmark for FlankerBenchmark {
+    fn name(&self) -> &str {
+        "Executive::Flanker"
+    }
+
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+
+        let mut cong = Vec::new();
+        let mut incong = Vec::new();
+        let mut neutral = Vec::new();
+        let mut effect = Vec::new();
+
+        for trial in 0..config.trials_per_condition {
+            let r = self.run_trial(config, trial);
+            cong.push(r.congruent_accuracy);
+            incong.push(r.incongruent_accuracy);
+            neutral.push(r.neutral_accuracy);
+            effect.push(r.flanker_effect);
+        }
+
+        result.insert("congruent_accuracy", MetricValue::from_samples(&cong));
+        result.insert("incongruent_accuracy", MetricValue::from_samples(&incong));
+        result.insert("neutral_accuracy", MetricValue::from_samples(&neutral));
+        result.insert("flanker_effect", MetricValue::from_samples(&effect));
+
+        result.conditions = 3;
+        result.trials_per_condition = config.trials_per_condition;
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_flanker_runs() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            trials_per_condition: 3,
+            ..Default::default()
+        };
+        let result = FlankerBenchmark.run(&config);
+        assert!(result.metrics.contains_key("congruent_accuracy"));
+        assert!(result.metrics.contains_key("incongruent_accuracy"));
+        assert!(result.metrics.contains_key("neutral_accuracy"));
+        assert!(result.metrics.contains_key("flanker_effect"));
+    }
+
+    #[test]
+    fn test_flanker_finite_metrics() {
+        let config = BenchmarkConfig {
+            dimension: 128,
+            trials_per_condition: 5,
+            ..Default::default()
+        };
+        let result = FlankerBenchmark.run(&config);
+        for (key, val) in &result.metrics {
+            assert!(val.mean.is_finite(), "metric {} is not finite", key);
+        }
+    }
+
+    #[test]
+    fn test_flanker_effect_direction() {
+        let config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let result = FlankerBenchmark.run(&config);
+        let cong = result.metrics["congruent_accuracy"].mean;
+        let incong = result.metrics["incongruent_accuracy"].mean;
+        // Congruent should be easier than incongruent
+        assert!(
+            cong >= incong - 0.05,
+            "congruent ({:.3}) should be >= incongruent ({:.3})",
+            cong,
+            incong
+        );
+    }
+}

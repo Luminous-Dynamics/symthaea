@@ -70,6 +70,26 @@ pub fn worm_baselines() -> BTreeMap<&'static str, Baseline> {
         },
     );
 
+    // Digit span forward (Wechsler, 2008; Woods et al., 2011)
+    m.insert(
+        "digit_span_forward",
+        Baseline {
+            value: 6.8,
+            source: "Wechsler (2008); Woods et al. (2011), WAIS-IV norms",
+            population: "human adults",
+        },
+    );
+
+    // Digit span backward
+    m.insert(
+        "digit_span_backward",
+        Baseline {
+            value: 5.1,
+            source: "Wechsler (2008); Woods et al. (2011), WAIS-IV norms",
+            population: "human adults",
+        },
+    );
+
     m
 }
 
@@ -177,7 +197,7 @@ pub fn tombench_baselines() -> BTreeMap<&'static str, Baseline> {
     m
 }
 
-/// Get all executive function baselines (WCST, IGT, Raven's).
+/// Get all executive function baselines (WCST, IGT, Raven's, Stroop, Flanker).
 pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
     let mut m = BTreeMap::new();
 
@@ -239,6 +259,58 @@ pub fn executive_baselines() -> BTreeMap<&'static str, Baseline> {
         Baseline {
             value: 0.95,
             source: "Raven (1938), Set A-B",
+            population: "human adults",
+        },
+    );
+
+    // Stroop Color-Word Interference (MacLeod, 1991; Stroop, 1935)
+    m.insert(
+        "stroop_congruent_accuracy",
+        Baseline {
+            value: 0.98,
+            source: "MacLeod (1991), Half a century of research on the Stroop effect",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "stroop_incongruent_accuracy",
+        Baseline {
+            value: 0.88,
+            source: "MacLeod (1991), Half a century of research on the Stroop effect",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "stroop_effect",
+        Baseline {
+            value: 0.10,
+            source: "MacLeod (1991), accuracy-based Stroop effect",
+            population: "human adults",
+        },
+    );
+
+    // Eriksen Flanker Task (Eriksen & Eriksen, 1974; Ridderinkhof et al., 2021)
+    m.insert(
+        "flanker_congruent_accuracy",
+        Baseline {
+            value: 0.97,
+            source: "Eriksen & Eriksen (1974); Ridderinkhof et al. (2021)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "flanker_incongruent_accuracy",
+        Baseline {
+            value: 0.90,
+            source: "Eriksen & Eriksen (1974); Ridderinkhof et al. (2021)",
+            population: "human adults",
+        },
+    );
+    m.insert(
+        "flanker_effect",
+        Baseline {
+            value: 0.07,
+            source: "Eriksen & Eriksen (1974), accuracy-based flanker effect",
             population: "human adults",
         },
     );

@@ -6,12 +6,12 @@
 //! ## Benchmarks
 //!
 //! - **WorM** — Working memory tasks (N-back, change detection, serial recall,
-//!   spatial updating, binding)
+//!   spatial updating, binding, digit span)
 //! - **CogBench** — Cognitive psychology experiments via FEP active inference
 //!   (probabilistic reasoning, exploration, bandits, instrumental learning,
 //!   two-step task, temporal discounting, BART)
 //! - **Executive** — Executive function (WCST rule-shifting, Iowa Gambling Task
-//!   loss aversion, Raven's Progressive Matrices pattern completion)
+//!   loss aversion, Raven's Progressive Matrices, Stroop interference, Flanker)
 //! - **Metacognition** — Metacognitive calibration (confidence-accuracy covariance)
 //! - **Butlin** — Consciousness indicators from 6 theories (RPT, GWT, HOT, PP, AST, IIT)
 //! - **ToMBench** — Theory of Mind tasks (false belief, faux-pas, persuasion,
