@@ -1,6 +1,45 @@
 //! Publication Coordinator Zome
 use hdk::prelude::*;
 use media_publication_integrity::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("civic_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let eligibility = evaluate_governance(&credential.profile, requirement);
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 /// Helper function to create an anchor entry and return its hash
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -11,6 +50,8 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn publish(input: PublishInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let now = sys_time()?;
     let publication = Publication {
         id: format!("pub:{}:{}", input.author_did, now.as_micros()),
@@ -75,6 +116,8 @@ pub struct AddBlockInput {
 
 #[hdk_extern]
 pub fn update_publication(input: UpdateInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Publication)?)).include_entries(true);
     for record in query(filter)? {
         if let Some(pub_entry) = record.entry().to_app_option::<Publication>().ok().flatten() {

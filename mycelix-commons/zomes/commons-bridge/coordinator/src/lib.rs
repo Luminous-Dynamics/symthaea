@@ -33,7 +33,7 @@ use mycelix_bridge_common::{
     CareAvailabilityQuery, CareAvailabilityResult,
     AuditTrailQuery, AuditTrailEntry, AuditTrailResult,
     RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
-    BridgeDomain, CommonsZome, resolve_commons_zome,
+    BridgeDomain, resolve_commons_zome,
     ConsciousnessCredential, ConsciousnessTier,
 };
 
@@ -369,7 +369,9 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
     )))
 }
 
-/// Backward-compatible wrapper — delegates to type-safe routing from bridge-common.
+/// Test-only wrapper — delegates to type-safe routing from bridge-common.
+/// Runtime code uses `BridgeDomain::from_str_loose` + `resolve_commons_zome` directly.
+#[cfg(test)]
 fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
     BridgeDomain::from_str_loose(domain)
         .and_then(|d| resolve_commons_zome(d, query_type))

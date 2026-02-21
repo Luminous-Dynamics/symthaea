@@ -5,10 +5,51 @@
 
 use hdk::prelude::*;
 use justice_cases_integrity::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("civic_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let eligibility = evaluate_governance(&credential.profile, requirement);
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 /// File a new case
 #[hdk_extern]
 pub fn file_case(case: Case) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let action_hash = create_entry(&EntryTypes::Case(case.clone()))?;
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created case".into())))?;
@@ -139,6 +180,8 @@ pub struct AddPartyInput {
 /// Submit evidence for a case
 #[hdk_extern]
 pub fn submit_evidence(evidence: Evidence) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let action_hash = create_entry(&EntryTypes::Evidence(evidence.clone()))?;
     let record = get(action_hash.clone(), GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not get created evidence".into())))?;

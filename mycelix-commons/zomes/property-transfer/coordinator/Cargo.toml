@@ -14,3 +14,4 @@ serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 property_transfer_integrity = { path = "../integrity" }
 commons-types = { workspace = true }
+mycelix-bridge-common = { workspace = true }

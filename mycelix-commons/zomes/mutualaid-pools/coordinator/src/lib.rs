@@ -9,6 +9,45 @@ use mutualaid_pools_integrity::{
     DisbursementRule, DisbursementStatus, EntryTypes, LinkTypes, MemberRole,
     MutualAidPool, PoolMembership, PoolStatus,
 };
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal, requirement_for_voting,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let eligibility = evaluate_governance(&credential.profile, requirement);
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 /// Input for creating a new pool
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -378,6 +417,8 @@ pub fn contribute(input: ContributeInput) -> ExternResult<ContributionWithHash> 
 /// Request a disbursement from a pool
 #[hdk_extern]
 pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<DisbursementWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let now = sys_time()?;
     let id = generate_id("disb")?;
 
@@ -456,6 +497,8 @@ pub fn request_disbursement(input: RequestDisbursementInput) -> ExternResult<Dis
 /// Vote on a disbursement request
 #[hdk_extern]
 pub fn vote_disbursement(input: VoteDisbursementInput) -> ExternResult<DisbursementWithHash> {
+    let _eligibility = require_consciousness(&requirement_for_voting())?;
+
     // Get the current disbursement
     let record = get(input.disbursement_hash.clone(), GetOptions::default())?
         .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("Disbursement not found".to_string())))?;

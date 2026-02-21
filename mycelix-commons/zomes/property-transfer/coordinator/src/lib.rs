@@ -1,6 +1,45 @@
 //! Property Transfer Coordinator Zome
 use hdk::prelude::*;
 use property_transfer_integrity::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal, requirement_for_voting,
+};
+
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+    let eligibility = evaluate_governance(&credential.profile, requirement);
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
 
 /// Get or create an anchor entry and return its EntryHash for use as link base
 fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
@@ -11,6 +50,8 @@ fn anchor_hash(anchor_string: &str) -> ExternResult<EntryHash> {
 
 #[hdk_extern]
 pub fn initiate_transfer(input: InitiateTransferInput) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let now = sys_time()?;
     let transfer = Transfer {
         id: format!("transfer:{}:{}", input.property_id, now.as_micros()),
@@ -100,6 +141,8 @@ fn update_transfer_status(transfer_id: &str, new_status: TransferStatus) -> Exte
 /// 4. Broadcasts ownership change event via bridge
 #[hdk_extern]
 pub fn complete_transfer(transfer_id: String) -> ExternResult<Record> {
+    let _eligibility = require_consciousness(&requirement_for_voting())?;
+
     let filter = ChainQueryFilter::new().entry_type(EntryType::App(AppEntryDef::try_from(UnitEntryTypes::Transfer)?)).include_entries(true);
     for record in query(filter)? {
         if let Some(transfer) = record.entry().to_app_option::<Transfer>().ok().flatten() {
