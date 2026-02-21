@@ -21,25 +21,16 @@ use symthaea_core::hdc::phi_topology_validation::real_hv_to_hv16;
 // at most 2 subsystems coincide on any given cycle.
 //   5→7, 10→11, 15→13, 20→19, 25→23, 50→47, 100→97, 200→199, 1000→997
 
-// -- Moral evaluation --
-const MORAL_EVAL_INTERVAL: usize = 7; // evaluate every Nth cycle (amortizes cost, prime)
+// -- Moral evaluation (constants used only in cycle.rs; others moved to helpers.rs) --
 const MORAL_CONCERN_THRESHOLD: f32 = -0.3; // score below this triggers concern
 const MORAL_BENEFIT_THRESHOLD: f32 = 0.5; // score above this boosts confidence
-const NEGATION_POLARITY_THRESHOLD: f32 = 0.5; // above this = negated input
-const NEGATION_DAMPENING: f32 = 0.3; // dampens moral_score for negated inputs
 const MORAL_CONCERN_EXPLORATION_DAMPEN: f32 = 0.5; // reduce exploration on moral concern
 const MORAL_CONCERN_PAUSE_BOOST: f32 = 1.5; // slow down on moral concern
 const MORAL_BENEFIT_CONFIDENCE_BOOST: f32 = 1.05; // confidence nudge for positive morality
 
 // -- Surprise & exploration --
-const SURPRISE_BOREDOM_DAMPEN: f32 = 0.7; // lower boredom threshold on surprise
 const QUANTUM_COHERENCE_THRESHOLD: f64 = 0.5; // coherence above this boosts exploration
 const QUANTUM_COHERENCE_BOOST_SCALE: f32 = 0.2; // strength of coherence → exploration
-
-// -- Memory recall --
-const MEMORY_RECALL_TOP_K: usize = 3; // episodic memories to recall
-const MEMORY_RECALL_SIM_THRESHOLD: f32 = 0.3; // minimum similarity for recall
-const MEMORY_CONTEXT_BOOST_SCALE: f32 = 0.1; // recalled memory → confidence boost
 
 
 // ═══════════════════════════════════════════════════════════════════
@@ -107,6 +98,7 @@ const GWT_BROADCAST_CONFIDENCE_BOOST: f32 = 0.03;
 const MCE_LR_BOOST_SCALE: f32 = 0.1; // up to +10% LR from consciousness
 const MCE_BOOST_DECAY: f32 = 0.9; // decay when MCE doesn't fire
 
+use super::helpers::MEMORY_RECALL_TOP_K;
 use super::temporal_network::TemporalNetwork;
 use super::training::TrainingSample;
 use super::{
@@ -176,89 +168,11 @@ impl CognitiveLoopService {
         let input_negation_polarity = self.detect_negation_polarity(input);
 
         // ═══════════════════════════════════════════════════════════════════════
-        // PHASE 0.4: Moral Evaluation (throttled: every 5th cycle or on new input)
+        // PHASE 0.4: Moral Evaluation (throttled: every Nth cycle or on new input)
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
-        // Evaluate input for moral alignment using HDC-based moral algebra.
-        // Throttled to amortize cost: reuse last judgment when input is unchanged.
-
-        let moral_judgment = if self.stats.total_cycles % MORAL_EVAL_INTERVAL == 1
-            || self
-                .last_moral_judgment
-                .as_ref()
-                .map_or(true, |j| j.input != input)
-        {
-            let j = self.evaluate_moral_alignment(input);
-            self.stats.moral_evaluations += 1;
-            j
-        } else {
-            // Cache hit: input unchanged and not due for re-evaluation.
-            // Safety: map_or(true, ...) returning false guarantees last_moral_judgment is Some.
-            self.last_moral_judgment.clone().expect("last_moral_judgment guaranteed Some by map_or guard")
-        };
-        let moral_concern_detected = moral_judgment.moral_score < MORAL_CONCERN_THRESHOLD
-            || moral_judgment.consent_violation
-            || !moral_judgment.violations.is_empty();
-
-        if moral_concern_detected {
-            self.stats.moral_concerns_detected += 1;
-        }
-
-        // Write moral stats (previously declared but never populated)
-        self.stats.moral_score = moral_judgment.moral_score;
-        self.stats.consent_violation = moral_judgment.consent_violation;
-        self.stats.deontological_violations = moral_judgment
-            .violations
-            .iter()
-            .filter(|v| {
-                v.contains("perfect") || v.contains("impermissible") || v.contains("deontological")
-            })
-            .count();
-
-        // Apply negation polarity: "not harmful" dampens negative moral score toward 0
-        let moral_score = if input_negation_polarity > NEGATION_POLARITY_THRESHOLD {
-            moral_judgment.moral_score * NEGATION_DAMPENING
-        } else {
-            moral_judgment.moral_score
-        };
-
-        // Contextual harmony weighting: domain-aware moral modulation
-        // Science: Haidt (2001) — moral foundations vary across contexts
-        let contextual_weight_factor = if let Some(ref mut cw) = self.contextual_weights {
-            use crate::consciousness::contextual_weights::{ActionType, DomainClassifier};
-            let domain = DomainClassifier::new().classify(input);
-            let action_type = if moral_concern_detected {
-                ActionType::Governance
-            } else {
-                ActionType::Basic
-            };
-            let weights = cw.get_all_weights(action_type, domain);
-            let weight_avg = weights.iter().map(|(_, w)| w).sum::<f32>() / weights.len().max(1) as f32;
-            // Guard near-zero average: prevents all-zero weights from silently
-            // suppressing moral reasoning (moral_score * 0.0 = 0.0)
-            if weight_avg.abs() < f32::EPSILON { 1.0 } else { weight_avg }
-        } else {
-            1.0
-        };
-        // Apply contextual weighting: scales moral signal by domain relevance
-        let moral_score = moral_score * contextual_weight_factor;
-
-        // Value feedback: self-correcting moral alignment via TD-learning trend.
-        // The moving average of recent moral assessments modulates the current
-        // score, creating a self-correcting loop (positive trend ≈ +10% boost).
-        let value_trend = self.value_feedback.recent_trend(50);
-        let moral_feedback = 1.0 + (value_trend * 0.1).clamp(-0.1, 0.1);
-        let moral_score = moral_score * moral_feedback;
-        // Record this cycle's moral assessment for future trend computation
-        {
-            let signal = self.value_feedback.create_signal(
-                input,
-                crate::consciousness::value_feedback_loop::FeedbackType::SelfAssessment,
-                moral_score,
-            );
-            self.value_feedback.process_feedback(signal);
-        }
-
+        let (moral_score, moral_concern_detected, moral_judgment) =
+            self.run_moral_phase(input, input_negation_polarity);
         module_timings.moral_algebra = _t.elapsed().as_micros() as u64;
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -397,41 +311,10 @@ impl CognitiveLoopService {
             .iter()
             .map(|v| v * phi_attention_weight)
             .collect();
-        if let Some(ref mut bridge) = self.surprise_bridge {
-            // Use compressed state (proper random projection of full 16,384D space) instead of
-            // truncated first-64 raw HDV elements (0.39% of the information).
-            let predicted = self.last_prediction.as_deref().unwrap_or(&[]);
-            let actual_len = predicted.len().max(1).min(compressed_state.len());
-            let actual = &compressed_state[..actual_len];
-            let current_state = self.last_state.as_deref().unwrap_or(&compressed_state);
-            let (surprise, should_explore, action) = bridge.cycle(predicted, actual, current_state);
-
-            if should_explore {
-                surprise_triggered = true;
-                // Lower boredom threshold to encourage exploration
-                let current_threshold = self.curiosity_drive.get_boredom_threshold();
-                self.curiosity_drive
-                    .set_boredom_threshold(current_threshold * SURPRISE_BOREDOM_DAMPEN);
-                // Boost exploration urge proportional to surprise intensity
-                self.curiosity_drive.exploration_urge = (self.curiosity_drive.exploration_urge
-                    + bridge.exploration_factor * 0.3)
-                    .clamp(0.0, 1.0);
-                exploration_action = action.map(|a| {
-                    format!(
-                        "perturbation[{}d,scale={:.3}]",
-                        a.len(),
-                        bridge.exploration_factor
-                    )
-                });
-                tracing::debug!(
-                    surprise = surprise,
-                    threshold = bridge.tracker().threshold(),
-                    exploration_factor = bridge.exploration_factor,
-                    cycle = self.stats.total_cycles,
-                    "Surprise exploration triggered"
-                );
-            }
-        }
+        let (surprise_result, explore_action) =
+            self.run_surprise_exploration(&compressed_state);
+        surprise_triggered = surprise_result;
+        exploration_action = explore_action;
 
         module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
@@ -504,44 +387,7 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         // 1a. Memory System Integration: Recall relevant episodic memories
         // ═══════════════════════════════════════════════════════════════════════
-        // Use HDC embedding to query episodic memory for context
-
-        // Use compressed_state for recall queries: matches the dimension of stored embeddings
-        // (prefrontal graduates and episodic encodes both use compressed embeddings).
-        // Previously used raw HDV[0..64] — 0.39% of 16,384D space, mismatched with stored data.
-        let hdv_sample: Vec<f32> = compressed_state[..64.min(compressed_state.len())].to_vec();
-        let recalled_memories = self.episodic_memory.recall(&hdv_sample, MEMORY_RECALL_TOP_K, MEMORY_RECALL_SIM_THRESHOLD);
-        let memory_context_boost = if !recalled_memories.is_empty() {
-            // Recalled memories boost prediction confidence slightly (safe division with max(1))
-            recalled_memories.iter().map(|(_, sim)| sim).sum::<f32>()
-                / recalled_memories.len().max(1) as f32
-                * MEMORY_CONTEXT_BOOST_SCALE
-        } else {
-            0.0
-        };
-
-        // Extract rich context from recalled memories (valence + Phi at encoding time)
-        // Science: Damasio (1999) — emotional re-experiencing from recalled episodes;
-        // Phi at encoding primes consciousness expectation for similar situations.
-        if !recalled_memories.is_empty() {
-            let n = recalled_memories.len() as f32;
-            let memory_valence_avg: f32 =
-                recalled_memories.iter().map(|(m, _)| m.valence).sum::<f32>() / n;
-            let memory_phi_avg: f32 =
-                recalled_memories.iter().map(|(m, _)| m.phi_at_encoding).sum::<f32>() / n;
-
-            // Memory valence biases current emotional state (emotional re-experiencing)
-            if memory_valence_avg.abs() > 0.1 {
-                let valence_nudge = memory_valence_avg * 0.15; // ±15% of recalled valence
-                self.emotion_contagion.valence =
-                    (self.emotion_contagion.valence + valence_nudge).clamp(-1.0, 1.0);
-            }
-            // Memory Phi primes consciousness expectation
-            if memory_phi_avg > 0.4 {
-                self.prediction_confidence =
-                    (self.prediction_confidence + (memory_phi_avg - 0.4) * 0.05).clamp(0.0, 1.0);
-            }
-        }
+        let memory_context_boost = self.recall_episodic_context(&compressed_state);
 
         // ═══════════════════════════════════════════════════════════════════════
         // 1a.1 Resonator-enhanced recall: factorize bundled memories
@@ -1618,6 +1464,10 @@ impl CognitiveLoopService {
             }
             module_timings.stability_regime = _t_stability.elapsed().as_micros() as u64;
 
+            // Pre-compute hdv_sample for episodic encoding (64-dim subsample of compressed state)
+            let hdv_sample: Vec<f32> =
+                compressed_state[..64.min(compressed_state.len())].to_vec();
+
             rayon_join(
                 // -- Branch A: Semantic Memory + Causal Enhancement --
                 || {
@@ -2347,10 +2197,42 @@ impl CognitiveLoopService {
             };
         module_timings.dissipative_consciousness = _t.elapsed().as_micros() as u64;
 
-        // FEEDBACK: Criticality → exploration boost (edge-of-chaos = optimal exploration)
+        // FEEDBACK: Dissipative regime → exploration + learning rate modulation
+        // Science: Prigogine (1977) — dissipative structures self-organize at edge of chaos.
+        // Use recommend_action() to translate thermodynamic state into cognitive adjustments.
         if let Some(ref dc) = self.dissipative_consciousness {
-            if dc.is_critical() {
-                self.prediction_confidence = (self.prediction_confidence - 0.01).max(0.0);
+            use crate::consciousness::dissipative_consciousness::DissipativeAction;
+            match dc.recommend_action() {
+                DissipativeAction::Maintain { .. } => {
+                    // Optimal regime: slight confidence boost (system is well-organized)
+                    self.prediction_confidence =
+                        (self.prediction_confidence + 0.005).clamp(0.0, 1.0);
+                }
+                DissipativeAction::IncreaseActivity { suggested_increase, .. } => {
+                    // Near equilibrium: boost exploration proportional to suggested increase
+                    let explore_boost = (suggested_increase * 0.15).min(0.05) as f32;
+                    self.curiosity_drive.exploration_urge =
+                        (self.curiosity_drive.exploration_urge + explore_boost).clamp(0.0, 1.0);
+                    self.prediction_confidence =
+                        (self.prediction_confidence - 0.01).max(0.0);
+                }
+                DissipativeAction::IncreaseCoherence { .. } => {
+                    // Chaotic: suppress exploration, boost learning to restore coherence
+                    self.curiosity_drive.exploration_urge =
+                        (self.curiosity_drive.exploration_urge * 0.9).max(0.0);
+                    self.fep_lr_boost = (self.fep_lr_boost * 1.05).clamp(1.0, 2.0);
+                }
+                DissipativeAction::IncreaseDifferentiation { .. } => {
+                    // Too ordered: nudge exploration up, learning down slightly
+                    self.curiosity_drive.exploration_urge =
+                        (self.curiosity_drive.exploration_urge + 0.02).clamp(0.0, 1.0);
+                    self.prediction_confidence =
+                        (self.prediction_confidence - 0.005).max(0.0);
+                }
+                DissipativeAction::IncreaseIntegration { .. } => {
+                    // Too differentiated: boost learning rate for better integration
+                    self.fep_lr_boost = (self.fep_lr_boost * 1.03).clamp(1.0, 2.0);
+                }
             }
         }
 
@@ -2428,12 +2310,20 @@ impl CognitiveLoopService {
             };
         module_timings.consciousness_equation_v2 = _t.elapsed().as_micros() as u64;
 
-        // FEEDBACK: Unified consciousness score modulates confidence + exploration
+        // FEEDBACK: Unified consciousness score modulates confidence + exploration + consolidation
         // Science: High C(t) = strong integration across theories → confident, less exploration needed
+        // Additionally: high consciousness moments are episodically significant (Baars 2005 —
+        // GWT predicts conscious moments are preferentially consolidated into long-term memory)
         if equation_v2_consciousness > 0.6 {
             let boost = (equation_v2_consciousness - 0.6) * 0.08; // up to +3.2%
             self.prediction_confidence =
                 (self.prediction_confidence + boost as f32).clamp(0.0, 1.0);
+            // High-consciousness moments → boost episodic consolidation priority
+            // Science: Conscious access correlates with memory formation (Dehaene 2014, ch.4)
+            if let Some(ref mut replay) = self.phi_episodic_replay {
+                let consolidation_boost = (equation_v2_consciousness - 0.6) * 0.1;
+                replay.boost_recent_consolidation(consolidation_boost);
+            }
         } else if equation_v2_consciousness > 0.0 && equation_v2_consciousness < 0.3 {
             // Low consciousness → boost exploration to find better integration
             self.curiosity_drive.exploration_urge =
@@ -2465,11 +2355,25 @@ impl CognitiveLoopService {
         module_timings.hierarchical_ltc = _t.elapsed().as_micros() as u64;
 
         // FEEDBACK: Hierarchical LTC Phi cross-validates spectral MIP
-        // Science: Independent Phi estimates should converge; divergence signals instability
-        if hierarchical_ltc_phi > 0.3 {
-            let hltc_boost = (hierarchical_ltc_phi - 0.3).min(0.2) * 0.05;
-            self.prediction_confidence =
-                (self.prediction_confidence + hltc_boost).clamp(0.0, 1.0);
+        // Science: Independent Phi estimates should converge; divergence signals instability.
+        // When they agree, boost confidence. When they diverge, increase exploration —
+        // the system is uncertain about its own integration level (Tononi 2015, §3.1).
+        if hierarchical_ltc_phi > 0.1 {
+            let spectral_phi = unified_psi as f32;
+            let phi_divergence = (hierarchical_ltc_phi - spectral_phi).abs();
+            if phi_divergence < 0.2 {
+                // Phi estimates converge → strong confidence in integration measure
+                let convergence_boost = (0.2 - phi_divergence) * 0.05;
+                self.prediction_confidence =
+                    (self.prediction_confidence + convergence_boost).clamp(0.0, 1.0);
+            } else if phi_divergence > 0.4 {
+                // Significant divergence → epistemic uncertainty about integration
+                let divergence_penalty = (phi_divergence - 0.4).min(0.3) * 0.03;
+                self.prediction_confidence =
+                    (self.prediction_confidence - divergence_penalty).max(0.0);
+                self.curiosity_drive.exploration_urge =
+                    (self.curiosity_drive.exploration_urge + divergence_penalty).clamp(0.0, 1.0);
+            }
         }
 
         // ═══════════════════════════════════════════════════════════════════════
@@ -3057,7 +2961,7 @@ impl CognitiveLoopService {
             let avg_err = self.stats.avg_prediction_error;
             let error_spike = avg_err > 0.01 && prediction_error > avg_err * 2.0;
             let semantic_miss = self.semantic_memory.stats().semantic_misses > 0
-                && recalled_memories.is_empty()
+                && memory_context_boost == 0.0 // no episodic memories recalled this cycle
                 && self.stats.total_cycles > 10;
 
             if error_spike || semantic_miss {
@@ -4491,7 +4395,8 @@ impl CognitiveLoopService {
         }
         module_timings.soul_experience = _t.elapsed().as_micros() as u64;
 
-        // Pre-compute formatted strings to avoid format!() inside struct literal
+        // Pre-compute values and formatted strings to avoid expensive ops inside struct literal
+        let value_trend = self.value_feedback.recent_trend(50);
         let circadian_phase_str = format!("{:?}", self.biorhythm.phase);
         let selected_strategy_str = format!("{:?}", selected_strategy);
 
@@ -4664,7 +4569,7 @@ impl CognitiveLoopService {
 
         // Pre-compute identity fields before moving output
         #[cfg(feature = "identity")]
-        let signed_output = self.mfdi_bridge.sign_output(&output).ok();
+        let signed_output = self.mfdi_bridge.sign_output(output.clone()).ok();
         #[cfg(feature = "identity")]
         let assurance_level = self.mfdi_bridge.assurance_level();
 
