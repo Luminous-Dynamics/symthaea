@@ -229,8 +229,16 @@ impl BenchmarkReport {
             ("trials_to_first_category", "wcst_trials_to_first", exec_bl),
             ("overall_net_score", "igt_overall_net_score", exec_bl),
             ("deck_preference_good", "igt_deck_preference_good", exec_bl),
-            // Note: overall_accuracy and easy_accuracy are Raven's-specific;
-            // matched below only for Executive::Ravens benchmarks
+            // Note: overall_accuracy, easy_accuracy, congruent_accuracy,
+            // incongruent_accuracy are benchmark-specific; matched below with
+            // benchmark-name guards to avoid cross-benchmark collisions.
+            // Stroop-specific
+            ("stroop_effect", "stroop_effect", exec_bl),
+            // Flanker-specific
+            ("flanker_effect", "flanker_effect", exec_bl),
+            // Digit Span
+            ("forward_span", "digit_span_forward", worm_bl),
+            ("backward_span", "digit_span_backward", worm_bl),
             // Metacognition
             ("calibration_error_ece", "calibration_error_ece", meta_bl),
             ("discrimination_gamma", "discrimination_gamma", meta_bl),
@@ -275,6 +283,42 @@ impl BenchmarkReport {
                         human_value: bl.value, source: bl.source.to_string(),
                         population: bl.population.to_string(), ratio,
                     }));
+                }
+            }
+        }
+
+        // Stroop-specific: congruent_accuracy, incongruent_accuracy
+        if benchmark.contains("Stroop") {
+            for (metric_key, baseline_key) in [
+                ("congruent_accuracy", "stroop_congruent_accuracy"),
+                ("incongruent_accuracy", "stroop_incongruent_accuracy"),
+            ] {
+                if let Some(metric) = result.metrics.get(metric_key) {
+                    if let Some(bl) = exec_bl.get(baseline_key) {
+                        let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
+                        comps.push((metric_key.to_string(), BaselineComparison {
+                            human_value: bl.value, source: bl.source.to_string(),
+                            population: bl.population.to_string(), ratio,
+                        }));
+                    }
+                }
+            }
+        }
+
+        // Flanker-specific: congruent_accuracy, incongruent_accuracy
+        if benchmark.contains("Flanker") {
+            for (metric_key, baseline_key) in [
+                ("congruent_accuracy", "flanker_congruent_accuracy"),
+                ("incongruent_accuracy", "flanker_incongruent_accuracy"),
+            ] {
+                if let Some(metric) = result.metrics.get(metric_key) {
+                    if let Some(bl) = exec_bl.get(baseline_key) {
+                        let ratio = if bl.value.abs() > 1e-10 { metric.mean / bl.value } else { 0.0 };
+                        comps.push((metric_key.to_string(), BaselineComparison {
+                            human_value: bl.value, source: bl.source.to_string(),
+                            population: bl.population.to_string(), ratio,
+                        }));
+                    }
                 }
             }
         }

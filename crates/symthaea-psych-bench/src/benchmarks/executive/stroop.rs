@@ -1,0 +1,259 @@
+//! Stroop Color-Word Interference Test.
+//!
+//! Tests inhibitory control (executive attention). The system must identify
+//! the ink color of a color word while suppressing the word's semantic content.
+//!
+//! HDC implementation: models the Stroop effect as activation competition.
+//! Reading is "automatic" — the word's semantic meaning activates its
+//! corresponding color representation. The system must select the ink color
+//! despite interference from the word's automatic color activation.
+//!
+//! Conditions:
+//! - Congruent: word "RED" in red ink (word reinforces ink)
+//! - Incongruent: word "RED" in blue ink (word competes with ink)
+//! - Neutral: word "XXX" in red ink (no semantic activation)
+//!
+//! Human baselines (MacLeod, 1991; Stroop, 1935):
+//! - congruent_accuracy: 0.98
+//! - incongruent_accuracy: 0.88
+//! - stroop_effect: 0.10 (congruent - incongruent accuracy)
+//! - neutral_accuracy: 0.95
+
+use crate::harness::config::BenchmarkConfig;
+use crate::harness::report::{BenchmarkResult, MetricValue};
+use crate::harness::PsychBenchmark;
+use symthaea_core::hdc::ContinuousHV;
+
+/// Stroop Color-Word Interference benchmark.
+pub struct StroopBenchmark;
+
+#[derive(Clone, Copy)]
+enum Condition {
+    Congruent,
+    Incongruent,
+    Neutral,
+}
+
+impl StroopBenchmark {
+    fn run_trial(&self, config: &BenchmarkConfig, trial_idx: usize) -> TrialResult {
+        let dim = config.dimension;
+        let seed = config.trial_seed("executive", "stroop", trial_idx);
+        let mut rng = seed ^ 0x9E3779B97F4A7C15;
+
+        let xor_shift = |s: &mut u64| {
+            *s ^= *s << 13;
+            *s ^= *s >> 7;
+            *s ^= *s << 17;
+        };
+
+        // 4 color representation HVs: red, blue, green, yellow
+        let color_hvs: Vec<ContinuousHV> = (0..4)
+            .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i)))
+            .collect();
+
+        // Reading automaticity: how strongly the word activates its color.
+        // In humans, reading is highly automatic (Stroop, 1935).
+        let reading_automaticity: f32 = 0.5;
+
+        // Decision temperature: controls stochasticity of response selection.
+        // Lower = more deterministic. Tuned to produce human-like error rates.
+        let temperature: f64 = 0.25;
+
+        let trials_per_condition = 40;
+        let mut congruent_correct = 0u32;
+        let mut incongruent_correct = 0u32;
+        let mut neutral_correct = 0u32;
+
+        for trial in 0..(trials_per_condition * 3) {
+            let condition = match trial % 3 {
+                0 => Condition::Congruent,
+                1 => Condition::Incongruent,
+                _ => Condition::Neutral,
+            };
+
+            // Pick a random ink color (the correct answer)
+            xor_shift(&mut rng);
+            let ink_idx = (rng % 4) as usize;
+
+            // Build the combined activation:
+            // ink_activation (strength 1.0) + word_activation (strength reading_automaticity)
+            let combined = match condition {
+                Condition::Congruent => {
+                    // Word "RED" in red ink: both activate red
+                    // combined = color[ink] * (1 + reading_auto)
+                    color_hvs[ink_idx].scale(1.0 + reading_automaticity)
+                }
+                Condition::Incongruent => {
+                    // Word "RED" in blue ink: ink activates blue, word activates red
+                    xor_shift(&mut rng);
+                    let mut word_idx = (rng % 3) as usize;
+                    if word_idx >= ink_idx {
+                        word_idx += 1;
+                    }
+                    // combined = color[ink] + reading_auto * color[word]
+                    let ink_act = &color_hvs[ink_idx];
+                    let word_act = color_hvs[word_idx].scale(reading_automaticity);
+                    ContinuousHV::bundle(&[ink_act, &word_act])
+                }
+                Condition::Neutral => {
+                    // Word "XXX" in red ink: only ink activates color
+                    // Small random noise from non-color word processing
+                    let noise = ContinuousHV::random(dim, seed.wrapping_add(
+                        1000 + trial as u64,
+                    ));
+                    let noise_act = noise.scale(reading_automaticity * 0.3);
+                    ContinuousHV::bundle(&[&color_hvs[ink_idx], &noise_act])
+                }
+            };
+
+            // Compute similarity to each color candidate
+            let sims: Vec<f64> = color_hvs
+                .iter()
+                .map(|c| combined.similarity(c) as f64)
+                .collect();
+
+            // Softmax response selection with temperature
+            let max_sim = sims.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+            let exp_sims: Vec<f64> = sims
+                .iter()
+                .map(|s| ((s - max_sim) / temperature).exp())
+                .collect();
+            let exp_sum: f64 = exp_sims.iter().sum();
+
+            // Sample from softmax distribution
+            xor_shift(&mut rng);
+            let r = (rng % 10000) as f64 / 10000.0;
+            let mut cumsum = 0.0;
+            let mut response_idx = 0;
+            for (i, e) in exp_sims.iter().enumerate() {
+                cumsum += e / exp_sum;
+                if r < cumsum {
+                    response_idx = i;
+                    break;
+                }
+            }
+
+            let correct = response_idx == ink_idx;
+            match condition {
+                Condition::Congruent => {
+                    if correct {
+                        congruent_correct += 1;
+                    }
+                }
+                Condition::Incongruent => {
+                    if correct {
+                        incongruent_correct += 1;
+                    }
+                }
+                Condition::Neutral => {
+                    if correct {
+                        neutral_correct += 1;
+                    }
+                }
+            }
+        }
+
+        let cong_acc = congruent_correct as f64 / trials_per_condition as f64;
+        let incong_acc = incongruent_correct as f64 / trials_per_condition as f64;
+        let neut_acc = neutral_correct as f64 / trials_per_condition as f64;
+
+        TrialResult {
+            congruent_accuracy: cong_acc,
+            incongruent_accuracy: incong_acc,
+            neutral_accuracy: neut_acc,
+            stroop_effect: cong_acc - incong_acc,
+        }
+    }
+}
+
+struct TrialResult {
+    congruent_accuracy: f64,
+    incongruent_accuracy: f64,
+    neutral_accuracy: f64,
+    stroop_effect: f64,
+}
+
+impl PsychBenchmark for StroopBenchmark {
+    fn name(&self) -> &str {
+        "Executive::Stroop"
+    }
+
+    fn run(&self, config: &BenchmarkConfig) -> BenchmarkResult {
+        let start = std::time::Instant::now();
+        let mut result = BenchmarkResult::new(self.name(), config.label.clone());
+
+        let mut cong = Vec::new();
+        let mut incong = Vec::new();
+        let mut neutral = Vec::new();
+        let mut effect = Vec::new();
+
+        for trial in 0..config.trials_per_condition {
+            let r = self.run_trial(config, trial);
+            cong.push(r.congruent_accuracy);
+            incong.push(r.incongruent_accuracy);
+            neutral.push(r.neutral_accuracy);
+            effect.push(r.stroop_effect);
+        }
+
+        result.insert("congruent_accuracy", MetricValue::from_samples(&cong));
+        result.insert("incongruent_accuracy", MetricValue::from_samples(&incong));
+        result.insert("neutral_accuracy", MetricValue::from_samples(&neutral));
+        result.insert("stroop_effect", MetricValue::from_samples(&effect));
+
+        result.conditions = 3;
+        result.trials_per_condition = config.trials_per_condition;
+        result.elapsed_ms = start.elapsed().as_millis() as u64;
+        result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stroop_runs() {
+        let config = BenchmarkConfig {
+            dimension: 256,
+            trials_per_condition: 3,
+            ..Default::default()
+        };
+        let result = StroopBenchmark.run(&config);
+        assert!(result.metrics.contains_key("congruent_accuracy"));
+        assert!(result.metrics.contains_key("incongruent_accuracy"));
+        assert!(result.metrics.contains_key("neutral_accuracy"));
+        assert!(result.metrics.contains_key("stroop_effect"));
+    }
+
+    #[test]
+    fn test_stroop_finite_metrics() {
+        let config = BenchmarkConfig {
+            dimension: 128,
+            trials_per_condition: 5,
+            ..Default::default()
+        };
+        let result = StroopBenchmark.run(&config);
+        for (key, val) in &result.metrics {
+            assert!(val.mean.is_finite(), "metric {} is not finite", key);
+        }
+    }
+
+    #[test]
+    fn test_stroop_effect_direction() {
+        let config = BenchmarkConfig {
+            dimension: 512,
+            trials_per_condition: 20,
+            ..Default::default()
+        };
+        let result = StroopBenchmark.run(&config);
+        let cong = result.metrics["congruent_accuracy"].mean;
+        let incong = result.metrics["incongruent_accuracy"].mean;
+        // Congruent should be easier than incongruent
+        assert!(
+            cong >= incong - 0.05,
+            "congruent ({:.3}) should be >= incongruent ({:.3})",
+            cong,
+            incong
+        );
+    }
+}
