@@ -29,6 +29,48 @@ pub struct StartCircleInput {
 }
 
 // ============================================================================
+// Cross-Zome Membership Validation
+// ============================================================================
+
+/// Decode a typed value from a ZomeCallResponse.
+fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    response: ZomeCallResponse,
+    context: &str,
+) -> ExternResult<T> {
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode {} response: {}",
+                context, e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to {} failed: {:?}",
+            context, other
+        )))),
+    }
+}
+
+/// Fetch the caller's role in the given hearth via cross-zome call to kinship.
+/// Returns the role if the caller is an active member, Err otherwise.
+fn require_membership(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
+    let caller_role: Option<MemberRole> = decode_zome_response(
+        call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_kinship"),
+            FunctionName::new("get_caller_role"),
+            None,
+            hearth_hash.clone(),
+        )?,
+        "get_caller_role",
+    )?;
+
+    caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "You are not an active member of this hearth".into()
+    )))
+}
+
+// ============================================================================
 // Extern Functions
 // ============================================================================
 
@@ -37,6 +79,7 @@ pub struct StartCircleInput {
 /// and emits a HearthSignal::GratitudeExpressed signal.
 #[hdk_extern]
 pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -93,6 +136,7 @@ pub fn express_gratitude(input: ExpressGratitudeInput) -> ExternResult<Record> {
 /// Start a new appreciation circle with a theme and initial participants.
 #[hdk_extern]
 pub fn start_appreciation_circle(input: StartCircleInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
 
     let circle = AppreciationCircle {

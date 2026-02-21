@@ -1117,12 +1117,99 @@ export interface CrossZomeCallFailedSignal {
 }
 
 // ============================================================================
+// Signal Types — Story Signals
+// ============================================================================
+
+export interface StoryCreatedSignal {
+  type: 'StoryCreated';
+  hearth_hash: ActionHash;
+  story_hash: ActionHash;
+  storyteller: AgentPubKey;
+  story_type: StoryType;
+}
+
+export interface StoryUpdatedSignal {
+  type: 'StoryUpdated';
+  story_hash: ActionHash;
+  updated_by: AgentPubKey;
+}
+
+export interface TraditionObservedSignal {
+  type: 'TraditionObserved';
+  tradition_hash: ActionHash;
+  observed_by: AgentPubKey;
+}
+
+export type StorySignal =
+  | StoryCreatedSignal
+  | StoryUpdatedSignal
+  | TraditionObservedSignal;
+
+export type StorySignalType = StorySignal['type'];
+
+// ============================================================================
+// Signal Types — Resource Signals
+// ============================================================================
+
+export interface ResourceLentSignal {
+  type: 'ResourceLent';
+  resource_hash: ActionHash;
+  borrower: AgentPubKey;
+  due_date: Timestamp;
+}
+
+export interface ResourceReturnedSignal {
+  type: 'ResourceReturned';
+  loan_hash: ActionHash;
+  borrower: AgentPubKey;
+}
+
+export interface ExpenseLoggedSignal {
+  type: 'ExpenseLogged';
+  budget_hash: ActionHash;
+  amount_cents: number;
+}
+
+export type ResourceSignal =
+  | ResourceLentSignal
+  | ResourceReturnedSignal
+  | ExpenseLoggedSignal;
+
+export type ResourceSignalType = ResourceSignal['type'];
+
+// ============================================================================
+// Signal Types — Milestone Signals
+// ============================================================================
+
+export interface MilestoneRecordedSignal {
+  type: 'MilestoneRecorded';
+  hearth_hash: ActionHash;
+  milestone_hash: ActionHash;
+  milestone_type: MilestoneType;
+}
+
+export interface TransitionAdvancedSignal {
+  type: 'TransitionAdvanced';
+  transition_hash: ActionHash;
+  new_phase: TransitionPhase;
+}
+
+export type MilestoneSignal =
+  | MilestoneRecordedSignal
+  | TransitionAdvancedSignal;
+
+export type MilestoneSignalType = MilestoneSignal['type'];
+
+// ============================================================================
 // Unified HearthSignal
 // ============================================================================
 
 export type HearthSignal =
   | DecisionSignal
   | KinshipSignal
+  | StorySignal
+  | ResourceSignal
+  | MilestoneSignal
   | GratitudeExpressedSignal
   | CareTaskCompletedSignal
   | EmergencyAlertSignal

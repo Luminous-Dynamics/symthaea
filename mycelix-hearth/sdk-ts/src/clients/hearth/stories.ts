@@ -11,13 +11,26 @@ import type {
   CreateCollectionInput,
   AddToCollectionInput,
   CreateTraditionInput,
+  StorySignal,
+  StorySignalType,
 } from './types';
 import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_stories';
 
+const STORY_SIGNAL_TYPES: ReadonlySet<string> = new Set([
+  'StoryCreated',
+  'StoryUpdated',
+  'TraditionObserved',
+]);
+
+export type StorySignalHandler = (signal: StorySignal) => void;
+
 export class StoriesClient {
+  private signalHandlers: Map<string, Set<StorySignalHandler>> = new Map();
+  private listening = false;
+
   constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
 
   // ============================================================================
@@ -96,5 +109,82 @@ export class StoriesClient {
   /** Search stories by tag. */
   async searchStoriesByTag(tag: string): Promise<HolochainRecord[]> {
     return this.callZome('search_stories_by_tag', tag);
+  }
+
+  // ============================================================================
+  // Signal Handling
+  // ============================================================================
+
+  /**
+   * Subscribe to story signals. Returns an unsubscribe function.
+   *
+   * @param handler - Callback invoked for each matching signal
+   * @param signalType - Optional filter: only receive signals of this type.
+   *                     Pass '*' or omit to receive all story signals.
+   *
+   * @example
+   * ```ts
+   * const unsub = client.onSignal((signal) => {
+   *   if (signal.type === 'StoryCreated') console.log('New story!', signal.story_hash);
+   * });
+   * // Later:
+   * unsub();
+   * ```
+   */
+  onSignal(
+    handler: StorySignalHandler,
+    signalType: StorySignalType | '*' = '*',
+  ): () => void {
+    this.ensureListening();
+
+    const key = signalType;
+    if (!this.signalHandlers.has(key)) {
+      this.signalHandlers.set(key, new Set());
+    }
+    this.signalHandlers.get(key)!.add(handler);
+
+    return () => {
+      const handlers = this.signalHandlers.get(key);
+      if (handlers) {
+        handlers.delete(handler);
+        if (handlers.size === 0) {
+          this.signalHandlers.delete(key);
+        }
+      }
+    };
+  }
+
+  private ensureListening(): void {
+    if (this.listening) return;
+    this.listening = true;
+
+    this.client.on('signal', (signal) => {
+      try {
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
+        if (!parsed || typeof parsed !== 'object') return;
+
+        // Rust enums serialize as { "VariantName": { fields... } }
+        const variantName = Object.keys(parsed)[0];
+        if (!variantName || !STORY_SIGNAL_TYPES.has(variantName)) return;
+
+        const fields = parsed[variantName] as Record<string, unknown>;
+        const typedSignal = { type: variantName, ...fields } as StorySignal;
+
+        // Notify type-specific handlers
+        const typeHandlers = this.signalHandlers.get(variantName);
+        if (typeHandlers) {
+          typeHandlers.forEach((h) => h(typedSignal));
+        }
+
+        // Notify wildcard handlers
+        const wildcardHandlers = this.signalHandlers.get('*');
+        if (wildcardHandlers) {
+          wildcardHandlers.forEach((h) => h(typedSignal));
+        }
+      } catch {
+        // Ignore non-story signals
+      }
+    });
   }
 }

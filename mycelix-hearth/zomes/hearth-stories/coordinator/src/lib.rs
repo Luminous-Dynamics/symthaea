@@ -65,12 +65,55 @@ pub struct AddToCollectionInput {
 }
 
 // ============================================================================
+// Cross-Zome Membership Validation
+// ============================================================================
+
+/// Decode a typed value from a ZomeCallResponse.
+fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    response: ZomeCallResponse,
+    context: &str,
+) -> ExternResult<T> {
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode {} response: {}",
+                context, e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to {} failed: {:?}",
+            context, other
+        )))),
+    }
+}
+
+/// Fetch the caller's role in the given hearth via cross-zome call to kinship.
+/// Returns the role if the caller is an active member, Err otherwise.
+fn require_membership(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
+    let caller_role: Option<MemberRole> = decode_zome_response(
+        call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_kinship"),
+            FunctionName::new("get_caller_role"),
+            None,
+            hearth_hash.clone(),
+        )?,
+        "get_caller_role",
+    )?;
+
+    caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "You are not an active member of this hearth".into()
+    )))
+}
+
+// ============================================================================
 // Extern Functions
 // ============================================================================
 
 /// Create a new family story. Links it to the hearth and creates tag links.
 #[hdk_extern]
 pub fn create_story(input: CreateStoryInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -201,6 +244,7 @@ pub fn add_media_to_story(input: AddMediaInput) -> ExternResult<()> {
 /// Create a new story collection. Links it to the hearth.
 #[hdk_extern]
 pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let caller = agent_info()?.agent_initial_pubkey;
 
     let collection = StoryCollection {
@@ -241,6 +285,8 @@ pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<()> {
 /// Create a new family tradition. Links it to the hearth.
 #[hdk_extern]
 pub fn create_tradition(input: CreateTraditionInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
+
     let tradition = FamilyTradition {
         hearth_hash: input.hearth_hash.clone(),
         name: input.name,
@@ -268,6 +314,7 @@ pub fn create_tradition(input: CreateTraditionInput) -> ExternResult<Record> {
 }
 
 /// Mark a tradition as observed by updating its last_observed timestamp.
+/// Reads the tradition to obtain its hearth_hash, then validates membership.
 #[hdk_extern]
 pub fn observe_tradition(tradition_hash: ActionHash) -> ExternResult<Record> {
     let caller = agent_info()?.agent_initial_pubkey;
@@ -284,6 +331,9 @@ pub fn observe_tradition(tradition_hash: ActionHash) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Invalid tradition entry".into()
         )))?;
+
+    // Validate caller is an active member of the tradition's hearth
+    require_membership(&tradition.hearth_hash)?;
 
     tradition.last_observed = Some(now);
 
