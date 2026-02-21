@@ -183,18 +183,6 @@ impl RavensProgressiveMatricesBenchmark {
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(300 + i)))
             .collect();
 
-        // Role HVs
-        let role_shape = ContinuousHV::random(dim, seed.wrapping_add(400));
-        let role_size = ContinuousHV::random(dim, seed.wrapping_add(401));
-        let role_color = ContinuousHV::random(dim, seed.wrapping_add(402));
-
-        let encode_cell = |cell: &Cell| -> ContinuousHV {
-            let s = role_shape.bind(&shape_hvs[cell.shape]);
-            let z = role_size.bind(&size_hvs[cell.size]);
-            let c = role_color.bind(&color_hvs[cell.color]);
-            ContinuousHV::bundle(&[&s, &z, &c])
-        };
-
         let items_per_tier = 10;
         let mut easy_correct = 0u32;
         let mut medium_correct = 0u32;
@@ -208,36 +196,55 @@ impl RavensProgressiveMatricesBenchmark {
                     .wrapping_add(trial_idx as u64 * 10000);
                 let item = generate_item(item_seed, difficulty);
 
-                // Encode visible cells
-                let cell_hvs: Vec<ContinuousHV> = item.cells.iter().map(|c| encode_cell(c)).collect();
+                // Per-feature rule extraction avoids cross-feature interference.
+                // For each feature, extract the transformation rule from completed rows,
+                // then predict the missing cell's feature independently.
 
-                // Extract row patterns: what transforms row elements?
-                // Row 0: cells [0,1,2], Row 1: cells [3,4,5], Row 2: cells [6,7,?]
-                // Rule extraction: unbind(cell_end, cell_start) per completed row
-                let row0_rule = cell_hvs[2].bind(&cell_hvs[0].inverse());
-                let row1_rule = cell_hvs[5].bind(&cell_hvs[3].inverse());
+                // Extract feature HVs for each cell position
+                let grid_shape: Vec<&ContinuousHV> = item.cells.iter().map(|c| &shape_hvs[c.shape]).collect();
+                let grid_size: Vec<&ContinuousHV> = item.cells.iter().map(|c| &size_hvs[c.size]).collect();
+                let grid_color: Vec<&ContinuousHV> = item.cells.iter().map(|c| &color_hvs[c.color]).collect();
 
-                // Average the two row rules for a robust rule estimate
-                let avg_rule = ContinuousHV::bundle(&[&row0_rule, &row1_rule]);
+                // For each feature, extract row rules (col2 = rule(col0)) from 2 complete rows,
+                // then predict the missing cell's feature.
+                let predict_feature = |feat: &[&ContinuousHV]| -> ContinuousHV {
+                    // Row 0: cells [0,1,2], Row 1: cells [3,4,5], Row 2: cells [6,7,?]
+                    // Row rule: unbind(col2, col0) — what maps col0 to col2?
+                    let row0_rule = feat[2].bind(&feat[0].inverse());
+                    let row1_rule = feat[5].bind(&feat[3].inverse());
+                    let avg_row_rule = ContinuousHV::bundle(&[&row0_rule, &row1_rule]);
+                    // Predict: apply average row rule to row2's col0 (cell 6)
+                    let row_pred = avg_row_rule.bind(feat[6]);
 
-                // Predict missing cell: apply rule to row 2's col 0 (cell 6)
-                let predicted = avg_rule.bind(&cell_hvs[6]);
+                    // Column rule: unbind(row2, row0) in col 2 — but col2 is incomplete
+                    // Use col 0 instead: cells [0, 3, 6] all known
+                    // col0 rule: unbind(row2, row0) = how row progresses
+                    let col0_rule = feat[6].bind(&feat[0].inverse());
+                    let col1_rule = feat[7].bind(&feat[1].inverse());
+                    let avg_col_rule = ContinuousHV::bundle(&[&col0_rule, &col1_rule]);
+                    // Predict: apply column rule to row0's col2 (cell 2)
+                    let col_pred = avg_col_rule.bind(feat[2]);
 
-                // Also try column pattern: col 2 across rows
-                let col_rule = cell_hvs[5].bind(&cell_hvs[2].inverse());
-                let predicted_col = col_rule.bind(&cell_hvs[2]);
+                    // Ensemble: average row and column predictions
+                    ContinuousHV::bundle(&[&row_pred, &col_pred])
+                };
 
-                // Ensemble: average both predictions
-                let predicted_ensemble = ContinuousHV::bundle(&[&predicted, &predicted_col]);
+                let pred_shape = predict_feature(&grid_shape);
+                let pred_size = predict_feature(&grid_size);
+                let pred_color = predict_feature(&grid_color);
 
-                // Score answer and distractors
-                let answer_hv = encode_cell(&item.answer);
-                let answer_sim = predicted_ensemble.similarity(&answer_hv);
+                // Score answer and distractors by per-feature similarity sum
+                let score_cell = |cell: &Cell| -> f32 {
+                    pred_shape.similarity(&shape_hvs[cell.shape])
+                        + pred_size.similarity(&size_hvs[cell.size])
+                        + pred_color.similarity(&color_hvs[cell.color])
+                };
+
+                let answer_sim = score_cell(&item.answer);
 
                 let mut best_distractor_sim = f32::NEG_INFINITY;
                 for d in &item.distractors {
-                    let d_hv = encode_cell(d);
-                    let sim = predicted_ensemble.similarity(&d_hv);
+                    let sim = score_cell(d);
                     if sim > best_distractor_sim {
                         best_distractor_sim = sim;
                     }

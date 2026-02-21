@@ -97,29 +97,32 @@ fn extract_indicator_score(
 ) -> f64 {
     match indicator {
         "RPT-1" => {
-            // CfC recurrence → temporal coherence: directly measures temporal
-            // continuity from CfC recurrent dynamics. Drops when recurrence disabled.
-            metadata.temporal_coherence_score
+            // CfC recurrence → temporal causal chains: counts detected causal chains
+            // from recurrent dynamics. With 1 neuron, no temporal chains form.
+            // Falls back to temporal_continuity (ungated, runs every cycle).
+            let chains = metadata.temporal_causal_chains as f64;
+            if chains > 0.0 {
+                chains.min(10.0) / 10.0 // Normalize to [0, 1]
+            } else {
+                // Use temporal_continuity as fallback (ratio 0-1, runs every cycle)
+                metadata.temporal_continuity.max(0.0)
+            }
         }
         "GWT-3" => {
-            // Global broadcast → consciousness_level: integrated consciousness
-            // requires broadcast across workspace. Drops when GWT disabled.
-            metadata.consciousness_level
+            // Global broadcast → gwt_broadcast: direct binary indicator of whether
+            // GWT submitted this cycle. Always false when GWT is disabled.
+            // More reliable than consciousness_level which runs only every 10 cycles.
+            if metadata.gwt_broadcast { 1.0 } else { 0.0 }
         }
         "HOT-2" => {
             // Metacognitive monitoring: meta_cognitive_accuracy
             metadata.meta_cognitive_accuracy as f64
         }
         "PP-1" => {
-            // Prediction learning → use predictive_free_energy as learning signal.
-            // When prediction learning disabled (threshold=MAX), free energy stays
-            // high (no adaptation). Score = 1/(1+FE) so high FE → low score.
-            let fe = metadata.predictive_free_energy;
-            if fe.is_finite() {
-                1.0 / (1.0 + fe.abs())
-            } else {
-                0.0
-            }
+            // Prediction learning → actual_effective_lr: directly shows whether
+            // learning rate was applied. When learning_threshold=MAX, effective LR
+            // should be 0.0. When learning is active, it's > 0.
+            metadata.actual_effective_lr as f64
         }
         "AST-1" => {
             // Attention schema: attention_schema_focus with non-zero fallback
