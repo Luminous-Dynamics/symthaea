@@ -13,6 +13,7 @@ import type {
   DecisionSignal,
   DecisionSignalType,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_decisions';
@@ -36,113 +37,84 @@ export class DecisionsClient {
   // Zome Calls
   // ============================================================================
 
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  /** Create a new decision for hearth members to vote on. */
   async createDecision(input: CreateDecisionInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_decision',
-      payload: input,
-    });
+    return this.callZome('create_decision', input);
   }
 
+  /** Cast a vote on an open decision. */
   async castVote(input: CastVoteInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'cast_vote',
-      payload: input,
-    });
+    return this.callZome('cast_vote', input);
   }
 
+  /** Amend a previously cast vote. */
   async amendVote(input: AmendVoteInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'amend_vote',
-      payload: input,
-    });
+    return this.callZome('amend_vote', input);
   }
 
+  /** Tally current votes for a decision. Returns array of [choice, weight] tuples. */
   async tallyVotes(decisionHash: ActionHash): Promise<Array<[number, number]>> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'tally_votes',
-      payload: decisionHash,
-    });
+    return this.callZome('tally_votes', decisionHash);
   }
 
+  /** Finalize a decision after voting closes. */
   async finalizeDecision(input: FinalizeDecisionInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'finalize_decision',
-      payload: input,
-    });
+    return this.callZome('finalize_decision', input);
   }
 
+  /** Close a decision without finalizing (cancel). */
   async closeDecision(decisionHash: ActionHash): Promise<HolochainRecord> {
     const input: CloseDecisionInput = { decision_hash: decisionHash };
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'close_decision',
-      payload: input,
-    });
+    return this.callZome('close_decision', input);
   }
 
+  /** Get a decision record by hash. Returns null if not found. */
   async getDecision(decisionHash: ActionHash): Promise<HolochainRecord | null> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_decision',
-      payload: decisionHash,
-    });
+    return this.callZome('get_decision', decisionHash);
   }
 
+  /** Get all decisions for a hearth. */
   async getHearthDecisions(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_decisions',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_decisions', hearthHash);
   }
 
+  /** Get all votes cast on a decision. */
   async getDecisionVotes(decisionHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_decision_votes',
-      payload: decisionHash,
-    });
+    return this.callZome('get_decision_votes', decisionHash);
   }
 
+  /** Get decisions in a hearth where the caller hasn't voted yet. */
   async getMyPendingVotes(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_my_pending_votes',
-      payload: hearthHash,
-    });
+    return this.callZome('get_my_pending_votes', hearthHash);
   }
 
+  /** Get the vote amendment history for a decision. */
   async getVoteHistory(decisionHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_vote_history',
-      payload: decisionHash,
-    });
+    return this.callZome('get_vote_history', decisionHash);
   }
 
+  /** Get the outcome record for a finalized decision. */
   async getDecisionOutcome(decisionHash: ActionHash): Promise<HolochainRecord | null> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_decision_outcome',
-      payload: decisionHash,
-    });
+    return this.callZome('get_decision_outcome', decisionHash);
   }
 
   // ============================================================================
@@ -194,7 +166,8 @@ export class DecisionsClient {
 
     this.client.on('signal', (signal) => {
       try {
-        const parsed = signal.payload as Record<string, unknown>;
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return;
 
         // Rust enums serialize as { "VariantName": { fields... } }

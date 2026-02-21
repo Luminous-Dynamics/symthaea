@@ -15,6 +15,7 @@ import type {
   BridgeHealth,
   CrossZomeCallFailedSignal,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_bridge';
@@ -30,194 +31,141 @@ export class BridgeClient {
   constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
 
   // ============================================================================
+  // Private Helpers
+  // ============================================================================
+
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  // ============================================================================
   // Zome Calls — Intra-Cluster Dispatch
   // ============================================================================
 
+  /** Dispatch a synchronous RPC call to a hearth domain zome. */
   async dispatchCall(input: DispatchInput): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'dispatch_call',
-      payload: input,
-    });
+    return this.callZome('dispatch_call', input);
   }
 
+  /** Submit an audited async query to the hearth bridge. */
   async queryHearth(input: DispatchInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'query_hearth',
-      payload: input,
-    });
+    return this.callZome('query_hearth', input);
   }
 
+  /** Resolve a pending query with a result. */
   async resolveQuery(input: ResolveQueryInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'resolve_query',
-      payload: input,
-    });
+    return this.callZome('resolve_query', input);
   }
 
+  /** Broadcast an event to connected clients. */
   async broadcastEvent(input: DispatchInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'broadcast_event',
-      payload: input,
-    });
+    return this.callZome('broadcast_event', input);
   }
 
   // ============================================================================
   // Zome Calls — Event Queries
   // ============================================================================
 
+  /** Get events for a specific domain. */
   async getDomainEvents(domain: string): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_domain_events',
-      payload: domain,
-    });
+    return this.callZome('get_domain_events', domain);
   }
 
+  /** Get all events across all domains. */
   async getAllEvents(): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_all_events',
-      payload: null,
-    });
+    return this.callZome('get_all_events', null);
   }
 
+  /** Get events filtered by type. */
   async getEventsByType(query: EventTypeQuery): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_events_by_type',
-      payload: query,
-    });
+    return this.callZome('get_events_by_type', query);
   }
 
+  /** Get the caller's pending queries. */
   async getMyQueries(): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_my_queries',
-      payload: null,
-    });
+    return this.callZome('get_my_queries', null);
   }
 
   // ============================================================================
   // Zome Calls — Cross-Cluster Dispatch
   // ============================================================================
 
+  /** Dispatch a cross-cluster call to the Personal cluster. */
   async dispatchPersonalCall(input: CrossClusterDispatchInput): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'dispatch_personal_call',
-      payload: input,
-    });
+    return this.callZome('dispatch_personal_call', input);
   }
 
+  /** Dispatch a cross-cluster call to the Identity cluster. */
   async dispatchIdentityCall(input: CrossClusterDispatchInput): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'dispatch_identity_call',
-      payload: input,
-    });
+    return this.callZome('dispatch_identity_call', input);
   }
 
+  /** Dispatch a cross-cluster call to the Commons cluster. */
   async dispatchCommonsCall(input: CrossClusterDispatchInput): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'dispatch_commons_call',
-      payload: input,
-    });
+    return this.callZome('dispatch_commons_call', input);
   }
 
+  /** Dispatch a cross-cluster call to the Civic cluster. */
   async dispatchCivicCall(input: CrossClusterDispatchInput): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'dispatch_civic_call',
-      payload: input,
-    });
+    return this.callZome('dispatch_civic_call', input);
   }
 
   // ============================================================================
   // Zome Calls — Cross-Cluster Convenience
   // ============================================================================
 
+  /** Verify a member's identity via the Identity cluster. */
   async verifyMemberIdentity(agent: AgentPubKey): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'verify_member_identity',
-      payload: agent,
-    });
+    return this.callZome('verify_member_identity', agent);
   }
 
+  /** Escalate an emergency alert to the Civic cluster. */
   async escalateEmergency(alertData: string): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'escalate_emergency',
-      payload: alertData,
-    });
+    return this.callZome('escalate_emergency', alertData);
   }
 
+  /** Query a member's timebank balance from Commons. */
   async queryTimebankBalance(agent: AgentPubKey): Promise<DispatchResult> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'query_timebank_balance',
-      payload: agent,
-    });
+    return this.callZome('query_timebank_balance', agent);
   }
 
   // ============================================================================
   // Zome Calls — Lifecycle & Sync
   // ============================================================================
 
+  /** Initiate a severance (member departure) process. */
   async initiateSeverance(input: SeveranceInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'initiate_severance',
-      payload: input,
-    });
+    return this.callZome('initiate_severance', input);
   }
 
+  /** Trigger a hearth sync to assemble a weekly digest. */
   async hearthSync(input: HearthSyncInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'hearth_sync',
-      payload: input,
-    });
+    return this.callZome('hearth_sync', input);
   }
 
+  /** Get weekly digests for a hearth. */
   async getWeeklyDigests(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_weekly_digests',
-      payload: hearthHash,
-    });
+    return this.callZome('get_weekly_digests', hearthHash);
   }
 
+  /** Check the health of the bridge zome. */
   async healthCheck(): Promise<BridgeHealth> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'health_check',
-      payload: null,
-    });
+    return this.callZome('health_check', null);
   }
 
   // ============================================================================
@@ -269,7 +217,8 @@ export class BridgeClient {
 
     this.client.on('signal', (signal) => {
       try {
-        const parsed = signal.payload as Record<string, unknown>;
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return;
 
         // Rust enums serialize as { "VariantName": { fields... } }

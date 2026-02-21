@@ -11,6 +11,7 @@ import type {
   GratitudeSummary,
   GratitudeExpressedSignal,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_gratitude';
@@ -31,76 +32,63 @@ export class GratitudeClient {
   // Zome Calls
   // ============================================================================
 
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  /** Express gratitude toward another hearth member. */
   async expressGratitude(input: ExpressGratitudeInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'express_gratitude',
-      payload: input,
-    });
+    return this.callZome('express_gratitude', input);
   }
 
+  /** Start a new appreciation circle in the hearth. */
   async startAppreciationCircle(input: StartCircleInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'start_appreciation_circle',
-      payload: input,
-    });
+    return this.callZome('start_appreciation_circle', input);
   }
 
+  /** Join an active appreciation circle. */
   async joinCircle(circleHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'join_circle',
-      payload: circleHash,
-    });
+    return this.callZome('join_circle', circleHash);
   }
 
+  /** Complete (close) an appreciation circle. */
   async completeCircle(circleHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'complete_circle',
-      payload: circleHash,
-    });
+    return this.callZome('complete_circle', circleHash);
   }
 
+  /** Get the gratitude stream for a hearth. */
   async getGratitudeStream(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_gratitude_stream',
-      payload: hearthHash,
-    });
+    return this.callZome('get_gratitude_stream', hearthHash);
   }
 
+  /** Get the gratitude balance for an agent. */
   async getGratitudeBalance(agent: AgentPubKey): Promise<HolochainRecord | null> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_gratitude_balance',
-      payload: agent,
-    });
+    return this.callZome('get_gratitude_balance', agent);
   }
 
+  /** Get all appreciation circles for a hearth. */
   async getHearthCircles(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_circles',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_circles', hearthHash);
   }
 
+  /** Create a gratitude digest for a time epoch. */
   async createGratitudeDigest(input: DigestEpochInput): Promise<GratitudeSummary[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_gratitude_digest',
-      payload: input,
-    });
+    return this.callZome('create_gratitude_digest', input);
   }
 
   // ============================================================================
@@ -152,7 +140,8 @@ export class GratitudeClient {
 
     this.client.on('signal', (signal) => {
       try {
-        const parsed = signal.payload as Record<string, unknown>;
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return;
 
         // Rust enums serialize as { "VariantName": { fields... } }

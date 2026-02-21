@@ -11,6 +11,7 @@ import type {
   CheckInInput,
   EmergencyAlertSignal,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_emergency';
@@ -28,79 +29,70 @@ export class EmergencyClient {
   constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
 
   // ============================================================================
+  // Private helper
+  // ============================================================================
+
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  // ============================================================================
   // Zome Calls
   // ============================================================================
 
+  /** Create an emergency plan for the hearth. */
   async createEmergencyPlan(input: CreateEmergencyPlanInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_emergency_plan',
-      payload: input,
-    });
+    return this.callZome('create_emergency_plan', input);
   }
 
+  /** Update an existing emergency plan. */
   async updateEmergencyPlan(input: UpdatePlanInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'update_emergency_plan',
-      payload: input,
-    });
+    return this.callZome('update_emergency_plan', input);
   }
 
+  /** Raise an emergency alert. */
   async raiseAlert(input: RaiseAlertInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'raise_alert',
-      payload: input,
-    });
+    return this.callZome('raise_alert', input);
   }
 
+  /** Submit a safety check-in response to an alert. */
   async checkIn(input: CheckInInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'check_in',
-      payload: input,
-    });
+    return this.callZome('check_in', input);
   }
 
+  /** Resolve (close) an active emergency alert. */
   async resolveAlert(alertHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'resolve_alert',
-      payload: alertHash,
-    });
+    return this.callZome('resolve_alert', alertHash);
   }
 
+  /** Get all active emergency alerts for a hearth. */
   async getActiveAlerts(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_active_alerts',
-      payload: hearthHash,
-    });
+    return this.callZome('get_active_alerts', hearthHash);
   }
 
+  /** Get all check-in responses for an alert. */
   async getAlertCheckins(alertHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_alert_checkins',
-      payload: alertHash,
-    });
+    return this.callZome('get_alert_checkins', alertHash);
   }
 
+  /** Get the emergency plan for a hearth. */
   async getEmergencyPlan(hearthHash: ActionHash): Promise<HolochainRecord | null> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_emergency_plan',
-      payload: hearthHash,
-    });
+    return this.callZome('get_emergency_plan', hearthHash);
   }
 
   // ============================================================================
@@ -152,7 +144,8 @@ export class EmergencyClient {
 
     this.client.on('signal', (signal) => {
       try {
-        const parsed = signal.payload as Record<string, unknown>;
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return;
 
         // Rust enums serialize as { "VariantName": { fields... } }

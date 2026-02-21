@@ -13,6 +13,7 @@ import type {
   CareSummary,
   CareTaskCompletedSignal,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_care';
@@ -30,97 +31,80 @@ export class CareClient {
   constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
 
   // ============================================================================
+  // Private helper
+  // ============================================================================
+
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  // ============================================================================
   // Zome Calls
   // ============================================================================
 
+  /** Create a care schedule for the hearth. */
   async createCareSchedule(input: CreateCareScheduleInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_care_schedule',
-      payload: input,
-    });
+    return this.callZome('create_care_schedule', input);
   }
 
+  /** Mark a care task as completed. */
   async completeTask(input: CompleteTaskInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'complete_task',
-      payload: input,
-    });
+    return this.callZome('complete_task', input);
   }
 
+  /** Propose a care duty swap with another member. */
   async proposeSwap(input: ProposeSwapInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'propose_swap',
-      payload: input,
-    });
+    return this.callZome('propose_swap', input);
   }
 
+  /** Accept a proposed care swap. */
   async acceptSwap(swapHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'accept_swap',
-      payload: swapHash,
-    });
+    return this.callZome('accept_swap', swapHash);
   }
 
+  /** Decline a proposed care swap. */
   async declineSwap(swapHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'decline_swap',
-      payload: swapHash,
-    });
+    return this.callZome('decline_swap', swapHash);
   }
 
+  /** Create a meal plan for the hearth. */
   async createMealPlan(input: CreateMealPlanInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_meal_plan',
-      payload: input,
-    });
+    return this.callZome('create_meal_plan', input);
   }
 
+  /** Get the caller's current care duties. */
   async getMyCareDuties(): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_my_care_duties',
-      payload: null,
-    });
+    return this.callZome('get_my_care_duties', null);
   }
 
+  /** Get the full care schedule for a hearth. */
   async getHearthSchedule(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_schedule',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_schedule', hearthHash);
   }
 
+  /** Get all meal plans for a hearth. */
   async getHearthMealPlans(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_meal_plans',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_meal_plans', hearthHash);
   }
 
+  /** Create a care digest for a time epoch. */
   async createCareDigest(input: DigestEpochInput): Promise<CareSummary[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_care_digest',
-      payload: input,
-    });
+    return this.callZome('create_care_digest', input);
   }
 
   // ============================================================================
@@ -172,7 +156,8 @@ export class CareClient {
 
     this.client.on('signal', (signal) => {
       try {
-        const parsed = signal.payload as Record<string, unknown>;
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return;
 
         // Rust enums serialize as { "VariantName": { fields... } }

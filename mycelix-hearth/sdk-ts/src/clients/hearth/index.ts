@@ -1,4 +1,6 @@
 export * from './types';
+export { HearthError, classifyError } from './errors';
+export type { HearthErrorCode } from './errors';
 export { KinshipClient } from './kinship';
 export type { KinshipSignalHandler } from './kinship';
 export { DecisionsClient } from './decisions';

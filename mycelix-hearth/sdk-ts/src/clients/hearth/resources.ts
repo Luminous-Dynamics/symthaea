@@ -10,6 +10,7 @@ import type {
   CreateBudgetInput,
   LogExpenseInput,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_resources';
@@ -18,78 +19,69 @@ export class ResourcesClient {
   constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
 
   // ============================================================================
+  // Private helper
+  // ============================================================================
+
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  // ============================================================================
   // Zome Calls
   // ============================================================================
 
+  /** Register a shared resource in the hearth inventory. */
   async registerResource(input: RegisterResourceInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'register_resource',
-      payload: input,
-    });
+    return this.callZome('register_resource', input);
   }
 
+  /** Lend a resource to another member. */
   async lendResource(input: LendResourceInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'lend_resource',
-      payload: input,
-    });
+    return this.callZome('lend_resource', input);
   }
 
+  /** Return a borrowed resource. */
   async returnResource(loanHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'return_resource',
-      payload: loanHash,
-    });
+    return this.callZome('return_resource', loanHash);
   }
 
+  /** Create a budget category for expense tracking. */
   async createBudgetCategory(input: CreateBudgetInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_budget_category',
-      payload: input,
-    });
+    return this.callZome('create_budget_category', input);
   }
 
+  /** Log an expense against a budget category. */
   async logExpense(input: LogExpenseInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'log_expense',
-      payload: input,
-    });
+    return this.callZome('log_expense', input);
   }
 
+  /** Get the full resource inventory for a hearth. */
   async getHearthInventory(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_inventory',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_inventory', hearthHash);
   }
 
+  /** Get the budget summary for a hearth. */
   async getBudgetSummary(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_budget_summary',
-      payload: hearthHash,
-    });
+    return this.callZome('get_budget_summary', hearthHash);
   }
 
+  /** Get all active resource loans for a hearth. */
   async getResourceLoans(resourceHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_resource_loans',
-      payload: resourceHash,
-    });
+    return this.callZome('get_resource_loans', resourceHash);
   }
 }

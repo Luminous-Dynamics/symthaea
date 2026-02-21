@@ -13,6 +13,7 @@ import type {
   RhythmOccurredSignal,
   PresenceChangedSignal,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_rhythms';
@@ -34,70 +35,65 @@ export class RhythmsClient {
   constructor(private readonly client: AppClient, private readonly roleName = ROLE_NAME) {}
 
   // ============================================================================
+  // Private Helpers
+  // ============================================================================
+
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  // ============================================================================
   // Zome Calls
   // ============================================================================
 
+  /** Create a new family rhythm or ritual. */
   async createRhythm(input: CreateRhythmInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_rhythm',
-      payload: input,
-    });
+    return this.callZome('create_rhythm', input);
   }
 
+  /** Log an occurrence of a rhythm. */
   async logOccurrence(input: LogOccurrenceInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'log_occurrence',
-      payload: input,
-    });
+    return this.callZome('log_occurrence', input);
   }
 
+  /** Set the caller's presence status for the hearth. */
   async setPresence(input: SetPresenceInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'set_presence',
-      payload: input,
-    });
+    return this.callZome('set_presence', input);
   }
 
+  /** Get all rhythms for a hearth. */
   async getHearthRhythms(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_rhythms',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_rhythms', hearthHash);
   }
 
+  /** Get all occurrences of a specific rhythm. */
   async getRhythmOccurrences(rhythmHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_rhythm_occurrences',
-      payload: rhythmHash,
-    });
+    return this.callZome('get_rhythm_occurrences', rhythmHash);
   }
 
+  /** Get current presence status for all hearth members. */
   async getHearthPresence(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_presence',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_presence', hearthHash);
   }
 
+  /** Create a rhythm digest for a time epoch. */
   async createRhythmDigest(input: DigestEpochInput): Promise<RhythmSummary[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_rhythm_digest',
-      payload: input,
-    });
+    return this.callZome('create_rhythm_digest', input);
   }
 
   // ============================================================================
@@ -150,7 +146,8 @@ export class RhythmsClient {
 
     this.client.on('signal', (signal) => {
       try {
-        const parsed = signal.payload as Record<string, unknown>;
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return;
 
         // Rust enums serialize as { "VariantName": { fields... } }

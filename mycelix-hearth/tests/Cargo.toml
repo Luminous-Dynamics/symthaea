@@ -34,3 +34,23 @@ path = "sweettest_bridge.rs"
 [[test]]
 name = "sweettest_digest_sync"
 path = "sweettest_digest_sync.rs"
+
+[[test]]
+name = "sweettest_consciousness_gating"
+path = "sweettest_consciousness_gating.rs"
+
+[[test]]
+name = "sweettest_care_gratitude_rhythms"
+path = "sweettest_care_gratitude_rhythms.rs"
+
+[[test]]
+name = "sweettest_emergency"
+path = "sweettest_emergency.rs"
+
+[[test]]
+name = "sweettest_autonomy"
+path = "sweettest_autonomy.rs"
+
+[[test]]
+name = "sweettest_multi_hearth"
+path = "sweettest_multi_hearth.rs"

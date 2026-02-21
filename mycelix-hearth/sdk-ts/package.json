@@ -1,0 +1,30 @@
+{
+  "name": "@mycelix/hearth-sdk",
+  "version": "0.1.0",
+  "description": "Mycelix Hearth SDK - TypeScript clients for family/household coordination on Holochain",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/clients/hearth/index.d.ts",
+      "import": "./dist/clients/hearth/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "author": "Luminous Dynamics <dev@luminousdynamics.org>",
+  "license": "MIT",
+  "dependencies": {
+    "@holochain/client": "^0.20.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

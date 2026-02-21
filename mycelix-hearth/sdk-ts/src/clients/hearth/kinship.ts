@@ -18,6 +18,7 @@ import type {
   KinshipSignal,
   KinshipSignalType,
 } from './types';
+import { HearthError, classifyError } from './errors';
 
 const ROLE_NAME = 'hearth';
 const ZOME_NAME = 'hearth_kinship';
@@ -40,184 +41,123 @@ export class KinshipClient {
   // Zome Calls
   // ============================================================================
 
+  private async callZome<T>(fnName: string, payload: unknown): Promise<T> {
+    try {
+      return await this.client.callZome({
+        role_name: this.roleName,
+        zome_name: ZOME_NAME,
+        fn_name: fnName,
+        payload,
+      });
+    } catch (err) {
+      throw new HearthError({
+        code: classifyError(err),
+        message: `${ZOME_NAME}.${fnName} failed: ${err}`,
+        zome: ZOME_NAME,
+        fnName,
+        cause: err,
+      });
+    }
+  }
+
+  /** Create a new hearth (family/household unit). */
   async createHearth(input: CreateHearthInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_hearth',
-      payload: input,
-    });
+    return this.callZome('create_hearth', input);
   }
 
+  /** Invite an agent to join the hearth. */
   async inviteMember(input: InviteMemberInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'invite_member',
-      payload: input,
-    });
+    return this.callZome('invite_member', input);
   }
 
+  /** Accept a pending hearth invitation. */
   async acceptInvitation(input: AcceptInvitationInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'accept_invitation',
-      payload: input,
-    });
+    return this.callZome('accept_invitation', input);
   }
 
+  /** Decline a pending hearth invitation. */
   async declineInvitation(invitationHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'decline_invitation',
-      payload: invitationHash,
-    });
+    return this.callZome('decline_invitation', invitationHash);
   }
 
+  /** Leave a hearth voluntarily. */
   async leaveHearth(membershipHash: ActionHash): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'leave_hearth',
-      payload: membershipHash,
-    });
+    return this.callZome('leave_hearth', membershipHash);
   }
 
+  /** Update a member's role within the hearth. */
   async updateMemberRole(input: UpdateMemberRoleInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'update_member_role',
-      payload: input,
-    });
+    return this.callZome('update_member_role', input);
   }
 
+  /** Create a kinship bond between the caller and another member. */
   async createKinshipBond(input: CreateBondInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_kinship_bond',
-      payload: input,
-    });
+    return this.callZome('create_kinship_bond', input);
   }
 
+  /** Tend (strengthen) an existing kinship bond. */
   async tendBond(input: TendBondInput): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'tend_bond',
-      payload: input,
-    });
+    return this.callZome('tend_bond', input);
   }
 
+  /** Get the health status of a kinship bond. */
   async getBondHealth(input: GetBondHealthInput): Promise<number> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_bond_health',
-      payload: input,
-    });
+    return this.callZome('get_bond_health', input);
   }
 
+  /** Create a weekly digest entry for a hearth epoch. */
   async createWeeklyDigest(input: WeeklyDigest): Promise<HolochainRecord> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'create_weekly_digest',
-      payload: input,
-    });
+    return this.callZome('create_weekly_digest', input);
   }
 
+  /** Get all weekly digests for a hearth. */
   async getWeeklyDigests(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_weekly_digests',
-      payload: hearthHash,
-    });
+    return this.callZome('get_weekly_digests', hearthHash);
   }
 
+  /** Check if the caller is a guardian of the given hearth. */
   async isGuardian(hearthHash: ActionHash): Promise<boolean> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'is_guardian',
-      payload: hearthHash,
-    });
+    return this.callZome('is_guardian', hearthHash);
   }
 
+  /** Get the caller's vote weight in basis points for a hearth. */
   async getCallerVoteWeight(hearthHash: ActionHash): Promise<number> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_caller_vote_weight',
-      payload: hearthHash,
-    });
+    return this.callZome('get_caller_vote_weight', hearthHash);
   }
 
+  /** Get the caller's role in a hearth. */
   async getCallerRole(hearthHash: ActionHash): Promise<MemberRole | null> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_caller_role',
-      payload: hearthHash,
-    });
+    return this.callZome('get_caller_role', hearthHash);
   }
 
+  /** Get the count of active members in a hearth. */
   async getActiveMemberCount(hearthHash: ActionHash): Promise<number> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_active_member_count',
-      payload: hearthHash,
-    });
+    return this.callZome('get_active_member_count', hearthHash);
   }
 
+  /** Get all membership records for a hearth. */
   async getHearthMembers(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_hearth_members',
-      payload: hearthHash,
-    });
+    return this.callZome('get_hearth_members', hearthHash);
   }
 
+  /** Get all hearths the caller is a member of. */
   async getMyHearths(): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_my_hearths',
-      payload: null,
-    });
+    return this.callZome('get_my_hearths', null);
   }
 
+  /** Get the full kinship bond graph for a hearth. */
   async getKinshipGraph(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_kinship_graph',
-      payload: hearthHash,
-    });
+    return this.callZome('get_kinship_graph', hearthHash);
   }
 
+  /** Get bonds that haven't been tended recently. */
   async getNeglectedBonds(hearthHash: ActionHash): Promise<HolochainRecord[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_neglected_bonds',
-      payload: hearthHash,
-    });
+    return this.callZome('get_neglected_bonds', hearthHash);
   }
 
+  /** Get historical snapshots of bond strengths. */
   async getBondSnapshots(hearthHash: ActionHash): Promise<BondUpdate[]> {
-    return this.client.callZome({
-      role_name: this.roleName,
-      zome_name: ZOME_NAME,
-      fn_name: 'get_bond_snapshots',
-      payload: hearthHash,
-    });
+    return this.callZome('get_bond_snapshots', hearthHash);
   }
 
   // ============================================================================
@@ -269,7 +209,8 @@ export class KinshipClient {
 
     this.client.on('signal', (signal) => {
       try {
-        const parsed = signal.payload as Record<string, unknown>;
+        if (signal.type !== 'app') return;
+        const parsed = signal.value.payload as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return;
 
         // Rust enums serialize as { "VariantName": { fields... } }
