@@ -1892,17 +1892,26 @@ impl CognitiveLoopService {
         // ═══════════════════════════════════════════════════════════════════════
         let _t = Instant::now();
         let (lattice_height, lattice_width, lattice_join_concept) = if let Some(ref lattice) = self.primitive_lattice {
-            let props = lattice.properties();
-            // FEEDBACK: Lattice height (integration depth) → LR modulation
-            // Deeper lattice = more hierarchical structure = slower but more stable learning
-            if props.height > 5 {
-                let depth_factor = 1.0 - (props.height.min(9) as f32 - 5.0) * 0.01; // -1% per level above 5
+            // Properties (height/width/modularity) are O(n²–n³) on the lattice graph.
+            // The lattice is immutable after construction → compute once on first cycle,
+            // cache in stats, and reuse. This eliminates ~31ms/cycle overhead.
+            let (height, width) = if self.stats.lattice_height_cached == 0 {
+                let props = lattice.properties();
+                self.stats.lattice_height_cached = props.height;
+                self.stats.lattice_width_cached = props.width;
+                (props.height, props.width)
+            } else {
+                (self.stats.lattice_height_cached, self.stats.lattice_width_cached)
+            };
+
+            // FEEDBACK: Lattice height (integration depth) → LR modulation (once)
+            if height > 5 && self.stats.total_cycles == 0 {
+                let depth_factor = 1.0 - (height.min(9) as f32 - 5.0) * 0.01;
                 self.carryover.subsystem_lr_factor *= depth_factor;
             }
 
-            // Track B: Lattice join for concept composition
-            // Find the lowest-tier join (most specific integrating concept) among active primitives
-            let join_concept = if active_primitive_names.len() >= 2 {
+            // Track B: Lattice join for concept composition (every 5 cycles — join is O(1) via precomputed table)
+            let join_concept = if active_primitive_names.len() >= 2 && self.stats.total_cycles % 5 == 0 {
                 let mut best_join: Option<usize> = None;
                 for i in 0..active_primitive_names.len() {
                     for j in (i + 1)..active_primitive_names.len() {
@@ -1926,7 +1935,7 @@ impl CognitiveLoopService {
                 None
             };
 
-            (props.height, props.width, join_concept)
+            (height, width, join_concept)
         } else {
             (0, 0, None)
         };

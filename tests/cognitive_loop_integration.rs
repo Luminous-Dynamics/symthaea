@@ -1464,3 +1464,118 @@ fn test_negative_affect_reduces_confidence() {
         "With-primitives confidence should be bounded",
     );
 }
+
+// ── Performance Profiling ───────────────────────────────────────────
+
+#[test]
+fn test_module_timing_profile() {
+    let mut service = CognitiveLoopService::new(CognitiveLoopConfig {
+        enable_primitive_consciousness: true,
+        ..Default::default()
+    })
+    .unwrap();
+
+    // Run 100 cycles and collect timing data
+    let mut timing_sums: Vec<(&str, u64)> = Vec::new();
+    let mut total_cycle_us: u64 = 0;
+
+    for i in 0..100 {
+        let start = std::time::Instant::now();
+        let result = service.cycle(&format!("profiling cycle {i}"));
+        let cycle_us = start.elapsed().as_micros() as u64;
+        total_cycle_us += cycle_us;
+
+        let t = &result.metadata.module_timings_us;
+
+        if i == 0 {
+            // Initialize
+            timing_sums = vec![
+                ("affective_bridge", 0), ("predictive_processing", 0),
+                ("cross_modal_binding", 0), ("surprise_exploration", 0),
+                ("prefrontal", 0), ("meta_cognition", 0),
+                ("narrative_self", 0), ("gwt", 0),
+                ("virtual_body", 0), ("embodied_cognition", 0),
+                ("dream_replay", 0), ("moral_algebra", 0),
+                ("consciousness_resonance", 0), ("temporal_consciousness", 0),
+                ("attention_schema", 0), ("narrative_gwt", 0),
+                ("consciousness_thermodynamics", 0), ("phenomenal_binding", 0),
+                ("hierarchical_free_energy", 0), ("resonator_recall", 0),
+                ("support_intelligence", 0), ("temporal_analyzer", 0),
+                ("primitive_lattice", 0), ("compositionality", 0),
+                ("value_evaluator", 0), ("consciousness_profile", 0),
+                ("harmonics", 0), ("primitive_reasoning", 0),
+                ("causal_explanation", 0), ("adaptive_reasoning", 0),
+                ("epistemic_tiers", 0), ("phi_validation", 0),
+                ("dissipative_consciousness", 0), ("epistemic_conflict", 0),
+                ("consciousness_equation_v2", 0), ("hierarchical_ltc", 0),
+                ("primitive_evolution", 0), ("consciousness_holography", 0),
+                ("differentiable_consciousness", 0), ("affective_consciousness", 0),
+                ("unified_consciousness_pipeline", 0), ("multi_modal_integration", 0),
+                ("synthetic_grounding", 0), ("epistemic_gate", 0),
+                ("semantic_value_embedder", 0), ("composition_rules", 0),
+                ("harmonies_integration", 0), ("meta_cognitive_reasoning", 0),
+                ("code_primitive_routing", 0), ("empathic_unification", 0),
+                ("multi_objective_evolution", 0),
+            ];
+        }
+
+        let values = [
+            t.affective_bridge, t.predictive_processing,
+            t.cross_modal_binding, t.surprise_exploration,
+            t.prefrontal, t.meta_cognition,
+            t.narrative_self, t.gwt,
+            t.virtual_body, t.embodied_cognition,
+            t.dream_replay, t.moral_algebra,
+            t.consciousness_resonance, t.temporal_consciousness,
+            t.attention_schema, t.narrative_gwt,
+            t.consciousness_thermodynamics, t.phenomenal_binding,
+            t.hierarchical_free_energy, t.resonator_recall,
+            t.support_intelligence, t.temporal_analyzer,
+            t.primitive_lattice, t.compositionality,
+            t.value_evaluator, t.consciousness_profile,
+            t.harmonics, t.primitive_reasoning,
+            t.causal_explanation, t.adaptive_reasoning,
+            t.epistemic_tiers, t.phi_validation,
+            t.dissipative_consciousness, t.epistemic_conflict,
+            t.consciousness_equation_v2, t.hierarchical_ltc,
+            t.primitive_evolution, t.consciousness_holography,
+            t.differentiable_consciousness, t.affective_consciousness,
+            t.unified_consciousness_pipeline, t.multi_modal_integration,
+            t.synthetic_grounding, t.epistemic_gate,
+            t.semantic_value_embedder, t.composition_rules,
+            t.harmonies_integration, t.meta_cognitive_reasoning,
+            t.code_primitive_routing, t.empathic_unification,
+            t.multi_objective_evolution,
+        ];
+
+        for (j, &val) in values.iter().enumerate() {
+            timing_sums[j].1 += val;
+        }
+    }
+
+    // Sort by total time descending
+    timing_sums.sort_by(|a, b| b.1.cmp(&a.1));
+
+    // Print top 20 modules by total time
+    eprintln!("\n═══ MODULE TIMING PROFILE (100 cycles, primitives ON) ═══");
+    eprintln!("Total wall-clock: {:.1}ms", total_cycle_us as f64 / 1000.0);
+    eprintln!("Avg cycle: {:.1}ms\n", total_cycle_us as f64 / 100_000.0);
+    let instrumented_total: u64 = timing_sums.iter().map(|(_, t)| t).sum();
+    eprintln!("Instrumented total: {:.1}ms ({:.0}% of wall-clock)\n",
+        instrumented_total as f64 / 1000.0,
+        instrumented_total as f64 / total_cycle_us as f64 * 100.0);
+    eprintln!("{:<35} {:>10} {:>8} {:>6}", "Module", "Total(µs)", "Avg(µs)", "%");
+    eprintln!("{}", "-".repeat(65));
+    for (name, total) in timing_sums.iter().take(20) {
+        let pct = if instrumented_total > 0 { *total as f64 / instrumented_total as f64 * 100.0 } else { 0.0 };
+        eprintln!("{:<35} {:>10} {:>8} {:>5.1}%", name, total, total / 100, pct);
+    }
+
+    // Sanity: avg cycle time should be reasonable (<500ms in test profile)
+    let avg_cycle_ms = total_cycle_us as f64 / 100_000.0;
+    assert!(
+        avg_cycle_ms < 500.0,
+        "Average cycle time should be <500ms, got {:.1}ms",
+        avg_cycle_ms,
+    );
+}
