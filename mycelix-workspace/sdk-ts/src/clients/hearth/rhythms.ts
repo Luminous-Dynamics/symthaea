@@ -11,9 +11,6 @@ import type {
   CreateRhythmInput,
   LogOccurrenceInput,
   SetPresenceInput,
-  Rhythm,
-  RhythmOccurrence,
-  PresenceStatus,
 } from './types';
 import type { ActionHash } from '../../generated/common';
 

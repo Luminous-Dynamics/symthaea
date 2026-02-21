@@ -10,9 +10,6 @@ import type {
   CreateCareScheduleInput,
   ProposeSwapInput,
   CreateMealPlanInput,
-  CareSchedule,
-  CareSwap,
-  MealPlan,
 } from './types';
 import type { ActionHash } from '../../generated/common';
 

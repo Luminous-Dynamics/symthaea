@@ -86,14 +86,15 @@ export interface KinshipBond {
   member_a: AgentPubKey;
   member_b: AgentPubKey;
   bond_type: BondType;
-  strength: BondStrength;
+  strength_bp: number;
   last_tended: Timestamp;
+  created_at: Timestamp;
 }
 
 export interface HearthInvitation {
   hearth_hash: ActionHash;
   inviter: AgentPubKey;
-  invitee_key: AgentPubKey;
+  invitee_agent: AgentPubKey;
   proposed_role: MemberRole;
   message: string;
   expires_at: Timestamp;
@@ -102,7 +103,7 @@ export interface HearthInvitation {
 
 export interface InviteMemberInput {
   hearth_hash: ActionHash;
-  invitee_key: AgentPubKey;
+  invitee_agent: AgentPubKey;
   proposed_role: MemberRole;
   message: string;
   expires_at: Timestamp;
@@ -110,28 +111,61 @@ export interface InviteMemberInput {
 
 export interface CreateBondInput {
   hearth_hash: ActionHash;
-  member_a: AgentPubKey;
   member_b: AgentPubKey;
   bond_type: BondType;
-  initial_strength?: BondStrength;
+  initial_strength_bp?: number;
 }
 
 export interface TendBondInput {
   bond_hash: ActionHash;
   description: string;
-  quality: BondStrength;
+  quality_bp: number;
 }
 
-export interface BondHealthResult {
-  bond: KinshipBond;
-  current_strength: BondStrength;
-  days_since_tended: number;
-  neglected: boolean;
+export interface GetBondHealthInput {
+  bond_hash: ActionHash;
 }
 
 export interface UpdateMemberRoleInput {
   membership_hash: ActionHash;
   new_role: MemberRole;
+}
+
+export interface BondUpdate {
+  member_a: AgentPubKey;
+  member_b: AgentPubKey;
+  co_creation_count: number;
+  quality_sum_bp: number;
+}
+
+export interface CareSummary {
+  assignee: AgentPubKey;
+  tasks_completed: number;
+  hours_hundredths: number;
+}
+
+export interface GratitudeSummary {
+  from_agent: AgentPubKey;
+  to_agent: AgentPubKey;
+  count: number;
+}
+
+export interface RhythmSummary {
+  rhythm_hash: ActionHash;
+  occurrences: number;
+  avg_participation_bp: number;
+}
+
+export interface WeeklyDigest {
+  hearth_hash: ActionHash;
+  epoch_start: Timestamp;
+  epoch_end: Timestamp;
+  bond_updates: BondUpdate[];
+  care_summary: CareSummary[];
+  gratitude_summary: GratitudeSummary[];
+  rhythm_summary: RhythmSummary[];
+  created_by: AgentPubKey;
+  created_at: Timestamp;
 }
 
 // ============================================================================
@@ -631,6 +665,92 @@ export interface HearthEventInput {
   event_type: string;
   payload: string;
   related_hashes?: string[];
+}
+
+// ============================================================================
+// Decision Input Types (extended)
+// ============================================================================
+
+export interface FinalizeDecisionInput {
+  decision_hash: ActionHash;
+}
+
+export interface CloseDecisionInput {
+  decision_hash: ActionHash;
+  reason: string;
+}
+
+export interface AmendVoteInput {
+  original_vote_hash: ActionHash;
+  new_choice_index: number;
+  reason?: string;
+}
+
+// ============================================================================
+// Bridge Dispatch Types
+// ============================================================================
+
+export interface DispatchInput {
+  target_zome: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+export interface DispatchResult {
+  success: boolean;
+  payload?: Uint8Array;
+  error?: string;
+}
+
+export interface ResolveQueryInput {
+  domain: string;
+  query_type: string;
+  params: Uint8Array;
+}
+
+export interface EventTypeQuery {
+  event_type: string;
+  limit?: number;
+}
+
+export interface CrossClusterDispatchInput {
+  target_role: string;
+  target_zome: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+export interface SeveranceInput {
+  hearth_hash: ActionHash;
+  reason: string;
+}
+
+export interface HearthSyncInput {
+  hearth_hash: ActionHash;
+  epoch_start: Timestamp;
+  epoch_end: Timestamp;
+}
+
+export interface BridgeHealth {
+  status: string;
+  connected_zomes: number;
+  last_dispatch_at?: Timestamp;
+}
+
+export interface GateAuditInput {
+  gate_name: string;
+  agent: AgentPubKey;
+  allowed: boolean;
+  reason?: string;
+}
+
+export type ConsciousnessTier = 'Dormant' | 'Awakening' | 'Aware' | 'Reflective' | 'Transcendent';
+
+export interface ConsciousnessCredential {
+  did: string;
+  tier: ConsciousnessTier;
+  phi_score: number;
+  issued_at: Timestamp;
 }
 
 // ============================================================================

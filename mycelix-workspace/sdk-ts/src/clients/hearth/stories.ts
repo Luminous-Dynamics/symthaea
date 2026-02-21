@@ -10,9 +10,6 @@ import type {
   CreateStoryInput,
   CreateCollectionInput,
   CreateTraditionInput,
-  FamilyStory,
-  StoryCollection,
-  FamilyTradition,
 } from './types';
 import type { ActionHash } from '../../generated/common';
 

@@ -2,7 +2,7 @@
  * Hearth hApp Client
  *
  * Complete TypeScript client for the Mycelix Hearth hApp providing access
- * to all 10 hearth domain zomes:
+ * to all 11 hearth zomes (10 domain + 1 bridge):
  *
  * - **kinship** - Membership, relationships, bond management
  * - **gratitude** - Appreciation expressions and circles
@@ -14,6 +14,7 @@
  * - **resources** - Shared resources, loans, budgets
  * - **milestones** - Life milestones and transitions
  * - **rhythms** - Daily rhythms and presence status
+ * - **bridge** - Cross-zome dispatch, cross-cluster communication, governance gating
  *
  * @module @mycelix/sdk/clients/hearth
  */
@@ -30,6 +31,7 @@ import { DecisionsClient } from './decisions';
 import { ResourcesClient } from './resources';
 import { MilestonesClient } from './milestones';
 import { RhythmsClient } from './rhythms';
+import { BridgeClient } from './bridge';
 import { HearthError } from './types';
 
 // ============================================================================
@@ -61,7 +63,7 @@ const DEFAULT_CONFIG: Required<HearthClientConfig> = {
 /**
  * Unified Hearth hApp Client
  *
- * Provides access to all 10 hearth zomes through a single interface.
+ * Provides access to all 11 hearth zomes through a single interface.
  *
  * @example
  * ```typescript
@@ -103,6 +105,7 @@ export class HearthClient {
   public readonly resources: ResourcesClient;
   public readonly milestones: MilestonesClient;
   public readonly rhythms: RhythmsClient;
+  public readonly bridge: BridgeClient;
 
   private readonly _client: AppClient;
   private readonly _config: Required<HearthClientConfig>;
@@ -126,9 +129,10 @@ export class HearthClient {
     this.resources = new ResourcesClient(client, baseConfig);
     this.milestones = new MilestonesClient(client, baseConfig);
     this.rhythms = new RhythmsClient(client, baseConfig);
+    this.bridge = new BridgeClient(client, baseConfig);
 
     if (this._config.debug) {
-      console.log('[hearth-sdk] Client initialized with 10 zome clients');
+      console.log('[hearth-sdk] Client initialized with 11 zome clients');
     }
   }
 
@@ -200,5 +204,6 @@ export { DecisionsClient, type DecisionsClientConfig } from './decisions';
 export { ResourcesClient, type ResourcesClientConfig } from './resources';
 export { MilestonesClient, type MilestonesClientConfig } from './milestones';
 export { RhythmsClient, type RhythmsClientConfig } from './rhythms';
+export { BridgeClient, type BridgeClientConfig } from './bridge';
 export * from './types';
 export default HearthClient;

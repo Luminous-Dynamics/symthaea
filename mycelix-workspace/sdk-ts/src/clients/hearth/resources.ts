@@ -12,9 +12,6 @@ import type {
   LendResourceInput,
   CreateBudgetInput,
   LogExpenseInput,
-  SharedResource,
-  ResourceLoan,
-  BudgetCategory,
 } from './types';
 import type { ActionHash } from '../../generated/common';
 

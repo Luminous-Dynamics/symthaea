@@ -9,11 +9,9 @@
 import type {
   ExpressGratitudeInput,
   StartCircleInput,
-  GratitudeExpression,
-  AppreciationCircle,
   GratitudeAnchor,
 } from './types';
-import type { ActionHash, AgentPubKey } from '../../generated/common';
+import type { ActionHash } from '../../generated/common';
 
 export interface GratitudeClientConfig {
   roleName?: string;

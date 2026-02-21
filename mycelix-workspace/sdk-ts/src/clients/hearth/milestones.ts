@@ -11,8 +11,6 @@ import type {
   RecordMilestoneInput,
   BeginTransitionInput,
   AdvanceTransitionInput,
-  Milestone,
-  LifeTransition,
 } from './types';
 import type { ActionHash } from '../../generated/common';
 
