@@ -25,14 +25,23 @@
 
 #![allow(clippy::needless_range_loop)]
 
-pub mod types;
-pub mod encoder;
+pub mod benchmarks;
 pub mod controller;
+pub mod encoder;
 pub mod fep_agent;
+pub mod formation;
+pub mod simulator;
 pub mod training;
+pub mod types;
 
-pub use types::*;
-pub use encoder::QuadrotorHdcEncoder;
+#[cfg(feature = "mujoco")]
+pub mod mujoco_sim;
+#[cfg(feature = "mujoco")]
+pub mod viewer;
+
 pub use controller::FlightController;
+pub use encoder::QuadrotorHdcEncoder;
 pub use fep_agent::ActiveInferenceFlightAgent;
+pub use simulator::{PhysicsSimulator, SimplePhysicsSimulator};
 pub use training::FlightTrainer;
+pub use types::*;

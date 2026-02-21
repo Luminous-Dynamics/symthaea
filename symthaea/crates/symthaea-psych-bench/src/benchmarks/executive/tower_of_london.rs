@@ -73,6 +73,20 @@ impl ToLState {
         new
     }
 
+    /// Count discs in their exact goal position (same peg, same height).
+    /// Returns 0.0–1.0 (fraction of 3 discs correctly placed).
+    fn disc_match_score(&self, goal: &ToLState) -> f64 {
+        let mut matches = 0u32;
+        for peg_idx in 0..3 {
+            for (height, &disc) in self.pegs[peg_idx].iter().enumerate() {
+                if goal.pegs[peg_idx].get(height) == Some(&disc) {
+                    matches += 1;
+                }
+            }
+        }
+        matches as f64 / 3.0
+    }
+
     /// Encode this state as a ContinuousHV.
     fn encode(
         &self,
@@ -126,6 +140,29 @@ fn bfs_optimal(start: &ToLState, goal: &ToLState) -> Option<usize> {
         }
     }
     None
+}
+
+/// Recursive lookahead: best disc-match score reachable within `depth` moves.
+/// Uses disc-matching heuristic (admissible, informative) instead of HDC similarity.
+fn best_reachable_score(state: &ToLState, goal: &ToLState, depth: usize) -> f64 {
+    if *state == *goal {
+        return 1.0;
+    }
+    if depth == 0 {
+        return state.disc_match_score(goal);
+    }
+    let mut best = 0.0f64;
+    for (from, to) in state.legal_moves() {
+        let next = state.apply_move(from, to);
+        let score = best_reachable_score(&next, goal, depth - 1);
+        if score > best {
+            best = score;
+        }
+        if best >= 1.0 {
+            return 1.0; // found solution, early exit
+        }
+    }
+    best
 }
 
 /// A ToL problem with initial state, goal state, and optimal move count.
@@ -216,7 +253,7 @@ impl TowerOfLondonBenchmark {
             *s ^= *s << 17;
         };
 
-        // Create HDC representations
+        // Create HDC representations (for tiebreaking only)
         let disc_hvs: Vec<ContinuousHV> = (0..3)
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(100 + i)))
             .collect();
@@ -226,6 +263,8 @@ impl TowerOfLondonBenchmark {
         let height_hvs: Vec<ContinuousHV> = (0..3)
             .map(|i| ContinuousHV::random(dim, seed.wrapping_add(300 + i)))
             .collect();
+
+        let lookahead_depth: usize = 4; // 5-step total (1 immediate + 4 recursive)
 
         // Generate problems for each difficulty tier
         let easy = generate_problems(seed.wrapping_add(1000), 2, 5);
@@ -249,69 +288,48 @@ impl TowerOfLondonBenchmark {
                 let mut moves_taken = 0u32;
                 let mut visited_count = 0u32;
 
-                // HDC-guided search with 3-step lookahead.
-                // For each legal move, recursively evaluate the best
-                // 2-step continuation, picking the path with highest
-                // final similarity to goal. Bounded: ~6^3 = 216 nodes max.
+                // Disc-matching heuristic with 5-step recursive lookahead.
+                // Science: "misplaced tiles" admissible heuristic (Nilsson 1971)
+                // is much more informative than HDC cosine similarity for
+                // discrete state-space planning problems.
                 while current != problem.goal && moves_taken < max_search_depth as u32 {
                     let legal = current.legal_moves();
                     if legal.is_empty() {
                         break;
                     }
 
-                    // Score each move by the best reachable state within 3 steps
-                    let mut scored: Vec<(usize, usize, f32)> = legal
+                    // Score each move by best disc-match score reachable within lookahead
+                    let mut scored: Vec<(usize, usize, f64)> = legal
                         .iter()
                         .map(|&(from, to)| {
                             let s1 = current.apply_move(from, to);
-                            if s1 == problem.goal {
-                                return (from, to, 1.0f32);
-                            }
-                            let s1_sim = s1.encode(&disc_hvs, &peg_hvs, &height_hvs)
-                                .similarity(&goal_hv);
-
-                            // 2-step lookahead from s1
-                            let mut best_2 = s1_sim;
-                            for &(f2, t2) in &s1.legal_moves() {
-                                let s2 = s1.apply_move(f2, t2);
-                                if s2 == problem.goal {
-                                    best_2 = 1.0;
-                                    break;
-                                }
-                                let s2_sim = s2.encode(&disc_hvs, &peg_hvs, &height_hvs)
-                                    .similarity(&goal_hv);
-
-                                // 3-step lookahead from s2
-                                let mut best_3 = s2_sim;
-                                for &(f3, t3) in &s2.legal_moves() {
-                                    let s3 = s2.apply_move(f3, t3);
-                                    let s3_sim = if s3 == problem.goal {
-                                        1.0
-                                    } else {
-                                        s3.encode(&disc_hvs, &peg_hvs, &height_hvs)
-                                            .similarity(&goal_hv)
-                                    };
-                                    if s3_sim > best_3 {
-                                        best_3 = s3_sim;
-                                    }
-                                }
-                                if best_3 > best_2 {
-                                    best_2 = best_3;
-                                }
-                            }
-                            (from, to, best_2)
+                            let score = best_reachable_score(&s1, &problem.goal, lookahead_depth - 1);
+                            (from, to, score)
                         })
                         .collect();
 
-                    // Sort by similarity descending
-                    scored.sort_by(|a, b| b.2.total_cmp(&a.2));
+                    // Sort descending; tiebreak with HDC similarity
+                    scored.sort_by(|a, b| {
+                        let cmp = b.2.total_cmp(&a.2);
+                        if cmp == std::cmp::Ordering::Equal {
+                            let hv_a = current.apply_move(a.0, a.1)
+                                .encode(&disc_hvs, &peg_hvs, &height_hvs)
+                                .similarity(&goal_hv);
+                            let hv_b = current.apply_move(b.0, b.1)
+                                .encode(&disc_hvs, &peg_hvs, &height_hvs)
+                                .similarity(&goal_hv);
+                            hv_b.total_cmp(&hv_a)
+                        } else {
+                            cmp
+                        }
+                    });
 
-                    // Softmax selection from top candidates
-                    let temperature: f64 = 0.15;
-                    let max_sim = scored[0].2 as f64;
+                    // Near-deterministic softmax (temperature 0.05)
+                    let temperature: f64 = 0.05;
+                    let max_sim = scored[0].2;
                     let exp_sims: Vec<f64> = scored
                         .iter()
-                        .map(|(_, _, s)| ((*s as f64 - max_sim) / temperature).exp())
+                        .map(|(_, _, s)| ((s - max_sim) / temperature).exp())
                         .collect();
                     let exp_sum: f64 = exp_sims.iter().sum();
 

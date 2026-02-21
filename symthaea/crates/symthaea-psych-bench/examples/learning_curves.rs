@@ -48,11 +48,9 @@ fn run_nback_learning_curve(
     let mut per_block = Vec::with_capacity(num_blocks);
 
     for block in 0..num_blocks {
-        let config = BenchmarkConfig {
-            seed: base_config.seed.wrapping_add(block as u64 * 1000),
-            trials_per_condition: trials_per_block,
-            ..*base_config
-        };
+        let mut config = base_config.clone();
+        config.seed = base_config.seed.wrapping_add(block as u64 * 1000);
+        config.trials_per_condition = trials_per_block;
         let result = bench.run(&config);
         // Use nback_2 accuracy as the primary metric
         let acc = result
@@ -74,10 +72,8 @@ fn run_wcst_learning_curve(
     let mut per_block = Vec::with_capacity(num_blocks);
 
     for block in 0..num_blocks {
-        let config = BenchmarkConfig {
-            seed: base_config.seed.wrapping_add(block as u64 * 1000),
-            ..*base_config
-        };
+        let mut config = base_config.clone();
+        config.seed = base_config.seed.wrapping_add(block as u64 * 1000);
         let result = bench.run(&config);
         let cats = result
             .metrics

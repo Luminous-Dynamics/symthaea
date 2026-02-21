@@ -5,14 +5,15 @@
 //! - Training at 125Hz: BPTT from PD baseline targets
 //! - Cognitive tick at 25Hz: FEP agent modulates τ/LR/precision
 //!
-//! For pure-Rust testing (no MuJoCo), the trainer can use a simple
-//! ballistic physics model as a stand-in.
+//! Physics simulation is abstracted behind the `PhysicsSimulator` trait,
+//! allowing different backends (simple ballistic, MuJoCo, etc.).
 
 use symthaea_core::genesis::GenesisSeed;
 
 use crate::controller::FlightController;
 use crate::encoder::QuadrotorHdcEncoder;
 use crate::fep_agent::{ActiveInferenceFlightAgent, FlightFepConfig};
+use crate::simulator::{PhysicsSimulator, SimplePhysicsSimulator};
 use crate::types::*;
 
 /// Per-episode metrics.
@@ -36,124 +37,6 @@ pub struct EpisodeMetrics {
     pub total_steps: usize,
     /// Per-step telemetry (populated when `FlightConfig::collect_telemetry` is true).
     pub telemetry: Vec<FlightTelemetry>,
-}
-
-/// Simple ballistic physics model for pure-Rust testing.
-///
-/// Simulates a rigid body with thrust and moments (no rotor dynamics).
-/// Good enough for verifying the multi-rate loop and training convergence.
-struct SimplePhysics {
-    state: FlightState,
-    mass: f64,
-    inertia: [f64; 3], // Diagonal inertia tensor
-}
-
-impl SimplePhysics {
-    fn new() -> Self {
-        Self {
-            state: FlightState::hover(0.1),
-            mass: 0.027,                       // Crazyflie 2: 27g
-            inertia: [1.4e-5, 1.4e-5, 2.2e-5], // Approximate
-        }
-    }
-
-    #[allow(dead_code)]
-    fn reset(&mut self, altitude: f64) {
-        self.state = FlightState::hover(altitude);
-    }
-
-    fn reset_with_perturbation(&mut self, altitude: f64, perturbation: f64, seed: u64) {
-        self.state = FlightState::hover(altitude);
-        // Apply deterministic perturbation
-        let mut rng = seed;
-        let mut next_f64 = || -> f64 {
-            rng ^= rng << 13;
-            rng ^= rng >> 7;
-            rng ^= rng << 17;
-            (rng as f64 / u64::MAX as f64) * 2.0 - 1.0
-        };
-
-        self.state.position[0] += perturbation * next_f64() * 0.1;
-        self.state.position[1] += perturbation * next_f64() * 0.1;
-        self.state.position[2] += perturbation * next_f64() * 0.05;
-        // Slight tilt
-        let tilt = perturbation * next_f64() * 0.1;
-        self.state.quaternion = normalize_quat([1.0, tilt, tilt * 0.5, 0.0]);
-    }
-
-    fn step(&mut self, cmd: &QuadrotorCommand, dt: f64) -> &FlightState {
-        let g = 9.81;
-
-        // Thrust in world frame (rotated by quaternion)
-        let thrust = cmd.thrust as f64;
-        let [w, x, y, z] = self.state.quaternion;
-
-        // Simplified rotation of thrust vector (body z → world)
-        let fx = 2.0 * (x * z + w * y) * thrust;
-        let fy = 2.0 * (y * z - w * x) * thrust;
-        let fz = (1.0 - 2.0 * (x * x + y * y)) * thrust;
-
-        // Linear acceleration
-        let ax = fx / self.mass;
-        let ay = fy / self.mass;
-        let az = fz / self.mass - g;
-
-        // Update linear velocity
-        self.state.linear_velocity[0] += ax * dt;
-        self.state.linear_velocity[1] += ay * dt;
-        self.state.linear_velocity[2] += az * dt;
-
-        // Update position
-        self.state.position[0] += self.state.linear_velocity[0] * dt;
-        self.state.position[1] += self.state.linear_velocity[1] * dt;
-        self.state.position[2] += self.state.linear_velocity[2] * dt;
-
-        // Ground constraint
-        if self.state.position[2] < 0.0 {
-            self.state.position[2] = 0.0;
-            self.state.linear_velocity[2] = 0.0;
-        }
-
-        // Angular acceleration from moments
-        let alpha_x = cmd.roll_moment as f64 / self.inertia[0];
-        let alpha_y = cmd.pitch_moment as f64 / self.inertia[1];
-        let alpha_z = cmd.yaw_moment as f64 / self.inertia[2];
-
-        // Update angular velocity
-        self.state.angular_velocity[0] += alpha_x * dt;
-        self.state.angular_velocity[1] += alpha_y * dt;
-        self.state.angular_velocity[2] += alpha_z * dt;
-
-        // Simple angular damping
-        for av in &mut self.state.angular_velocity {
-            *av *= 0.99;
-        }
-
-        // Update quaternion from angular velocity
-        let [wx, wy, wz] = self.state.angular_velocity;
-        let half_dt = dt * 0.5;
-        let dw = w - half_dt * (x * wx + y * wy + z * wz);
-        let dx = x + half_dt * (w * wx + y * wz - z * wy);
-        let dy = y + half_dt * (w * wy + z * wx - x * wz);
-        let dz = z + half_dt * (w * wz + x * wy - y * wx);
-        self.state.quaternion = normalize_quat([dw, dx, dy, dz]);
-
-        self.state.timestamp += dt;
-        &self.state
-    }
-
-    fn state(&self) -> &FlightState {
-        &self.state
-    }
-}
-
-fn normalize_quat(q: [f64; 4]) -> [f64; 4] {
-    let norm = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
-    if norm < 1e-10 {
-        [1.0, 0.0, 0.0, 0.0]
-    } else {
-        [q[0] / norm, q[1] / norm, q[2] / norm, q[3] / norm]
-    }
 }
 
 /// Flight trainer with multi-rate control loop.
@@ -191,17 +74,15 @@ impl FlightTrainer {
         }
     }
 
-    /// Run a single training episode with the simple physics model.
-    ///
-    /// Returns per-episode metrics.
-    pub fn run_episode(
+    /// Run a single training episode with any physics simulator.
+    pub fn run_episode_with_sim(
         &self,
         encoder: &mut QuadrotorHdcEncoder,
         controller: &mut FlightController,
         fep_agent: &mut ActiveInferenceFlightAgent,
+        physics: &mut dyn PhysicsSimulator,
         episode: usize,
     ) -> EpisodeMetrics {
-        let mut physics = SimplePhysics::new();
         let setpoint = FlightSetpoint::hover();
         let dt = self.config.motor_dt();
         let cognitive_interval = self.config.cognitive_interval();
@@ -209,7 +90,7 @@ impl FlightTrainer {
         // Curriculum: perturbation grows across episodes
         let perturbation = if self.config.num_episodes > 1 {
             let progress = episode as f64 / (self.config.num_episodes - 1) as f64;
-            0.01 + 0.09 * progress // 0.01 → 0.10
+            0.01 + 0.09 * progress
         } else {
             0.01
         };
@@ -321,9 +202,19 @@ impl FlightTrainer {
         }
     }
 
+    /// Run a single training episode using the simple physics model.
+    pub fn run_episode(
+        &self,
+        encoder: &mut QuadrotorHdcEncoder,
+        controller: &mut FlightController,
+        fep_agent: &mut ActiveInferenceFlightAgent,
+        episode: usize,
+    ) -> EpisodeMetrics {
+        let mut physics = SimplePhysicsSimulator::new();
+        self.run_episode_with_sim(encoder, controller, fep_agent, &mut physics, episode)
+    }
+
     /// Run the full training curriculum.
-    ///
-    /// Returns all episode metrics.
     pub fn train(&mut self) -> Vec<EpisodeMetrics> {
         let genesis = self.genesis.clone();
         let num_levels = self.config.num_levels;
@@ -336,70 +227,80 @@ impl FlightTrainer {
         for ep in 0..self.config.num_episodes {
             let metrics = self.run_episode(&mut encoder, &mut controller, &mut fep_agent, ep);
             all_metrics.push(metrics.clone());
-
-            // Signal episode end to FEP agent
             fep_agent.reset();
         }
 
         self.metrics = all_metrics.clone();
         all_metrics
     }
+
+    /// Run training with CSV telemetry output.
+    ///
+    /// Writes per-step CSV and per-episode summary CSV to `output_dir`.
+    pub fn train_with_telemetry(&mut self, output_dir: &str) -> Vec<EpisodeMetrics> {
+        self.config.collect_telemetry = true;
+
+        let genesis = self.genesis.clone();
+        let num_levels = self.config.num_levels;
+        let mut encoder = QuadrotorHdcEncoder::new(&genesis, num_levels);
+        let mut controller = FlightController::new(&genesis, &self.config);
+        let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+
+        let mut all_metrics = Vec::with_capacity(self.config.num_episodes);
+        let _ = std::fs::create_dir_all(output_dir);
+
+        let mut summary = String::from(
+            "episode,avg_pos_error,avg_att_error,avg_free_energy,hover_fraction,final_pos_error,exploration_count\n",
+        );
+
+        for ep in 0..self.config.num_episodes {
+            let metrics = self.run_episode(&mut encoder, &mut controller, &mut fep_agent, ep);
+
+            // Write per-step CSV
+            if !metrics.telemetry.is_empty() {
+                let step_path = format!("{}/episode_{:04}.csv", output_dir, ep);
+                let mut csv = String::from(
+                    "step,time,pos_error,att_error,speed,altitude,free_energy,tau_factor,learning_rate,thrust,roll_moment,pitch_moment,yaw_moment\n",
+                );
+                for t in &metrics.telemetry {
+                    csv.push_str(&format!(
+                        "{},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6},{:.6}\n",
+                        t.step, t.time, t.position_error, t.attitude_error, t.speed,
+                        t.altitude, t.free_energy, t.tau_factor, t.learning_rate,
+                        t.command.thrust, t.command.roll_moment, t.command.pitch_moment,
+                        t.command.yaw_moment,
+                    ));
+                }
+                let _ = std::fs::write(&step_path, csv);
+            }
+
+            summary.push_str(&format!(
+                "{},{:.6},{:.6},{:.6},{:.4},{:.6},{}\n",
+                ep, metrics.avg_position_error, metrics.avg_attitude_error,
+                metrics.avg_free_energy, metrics.hover_fraction,
+                metrics.final_position_error, metrics.exploration_count,
+            ));
+
+            all_metrics.push(metrics.clone());
+            fep_agent.reset();
+        }
+
+        let summary_path = format!("{}/summary.csv", output_dir);
+        let _ = std::fs::write(&summary_path, summary);
+
+        self.metrics = all_metrics.clone();
+        all_metrics
+    }
+
+    /// Get a reference to the configuration.
+    pub fn config(&self) -> &FlightConfig {
+        &self.config
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_simple_physics_hover() {
-        let mut physics = SimplePhysics::new();
-        let cmd = QuadrotorCommand::hover();
-        let dt = 0.002;
-
-        // Hover for 100 steps (0.2s)
-        for _ in 0..100 {
-            physics.step(&cmd, dt);
-        }
-
-        let state = physics.state();
-        // Should stay near 10cm altitude
-        assert!(
-            (state.altitude() - 0.1).abs() < 0.05,
-            "Hover should maintain altitude: got {}",
-            state.altitude()
-        );
-    }
-
-    #[test]
-    fn test_simple_physics_ground_constraint() {
-        let mut physics = SimplePhysics::new();
-        physics.reset(0.0);
-        let cmd = QuadrotorCommand::zero(); // No thrust
-
-        physics.step(&cmd, 0.002);
-        assert!(
-            physics.state().position[2] >= 0.0,
-            "Ground constraint should prevent negative altitude"
-        );
-    }
-
-    #[test]
-    fn test_simple_physics_gravity() {
-        let mut physics = SimplePhysics::new();
-        physics.reset(1.0);
-        let cmd = QuadrotorCommand::zero(); // No thrust — freefall
-
-        for _ in 0..100 {
-            physics.step(&cmd, 0.002);
-        }
-
-        // Should have fallen significantly
-        assert!(
-            physics.state().altitude() < 0.95,
-            "Should fall under gravity: alt={}",
-            physics.state().altitude()
-        );
-    }
 
     #[test]
     fn test_trainer_single_episode() {
@@ -428,7 +329,7 @@ mod tests {
     fn test_trainer_multi_rate_timing() {
         let config = FlightConfig {
             num_episodes: 1,
-            steps_per_episode: 40, // Exactly 2 cognitive ticks
+            steps_per_episode: 40,
             ..FlightConfig::default()
         };
         let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
@@ -439,7 +340,6 @@ mod tests {
         let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
 
         let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
-        // 40 steps / 20 cognitive_interval = 2 cognitive ticks
         assert!(metrics.avg_free_energy.is_finite());
     }
 
@@ -488,10 +388,144 @@ mod tests {
         };
         let mut trainer = FlightTrainer::new(config);
         let metrics = trainer.train();
-
-        // Later episodes should have higher initial perturbation,
-        // so (on average) higher initial position error
-        // This is a soft check — not guaranteed per episode but trend should hold
         assert!(metrics.len() == 5);
+    }
+
+    #[test]
+    fn test_telemetry_enabled_collects() {
+        let config = FlightConfig {
+            num_episodes: 1,
+            steps_per_episode: 100,
+            collect_telemetry: true,
+            ..FlightConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = FlightTrainer::new(config.clone());
+
+        let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = FlightController::new(&genesis, &config);
+        let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        assert_eq!(metrics.telemetry.len(), 100);
+    }
+
+    #[test]
+    fn test_telemetry_disabled_empty() {
+        let config = FlightConfig {
+            num_episodes: 1,
+            steps_per_episode: 100,
+            collect_telemetry: false,
+            ..FlightConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = FlightTrainer::new(config.clone());
+
+        let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = FlightController::new(&genesis, &config);
+        let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        assert!(metrics.telemetry.is_empty());
+    }
+
+    #[test]
+    fn test_telemetry_values_finite() {
+        let config = FlightConfig {
+            num_episodes: 1,
+            steps_per_episode: 50,
+            collect_telemetry: true,
+            ..FlightConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = FlightTrainer::new(config.clone());
+
+        let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = FlightController::new(&genesis, &config);
+        let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        for t in &metrics.telemetry {
+            assert!(t.position_error.is_finite());
+            assert!(t.attitude_error.is_finite());
+            assert!(t.speed.is_finite());
+            assert!(t.altitude.is_finite());
+            assert!(t.free_energy.is_finite());
+            assert!(t.tau_factor.is_finite());
+            assert!(t.learning_rate.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_telemetry_time_monotonic() {
+        let config = FlightConfig {
+            num_episodes: 1,
+            steps_per_episode: 50,
+            collect_telemetry: true,
+            ..FlightConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = FlightTrainer::new(config.clone());
+
+        let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = FlightController::new(&genesis, &config);
+        let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+
+        let metrics = trainer.run_episode(&mut encoder, &mut controller, &mut fep_agent, 0);
+        for i in 1..metrics.telemetry.len() {
+            assert!(
+                metrics.telemetry[i].step > metrics.telemetry[i - 1].step,
+                "Steps should be monotonically increasing"
+            );
+        }
+    }
+
+    #[test]
+    fn test_csv_telemetry_output() {
+        let config = FlightConfig {
+            num_episodes: 2,
+            steps_per_episode: 20,
+            ..FlightConfig::default()
+        };
+        let mut trainer = FlightTrainer::new(config);
+        let dir = "/tmp/symthaea_flight_test_csv";
+        let _ = std::fs::remove_dir_all(dir);
+
+        let metrics = trainer.train_with_telemetry(dir);
+        assert_eq!(metrics.len(), 2);
+
+        let summary = std::fs::read_to_string(format!("{}/summary.csv", dir)).unwrap();
+        assert!(summary.starts_with("episode,avg_pos_error,"));
+
+        let ep0 = std::fs::read_to_string(format!("{}/episode_0000.csv", dir)).unwrap();
+        assert!(ep0.starts_with("step,time,pos_error,"));
+
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn test_run_episode_with_sim() {
+        let config = FlightConfig {
+            num_episodes: 1,
+            steps_per_episode: 50,
+            ..FlightConfig::default()
+        };
+        let genesis = GenesisSeed::from_phrase(&config.genesis_phrase);
+        let trainer = FlightTrainer::new(config.clone());
+
+        let mut encoder = QuadrotorHdcEncoder::new(&genesis, config.num_levels);
+        let mut controller = FlightController::new(&genesis, &config);
+        let mut fep_agent = ActiveInferenceFlightAgent::new(FlightFepConfig::default());
+        let mut sim = SimplePhysicsSimulator::new();
+
+        let metrics = trainer.run_episode_with_sim(
+            &mut encoder,
+            &mut controller,
+            &mut fep_agent,
+            &mut sim,
+            0,
+        );
+        assert_eq!(metrics.total_steps, 50);
+        assert!(metrics.avg_position_error.is_finite());
     }
 }

@@ -1,0 +1,1233 @@
+{
+  "name": "baseline",
+  "timestamp": "2026-02-21T21:13:10.227592154+00:00",
+  "git_hash": "3be2743e7",
+  "config_summary": "dim=512, trials=10, seed=42",
+  "metrics": {
+    "Affect::MoodCongruentRecall": {
+      "congruence_ratio": {
+        "mean": 0.7999999999999999,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.7999999999999999,
+        "ci_upper": 0.7999999999999999
+      },
+      "negative_mood::congruence_ratio": {
+        "mean": 0.7999999999999999,
+        "std_dev": 1.1702778228589004e-16,
+        "n": 10,
+        "ci_lower": 0.7999999999999998,
+        "ci_upper": 0.8
+      },
+      "positive_mood::congruence_ratio": {
+        "mean": 0.7999999999999999,
+        "std_dev": 1.1702778228589004e-16,
+        "n": 10,
+        "ci_lower": 0.7999999999999998,
+        "ci_upper": 0.8
+      }
+    },
+    "Affect::ValenceClassification": {
+      "negative_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "neutral_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "positive_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "valence_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "Butlin::ConsciousnessIndicators": {
+      "AST-1::Self-model_of_attention_process": {
+        "mean": 0.5,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.5,
+        "ci_upper": 0.5
+      },
+      "GWT-1::Parallel_specialized_systems": {
+        "mean": 0.9,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.9,
+        "ci_upper": 0.9
+      },
+      "GWT-2::Limited_capacity_with_selective_attention": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "GWT-3::Global_broadcast_mechanism": {
+        "mean": 0.8,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.8,
+        "ci_upper": 0.8
+      },
+      "GWT-4::State-dependent_attention_modulation": {
+        "mean": 0.8,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.8,
+        "ci_upper": 0.8
+      },
+      "HOT-1::Generative/top-down_perceptual_processing": {
+        "mean": 0.9,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.9,
+        "ci_upper": 0.9
+      },
+      "HOT-2::Metacognitive_monitoring_of_own_states": {
+        "mean": 0.7,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.7,
+        "ci_upper": 0.7
+      },
+      "HOT-3::Agency_with_belief_updating_from_action_outcomes": {
+        "mean": 0.8,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.8,
+        "ci_upper": 0.8
+      },
+      "HOT-4::Sparse_and_smooth_neural_coding": {
+        "mean": 0.7,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.7,
+        "ci_upper": 0.7
+      },
+      "IIT-1::Integrated_information_(Phi)_>_0": {
+        "mean": 0.8,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.8,
+        "ci_upper": 0.8
+      },
+      "PP-1::Prediction_errors_drive_learning_and_adaptation": {
+        "mean": 0.9,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.9,
+        "ci_upper": 0.9
+      },
+      "PP-2::Hierarchical_prediction_at_multiple_scales": {
+        "mean": 0.5,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.5,
+        "ci_upper": 0.5
+      },
+      "RPT-1::Algorithmic_recurrence": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "RPT-2::Integrated_perceptual_representations": {
+        "mean": 0.8,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.8,
+        "ci_upper": 0.8
+      },
+      "absent_count": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "partial_count": {
+        "mean": 2.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 2.0,
+        "ci_upper": 2.0
+      },
+      "present_count": {
+        "mean": 12.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 12.0,
+        "ci_upper": 12.0
+      }
+    },
+    "CogBench::BART": {
+      "average_earnings": {
+        "mean": 2.33625,
+        "std_dev": 0.682689991870395,
+        "n": 10,
+        "ci_lower": 1.9131143592179929,
+        "ci_upper": 2.7593856407820074
+      },
+      "average_pumps": {
+        "mean": 30.380337717837715,
+        "std_dev": 2.8402098646146685,
+        "n": 10,
+        "ci_lower": 28.619957405645795,
+        "ci_upper": 32.14071803002964
+      },
+      "pop_rate": {
+        "mean": 0.49000000000000005,
+        "std_dev": 0.1349897115421106,
+        "n": 10,
+        "ci_lower": 0.40633250996421083,
+        "ci_upper": 0.5736674900357892
+      }
+    },
+    "CogBench::HorizonTask": {
+      "horizon_1::directed_exploration": {
+        "mean": 0.6,
+        "std_dev": 0.5163977794943222,
+        "n": 10,
+        "ci_lower": 0.27993334027633143,
+        "ci_upper": 0.9200666597236685
+      },
+      "horizon_1::exploitation_rate": {
+        "mean": 0.4,
+        "std_dev": 0.5163977794943222,
+        "n": 10,
+        "ci_lower": 0.07993334027633148,
+        "ci_upper": 0.7200666597236686
+      },
+      "horizon_1::random_exploration": {
+        "mean": 0.6909731680558323,
+        "std_dev": 1.1702778228589004e-16,
+        "n": 10,
+        "ci_lower": 0.6909731680558322,
+        "ci_upper": 0.6909731680558324
+      },
+      "horizon_6::directed_exploration": {
+        "mean": 0.55,
+        "std_dev": 0.17655831757856336,
+        "n": 10,
+        "ci_lower": 0.44056802101446146,
+        "ci_upper": 0.6594319789855386
+      },
+      "horizon_6::exploitation_rate": {
+        "mean": 0.43333333333333324,
+        "std_dev": 0.21081851067789195,
+        "n": 10,
+        "ci_lower": 0.3026666666666666,
+        "ci_upper": 0.5639999999999998
+      },
+      "horizon_6::random_exploration": {
+        "mean": 0.6914501594875979,
+        "std_dev": 0.0010109825055596247,
+        "n": 10,
+        "ci_lower": 0.6908235460387361,
+        "ci_upper": 0.6920767729364597
+      }
+    },
+    "CogBench::InstrumentalLearning": {
+      "exploration_rate": {
+        "mean": 0.09000000000000001,
+        "std_dev": 0.06687467549246293,
+        "n": 10,
+        "ci_lower": 0.04855064670119825,
+        "ci_upper": 0.13144935329880178
+      },
+      "learning_rate": {
+        "mean": 0.04379556877793176,
+        "std_dev": 0.04445867979991117,
+        "n": 10,
+        "ci_lower": 0.01623979355129146,
+        "ci_upper": 0.07135134400457206
+      },
+      "optimism_bias": {
+        "mean": 0.03677465354671941,
+        "std_dev": 0.06719148966796291,
+        "n": 10,
+        "ci_lower": -0.00487106321244557,
+        "ci_upper": 0.07842037030588439
+      }
+    },
+    "CogBench::ProbabilisticReasoning": {
+      "beta1_prior_weight": {
+        "mean": 0.6310586473708646,
+        "std_dev": 1.1702778228589004e-16,
+        "n": 10,
+        "ci_lower": 0.6310586473708645,
+        "ci_upper": 0.6310586473708647
+      },
+      "beta2_likelihood_weight": {
+        "mean": 0.3689413526291356,
+        "std_dev": 5.851389114294502e-17,
+        "n": 10,
+        "ci_lower": 0.3689413526291355,
+        "ci_upper": 0.36894135262913563
+      }
+    },
+    "CogBench::RestlessBandit": {
+      "overall_accuracy": {
+        "mean": 0.719,
+        "std_dev": 0.11570556502510057,
+        "n": 10,
+        "ci_lower": 0.647284947806537,
+        "ci_upper": 0.7907150521934629
+      },
+      "qsr_metacognitive_sensitivity": {
+        "mean": 0.4115398023656757,
+        "std_dev": 0.23058819636097214,
+        "n": 10,
+        "ci_lower": 0.2686197575637147,
+        "ci_upper": 0.5544598471676367
+      }
+    },
+    "CogBench::ReversalLearning": {
+      "avg_reversal_trials": {
+        "mean": 13.092490842490843,
+        "std_dev": 0.7574116964877864,
+        "n": 10,
+        "ci_lower": 12.623042209369546,
+        "ci_upper": 13.56193947561214
+      },
+      "initial_acquisition_trials": {
+        "mean": 11.1,
+        "std_dev": 2.5582111805799856,
+        "n": 10,
+        "ci_lower": 9.514404282997152,
+        "ci_upper": 12.685595717002847
+      },
+      "lose_shift_rate": {
+        "mean": 0.5592565086047305,
+        "std_dev": 0.05810456796048143,
+        "n": 10,
+        "ci_lower": 0.5232429242705581,
+        "ci_upper": 0.595270092938903
+      },
+      "perseverative_errors": {
+        "mean": 43.3,
+        "std_dev": 4.056544780420347,
+        "n": 10,
+        "ci_lower": 40.7857274964272,
+        "ci_upper": 45.814272503572795
+      },
+      "reversal_cost": {
+        "mean": 1.9924908424908423,
+        "std_dev": 2.7785381092542267,
+        "n": 10,
+        "ci_lower": 0.27033508028990116,
+        "ci_upper": 3.7146466046917834
+      },
+      "reversals_completed": {
+        "mean": 13.8,
+        "std_dev": 0.7888106377466155,
+        "n": 10,
+        "ci_lower": 13.31109010146154,
+        "ci_upper": 14.288909898538462
+      },
+      "total_errors": {
+        "mean": 45.2,
+        "std_dev": 3.8239014399199966,
+        "n": 10,
+        "ci_lower": 42.82992133276364,
+        "ci_upper": 47.570078667236366
+      },
+      "win_stay_rate": {
+        "mean": 0.9247417768210386,
+        "std_dev": 0.01903663163802359,
+        "n": 10,
+        "ci_lower": 0.9129427502900984,
+        "ci_upper": 0.9365408033519789
+      }
+    },
+    "CogBench::TemporalDiscounting": {
+      "discounting_score_S": {
+        "mean": 0.525,
+        "std_dev": 0.2024159633581853,
+        "n": 10,
+        "ci_lower": 0.3995412861181461,
+        "ci_upper": 0.650458713881854
+      }
+    },
+    "CogBench::TwoStep": {
+      "beta3_model_basedness": {
+        "mean": 0.30465931643176225,
+        "std_dev": 0.11405002656533121,
+        "n": 10,
+        "ci_lower": 0.23397037760652747,
+        "ci_upper": 0.375348255256997
+      },
+      "reward_effect": {
+        "mean": -0.06183395594773302,
+        "std_dev": 0.19476736863338667,
+        "n": 10,
+        "ci_lower": -0.1825520217045241,
+        "ci_upper": 0.058884109809058054
+      }
+    },
+    "Creativity::AlternateUses": {
+      "flexibility": {
+        "mean": 2.4,
+        "std_dev": 1.2649110640673518,
+        "n": 10,
+        "ci_lower": 1.616,
+        "ci_upper": 3.1839999999999997
+      },
+      "fluency": {
+        "mean": 6.2,
+        "std_dev": 4.848825745591515,
+        "n": 10,
+        "ci_lower": 3.1946666666666665,
+        "ci_upper": 9.205333333333334
+      },
+      "originality": {
+        "mean": 0.8628914829343557,
+        "std_dev": 0.30333865179984,
+        "n": 10,
+        "ci_lower": 0.6748802386921189,
+        "ci_upper": 1.0509027271765925
+      }
+    },
+    "Creativity::RemoteAssociates": {
+      "binding_accuracy": {
+        "mean": 0.3,
+        "std_dev": 0.48304589153964794,
+        "n": 10,
+        "ci_lower": 0.0006050545962184573,
+        "ci_upper": 0.5993949454037815
+      },
+      "mean_solution_rank": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "overall_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "Executive::Flanker": {
+      "congruent_accuracy": {
+        "mean": 0.9799999999999999,
+        "std_dev": 0.015811388300841913,
+        "n": 10,
+        "ci_lower": 0.9701999999999998,
+        "ci_upper": 0.9897999999999999
+      },
+      "flanker_effect": {
+        "mean": 0.13249999999999998,
+        "std_dev": 0.06241661103691336,
+        "n": 10,
+        "ci_lower": 0.09381378367773174,
+        "ci_upper": 0.17118621632226821
+      },
+      "incongruent_accuracy": {
+        "mean": 0.8474999999999999,
+        "std_dev": 0.059453529939123236,
+        "n": 10,
+        "ci_lower": 0.8106503203692502,
+        "ci_upper": 0.8843496796307496
+      },
+      "neutral_accuracy": {
+        "mean": 0.9749999999999999,
+        "std_dev": 0.026352313834736494,
+        "n": 10,
+        "ci_lower": 0.9586666666666666,
+        "ci_upper": 0.9913333333333332
+      }
+    },
+    "Executive::IGT": {
+      "block_5_net_score": {
+        "mean": 5.0,
+        "std_dev": 4.242640687119285,
+        "n": 10,
+        "ci_lower": 2.370384058460248,
+        "ci_upper": 7.629615941539752
+      },
+      "deck_preference_good": {
+        "mean": 0.6199999999999999,
+        "std_dev": 0.07245688373094718,
+        "n": 10,
+        "ci_lower": 0.5750907581894327,
+        "ci_upper": 0.6649092418105671
+      },
+      "learning_rate": {
+        "mean": 1.36,
+        "std_dev": 1.1577756451249286,
+        "n": 10,
+        "ci_lower": 0.6424032206191436,
+        "ci_upper": 2.0775967793808565
+      },
+      "overall_net_score": {
+        "mean": 15.2,
+        "std_dev": 7.067924416372572,
+        "n": 10,
+        "ci_lower": 10.81925506081189,
+        "ci_upper": 19.580744939188108
+      }
+    },
+    "Executive::Ravens": {
+      "difficulty_gradient": {
+        "mean": 0.5,
+        "std_dev": 0.21081851067789192,
+        "n": 10,
+        "ci_lower": 0.3693333333333334,
+        "ci_upper": 0.6306666666666666
+      },
+      "easy_accuracy": {
+        "mean": 0.8900000000000002,
+        "std_dev": 0.09944289260117531,
+        "n": 10,
+        "ci_lower": 0.8283646566038971,
+        "ci_upper": 0.9516353433961033
+      },
+      "hard_accuracy": {
+        "mean": 0.39,
+        "std_dev": 0.1728840330651992,
+        "n": 10,
+        "ci_lower": 0.28284536614986944,
+        "ci_upper": 0.4971546338501306
+      },
+      "medium_accuracy": {
+        "mean": 0.7100000000000001,
+        "std_dev": 0.2726414006223804,
+        "n": 10,
+        "ci_lower": 0.5410151091566666,
+        "ci_upper": 0.8789848908433335
+      },
+      "overall_accuracy": {
+        "mean": 0.6633333333333333,
+        "std_dev": 0.11160999114531275,
+        "n": 10,
+        "ci_lower": 0.5941567441298523,
+        "ci_upper": 0.7325099225368144
+      }
+    },
+    "Executive::Stroop": {
+      "congruent_accuracy": {
+        "mean": 0.96,
+        "std_dev": 0.04116363011742822,
+        "n": 10,
+        "ci_lower": 0.9344865177253716,
+        "ci_upper": 0.9855134822746283
+      },
+      "incongruent_accuracy": {
+        "mean": 0.8300000000000001,
+        "std_dev": 0.030731814857642953,
+        "n": 10,
+        "ci_lower": 0.8109522238101721,
+        "ci_upper": 0.8490477761898281
+      },
+      "neutral_accuracy": {
+        "mean": 0.9375,
+        "std_dev": 0.031732387941099595,
+        "n": 10,
+        "ci_lower": 0.9178320621879726,
+        "ci_upper": 0.9571679378120274
+      },
+      "stroop_effect": {
+        "mean": 0.13000000000000003,
+        "std_dev": 0.05374838498865697,
+        "n": 10,
+        "ci_lower": 0.09668640584452719,
+        "ci_upper": 0.16331359415547286
+      }
+    },
+    "Executive::TowerOfLondon": {
+      "avg_excess_moves": {
+        "mean": 7.4509324009324,
+        "std_dev": 2.1904219563030867,
+        "n": 10,
+        "ci_lower": 6.093294806855525,
+        "ci_upper": 8.808569995009275
+      },
+      "difficulty_gradient": {
+        "mean": 0.030000000000000006,
+        "std_dev": 0.23944379994757295,
+        "n": 10,
+        "ci_lower": -0.11840880477024712,
+        "ci_upper": 0.17840880477024712
+      },
+      "easy_optimal_rate": {
+        "mean": 0.1,
+        "std_dev": 0.16996731711975954,
+        "n": 10,
+        "ci_lower": -0.005346834577767731,
+        "ci_upper": 0.20534683457776776
+      },
+      "hard_optimal_rate": {
+        "mean": 0.06999999999999999,
+        "std_dev": 0.11352924243950935,
+        "n": 10,
+        "ci_lower": -0.0003661534798908572,
+        "ci_upper": 0.14036615347989084
+      },
+      "medium_optimal_rate": {
+        "mean": 0.24,
+        "std_dev": 0.25376182086435906,
+        "n": 10,
+        "ci_lower": 0.0827167939238895,
+        "ci_upper": 0.39728320607611045
+      },
+      "overall_optimal_rate": {
+        "mean": 0.13727938727938727,
+        "std_dev": 0.103182418564198,
+        "n": 10,
+        "ci_lower": 0.07332626167843682,
+        "ci_upper": 0.20123251288033772
+      },
+      "planning_efficiency": {
+        "mean": 0.37601398214887527,
+        "std_dev": 0.05247978052722266,
+        "n": 10,
+        "ci_lower": 0.34348667718480724,
+        "ci_upper": 0.4085412871129433
+      }
+    },
+    "Executive::WCST": {
+      "categories_completed": {
+        "mean": 6.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 6.0,
+        "ci_upper": 6.0
+      },
+      "non_perseverative_errors": {
+        "mean": 7.5,
+        "std_dev": 2.5055493963954847,
+        "n": 10,
+        "ci_lower": 5.947044394996718,
+        "ci_upper": 9.052955605003282
+      },
+      "perseverative_errors": {
+        "mean": 8.4,
+        "std_dev": 2.6331223544175333,
+        "n": 10,
+        "ci_lower": 6.7679738564185525,
+        "ci_upper": 10.032026143581449
+      },
+      "total_errors": {
+        "mean": 15.9,
+        "std_dev": 3.5418137224371984,
+        "n": 10,
+        "ci_lower": 13.704761111455571,
+        "ci_upper": 18.09523888854443
+      },
+      "trials_to_first_category": {
+        "mean": 12.1,
+        "std_dev": 4.701063709417263,
+        "n": 10,
+        "ci_lower": 9.186250525525573,
+        "ci_upper": 15.013749474474427
+      }
+    },
+    "MemoryAgent::AccurateRetrieval": {
+      "facts_3_delay_2::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "facts_5_delay_5::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "facts_7_delay_10::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "overall_retrieval_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "MemoryAgent::ConflictResolution": {
+      "recency_preference": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "resolution_consistency": {
+        "mean": 0.1590377688407898,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.1590377688407898,
+        "ci_upper": 0.1590377688407898
+      }
+    },
+    "MemoryAgent::LongRange": {
+      "delay_100::retention": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "delay_20::retention": {
+        "mean": 0.7,
+        "std_dev": 0.48304589153964794,
+        "n": 10,
+        "ci_lower": 0.4006050545962184,
+        "ci_upper": 0.9993949454037815
+      },
+      "delay_50::retention": {
+        "mean": 0.8,
+        "std_dev": 0.42163702135578396,
+        "n": 10,
+        "ci_lower": 0.5386666666666667,
+        "ci_upper": 1.0613333333333332
+      },
+      "delay_5::retention": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "MemoryAgent::TestTimeLearning": {
+      "correction_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "Metacognition::Calibration": {
+      "calibration_error_ece": {
+        "mean": 0.1786702149662564,
+        "std_dev": 0.03466465991846847,
+        "n": 10,
+        "ci_lower": 0.15718483615338502,
+        "ci_upper": 0.20015559377912778
+      },
+      "discrimination_gamma": {
+        "mean": 0.7017451511280749,
+        "std_dev": 0.07567290840609577,
+        "n": 10,
+        "ci_lower": 0.6548425965724922,
+        "ci_upper": 0.7486477056836576
+      },
+      "overconfidence": {
+        "mean": 0.434049779148982,
+        "std_dev": 0.024664215089227424,
+        "n": 10,
+        "ci_lower": 0.4187627402580607,
+        "ci_upper": 0.44933681803990333
+      },
+      "resolution": {
+        "mean": 0.053870567471743944,
+        "std_dev": 0.0168247998846446,
+        "n": 10,
+        "ci_lower": 0.04344244846458897,
+        "ci_upper": 0.06429868647889891
+      }
+    },
+    "ToMBench::FalseBelief": {
+      "false_belief_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "ToMBench::FauxPas": {
+      "faux_pas_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "ToMBench::Hinting": {
+      "hinting_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "ToMBench::Persuasion": {
+      "persuasion_detection": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "ToMBench::StrangeStory": {
+      "deception::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 3,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "irony::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 4,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "overall_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "white_lie::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 3,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "WorM::Binding": {
+      "set_2::binding_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "set_2::binding_deficit": {
+        "mean": -0.1,
+        "std_dev": 0.31622776601683794,
+        "n": 10,
+        "ci_lower": -0.296,
+        "ci_upper": 0.09599999999999997
+      },
+      "set_2::feature_accuracy": {
+        "mean": 0.9,
+        "std_dev": 0.31622776601683794,
+        "n": 10,
+        "ci_lower": 0.7040000000000001,
+        "ci_upper": 1.096
+      },
+      "set_4::binding_accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "set_4::binding_deficit": {
+        "mean": -0.1,
+        "std_dev": 0.31622776601683794,
+        "n": 10,
+        "ci_lower": -0.296,
+        "ci_upper": 0.09599999999999997
+      },
+      "set_4::feature_accuracy": {
+        "mean": 0.9,
+        "std_dev": 0.31622776601683794,
+        "n": 10,
+        "ci_lower": 0.7040000000000001,
+        "ci_upper": 1.096
+      },
+      "set_6::binding_accuracy": {
+        "mean": 0.6,
+        "std_dev": 0.5163977794943223,
+        "n": 10,
+        "ci_lower": 0.2799333402763314,
+        "ci_upper": 0.9200666597236686
+      },
+      "set_6::binding_deficit": {
+        "mean": 0.3,
+        "std_dev": 0.48304589153964794,
+        "n": 10,
+        "ci_lower": 0.0006050545962184573,
+        "ci_upper": 0.5993949454037815
+      },
+      "set_6::feature_accuracy": {
+        "mean": 0.9,
+        "std_dev": 0.31622776601683794,
+        "n": 10,
+        "ci_lower": 0.7040000000000001,
+        "ci_upper": 1.096
+      }
+    },
+    "WorM::ChangeDetection": {
+      "set_size_2::accuracy": {
+        "mean": 0.9,
+        "std_dev": 0.31622776601683794,
+        "n": 10,
+        "ci_lower": 0.7040000000000001,
+        "ci_upper": 1.096
+      },
+      "set_size_4::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "set_size_6::accuracy": {
+        "mean": 0.8,
+        "std_dev": 0.42163702135578396,
+        "n": 10,
+        "ci_lower": 0.5386666666666667,
+        "ci_upper": 1.0613333333333332
+      },
+      "set_size_8::accuracy": {
+        "mean": 0.7,
+        "std_dev": 0.48304589153964794,
+        "n": 10,
+        "ci_lower": 0.4006050545962184,
+        "ci_upper": 0.9993949454037815
+      }
+    },
+    "WorM::DigitSpan": {
+      "backward_span": {
+        "mean": 10.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 10.0,
+        "ci_upper": 10.0
+      },
+      "forward_accuracy_at_7": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "forward_span": {
+        "mean": 10.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 10.0,
+        "ci_upper": 10.0
+      }
+    },
+    "WorM::N-back": {
+      "nback_1::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "nback_1::false_alarm_rate": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "nback_1::hit_rate": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "nback_2::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "nback_2::false_alarm_rate": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "nback_2::hit_rate": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "nback_3::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "nback_3::false_alarm_rate": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "nback_3::hit_rate": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    },
+    "WorM::SerialRecall": {
+      "list_5::pos_0": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_5::pos_1": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_5::pos_2": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_5::pos_3": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_5::pos_4": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_5::primacy_index": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "list_5::recency_index": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "list_7::pos_0": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_7::pos_1": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_7::pos_2": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_7::pos_3": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_7::pos_4": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_7::pos_5": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_7::pos_6": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_7::primacy_index": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "list_7::recency_index": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "list_9::pos_0": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "list_9::pos_1": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "list_9::pos_2": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_9::pos_3": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_9::pos_4": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_9::pos_5": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_9::pos_6": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_9::pos_7": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_9::pos_8": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "list_9::primacy_index": {
+        "mean": -1.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": -1.0,
+        "ci_upper": -1.0
+      },
+      "list_9::recency_index": {
+        "mean": 0.0,
+        "std_dev": 0.0,
+        "n": 1,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      }
+    },
+    "WorM::SpatialUpdating": {
+      "updates_10::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "updates_3::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "updates_5::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      },
+      "updates_7::accuracy": {
+        "mean": 1.0,
+        "std_dev": 0.0,
+        "n": 10,
+        "ci_lower": 1.0,
+        "ci_upper": 1.0
+      }
+    }
+  }
+}
