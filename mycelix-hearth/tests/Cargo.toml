@@ -54,3 +54,15 @@ path = "sweettest_autonomy.rs"
 [[test]]
 name = "sweettest_multi_hearth"
 path = "sweettest_multi_hearth.rs"
+
+[[test]]
+name = "sweettest_resources"
+path = "sweettest_resources.rs"
+
+[[test]]
+name = "sweettest_milestones"
+path = "sweettest_milestones.rs"
+
+[[test]]
+name = "sweettest_stories"
+path = "sweettest_stories.rs"

@@ -76,6 +76,23 @@ fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
     }
 }
 
+/// Verify the caller is an active member of the given hearth.
+fn require_membership(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_kinship"),
+        FunctionName::new("get_caller_role"),
+        None,
+        hearth_hash,
+    )?;
+    let role: Option<MemberRole> = decode_zome_response(response, "get_caller_role")?;
+    role.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "You are not an active member of this hearth".into()
+        ))
+    })
+}
+
 /// Check whether a care schedule can be completed (must be Active).
 fn is_schedule_completable(status: &CareScheduleStatus) -> bool {
     *status == CareScheduleStatus::Active
@@ -93,6 +110,7 @@ fn is_swap_pending(status: &SwapStatus) -> bool {
 /// Create a new care schedule and link it to the hearth and assigned agent.
 #[hdk_extern]
 pub fn create_care_schedule(input: CreateCareScheduleInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let schedule = CareSchedule {
         hearth_hash: input.hearth_hash.clone(),
         care_type: input.care_type,
@@ -210,6 +228,7 @@ pub fn complete_task(input: CompleteTaskInput) -> ExternResult<Record> {
 /// Propose a care task swap with another hearth member.
 #[hdk_extern]
 pub fn propose_swap(input: ProposeSwapInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let schedule_record =
         get(input.original_schedule_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
             WasmErrorInner::Guest("Original care schedule not found".into())
@@ -278,6 +297,7 @@ pub fn decline_swap(swap_hash: ActionHash) -> ExternResult<Record> {
 /// Create a weekly meal plan for the hearth.
 #[hdk_extern]
 pub fn create_meal_plan(input: CreateMealPlanInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let plan = MealPlan {
         hearth_hash: input.hearth_hash.clone(),
         week_start: input.week_start,

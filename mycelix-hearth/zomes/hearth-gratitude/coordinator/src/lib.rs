@@ -190,6 +190,8 @@ pub fn join_circle(circle_hash: ActionHash) -> ExternResult<Record> {
             "Invalid circle entry".into()
         )))?;
 
+    require_membership(&circle.hearth_hash)?;
+
     if circle.status == CircleStatus::Completed {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Cannot join a completed circle".into()

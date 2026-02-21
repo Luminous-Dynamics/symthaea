@@ -208,7 +208,8 @@ fn require_consciousness(
         }
     };
 
-    let eligibility = evaluate_governance(&credential.profile, requirement);
+    let now_us = sys_time()?.as_micros() as u64;
+    let eligibility = evaluate_governance(&credential, requirement, now_us);
     if !eligibility.eligible {
         return Err(wasm_error!(WasmErrorInner::Guest(format!(
             "Consciousness gate: tier {:?} insufficient. Reasons: {}",

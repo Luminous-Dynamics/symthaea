@@ -14,6 +14,8 @@ import type {
   HearthSyncInput,
   BridgeHealth,
   CrossZomeCallFailedSignal,
+  ConsciousnessCredential,
+  GateAuditInput,
 } from './types';
 import { HearthError, classifyError } from './errors';
 
@@ -166,6 +168,20 @@ export class BridgeClient {
   /** Check the health of the bridge zome. */
   async healthCheck(): Promise<BridgeHealth> {
     return this.callZome('health_check', null);
+  }
+
+  // ============================================================================
+  // Zome Calls — Consciousness Credential
+  // ============================================================================
+
+  /** Get a consciousness credential for the specified DID. */
+  async getConsciousnessCredential(did: string): Promise<ConsciousnessCredential> {
+    return this.callZome('get_consciousness_credential', did);
+  }
+
+  /** Log a governance gate audit event. */
+  async logGovernanceGate(input: GateAuditInput): Promise<void> {
+    return this.callZome('log_governance_gate', input);
   }
 
   // ============================================================================

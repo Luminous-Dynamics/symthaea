@@ -1218,3 +1218,59 @@ export type HearthSignal =
   | CrossZomeCallFailedSignal;
 
 export type HearthSignalType = HearthSignal['type'];
+
+// ============================================================================
+// Consciousness Profile Types (from mycelix-bridge-common)
+// ============================================================================
+
+/** Governance tiers derived from combined consciousness score. */
+export type ConsciousnessTier =
+  | 'Observer'
+  | 'Participant'
+  | 'Citizen'
+  | 'Steward'
+  | 'Guardian';
+
+/** 4-dimensional consciousness profile. Each dimension is 0.0-1.0. */
+export interface ConsciousnessProfile {
+  /** Identity verification strength (Anonymous=0.0 to Critical=1.0). */
+  identity: number;
+  /** Cross-hApp reputation with exponential decay. */
+  reputation: number;
+  /** Community trust attestations, weighted by attestor tier. */
+  community: number;
+  /** Domain-specific engagement, computed locally per bridge. */
+  engagement: number;
+}
+
+/** Time-limited credential containing a ConsciousnessProfile. */
+export interface ConsciousnessCredential {
+  /** Agent's DID (e.g., "did:mycelix:<pubkey>"). */
+  did: string;
+  /** The multi-dimensional profile. */
+  profile: ConsciousnessProfile;
+  /** Derived tier at issuance time. */
+  tier: ConsciousnessTier;
+  /** Issuance timestamp (microseconds since epoch). */
+  issued_at: number;
+  /** Expiry timestamp (microseconds since epoch). */
+  expires_at: number;
+  /** DID of the issuing bridge. */
+  issuer: string;
+}
+
+/** Audit input for logging governance gate decisions. */
+export interface GateAuditInput {
+  /** The extern function that triggered the gate check. */
+  action_name: string;
+  /** The zome that performed the check. */
+  zome_name: string;
+  /** Whether the agent met all requirements. */
+  eligible: boolean;
+  /** The agent's derived consciousness tier. */
+  actual_tier: string;
+  /** The minimum tier required by the governance action. */
+  required_tier: string;
+  /** Progressive vote weight in basis points (0-10000). */
+  weight_bp: number;
+}

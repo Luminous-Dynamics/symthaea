@@ -143,6 +143,7 @@ fn get_caller_role(hearth_hash: ActionHash) -> ExternResult<MemberRole> {
 /// Links the resource from the hearth via HearthToResources.
 #[hdk_extern]
 pub fn register_resource(input: RegisterResourceInput) -> ExternResult<Record> {
+    get_caller_role(input.hearth_hash.clone())?;
     let resource = SharedResource {
         hearth_hash: input.hearth_hash.clone(),
         name: input.name,
@@ -337,6 +338,8 @@ pub fn log_expense(input: LogExpenseInput) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Budget entry is missing".into()
         )))?;
+
+    get_caller_role(budget.hearth_hash.clone())?;
 
     budget.current_month_actual_cents = budget
         .current_month_actual_cents

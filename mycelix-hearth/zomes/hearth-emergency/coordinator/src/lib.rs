@@ -61,6 +61,23 @@ fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
     }
 }
 
+/// Verify the caller is an active member of the given hearth.
+fn require_membership(hearth_hash: &ActionHash) -> ExternResult<MemberRole> {
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_kinship"),
+        FunctionName::new("get_caller_role"),
+        None,
+        hearth_hash,
+    )?;
+    let role: Option<MemberRole> = decode_zome_response(response, "get_caller_role")?;
+    role.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "You are not an active member of this hearth".into()
+        ))
+    })
+}
+
 /// Check whether an alert can be resolved (resolved_at must be None).
 fn is_alert_resolvable(alert: &EmergencyAlert) -> bool {
     alert.resolved_at.is_none()
@@ -86,6 +103,7 @@ fn is_alert_type_life_threatening(alert_type: &AlertType) -> bool {
 /// Links the plan from the hearth via HearthToPlans.
 #[hdk_extern]
 pub fn create_emergency_plan(input: CreateEmergencyPlanInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
     let plan = EmergencyPlan {
         hearth_hash: input.hearth_hash.clone(),
@@ -114,6 +132,7 @@ pub fn create_emergency_plan(input: CreateEmergencyPlanInput) -> ExternResult<Re
 /// Update an existing emergency plan.
 #[hdk_extern]
 pub fn update_emergency_plan(input: UpdatePlanInput) -> ExternResult<Record> {
+    require_membership(&input.input.hearth_hash)?;
     let now = sys_time()?;
     let plan = EmergencyPlan {
         hearth_hash: input.input.hearth_hash,
@@ -136,6 +155,7 @@ pub fn update_emergency_plan(input: UpdatePlanInput) -> ExternResult<Record> {
 /// Links the alert from the hearth and emits a HearthSignal::EmergencyAlert.
 #[hdk_extern]
 pub fn raise_alert(input: RaiseAlertInput) -> ExternResult<Record> {
+    require_membership(&input.hearth_hash)?;
     let now = sys_time()?;
     let agent = agent_info()?.agent_initial_pubkey;
 
@@ -195,6 +215,8 @@ pub fn check_in(input: CheckInInput) -> ExternResult<Record> {
         .ok_or(wasm_error!(WasmErrorInner::Guest(
             "Alert entry is missing".into()
         )))?;
+
+    require_membership(&alert.hearth_hash)?;
 
     let checkin = SafetyCheckIn {
         hearth_hash: alert.hearth_hash,

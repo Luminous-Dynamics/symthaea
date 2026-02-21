@@ -19,7 +19,7 @@ use hearth_types::{
 use mycelix_bridge_common::{
     self as bridge, check_rate_limit_count, BridgeHealth, CrossClusterDispatchInput, DispatchInput,
     DispatchResult, EventTypeQuery, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
-    ConsciousnessCredential, ConsciousnessTier,
+    ConsciousnessCredential, ConsciousnessTier, GateAuditInput,
 };
 
 // ============================================================================
@@ -297,6 +297,25 @@ pub fn broadcast_event(input: DispatchInput) -> ExternResult<Record> {
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
         "Could not find created event".into()
     )))
+}
+
+/// Log a governance gate decision as an auditable event.
+///
+/// Called fire-and-forget by each coordinator's `require_consciousness()`.
+/// Stores the decision as a `HearthEventEntry` with `domain: "governance_gate"`.
+#[hdk_extern]
+pub fn log_governance_gate(input: GateAuditInput) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let event = HearthEventEntry {
+        domain: "governance_gate".to_string(),
+        event_type: input.action_name.clone(),
+        source_agent: agent,
+        payload: serde_json::to_string(&input).unwrap_or_default(),
+        created_at: sys_time()?,
+        related_hashes: vec![],
+    };
+    let _ = create_entry(&EntryTypes::BridgeEvent(event));
+    Ok(())
 }
 
 // ============================================================================
@@ -727,7 +746,8 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
         return Ok(None);
     }
 
-    let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
+    let link = links.into_iter().max_by_key(|l| l.timestamp)
+        .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No credential cache links found".into())))?;
     let target = link.target.into_action_hash().ok_or_else(||
         wasm_error!(WasmErrorInner::Guest("Invalid credential cache link target".into())))?;
 
@@ -744,6 +764,10 @@ fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredenti
                     .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
                         "Credential cache decode error: {}", e
                     ))))?;
+                // Check credential expiry — don't serve expired credentials from cache
+                if credential.is_expired(now as u64) {
+                    return Ok(None);
+                }
                 return Ok(Some(credential));
             }
         }

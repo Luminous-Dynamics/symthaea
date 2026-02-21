@@ -14,3 +14,4 @@ serde_json = { workspace = true }
 holochain_serialized_bytes = { workspace = true }
 hearth_autonomy_integrity = { path = "../integrity" }
 hearth-types = { workspace = true }
+mycelix-bridge-common = { workspace = true }

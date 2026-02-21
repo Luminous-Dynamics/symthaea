@@ -273,6 +273,19 @@ pub fn create_collection(input: CreateCollectionInput) -> ExternResult<Record> {
 /// Add a story to a collection via a link.
 #[hdk_extern]
 pub fn add_to_collection(input: AddToCollectionInput) -> ExternResult<()> {
+    // Fetch the collection to get its hearth_hash for membership check
+    let record = get(input.collection_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Collection not found".into())),
+    )?;
+    let collection: StoryCollection = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid collection entry".into()
+        )))?;
+    require_membership(&collection.hearth_hash)?;
+
     create_link(
         input.collection_hash,
         input.story_hash,
