@@ -30,6 +30,7 @@ pub struct PreservationBatch {
     pub expected_ready: u64,
     pub status: BatchStatus,
     pub notes: Option<String>,
+    pub allergen_flags: Vec<String>,
 }
 
 // ============================================================================
@@ -190,6 +191,32 @@ fn validate_batch(b: PreservationBatch) -> ExternResult<ValidateCallbackResult> 
     if b.quantity_kg <= 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Quantity must be positive".into()));
     }
+    // Batch ID max length
+    if b.id.len() > 128 {
+        return Ok(ValidateCallbackResult::Invalid("Batch ID too long (max 128 chars)".into()));
+    }
+    // expected_ready must be >= started_at
+    if b.expected_ready < b.started_at {
+        return Ok(ValidateCallbackResult::Invalid("expected_ready cannot be before started_at".into()));
+    }
+    // Allergen flags validation
+    if b.allergen_flags.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 allergen flags".into()));
+    }
+    for flag in &b.allergen_flags {
+        if flag.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid("Allergen flag cannot be empty".into()));
+        }
+        if flag.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid("Allergen flag too long (max 128 chars)".into()));
+        }
+    }
+    // Notes max length (if present)
+    if let Some(ref notes) = b.notes {
+        if notes.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid("Batch notes too long (max 4096 chars)".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -236,6 +263,7 @@ mod tests {
             expected_ready: 1701000000,
             status: BatchStatus::InProgress,
             notes: None,
+            allergen_flags: vec![],
         }
     }
 
@@ -754,4 +782,117 @@ mod tests {
         let result = validate_link_tag(&LinkTypes::AgentToBatch, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
+
+    // ── Serde roundtrip: batch with allergens ──────────────────────────
+
+    #[test]
+    fn serde_roundtrip_batch_with_allergens() {
+        let mut b = valid_batch();
+        b.allergen_flags = vec!["Gluten".into(), "Dairy".into(), "Nuts".into()];
+        let json = serde_json::to_string(&b).unwrap();
+        let back: PreservationBatch = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, b);
+    }
+
+    // ── validate_batch: id max length ──────────────────────────────────
+
+    #[test]
+    fn batch_id_too_long_rejected() {
+        let mut b = valid_batch();
+        b.id = "x".repeat(129);
+        assert_invalid(validate_batch(b), "Batch ID too long (max 128 chars)");
+    }
+
+    #[test]
+    fn batch_id_exactly_128_accepted() {
+        let mut b = valid_batch();
+        b.id = "x".repeat(128);
+        assert_valid(validate_batch(b));
+    }
+
+    // ── validate_batch: expected_ready vs started_at ───────────────────
+
+    #[test]
+    fn batch_expected_ready_before_started_rejected() {
+        let mut b = valid_batch();
+        b.started_at = 1700000000;
+        b.expected_ready = 1699999999;
+        assert_invalid(validate_batch(b), "expected_ready cannot be before started_at");
+    }
+
+    #[test]
+    fn batch_expected_ready_equals_started_accepted() {
+        let mut b = valid_batch();
+        b.started_at = 1700000000;
+        b.expected_ready = 1700000000;
+        assert_valid(validate_batch(b));
+    }
+
+    // ── validate_batch: allergen flags ─────────────────────────────────
+
+    #[test]
+    fn batch_allergen_flags_valid() {
+        let mut b = valid_batch();
+        b.allergen_flags = vec!["Gluten".into(), "Soy".into()];
+        assert_valid(validate_batch(b));
+    }
+
+    #[test]
+    fn batch_too_many_allergen_flags_rejected() {
+        let mut b = valid_batch();
+        b.allergen_flags = (0..51).map(|i| format!("allergen-{i}")).collect();
+        assert_invalid(validate_batch(b), "Cannot have more than 50 allergen flags");
+    }
+
+    #[test]
+    fn batch_empty_allergen_flag_rejected() {
+        let mut b = valid_batch();
+        b.allergen_flags = vec!["Gluten".into(), "".into()];
+        assert_invalid(validate_batch(b), "Allergen flag cannot be empty");
+    }
+
+    #[test]
+    fn batch_whitespace_allergen_flag_rejected() {
+        let mut b = valid_batch();
+        b.allergen_flags = vec!["   ".into()];
+        assert_invalid(validate_batch(b), "Allergen flag cannot be empty");
+    }
+
+    #[test]
+    fn batch_allergen_flag_too_long_rejected() {
+        let mut b = valid_batch();
+        b.allergen_flags = vec!["a".repeat(129)];
+        assert_invalid(validate_batch(b), "Allergen flag too long (max 128 chars)");
+    }
+
+    #[test]
+    fn batch_exactly_50_allergen_flags_accepted() {
+        let mut b = valid_batch();
+        b.allergen_flags = (0..50).map(|i| format!("allergen-{i}")).collect();
+        assert_valid(validate_batch(b));
+    }
+
+    #[test]
+    fn batch_allergen_flag_exactly_128_accepted() {
+        let mut b = valid_batch();
+        b.allergen_flags = vec!["a".repeat(128)];
+        assert_valid(validate_batch(b));
+    }
+
+    // ── validate_batch: notes max length ───────────────────────────────
+
+    #[test]
+    fn batch_notes_too_long_rejected() {
+        let mut b = valid_batch();
+        b.notes = Some("n".repeat(4097));
+        assert_invalid(validate_batch(b), "Batch notes too long (max 4096 chars)");
+    }
+
+    #[test]
+    fn batch_notes_exactly_4096_accepted() {
+        let mut b = valid_batch();
+        b.notes = Some("n".repeat(4096));
+        assert_valid(validate_batch(b));
+    }
+
 }

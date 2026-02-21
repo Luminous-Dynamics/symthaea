@@ -212,6 +212,81 @@ pub fn get_shareable_diagnostics(agent: AgentPubKey) -> ExternResult<Vec<Record>
 }
 
 // ============================================================================
+// HELPER PROFILES
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct UpdateAvailInput {
+    pub helper_hash: ActionHash,
+    pub available: bool,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HelperWorkload {
+    pub agent: AgentPubKey,
+    pub active_tickets: u32,
+    pub max_concurrent: u32,
+}
+
+/// Register a new helper profile, linking it to the "all_helpers" anchor.
+#[hdk_extern]
+pub fn register_helper(profile: HelperProfile) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::HelperProfile(profile))?;
+    create_entry(&EntryTypes::Anchor(Anchor("all_helpers".to_string())))?;
+    create_link(
+        anchor_hash("all_helpers")?,
+        action_hash.clone(),
+        LinkTypes::AllHelpers,
+        (),
+    )?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created helper profile".into())))
+}
+
+/// Update a helper's availability status.
+#[hdk_extern]
+pub fn update_availability(input: UpdateAvailInput) -> ExternResult<Record> {
+    let record = get(input.helper_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Helper profile not found".into())))?;
+    let mut profile: HelperProfile = record.entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a HelperProfile".into())))?;
+    profile.available = input.available;
+    let new_hash = update_entry(input.helper_hash, &EntryTypes::HelperProfile(profile))?;
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated helper profile".into())))
+}
+
+/// Get all available helpers, optionally filtered by support category.
+#[hdk_extern]
+pub fn get_available_helpers(category: Option<SupportCategory>) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_helpers")?, LinkTypes::AllHelpers)?,
+        GetStrategy::default(),
+    )?;
+    let all_records = records_from_links(links)?;
+    let mut available = Vec::new();
+    for record in all_records {
+        if let Some(profile) = record.entry()
+            .to_app_option::<HelperProfile>()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        {
+            if profile.available {
+                if let Some(ref cat) = category {
+                    if profile.expertise_categories.contains(cat) {
+                        available.push(record);
+                    }
+                } else {
+                    available.push(record);
+                }
+            }
+        }
+    }
+    Ok(available)
+}
+
+// ============================================================================
 // COGNITIVE UPDATES
 // ============================================================================
 
@@ -426,6 +501,38 @@ mod tests {
         let json = serde_json::to_string(&cu).unwrap();
         let back: CognitiveUpdate = serde_json::from_str(&json).unwrap();
         assert_eq!(cu, back);
+    }
+
+    // ========================================================================
+    // UpdateAvailInput serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn update_avail_input_serde_roundtrip() {
+        let input = UpdateAvailInput {
+            helper_hash: fake_action_hash(),
+            available: true,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: UpdateAvailInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.available, true);
+    }
+
+    // ========================================================================
+    // HelperWorkload serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn helper_workload_serde_roundtrip() {
+        let workload = HelperWorkload {
+            agent: fake_agent(),
+            active_tickets: 2,
+            max_concurrent: 5,
+        };
+        let json = serde_json::to_string(&workload).unwrap();
+        let back: HelperWorkload = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.active_tickets, 2);
+        assert_eq!(back.max_concurrent, 5);
     }
 
     #[test]

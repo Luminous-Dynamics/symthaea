@@ -158,6 +158,12 @@ fn check_mutualaid_matching_needs() -> Option<Vec<Record>> {
     }
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AllergenSearchInput {
+    pub market_hash: ActionHash,
+    pub exclude_allergens: Vec<String>,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct UpdateOrderStatusInput {
     pub order_hash: ActionHash,
@@ -202,6 +208,30 @@ pub fn get_my_orders(_: ()) -> ExternResult<Vec<Record>> {
         GetStrategy::default(),
     )?;
     records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn search_allergen_safe(input: AllergenSearchInput) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(input.market_hash, LinkTypes::MarketToListing)?,
+        GetStrategy::default(),
+    )?;
+    let all_records = records_from_links(links)?;
+    let exclude_lower: Vec<String> = input.exclude_allergens.iter()
+        .map(|a| a.to_lowercase()).collect();
+    let mut safe = Vec::new();
+    for record in all_records {
+        let listing: Option<Listing> = record.entry().to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+        if let Some(listing) = listing {
+            let has_excluded = listing.allergen_flags.iter()
+                .any(|f| exclude_lower.contains(&f.to_lowercase()));
+            if !has_excluded {
+                safe.push(record);
+            }
+        }
+    }
+    Ok(safe)
 }
 
 #[cfg(test)]
@@ -349,6 +379,9 @@ mod tests {
             price_per_kg: 5.50,
             available_from: 1700000000,
             status: ListingStatus::Available,
+            allergen_flags: vec![],
+            organic: false,
+            cultural_markers: vec![],
         };
         let json = serde_json::to_string(&listing).unwrap();
         let decoded: Listing = serde_json::from_str(&json).unwrap();
@@ -375,6 +408,9 @@ mod tests {
                 price_per_kg: 8.00,
                 available_from: 1700000000,
                 status: status.clone(),
+                allergen_flags: vec![],
+                organic: false,
+                cultural_markers: vec![],
             };
             let json = serde_json::to_string(&listing).unwrap();
             let decoded: Listing = serde_json::from_str(&json).unwrap();
@@ -392,6 +428,9 @@ mod tests {
             price_per_kg: 0.0,
             available_from: 1700000000,
             status: ListingStatus::Available,
+            allergen_flags: vec![],
+            organic: false,
+            cultural_markers: vec![],
         };
         let json = serde_json::to_string(&listing).unwrap();
         let decoded: Listing = serde_json::from_str(&json).unwrap();
@@ -526,6 +565,9 @@ mod tests {
             price_per_kg: 0.50,
             available_from: u64::MAX,
             status: ListingStatus::Available,
+            allergen_flags: vec![],
+            organic: false,
+            cultural_markers: vec![],
         };
         let json = serde_json::to_string(&listing).unwrap();
         let decoded: Listing = serde_json::from_str(&json).unwrap();
@@ -543,6 +585,9 @@ mod tests {
             price_per_kg: 1.0,
             available_from: 0,
             status: ListingStatus::Available,
+            allergen_flags: vec![],
+            organic: false,
+            cultural_markers: vec![],
         };
         let json = serde_json::to_string(&listing).unwrap();
         let decoded: Listing = serde_json::from_str(&json).unwrap();
@@ -641,10 +686,61 @@ mod tests {
             price_per_kg: 3.0,
             available_from: 0,
             status: ListingStatus::Reserved,
+            allergen_flags: vec![],
+            organic: false,
+            cultural_markers: vec![],
         };
         let json = serde_json::to_string(&listing).unwrap();
         let decoded: Listing = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.available_from, 0);
         assert_eq!(decoded.status, ListingStatus::Reserved);
+    }
+
+    // ========================================================================
+    // AllergenSearchInput serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn allergen_search_input_serde_roundtrip() {
+        let input = AllergenSearchInput {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            exclude_allergens: vec!["gluten".to_string(), "dairy".to_string()],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AllergenSearchInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.exclude_allergens, vec!["gluten", "dairy"]);
+    }
+
+    #[test]
+    fn allergen_search_input_serde_empty_exclusions() {
+        let input = AllergenSearchInput {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            exclude_allergens: vec![],
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: AllergenSearchInput = serde_json::from_str(&json).unwrap();
+        assert!(decoded.exclude_allergens.is_empty());
+    }
+
+    #[test]
+    fn listing_serde_with_all_new_fields_populated() {
+        let listing = Listing {
+            market_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            producer: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            product_name: "Organic Kimchi".to_string(),
+            quantity_kg: 8.0,
+            price_per_kg: 12.00,
+            available_from: 1700000000,
+            status: ListingStatus::Available,
+            allergen_flags: vec!["soy".to_string(), "shellfish".to_string()],
+            organic: true,
+            cultural_markers: vec!["korean".to_string(), "fermented".to_string()],
+        };
+        let json = serde_json::to_string(&listing).unwrap();
+        let decoded: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.allergen_flags, vec!["soy", "shellfish"]);
+        assert!(decoded.organic);
+        assert_eq!(decoded.cultural_markers, vec!["korean", "fermented"]);
+        assert_eq!(decoded.product_name, "Organic Kimchi");
     }
 }

@@ -63,6 +63,56 @@ pub struct Recipe {
 }
 
 // ============================================================================
+// SEED STOCK (Exchange)
+// ============================================================================
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SeedStock {
+    pub variety_hash: ActionHash,
+    pub grower: AgentPubKey,
+    pub quantity_grams: f64,
+    pub location: String,
+    pub germination_rate_pct: Option<f64>,
+    pub available_for_exchange: bool,
+    pub notes: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum SeedRequestStatus {
+    Open,
+    Matched,
+    Fulfilled,
+}
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SeedRequest {
+    pub wanted_variety: String,
+    pub quantity_grams: f64,
+    pub requester: AgentPubKey,
+    pub status: SeedRequestStatus,
+    pub deadline: Option<u64>,
+}
+
+// ============================================================================
+// NUTRIENT PROFILE
+// ============================================================================
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct NutrientProfile {
+    pub crop_name: String,
+    pub calories_per_100g: f64,
+    pub protein_g: f64,
+    pub carbs_g: f64,
+    pub fat_g: f64,
+    pub fiber_g: f64,
+    pub key_vitamins: Vec<String>,
+    pub key_minerals: Vec<String>,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -73,6 +123,9 @@ pub enum EntryTypes {
     SeedVariety(SeedVariety),
     TraditionalPractice(TraditionalPractice),
     Recipe(Recipe),
+    SeedStock(SeedStock),
+    SeedRequest(SeedRequest),
+    NutrientProfile(NutrientProfile),
 }
 
 #[hdk_link_types]
@@ -84,6 +137,9 @@ pub enum LinkTypes {
     CategoryToPractice,
     TagToRecipe,
     AgentToRecipe,
+    VarietyToStocks,
+    AllSeedRequests,
+    CropToNutrients,
 }
 
 // ============================================================================
@@ -99,12 +155,18 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::SeedVariety(s) => validate_seed(s),
                 EntryTypes::TraditionalPractice(p) => validate_practice(p),
                 EntryTypes::Recipe(r) => validate_recipe(r),
+                EntryTypes::SeedStock(s) => validate_seed_stock(s),
+                EntryTypes::SeedRequest(r) => validate_seed_request(r),
+                EntryTypes::NutrientProfile(n) => validate_nutrient_profile(n),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::SeedVariety(s) => validate_seed(s),
                 EntryTypes::TraditionalPractice(p) => validate_practice(p),
                 EntryTypes::Recipe(r) => validate_recipe(r),
+                EntryTypes::SeedStock(s) => validate_seed_stock(s),
+                EntryTypes::SeedRequest(r) => validate_seed_request(r),
+                EntryTypes::NutrientProfile(n) => validate_nutrient_profile(n),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -166,6 +228,30 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::VarietyToStocks => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "VarietyToStocks link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::AllSeedRequests => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "AllSeedRequests link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::CropToNutrients => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "CropToNutrients link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -211,6 +297,67 @@ fn validate_recipe(r: Recipe) -> ExternResult<ValidateCallbackResult> {
     }
     if r.servings == 0 {
         return Ok(ValidateCallbackResult::Invalid("Servings must be positive".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_seed_stock(s: SeedStock) -> ExternResult<ValidateCallbackResult> {
+    if s.quantity_grams <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("SeedStock quantity must be positive".into()));
+    }
+    if s.location.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("SeedStock location cannot be empty".into()));
+    }
+    if s.location.len() > 512 {
+        return Ok(ValidateCallbackResult::Invalid("SeedStock location too long (max 512 chars)".into()));
+    }
+    if let Some(rate) = s.germination_rate_pct {
+        if rate < 0.0 || rate > 100.0 {
+            return Ok(ValidateCallbackResult::Invalid("Germination rate must be between 0 and 100".into()));
+        }
+    }
+    if let Some(ref notes) = s.notes {
+        if notes.len() > 2048 {
+            return Ok(ValidateCallbackResult::Invalid("SeedStock notes too long (max 2048 chars)".into()));
+        }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_seed_request(r: SeedRequest) -> ExternResult<ValidateCallbackResult> {
+    if r.wanted_variety.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("SeedRequest wanted_variety cannot be empty".into()));
+    }
+    if r.wanted_variety.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("SeedRequest wanted_variety too long (max 256 chars)".into()));
+    }
+    if r.quantity_grams <= 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("SeedRequest quantity must be positive".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_nutrient_profile(n: NutrientProfile) -> ExternResult<ValidateCallbackResult> {
+    if n.crop_name.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid("NutrientProfile crop_name cannot be empty".into()));
+    }
+    if n.crop_name.len() > 256 {
+        return Ok(ValidateCallbackResult::Invalid("NutrientProfile crop_name too long (max 256 chars)".into()));
+    }
+    if n.calories_per_100g < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Calories cannot be negative".into()));
+    }
+    if n.protein_g < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Protein cannot be negative".into()));
+    }
+    if n.carbs_g < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Carbs cannot be negative".into()));
+    }
+    if n.fat_g < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Fat cannot be negative".into()));
+    }
+    if n.fiber_g < 0.0 {
+        return Ok(ValidateCallbackResult::Invalid("Fiber cannot be negative".into()));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -777,7 +924,10 @@ mod tests {
             | LinkTypes::AllRecipes
             | LinkTypes::SpeciesToSeed
             | LinkTypes::CategoryToPractice
-            | LinkTypes::AgentToRecipe => 256,
+            | LinkTypes::AgentToRecipe
+            | LinkTypes::VarietyToStocks
+            | LinkTypes::AllSeedRequests
+            | LinkTypes::CropToNutrients => 256,
             LinkTypes::TagToRecipe => 512,
         };
         let name = match link_type {
@@ -788,6 +938,9 @@ mod tests {
             LinkTypes::CategoryToPractice => "CategoryToPractice",
             LinkTypes::TagToRecipe => "TagToRecipe",
             LinkTypes::AgentToRecipe => "AgentToRecipe",
+            LinkTypes::VarietyToStocks => "VarietyToStocks",
+            LinkTypes::AllSeedRequests => "AllSeedRequests",
+            LinkTypes::CropToNutrients => "CropToNutrients",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -879,6 +1032,456 @@ mod tests {
     #[test]
     fn test_link_agent_to_recipe_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::AgentToRecipe, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── New type test helpers ───────────────────────────────────────────
+
+    fn valid_seed_stock() -> SeedStock {
+        SeedStock {
+            variety_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            grower: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            quantity_grams: 50.0,
+            location: "Community garden shed".into(),
+            germination_rate_pct: Some(85.0),
+            available_for_exchange: true,
+            notes: Some("Harvested fall 2025".into()),
+        }
+    }
+
+    fn valid_seed_request() -> SeedRequest {
+        SeedRequest {
+            wanted_variety: "Cherokee Purple".into(),
+            quantity_grams: 10.0,
+            requester: AgentPubKey::from_raw_36(vec![0xcd; 36]),
+            status: SeedRequestStatus::Open,
+            deadline: Some(1700000000),
+        }
+    }
+
+    fn valid_nutrient_profile() -> NutrientProfile {
+        NutrientProfile {
+            crop_name: "Kale".into(),
+            calories_per_100g: 49.0,
+            protein_g: 4.3,
+            carbs_g: 8.8,
+            fat_g: 0.9,
+            fiber_g: 3.6,
+            key_vitamins: vec!["A".into(), "C".into(), "K".into()],
+            key_minerals: vec!["Calcium".into(), "Iron".into()],
+        }
+    }
+
+    // ── Serde roundtrip: SeedStock ──────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_seed_stock() {
+        let s = valid_seed_stock();
+        let json = serde_json::to_string(&s).unwrap();
+        let back: SeedStock = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, s);
+    }
+
+    #[test]
+    fn serde_roundtrip_seed_stock_minimal() {
+        let s = SeedStock {
+            variety_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+            grower: AgentPubKey::from_raw_36(vec![0xbb; 36]),
+            quantity_grams: 1.0,
+            location: "A".into(),
+            germination_rate_pct: None,
+            available_for_exchange: false,
+            notes: None,
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let back: SeedStock = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, s);
+    }
+
+    // ── Serde roundtrip: SeedRequest ────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_seed_request_open() {
+        let r = valid_seed_request();
+        let json = serde_json::to_string(&r).unwrap();
+        let back: SeedRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn serde_roundtrip_seed_request_matched() {
+        let mut r = valid_seed_request();
+        r.status = SeedRequestStatus::Matched;
+        let json = serde_json::to_string(&r).unwrap();
+        let back: SeedRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn serde_roundtrip_seed_request_fulfilled() {
+        let mut r = valid_seed_request();
+        r.status = SeedRequestStatus::Fulfilled;
+        r.deadline = None;
+        let json = serde_json::to_string(&r).unwrap();
+        let back: SeedRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    // ── Serde roundtrip: SeedRequestStatus ──────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_seed_request_status_all_variants() {
+        let variants = vec![
+            SeedRequestStatus::Open,
+            SeedRequestStatus::Matched,
+            SeedRequestStatus::Fulfilled,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let back: SeedRequestStatus = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, v);
+        }
+    }
+
+    // ── Serde roundtrip: NutrientProfile ────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_nutrient_profile() {
+        let n = valid_nutrient_profile();
+        let json = serde_json::to_string(&n).unwrap();
+        let back: NutrientProfile = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, n);
+    }
+
+    #[test]
+    fn serde_roundtrip_nutrient_profile_minimal() {
+        let n = NutrientProfile {
+            crop_name: "Rice".into(),
+            calories_per_100g: 130.0,
+            protein_g: 2.7,
+            carbs_g: 28.2,
+            fat_g: 0.3,
+            fiber_g: 0.4,
+            key_vitamins: vec![],
+            key_minerals: vec![],
+        };
+        let json = serde_json::to_string(&n).unwrap();
+        let back: NutrientProfile = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, n);
+    }
+
+    // ── validate_seed_stock ─────────────────────────────────────────────
+
+    #[test]
+    fn valid_seed_stock_passes() {
+        assert_valid(validate_seed_stock(valid_seed_stock()));
+    }
+
+    #[test]
+    fn seed_stock_zero_quantity_rejected() {
+        let mut s = valid_seed_stock();
+        s.quantity_grams = 0.0;
+        assert_invalid(validate_seed_stock(s), "SeedStock quantity must be positive");
+    }
+
+    #[test]
+    fn seed_stock_negative_quantity_rejected() {
+        let mut s = valid_seed_stock();
+        s.quantity_grams = -1.0;
+        assert_invalid(validate_seed_stock(s), "SeedStock quantity must be positive");
+    }
+
+    #[test]
+    fn seed_stock_empty_location_rejected() {
+        let mut s = valid_seed_stock();
+        s.location = String::new();
+        assert_invalid(validate_seed_stock(s), "SeedStock location cannot be empty");
+    }
+
+    #[test]
+    fn seed_stock_whitespace_location_rejected() {
+        let mut s = valid_seed_stock();
+        s.location = "   ".into();
+        assert_invalid(validate_seed_stock(s), "SeedStock location cannot be empty");
+    }
+
+    #[test]
+    fn seed_stock_location_too_long_rejected() {
+        let mut s = valid_seed_stock();
+        s.location = "x".repeat(513);
+        assert_invalid(validate_seed_stock(s), "SeedStock location too long (max 512 chars)");
+    }
+
+    #[test]
+    fn seed_stock_location_at_max_valid() {
+        let mut s = valid_seed_stock();
+        s.location = "x".repeat(512);
+        assert_valid(validate_seed_stock(s));
+    }
+
+    #[test]
+    fn seed_stock_germination_negative_rejected() {
+        let mut s = valid_seed_stock();
+        s.germination_rate_pct = Some(-0.1);
+        assert_invalid(validate_seed_stock(s), "Germination rate must be between 0 and 100");
+    }
+
+    #[test]
+    fn seed_stock_germination_over_100_rejected() {
+        let mut s = valid_seed_stock();
+        s.germination_rate_pct = Some(100.1);
+        assert_invalid(validate_seed_stock(s), "Germination rate must be between 0 and 100");
+    }
+
+    #[test]
+    fn seed_stock_germination_zero_valid() {
+        let mut s = valid_seed_stock();
+        s.germination_rate_pct = Some(0.0);
+        assert_valid(validate_seed_stock(s));
+    }
+
+    #[test]
+    fn seed_stock_germination_100_valid() {
+        let mut s = valid_seed_stock();
+        s.germination_rate_pct = Some(100.0);
+        assert_valid(validate_seed_stock(s));
+    }
+
+    #[test]
+    fn seed_stock_germination_none_valid() {
+        let mut s = valid_seed_stock();
+        s.germination_rate_pct = None;
+        assert_valid(validate_seed_stock(s));
+    }
+
+    #[test]
+    fn seed_stock_notes_too_long_rejected() {
+        let mut s = valid_seed_stock();
+        s.notes = Some("x".repeat(2049));
+        assert_invalid(validate_seed_stock(s), "SeedStock notes too long (max 2048 chars)");
+    }
+
+    #[test]
+    fn seed_stock_notes_at_max_valid() {
+        let mut s = valid_seed_stock();
+        s.notes = Some("x".repeat(2048));
+        assert_valid(validate_seed_stock(s));
+    }
+
+    #[test]
+    fn seed_stock_notes_none_valid() {
+        let mut s = valid_seed_stock();
+        s.notes = None;
+        assert_valid(validate_seed_stock(s));
+    }
+
+    #[test]
+    fn seed_stock_not_available_valid() {
+        let mut s = valid_seed_stock();
+        s.available_for_exchange = false;
+        assert_valid(validate_seed_stock(s));
+    }
+
+    // ── validate_seed_request ───────────────────────────────────────────
+
+    #[test]
+    fn valid_seed_request_passes() {
+        assert_valid(validate_seed_request(valid_seed_request()));
+    }
+
+    #[test]
+    fn seed_request_empty_variety_rejected() {
+        let mut r = valid_seed_request();
+        r.wanted_variety = String::new();
+        assert_invalid(validate_seed_request(r), "SeedRequest wanted_variety cannot be empty");
+    }
+
+    #[test]
+    fn seed_request_whitespace_variety_rejected() {
+        let mut r = valid_seed_request();
+        r.wanted_variety = "  ".into();
+        assert_invalid(validate_seed_request(r), "SeedRequest wanted_variety cannot be empty");
+    }
+
+    #[test]
+    fn seed_request_variety_too_long_rejected() {
+        let mut r = valid_seed_request();
+        r.wanted_variety = "x".repeat(257);
+        assert_invalid(validate_seed_request(r), "SeedRequest wanted_variety too long (max 256 chars)");
+    }
+
+    #[test]
+    fn seed_request_variety_at_max_valid() {
+        let mut r = valid_seed_request();
+        r.wanted_variety = "x".repeat(256);
+        assert_valid(validate_seed_request(r));
+    }
+
+    #[test]
+    fn seed_request_zero_quantity_rejected() {
+        let mut r = valid_seed_request();
+        r.quantity_grams = 0.0;
+        assert_invalid(validate_seed_request(r), "SeedRequest quantity must be positive");
+    }
+
+    #[test]
+    fn seed_request_negative_quantity_rejected() {
+        let mut r = valid_seed_request();
+        r.quantity_grams = -5.0;
+        assert_invalid(validate_seed_request(r), "SeedRequest quantity must be positive");
+    }
+
+    #[test]
+    fn seed_request_no_deadline_valid() {
+        let mut r = valid_seed_request();
+        r.deadline = None;
+        assert_valid(validate_seed_request(r));
+    }
+
+    #[test]
+    fn seed_request_all_statuses_valid() {
+        for status in [SeedRequestStatus::Open, SeedRequestStatus::Matched, SeedRequestStatus::Fulfilled] {
+            let mut r = valid_seed_request();
+            r.status = status;
+            assert_valid(validate_seed_request(r));
+        }
+    }
+
+    // ── validate_nutrient_profile ───────────────────────────────────────
+
+    #[test]
+    fn valid_nutrient_profile_passes() {
+        assert_valid(validate_nutrient_profile(valid_nutrient_profile()));
+    }
+
+    #[test]
+    fn nutrient_profile_empty_crop_name_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.crop_name = String::new();
+        assert_invalid(validate_nutrient_profile(n), "NutrientProfile crop_name cannot be empty");
+    }
+
+    #[test]
+    fn nutrient_profile_whitespace_crop_name_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.crop_name = "  ".into();
+        assert_invalid(validate_nutrient_profile(n), "NutrientProfile crop_name cannot be empty");
+    }
+
+    #[test]
+    fn nutrient_profile_crop_name_too_long_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.crop_name = "x".repeat(257);
+        assert_invalid(validate_nutrient_profile(n), "NutrientProfile crop_name too long (max 256 chars)");
+    }
+
+    #[test]
+    fn nutrient_profile_crop_name_at_max_valid() {
+        let mut n = valid_nutrient_profile();
+        n.crop_name = "x".repeat(256);
+        assert_valid(validate_nutrient_profile(n));
+    }
+
+    #[test]
+    fn nutrient_profile_negative_calories_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.calories_per_100g = -1.0;
+        assert_invalid(validate_nutrient_profile(n), "Calories cannot be negative");
+    }
+
+    #[test]
+    fn nutrient_profile_zero_calories_valid() {
+        let mut n = valid_nutrient_profile();
+        n.calories_per_100g = 0.0;
+        assert_valid(validate_nutrient_profile(n));
+    }
+
+    #[test]
+    fn nutrient_profile_negative_protein_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.protein_g = -0.1;
+        assert_invalid(validate_nutrient_profile(n), "Protein cannot be negative");
+    }
+
+    #[test]
+    fn nutrient_profile_negative_carbs_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.carbs_g = -0.1;
+        assert_invalid(validate_nutrient_profile(n), "Carbs cannot be negative");
+    }
+
+    #[test]
+    fn nutrient_profile_negative_fat_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.fat_g = -0.1;
+        assert_invalid(validate_nutrient_profile(n), "Fat cannot be negative");
+    }
+
+    #[test]
+    fn nutrient_profile_negative_fiber_rejected() {
+        let mut n = valid_nutrient_profile();
+        n.fiber_g = -0.1;
+        assert_invalid(validate_nutrient_profile(n), "Fiber cannot be negative");
+    }
+
+    #[test]
+    fn nutrient_profile_all_zero_macros_valid() {
+        let n = NutrientProfile {
+            crop_name: "Water".into(),
+            calories_per_100g: 0.0,
+            protein_g: 0.0,
+            carbs_g: 0.0,
+            fat_g: 0.0,
+            fiber_g: 0.0,
+            key_vitamins: vec![],
+            key_minerals: vec![],
+        };
+        assert_valid(validate_nutrient_profile(n));
+    }
+
+    #[test]
+    fn nutrient_profile_empty_vitamins_minerals_valid() {
+        let mut n = valid_nutrient_profile();
+        n.key_vitamins = vec![];
+        n.key_minerals = vec![];
+        assert_valid(validate_nutrient_profile(n));
+    }
+
+    // ── Link tag tests: new link types ──────────────────────────────────
+
+    #[test]
+    fn test_link_variety_to_stocks_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::VarietyToStocks, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_variety_to_stocks_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::VarietyToStocks, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_all_seed_requests_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::AllSeedRequests, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_all_seed_requests_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::AllSeedRequests, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    #[test]
+    fn test_link_crop_to_nutrients_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::CropToNutrients, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_crop_to_nutrients_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::CropToNutrients, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

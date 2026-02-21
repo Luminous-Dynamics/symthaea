@@ -197,6 +197,7 @@ mod tests {
             expected_ready: 1701000000,
             status: BatchStatus::InProgress,
             notes: Some("First fermentation attempt".to_string()),
+            allergen_flags: vec![],
         };
         let json = serde_json::to_string(&batch).unwrap();
         let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
@@ -218,6 +219,7 @@ mod tests {
             expected_ready: 1700500000,
             status: BatchStatus::Completed,
             notes: None,
+            allergen_flags: vec![],
         };
         let json = serde_json::to_string(&batch).unwrap();
         let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
@@ -283,6 +285,7 @@ mod tests {
             expected_ready: 1700500000,
             status: BatchStatus::InProgress,
             notes: Some("Hickory chips".to_string()),
+            allergen_flags: vec![],
         };
         assert_eq!(batch, batch.clone());
     }
@@ -298,6 +301,7 @@ mod tests {
             expected_ready: 1,
             status: BatchStatus::InProgress,
             notes: None,
+            allergen_flags: vec![],
         };
         let mut b = a.clone();
         b.status = BatchStatus::Failed;
@@ -343,6 +347,7 @@ mod tests {
             expected_ready: 1702000000,
             status: BatchStatus::Completed,
             notes: Some("Pickled cucumbers".to_string()),
+            allergen_flags: vec![],
         };
         let json = serde_json::to_string(&batch).unwrap();
         let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
@@ -361,6 +366,7 @@ mod tests {
             expected_ready: 0,
             status: BatchStatus::Failed,
             notes: None,
+            allergen_flags: vec![],
         };
         let json = serde_json::to_string(&batch).unwrap();
         let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
@@ -379,6 +385,7 @@ mod tests {
             expected_ready: 1700500000,
             status: BatchStatus::Consumed,
             notes: Some("Kimchi consumed by community".to_string()),
+            allergen_flags: vec![],
         };
         let json = serde_json::to_string(&batch).unwrap();
         let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();
@@ -496,6 +503,7 @@ mod tests {
             expected_ready: 1,
             status: BatchStatus::InProgress,
             notes: None,
+            allergen_flags: vec![],
         };
         let mut b = a.clone();
         b.id = "batch-b".to_string();
@@ -528,6 +536,7 @@ mod tests {
             expected_ready: 1702000000,
             status: BatchStatus::InProgress,
             notes: Some(long_notes.clone()),
+            allergen_flags: vec![],
         };
         let json = serde_json::to_string(&batch).unwrap();
         let decoded: PreservationBatch = serde_json::from_str(&json).unwrap();

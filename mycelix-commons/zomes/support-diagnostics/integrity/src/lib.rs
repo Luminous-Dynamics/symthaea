@@ -89,6 +89,28 @@ pub struct CognitiveUpdate {
 }
 
 // ============================================================================
+// HELPER PROFILE
+// ============================================================================
+
+/// A helper profile representing an agent who can assist with support tickets.
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct HelperProfile {
+    /// The agent this profile belongs to
+    pub agent: AgentPubKey,
+    /// Categories this helper has expertise in
+    pub expertise_categories: Vec<SupportCategory>,
+    /// Maximum number of concurrent tickets this helper can handle
+    pub max_concurrent: u32,
+    /// Preferred difficulty level for ticket assignments
+    pub difficulty_preference: DifficultyLevel,
+    /// Whether this helper is currently available
+    pub available: bool,
+    /// When the profile was created
+    pub created_at: Timestamp,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -99,6 +121,7 @@ pub enum EntryTypes {
     DiagnosticResult(DiagnosticResult),
     PrivacyPreference(PrivacyPreference),
     CognitiveUpdate(CognitiveUpdate),
+    HelperProfile(HelperProfile),
 }
 
 #[hdk_link_types]
@@ -115,6 +138,8 @@ pub enum LinkTypes {
     CategoryToCognitiveUpdate,
     /// All cognitive updates index, time-sharded (max 256 byte tag)
     AllCognitiveUpdates,
+    /// All registered helpers index (max 256 byte tag)
+    AllHelpers,
 }
 
 // ============================================================================
@@ -130,6 +155,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::DiagnosticResult(r) => validate_create_diagnostic(action, r),
                 EntryTypes::PrivacyPreference(p) => validate_create_privacy_preference(action, p),
                 EntryTypes::CognitiveUpdate(u) => validate_create_cognitive_update(action, u),
+                EntryTypes::HelperProfile(h) => validate_helper_profile(action, h),
             },
             OpEntry::UpdateEntry {
                 app_entry,
@@ -146,6 +172,9 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 }
                 EntryTypes::CognitiveUpdate(u) => {
                     validate_update_cognitive_update(action, u, original_action_hash)
+                }
+                EntryTypes::HelperProfile(h) => {
+                    validate_update_helper_profile(action, h, original_action_hash)
                 }
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -201,6 +230,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 if tag.0.len() > 256 {
                     return Ok(ValidateCallbackResult::Invalid(
                         "AllCognitiveUpdates link tag too long (max 256 bytes)".into(),
+                    ));
+                }
+                Ok(ValidateCallbackResult::Valid)
+            }
+            LinkTypes::AllHelpers => {
+                if tag.0.len() > 256 {
+                    return Ok(ValidateCallbackResult::Invalid(
+                        "AllHelpers link tag too long (max 256 bytes)".into(),
                     ));
                 }
                 Ok(ValidateCallbackResult::Valid)
@@ -352,6 +389,45 @@ fn validate_update_cognitive_update(
 }
 
 // ============================================================================
+// VALIDATION HELPERS — HelperProfile
+// ============================================================================
+
+fn validate_helper_profile(
+    _action: Create,
+    h: HelperProfile,
+) -> ExternResult<ValidateCallbackResult> {
+    if h.expertise_categories.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HelperProfile must have at least one expertise category".into(),
+        ));
+    }
+    if h.max_concurrent == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HelperProfile max_concurrent must be at least 1".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_update_helper_profile(
+    _action: Update,
+    h: HelperProfile,
+    _original_action_hash: ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    if h.expertise_categories.is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HelperProfile must have at least one expertise category".into(),
+        ));
+    }
+    if h.max_concurrent == 0 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "HelperProfile max_concurrent must be at least 1".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -458,6 +534,17 @@ mod tests {
             share_resolution_patterns: true,
             share_cognitive_updates: false,
             updated_at: fake_timestamp(),
+        }
+    }
+
+    fn make_helper_profile() -> HelperProfile {
+        HelperProfile {
+            agent: fake_agent(),
+            expertise_categories: vec![SupportCategory::Network, SupportCategory::Software],
+            max_concurrent: 3,
+            difficulty_preference: DifficultyLevel::Intermediate,
+            available: true,
+            created_at: fake_timestamp(),
         }
     }
 
@@ -916,6 +1003,110 @@ mod tests {
     }
 
     // ========================================================================
+    // SERDE ROUNDTRIP — HelperProfile
+    // ========================================================================
+
+    #[test]
+    fn serde_roundtrip_helper_profile() {
+        let hp = make_helper_profile();
+        let json = serde_json::to_string(&hp).unwrap();
+        let back: HelperProfile = serde_json::from_str(&json).unwrap();
+        assert_eq!(hp, back);
+    }
+
+    // ========================================================================
+    // VALIDATION — HelperProfile
+    // ========================================================================
+
+    #[test]
+    fn valid_helper_profile_passes() {
+        let result = validate_helper_profile(fake_create(), make_helper_profile());
+        assert_valid(&result);
+    }
+
+    #[test]
+    fn helper_empty_categories_rejected() {
+        let mut hp = make_helper_profile();
+        hp.expertise_categories = vec![];
+        let result = validate_helper_profile(fake_create(), hp);
+        assert_invalid(&result);
+        assert_eq!(
+            invalid_msg(&result),
+            "HelperProfile must have at least one expertise category"
+        );
+    }
+
+    #[test]
+    fn helper_zero_max_concurrent_rejected() {
+        let mut hp = make_helper_profile();
+        hp.max_concurrent = 0;
+        let result = validate_helper_profile(fake_create(), hp);
+        assert_invalid(&result);
+        assert_eq!(
+            invalid_msg(&result),
+            "HelperProfile max_concurrent must be at least 1"
+        );
+    }
+
+    #[test]
+    fn helper_single_category_accepted() {
+        let mut hp = make_helper_profile();
+        hp.expertise_categories = vec![SupportCategory::Security];
+        let result = validate_helper_profile(fake_create(), hp);
+        assert_valid(&result);
+    }
+
+    #[test]
+    fn helper_all_categories_accepted() {
+        let mut hp = make_helper_profile();
+        hp.expertise_categories = vec![
+            SupportCategory::Network,
+            SupportCategory::Hardware,
+            SupportCategory::Software,
+            SupportCategory::Holochain,
+            SupportCategory::Mycelix,
+            SupportCategory::Security,
+            SupportCategory::General,
+        ];
+        let result = validate_helper_profile(fake_create(), hp);
+        assert_valid(&result);
+    }
+
+    #[test]
+    fn helper_update_valid() {
+        let result = validate_update_helper_profile(
+            fake_update(),
+            make_helper_profile(),
+            fake_action_hash(),
+        );
+        assert_valid(&result);
+    }
+
+    #[test]
+    fn helper_update_empty_categories_rejected() {
+        let mut hp = make_helper_profile();
+        hp.expertise_categories = vec![];
+        let result = validate_update_helper_profile(fake_update(), hp, fake_action_hash());
+        assert_invalid(&result);
+    }
+
+    // ========================================================================
+    // LINK TAG BOUNDARY TESTS — AllHelpers
+    // ========================================================================
+
+    #[test]
+    fn all_helpers_link_tag_256_bytes_within_limit() {
+        let tag = LinkTag::new(vec![0u8; 256]);
+        assert!(tag.0.len() <= 256);
+    }
+
+    #[test]
+    fn all_helpers_link_tag_257_bytes_exceeds_limit() {
+        let tag = LinkTag::new(vec![0u8; 257]);
+        assert!(tag.0.len() > 256);
+    }
+
+    // ========================================================================
     // CLONE / EQUALITY TESTS
     // ========================================================================
 
@@ -938,6 +1129,13 @@ mod tests {
         let cu = make_cognitive_update();
         let cloned = cu.clone();
         assert_eq!(cu, cloned);
+    }
+
+    #[test]
+    fn helper_profile_clone_equals() {
+        let hp = make_helper_profile();
+        let cloned = hp.clone();
+        assert_eq!(hp, cloned);
     }
 
     #[test]

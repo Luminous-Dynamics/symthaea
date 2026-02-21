@@ -110,6 +110,47 @@ pub struct PreemptiveAlert {
 }
 
 // ============================================================================
+// ESCALATION
+// ============================================================================
+
+/// Escalation level tiers for support ticket routing
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum EscalationLevel {
+    Tier1,
+    Tier2,
+    Management,
+    Emergency,
+}
+
+/// An escalation record for a support ticket
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct Escalation {
+    pub ticket_hash: ActionHash,
+    pub escalated_by: AgentPubKey,
+    pub from_level: EscalationLevel,
+    pub to_level: EscalationLevel,
+    pub reason: String,
+    pub escalated_at: Timestamp,
+}
+
+// ============================================================================
+// SATISFACTION SURVEY
+// ============================================================================
+
+/// A satisfaction survey submitted after ticket resolution
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct SatisfactionSurvey {
+    pub ticket_hash: ActionHash,
+    pub respondent: AgentPubKey,
+    pub rating: u8,
+    pub comment: Option<String>,
+    pub would_recommend: bool,
+    pub submitted_at: Timestamp,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -122,6 +163,8 @@ pub enum EntryTypes {
     AutonomousAction(AutonomousAction),
     UndoAction(UndoAction),
     PreemptiveAlert(PreemptiveAlert),
+    Escalation(Escalation),
+    SatisfactionSurvey(SatisfactionSurvey),
 }
 
 #[hdk_link_types]
@@ -134,6 +177,8 @@ pub enum LinkTypes {
     TicketToAction,
     ActionToUndo,
     AgentToAlert,
+    TicketToEscalations,
+    TicketToSurvey,
 }
 
 // ============================================================================
@@ -151,12 +196,16 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::AutonomousAction(_) => Ok(ValidateCallbackResult::Valid),
                 EntryTypes::UndoAction(undo) => validate_undo_action(undo),
                 EntryTypes::PreemptiveAlert(alert) => validate_preemptive_alert(alert),
+                EntryTypes::Escalation(escalation) => validate_escalation(escalation),
+                EntryTypes::SatisfactionSurvey(survey) => validate_satisfaction(survey),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::SupportTicket(ticket) => validate_support_ticket(ticket),
                 EntryTypes::TicketComment(comment) => validate_ticket_comment(comment),
                 EntryTypes::UndoAction(undo) => validate_undo_action(undo),
                 EntryTypes::PreemptiveAlert(alert) => validate_preemptive_alert(alert),
+                EntryTypes::Escalation(escalation) => validate_escalation(escalation),
+                EntryTypes::SatisfactionSurvey(survey) => validate_satisfaction(survey),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -227,6 +276,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::TicketToEscalations => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "TicketToEscalations link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::TicketToSurvey => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "TicketToSurvey link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -284,6 +349,36 @@ fn validate_undo_action(undo: UndoAction) -> ExternResult<ValidateCallbackResult
         return Ok(ValidateCallbackResult::Invalid(
             "UndoAction rollback_result cannot be empty".into(),
         ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_escalation(e: Escalation) -> ExternResult<ValidateCallbackResult> {
+    if e.reason.trim().is_empty() {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Escalation reason cannot be empty".into(),
+        ));
+    }
+    if e.reason.len() > 2048 {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Escalation reason too long (max 2048 chars)".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_satisfaction(s: SatisfactionSurvey) -> ExternResult<ValidateCallbackResult> {
+    if !(1..=5).contains(&s.rating) {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Satisfaction rating must be between 1 and 5".into(),
+        ));
+    }
+    if let Some(ref comment) = s.comment {
+        if comment.len() > 4096 {
+            return Ok(ValidateCallbackResult::Invalid(
+                "Satisfaction comment too long (max 4096 chars)".into(),
+            ));
+        }
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -807,6 +902,8 @@ mod tests {
             LinkTypes::TicketToAction => "TicketToAction",
             LinkTypes::ActionToUndo => "ActionToUndo",
             LinkTypes::AgentToAlert => "AgentToAlert",
+            LinkTypes::TicketToEscalations => "TicketToEscalations",
+            LinkTypes::TicketToSurvey => "TicketToSurvey",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -910,6 +1007,245 @@ mod tests {
     #[test]
     fn link_agent_to_alert_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::AgentToAlert, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- Serde roundtrip: EscalationLevel -------------------------------------
+
+    #[test]
+    fn serde_roundtrip_escalation_level_all_variants() {
+        let variants = vec![
+            EscalationLevel::Tier1, EscalationLevel::Tier2,
+            EscalationLevel::Management, EscalationLevel::Emergency,
+        ];
+        for v in &variants {
+            let json = serde_json::to_string(v).unwrap();
+            let back: EscalationLevel = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, v);
+        }
+    }
+
+    // -- Serde roundtrip: Escalation ------------------------------------------
+
+    #[test]
+    fn serde_roundtrip_escalation() {
+        let e = Escalation {
+            ticket_hash: fake_action_hash(),
+            escalated_by: fake_agent(),
+            from_level: EscalationLevel::Tier1,
+            to_level: EscalationLevel::Tier2,
+            reason: "Customer needs specialist help".into(),
+            escalated_at: fake_timestamp(),
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        let back: Escalation = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, e);
+    }
+
+    // -- Serde roundtrip: SatisfactionSurvey ----------------------------------
+
+    #[test]
+    fn serde_roundtrip_satisfaction_survey() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 4,
+            comment: None,
+            would_recommend: true,
+            submitted_at: fake_timestamp(),
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let back: SatisfactionSurvey = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, s);
+    }
+
+    #[test]
+    fn serde_roundtrip_satisfaction_survey_with_comment() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 5,
+            comment: Some("Excellent support, very responsive!".into()),
+            would_recommend: true,
+            submitted_at: fake_timestamp(),
+        };
+        let json = serde_json::to_string(&s).unwrap();
+        let back: SatisfactionSurvey = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, s);
+    }
+
+    // -- validate_escalation --------------------------------------------------
+
+    #[test]
+    fn valid_escalation_passes() {
+        let e = Escalation {
+            ticket_hash: fake_action_hash(),
+            escalated_by: fake_agent(),
+            from_level: EscalationLevel::Tier1,
+            to_level: EscalationLevel::Management,
+            reason: "Unresolved after 48 hours".into(),
+            escalated_at: fake_timestamp(),
+        };
+        assert_valid(validate_escalation(e));
+    }
+
+    #[test]
+    fn escalation_empty_reason_rejected() {
+        let e = Escalation {
+            ticket_hash: fake_action_hash(),
+            escalated_by: fake_agent(),
+            from_level: EscalationLevel::Tier1,
+            to_level: EscalationLevel::Tier2,
+            reason: String::new(),
+            escalated_at: fake_timestamp(),
+        };
+        assert_invalid(validate_escalation(e), "reason cannot be empty");
+    }
+
+    #[test]
+    fn escalation_whitespace_reason_rejected() {
+        let e = Escalation {
+            ticket_hash: fake_action_hash(),
+            escalated_by: fake_agent(),
+            from_level: EscalationLevel::Tier1,
+            to_level: EscalationLevel::Tier2,
+            reason: "   \t\n  ".into(),
+            escalated_at: fake_timestamp(),
+        };
+        assert_invalid(validate_escalation(e), "reason cannot be empty");
+    }
+
+    #[test]
+    fn escalation_reason_too_long_rejected() {
+        let e = Escalation {
+            ticket_hash: fake_action_hash(),
+            escalated_by: fake_agent(),
+            from_level: EscalationLevel::Tier2,
+            to_level: EscalationLevel::Emergency,
+            reason: "x".repeat(2049),
+            escalated_at: fake_timestamp(),
+        };
+        assert_invalid(validate_escalation(e), "reason too long");
+    }
+
+    // -- validate_satisfaction ------------------------------------------------
+
+    #[test]
+    fn valid_satisfaction_passes() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 3,
+            comment: Some("Average experience".into()),
+            would_recommend: false,
+            submitted_at: fake_timestamp(),
+        };
+        assert_valid(validate_satisfaction(s));
+    }
+
+    #[test]
+    fn satisfaction_rating_0_rejected() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 0,
+            comment: None,
+            would_recommend: false,
+            submitted_at: fake_timestamp(),
+        };
+        assert_invalid(validate_satisfaction(s), "rating must be between 1 and 5");
+    }
+
+    #[test]
+    fn satisfaction_rating_6_rejected() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 6,
+            comment: None,
+            would_recommend: true,
+            submitted_at: fake_timestamp(),
+        };
+        assert_invalid(validate_satisfaction(s), "rating must be between 1 and 5");
+    }
+
+    #[test]
+    fn satisfaction_rating_1_valid() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 1,
+            comment: None,
+            would_recommend: false,
+            submitted_at: fake_timestamp(),
+        };
+        assert_valid(validate_satisfaction(s));
+    }
+
+    #[test]
+    fn satisfaction_rating_5_valid() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 5,
+            comment: None,
+            would_recommend: true,
+            submitted_at: fake_timestamp(),
+        };
+        assert_valid(validate_satisfaction(s));
+    }
+
+    #[test]
+    fn satisfaction_comment_too_long_rejected() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 4,
+            comment: Some("x".repeat(4097)),
+            would_recommend: true,
+            submitted_at: fake_timestamp(),
+        };
+        assert_invalid(validate_satisfaction(s), "comment too long");
+    }
+
+    #[test]
+    fn satisfaction_no_comment_valid() {
+        let s = SatisfactionSurvey {
+            ticket_hash: fake_action_hash(),
+            respondent: fake_agent(),
+            rating: 3,
+            comment: None,
+            would_recommend: true,
+            submitted_at: fake_timestamp(),
+        };
+        assert_valid(validate_satisfaction(s));
+    }
+
+    // -- Link tag boundary: TicketToEscalations -------------------------------
+
+    #[test]
+    fn link_ticket_to_escalations_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::TicketToEscalations, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn link_ticket_to_escalations_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::TicketToEscalations, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // -- Link tag boundary: TicketToSurvey ------------------------------------
+
+    #[test]
+    fn link_ticket_to_survey_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::TicketToSurvey, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn link_ticket_to_survey_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::TicketToSurvey, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

@@ -53,6 +53,9 @@ pub struct Listing {
     pub price_per_kg: f64,
     pub available_from: u64,
     pub status: ListingStatus,
+    pub allergen_flags: Vec<String>,
+    pub organic: bool,
+    pub cultural_markers: Vec<String>,
 }
 
 // ============================================================================
@@ -198,6 +201,30 @@ fn validate_listing(l: Listing) -> ExternResult<ValidateCallbackResult> {
     if l.price_per_kg < 0.0 {
         return Ok(ValidateCallbackResult::Invalid("Price cannot be negative".into()));
     }
+    // Allergen flags validation
+    if l.allergen_flags.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 allergen flags".into()));
+    }
+    for flag in &l.allergen_flags {
+        if flag.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid("Allergen flag cannot be empty".into()));
+        }
+        if flag.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid("Allergen flag too long (max 128 chars)".into()));
+        }
+    }
+    // Cultural markers validation
+    if l.cultural_markers.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 cultural markers".into()));
+    }
+    for marker in &l.cultural_markers {
+        if marker.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid("Cultural marker cannot be empty".into()));
+        }
+        if marker.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid("Cultural marker too long (max 128 chars)".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -242,6 +269,9 @@ mod tests {
             price_per_kg: 5.50,
             available_from: 1700000000,
             status: ListingStatus::Available,
+            allergen_flags: vec![],
+            organic: false,
+            cultural_markers: vec![],
         }
     }
 
@@ -742,5 +772,123 @@ mod tests {
     fn test_link_listing_to_order_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::ListingToOrder, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Serde roundtrip: Listing with new fields ────────────────────────
+
+    #[test]
+    fn serde_roundtrip_listing_with_new_fields() {
+        let l = Listing {
+            market_hash: fake_action_hash(),
+            producer: fake_agent(),
+            product_name: "Organic Kale".into(),
+            quantity_kg: 5.0,
+            price_per_kg: 3.00,
+            available_from: 1700000000,
+            status: ListingStatus::Available,
+            allergen_flags: vec!["gluten".into(), "soy".into()],
+            organic: true,
+            cultural_markers: vec!["halal".into(), "kosher".into()],
+        };
+        let json = serde_json::to_string(&l).unwrap();
+        let back: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, l);
+    }
+
+    #[test]
+    fn serde_roundtrip_listing_with_allergens_and_cultural_markers() {
+        let l = Listing {
+            market_hash: fake_action_hash(),
+            producer: fake_agent(),
+            product_name: "Tamales".into(),
+            quantity_kg: 20.0,
+            price_per_kg: 12.00,
+            available_from: 1700000000,
+            status: ListingStatus::Available,
+            allergen_flags: vec!["corn".into(), "dairy".into(), "lard".into()],
+            organic: false,
+            cultural_markers: vec!["mexican".into(), "traditional".into()],
+        };
+        let json = serde_json::to_string(&l).unwrap();
+        let back: Listing = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.allergen_flags, vec!["corn", "dairy", "lard"]);
+        assert_eq!(back.cultural_markers, vec!["mexican", "traditional"]);
+        assert!(!back.organic);
+    }
+
+    // ── Allergen flag validation tests ──────────────────────────────────
+
+    #[test]
+    fn listing_with_allergens_valid() {
+        let mut l = valid_listing();
+        l.allergen_flags = vec!["gluten".into(), "dairy".into(), "nuts".into()];
+        assert_valid(validate_listing(l));
+    }
+
+    #[test]
+    fn listing_too_many_allergens_rejected() {
+        let mut l = valid_listing();
+        l.allergen_flags = (0..51).map(|i| format!("allergen_{i}")).collect();
+        assert_invalid(validate_listing(l), "Cannot have more than 50 allergen flags");
+    }
+
+    #[test]
+    fn listing_empty_allergen_flag_rejected() {
+        let mut l = valid_listing();
+        l.allergen_flags = vec!["gluten".into(), "".into()];
+        assert_invalid(validate_listing(l), "Allergen flag cannot be empty");
+    }
+
+    #[test]
+    fn listing_allergen_flag_too_long_rejected() {
+        let mut l = valid_listing();
+        l.allergen_flags = vec!["x".repeat(129)];
+        assert_invalid(validate_listing(l), "Allergen flag too long (max 128 chars)");
+    }
+
+    #[test]
+    fn listing_exactly_50_allergens_accepted() {
+        let mut l = valid_listing();
+        l.allergen_flags = (0..50).map(|i| format!("allergen_{i}")).collect();
+        assert_valid(validate_listing(l));
+    }
+
+    // ── Organic flag validation tests ───────────────────────────────────
+
+    #[test]
+    fn listing_organic_true_valid() {
+        let mut l = valid_listing();
+        l.organic = true;
+        assert_valid(validate_listing(l));
+    }
+
+    // ── Cultural markers validation tests ───────────────────────────────
+
+    #[test]
+    fn listing_cultural_markers_valid() {
+        let mut l = valid_listing();
+        l.cultural_markers = vec!["halal".into(), "kosher".into(), "vegan".into()];
+        assert_valid(validate_listing(l));
+    }
+
+    #[test]
+    fn listing_too_many_cultural_markers_rejected() {
+        let mut l = valid_listing();
+        l.cultural_markers = (0..51).map(|i| format!("marker_{i}")).collect();
+        assert_invalid(validate_listing(l), "Cannot have more than 50 cultural markers");
+    }
+
+    #[test]
+    fn listing_empty_cultural_marker_rejected() {
+        let mut l = valid_listing();
+        l.cultural_markers = vec!["halal".into(), " ".into()];
+        assert_invalid(validate_listing(l), "Cultural marker cannot be empty");
+    }
+
+    #[test]
+    fn listing_cultural_marker_too_long_rejected() {
+        let mut l = valid_listing();
+        l.cultural_markers = vec!["x".repeat(129)];
+        assert_invalid(validate_listing(l), "Cultural marker too long (max 128 chars)");
     }
 }

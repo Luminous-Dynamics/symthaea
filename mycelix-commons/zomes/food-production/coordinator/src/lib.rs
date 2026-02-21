@@ -33,6 +33,22 @@ fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
 }
 
 // ============================================================================
+// GARDEN MEMBERSHIP INPUT TYPES
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct AddMemberInput {
+    pub plot_hash: ActionHash,
+    pub member: AgentPubKey,
+    pub role: GardenRole,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct RemoveMemberInput {
+    pub membership_hash: ActionHash,
+}
+
+// ============================================================================
 // PLOT MANAGEMENT
 // ============================================================================
 
@@ -150,6 +166,40 @@ pub fn get_season_plans(plot_hash: ActionHash) -> ExternResult<Vec<Record>> {
         GetStrategy::default(),
     )?;
     records_from_links(links)
+}
+
+// ============================================================================
+// GARDEN MEMBERSHIP
+// ============================================================================
+
+#[hdk_extern]
+pub fn add_garden_member(input: AddMemberInput) -> ExternResult<Record> {
+    let now = sys_time()?;
+    let membership = GardenMembership {
+        plot_hash: input.plot_hash.clone(),
+        member: input.member,
+        role: input.role,
+        joined_at: now.as_micros() as u64,
+    };
+    let action_hash = create_entry(&EntryTypes::GardenMembership(membership))?;
+    create_link(input.plot_hash, action_hash.clone(), LinkTypes::PlotToMembers, ())?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created membership".into())))
+}
+
+#[hdk_extern]
+pub fn get_plot_members(plot_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(plot_hash, LinkTypes::PlotToMembers)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn remove_garden_member(input: RemoveMemberInput) -> ExternResult<ActionHash> {
+    delete_entry(input.membership_hash.clone())?;
+    Ok(input.membership_hash)
 }
 
 #[cfg(test)]
@@ -338,6 +388,8 @@ mod tests {
             planted_at: 1700000000,
             expected_harvest: 1708000000,
             status: CropStatus::Growing,
+            allergen_flags: vec![],
+            organic_certified: false,
         };
         let json = serde_json::to_string(&crop).unwrap();
         let decoded: Crop = serde_json::from_str(&json).unwrap();
@@ -365,6 +417,8 @@ mod tests {
                 planted_at: 1700000000,
                 expected_harvest: 1705000000,
                 status: status.clone(),
+                allergen_flags: vec![],
+                organic_certified: false,
             };
             let json = serde_json::to_string(&crop).unwrap();
             let decoded: Crop = serde_json::from_str(&json).unwrap();
@@ -542,6 +596,8 @@ mod tests {
             planted_at: 0,
             expected_harvest: 0,
             status: CropStatus::Planned,
+            allergen_flags: vec![],
+            organic_certified: false,
         };
         let json = serde_json::to_string(&crop).unwrap();
         let decoded: Crop = serde_json::from_str(&json).unwrap();
@@ -591,5 +647,55 @@ mod tests {
         let json = serde_json::to_string(&sp).unwrap();
         let decoded: SeasonPlan = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.year, 0);
+    }
+
+    // ========================================================================
+    // AddMemberInput serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn add_member_input_serde_roundtrip_all_roles() {
+        for role in [GardenRole::Steward, GardenRole::Volunteer, GardenRole::Member] {
+            let input = AddMemberInput {
+                plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+                member: AgentPubKey::from_raw_36(vec![0xab; 36]),
+                role: role.clone(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let decoded: AddMemberInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.role, role);
+        }
+    }
+
+    // ========================================================================
+    // RemoveMemberInput serde roundtrip
+    // ========================================================================
+
+    #[test]
+    fn remove_member_input_serde_roundtrip() {
+        let input = RemoveMemberInput {
+            membership_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: RemoveMemberInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.membership_hash, input.membership_hash);
+    }
+
+    // ========================================================================
+    // GardenMembership serde roundtrip (coordinator perspective)
+    // ========================================================================
+
+    #[test]
+    fn garden_membership_serde_roundtrip_from_coordinator() {
+        let m = GardenMembership {
+            plot_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            member: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            role: GardenRole::Steward,
+            joined_at: 1700000000,
+        };
+        let json = serde_json::to_string(&m).unwrap();
+        let decoded: GardenMembership = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.role, GardenRole::Steward);
+        assert_eq!(decoded.joined_at, 1700000000);
     }
 }

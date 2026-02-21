@@ -118,6 +118,95 @@ pub fn get_recipes_by_tag(tag: String) -> ExternResult<Vec<Record>> {
 }
 
 // ============================================================================
+// SEED EXCHANGE
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct MatchSeedInput {
+    pub request_hash: ActionHash,
+    pub stock_hash: ActionHash,
+}
+
+#[hdk_extern]
+pub fn offer_seeds(stock: SeedStock) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::SeedStock(stock.clone()))?;
+    create_link(stock.variety_hash, action_hash.clone(), LinkTypes::VarietyToStocks, ())?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created seed stock".into())))
+}
+
+#[hdk_extern]
+pub fn request_seeds(request: SeedRequest) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::SeedRequest(request))?;
+    create_entry(&EntryTypes::Anchor(Anchor("all_seed_requests".to_string())))?;
+    create_link(anchor_hash("all_seed_requests")?, action_hash.clone(), LinkTypes::AllSeedRequests, ())?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created seed request".into())))
+}
+
+#[hdk_extern]
+pub fn get_available_seeds(variety_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(variety_hash, LinkTypes::VarietyToStocks)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_open_seed_requests(_: ()) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash("all_seed_requests")?, LinkTypes::AllSeedRequests)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn match_seed_request(input: MatchSeedInput) -> ExternResult<Record> {
+    let record = get(input.request_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Seed request not found".into())))?;
+    let mut request: SeedRequest = record.entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Not a SeedRequest".into())))?;
+    request.status = SeedRequestStatus::Matched;
+    let new_hash = update_entry(input.request_hash, &EntryTypes::SeedRequest(request))?;
+    get(new_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find updated seed request".into())))
+}
+
+// ============================================================================
+// NUTRITION TRACKING
+// ============================================================================
+
+#[hdk_extern]
+pub fn add_nutrient_profile(profile: NutrientProfile) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::NutrientProfile(profile.clone()))?;
+    let crop_anchor = format!("nutrients:{}", profile.crop_name.to_lowercase());
+    create_entry(&EntryTypes::Anchor(Anchor(crop_anchor.clone())))?;
+    create_link(anchor_hash(&crop_anchor)?, action_hash.clone(), LinkTypes::CropToNutrients, ())?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created nutrient profile".into())))
+}
+
+#[hdk_extern]
+pub fn get_nutrient_profile(crop_name: String) -> ExternResult<Option<Record>> {
+    let crop_anchor = format!("nutrients:{}", crop_name.to_lowercase());
+    let links = get_links(
+        LinkQuery::try_new(anchor_hash(&crop_anchor)?, LinkTypes::CropToNutrients)?,
+        GetStrategy::default(),
+    )?;
+    if links.is_empty() {
+        return Ok(None);
+    }
+    let latest = links.last().unwrap();
+    let action_hash = ActionHash::try_from(latest.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    get(action_hash, GetOptions::default())
+}
+
+// ============================================================================
 // UPDATE FUNCTIONS
 // ============================================================================
 
@@ -778,5 +867,157 @@ mod tests {
         assert_eq!(decoded.ingredients.len(), 1);
         assert!(decoded.tags.is_empty());
         assert_eq!(decoded.source_attribution, None);
+    }
+
+    // ========================================================================
+    // MatchSeedInput serde tests
+    // ========================================================================
+
+    #[test]
+    fn match_seed_input_serde_roundtrip() {
+        let input = MatchSeedInput {
+            request_hash: ActionHash::from_raw_36(vec![0xab; 36]),
+            stock_hash: ActionHash::from_raw_36(vec![0xcd; 36]),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: MatchSeedInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.request_hash, input.request_hash);
+        assert_eq!(decoded.stock_hash, input.stock_hash);
+    }
+
+    #[test]
+    fn match_seed_input_clone_is_equal() {
+        let input = MatchSeedInput {
+            request_hash: ActionHash::from_raw_36(vec![0x11; 36]),
+            stock_hash: ActionHash::from_raw_36(vec![0x22; 36]),
+        };
+        let cloned = input.clone();
+        assert_eq!(cloned.request_hash, input.request_hash);
+        assert_eq!(cloned.stock_hash, input.stock_hash);
+    }
+
+    // ========================================================================
+    // SeedStock coordinator serde tests
+    // ========================================================================
+
+    #[test]
+    fn seed_stock_coordinator_serde_roundtrip() {
+        let stock = SeedStock {
+            variety_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            grower: AgentPubKey::from_raw_36(vec![0xab; 36]),
+            quantity_grams: 50.0,
+            location: "Community garden shed".to_string(),
+            germination_rate_pct: Some(85.0),
+            available_for_exchange: true,
+            notes: Some("Harvested fall 2025".to_string()),
+        };
+        let json = serde_json::to_string(&stock).unwrap();
+        let decoded: SeedStock = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.quantity_grams, 50.0);
+        assert_eq!(decoded.location, "Community garden shed");
+        assert_eq!(decoded.germination_rate_pct, Some(85.0));
+        assert!(decoded.available_for_exchange);
+        assert_eq!(decoded.notes, Some("Harvested fall 2025".to_string()));
+    }
+
+    #[test]
+    fn seed_stock_coordinator_minimal_serde_roundtrip() {
+        let stock = SeedStock {
+            variety_hash: ActionHash::from_raw_36(vec![0xaa; 36]),
+            grower: AgentPubKey::from_raw_36(vec![0xbb; 36]),
+            quantity_grams: 0.5,
+            location: "Shed".to_string(),
+            germination_rate_pct: None,
+            available_for_exchange: false,
+            notes: None,
+        };
+        let json = serde_json::to_string(&stock).unwrap();
+        let decoded: SeedStock = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.germination_rate_pct, None);
+        assert!(!decoded.available_for_exchange);
+        assert_eq!(decoded.notes, None);
+    }
+
+    // ========================================================================
+    // SeedRequest coordinator serde tests
+    // ========================================================================
+
+    #[test]
+    fn seed_request_coordinator_serde_roundtrip() {
+        let request = SeedRequest {
+            wanted_variety: "Cherokee Purple".to_string(),
+            quantity_grams: 10.0,
+            requester: AgentPubKey::from_raw_36(vec![0xcd; 36]),
+            status: SeedRequestStatus::Open,
+            deadline: Some(1700000000),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: SeedRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.wanted_variety, "Cherokee Purple");
+        assert_eq!(decoded.quantity_grams, 10.0);
+        assert_eq!(decoded.status, SeedRequestStatus::Open);
+        assert_eq!(decoded.deadline, Some(1700000000));
+    }
+
+    #[test]
+    fn seed_request_coordinator_all_statuses_roundtrip() {
+        for status in [SeedRequestStatus::Open, SeedRequestStatus::Matched, SeedRequestStatus::Fulfilled] {
+            let request = SeedRequest {
+                wanted_variety: "Test".to_string(),
+                quantity_grams: 1.0,
+                requester: AgentPubKey::from_raw_36(vec![0xee; 36]),
+                status: status.clone(),
+                deadline: None,
+            };
+            let json = serde_json::to_string(&request).unwrap();
+            let decoded: SeedRequest = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded.status, status);
+        }
+    }
+
+    // ========================================================================
+    // NutrientProfile coordinator serde tests
+    // ========================================================================
+
+    #[test]
+    fn nutrient_profile_coordinator_serde_roundtrip() {
+        let profile = NutrientProfile {
+            crop_name: "Kale".to_string(),
+            calories_per_100g: 49.0,
+            protein_g: 4.3,
+            carbs_g: 8.8,
+            fat_g: 0.9,
+            fiber_g: 3.6,
+            key_vitamins: vec!["A".to_string(), "C".to_string(), "K".to_string()],
+            key_minerals: vec!["Calcium".to_string(), "Iron".to_string()],
+        };
+        let json = serde_json::to_string(&profile).unwrap();
+        let decoded: NutrientProfile = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.crop_name, "Kale");
+        assert_eq!(decoded.calories_per_100g, 49.0);
+        assert_eq!(decoded.protein_g, 4.3);
+        assert_eq!(decoded.carbs_g, 8.8);
+        assert_eq!(decoded.fat_g, 0.9);
+        assert_eq!(decoded.fiber_g, 3.6);
+        assert_eq!(decoded.key_vitamins.len(), 3);
+        assert_eq!(decoded.key_minerals.len(), 2);
+    }
+
+    #[test]
+    fn nutrient_profile_coordinator_empty_lists_roundtrip() {
+        let profile = NutrientProfile {
+            crop_name: "Rice".to_string(),
+            calories_per_100g: 130.0,
+            protein_g: 2.7,
+            carbs_g: 28.2,
+            fat_g: 0.3,
+            fiber_g: 0.4,
+            key_vitamins: vec![],
+            key_minerals: vec![],
+        };
+        let json = serde_json::to_string(&profile).unwrap();
+        let decoded: NutrientProfile = serde_json::from_str(&json).unwrap();
+        assert!(decoded.key_vitamins.is_empty());
+        assert!(decoded.key_minerals.is_empty());
     }
 }

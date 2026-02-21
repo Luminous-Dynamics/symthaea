@@ -98,6 +98,27 @@ pub struct ReputationRecord {
 }
 
 // ============================================================================
+// ARTICLE-TICKET LINKING
+// ============================================================================
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum LinkReason {
+    SuggestedFAQ,
+    DuplicateResolution,
+    RelatedKnowledge,
+}
+
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct ArticleTicketLink {
+    pub article_hash: ActionHash,
+    pub ticket_hash: ActionHash,
+    pub linked_by: AgentPubKey,
+    pub link_reason: LinkReason,
+    pub created_at: Timestamp,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -109,6 +130,7 @@ pub enum EntryTypes {
     Resolution(Resolution),
     ArticleFlag(ArticleFlag),
     ReputationRecord(ReputationRecord),
+    ArticleTicketLink(ArticleTicketLink),
 }
 
 #[hdk_link_types]
@@ -120,6 +142,8 @@ pub enum LinkTypes {
     ArticleToResolution,
     ArticleToFlag,
     AgentToReputation,
+    ArticleToTickets,
+    TicketToArticles,
 }
 
 // ============================================================================
@@ -136,6 +160,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Resolution(r) => validate_resolution(r),
                 EntryTypes::ArticleFlag(f) => validate_flag(f),
                 EntryTypes::ReputationRecord(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::ArticleTicketLink(l) => validate_article_ticket_link(l),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
@@ -143,6 +168,7 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Resolution(r) => validate_resolution(r),
                 EntryTypes::ArticleFlag(f) => validate_flag(f),
                 EntryTypes::ReputationRecord(_) => Ok(ValidateCallbackResult::Valid),
+                EntryTypes::ArticleTicketLink(l) => validate_article_ticket_link(l),
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -204,6 +230,22 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::ArticleToTickets => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "ArticleToTickets link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
+                LinkTypes::TicketToArticles => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "TicketToArticles link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -255,6 +297,10 @@ fn validate_flag(f: ArticleFlag) -> ExternResult<ValidateCallbackResult> {
             "Flag description must be at least 10 characters".into(),
         ));
     }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_article_ticket_link(_l: ArticleTicketLink) -> ExternResult<ValidateCallbackResult> {
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -327,6 +373,16 @@ mod tests {
             event: ReputationEvent::HelpProvided,
             reference_hash: test_action_hash(),
             points: 10,
+            created_at: test_timestamp(),
+        }
+    }
+
+    fn valid_article_ticket_link() -> ArticleTicketLink {
+        ArticleTicketLink {
+            article_hash: test_action_hash(),
+            ticket_hash: ActionHash::from_raw_36(vec![0xcc; 36]),
+            linked_by: test_agent(),
+            link_reason: LinkReason::SuggestedFAQ,
             created_at: test_timestamp(),
         }
     }
@@ -814,7 +870,9 @@ mod tests {
             | LinkTypes::AgentToArticle
             | LinkTypes::ArticleToResolution
             | LinkTypes::ArticleToFlag
-            | LinkTypes::AgentToReputation => 256,
+            | LinkTypes::AgentToReputation
+            | LinkTypes::ArticleToTickets
+            | LinkTypes::TicketToArticles => 256,
             LinkTypes::TagToArticle => 512,
         };
         let name = match link_type {
@@ -825,6 +883,8 @@ mod tests {
             LinkTypes::ArticleToResolution => "ArticleToResolution",
             LinkTypes::ArticleToFlag => "ArticleToFlag",
             LinkTypes::AgentToReputation => "AgentToReputation",
+            LinkTypes::ArticleToTickets => "ArticleToTickets",
+            LinkTypes::TicketToArticles => "TicketToArticles",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -916,6 +976,77 @@ mod tests {
     #[test]
     fn link_agent_to_reputation_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::AgentToReputation, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Serde roundtrip tests: LinkReason ──────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_link_reason_suggested_faq() {
+        let r = LinkReason::SuggestedFAQ;
+        let json = serde_json::to_string(&r).unwrap();
+        let back: LinkReason = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn serde_roundtrip_link_reason_duplicate_resolution() {
+        let r = LinkReason::DuplicateResolution;
+        let json = serde_json::to_string(&r).unwrap();
+        let back: LinkReason = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    #[test]
+    fn serde_roundtrip_link_reason_related_knowledge() {
+        let r = LinkReason::RelatedKnowledge;
+        let json = serde_json::to_string(&r).unwrap();
+        let back: LinkReason = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, r);
+    }
+
+    // ── Serde roundtrip tests: ArticleTicketLink ───────────────────────
+
+    #[test]
+    fn serde_roundtrip_article_ticket_link() {
+        let l = valid_article_ticket_link();
+        let json = serde_json::to_string(&l).unwrap();
+        let back: ArticleTicketLink = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, l);
+    }
+
+    // ── validate_article_ticket_link ───────────────────────────────────
+
+    #[test]
+    fn valid_article_ticket_link_passes() {
+        assert_valid(validate_article_ticket_link(valid_article_ticket_link()));
+    }
+
+    // ── Link tag tests: ArticleToTickets ───────────────────────────────
+
+    #[test]
+    fn link_article_to_tickets_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::ArticleToTickets, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn link_article_to_tickets_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::ArticleToTickets, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Link tag tests: TicketToArticles ───────────────────────────────
+
+    #[test]
+    fn link_ticket_to_articles_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::TicketToArticles, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn link_ticket_to_articles_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::TicketToArticles, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
     }
 }

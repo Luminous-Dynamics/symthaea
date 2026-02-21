@@ -75,6 +75,8 @@ pub struct Crop {
     pub planted_at: u64,
     pub expected_harvest: u64,
     pub status: CropStatus,
+    pub allergen_flags: Vec<String>,
+    pub organic_certified: bool,
 }
 
 // ============================================================================
@@ -117,6 +119,28 @@ pub struct SeasonPlan {
 }
 
 // ============================================================================
+// GARDEN MEMBERSHIP
+// ============================================================================
+
+/// Role within a community garden
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub enum GardenRole {
+    Steward,
+    Volunteer,
+    Member,
+}
+
+/// Membership record linking an agent to a plot
+#[hdk_entry_helper]
+#[derive(Clone, PartialEq)]
+pub struct GardenMembership {
+    pub plot_hash: ActionHash,
+    pub member: AgentPubKey,
+    pub role: GardenRole,
+    pub joined_at: u64,
+}
+
+// ============================================================================
 // ENTRY & LINK TYPE REGISTRATION
 // ============================================================================
 
@@ -128,6 +152,7 @@ pub enum EntryTypes {
     Crop(Crop),
     YieldRecord(YieldRecord),
     SeasonPlan(SeasonPlan),
+    GardenMembership(GardenMembership),
 }
 
 #[hdk_link_types]
@@ -138,6 +163,7 @@ pub enum LinkTypes {
     CropToYield,
     PlotToSeasonPlan,
     AgentToYield,
+    PlotToMembers,
 }
 
 // ============================================================================
@@ -154,9 +180,11 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 EntryTypes::Crop(crop) => validate_crop(crop),
                 EntryTypes::YieldRecord(yr) => validate_yield(yr),
                 EntryTypes::SeasonPlan(sp) => validate_season_plan(sp),
+                EntryTypes::GardenMembership(m) => validate_garden_membership(m),
             },
             OpEntry::UpdateEntry { app_entry, .. } => match app_entry {
                 EntryTypes::Plot(plot) => validate_plot(plot),
+                EntryTypes::GardenMembership(m) => validate_garden_membership(m),
                 _ => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -211,6 +239,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     }
                     Ok(ValidateCallbackResult::Valid)
                 }
+                LinkTypes::PlotToMembers => {
+                    if tag.0.len() > 256 {
+                        return Ok(ValidateCallbackResult::Invalid(
+                            "PlotToMembers link tag too long (max 256 bytes)".into(),
+                        ));
+                    }
+                    Ok(ValidateCallbackResult::Valid)
+                }
             }
         }
         FlatOp::RegisterDeleteLink { .. } => Ok(ValidateCallbackResult::Valid),
@@ -259,6 +295,17 @@ fn validate_crop(crop: Crop) -> ExternResult<ValidateCallbackResult> {
     if crop.variety.len() > 128 {
         return Ok(ValidateCallbackResult::Invalid("Crop variety must be 128 characters or fewer".into()));
     }
+    if crop.allergen_flags.len() > 50 {
+        return Ok(ValidateCallbackResult::Invalid("Cannot have more than 50 allergen flags".into()));
+    }
+    for flag in &crop.allergen_flags {
+        if flag.trim().is_empty() {
+            return Ok(ValidateCallbackResult::Invalid("Allergen flag cannot be empty".into()));
+        }
+        if flag.len() > 128 {
+            return Ok(ValidateCallbackResult::Invalid("Allergen flag too long (max 128 chars)".into()));
+        }
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -300,6 +347,13 @@ fn validate_season_plan(sp: SeasonPlan) -> ExternResult<ValidateCallbackResult> 
     Ok(ValidateCallbackResult::Valid)
 }
 
+fn validate_garden_membership(m: GardenMembership) -> ExternResult<ValidateCallbackResult> {
+    if m.joined_at == 0 {
+        return Ok(ValidateCallbackResult::Invalid("GardenMembership joined_at cannot be zero".into()));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,6 +388,17 @@ mod tests {
             planted_at: 1700000000,
             expected_harvest: 1708000000,
             status: CropStatus::Planted,
+            allergen_flags: vec![],
+            organic_certified: false,
+        }
+    }
+
+    fn valid_garden_membership() -> GardenMembership {
+        GardenMembership {
+            plot_hash: fake_action_hash(),
+            member: fake_agent(),
+            role: GardenRole::Member,
+            joined_at: 1700000000,
         }
     }
 
@@ -1066,7 +1131,8 @@ mod tests {
             | LinkTypes::PlotToCrop
             | LinkTypes::CropToYield
             | LinkTypes::PlotToSeasonPlan
-            | LinkTypes::AgentToYield => 256,
+            | LinkTypes::AgentToYield
+            | LinkTypes::PlotToMembers => 256,
         };
         let name = match link_type {
             LinkTypes::AllPlots => "AllPlots",
@@ -1075,6 +1141,7 @@ mod tests {
             LinkTypes::CropToYield => "CropToYield",
             LinkTypes::PlotToSeasonPlan => "PlotToSeasonPlan",
             LinkTypes::AgentToYield => "AgentToYield",
+            LinkTypes::PlotToMembers => "PlotToMembers",
         };
         if tag.0.len() > max {
             ValidateCallbackResult::Invalid(
@@ -1155,5 +1222,127 @@ mod tests {
     fn test_link_agent_to_yield_tag_over_max_rejected() {
         let result = validate_link_tag(&LinkTypes::AgentToYield, 257);
         assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── PlotToMembers link tag tests ────────────────────────────────────
+
+    #[test]
+    fn test_link_plot_to_members_tag_at_max_accepted() {
+        let result = validate_link_tag(&LinkTypes::PlotToMembers, 256);
+        assert_eq!(result, ValidateCallbackResult::Valid);
+    }
+
+    #[test]
+    fn test_link_plot_to_members_tag_over_max_rejected() {
+        let result = validate_link_tag(&LinkTypes::PlotToMembers, 257);
+        assert!(matches!(result, ValidateCallbackResult::Invalid(_)));
+    }
+
+    // ── Serde roundtrip: GardenRole ─────────────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_garden_role_all_variants() {
+        let roles = vec![GardenRole::Steward, GardenRole::Volunteer, GardenRole::Member];
+        for r in &roles {
+            let json = serde_json::to_string(r).unwrap();
+            let back: GardenRole = serde_json::from_str(&json).unwrap();
+            assert_eq!(&back, r);
+        }
+    }
+
+    // ── Serde roundtrip: GardenMembership ───────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_garden_membership() {
+        let m = valid_garden_membership();
+        let json = serde_json::to_string(&m).unwrap();
+        let back: GardenMembership = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, m);
+    }
+
+    // ── Serde roundtrip: Crop with allergens ────────────────────────────
+
+    #[test]
+    fn serde_roundtrip_crop_with_allergens() {
+        let mut c = valid_crop();
+        c.allergen_flags = vec!["gluten".into(), "soy".into()];
+        c.organic_certified = true;
+        let json = serde_json::to_string(&c).unwrap();
+        let back: Crop = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, c);
+    }
+
+    // ── validate_crop: allergen flags ───────────────────────────────────
+
+    #[test]
+    fn crop_with_allergen_flags_valid() {
+        let mut c = valid_crop();
+        c.allergen_flags = vec!["gluten".into(), "nuts".into()];
+        assert_valid(validate_crop(c));
+    }
+
+    #[test]
+    fn crop_too_many_allergens_rejected() {
+        let mut c = valid_crop();
+        c.allergen_flags = (0..51).map(|i| format!("allergen_{i}")).collect();
+        assert_invalid(validate_crop(c), "Cannot have more than 50 allergen flags");
+    }
+
+    #[test]
+    fn crop_empty_allergen_flag_rejected() {
+        let mut c = valid_crop();
+        c.allergen_flags = vec!["".into()];
+        assert_invalid(validate_crop(c), "Allergen flag cannot be empty");
+    }
+
+    #[test]
+    fn crop_allergen_flag_too_long_rejected() {
+        let mut c = valid_crop();
+        c.allergen_flags = vec!["x".repeat(129)];
+        assert_invalid(validate_crop(c), "Allergen flag too long (max 128 chars)");
+    }
+
+    #[test]
+    fn crop_exactly_50_allergen_flags_accepted() {
+        let mut c = valid_crop();
+        c.allergen_flags = (0..50).map(|i| format!("allergen_{i}")).collect();
+        assert_valid(validate_crop(c));
+    }
+
+    #[test]
+    fn crop_whitespace_allergen_flag_rejected() {
+        let mut c = valid_crop();
+        c.allergen_flags = vec!["  ".into()];
+        assert_invalid(validate_crop(c), "Allergen flag cannot be empty");
+    }
+
+    #[test]
+    fn crop_organic_true_valid() {
+        let mut c = valid_crop();
+        c.organic_certified = true;
+        assert_valid(validate_crop(c));
+    }
+
+    // ── validate_garden_membership ──────────────────────────────────────
+
+    #[test]
+    fn garden_membership_valid() {
+        assert_valid(validate_garden_membership(valid_garden_membership()));
+    }
+
+    #[test]
+    fn garden_membership_zero_joined_at_rejected() {
+        let mut m = valid_garden_membership();
+        m.joined_at = 0;
+        assert_invalid(validate_garden_membership(m), "GardenMembership joined_at cannot be zero");
+    }
+
+    #[test]
+    fn garden_membership_all_roles_valid() {
+        for role in [GardenRole::Steward, GardenRole::Volunteer, GardenRole::Member] {
+            let mut m = valid_garden_membership();
+            m.role = role;
+            assert_valid(validate_garden_membership(m));
+        }
     }
 }

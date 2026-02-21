@@ -87,6 +87,15 @@ members = [
     "zomes/transport-impact/integrity",
     "zomes/transport-impact/coordinator",
 
+    # Support domain (3 zomes)
+    "crates/support-types",
+    "zomes/support-tickets/integrity",
+    "zomes/support-tickets/coordinator",
+    "zomes/support-knowledge/integrity",
+    "zomes/support-knowledge/coordinator",
+    "zomes/support-diagnostics/integrity",
+    "zomes/support-diagnostics/coordinator",
+
     # Space / membrane factory (1 zome)
     "zomes/space/integrity",
     "zomes/space/coordinator",
@@ -125,6 +134,7 @@ getrandom_03 = { package = "getrandom", version = "0.3" }
 # Internal shared crates
 commons-types = { path = "crates/commons-types" }
 mutualaid-common = { path = "crates/mutualaid-common" }
+support-types = { path = "crates/support-types" }
 mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
 mycelix-bridge-entry-types = { path = "../crates/mycelix-bridge-entry-types" }
 

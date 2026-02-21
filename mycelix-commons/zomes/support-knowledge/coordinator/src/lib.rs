@@ -32,6 +32,19 @@ pub struct DeprecateInput {
     pub reason: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct LinkArticleInput {
+    pub article_hash: ActionHash,
+    pub ticket_hash: ActionHash,
+    pub link_reason: LinkReason,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct FindSimilarInput {
+    pub keywords: Vec<String>,
+    pub max_results: Option<usize>,
+}
+
 // ============================================================================
 // HELPERS
 // ============================================================================
@@ -255,6 +268,45 @@ pub fn get_agent_reputation(agent: AgentPubKey) -> ExternResult<Vec<Record>> {
     records_from_links(links)
 }
 
+// ============================================================================
+// ARTICLE-TICKET LINKING
+// ============================================================================
+
+#[hdk_extern]
+pub fn link_article_to_ticket(input: LinkArticleInput) -> ExternResult<Record> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let link = ArticleTicketLink {
+        article_hash: input.article_hash.clone(),
+        ticket_hash: input.ticket_hash.clone(),
+        linked_by: agent,
+        link_reason: input.link_reason,
+        created_at: sys_time()?,
+    };
+    let action_hash = create_entry(&EntryTypes::ArticleTicketLink(link))?;
+    create_link(input.article_hash, action_hash.clone(), LinkTypes::ArticleToTickets, ())?;
+    create_link(input.ticket_hash, action_hash.clone(), LinkTypes::TicketToArticles, ())?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created article-ticket link".into())))
+}
+
+#[hdk_extern]
+pub fn get_suggested_articles(ticket_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(ticket_hash, LinkTypes::TicketToArticles)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_tickets_for_article(article_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(article_hash, LinkTypes::ArticleToTickets)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -394,5 +446,42 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let decoded: DeprecateInput = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.reason, "");
+    }
+
+    #[test]
+    fn link_article_input_serde_roundtrip() {
+        let input = LinkArticleInput {
+            article_hash: ActionHash::from_raw_36(vec![0xdb; 36]),
+            ticket_hash: ActionHash::from_raw_36(vec![0xcc; 36]),
+            link_reason: LinkReason::SuggestedFAQ,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: LinkArticleInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.article_hash, input.article_hash);
+        assert_eq!(decoded.ticket_hash, input.ticket_hash);
+    }
+
+    #[test]
+    fn find_similar_input_serde_roundtrip() {
+        let input = FindSimilarInput {
+            keywords: vec!["holochain".into(), "networking".into()],
+            max_results: Some(10),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FindSimilarInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.keywords, vec!["holochain", "networking"]);
+        assert_eq!(decoded.max_results, Some(10));
+    }
+
+    #[test]
+    fn find_similar_input_no_max_results_roundtrip() {
+        let input = FindSimilarInput {
+            keywords: vec!["test".into()],
+            max_results: None,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let decoded: FindSimilarInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.keywords, vec!["test"]);
+        assert_eq!(decoded.max_results, None);
     }
 }

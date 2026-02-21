@@ -10,6 +10,8 @@ use support_types::{
 };
 #[cfg(test)]
 use support_types::{SupportCategory, TicketPriority, AutonomyLevel};
+#[cfg(test)]
+use support_tickets_integrity::{EscalationLevel, SatisfactionSurvey};
 
 // ============================================================================
 // BRIDGE SIGNAL (for cross-domain UI notification)
@@ -77,6 +79,14 @@ pub struct UpdateTicketInput {
 pub struct PromoteAlertInput {
     pub alert_hash: ActionHash,
     pub ticket: SupportTicket,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EscalateInput {
+    pub ticket_hash: ActionHash,
+    pub from_level: EscalationLevel,
+    pub to_level: EscalationLevel,
+    pub reason: String,
 }
 
 // ============================================================================
@@ -429,6 +439,65 @@ pub fn promote_alert_to_ticket(input: PromoteAlertInput) -> ExternResult<Record>
 }
 
 // ============================================================================
+// ESCALATION
+// ============================================================================
+
+#[hdk_extern]
+pub fn escalate_ticket(input: EscalateInput) -> ExternResult<Record> {
+    let _ticket = get(input.ticket_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Ticket not found".into())))?;
+    let agent = agent_info()?.agent_initial_pubkey;
+    let escalation = Escalation {
+        ticket_hash: input.ticket_hash.clone(),
+        escalated_by: agent,
+        from_level: input.from_level,
+        to_level: input.to_level,
+        reason: input.reason,
+        escalated_at: sys_time()?,
+    };
+    let action_hash = create_entry(&EntryTypes::Escalation(escalation))?;
+    create_link(input.ticket_hash, action_hash.clone(), LinkTypes::TicketToEscalations, ())?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created escalation".into())))
+}
+
+#[hdk_extern]
+pub fn get_escalation_history(ticket_hash: ActionHash) -> ExternResult<Vec<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(ticket_hash, LinkTypes::TicketToEscalations)?,
+        GetStrategy::default(),
+    )?;
+    records_from_links(links)
+}
+
+// ============================================================================
+// SATISFACTION SURVEY
+// ============================================================================
+
+#[hdk_extern]
+pub fn submit_satisfaction(survey: SatisfactionSurvey) -> ExternResult<Record> {
+    let action_hash = create_entry(&EntryTypes::SatisfactionSurvey(survey.clone()))?;
+    create_link(survey.ticket_hash, action_hash.clone(), LinkTypes::TicketToSurvey, ())?;
+    get(action_hash, GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created satisfaction survey".into())))
+}
+
+#[hdk_extern]
+pub fn get_ticket_satisfaction(ticket_hash: ActionHash) -> ExternResult<Option<Record>> {
+    let links = get_links(
+        LinkQuery::try_new(ticket_hash, LinkTypes::TicketToSurvey)?,
+        GetStrategy::default(),
+    )?;
+    if links.is_empty() {
+        return Ok(None);
+    }
+    let latest = links.last().unwrap();
+    let action_hash = ActionHash::try_from(latest.target.clone())
+        .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+    get(action_hash, GetOptions::default())
+}
+
+// ============================================================================
 // TESTS
 // ============================================================================
 
@@ -609,5 +678,41 @@ mod tests {
         assert_eq!(cloned.event_type, signal.event_type);
         assert_eq!(cloned.source_zome, signal.source_zome);
         assert_eq!(cloned.payload, signal.payload);
+    }
+
+    // -- Serde roundtrip: EscalateInput ---------------------------------------
+
+    #[test]
+    fn serde_roundtrip_escalate_input() {
+        let input = EscalateInput {
+            ticket_hash: fake_action_hash(),
+            from_level: EscalationLevel::Tier1,
+            to_level: EscalationLevel::Tier2,
+            reason: "Customer requires specialist attention".into(),
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: EscalateInput = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.reason, "Customer requires specialist attention");
+    }
+
+    #[test]
+    fn serde_roundtrip_escalate_input_all_levels() {
+        for (from, to) in [
+            (EscalationLevel::Tier1, EscalationLevel::Tier2),
+            (EscalationLevel::Tier2, EscalationLevel::Management),
+            (EscalationLevel::Management, EscalationLevel::Emergency),
+            (EscalationLevel::Tier1, EscalationLevel::Emergency),
+        ] {
+            let input = EscalateInput {
+                ticket_hash: fake_action_hash(),
+                from_level: from.clone(),
+                to_level: to.clone(),
+                reason: "Escalation test".into(),
+            };
+            let json = serde_json::to_string(&input).unwrap();
+            let back: EscalateInput = serde_json::from_str(&json).unwrap();
+            assert_eq!(back.from_level, from);
+            assert_eq!(back.to_level, to);
+        }
     }
 }
