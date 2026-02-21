@@ -1,0 +1,836 @@
+//! Hearth Bridge Coordinator Zome
+//!
+//! Unified gateway for cross-domain and cross-cluster communication in the
+//! Hearth (Family/Household) cluster. Provides three integration patterns:
+//!
+//! 1. **dispatch_call** -- synchronous RPC to any hearth domain zome
+//! 2. **query_hearth** -- audited async query/response with DHT persistence
+//! 3. **broadcast_event** -- event distribution to connected clients
+//!
+//! Cross-cluster callers (Personal, Identity, Commons, Civic) reach this
+//! bridge via `CallTargetCell::OtherRole("hearth")`.
+
+use hdk::prelude::*;
+use hearth_bridge_integrity::*;
+use hearth_types::{SeveranceInput, SeveranceSummaryData};
+use mycelix_bridge_common::{
+    self as bridge, check_rate_limit_count, BridgeHealth, CrossClusterDispatchInput, DispatchInput,
+    DispatchResult, EventTypeQuery, ResolveQueryInput, RATE_LIMIT_WINDOW_SECS,
+};
+
+// ============================================================================
+// Allowed zome names -- security boundary for dispatch
+// ============================================================================
+
+const ALLOWED_ZOMES: &[&str] = &[
+    "hearth_kinship",
+    "hearth_gratitude",
+    "hearth_stories",
+    "hearth_care",
+    "hearth_autonomy",
+    "hearth_emergency",
+    "hearth_decisions",
+    "hearth_resources",
+    "hearth_milestones",
+    "hearth_rhythms",
+];
+
+// Cross-cluster dispatch targets (what hearth bridge can call in other clusters)
+const ALLOWED_PERSONAL_ZOMES: &[&str] = &["personal_bridge"];
+const ALLOWED_IDENTITY_ZOMES: &[&str] = &["identity_bridge", "did_registry", "recovery"];
+const ALLOWED_COMMONS_ZOMES: &[&str] = &["commons_bridge"];
+const ALLOWED_CIVIC_ZOMES: &[&str] = &["civic_bridge"];
+
+// ============================================================================
+// Domain-to-zome resolution
+// ============================================================================
+
+fn resolve_zome(domain: &str) -> Option<&'static str> {
+    match domain {
+        "kinship" => Some("hearth_kinship"),
+        "gratitude" => Some("hearth_gratitude"),
+        "stories" => Some("hearth_stories"),
+        "care" => Some("hearth_care"),
+        "autonomy" => Some("hearth_autonomy"),
+        "emergency" => Some("hearth_emergency"),
+        "decisions" => Some("hearth_decisions"),
+        "resources" => Some("hearth_resources"),
+        "milestones" => Some("hearth_milestones"),
+        "rhythms" => Some("hearth_rhythms"),
+        _ => None,
+    }
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+fn ensure_anchor(anchor_str: &str) -> ExternResult<EntryHash> {
+    let anchor = Anchor(anchor_str.to_string());
+    create_entry(&EntryTypes::Anchor(anchor))?;
+    anchor_hash(anchor_str)
+}
+
+// ============================================================================
+// Rate Limiting
+// ============================================================================
+
+fn enforce_rate_limit(target_zome: &str) -> ExternResult<()> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let anchor = ensure_anchor("dispatch_rate_limit")?;
+
+    let links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::DispatchRateLimit)?,
+        GetStrategy::Local,
+    )?;
+
+    let now = sys_time()?;
+    let window_start_micros = now.as_micros() - (RATE_LIMIT_WINDOW_SECS * 1_000_000);
+    let window_start = Timestamp::from_micros(window_start_micros);
+
+    let recent_count = links.iter().filter(|l| l.timestamp >= window_start).count();
+
+    check_rate_limit_count(recent_count).map_err(|msg| wasm_error!(WasmErrorInner::Guest(msg)))?;
+
+    create_link(
+        agent,
+        anchor,
+        LinkTypes::DispatchRateLimit,
+        target_zome.as_bytes().to_vec(),
+    )?;
+
+    Ok(())
+}
+
+// ============================================================================
+// Cross-Domain Dispatch (synchronous RPC)
+// ============================================================================
+
+/// Dispatch a synchronous call to any domain zome within the Hearth DNA.
+#[hdk_extern]
+pub fn dispatch_call(input: DispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&input.zome)?;
+    bridge::dispatch_call_checked(&input, ALLOWED_ZOMES)
+}
+
+// ============================================================================
+// Audited Query/Response
+// ============================================================================
+
+/// Submit a cross-domain hearth query.
+/// Creates a BridgeQuery entry on the DHT, links it for indexing,
+/// and attempts auto-dispatch to the resolved zome.
+#[hdk_extern]
+pub fn query_hearth(input: DispatchInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    // Determine domain from zome name or use zome as domain
+    let domain = ALLOWED_ZOMES
+        .iter()
+        .find(|z| **z == input.zome)
+        .map(|z| z.replace("hearth_", ""))
+        .unwrap_or_else(|| input.zome.clone());
+
+    let query = HearthQueryEntry {
+        domain: domain.clone(),
+        query_type: input.fn_name.clone(),
+        requester: caller.clone(),
+        params: String::from_utf8_lossy(&input.payload).to_string(),
+        result: None,
+        created_at: now,
+        resolved_at: None,
+        success: None,
+    };
+
+    let action_hash = create_entry(&EntryTypes::BridgeQuery(query))?;
+
+    let all_anchor = ensure_anchor("all_hearth_queries")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllQueries, ())?;
+
+    let agent_anchor = ensure_anchor(&format!("agent_queries:{}", caller))?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToQuery,
+        (),
+    )?;
+
+    let domain_anchor = ensure_anchor(&format!("domain_queries:{}", domain))?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToQuery,
+        (),
+    )?;
+
+    // Attempt auto-dispatch
+    if let Some(zome_name) = resolve_zome(&domain) {
+        let dispatch = DispatchInput {
+            zome: zome_name.to_string(),
+            fn_name: input.fn_name,
+            payload: input.payload,
+        };
+        if let Ok(result) = dispatch_call(dispatch) {
+            if result.success {
+                let result_str = result
+                    .response
+                    .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
+                    .unwrap_or_else(|| "null".to_string());
+                let _ = resolve_query(ResolveQueryInput {
+                    query_hash: action_hash.clone(),
+                    result: result_str,
+                    success: true,
+                });
+            }
+        }
+    }
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created query".into()
+    )))
+}
+
+// ============================================================================
+// Query Resolution
+// ============================================================================
+
+/// Resolve a pending query with a result.
+#[hdk_extern]
+pub fn resolve_query(input: ResolveQueryInput) -> ExternResult<Record> {
+    let record = get(input.query_hash.clone(), GetOptions::default())?
+        .ok_or(wasm_error!(WasmErrorInner::Guest("Query not found".into())))?;
+
+    let mut query: HearthQueryEntry = record
+        .entry()
+        .to_app_option()
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Invalid query entry".into()
+        )))?;
+
+    let now = sys_time()?;
+    query.result = Some(input.result);
+    query.resolved_at = Some(now);
+    query.success = Some(input.success);
+
+    let updated_hash = update_entry(input.query_hash, &EntryTypes::BridgeQuery(query))?;
+    get(updated_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find updated query".into()
+    )))
+}
+
+// ============================================================================
+// Event Broadcasting
+// ============================================================================
+
+/// Signal payload emitted to connected UI clients.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct BridgeEventSignal {
+    pub signal_type: String,
+    pub domain: String,
+    pub event_type: String,
+    pub payload: String,
+    pub action_hash: ActionHash,
+}
+
+/// Broadcast a cross-domain event and emit a signal to connected clients.
+#[hdk_extern]
+pub fn broadcast_event(input: DispatchInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    let domain = ALLOWED_ZOMES
+        .iter()
+        .find(|z| **z == input.zome)
+        .map(|z| z.replace("hearth_", ""))
+        .unwrap_or_else(|| input.zome.clone());
+
+    let event = HearthEventEntry {
+        domain: domain.clone(),
+        event_type: input.fn_name.clone(),
+        source_agent: caller.clone(),
+        payload: String::from_utf8_lossy(&input.payload).to_string(),
+        created_at: now,
+        related_hashes: vec![],
+    };
+
+    let action_hash = create_entry(&EntryTypes::BridgeEvent(event.clone()))?;
+
+    let all_anchor = ensure_anchor("all_hearth_events")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
+
+    let agent_anchor = ensure_anchor(&format!("agent_events:{}", caller))?;
+    create_link(
+        agent_anchor,
+        action_hash.clone(),
+        LinkTypes::AgentToEvent,
+        (),
+    )?;
+
+    let domain_anchor = ensure_anchor(&format!("domain_events:{}", domain))?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToEvent,
+        (),
+    )?;
+
+    let signal = BridgeEventSignal {
+        signal_type: "hearth_bridge_event".to_string(),
+        domain: event.domain,
+        event_type: event.event_type,
+        payload: event.payload,
+        action_hash: action_hash.clone(),
+    };
+    emit_signal(&signal)?;
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created event".into()
+    )))
+}
+
+// ============================================================================
+// Query Helpers
+// ============================================================================
+
+#[hdk_extern]
+pub fn get_domain_events(domain: String) -> ExternResult<Vec<Record>> {
+    let domain_anchor = anchor_hash(&format!("domain_events:{}", domain))?;
+    let links = get_links(
+        LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_all_events(_: ()) -> ExternResult<Vec<Record>> {
+    let all_anchor = anchor_hash("all_hearth_events")?;
+    let links = get_links(
+        LinkQuery::try_new(all_anchor, LinkTypes::AllEvents)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_events_by_type(query: EventTypeQuery) -> ExternResult<Vec<Record>> {
+    // Reuse domain-based indexing since we store by domain
+    let domain_anchor = anchor_hash(&format!("domain_events:{}", query.domain))?;
+    let links = get_links(
+        LinkQuery::try_new(domain_anchor, LinkTypes::DomainToEvent)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+#[hdk_extern]
+pub fn get_my_queries(_: ()) -> ExternResult<Vec<Record>> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let agent_anchor = anchor_hash(&format!("agent_queries:{}", caller))?;
+    let links = get_links(
+        LinkQuery::try_new(agent_anchor, LinkTypes::AgentToQuery)?,
+        GetStrategy::default(),
+    )?;
+    bridge::records_from_links(links)
+}
+
+// ============================================================================
+// Cross-Cluster Dispatch
+// ============================================================================
+
+const PERSONAL_ROLE: &str = "personal";
+const IDENTITY_ROLE: &str = "identity";
+const COMMONS_ROLE: &str = "commons";
+const CIVIC_ROLE: &str = "civic";
+
+/// Dispatch a call to the Personal cluster.
+#[hdk_extern]
+pub fn dispatch_personal_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("personal:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: PERSONAL_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_PERSONAL_ZOMES)
+}
+
+/// Dispatch a call to the Identity cluster.
+#[hdk_extern]
+pub fn dispatch_identity_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("identity:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Dispatch a call to the Commons cluster.
+#[hdk_extern]
+pub fn dispatch_commons_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("commons:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES)
+}
+
+/// Dispatch a call to the Civic cluster.
+#[hdk_extern]
+pub fn dispatch_civic_call(input: CrossClusterDispatchInput) -> ExternResult<DispatchResult> {
+    enforce_rate_limit(&format!("civic:{}", input.zome))?;
+    let dispatch = CrossClusterDispatchInput {
+        role: CIVIC_ROLE.to_string(),
+        zome: input.zome,
+        fn_name: input.fn_name,
+        payload: input.payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_CIVIC_ZOMES)
+}
+
+// ============================================================================
+// Typed Convenience Functions
+// ============================================================================
+
+/// Verify a member's identity via the Identity cluster.
+#[hdk_extern]
+pub fn verify_member_identity(agent: AgentPubKey) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("identity:identity_bridge")?;
+    let payload = ExternIO::encode(agent)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "verify_identity".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)
+}
+
+/// Escalate an emergency alert to the Civic cluster's emergency system.
+#[hdk_extern]
+pub fn escalate_emergency(alert_data: String) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("civic:civic_bridge")?;
+    let payload = ExternIO::encode(alert_data)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: CIVIC_ROLE.to_string(),
+        zome: "civic_bridge".to_string(),
+        fn_name: "escalate_emergency".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_CIVIC_ZOMES)
+}
+
+/// Query the timebank balance for an agent from the Commons cluster.
+#[hdk_extern]
+pub fn query_timebank_balance(agent: AgentPubKey) -> ExternResult<DispatchResult> {
+    enforce_rate_limit("commons:commons_bridge")?;
+    let payload = ExternIO::encode(agent)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: COMMONS_ROLE.to_string(),
+        zome: "commons_bridge".to_string(),
+        fn_name: "query_timebank_balance".to_string(),
+        payload,
+    };
+    bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_COMMONS_ZOMES)
+}
+
+// ============================================================================
+// Severance (H3: Coming-of-age data migration)
+// ============================================================================
+
+/// Initiate a severance process for a member leaving or coming of age.
+/// Records a SeveranceSummaryData event on the DHT and dispatches
+/// a personal vault export via the Personal cluster.
+#[hdk_extern]
+pub fn initiate_severance(input: SeveranceInput) -> ExternResult<Record> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+
+    // Build the severance summary
+    let summary = SeveranceSummaryData {
+        hearth_hash: input.hearth_hash.clone(),
+        member: caller.clone(),
+        milestones_exported: if input.export_milestones { 1 } else { 0 },
+        care_records_exported: if input.export_care_history { 1 } else { 0 },
+        bond_snapshot_exported: input.export_bond_snapshot,
+        new_role: input.new_role.clone(),
+        completed_at: now,
+    };
+
+    // Record as a bridge event for audit trail
+    let event_payload = serde_json::to_string(&summary)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?;
+
+    let event = HearthEventEntry {
+        domain: "kinship".to_string(),
+        event_type: "severance_initiated".to_string(),
+        source_agent: caller.clone(),
+        payload: event_payload,
+        created_at: now,
+        related_hashes: vec![],
+    };
+
+    let action_hash = create_entry(&EntryTypes::BridgeEvent(event))?;
+
+    let all_anchor = ensure_anchor("all_hearth_events")?;
+    create_link(all_anchor, action_hash.clone(), LinkTypes::AllEvents, ())?;
+
+    let domain_anchor = ensure_anchor("domain_events:kinship")?;
+    create_link(
+        domain_anchor,
+        action_hash.clone(),
+        LinkTypes::DomainToEvent,
+        (),
+    )?;
+
+    // Dispatch personal vault export via cross-cluster call
+    let export_payload = ExternIO::encode(&input)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let personal_dispatch = CrossClusterDispatchInput {
+        role: PERSONAL_ROLE.to_string(),
+        zome: "personal_bridge".to_string(),
+        fn_name: "export_member_data".to_string(),
+        payload: export_payload,
+    };
+    // Best-effort -- don't fail the severance if the personal export fails
+    let _ = bridge::dispatch_call_cross_cluster(&personal_dispatch, ALLOWED_PERSONAL_ZOMES);
+
+    get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "Could not find created severance event".into()
+    )))
+}
+
+// ============================================================================
+// Epoch Sync (H2: Weekly digest rollup)
+// ============================================================================
+
+/// Trigger epoch sync for a hearth: calls digest creation on gratitude,
+/// care, and rhythm zomes.
+#[hdk_extern]
+pub fn hearth_sync(hearth_hash: ActionHash) -> ExternResult<()> {
+    let hash_payload = ExternIO::encode(hearth_hash.clone())
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+
+    // Call create_gratitude_digest
+    let gratitude_dispatch = DispatchInput {
+        zome: "hearth_gratitude".to_string(),
+        fn_name: "create_gratitude_digest".to_string(),
+        payload: hash_payload.clone(),
+    };
+    let _ = bridge::dispatch_call_checked(&gratitude_dispatch, ALLOWED_ZOMES);
+
+    // Call create_care_digest
+    let care_dispatch = DispatchInput {
+        zome: "hearth_care".to_string(),
+        fn_name: "create_care_digest".to_string(),
+        payload: hash_payload.clone(),
+    };
+    let _ = bridge::dispatch_call_checked(&care_dispatch, ALLOWED_ZOMES);
+
+    // Call create_rhythm_digest
+    let rhythm_dispatch = DispatchInput {
+        zome: "hearth_rhythms".to_string(),
+        fn_name: "create_rhythm_digest".to_string(),
+        payload: hash_payload,
+    };
+    let _ = bridge::dispatch_call_checked(&rhythm_dispatch, ALLOWED_ZOMES);
+
+    Ok(())
+}
+
+// ============================================================================
+// Admin
+// ============================================================================
+
+/// Health check for the hearth bridge.
+#[hdk_extern]
+pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
+    let caller = agent_info()?.agent_initial_pubkey;
+    let events = get_all_events(())?;
+    let queries = get_my_queries(())?;
+
+    Ok(BridgeHealth {
+        healthy: true,
+        agent: caller.to_string(),
+        total_events: events.len() as u32,
+        total_queries: queries.len() as u32,
+        domains: vec![
+            "kinship".to_string(),
+            "gratitude".to_string(),
+            "stories".to_string(),
+            "care".to_string(),
+            "autonomy".to_string(),
+            "emergency".to_string(),
+            "decisions".to_string(),
+            "resources".to_string(),
+            "milestones".to_string(),
+            "rhythms".to_string(),
+        ],
+    })
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hearth_types::MemberRole;
+
+    // ---- Allowlist validation ----
+
+    #[test]
+    fn local_allowlist_covers_all_hearth_domains() {
+        assert!(ALLOWED_ZOMES.contains(&"hearth_kinship"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_gratitude"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_stories"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_care"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_autonomy"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_emergency"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_decisions"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_resources"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_milestones"));
+        assert!(ALLOWED_ZOMES.contains(&"hearth_rhythms"));
+    }
+
+    #[test]
+    fn local_allowlist_has_expected_count() {
+        assert_eq!(ALLOWED_ZOMES.len(), 10);
+    }
+
+    #[test]
+    fn allowed_zomes_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_ZOMES {
+            assert!(seen.insert(zome), "Duplicate in ALLOWED_ZOMES: '{}'", zome);
+        }
+    }
+
+    #[test]
+    fn allowed_zomes_entries_are_non_empty() {
+        for zome in ALLOWED_ZOMES {
+            assert!(!zome.is_empty());
+            assert!(!zome.contains(' '));
+        }
+    }
+
+    // ---- Cross-cluster allowlists ----
+
+    #[test]
+    fn personal_allowlist_contains_bridge() {
+        assert!(ALLOWED_PERSONAL_ZOMES.contains(&"personal_bridge"));
+    }
+
+    #[test]
+    fn identity_allowlist_contains_expected() {
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"identity_bridge"));
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"did_registry"));
+        assert!(ALLOWED_IDENTITY_ZOMES.contains(&"recovery"));
+    }
+
+    #[test]
+    fn commons_allowlist_contains_bridge() {
+        assert!(ALLOWED_COMMONS_ZOMES.contains(&"commons_bridge"));
+    }
+
+    #[test]
+    fn civic_allowlist_contains_bridge() {
+        assert!(ALLOWED_CIVIC_ZOMES.contains(&"civic_bridge"));
+    }
+
+    #[test]
+    fn role_constants_correct() {
+        assert_eq!(PERSONAL_ROLE, "personal");
+        assert_eq!(IDENTITY_ROLE, "identity");
+        assert_eq!(COMMONS_ROLE, "commons");
+        assert_eq!(CIVIC_ROLE, "civic");
+    }
+
+    // ---- Domain resolution ----
+
+    #[test]
+    fn resolve_all_hearth_domains() {
+        assert_eq!(resolve_zome("kinship"), Some("hearth_kinship"));
+        assert_eq!(resolve_zome("gratitude"), Some("hearth_gratitude"));
+        assert_eq!(resolve_zome("stories"), Some("hearth_stories"));
+        assert_eq!(resolve_zome("care"), Some("hearth_care"));
+        assert_eq!(resolve_zome("autonomy"), Some("hearth_autonomy"));
+        assert_eq!(resolve_zome("emergency"), Some("hearth_emergency"));
+        assert_eq!(resolve_zome("decisions"), Some("hearth_decisions"));
+        assert_eq!(resolve_zome("resources"), Some("hearth_resources"));
+        assert_eq!(resolve_zome("milestones"), Some("hearth_milestones"));
+        assert_eq!(resolve_zome("rhythms"), Some("hearth_rhythms"));
+    }
+
+    #[test]
+    fn resolve_unknown_domain_returns_none() {
+        assert!(resolve_zome("justice").is_none());
+        assert!(resolve_zome("property").is_none());
+        assert!(resolve_zome("").is_none());
+        assert!(resolve_zome("housing").is_none());
+    }
+
+    #[test]
+    fn resolve_outputs_are_in_allowlist() {
+        let domains = [
+            "kinship",
+            "gratitude",
+            "stories",
+            "care",
+            "autonomy",
+            "emergency",
+            "decisions",
+            "resources",
+            "milestones",
+            "rhythms",
+        ];
+        for domain in &domains {
+            let resolved = resolve_zome(domain).unwrap();
+            assert!(
+                ALLOWED_ZOMES.contains(&resolved),
+                "resolve('{}') = '{}' not in ALLOWED_ZOMES",
+                domain,
+                resolved
+            );
+        }
+    }
+
+    // ---- Signal type ----
+
+    #[test]
+    fn bridge_event_signal_type_is_hearth() {
+        let signal = BridgeEventSignal {
+            signal_type: "hearth_bridge_event".to_string(),
+            domain: "kinship".to_string(),
+            event_type: "member_joined".to_string(),
+            payload: "{}".to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        assert_eq!(signal.signal_type, "hearth_bridge_event");
+    }
+
+    #[test]
+    fn bridge_event_signal_serde_roundtrip() {
+        let signal = BridgeEventSignal {
+            signal_type: "hearth_bridge_event".to_string(),
+            domain: "milestones".to_string(),
+            event_type: "milestone_recorded".to_string(),
+            payload: r#"{"type":"graduation"}"#.to_string(),
+            action_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+        };
+        let json = serde_json::to_string(&signal).unwrap();
+        let back: BridgeEventSignal = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.domain, "milestones");
+        assert_eq!(back.event_type, "milestone_recorded");
+    }
+
+    // ---- Rate limit ----
+
+    #[test]
+    fn rate_limit_under_threshold_passes() {
+        assert!(check_rate_limit_count(0).is_ok());
+        assert!(check_rate_limit_count(99).is_ok());
+    }
+
+    #[test]
+    fn rate_limit_at_threshold_rejects() {
+        let err = check_rate_limit_count(100).unwrap_err();
+        assert!(err.contains("Rate limit exceeded"));
+    }
+
+    // ---- Health check domain list ----
+
+    #[test]
+    fn health_check_domains_match_resolution() {
+        let domains = [
+            "kinship",
+            "gratitude",
+            "stories",
+            "care",
+            "autonomy",
+            "emergency",
+            "decisions",
+            "resources",
+            "milestones",
+            "rhythms",
+        ];
+        for domain in &domains {
+            assert!(resolve_zome(domain).is_some());
+        }
+    }
+
+    // ---- Cross-cluster allowlist no-duplicate checks ----
+
+    #[test]
+    fn personal_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_PERSONAL_ZOMES {
+            assert!(seen.insert(zome), "Duplicate: '{}'", zome);
+        }
+    }
+
+    #[test]
+    fn identity_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_IDENTITY_ZOMES {
+            assert!(seen.insert(zome), "Duplicate: '{}'", zome);
+        }
+    }
+
+    #[test]
+    fn commons_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_COMMONS_ZOMES {
+            assert!(seen.insert(zome), "Duplicate: '{}'", zome);
+        }
+    }
+
+    #[test]
+    fn civic_allowlist_has_no_duplicates() {
+        let mut seen = std::collections::HashSet::new();
+        for zome in ALLOWED_CIVIC_ZOMES {
+            assert!(seen.insert(zome), "Duplicate: '{}'", zome);
+        }
+    }
+
+    // ---- SeveranceInput serde ----
+
+    #[test]
+    fn severance_input_serde_roundtrip() {
+        let input = SeveranceInput {
+            hearth_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            member_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            export_milestones: true,
+            export_care_history: true,
+            export_bond_snapshot: false,
+            new_role: MemberRole::Adult,
+        };
+        let json = serde_json::to_string(&input).unwrap();
+        let back: SeveranceInput = serde_json::from_str(&json).unwrap();
+        assert!(back.export_milestones);
+        assert_eq!(back.new_role, MemberRole::Adult);
+    }
+}

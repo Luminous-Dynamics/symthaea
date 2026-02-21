@@ -99,6 +99,10 @@
       "types": "./dist/integrations/knowledge/index.d.ts",
       "import": "./dist/integrations/knowledge/index.js"
     },
+    "./integrations/hearth": {
+      "types": "./dist/integrations/hearth/index.d.ts",
+      "import": "./dist/integrations/hearth/index.js"
+    },
     "./validation": {
       "types": "./dist/validation/index.d.ts",
       "import": "./dist/validation/index.js"

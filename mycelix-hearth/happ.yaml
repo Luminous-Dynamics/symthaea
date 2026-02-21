@@ -1,0 +1,27 @@
+---
+# Mycelix Hearth hApp Bundle
+# Family/Household/Kinship Coordination — HEARTH Tier
+#
+# NOTE: "HEARTH" also exists in sdk-ts/src/clients/finance/hearth.ts as a
+# commons pool governance concept. The finance HEARTH operates against the
+# `finance` DNA role; the family HEARTH is its own cluster DNA at `hearth` role.
+# Context distinguishes them.
+
+manifest_version: "0"
+name: mycelix-hearth
+description: |
+  Family/household/kinship coordination for the Mycelix ecosystem.
+  HEARTH tier: shared family space with relationship-aware bonds,
+  graduated autonomy, gratitude, and Living Primitives integration.
+
+roles:
+  - name: hearth
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./dna/mycelix_hearth.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0

@@ -1,0 +1,16 @@
+[package]
+name = "hearth_resources"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "hearth_resources"
+
+[dependencies]
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hearth_resources_integrity = { path = "../integrity" }
+hearth-types = { workspace = true }

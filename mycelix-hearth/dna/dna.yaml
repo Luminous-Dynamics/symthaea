@@ -1,0 +1,127 @@
+---
+# Mycelix Hearth DNA
+# Family/Household/Kinship Coordination — HEARTH Tier
+# 11 domain zomes + 1 unified bridge = 12 zome pairs (24 WASM crates)
+# Plus 1 shared types crate = 25 total workspace members
+
+manifest_version: "0"
+name: mycelix_hearth
+
+integrity:
+  network_seed: "mycelix-hearth-v1"
+  properties:
+    # Hearth DNA uses cross-domain calls mediated through hearth_bridge.
+    cross_domain_calls: true
+
+  zomes:
+    # Kinship (core membership + relationships)
+    - name: hearth_kinship_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_kinship_integrity.wasm
+
+    # Gratitude
+    - name: hearth_gratitude_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_gratitude_integrity.wasm
+
+    # Stories
+    - name: hearth_stories_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_stories_integrity.wasm
+
+    # Care
+    - name: hearth_care_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_care_integrity.wasm
+
+    # Autonomy
+    - name: hearth_autonomy_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_autonomy_integrity.wasm
+
+    # Emergency
+    - name: hearth_emergency_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_emergency_integrity.wasm
+
+    # Decisions
+    - name: hearth_decisions_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_decisions_integrity.wasm
+
+    # Resources
+    - name: hearth_resources_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_resources_integrity.wasm
+
+    # Milestones
+    - name: hearth_milestones_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_milestones_integrity.wasm
+
+    # Rhythms
+    - name: hearth_rhythms_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_rhythms_integrity.wasm
+
+    # Unified bridge
+    - name: hearth_bridge_integrity
+      path: ../target/wasm32-unknown-unknown/release/hearth_bridge_integrity.wasm
+
+coordinator:
+  zomes:
+    # Kinship
+    - name: hearth_kinship
+      path: ../target/wasm32-unknown-unknown/release/hearth_kinship.wasm
+      dependencies:
+        - name: hearth_kinship_integrity
+
+    # Gratitude
+    - name: hearth_gratitude
+      path: ../target/wasm32-unknown-unknown/release/hearth_gratitude.wasm
+      dependencies:
+        - name: hearth_gratitude_integrity
+
+    # Stories
+    - name: hearth_stories
+      path: ../target/wasm32-unknown-unknown/release/hearth_stories.wasm
+      dependencies:
+        - name: hearth_stories_integrity
+
+    # Care
+    - name: hearth_care
+      path: ../target/wasm32-unknown-unknown/release/hearth_care.wasm
+      dependencies:
+        - name: hearth_care_integrity
+
+    # Autonomy
+    - name: hearth_autonomy
+      path: ../target/wasm32-unknown-unknown/release/hearth_autonomy.wasm
+      dependencies:
+        - name: hearth_autonomy_integrity
+
+    # Emergency
+    - name: hearth_emergency
+      path: ../target/wasm32-unknown-unknown/release/hearth_emergency.wasm
+      dependencies:
+        - name: hearth_emergency_integrity
+
+    # Decisions
+    - name: hearth_decisions
+      path: ../target/wasm32-unknown-unknown/release/hearth_decisions.wasm
+      dependencies:
+        - name: hearth_decisions_integrity
+
+    # Resources
+    - name: hearth_resources
+      path: ../target/wasm32-unknown-unknown/release/hearth_resources.wasm
+      dependencies:
+        - name: hearth_resources_integrity
+
+    # Milestones
+    - name: hearth_milestones
+      path: ../target/wasm32-unknown-unknown/release/hearth_milestones.wasm
+      dependencies:
+        - name: hearth_milestones_integrity
+
+    # Rhythms
+    - name: hearth_rhythms
+      path: ../target/wasm32-unknown-unknown/release/hearth_rhythms.wasm
+      dependencies:
+        - name: hearth_rhythms_integrity
+
+    # Unified bridge
+    - name: hearth_bridge
+      path: ../target/wasm32-unknown-unknown/release/hearth_bridge.wasm
+      dependencies:
+        - name: hearth_bridge_integrity

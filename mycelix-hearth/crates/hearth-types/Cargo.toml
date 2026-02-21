@@ -1,0 +1,13 @@
+[package]
+name = "hearth-types"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+hdi = { workspace = true }
+hdk = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+mycelix-bridge-entry-types = { workspace = true }
+mycelix-bridge-common = { workspace = true }

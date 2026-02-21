@@ -155,8 +155,19 @@ build-civic:
         echo "⚠️  mycelix-civic not found"; \
     fi
 
+# Build Hearth cluster (kinship + gratitude + stories + care + autonomy + emergency + decisions + resources + milestones + rhythms — 13 zomes)
+build-hearth:
+    @echo "🏠 Building mycelix-hearth cluster..."
+    @if [ -f "../mycelix-hearth/Cargo.toml" ]; then \
+        cd ../mycelix-hearth && \
+        cargo build --release --target wasm32-unknown-unknown && \
+        hc dna pack dna && hc app pack .; \
+    else \
+        echo "⚠️  mycelix-hearth not found"; \
+    fi
+
 # Build all hApps (clusters + standalone)
-build-happs: build-commons build-civic build-core build-epistemic-markets build-fabrication build-mail build-marketplace build-edunet build-supplychain build-identity build-knowledge build-governance build-finance build-energy build-desci build-music
+build-happs: build-commons build-civic build-hearth build-core build-epistemic-markets build-fabrication build-mail build-marketplace build-edunet build-supplychain build-identity build-knowledge build-governance build-finance build-energy build-desci build-music
     @echo "✅ All hApps built!"
 
 # Build production-ready hApps only

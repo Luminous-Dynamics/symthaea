@@ -21,6 +21,7 @@
  * | `justice` | mycelix-civic | 5 | Cases, evidence, arbitration, enforcement |
  * | `emergency` | mycelix-civic | 3 | Incidents, coordination, shelters |
  * | `media` | mycelix-civic | 4 | Publication, attribution, factcheck, curation |
+ * | `hearth` | mycelix-hearth | 10 | Kinship, gratitude, stories, care, autonomy, emergency, decisions, resources, milestones, rhythms |
  *
  * @example
  * ```typescript
@@ -59,6 +60,7 @@ export * as care from './care/index.js';
 export * as emergency from './emergency/index.js';
 export * as water from './water/index.js';
 export * as housing from './housing/index.js';
+export * as hearth from './hearth/index.js';
 
 // =============================================================================
 // IDENTITY HAPP EXPORTS
@@ -156,3 +158,24 @@ export {
   HousingError,
   type HousingClientConfig,
 } from './housing/index.js';
+
+// =============================================================================
+// HEARTH HAPP EXPORTS
+// =============================================================================
+
+export {
+  HearthClient,
+  createHearthClient,
+  KinshipClient,
+  GratitudeClient,
+  StoriesClient,
+  HearthCareClient,
+  AutonomyClient,
+  EmergencyClient as HearthEmergencyClient,
+  DecisionsClient,
+  ResourcesClient,
+  MilestonesClient,
+  RhythmsClient,
+  HearthError,
+  type HearthClientConfig,
+} from './hearth/index.js';

@@ -1,0 +1,15 @@
+[package]
+name = "hearth_autonomy_integrity"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+name = "hearth_autonomy_integrity"
+
+[dependencies]
+hdi = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+holochain_serialized_bytes = { workspace = true }
+hearth-types = { workspace = true }

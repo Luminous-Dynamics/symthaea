@@ -475,6 +475,57 @@ pub struct AuditTrailResult {
 }
 
 // ============================================================================
+// Typed hearth↔other cluster query/result helpers
+// ============================================================================
+
+/// Input for querying hearth membership (civic/commons → hearth)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthMemberQuery {
+    pub hearth_hash: ActionHash,
+    pub agent: AgentPubKey,
+}
+
+/// Result of a hearth membership query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthMemberResult {
+    pub is_member: bool,
+    pub role: Option<String>,
+    pub display_name: Option<String>,
+    pub error: Option<String>,
+}
+
+/// Input for querying hearth care availability (commons → hearth)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthCareQuery {
+    pub hearth_hash: ActionHash,
+    pub care_type: Option<String>,
+}
+
+/// Result of a hearth care query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthCareResult {
+    pub available_caregivers: u32,
+    pub active_schedules: u32,
+    pub error: Option<String>,
+}
+
+/// Input for querying hearth emergency status (civic → hearth)
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthEmergencyQuery {
+    pub hearth_hash: ActionHash,
+}
+
+/// Result of a hearth emergency status query
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct HearthEmergencyResult {
+    pub has_active_alerts: bool,
+    pub active_alert_count: u32,
+    pub members_checked_in: u32,
+    pub members_missing: u32,
+    pub error: Option<String>,
+}
+
+// ============================================================================
 // Utilities
 // ============================================================================
 
@@ -907,7 +958,10 @@ mod tests {
         let json = serde_json::to_string(&r).unwrap();
         let r2: FoodAvailabilityResult = serde_json::from_str(&json).unwrap();
         assert_eq!(r2.available_listings, 12);
-        assert_eq!(r2.nearest_market.as_deref(), Some("Southside Farmers Market"));
+        assert_eq!(
+            r2.nearest_market.as_deref(),
+            Some("Southside Farmers Market")
+        );
         assert!(r2.error.is_none());
     }
 
@@ -1226,5 +1280,130 @@ mod tests {
         let json = serde_json::to_string(&q).unwrap();
         let q2: EmergencyCareQuery = serde_json::from_str(&json).unwrap();
         assert_eq!(q2.skill_needed, "");
+    }
+
+    // Hearth↔cluster typed helper serde tests
+
+    #[test]
+    fn hearth_member_query_serde_roundtrip() {
+        let q = HearthMemberQuery {
+            hearth_hash: ActionHash::from_raw_36(vec![1u8; 36]),
+            agent: AgentPubKey::from_raw_36(vec![2u8; 36]),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: HearthMemberQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.hearth_hash, q2.hearth_hash);
+        assert_eq!(q.agent, q2.agent);
+    }
+
+    #[test]
+    fn hearth_member_result_found() {
+        let r = HearthMemberResult {
+            is_member: true,
+            role: Some("Adult".into()),
+            display_name: Some("Alice".into()),
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: HearthMemberResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.is_member);
+        assert_eq!(r2.role.as_deref(), Some("Adult"));
+        assert_eq!(r2.display_name.as_deref(), Some("Alice"));
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn hearth_member_result_not_found() {
+        let r = HearthMemberResult {
+            is_member: false,
+            role: None,
+            display_name: None,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: HearthMemberResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.is_member);
+        assert!(r2.role.is_none());
+    }
+
+    #[test]
+    fn hearth_care_query_serde_roundtrip() {
+        let q = HearthCareQuery {
+            hearth_hash: ActionHash::from_raw_36(vec![3u8; 36]),
+            care_type: Some("Childcare".into()),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: HearthCareQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.hearth_hash, q2.hearth_hash);
+        assert_eq!(q2.care_type.as_deref(), Some("Childcare"));
+    }
+
+    #[test]
+    fn hearth_care_query_no_filter() {
+        let q = HearthCareQuery {
+            hearth_hash: ActionHash::from_raw_36(vec![4u8; 36]),
+            care_type: None,
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: HearthCareQuery = serde_json::from_str(&json).unwrap();
+        assert!(q2.care_type.is_none());
+    }
+
+    #[test]
+    fn hearth_care_result_serde_roundtrip() {
+        let r = HearthCareResult {
+            available_caregivers: 3,
+            active_schedules: 7,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: HearthCareResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.available_caregivers, 3);
+        assert_eq!(r2.active_schedules, 7);
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn hearth_emergency_query_serde_roundtrip() {
+        let q = HearthEmergencyQuery {
+            hearth_hash: ActionHash::from_raw_36(vec![5u8; 36]),
+        };
+        let json = serde_json::to_string(&q).unwrap();
+        let q2: HearthEmergencyQuery = serde_json::from_str(&json).unwrap();
+        assert_eq!(q.hearth_hash, q2.hearth_hash);
+    }
+
+    #[test]
+    fn hearth_emergency_result_active() {
+        let r = HearthEmergencyResult {
+            has_active_alerts: true,
+            active_alert_count: 2,
+            members_checked_in: 4,
+            members_missing: 1,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: HearthEmergencyResult = serde_json::from_str(&json).unwrap();
+        assert!(r2.has_active_alerts);
+        assert_eq!(r2.active_alert_count, 2);
+        assert_eq!(r2.members_checked_in, 4);
+        assert_eq!(r2.members_missing, 1);
+        assert!(r2.error.is_none());
+    }
+
+    #[test]
+    fn hearth_emergency_result_clear() {
+        let r = HearthEmergencyResult {
+            has_active_alerts: false,
+            active_alert_count: 0,
+            members_checked_in: 5,
+            members_missing: 0,
+            error: None,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        let r2: HearthEmergencyResult = serde_json::from_str(&json).unwrap();
+        assert!(!r2.has_active_alerts);
+        assert_eq!(r2.active_alert_count, 0);
+        assert_eq!(r2.members_missing, 0);
     }
 }

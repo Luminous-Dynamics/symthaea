@@ -68,6 +68,23 @@ export {
   CIVIC_ZOMES,
 } from './civic/index.js';
 
+export {
+  HearthBridgeClient,
+  createHearthBridgeClient,
+  isHearthBridgeSignal,
+  HEARTH_DOMAINS,
+  HEARTH_ZOMES,
+} from './hearth/index.js';
+
+export type {
+  HearthQueryInput,
+  HearthEventInput,
+  HearthBridgeEventSignal,
+  HearthBridgeSignalHandler,
+  SeveranceInput,
+  CrossClusterDispatchInput as HearthCrossClusterInput,
+} from './hearth/index.js';
+
 export type {
   CivicQueryInput,
   CivicEventInput,

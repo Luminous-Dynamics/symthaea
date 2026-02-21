@@ -20,6 +20,7 @@ on:
       - 'mycelix-edunet/**'
       - 'mycelix-marketplace/**'
       - 'mycelix-supplychain/**'
+      - 'mycelix-hearth/**'
       - 'mycelix-workspace/happs/lucid/ui/**'
       - '.github/workflows/mycelix-ci.yml'
   pull_request:
@@ -41,6 +42,7 @@ on:
       - 'mycelix-edunet/**'
       - 'mycelix-marketplace/**'
       - 'mycelix-supplychain/**'
+      - 'mycelix-hearth/**'
 
 concurrency:
   group: mycelix-ci-${{ github.ref }}
@@ -262,6 +264,7 @@ jobs:
           - { name: edunet, path: mycelix-edunet }
           - { name: marketplace, path: mycelix-marketplace/backend }
           - { name: supplychain, path: mycelix-supplychain/holochain }
+          - { name: hearth, path: mycelix-hearth }
 
     steps:
       - uses: actions/checkout@v4
@@ -400,6 +403,12 @@ jobs:
         run: |
           cargo test --lib -p support-types -p support_knowledge_integrity -p support_knowledge -p support_tickets_integrity -p support_tickets -p support_diagnostics_integrity -p support_diagnostics
         working-directory: mycelix-commons
+
+      - name: Run hearth cluster unit tests
+        env:
+          CARGO_TARGET_WASM32_UNKNOWN_UNKNOWN_RUSTFLAGS: '--cfg getrandom_backend="custom"'
+        run: cargo test --all
+        working-directory: mycelix-hearth
 
       - name: Run SDK unit tests
         run: cargo test --lib --features simulation

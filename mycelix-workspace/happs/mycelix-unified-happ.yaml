@@ -1,14 +1,15 @@
 ---
 # Mycelix Unified hApp Bundle
-# Combines Personal + Identity + Commons + Civic DNAs for cross-cluster communication.
+# Combines Personal + Identity + Hearth + Commons + Civic DNAs for cross-cluster communication.
 #
 # When all DNAs are installed as separate roles within the same hApp,
 # zomes can call between clusters using:
-#   call(CallTargetCell::OtherRole("identity"/"commons_land"/"commons_care"/"civic"), zome, fn, None, payload)
+#   call(CallTargetCell::OtherRole("identity"/"hearth"/"commons_land"/"commons_care"/"civic"), zome, fn, None, payload)
 #
 # This is the deployment manifest for environments that need
 # cross-cluster integration (e.g., justice enforcement freezing
-# property transfers, emergency querying housing capacity).
+# property transfers, emergency querying housing capacity,
+# hearth escalating emergencies to civic).
 #
 # For standalone deployments where only one cluster is needed,
 # use the individual happ.yaml files in happs/commons/ or happs/civic/.
@@ -16,14 +17,17 @@
 manifest_version: "0"
 name: mycelix-unified
 description: |
-  Unified Mycelix platform — Fractal CivOS 4-tier architecture:
+  Unified Mycelix platform — Fractal CivOS 5-tier architecture:
   - Personal (Sovereign): Private identity vault, health vault, credentials
   - Identity (Authority): DID registry, verifiable credentials, MFA, recovery
+  - Hearth (FAMILY): Kinship bonds, gratitude, care, autonomy, stories, rhythms
   - Civic (WE): Justice, emergency, media (permissioned)
   - Commons Land (ALL): Property, housing, water, food (physical infrastructure)
   - Commons Care (ALL): Care, mutualaid, transport, support, space (social/care)
   Enables cross-cluster calls between all tiers via OtherRole dispatch.
   Commons split into two sub-cluster DNAs to fit under Holochain's 16MB limit.
+  Note: "HEARTH" in the finance hApp refers to commons pool governance;
+  the hearth DNA here is the family/kinship coordination layer.
 
 roles:
   - name: personal
@@ -43,6 +47,17 @@ roles:
       deferred: false
     dna:
       path: ./identity/dna/mycelix_identity_dna.dna
+      modifiers:
+        network_seed: ~
+        properties: ~
+      clone_limit: 0
+
+  - name: hearth
+    provisioning:
+      strategy: create
+      deferred: false
+    dna:
+      path: ./hearth/dna/mycelix_hearth.dna
       modifiers:
         network_seed: ~
         properties: ~
