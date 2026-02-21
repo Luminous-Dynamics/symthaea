@@ -2002,7 +2002,7 @@ impl CognitiveLoopService {
             self.carryover.recent_hvs.remove(0);
         }
         let (consciousness_profile_composite, synergy_enhanced_composite, emergent_properties_count) =
-            if self.stats.total_cycles % 10 == 0 && self.primitive_processor.is_some() {
+            if self.stats.total_cycles % 25 == 0 && self.primitive_processor.is_some() {
                 let profile =
                     crate::consciousness::consciousness_profile::ConsciousnessProfile::from_components(
                         &self.carryover.recent_hvs,
@@ -2011,9 +2011,13 @@ impl CognitiveLoopService {
                 // Dimension synergies: discover non-linear interactions between consciousness dims
                 let synergy =
                     crate::consciousness::dimension_synergies::SynergyProfile::from_base(profile);
+                self.carryover.last_profile_composite = composite;
+                self.carryover.last_synergy_composite = synergy.enhanced_composite;
+                self.carryover.last_emergent_count = synergy.emergent_properties.len();
                 (composite, synergy.enhanced_composite, synergy.emergent_properties.len())
             } else {
-                (0.0, 0.0, 0)
+                // Non-compute cycle: return cached values
+                (self.carryover.last_profile_composite, self.carryover.last_synergy_composite, self.carryover.last_emergent_count)
             };
         module_timings.consciousness_profile = _t.elapsed().as_micros() as u64;
 
@@ -2226,11 +2230,14 @@ impl CognitiveLoopService {
                         };
                         explainer.learn_from_chain(&chain, "cognitive_cycle");
                     }
+                    // Only call summarize_understanding on learning cycles (expensive)
                     let summary = explainer.summarize_understanding();
+                    self.carryover.last_causal_relations = summary.total_causal_relations;
+                    self.carryover.last_causal_confidence = summary.average_confidence;
                     (summary.total_causal_relations, summary.average_confidence)
                 } else {
-                    let summary = explainer.summarize_understanding();
-                    (summary.total_causal_relations, summary.average_confidence)
+                    // Non-learning cycle: return cached summary (avoids ~880µs/cycle)
+                    (self.carryover.last_causal_relations, self.carryover.last_causal_confidence)
                 }
             } else {
                 (0, 0.0)
