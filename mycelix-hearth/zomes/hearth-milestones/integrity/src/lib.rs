@@ -103,9 +103,19 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Milestone(milestone) => validate_milestone(&milestone),
             EntryTypes::LifeTransition(transition) => validate_transition(&transition),
         },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
-            EntryTypes::Milestone(milestone) => validate_milestone(&milestone),
-            EntryTypes::LifeTransition(transition) => validate_transition(&transition),
+        FlatOp::StoreEntry(OpEntry::UpdateEntry {
+            app_entry,
+            original_action_hash,
+            ..
+        }) => match app_entry {
+            EntryTypes::Milestone(milestone) => {
+                validate_milestone(&milestone)?;
+                validate_milestone_immutable_fields(&milestone, &original_action_hash)
+            }
+            EntryTypes::LifeTransition(transition) => {
+                validate_transition(&transition)?;
+                validate_transition_immutable_fields(&transition, &original_action_hash)
+            }
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterCreateLink {
@@ -173,6 +183,88 @@ pub fn validate_transition(transition: &LifeTransition) -> ExternResult<Validate
     if transition.supporting_members.len() > 50 {
         return Ok(ValidateCallbackResult::Invalid(
             "Transition supporting_members must be <= 50".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
+// Immutable Field Validation
+// ============================================================================
+
+fn validate_milestone_immutable_fields(
+    new: &Milestone,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: Milestone = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original Milestone: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original Milestone entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a Milestone".into(),
+        ));
+    }
+    if new.member != original.member {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change member on a Milestone".into(),
+        ));
+    }
+    if new.milestone_type != original.milestone_type {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change milestone_type on a Milestone".into(),
+        ));
+    }
+    if new.date != original.date {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change date on a Milestone".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_transition_immutable_fields(
+    new: &LifeTransition,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: LifeTransition = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original LifeTransition: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original LifeTransition entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a LifeTransition".into(),
+        ));
+    }
+    if new.member != original.member {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change member on a LifeTransition".into(),
+        ));
+    }
+    if new.transition_type != original.transition_type {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change transition_type on a LifeTransition".into(),
+        ));
+    }
+    if new.started_at != original.started_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change started_at on a LifeTransition".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -451,5 +543,71 @@ mod tests {
             validate_milestone(&m).unwrap(),
             ValidateCallbackResult::Valid
         ));
+    }
+
+    // ---- Immutable Field Pure Equality Tests ----
+
+    #[test]
+    fn milestone_immutable_field_hearth_hash_difference_detected() {
+        let a = make_milestone("Test", 0, 0);
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn milestone_immutable_field_member_difference_detected() {
+        let a = make_milestone("Test", 0, 0);
+        let mut b = a.clone();
+        b.member = fake_agent_b();
+        assert_ne!(a.member, b.member);
+    }
+
+    #[test]
+    fn milestone_immutable_field_milestone_type_difference_detected() {
+        let a = make_milestone("Test", 0, 0);
+        let mut b = a.clone();
+        b.milestone_type = MilestoneType::Graduation;
+        assert_ne!(a.milestone_type, b.milestone_type);
+    }
+
+    #[test]
+    fn milestone_immutable_field_date_difference_detected() {
+        let a = make_milestone("Test", 0, 0);
+        let mut b = a.clone();
+        b.date = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.date, b.date);
+    }
+
+    #[test]
+    fn transition_immutable_field_hearth_hash_difference_detected() {
+        let a = make_transition(1);
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn transition_immutable_field_member_difference_detected() {
+        let a = make_transition(1);
+        let mut b = a.clone();
+        b.member = fake_agent_b();
+        assert_ne!(a.member, b.member);
+    }
+
+    #[test]
+    fn transition_immutable_field_transition_type_difference_detected() {
+        let a = make_transition(1);
+        let mut b = a.clone();
+        b.transition_type = TransitionType::JoiningHearth;
+        assert_ne!(a.transition_type, b.transition_type);
+    }
+
+    #[test]
+    fn transition_immutable_field_started_at_difference_detected() {
+        let a = make_transition(1);
+        let mut b = a.clone();
+        b.started_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.started_at, b.started_at);
     }
 }

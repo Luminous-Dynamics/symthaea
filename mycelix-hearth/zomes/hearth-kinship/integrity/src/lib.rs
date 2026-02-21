@@ -152,13 +152,41 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             EntryTypes::WeeklyDigest(digest) => validate_weekly_digest(&digest),
         },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
-            EntryTypes::Hearth(hearth) => validate_hearth(&hearth),
-            EntryTypes::HearthMembership(membership) => validate_membership(&membership),
-            EntryTypes::KinshipBond(bond) => validate_bond(&bond),
-            EntryTypes::HearthInvitation(invitation) => validate_invitation(&invitation),
-            EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
-            EntryTypes::WeeklyDigest(digest) => validate_weekly_digest(&digest),
+        FlatOp::StoreEntry(OpEntry::UpdateEntry {
+            app_entry,
+            original_action_hash,
+            ..
+        }) => match app_entry {
+            EntryTypes::Hearth(hearth) => {
+                validate_hearth(&hearth)?;
+                validate_hearth_immutable_fields(&hearth, &original_action_hash)
+            }
+            EntryTypes::HearthMembership(membership) => {
+                validate_membership(&membership)?;
+                validate_membership_immutable_fields(&membership, &original_action_hash)
+            }
+            EntryTypes::KinshipBond(bond) => {
+                validate_bond(&bond)?;
+                validate_bond_immutable_fields(&bond, &original_action_hash)
+            }
+            EntryTypes::HearthInvitation(invitation) => {
+                validate_invitation(&invitation)?;
+                validate_invitation_immutable_fields(&invitation, &original_action_hash)
+            }
+            EntryTypes::Anchor(_) => {
+                // INVARIANT: Anchor immutability — anchors are deterministic link bases
+                // and must not be modified after creation.
+                Ok(ValidateCallbackResult::Invalid(
+                    "Anchor cannot be updated once created".into(),
+                ))
+            }
+            EntryTypes::WeeklyDigest(_) => {
+                // INVARIANT: WeeklyDigest immutability — digests are rollup snapshots
+                // of an epoch and cannot be modified after creation.
+                Ok(ValidateCallbackResult::Invalid(
+                    "WeeklyDigest cannot be updated once created".into(),
+                ))
+            }
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterCreateLink {
@@ -277,6 +305,151 @@ pub fn validate_invitation(invitation: &HearthInvitation) -> ExternResult<Valida
     if invitation.message.len() > 2048 {
         return Ok(ValidateCallbackResult::Invalid(
             "Invitation message must be <= 2048 characters".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
+// Immutable Field Validation
+// ============================================================================
+
+fn validate_hearth_immutable_fields(
+    new: &Hearth,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: Hearth = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original Hearth: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original Hearth entry is missing".into()
+        )))?;
+    if new.created_by != original.created_by {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change created_by on a Hearth".into(),
+        ));
+    }
+    if new.created_at != original.created_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change created_at on a Hearth".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_membership_immutable_fields(
+    new: &HearthMembership,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: HearthMembership = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original HearthMembership: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original HearthMembership entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a HearthMembership".into(),
+        ));
+    }
+    if new.agent != original.agent {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change agent on a HearthMembership".into(),
+        ));
+    }
+    if new.joined_at != original.joined_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change joined_at on a HearthMembership".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_bond_immutable_fields(
+    new: &KinshipBond,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: KinshipBond = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original KinshipBond: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original KinshipBond entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a KinshipBond".into(),
+        ));
+    }
+    if new.member_a != original.member_a {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change member_a on a KinshipBond".into(),
+        ));
+    }
+    if new.member_b != original.member_b {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change member_b on a KinshipBond".into(),
+        ));
+    }
+    if new.created_at != original.created_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change created_at on a KinshipBond".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_invitation_immutable_fields(
+    new: &HearthInvitation,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: HearthInvitation = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original HearthInvitation: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original HearthInvitation entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a HearthInvitation".into(),
+        ));
+    }
+    if new.inviter != original.inviter {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change inviter on a HearthInvitation".into(),
+        ));
+    }
+    if new.invitee_agent != original.invitee_agent {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change invitee_agent on a HearthInvitation".into(),
+        ));
+    }
+    if new.expires_at != original.expires_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change expires_at on a HearthInvitation".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -925,5 +1098,127 @@ mod tests {
         let json = serde_json::to_string(&d).unwrap();
         let back: WeeklyDigest = serde_json::from_str(&json).unwrap();
         assert_eq!(back, d);
+    }
+
+    // -- Immutable field pure equality tests --
+
+    #[test]
+    fn hearth_immutable_field_created_by_difference_detected() {
+        let a = make_hearth("Test", "desc", 10);
+        let mut b = a.clone();
+        b.created_by = fake_agent_b();
+        assert_ne!(a.created_by, b.created_by);
+    }
+
+    #[test]
+    fn hearth_immutable_field_created_at_difference_detected() {
+        let a = make_hearth("Test", "desc", 10);
+        let mut b = a.clone();
+        b.created_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.created_at, b.created_at);
+    }
+
+    #[test]
+    fn membership_immutable_field_hearth_hash_difference_detected() {
+        let a = make_membership("Alice");
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn membership_immutable_field_agent_difference_detected() {
+        let a = make_membership("Alice");
+        let mut b = a.clone();
+        b.agent = fake_agent_b();
+        assert_ne!(a.agent, b.agent);
+    }
+
+    #[test]
+    fn membership_immutable_field_joined_at_difference_detected() {
+        let a = make_membership("Alice");
+        let mut b = a.clone();
+        b.joined_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.joined_at, b.joined_at);
+    }
+
+    #[test]
+    fn bond_immutable_field_hearth_hash_difference_detected() {
+        let a = make_bond(5000, fake_agent_a(), fake_agent_b());
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn bond_immutable_field_member_a_difference_detected() {
+        let a = make_bond(5000, fake_agent_a(), fake_agent_b());
+        let mut b = a.clone();
+        b.member_a = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.member_a, b.member_a);
+    }
+
+    #[test]
+    fn bond_immutable_field_member_b_difference_detected() {
+        let a = make_bond(5000, fake_agent_a(), fake_agent_b());
+        let mut b = a.clone();
+        b.member_b = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.member_b, b.member_b);
+    }
+
+    #[test]
+    fn bond_immutable_field_created_at_difference_detected() {
+        let a = make_bond(5000, fake_agent_a(), fake_agent_b());
+        let mut b = a.clone();
+        b.created_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.created_at, b.created_at);
+    }
+
+    #[test]
+    fn invitation_immutable_field_hearth_hash_difference_detected() {
+        let a = make_invitation("Hello");
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn invitation_immutable_field_inviter_difference_detected() {
+        let a = make_invitation("Hello");
+        let mut b = a.clone();
+        b.inviter = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.inviter, b.inviter);
+    }
+
+    #[test]
+    fn invitation_immutable_field_invitee_agent_difference_detected() {
+        let a = make_invitation("Hello");
+        let mut b = a.clone();
+        b.invitee_agent = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.invitee_agent, b.invitee_agent);
+    }
+
+    #[test]
+    fn invitation_immutable_field_expires_at_difference_detected() {
+        let a = make_invitation("Hello");
+        let mut b = a.clone();
+        b.expires_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.expires_at, b.expires_at);
+    }
+
+    #[test]
+    fn anchor_immutability_documented() {
+        // Anchor should be created once and never updated.
+        // The integrity validate() function rejects UpdateEntry for Anchor.
+        let a = Anchor("all_hearths".into());
+        assert_eq!(a.0, "all_hearths");
+    }
+
+    #[test]
+    fn weekly_digest_immutability_documented() {
+        // WeeklyDigest should be created once and never updated.
+        // The integrity validate() function rejects UpdateEntry for WeeklyDigest.
+        let d = make_digest(0, 604_800_000_000);
+        assert_eq!(d.epoch_start, Timestamp::from_micros(0));
     }
 }

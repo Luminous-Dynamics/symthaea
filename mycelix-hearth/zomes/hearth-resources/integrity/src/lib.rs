@@ -115,8 +115,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                 validate_resource(&resource)?;
                 validate_resource_immutable_fields(&resource, &original_action_hash)
             }
-            EntryTypes::ResourceLoan(loan) => validate_loan(&loan),
-            EntryTypes::BudgetCategory(budget) => validate_budget(&budget),
+            EntryTypes::ResourceLoan(loan) => {
+                validate_loan(&loan)?;
+                validate_loan_immutable_fields(&loan, &original_action_hash)
+            }
+            EntryTypes::BudgetCategory(budget) => {
+                validate_budget(&budget)?;
+                validate_budget_immutable_fields(&budget, &original_action_hash)
+            }
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterCreateLink {
@@ -214,6 +220,73 @@ pub fn validate_resource_immutable_fields(
     if new_resource.hearth_hash != original_resource.hearth_hash {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot change hearth_hash on a SharedResource".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a ResourceLoan update.
+pub fn validate_loan_immutable_fields(
+    new_loan: &ResourceLoan,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_loan: ResourceLoan = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original ResourceLoan: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original ResourceLoan entry is missing".into()
+        )))?;
+
+    if new_loan.resource_hash != original_loan.resource_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change resource_hash on a ResourceLoan".into(),
+        ));
+    }
+    if new_loan.lender_hearth != original_loan.lender_hearth {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change lender_hearth on a ResourceLoan".into(),
+        ));
+    }
+    if new_loan.borrower != original_loan.borrower {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change borrower on a ResourceLoan".into(),
+        ));
+    }
+    if new_loan.created_at != original_loan.created_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change created_at on a ResourceLoan".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a BudgetCategory update.
+pub fn validate_budget_immutable_fields(
+    new_budget: &BudgetCategory,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_budget: BudgetCategory = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original BudgetCategory: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original BudgetCategory entry is missing".into()
+        )))?;
+
+    if new_budget.hearth_hash != original_budget.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a BudgetCategory".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -560,5 +633,49 @@ mod tests {
         let mut r2 = r1.clone();
         r2.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
         assert_ne!(r1.hearth_hash, r2.hearth_hash);
+    }
+
+    // -- ResourceLoan immutable field tests --
+
+    #[test]
+    fn loan_immutable_resource_hash_difference_detected() {
+        let l1 = make_loan(LoanStatus::Active);
+        let mut l2 = l1.clone();
+        l2.resource_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(l1.resource_hash, l2.resource_hash);
+    }
+
+    #[test]
+    fn loan_immutable_lender_hearth_difference_detected() {
+        let l1 = make_loan(LoanStatus::Active);
+        let mut l2 = l1.clone();
+        l2.lender_hearth = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(l1.lender_hearth, l2.lender_hearth);
+    }
+
+    #[test]
+    fn loan_immutable_borrower_difference_detected() {
+        let l1 = make_loan(LoanStatus::Active);
+        let mut l2 = l1.clone();
+        l2.borrower = AgentPubKey::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(l1.borrower, l2.borrower);
+    }
+
+    #[test]
+    fn loan_immutable_created_at_difference_detected() {
+        let l1 = make_loan(LoanStatus::Active);
+        let mut l2 = l1.clone();
+        l2.created_at = Timestamp::from_micros(9_999_999);
+        assert_ne!(l1.created_at, l2.created_at);
+    }
+
+    // -- BudgetCategory immutable field tests --
+
+    #[test]
+    fn budget_immutable_hearth_hash_difference_detected() {
+        let b1 = make_budget("Groceries", 50000);
+        let mut b2 = b1.clone();
+        b2.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(b1.hearth_hash, b2.hearth_hash);
     }
 }

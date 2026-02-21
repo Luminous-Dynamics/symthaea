@@ -138,8 +138,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     validate_schedule_update(&schedule)?;
                     validate_schedule_immutable_fields(&schedule, &original_action_hash)
                 }
-                EntryTypes::CareSwap(swap) => validate_swap_update(&swap),
-                EntryTypes::MealPlan(plan) => validate_meal_plan_update(&plan),
+                EntryTypes::CareSwap(swap) => {
+                    validate_swap_update(&swap)?;
+                    validate_swap_immutable_fields(&swap, &original_action_hash)
+                }
+                EntryTypes::MealPlan(plan) => {
+                    validate_meal_plan_update(&plan)?;
+                    validate_meal_plan_immutable_fields(&plan, &original_action_hash)
+                }
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -244,6 +250,83 @@ fn validate_schedule_immutable_fields(
     if new_schedule.hearth_hash != original_schedule.hearth_hash {
         return Ok(ValidateCallbackResult::Invalid(
             "Cannot change hearth_hash on a CareSchedule".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a CareSwap update.
+fn validate_swap_immutable_fields(
+    new_swap: &CareSwap,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_swap: CareSwap = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original CareSwap: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original CareSwap entry is missing".into()
+        )))?;
+
+    if new_swap.hearth_hash != original_swap.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a CareSwap".into(),
+        ));
+    }
+    if new_swap.requester != original_swap.requester {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change requester on a CareSwap".into(),
+        ));
+    }
+    if new_swap.responder != original_swap.responder {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change responder on a CareSwap".into(),
+        ));
+    }
+    if new_swap.original_schedule_hash != original_swap.original_schedule_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change original_schedule_hash on a CareSwap".into(),
+        ));
+    }
+    if new_swap.swap_date != original_swap.swap_date {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change swap_date on a CareSwap".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a MealPlan update.
+fn validate_meal_plan_immutable_fields(
+    new_plan: &MealPlan,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_plan: MealPlan = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original MealPlan: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original MealPlan entry is missing".into()
+        )))?;
+
+    if new_plan.hearth_hash != original_plan.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a MealPlan".into(),
+        ));
+    }
+    if new_plan.week_start != original_plan.week_start {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change week_start on a MealPlan".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -564,5 +647,65 @@ mod tests {
         let mut s2 = s1.clone();
         s2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
         assert_ne!(s1.hearth_hash, s2.hearth_hash);
+    }
+
+    // -- CareSwap immutable field tests --
+
+    #[test]
+    fn swap_immutable_hearth_hash_difference_detected() {
+        let s1 = valid_swap();
+        let mut s2 = s1.clone();
+        s2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(s1.hearth_hash, s2.hearth_hash);
+    }
+
+    #[test]
+    fn swap_immutable_requester_difference_detected() {
+        let s1 = valid_swap();
+        let mut s2 = s1.clone();
+        s2.requester = AgentPubKey::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(s1.requester, s2.requester);
+    }
+
+    #[test]
+    fn swap_immutable_responder_difference_detected() {
+        let s1 = valid_swap();
+        let mut s2 = s1.clone();
+        s2.responder = AgentPubKey::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(s1.responder, s2.responder);
+    }
+
+    #[test]
+    fn swap_immutable_original_schedule_hash_difference_detected() {
+        let s1 = valid_swap();
+        let mut s2 = s1.clone();
+        s2.original_schedule_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(s1.original_schedule_hash, s2.original_schedule_hash);
+    }
+
+    #[test]
+    fn swap_immutable_swap_date_difference_detected() {
+        let s1 = valid_swap();
+        let mut s2 = s1.clone();
+        s2.swap_date = Timestamp::from_micros(9_999_999);
+        assert_ne!(s1.swap_date, s2.swap_date);
+    }
+
+    // -- MealPlan immutable field tests --
+
+    #[test]
+    fn meal_plan_immutable_hearth_hash_difference_detected() {
+        let p1 = valid_meal_plan();
+        let mut p2 = p1.clone();
+        p2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(p1.hearth_hash, p2.hearth_hash);
+    }
+
+    #[test]
+    fn meal_plan_immutable_week_start_difference_detected() {
+        let p1 = valid_meal_plan();
+        let mut p2 = p1.clone();
+        p2.week_start = Timestamp::from_micros(9_999_999);
+        assert_ne!(p1.week_start, p2.week_start);
     }
 }

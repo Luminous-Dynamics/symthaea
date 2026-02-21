@@ -139,8 +139,14 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
                     validate_story_update(&story)?;
                     validate_story_immutable_fields(&story, &original_action_hash)
                 }
-                EntryTypes::StoryCollection(collection) => validate_collection_update(collection),
-                EntryTypes::FamilyTradition(tradition) => validate_tradition_update(tradition),
+                EntryTypes::StoryCollection(collection) => {
+                    validate_collection_update(&collection)?;
+                    validate_collection_immutable_fields(&collection, &original_action_hash)
+                }
+                EntryTypes::FamilyTradition(tradition) => {
+                    validate_tradition_update(&tradition)?;
+                    validate_tradition_immutable_fields(&tradition, &original_action_hash)
+                }
                 EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             },
             _ => Ok(ValidateCallbackResult::Valid),
@@ -256,6 +262,63 @@ fn validate_story_immutable_fields(
     Ok(ValidateCallbackResult::Valid)
 }
 
+/// Validate that immutable fields have not changed on a StoryCollection update.
+fn validate_collection_immutable_fields(
+    new_collection: &StoryCollection,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_collection: StoryCollection = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original StoryCollection: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original StoryCollection entry is missing".into()
+        )))?;
+
+    if new_collection.hearth_hash != original_collection.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a StoryCollection".into(),
+        ));
+    }
+    if new_collection.curator != original_collection.curator {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change curator on a StoryCollection".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+/// Validate that immutable fields have not changed on a FamilyTradition update.
+fn validate_tradition_immutable_fields(
+    new_tradition: &FamilyTradition,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original_tradition: FamilyTradition = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original FamilyTradition: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original FamilyTradition entry is missing".into()
+        )))?;
+
+    if new_tradition.hearth_hash != original_tradition.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a FamilyTradition".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
 fn validate_collection(
     _action: Create,
     collection: StoryCollection,
@@ -278,7 +341,7 @@ fn validate_collection(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_collection_update(collection: StoryCollection) -> ExternResult<ValidateCallbackResult> {
+fn validate_collection_update(collection: &StoryCollection) -> ExternResult<ValidateCallbackResult> {
     if collection.name.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Collection name cannot be empty".into(),
@@ -324,7 +387,7 @@ fn validate_tradition(
     Ok(ValidateCallbackResult::Valid)
 }
 
-fn validate_tradition_update(tradition: FamilyTradition) -> ExternResult<ValidateCallbackResult> {
+fn validate_tradition_update(tradition: &FamilyTradition) -> ExternResult<ValidateCallbackResult> {
     if tradition.name.is_empty() {
         return Ok(ValidateCallbackResult::Invalid(
             "Tradition name cannot be empty".into(),
@@ -1033,7 +1096,7 @@ mod tests {
     #[test]
     fn test_collection_update_valid() {
         let collection = valid_collection();
-        let result = validate_collection_update(collection).unwrap();
+        let result = validate_collection_update(&collection).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -1041,7 +1104,7 @@ mod tests {
     fn test_collection_update_empty_name_rejected() {
         let mut collection = valid_collection();
         collection.name = "".to_string();
-        let result = validate_collection_update(collection).unwrap();
+        let result = validate_collection_update(&collection).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
                 assert_eq!(msg, "Collection name cannot be empty");
@@ -1053,7 +1116,7 @@ mod tests {
     #[test]
     fn test_tradition_update_valid() {
         let tradition = valid_tradition();
-        let result = validate_tradition_update(tradition).unwrap();
+        let result = validate_tradition_update(&tradition).unwrap();
         assert_eq!(result, ValidateCallbackResult::Valid);
     }
 
@@ -1061,7 +1124,7 @@ mod tests {
     fn test_tradition_update_empty_name_rejected() {
         let mut tradition = valid_tradition();
         tradition.name = "".to_string();
-        let result = validate_tradition_update(tradition).unwrap();
+        let result = validate_tradition_update(&tradition).unwrap();
         match result {
             ValidateCallbackResult::Invalid(msg) => {
                 assert_eq!(msg, "Tradition name cannot be empty");
@@ -1086,5 +1149,33 @@ mod tests {
         let mut s2 = s1.clone();
         s2.storyteller = AgentPubKey::from_raw_36(vec![0xCD; 36]);
         assert_ne!(s1.storyteller, s2.storyteller);
+    }
+
+    // -- StoryCollection immutable field tests --
+
+    #[test]
+    fn collection_immutable_hearth_hash_difference_detected() {
+        let c1 = valid_collection();
+        let mut c2 = c1.clone();
+        c2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(c1.hearth_hash, c2.hearth_hash);
+    }
+
+    #[test]
+    fn collection_immutable_curator_difference_detected() {
+        let c1 = valid_collection();
+        let mut c2 = c1.clone();
+        c2.curator = AgentPubKey::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(c1.curator, c2.curator);
+    }
+
+    // -- FamilyTradition immutable field tests --
+
+    #[test]
+    fn tradition_immutable_hearth_hash_difference_detected() {
+        let t1 = valid_tradition();
+        let mut t2 = t1.clone();
+        t2.hearth_hash = ActionHash::from_raw_36(vec![0xCD; 36]);
+        assert_ne!(t1.hearth_hash, t2.hearth_hash);
     }
 }

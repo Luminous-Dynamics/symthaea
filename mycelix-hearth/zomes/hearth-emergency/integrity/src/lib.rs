@@ -127,10 +127,26 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::EmergencyAlert(alert) => validate_alert(&alert),
             EntryTypes::SafetyCheckIn(checkin) => validate_checkin(&checkin),
         },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
-            EntryTypes::EmergencyPlan(plan) => validate_plan(&plan),
-            EntryTypes::EmergencyAlert(alert) => validate_alert(&alert),
-            EntryTypes::SafetyCheckIn(checkin) => validate_checkin(&checkin),
+        FlatOp::StoreEntry(OpEntry::UpdateEntry {
+            app_entry,
+            original_action_hash,
+            ..
+        }) => match app_entry {
+            EntryTypes::EmergencyPlan(plan) => {
+                validate_plan(&plan)?;
+                validate_plan_immutable_fields(&plan, &original_action_hash)
+            }
+            EntryTypes::EmergencyAlert(alert) => {
+                validate_alert(&alert)?;
+                validate_alert_immutable_fields(&alert, &original_action_hash)
+            }
+            EntryTypes::SafetyCheckIn(_) => {
+                // INVARIANT: SafetyCheckIn immutability — check-ins are point-in-time
+                // records and cannot be modified after creation.
+                Ok(ValidateCallbackResult::Invalid(
+                    "SafetyCheckIn cannot be updated once created".into(),
+                ))
+            }
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterCreateLink {
@@ -250,6 +266,63 @@ pub fn validate_checkin(checkin: &SafetyCheckIn) -> ExternResult<ValidateCallbac
                 "Check-in location_hint must be <= 1024 characters".into(),
             ));
         }
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
+// Immutable Field Validation
+// ============================================================================
+
+fn validate_plan_immutable_fields(
+    new: &EmergencyPlan,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: EmergencyPlan = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original EmergencyPlan: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original EmergencyPlan entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on an EmergencyPlan".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_alert_immutable_fields(
+    new: &EmergencyAlert,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: EmergencyAlert = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original EmergencyAlert: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original EmergencyAlert entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on an EmergencyAlert".into(),
+        ));
+    }
+    if new.alert_type != original.alert_type {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change alert_type on an EmergencyAlert".into(),
+        ));
     }
     Ok(ValidateCallbackResult::Valid)
 }
@@ -617,5 +690,42 @@ mod tests {
                 ValidateCallbackResult::Valid
             ));
         }
+    }
+
+    // ---- Immutable Field Pure Equality Tests ----
+
+    #[test]
+    fn plan_immutable_field_hearth_hash_difference_detected() {
+        let a = make_plan(vec![make_contact("Alice", "555-1234")], vec![]);
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn alert_immutable_field_hearth_hash_difference_detected() {
+        let a = make_alert("Test alert");
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn alert_immutable_field_alert_type_difference_detected() {
+        let a = make_alert("Test alert");
+        let mut b = a.clone();
+        b.alert_type = AlertType::Fire;
+        assert_ne!(a.alert_type, b.alert_type);
+    }
+
+    #[test]
+    fn checkin_immutability_all_fields_stable() {
+        let a = make_checkin();
+        let b = a.clone();
+        assert_eq!(a.hearth_hash, b.hearth_hash);
+        assert_eq!(a.alert_hash, b.alert_hash);
+        assert_eq!(a.member, b.member);
+        assert_eq!(a.status, b.status);
+        assert_eq!(a.checked_in_at, b.checked_in_at);
     }
 }

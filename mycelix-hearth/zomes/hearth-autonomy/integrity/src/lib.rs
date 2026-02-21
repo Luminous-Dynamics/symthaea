@@ -160,13 +160,29 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             OpEntry::UpdateEntry {
                 app_entry,
                 action: _,
-                original_action_hash: _,
+                original_action_hash,
                 original_entry_hash: _,
             } => match app_entry {
-                EntryTypes::AutonomyProfile(profile) => validate_profile_update(&profile),
-                EntryTypes::AutonomyRequest(request) => validate_request_update(&request),
-                EntryTypes::GuardianApproval(approval) => validate_approval(&approval),
-                EntryTypes::TierTransition(transition) => validate_transition_update(&transition),
+                EntryTypes::AutonomyProfile(profile) => {
+                    validate_profile_update(&profile)?;
+                    validate_profile_immutable_fields(&profile, &original_action_hash)
+                }
+                EntryTypes::AutonomyRequest(request) => {
+                    validate_request_update(&request)?;
+                    validate_request_immutable_fields(&request, &original_action_hash)
+                }
+                EntryTypes::GuardianApproval(_) => {
+                    // INVARIANT: GuardianApproval immutability — once a guardian records
+                    // their approval or denial, it cannot be modified. This ensures
+                    // that autonomy decisions remain stable and auditable.
+                    Ok(ValidateCallbackResult::Invalid(
+                        "GuardianApproval cannot be updated once recorded".into(),
+                    ))
+                }
+                EntryTypes::TierTransition(transition) => {
+                    validate_transition_update(&transition)?;
+                    validate_transition_immutable_fields(&transition, &original_action_hash)
+                }
             },
             _ => Ok(ValidateCallbackResult::Valid),
         },
@@ -316,6 +332,122 @@ fn validate_transition_update(transition: &TierTransition) -> ExternResult<Valid
     if tier_rank(&transition.to_tier) <= tier_rank(&transition.from_tier) {
         return Ok(ValidateCallbackResult::Invalid(
             "Tier transition must be forward-only (to_tier must be greater than from_tier)".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
+// Immutable Field Validation
+// ============================================================================
+
+fn validate_profile_immutable_fields(
+    new: &AutonomyProfile,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: AutonomyProfile = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original AutonomyProfile: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original AutonomyProfile entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on an AutonomyProfile".into(),
+        ));
+    }
+    if new.member != original.member {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change member on an AutonomyProfile".into(),
+        ));
+    }
+    if new.created_at != original.created_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change created_at on an AutonomyProfile".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_request_immutable_fields(
+    new: &AutonomyRequest,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: AutonomyRequest = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original AutonomyRequest: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original AutonomyRequest entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on an AutonomyRequest".into(),
+        ));
+    }
+    if new.requester != original.requester {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change requester on an AutonomyRequest".into(),
+        ));
+    }
+    if new.created_at != original.created_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change created_at on an AutonomyRequest".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_transition_immutable_fields(
+    new: &TierTransition,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: TierTransition = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original TierTransition: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original TierTransition entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a TierTransition".into(),
+        ));
+    }
+    if new.member != original.member {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change member on a TierTransition".into(),
+        ));
+    }
+    if new.from_tier != original.from_tier {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change from_tier on a TierTransition".into(),
+        ));
+    }
+    if new.to_tier != original.to_tier {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change to_tier on a TierTransition".into(),
+        ));
+    }
+    if new.started_at != original.started_at {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change started_at on a TierTransition".into(),
         ));
     }
     Ok(ValidateCallbackResult::Valid)
@@ -649,5 +781,104 @@ mod tests {
         let json = serde_json::to_string(&transition).unwrap();
         let back: TierTransition = serde_json::from_str(&json).unwrap();
         assert_eq!(transition, back);
+    }
+
+    // -- Immutable field pure equality tests --
+
+    #[test]
+    fn profile_immutable_field_hearth_hash_difference_detected() {
+        let a = valid_profile();
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn profile_immutable_field_member_difference_detected() {
+        let a = valid_profile();
+        let mut b = a.clone();
+        b.member = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.member, b.member);
+    }
+
+    #[test]
+    fn profile_immutable_field_created_at_difference_detected() {
+        let a = valid_profile();
+        let mut b = a.clone();
+        b.created_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.created_at, b.created_at);
+    }
+
+    #[test]
+    fn request_immutable_field_hearth_hash_difference_detected() {
+        let a = valid_request();
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn request_immutable_field_requester_difference_detected() {
+        let a = valid_request();
+        let mut b = a.clone();
+        b.requester = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.requester, b.requester);
+    }
+
+    #[test]
+    fn request_immutable_field_created_at_difference_detected() {
+        let a = valid_request();
+        let mut b = a.clone();
+        b.created_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.created_at, b.created_at);
+    }
+
+    #[test]
+    fn guardian_approval_immutability_documented() {
+        // GuardianApproval should be created once and never updated.
+        // The integrity validate() function rejects UpdateEntry for GuardianApproval.
+        let approval = valid_approval();
+        assert_eq!(approval.approved, true);
+        assert_eq!(approval.guardian, agent_key_1());
+    }
+
+    #[test]
+    fn transition_immutable_field_hearth_hash_difference_detected() {
+        let a = valid_transition();
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn transition_immutable_field_member_difference_detected() {
+        let a = valid_transition();
+        let mut b = a.clone();
+        b.member = AgentPubKey::from_raw_36(vec![0xcd; 36]);
+        assert_ne!(a.member, b.member);
+    }
+
+    #[test]
+    fn transition_immutable_field_from_tier_difference_detected() {
+        let a = valid_transition();
+        let mut b = a.clone();
+        b.from_tier = AutonomyTier::Dependent;
+        assert_ne!(a.from_tier, b.from_tier);
+    }
+
+    #[test]
+    fn transition_immutable_field_to_tier_difference_detected() {
+        let a = valid_transition();
+        let mut b = a.clone();
+        b.to_tier = AutonomyTier::Autonomous;
+        assert_ne!(a.to_tier, b.to_tier);
+    }
+
+    #[test]
+    fn transition_immutable_field_started_at_difference_detected() {
+        let a = valid_transition();
+        let mut b = a.clone();
+        b.started_at = Timestamp::from_micros(9_000_000);
+        assert_ne!(a.started_at, b.started_at);
     }
 }

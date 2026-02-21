@@ -108,10 +108,26 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::RhythmOccurrence(occurrence) => validate_occurrence(&occurrence),
             EntryTypes::PresenceStatus(presence) => validate_presence(&presence),
         },
-        FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
-            EntryTypes::Rhythm(rhythm) => validate_rhythm(&rhythm),
-            EntryTypes::RhythmOccurrence(occurrence) => validate_occurrence(&occurrence),
-            EntryTypes::PresenceStatus(presence) => validate_presence(&presence),
+        FlatOp::StoreEntry(OpEntry::UpdateEntry {
+            app_entry,
+            original_action_hash,
+            ..
+        }) => match app_entry {
+            EntryTypes::Rhythm(rhythm) => {
+                validate_rhythm(&rhythm)?;
+                validate_rhythm_immutable_fields(&rhythm, &original_action_hash)
+            }
+            EntryTypes::RhythmOccurrence(_) => {
+                // INVARIANT: RhythmOccurrence immutability — occurrences are event
+                // records and cannot be modified after creation.
+                Ok(ValidateCallbackResult::Invalid(
+                    "RhythmOccurrence cannot be updated once created".into(),
+                ))
+            }
+            EntryTypes::PresenceStatus(presence) => {
+                validate_presence(&presence)?;
+                validate_presence_immutable_fields(&presence, &original_action_hash)
+            }
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         FlatOp::RegisterCreateLink {
@@ -210,6 +226,63 @@ pub fn validate_presence(presence: &PresenceStatus) -> ExternResult<ValidateCall
     // Basic structural validation — PresenceStatus is always valid
     // as long as the types are correct (enforced by serde deserialization).
     let _ = presence;
+    Ok(ValidateCallbackResult::Valid)
+}
+
+// ============================================================================
+// Immutable Field Validation
+// ============================================================================
+
+fn validate_rhythm_immutable_fields(
+    new: &Rhythm,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: Rhythm = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original Rhythm: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original Rhythm entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a Rhythm".into(),
+        ));
+    }
+    Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_presence_immutable_fields(
+    new: &PresenceStatus,
+    original_action_hash: &ActionHash,
+) -> ExternResult<ValidateCallbackResult> {
+    let original_record = must_get_valid_record(original_action_hash.clone())?;
+    let original: PresenceStatus = original_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize original PresenceStatus: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Original PresenceStatus entry is missing".into()
+        )))?;
+    if new.hearth_hash != original.hearth_hash {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change hearth_hash on a PresenceStatus".into(),
+        ));
+    }
+    if new.agent != original.agent {
+        return Ok(ValidateCallbackResult::Invalid(
+            "Cannot change agent on a PresenceStatus".into(),
+        ));
+    }
     Ok(ValidateCallbackResult::Valid)
 }
 
@@ -509,5 +582,46 @@ mod tests {
         let _b = LinkTypes::RhythmToOccurrences;
         let _c = LinkTypes::HearthToPresence;
         let _d = LinkTypes::AgentToPresence;
+    }
+
+    // ---- Immutable Field Pure Equality Tests ----
+
+    fn fake_agent_b() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    #[test]
+    fn rhythm_immutable_field_hearth_hash_difference_detected() {
+        let a = make_rhythm("Test", "Daily", "", 0);
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn occurrence_immutability_all_fields_stable() {
+        let a = make_occurrence("Notes", Some(5000), 2);
+        let b = a.clone();
+        assert_eq!(a.rhythm_hash, b.rhythm_hash);
+        assert_eq!(a.date, b.date);
+        assert_eq!(a.notes, b.notes);
+        assert_eq!(a.mood_bp, b.mood_bp);
+        assert_eq!(a.created_at, b.created_at);
+    }
+
+    #[test]
+    fn presence_immutable_field_hearth_hash_difference_detected() {
+        let a = make_presence(PresenceStatusType::Home);
+        let mut b = a.clone();
+        b.hearth_hash = ActionHash::from_raw_36(vec![0xCDu8; 36]);
+        assert_ne!(a.hearth_hash, b.hearth_hash);
+    }
+
+    #[test]
+    fn presence_immutable_field_agent_difference_detected() {
+        let a = make_presence(PresenceStatusType::Home);
+        let mut b = a.clone();
+        b.agent = fake_agent_b();
+        assert_ne!(a.agent, b.agent);
     }
 }
