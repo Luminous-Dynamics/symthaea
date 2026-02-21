@@ -92,24 +92,6 @@ impl MetacognitiveCalibrationBenchmark {
                 let target_idx = (rng % diff.num_items as u64) as usize;
                 let target = items[target_idx].clone();
 
-                // Retrieval lure: on some trials, inject a similar-but-wrong item
-                // into WM. This creates "high confidence but wrong" cases that
-                // prevent degenerate gamma=1.0.
-                let inject_lure = item_trial % 3 == 0; // Every 3rd trial
-                if inject_lure {
-                    rng ^= rng << 13;
-                    rng ^= rng >> 7;
-                    rng ^= rng << 17;
-                    let lure_noise = ContinuousHV::random(dim, rng.wrapping_add(7777));
-                    // Lure is 70-80% similar to target (confusable but wrong)
-                    let lure_weight = 0.25 + 0.05 * diff.num_items as f32;
-                    let lure = ContinuousHV::weighted_bundle(
-                        &[&target, &lure_noise],
-                        &[1.0 - lure_weight, lure_weight],
-                    );
-                    wm.perceive(lure);
-                }
-
                 // Delay: push intervening distractors
                 for d in 0..diff.delay {
                     rng ^= rng << 13;
@@ -118,6 +100,27 @@ impl MetacognitiveCalibrationBenchmark {
                     let distractor = ContinuousHV::random(dim, rng.wrapping_add(1000 + d as u64));
                     wm.perceive(distractor);
                 }
+
+                // Signal-detection recognition task:
+                // - "Old" trials (70%): query = target (stored item)
+                // - "New" trials (30%): query = lure (similar to target but not stored)
+                // This creates false alarms (high confidence + wrong) that break
+                // the degenerate gamma=1.0 from confidence=accuracy coupling.
+                rng ^= rng << 13;
+                rng ^= rng >> 7;
+                rng ^= rng << 17;
+                let is_new_trial = item_trial % 3 == 0; // 33% "new" trials
+                let query = if is_new_trial {
+                    // Lure: similar to target (confusable) but NOT stored
+                    let lure_noise = ContinuousHV::random(dim, rng.wrapping_add(7777));
+                    let lure_weight = 0.20 + 0.03 * diff.num_items as f32;
+                    ContinuousHV::weighted_bundle(
+                        &[&target, &lure_noise],
+                        &[1.0 - lure_weight, lure_weight],
+                    )
+                } else {
+                    target.clone()
+                };
 
                 // Retrieve: find most similar item in WM to query
                 let contents = wm.contents();
@@ -130,16 +133,23 @@ impl MetacognitiveCalibrationBenchmark {
                 let (_best_idx, best_sim) = contents
                     .iter()
                     .enumerate()
-                    .map(|(i, hv)| (i, target.similarity(hv)))
+                    .map(|(i, hv)| (i, query.similarity(hv)))
                     .max_by(|(_, a), (_, b)| a.total_cmp(b))
                     .unwrap_or((0, 0.0));
 
                 // Confidence = max similarity (natural HDC metric), clamped to [0, 1]
                 let confidence = (best_sim as f64).clamp(0.0, 1.0);
 
-                // Accuracy: exact match has sim ~1.0, random has sim ~0.
-                // Threshold 0.3 separates genuine matches from noise.
-                let accurate = best_sim > 0.3;
+                // Accuracy depends on trial type:
+                // - Old trial: correct if recognized (high similarity to stored item)
+                // - New trial: correct if REJECTED (low similarity = "not in memory")
+                // This decouples confidence from accuracy: on new trials, high
+                // similarity to the stored target creates false alarms.
+                let accurate = if is_new_trial {
+                    best_sim <= 0.3 // Correct rejection
+                } else {
+                    best_sim > 0.3 // Hit
+                };
 
                 all_confidences.push(confidence);
                 all_accuracies.push(if accurate { 1.0 } else { 0.0 });

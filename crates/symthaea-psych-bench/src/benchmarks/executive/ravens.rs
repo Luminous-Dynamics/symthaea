@@ -205,9 +205,9 @@ impl RavensProgressiveMatricesBenchmark {
                 let grid_size: Vec<&ContinuousHV> = item.cells.iter().map(|c| &size_hvs[c.size]).collect();
                 let grid_color: Vec<&ContinuousHV> = item.cells.iter().map(|c| &color_hvs[c.color]).collect();
 
-                // For each feature, extract row, column, and diagonal rules
-                // from complete rows/columns, then predict the missing cell's
-                // feature using a 3-source ensemble.
+                // Per-feature rule extraction: for each feature independently,
+                // extract row-wise and column-wise transformation rules from
+                // completed rows/columns, then predict the missing cell.
                 let predict_feature = |feat: &[&ContinuousHV]| -> ContinuousHV {
                     // Row 0: cells [0,1,2], Row 1: cells [3,4,5], Row 2: cells [6,7,?]
                     // Row rule: unbind(col2, col0) — what maps col0 to col2?
@@ -224,19 +224,8 @@ impl RavensProgressiveMatricesBenchmark {
                     // Predict: apply column rule to row0's col2 (cell 2)
                     let col_pred = avg_col_rule.bind(feat[2]);
 
-                    // Diagonal rule: main diagonal [0,4,?] and anti-diagonal [2,4,6]
-                    // Main diag: cells 0→4→8(missing). Rule: unbind(4, 0)
-                    let diag_rule = feat[4].bind(&feat[0].inverse());
-                    let diag_pred = diag_rule.bind(feat[4]); // Apply to cell 4 to get cell 8
-
-                    // Also use row-col cross-validation: row1 rule applied to row2
-                    let row1_col2_rule = feat[5].bind(&feat[3].inverse());
-                    let cross_pred = row1_col2_rule.bind(feat[6]);
-
-                    // 4-source weighted ensemble: row + column + diagonal + cross
-                    ContinuousHV::weighted_bundle(&[
-                        &row_pred, &col_pred, &diag_pred, &cross_pred,
-                    ], &[1.0, 1.0, 0.5, 0.5])
+                    // Bundle row and column predictions equally
+                    ContinuousHV::bundle(&[&row_pred, &col_pred])
                 };
 
                 let pred_shape = predict_feature(&grid_shape);
