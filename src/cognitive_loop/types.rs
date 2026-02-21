@@ -795,6 +795,20 @@ pub struct ModuleTimings {
     pub core_training: u64,
     /// Parallel post-processing (rayon: stability + memory + episodic)
     pub core_parallel_postprocess: u64,
+
+    // ── End-of-cycle sections (previously un-instrumented) ──
+    /// Unified living mind integration (cfg-gated `full_consciousness`)
+    pub living_mind: u64,
+    /// Master consciousness equation (every Nth cycle)
+    pub master_consciousness_equation: u64,
+    /// End-of-cycle homeostasis (clamps, drift correction)
+    pub homeostasis: u64,
+    /// Spectral MIP finder (O(n³) Fiedler + Cholesky, every 47 cycles)
+    pub spectral_mip: u64,
+    /// Soul experience integration (value learning feedback)
+    pub soul_experience: u64,
+    /// CycleMetadata struct construction + format!() serialization
+    pub metadata_assembly: u64,
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

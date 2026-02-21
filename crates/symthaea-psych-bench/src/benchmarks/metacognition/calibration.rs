@@ -28,12 +28,16 @@ struct Difficulty {
     delay: usize,
 }
 
-// Delays calibrated to create a difficulty gradient:
-// Easy: most items survive in WM. Hard: most items evicted, retrieval fails.
-const DIFFICULTIES: [Difficulty; 3] = [
-    Difficulty { _name: "easy", num_items: 3, delay: 2 },
+// Difficulties calibrated to span the WM capacity boundary, creating
+// a gradient from perfect retrieval (easy) to near-chance (hard).
+// The borderline cases (medium_low, medium_high) are critical for
+// generating trials where confidence and accuracy decouple.
+const DIFFICULTIES: [Difficulty; 5] = [
+    Difficulty { _name: "easy", num_items: 3, delay: 1 },
+    Difficulty { _name: "medium_low", num_items: 4, delay: 3 },
     Difficulty { _name: "medium", num_items: 5, delay: 5 },
-    Difficulty { _name: "hard", num_items: 7, delay: 7 },
+    Difficulty { _name: "medium_high", num_items: 6, delay: 6 },
+    Difficulty { _name: "hard", num_items: 7, delay: 8 },
 ];
 
 impl MetacognitiveCalibrationBenchmark {
@@ -51,10 +55,11 @@ impl MetacognitiveCalibrationBenchmark {
         let items_per_difficulty = 15;
 
         // Generate category prototypes — items within a category are confusable.
-        // This creates realistic memory interference where similar items compete,
-        // breaking the perfect confidence-accuracy coupling that occurs with
-        // orthogonal random vectors.
-        let num_categories = 3;
+        // Using 2 categories maximizes interference: more items share each
+        // prototype, creating realistic competition where confidence and
+        // accuracy can decouple (high confidence + wrong answer, or low
+        // confidence + right answer).
+        let num_categories = 2;
         let category_protos: Vec<ContinuousHV> = (0..num_categories)
             .map(|c| {
                 rng ^= rng << 13;
@@ -81,8 +86,10 @@ impl MetacognitiveCalibrationBenchmark {
                         rng ^= rng << 17;
                         let cat = i % num_categories;
                         let item_noise = ContinuousHV::random(dim, rng.wrapping_add(i as u64));
-                        // Within-category variation: 25-40% noise
-                        let noise_frac = 0.25 + 0.05 * (i as f32 / diff.num_items as f32);
+                        // Within-category variation: 20-35% noise.
+                        // Lower noise = items are more similar to their category
+                        // prototype = harder to distinguish = more interference.
+                        let noise_frac = 0.20 + 0.05 * (i as f32 / diff.num_items as f32);
                         ContinuousHV::weighted_bundle(
                             &[&category_protos[cat], &item_noise],
                             &[1.0 - noise_frac, noise_frac],
@@ -90,13 +97,17 @@ impl MetacognitiveCalibrationBenchmark {
                     })
                     .collect();
 
-                // Store items in working memory with encoding noise
+                // Store items in working memory with encoding noise.
+                // Higher noise at harder difficulties creates realistic
+                // degradation: even items still in WM have imperfect
+                // similarity to their originals, producing intermediate
+                // confidence values.
                 for item in &items {
                     rng ^= rng << 13;
                     rng ^= rng >> 7;
                     rng ^= rng << 17;
                     let noise = ContinuousHV::random(dim, rng.wrapping_add(5000));
-                    let noise_weight = 0.05 + 0.02 * diff.num_items as f32;
+                    let noise_weight = 0.08 + 0.04 * diff.num_items as f32;
                     let noisy = ContinuousHV::weighted_bundle(
                         &[item, &noise],
                         &[1.0 - noise_weight, noise_weight],
@@ -146,9 +157,10 @@ impl MetacognitiveCalibrationBenchmark {
                 // Confidence = gap between best and second-best similarity.
                 // With category-based items, same-category items compete,
                 // creating small gaps even when the correct item is retrieved.
-                // Scale gap so the typical range (0.0-0.2) maps broadly to (0.0-1.0).
+                // Scale gap by 3.0 (not 5.0) to preserve intermediate
+                // confidence values rather than saturating at 1.0.
                 let gap = (best_sim - second_sim) as f64;
-                let confidence = (gap * 5.0).clamp(0.0, 1.0);
+                let confidence = (gap * 3.0).clamp(0.0, 1.0);
 
                 // Accuracy: verify retrieved item is actually the target.
                 // Check similarity between best WM item and ALL original items.
@@ -311,7 +323,7 @@ impl PsychBenchmark for MetacognitiveCalibrationBenchmark {
         result.insert("overconfidence", MetricValue::from_samples(&overconfs));
         result.insert("resolution", MetricValue::from_samples(&resolutions));
 
-        result.conditions = 3; // easy, medium, hard
+        result.conditions = 5; // easy, medium_low, medium, medium_high, hard
         result.trials_per_condition = config.trials_per_condition;
         result.elapsed_ms = start.elapsed().as_millis() as u64;
         result
