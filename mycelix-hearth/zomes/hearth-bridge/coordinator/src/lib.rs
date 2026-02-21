@@ -13,7 +13,7 @@
 use hdk::prelude::*;
 use hearth_bridge_integrity::*;
 use hearth_types::{
-    BondUpdate, CareSummary, GratitudeSummary, MemberRole, RhythmSummary, SeveranceInput,
+    BondUpdate, CareSummary, GratitudeSummary, RhythmSummary, SeveranceInput,
     SeveranceSummaryData, WeeklyDigest,
 };
 use mycelix_bridge_common::{
