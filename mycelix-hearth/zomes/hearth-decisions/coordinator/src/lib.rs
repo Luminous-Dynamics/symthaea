@@ -5,6 +5,11 @@
 use hdk::prelude::*;
 use hearth_decisions_integrity::*;
 use hearth_types::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_basic, requirement_for_proposal,
+    requirement_for_voting,
+};
 
 // ============================================================================
 // Input Types
@@ -161,6 +166,66 @@ fn can_finalize(decision_type: &DecisionType, role: &MemberRole) -> bool {
     }
 }
 
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+/// Map a decision type to its governance requirement.
+fn requirement_for_decision_type(dt: &DecisionType) -> GovernanceRequirement {
+    match dt {
+        DecisionType::MajorityVote => requirement_for_basic(),
+        DecisionType::ElderDecision | DecisionType::GuardianDecision => requirement_for_proposal(),
+        DecisionType::Consensus => requirement_for_voting(),
+    }
+}
+
+/// Fetch the calling agent's consciousness credential via the hearth bridge
+/// and evaluate it against the given governance requirement.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("hearth_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+
+    let eligibility = evaluate_governance(&credential.profile, requirement);
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
+
+/// Compose role-based vote weight with consciousness-based progressive weight.
+/// An Adult (10000bp) with Citizen tier (7500bp) gets 7500bp effective.
+/// A Youth (5000bp) with Participant tier (5000bp) gets 2500bp effective.
+fn compose_weights(role_weight_bp: u32, consciousness_weight_bp: u32) -> u32 {
+    ((role_weight_bp as u64 * consciousness_weight_bp as u64) / 10000) as u32
+}
+
 /// Deterministic winner selection: highest weight wins, lowest index breaks ties.
 /// Returns the option index of the winner, or 0 if tallies are empty.
 fn winning_option(tallies: &[(u32, u32)]) -> u32 {
@@ -181,6 +246,9 @@ fn winning_option(tallies: &[(u32, u32)]) -> u32 {
 /// Links the decision from the hearth via HearthToDecisions.
 #[hdk_extern]
 pub fn create_decision(input: CreateDecisionInput) -> ExternResult<Record> {
+    // Consciousness gate: requirement depends on decision type
+    let _eligibility = require_consciousness(&requirement_for_decision_type(&input.decision_type))?;
+
     let now = sys_time()?;
     let agent = agent_info()?.agent_initial_pubkey;
 
@@ -297,7 +365,11 @@ pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
         ))));
     }
 
-    let weight_bp = role.default_vote_weight_bp();
+    // Consciousness gate: requirement depends on decision type.
+    // Progressive weight composes with role-based weight.
+    let eligibility = require_consciousness(&requirement_for_decision_type(&decision.decision_type))?;
+    let role_weight_bp = role.default_vote_weight_bp();
+    let weight_bp = compose_weights(role_weight_bp, eligibility.weight_bp);
 
     let vote = Vote {
         decision_hash: input.decision_hash.clone(),
@@ -757,7 +829,10 @@ pub fn amend_vote(input: AmendVoteInput) -> ExternResult<Record> {
         ))));
     }
 
-    let weight_bp = role.default_vote_weight_bp();
+    // Consciousness gate + progressive weight (same as cast_vote)
+    let eligibility = require_consciousness(&requirement_for_decision_type(&decision.decision_type))?;
+    let role_weight_bp = role.default_vote_weight_bp();
+    let weight_bp = compose_weights(role_weight_bp, eligibility.weight_bp);
 
     // 7. Create new vote entry + links
     let vote = Vote {
@@ -1941,5 +2016,62 @@ mod tests {
         // All options at zero weight — lowest index wins
         let tallies = vec![(2, 0), (0, 0), (1, 0)];
         assert_eq!(winning_option(&tallies), 0);
+    }
+
+    // ---- Consciousness gating helpers ----
+
+    #[test]
+    fn compose_weights_full_both() {
+        // Steward (10000bp) + Guardian (10000bp) = 10000bp
+        assert_eq!(compose_weights(10000, 10000), 10000);
+    }
+
+    #[test]
+    fn compose_weights_half_role() {
+        // Youth (5000bp) + Citizen (7500bp) = 3750bp
+        assert_eq!(compose_weights(5000, 7500), 3750);
+    }
+
+    #[test]
+    fn compose_weights_half_consciousness() {
+        // Adult (10000bp) + Participant (5000bp) = 5000bp
+        assert_eq!(compose_weights(10000, 5000), 5000);
+    }
+
+    #[test]
+    fn compose_weights_zero_role() {
+        // Child (0bp) + any consciousness = 0bp
+        assert_eq!(compose_weights(0, 10000), 0);
+    }
+
+    #[test]
+    fn compose_weights_zero_consciousness() {
+        // Any role + Observer (0bp) = 0bp
+        assert_eq!(compose_weights(10000, 0), 0);
+    }
+
+    #[test]
+    fn compose_weights_progressive_examples() {
+        // Adult (10000bp) + Citizen (7500bp) = 7500bp
+        assert_eq!(compose_weights(10000, 7500), 7500);
+        // Youth (5000bp) + Participant (5000bp) = 2500bp
+        assert_eq!(compose_weights(5000, 5000), 2500);
+    }
+
+    #[test]
+    fn requirement_for_decision_type_mapping() {
+        use mycelix_bridge_common::ConsciousnessTier;
+
+        let req_majority = requirement_for_decision_type(&DecisionType::MajorityVote);
+        assert_eq!(req_majority.min_tier, ConsciousnessTier::Participant);
+
+        let req_elder = requirement_for_decision_type(&DecisionType::ElderDecision);
+        assert_eq!(req_elder.min_tier, ConsciousnessTier::Participant);
+
+        let req_guardian = requirement_for_decision_type(&DecisionType::GuardianDecision);
+        assert_eq!(req_guardian.min_tier, ConsciousnessTier::Participant);
+
+        let req_consensus = requirement_for_decision_type(&DecisionType::Consensus);
+        assert_eq!(req_consensus.min_tier, ConsciousnessTier::Citizen);
     }
 }

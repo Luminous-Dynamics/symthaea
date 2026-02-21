@@ -16,6 +16,21 @@ pub mod consciousness_thresholds;
 pub use consciousness_thresholds as phi_thresholds;
 pub use consciousness_thresholds::{ConsciousnessThresholds, PhiThresholds};
 
+pub mod consciousness_profile;
+pub use consciousness_profile::{
+    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
+    GovernanceEligibility, GovernanceRequirement, evaluate_governance,
+    requirement_for_basic, requirement_for_constitutional,
+    requirement_for_proposal, requirement_for_voting,
+};
+
+pub mod routing;
+pub use routing::{
+    BridgeDomain, CivicZome, CommonsZome, CrossClusterRole,
+    resolve_civic_zome, resolve_commons_zome,
+    CIVIC_DOMAINS, COMMONS_DOMAINS,
+};
+
 use hdk::prelude::*;
 use serde::{Deserialize, Serialize};
 

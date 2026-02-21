@@ -33,6 +33,8 @@ use mycelix_bridge_common::{
     CareAvailabilityQuery, CareAvailabilityResult,
     AuditTrailQuery, AuditTrailEntry, AuditTrailResult,
     RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
+    BridgeDomain, CommonsZome, resolve_commons_zome,
+    ConsciousnessCredential, ConsciousnessTier,
 };
 
 // ============================================================================
@@ -334,8 +336,11 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
     let domain_anchor = ensure_anchor(&format!("domain_queries:{}", query.domain))?;
     create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToQuery, ())?;
 
-    // Attempt auto-dispatch if query_type looks like a zome function call
-    if let Some(zome_name) = resolve_domain_zome(&query.domain, &query.query_type) {
+    // Attempt auto-dispatch using type-safe routing
+    let target = BridgeDomain::from_str_loose(&query.domain)
+        .and_then(|d| resolve_commons_zome(d, &query.query_type));
+    if let Some(zome) = target {
+        let zome_name = zome.as_str().to_string();
         let payload_bytes = ExternIO::encode(query.params.clone())
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             .0;
@@ -364,66 +369,11 @@ pub fn query_commons(query: CommonsQuery) -> ExternResult<Record> {
     )))
 }
 
-/// Map a domain name to its primary coordinator zome for auto-dispatch.
+/// Backward-compatible wrapper — delegates to type-safe routing from bridge-common.
 fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
-    let zome = match domain {
-        "property" => match query_type {
-            s if s.contains("transfer") || s.contains("ownership") => "property_transfer",
-            s if s.contains("dispute") => "property_disputes",
-            s if s.contains("encumbrance") || s.contains("title") => "property_registry",
-            _ => "property_registry",
-        },
-        "housing" => match query_type {
-            s if s.contains("clt") || s.contains("lease") || s.contains("resale") => "housing_clt",
-            s if s.contains("member") => "housing_membership",
-            s if s.contains("finance") || s.contains("fee") => "housing_finances",
-            s if s.contains("maintenance") || s.contains("repair") => "housing_maintenance",
-            s if s.contains("governance") || s.contains("proposal") => "housing_governance",
-            _ => "housing_units",
-        },
-        "care" => match query_type {
-            s if s.contains("match") => "care_matching",
-            s if s.contains("circle") => "care_circles",
-            s if s.contains("credential") => "care_credentials",
-            s if s.contains("plan") => "care_plans",
-            _ => "care_timebank",
-        },
-        "mutualaid" => match query_type {
-            s if s.contains("resource") || s.contains("booking") => "mutualaid_resources",
-            s if s.contains("need") || s.contains("handoff") => "mutualaid_needs",
-            s if s.contains("pool") => "mutualaid_pools",
-            s if s.contains("request") => "mutualaid_requests",
-            s if s.contains("circle") => "mutualaid_circles",
-            s if s.contains("governance") || s.contains("proposal") => "mutualaid_governance",
-            _ => "mutualaid_timebank",
-        },
-        "water" => match query_type {
-            s if s.contains("purity") || s.contains("quality") => "water_purity",
-            s if s.contains("capture") || s.contains("harvest") => "water_capture",
-            s if s.contains("steward") || s.contains("guardian") => "water_steward",
-            s if s.contains("wisdom") || s.contains("knowledge") => "water_wisdom",
-            _ => "water_flow",
-        },
-        "food" => match query_type {
-            s if s.contains("distribution") || s.contains("market") || s.contains("order") => "food_distribution",
-            s if s.contains("preservation") || s.contains("batch") || s.contains("storage") => "food_preservation",
-            s if s.contains("knowledge") || s.contains("seed") || s.contains("recipe") => "food_knowledge",
-            _ => "food_production",
-        },
-        "transport" => match query_type {
-            s if s.contains("share") || s.contains("ride") || s.contains("cargo") => "transport_sharing",
-            s if s.contains("impact") || s.contains("carbon") || s.contains("emission") => "transport_impact",
-            _ => "transport_routes",
-        },
-        "support" => match query_type {
-            s if s.contains("ticket") => "support_tickets",
-            s if s.contains("diagnostic") => "support_diagnostics",
-            _ => "support_knowledge",
-        },
-        "space" => "space",
-        _ => return None,
-    };
-    Some(zome.to_string())
+    BridgeDomain::from_str_loose(domain)
+        .and_then(|d| resolve_commons_zome(d, query_type))
+        .map(|z| z.as_str().to_string())
 }
 
 /// Resolve a pending query with a result
@@ -1005,6 +955,109 @@ pub fn get_agent_trust_score(did: String) -> ExternResult<DispatchResult> {
 }
 
 // ============================================================================
+// Consciousness Credential (cross-cluster → identity)
+// ============================================================================
+
+/// Get a consciousness credential for the specified DID.
+///
+/// Cross-cluster call to `identity_bridge.issue_consciousness_credential` to
+/// obtain identity, reputation, and community dimensions, then fills in the
+/// engagement dimension locally from this cluster's activity data (events +
+/// queries in the last 90 days with 30-day half-life exponential decay).
+#[hdk_extern]
+pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    enforce_rate_limit("identity:identity_bridge")?;
+
+    // 1. Cross-cluster call to identity: issue_consciousness_credential
+    let payload = ExternIO::encode(did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "issue_consciousness_credential".to_string(),
+        payload,
+    };
+    let result = bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)?;
+
+    if !result.success {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to issue consciousness credential: {}",
+            result.error.unwrap_or_else(|| "unknown".to_string())
+        ))));
+    }
+    let response_bytes = result.response.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Empty response from identity bridge".into()
+        ))
+    })?;
+    let mut credential: ConsciousnessCredential = ExternIO(response_bytes)
+        .decode()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {:?}",
+                e
+            )))
+        })?;
+
+    // 2. Fill in engagement dimension locally (no cross-cluster call)
+    credential.profile.engagement = calculate_local_engagement()?;
+
+    // 3. Recalculate tier with engagement included
+    credential.tier = ConsciousnessTier::from_score(credential.profile.combined_score());
+
+    Ok(credential)
+}
+
+/// Calculate local engagement score from this cluster's activity.
+///
+/// Counts the calling agent's events and queries in the last 90 days,
+/// applies 30-day half-life exponential decay, and normalizes to 0.0-1.0.
+/// 50 decay-weighted interactions = 1.0 (capped).
+fn calculate_local_engagement() -> ExternResult<f64> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+    let ninety_days_micros = 90i64 * 24 * 60 * 60 * 1_000_000;
+    let cutoff = Timestamp::from_micros(now.as_micros() - ninety_days_micros);
+    let half_life_micros = 30.0 * 24.0 * 60.0 * 60.0 * 1_000_000.0;
+
+    let mut weighted_count = 0.0f64;
+
+    // Count events
+    if let Ok(event_anchor) = anchor_hash(&format!("agent_events:{}", agent)) {
+        if let Ok(event_links) = get_links(
+            LinkQuery::try_new(event_anchor, LinkTypes::AgentToEvent)?,
+            GetStrategy::Local,
+        ) {
+            for link in &event_links {
+                if link.timestamp >= cutoff {
+                    let age_micros = (now.as_micros() - link.timestamp.as_micros()) as f64;
+                    weighted_count += (-age_micros * 0.693 / half_life_micros).exp();
+                }
+            }
+        }
+    }
+
+    // Count queries
+    if let Ok(query_anchor) = anchor_hash(&format!("agent_queries:{}", agent)) {
+        if let Ok(query_links) = get_links(
+            LinkQuery::try_new(query_anchor, LinkTypes::AgentToQuery)?,
+            GetStrategy::Local,
+        ) {
+            for link in &query_links {
+                if link.timestamp >= cutoff {
+                    let age_micros = (now.as_micros() - link.timestamp.as_micros()) as f64;
+                    weighted_count += (-age_micros * 0.693 / half_life_micros).exp();
+                }
+            }
+        }
+    }
+
+    // Normalize: 50 decay-weighted interactions in 90 days = 1.0
+    Ok((weighted_count / 50.0).min(1.0))
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -1516,11 +1569,11 @@ mod tests {
     }
 
     #[test]
-    fn resolve_case_sensitive_domain() {
-        // Domain matching is case-sensitive
-        assert!(resolve_domain_zome("Property", "get_property").is_none());
-        assert!(resolve_domain_zome("PROPERTY", "get_property").is_none());
-        assert!(resolve_domain_zome("HOUSING", "list_units").is_none());
+    fn resolve_case_insensitive_domain() {
+        // Domain matching is now case-insensitive (fixed via routing module)
+        assert_eq!(resolve_domain_zome("Property", "get_property").unwrap(), "property_registry");
+        assert_eq!(resolve_domain_zome("PROPERTY", "get_property").unwrap(), "property_registry");
+        assert_eq!(resolve_domain_zome("HOUSING", "list_units").unwrap(), "housing_units");
     }
 
     #[test]

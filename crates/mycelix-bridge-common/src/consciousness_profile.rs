@@ -1,0 +1,1045 @@
+//! Multi-dimensional consciousness profile for governance gating.
+//!
+//! Replaces the single MATL score (40% MFA + 60% reputation) with a
+//! 4-dimensional `ConsciousnessProfile` that gates governance actions
+//! with progressive vote weighting.
+//!
+//! ## Dimensions
+//!
+//! 1. **Identity** — MFA assurance level (Anonymous=0.0 → Critical=1.0)
+//! 2. **Reputation** — Cross-hApp aggregated reputation with exponential decay
+//! 3. **Community** — Peer trust attestations, weighted by attestor tier
+//! 4. **Engagement** — Domain-specific participation, computed locally per bridge
+//!
+//! ## Usage
+//!
+//! Governance zomes call their local bridge's `get_consciousness_credential`,
+//! then evaluate it with `evaluate_governance()` — a pure function with no
+//! HDK dependency.
+
+use serde::{Deserialize, Serialize};
+
+// ============================================================================
+// Core types
+// ============================================================================
+
+/// 4-dimensional consciousness profile.
+///
+/// Each dimension is 0.0–1.0. Governance actions require different
+/// minimum combinations. Vote weight scales with overall profile strength.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+pub struct ConsciousnessProfile {
+    /// Identity verification strength (from MFA AssuranceLevel).
+    /// Anonymous=0.0, Basic=0.25, Verified=0.5, HighlyAssured=0.75, Critical=1.0
+    pub identity: f64,
+
+    /// Cross-hApp reputation (from identity bridge aggregated reputation).
+    /// Exponential decay with 30-day half-life, multi-source weighted average.
+    pub reputation: f64,
+
+    /// Community trust attestations (from aggregated peer trust credentials).
+    /// Weighted by attestor's own tier — higher-consciousness peers count more.
+    pub community: f64,
+
+    /// Domain-specific engagement (computed locally by each cluster bridge).
+    /// Based on event/query participation counts, decayed over time.
+    pub engagement: f64,
+}
+
+impl ConsciousnessProfile {
+    /// Combined score — weighted average of all 4 dimensions.
+    ///
+    /// Identity and community are weighted higher for governance:
+    /// - identity:   25%
+    /// - reputation:  25%
+    /// - community:  30%
+    /// - engagement: 20%
+    pub fn combined_score(&self) -> f64 {
+        self.identity * 0.25
+            + self.reputation * 0.25
+            + self.community * 0.30
+            + self.engagement * 0.20
+    }
+
+    /// Derive the consciousness tier from this profile's combined score.
+    pub fn tier(&self) -> ConsciousnessTier {
+        ConsciousnessTier::from_score(self.combined_score())
+    }
+
+    /// Create a profile with all dimensions at zero (anonymous, no history).
+    pub fn zero() -> Self {
+        Self {
+            identity: 0.0,
+            reputation: 0.0,
+            community: 0.0,
+            engagement: 0.0,
+        }
+    }
+
+    /// Clamp all dimensions to 0.0–1.0.
+    pub fn clamped(&self) -> Self {
+        Self {
+            identity: self.identity.clamp(0.0, 1.0),
+            reputation: self.reputation.clamp(0.0, 1.0),
+            community: self.community.clamp(0.0, 1.0),
+            engagement: self.engagement.clamp(0.0, 1.0),
+        }
+    }
+}
+
+impl Default for ConsciousnessProfile {
+    fn default() -> Self {
+        Self::zero()
+    }
+}
+
+/// Time-limited credential containing a `ConsciousnessProfile`.
+///
+/// Stored on the agent's source chain. Governance zomes validate locally
+/// by checking issuer and expiry — no cross-cluster call needed at
+/// governance time.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ConsciousnessCredential {
+    /// Agent's DID (e.g., "did:mycelix:<pubkey>").
+    pub did: String,
+    /// The multi-dimensional profile.
+    pub profile: ConsciousnessProfile,
+    /// Derived tier at issuance time.
+    pub tier: ConsciousnessTier,
+    /// Issuance timestamp (microseconds since epoch).
+    pub issued_at: u64,
+    /// Expiry timestamp (default: issued_at + 24 hours).
+    pub expires_at: u64,
+    /// DID of the issuing bridge (e.g., "did:mycelix:<identity_bridge_pubkey>").
+    pub issuer: String,
+}
+
+impl ConsciousnessCredential {
+    /// Default TTL for credentials: 24 hours in microseconds.
+    pub const DEFAULT_TTL_US: u64 = 86_400_000_000;
+
+    /// Check if the credential has expired relative to the given timestamp.
+    pub fn is_expired(&self, now_us: u64) -> bool {
+        now_us >= self.expires_at
+    }
+}
+
+// ============================================================================
+// Tiers
+// ============================================================================
+
+/// Governance tiers derived from combined consciousness score.
+///
+/// Mirrors the TrustTier concept from the identity cluster, but defined
+/// here as the canonical shared definition across all clusters.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ConsciousnessTier {
+    /// combined < 0.3 — can read, no governance participation
+    Observer,
+    /// combined >= 0.3 — basic proposals
+    Participant,
+    /// combined >= 0.4 — voting rights
+    Citizen,
+    /// combined >= 0.6 — constitutional actions
+    Steward,
+    /// combined >= 0.8 — emergency powers
+    Guardian,
+}
+
+impl ConsciousnessTier {
+    /// Derive a tier from a combined consciousness score.
+    pub fn from_score(score: f64) -> Self {
+        if score >= 0.8 {
+            Self::Guardian
+        } else if score >= 0.6 {
+            Self::Steward
+        } else if score >= 0.4 {
+            Self::Citizen
+        } else if score >= 0.3 {
+            Self::Participant
+        } else {
+            Self::Observer
+        }
+    }
+
+    /// Minimum combined score required for this tier.
+    pub fn min_score(&self) -> f64 {
+        match self {
+            Self::Observer => 0.0,
+            Self::Participant => 0.3,
+            Self::Citizen => 0.4,
+            Self::Steward => 0.6,
+            Self::Guardian => 0.8,
+        }
+    }
+
+    /// Progressive vote weight in basis points (0–10000).
+    ///
+    /// Observers cannot vote. Weight increases with tier.
+    pub fn vote_weight_bp(&self) -> u32 {
+        match self {
+            Self::Observer => 0,
+            Self::Participant => 5000,
+            Self::Citizen => 7500,
+            Self::Steward => 10000,
+            Self::Guardian => 10000,
+        }
+    }
+}
+
+// ============================================================================
+// Governance requirements
+// ============================================================================
+
+/// What a governance action requires from the consciousness profile.
+///
+/// The `min_tier` is always checked. Optional per-dimension minimums
+/// add additional requirements (e.g., constitutional changes require
+/// minimum identity verification AND community trust).
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GovernanceRequirement {
+    /// Minimum consciousness tier required.
+    pub min_tier: ConsciousnessTier,
+    /// Optional minimum identity dimension (None = no minimum).
+    pub min_identity: Option<f64>,
+    /// Optional minimum community dimension (None = no minimum).
+    pub min_community: Option<f64>,
+}
+
+/// Result of evaluating a profile against a governance requirement.
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct GovernanceEligibility {
+    /// Whether the agent meets all requirements.
+    pub eligible: bool,
+    /// Progressive vote weight in basis points (0–10000).
+    pub weight_bp: u32,
+    /// The agent's derived consciousness tier.
+    pub tier: ConsciousnessTier,
+    /// The agent's consciousness profile.
+    pub profile: ConsciousnessProfile,
+    /// Why ineligible (empty if eligible).
+    pub reasons: Vec<String>,
+}
+
+// ============================================================================
+// Evaluation (pure functions — no HDK dependency)
+// ============================================================================
+
+/// Evaluate a consciousness profile against a governance requirement.
+///
+/// This is the core gating function. It's pure — no HDK calls, no
+/// side effects. Governance zomes call this after obtaining a
+/// `ConsciousnessCredential` from their local bridge.
+pub fn evaluate_governance(
+    profile: &ConsciousnessProfile,
+    requirement: &GovernanceRequirement,
+) -> GovernanceEligibility {
+    let clamped = profile.clamped();
+    let tier = clamped.tier();
+    let mut reasons = Vec::new();
+
+    // Check tier
+    if tier < requirement.min_tier {
+        reasons.push(format!(
+            "Tier {:?} below required {:?} (score {:.3}, need >= {:.3})",
+            tier,
+            requirement.min_tier,
+            clamped.combined_score(),
+            requirement.min_tier.min_score(),
+        ));
+    }
+
+    // Check identity minimum
+    if let Some(min_id) = requirement.min_identity {
+        if clamped.identity < min_id {
+            reasons.push(format!(
+                "Identity {:.3} below required {:.3}",
+                clamped.identity, min_id,
+            ));
+        }
+    }
+
+    // Check community minimum
+    if let Some(min_comm) = requirement.min_community {
+        if clamped.community < min_comm {
+            reasons.push(format!(
+                "Community {:.3} below required {:.3}",
+                clamped.community, min_comm,
+            ));
+        }
+    }
+
+    let eligible = reasons.is_empty();
+    let weight_bp = if eligible { tier.vote_weight_bp() } else { 0 };
+
+    GovernanceEligibility {
+        eligible,
+        weight_bp,
+        tier,
+        profile: clamped,
+        reasons,
+    }
+}
+
+// ============================================================================
+// Standard requirement presets
+// ============================================================================
+
+/// Requirement for basic governance participation (viewing proposals, commenting).
+///
+/// Participant tier (combined >= 0.3), no per-dimension minimums.
+pub fn requirement_for_basic() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Participant,
+        min_identity: None,
+        min_community: None,
+    }
+}
+
+/// Requirement for submitting proposals.
+///
+/// Participant tier + identity >= 0.25 (at least Basic MFA).
+pub fn requirement_for_proposal() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Participant,
+        min_identity: Some(0.25),
+        min_community: None,
+    }
+}
+
+/// Requirement for casting votes.
+///
+/// Citizen tier + identity >= 0.25. Weight scales with tier.
+pub fn requirement_for_voting() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Citizen,
+        min_identity: Some(0.25),
+        min_community: None,
+    }
+}
+
+/// Requirement for constitutional changes (bylaw amendments, etc.).
+///
+/// Steward tier + identity >= 0.5 + community >= 0.3.
+pub fn requirement_for_constitutional() -> GovernanceRequirement {
+    GovernanceRequirement {
+        min_tier: ConsciousnessTier::Steward,
+        min_identity: Some(0.5),
+        min_community: Some(0.3),
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // -- ConsciousnessProfile --
+
+    #[test]
+    fn zero_profile_is_all_zeros() {
+        let p = ConsciousnessProfile::zero();
+        assert_eq!(p.identity, 0.0);
+        assert_eq!(p.reputation, 0.0);
+        assert_eq!(p.community, 0.0);
+        assert_eq!(p.engagement, 0.0);
+        assert_eq!(p.combined_score(), 0.0);
+    }
+
+    #[test]
+    fn combined_score_weights_correct() {
+        // All ones → 0.25 + 0.25 + 0.30 + 0.20 = 1.0
+        let p = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 1.0,
+            community: 1.0,
+            engagement: 1.0,
+        };
+        assert!((p.combined_score() - 1.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn combined_score_weighted_average() {
+        let p = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
+        assert!((p.combined_score() - 0.5).abs() < 1e-10);
+    }
+
+    #[test]
+    fn combined_score_identity_only() {
+        let p = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 0.0,
+            community: 0.0,
+            engagement: 0.0,
+        };
+        assert!((p.combined_score() - 0.25).abs() < 1e-10);
+    }
+
+    #[test]
+    fn combined_score_community_only() {
+        let p = ConsciousnessProfile {
+            identity: 0.0,
+            reputation: 0.0,
+            community: 1.0,
+            engagement: 0.0,
+        };
+        assert!((p.combined_score() - 0.30).abs() < 1e-10);
+    }
+
+    #[test]
+    fn combined_score_engagement_only() {
+        let p = ConsciousnessProfile {
+            identity: 0.0,
+            reputation: 0.0,
+            community: 0.0,
+            engagement: 1.0,
+        };
+        assert!((p.combined_score() - 0.20).abs() < 1e-10);
+    }
+
+    #[test]
+    fn combined_score_reputation_only() {
+        let p = ConsciousnessProfile {
+            identity: 0.0,
+            reputation: 1.0,
+            community: 0.0,
+            engagement: 0.0,
+        };
+        assert!((p.combined_score() - 0.25).abs() < 1e-10);
+    }
+
+    #[test]
+    fn clamped_clips_values() {
+        let p = ConsciousnessProfile {
+            identity: 1.5,
+            reputation: -0.3,
+            community: 2.0,
+            engagement: -1.0,
+        };
+        let c = p.clamped();
+        assert_eq!(c.identity, 1.0);
+        assert_eq!(c.reputation, 0.0);
+        assert_eq!(c.community, 1.0);
+        assert_eq!(c.engagement, 0.0);
+    }
+
+    #[test]
+    fn clamped_preserves_valid_values() {
+        let p = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.7,
+            community: 0.3,
+            engagement: 0.9,
+        };
+        let c = p.clamped();
+        assert_eq!(c, p);
+    }
+
+    #[test]
+    fn default_is_zero() {
+        assert_eq!(ConsciousnessProfile::default(), ConsciousnessProfile::zero());
+    }
+
+    // -- ConsciousnessTier --
+
+    #[test]
+    fn tier_from_score_boundaries() {
+        assert_eq!(ConsciousnessTier::from_score(0.0), ConsciousnessTier::Observer);
+        assert_eq!(ConsciousnessTier::from_score(0.29), ConsciousnessTier::Observer);
+        assert_eq!(ConsciousnessTier::from_score(0.3), ConsciousnessTier::Participant);
+        assert_eq!(ConsciousnessTier::from_score(0.39), ConsciousnessTier::Participant);
+        assert_eq!(ConsciousnessTier::from_score(0.4), ConsciousnessTier::Citizen);
+        assert_eq!(ConsciousnessTier::from_score(0.59), ConsciousnessTier::Citizen);
+        assert_eq!(ConsciousnessTier::from_score(0.6), ConsciousnessTier::Steward);
+        assert_eq!(ConsciousnessTier::from_score(0.79), ConsciousnessTier::Steward);
+        assert_eq!(ConsciousnessTier::from_score(0.8), ConsciousnessTier::Guardian);
+        assert_eq!(ConsciousnessTier::from_score(1.0), ConsciousnessTier::Guardian);
+    }
+
+    #[test]
+    fn tier_min_scores_are_monotonic() {
+        let tiers = [
+            ConsciousnessTier::Observer,
+            ConsciousnessTier::Participant,
+            ConsciousnessTier::Citizen,
+            ConsciousnessTier::Steward,
+            ConsciousnessTier::Guardian,
+        ];
+        for i in 1..tiers.len() {
+            assert!(
+                tiers[i].min_score() > tiers[i - 1].min_score(),
+                "{:?} min_score should be > {:?} min_score",
+                tiers[i],
+                tiers[i - 1]
+            );
+        }
+    }
+
+    #[test]
+    fn tier_vote_weights_are_progressive() {
+        assert_eq!(ConsciousnessTier::Observer.vote_weight_bp(), 0);
+        assert!(ConsciousnessTier::Participant.vote_weight_bp() > 0);
+        assert!(
+            ConsciousnessTier::Citizen.vote_weight_bp()
+                >= ConsciousnessTier::Participant.vote_weight_bp()
+        );
+        assert!(
+            ConsciousnessTier::Steward.vote_weight_bp()
+                >= ConsciousnessTier::Citizen.vote_weight_bp()
+        );
+        assert!(
+            ConsciousnessTier::Guardian.vote_weight_bp()
+                >= ConsciousnessTier::Steward.vote_weight_bp()
+        );
+    }
+
+    #[test]
+    fn tier_ordering() {
+        assert!(ConsciousnessTier::Observer < ConsciousnessTier::Participant);
+        assert!(ConsciousnessTier::Participant < ConsciousnessTier::Citizen);
+        assert!(ConsciousnessTier::Citizen < ConsciousnessTier::Steward);
+        assert!(ConsciousnessTier::Steward < ConsciousnessTier::Guardian);
+    }
+
+    // -- Profile → Tier integration --
+
+    #[test]
+    fn profile_tier_derivation() {
+        let observer = ConsciousnessProfile::zero();
+        assert_eq!(observer.tier(), ConsciousnessTier::Observer);
+
+        let participant = ConsciousnessProfile {
+            identity: 0.3,
+            reputation: 0.3,
+            community: 0.3,
+            engagement: 0.3,
+        };
+        assert_eq!(participant.tier(), ConsciousnessTier::Participant);
+
+        let citizen = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.4,
+            engagement: 0.2,
+        };
+        // 0.5*0.25 + 0.5*0.25 + 0.4*0.30 + 0.2*0.20 = 0.125+0.125+0.12+0.04 = 0.41
+        assert_eq!(citizen.tier(), ConsciousnessTier::Citizen);
+
+        let steward = ConsciousnessProfile {
+            identity: 0.75,
+            reputation: 0.7,
+            community: 0.6,
+            engagement: 0.5,
+        };
+        // 0.75*0.25 + 0.7*0.25 + 0.6*0.30 + 0.5*0.20 = 0.1875+0.175+0.18+0.10 = 0.6425
+        assert_eq!(steward.tier(), ConsciousnessTier::Steward);
+
+        let guardian = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 0.9,
+            community: 0.8,
+            engagement: 0.7,
+        };
+        // 1.0*0.25 + 0.9*0.25 + 0.8*0.30 + 0.7*0.20 = 0.25+0.225+0.24+0.14 = 0.855
+        assert_eq!(guardian.tier(), ConsciousnessTier::Guardian);
+    }
+
+    // -- evaluate_governance --
+
+    #[test]
+    fn evaluate_observer_rejected_for_basic() {
+        let profile = ConsciousnessProfile::zero();
+        let result = evaluate_governance(&profile, &requirement_for_basic());
+        assert!(!result.eligible);
+        assert_eq!(result.weight_bp, 0);
+        assert_eq!(result.tier, ConsciousnessTier::Observer);
+        assert!(!result.reasons.is_empty());
+    }
+
+    #[test]
+    fn evaluate_participant_passes_basic() {
+        let profile = ConsciousnessProfile {
+            identity: 0.3,
+            reputation: 0.3,
+            community: 0.3,
+            engagement: 0.3,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_basic());
+        assert!(result.eligible);
+        assert_eq!(result.weight_bp, 5000);
+        assert_eq!(result.tier, ConsciousnessTier::Participant);
+        assert!(result.reasons.is_empty());
+    }
+
+    #[test]
+    fn evaluate_participant_rejected_for_voting() {
+        let profile = ConsciousnessProfile {
+            identity: 0.3,
+            reputation: 0.3,
+            community: 0.3,
+            engagement: 0.3,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_voting());
+        assert!(!result.eligible);
+        assert!(!result.reasons.is_empty());
+    }
+
+    #[test]
+    fn evaluate_citizen_passes_voting() {
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.4,
+            engagement: 0.2,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_voting());
+        assert!(result.eligible);
+        assert_eq!(result.weight_bp, 7500); // Citizen weight
+        assert_eq!(result.tier, ConsciousnessTier::Citizen);
+    }
+
+    #[test]
+    fn evaluate_proposal_requires_identity() {
+        // High combined score but zero identity
+        let profile = ConsciousnessProfile {
+            identity: 0.0,
+            reputation: 0.5,
+            community: 0.5,
+            engagement: 0.5,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_proposal());
+        assert!(!result.eligible);
+        assert!(result.reasons.iter().any(|r| r.contains("Identity")));
+    }
+
+    #[test]
+    fn evaluate_constitutional_requires_all() {
+        // Steward tier but low identity
+        let profile = ConsciousnessProfile {
+            identity: 0.3,
+            reputation: 0.8,
+            community: 0.8,
+            engagement: 0.8,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        assert!(!result.eligible);
+        assert!(result.reasons.iter().any(|r| r.contains("Identity")));
+    }
+
+    #[test]
+    fn evaluate_constitutional_requires_community() {
+        // Steward tier, good identity, but low community
+        let profile = ConsciousnessProfile {
+            identity: 0.75,
+            reputation: 0.7,
+            community: 0.1,
+            engagement: 0.8,
+        };
+        // combined = 0.1875+0.175+0.03+0.16 = 0.5525 → Citizen (not Steward!)
+        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        assert!(!result.eligible);
+        // Should fail on tier AND community
+        assert!(result.reasons.iter().any(|r| r.contains("Community") || r.contains("Tier")));
+    }
+
+    #[test]
+    fn evaluate_guardian_passes_constitutional() {
+        let profile = ConsciousnessProfile {
+            identity: 1.0,
+            reputation: 0.9,
+            community: 0.8,
+            engagement: 0.7,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        assert!(result.eligible);
+        assert_eq!(result.weight_bp, 10000);
+        assert_eq!(result.tier, ConsciousnessTier::Guardian);
+    }
+
+    #[test]
+    fn evaluate_clamps_out_of_range_values() {
+        let profile = ConsciousnessProfile {
+            identity: 2.0,
+            reputation: 2.0,
+            community: 2.0,
+            engagement: 2.0,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        assert!(result.eligible);
+        // Clamped to 1.0 each → combined = 1.0 → Guardian
+        assert_eq!(result.tier, ConsciousnessTier::Guardian);
+        assert_eq!(result.profile.identity, 1.0);
+    }
+
+    #[test]
+    fn evaluate_multiple_failure_reasons() {
+        let profile = ConsciousnessProfile::zero();
+        let result = evaluate_governance(&profile, &requirement_for_constitutional());
+        assert!(!result.eligible);
+        // Should fail on tier, identity, and community
+        assert!(result.reasons.len() >= 3, "Expected 3+ reasons, got: {:?}", result.reasons);
+    }
+
+    // -- Progressive weight composition --
+
+    #[test]
+    fn progressive_weight_composition_with_role() {
+        // Simulates hearth-decisions: final_weight = role_bp * consciousness_bp / 10000
+        let citizen_bp: u64 = ConsciousnessTier::Citizen.vote_weight_bp() as u64;
+        let adult_role_bp: u64 = 10000; // Adult
+        let youth_role_bp: u64 = 5000;  // Youth
+
+        let adult_final = (adult_role_bp * citizen_bp / 10000) as u32;
+        let youth_final = (youth_role_bp * citizen_bp / 10000) as u32;
+
+        assert_eq!(adult_final, 7500);
+        assert_eq!(youth_final, 3750);
+    }
+
+    // -- ConsciousnessCredential --
+
+    #[test]
+    fn credential_not_expired_when_fresh() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 1_000_000,
+            expires_at: 1_000_000 + ConsciousnessCredential::DEFAULT_TTL_US,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        assert!(!cred.is_expired(1_000_000));
+        assert!(!cred.is_expired(1_000_000 + ConsciousnessCredential::DEFAULT_TTL_US - 1));
+    }
+
+    #[test]
+    fn credential_expired_at_boundary() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 1_000_000,
+            expires_at: 1_000_000 + ConsciousnessCredential::DEFAULT_TTL_US,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        assert!(cred.is_expired(cred.expires_at));
+        assert!(cred.is_expired(cred.expires_at + 1));
+    }
+
+    #[test]
+    fn default_ttl_is_24_hours() {
+        assert_eq!(ConsciousnessCredential::DEFAULT_TTL_US, 86_400_000_000);
+    }
+
+    // -- Serde roundtrips --
+
+    #[test]
+    fn profile_serde_roundtrip() {
+        let p = ConsciousnessProfile {
+            identity: 0.75,
+            reputation: 0.5,
+            community: 0.6,
+            engagement: 0.3,
+        };
+        let json = serde_json::to_string(&p).unwrap();
+        let p2: ConsciousnessProfile = serde_json::from_str(&json).unwrap();
+        assert_eq!(p, p2);
+    }
+
+    #[test]
+    fn tier_serde_roundtrip() {
+        let tiers = [
+            ConsciousnessTier::Observer,
+            ConsciousnessTier::Participant,
+            ConsciousnessTier::Citizen,
+            ConsciousnessTier::Steward,
+            ConsciousnessTier::Guardian,
+        ];
+        for tier in &tiers {
+            let json = serde_json::to_string(tier).unwrap();
+            let t2: ConsciousnessTier = serde_json::from_str(&json).unwrap();
+            assert_eq!(*tier, t2);
+        }
+    }
+
+    #[test]
+    fn credential_serde_roundtrip() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:abc123".into(),
+            profile: ConsciousnessProfile {
+                identity: 0.5,
+                reputation: 0.6,
+                community: 0.7,
+                engagement: 0.4,
+            },
+            tier: ConsciousnessTier::Steward,
+            issued_at: 1_700_000_000_000_000,
+            expires_at: 1_700_000_000_000_000 + ConsciousnessCredential::DEFAULT_TTL_US,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        let json = serde_json::to_string(&cred).unwrap();
+        let c2: ConsciousnessCredential = serde_json::from_str(&json).unwrap();
+        assert_eq!(c2.did, "did:mycelix:abc123");
+        assert_eq!(c2.tier, ConsciousnessTier::Steward);
+        assert_eq!(c2.profile.identity, 0.5);
+    }
+
+    #[test]
+    fn governance_requirement_serde_roundtrip() {
+        let req = requirement_for_constitutional();
+        let json = serde_json::to_string(&req).unwrap();
+        let r2: GovernanceRequirement = serde_json::from_str(&json).unwrap();
+        assert_eq!(r2.min_tier, ConsciousnessTier::Steward);
+        assert_eq!(r2.min_identity, Some(0.5));
+        assert_eq!(r2.min_community, Some(0.3));
+    }
+
+    #[test]
+    fn governance_eligibility_serde_roundtrip() {
+        let profile = ConsciousnessProfile {
+            identity: 0.5,
+            reputation: 0.5,
+            community: 0.4,
+            engagement: 0.2,
+        };
+        let eligibility = evaluate_governance(&profile, &requirement_for_voting());
+        let json = serde_json::to_string(&eligibility).unwrap();
+        let e2: GovernanceEligibility = serde_json::from_str(&json).unwrap();
+        assert_eq!(e2.eligible, eligibility.eligible);
+        assert_eq!(e2.weight_bp, eligibility.weight_bp);
+        assert_eq!(e2.tier, eligibility.tier);
+    }
+
+    // -- Edge cases --
+
+    #[test]
+    fn negative_values_clamped_to_zero() {
+        let profile = ConsciousnessProfile {
+            identity: -0.5,
+            reputation: -1.0,
+            community: -0.1,
+            engagement: -999.0,
+        };
+        let result = evaluate_governance(&profile, &requirement_for_basic());
+        assert!(!result.eligible);
+        assert_eq!(result.profile.identity, 0.0);
+        assert_eq!(result.profile.reputation, 0.0);
+        assert_eq!(result.profile.community, 0.0);
+        assert_eq!(result.profile.engagement, 0.0);
+    }
+
+    #[test]
+    fn exact_threshold_boundary_participant() {
+        // combined = exactly 0.3
+        let profile = ConsciousnessProfile {
+            identity: 0.3,
+            reputation: 0.3,
+            community: 0.3,
+            engagement: 0.3,
+        };
+        assert_eq!(profile.tier(), ConsciousnessTier::Participant);
+        let result = evaluate_governance(&profile, &requirement_for_basic());
+        assert!(result.eligible);
+    }
+
+    #[test]
+    fn just_below_participant_threshold() {
+        // combined just under 0.3
+        let profile = ConsciousnessProfile {
+            identity: 0.29,
+            reputation: 0.29,
+            community: 0.29,
+            engagement: 0.29,
+        };
+        // 0.29 * (0.25+0.25+0.30+0.20) = 0.29 * 1.0 = 0.29
+        assert_eq!(profile.tier(), ConsciousnessTier::Observer);
+        let result = evaluate_governance(&profile, &requirement_for_basic());
+        assert!(!result.eligible);
+    }
+
+    // -- Requirement presets --
+
+    #[test]
+    fn requirement_presets_are_ordered() {
+        let basic = requirement_for_basic();
+        let proposal = requirement_for_proposal();
+        let voting = requirement_for_voting();
+        let constitutional = requirement_for_constitutional();
+
+        assert!(basic.min_tier <= proposal.min_tier);
+        assert!(proposal.min_tier <= voting.min_tier);
+        assert!(voting.min_tier <= constitutional.min_tier);
+    }
+
+    #[test]
+    fn requirement_identity_thresholds_ordered() {
+        let proposal_id = requirement_for_proposal().min_identity.unwrap_or(0.0);
+        let voting_id = requirement_for_voting().min_identity.unwrap_or(0.0);
+        let const_id = requirement_for_constitutional().min_identity.unwrap_or(0.0);
+
+        assert!(proposal_id <= voting_id || proposal_id <= const_id);
+        assert!(voting_id <= const_id);
+    }
+
+    // -- Credential expiry edge cases --
+
+    #[test]
+    fn credential_not_expired_one_microsecond_before() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 1_000_000,
+            expires_at: 2_000_000,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        assert!(!cred.is_expired(1_999_999));
+    }
+
+    #[test]
+    fn credential_expired_exactly_at_boundary() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 1_000_000,
+            expires_at: 2_000_000,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        // >= means expired at exact boundary
+        assert!(cred.is_expired(2_000_000));
+    }
+
+    #[test]
+    fn credential_expired_one_microsecond_after() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 1_000_000,
+            expires_at: 2_000_000,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        assert!(cred.is_expired(2_000_001));
+    }
+
+    #[test]
+    fn credential_zero_ttl_always_expired() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 1_000_000,
+            expires_at: 1_000_000, // zero TTL
+            issuer: "did:mycelix:issuer".into(),
+        };
+        assert!(cred.is_expired(1_000_000));
+    }
+
+    #[test]
+    fn credential_u64_max_expires_at_not_expired() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 0,
+            expires_at: u64::MAX,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        // Any reasonable timestamp is before u64::MAX
+        assert!(!cred.is_expired(1_700_000_000_000_000));
+    }
+
+    #[test]
+    fn credential_u64_max_expires_at_expired_at_max() {
+        let cred = ConsciousnessCredential {
+            did: "did:mycelix:test".into(),
+            profile: ConsciousnessProfile::zero(),
+            tier: ConsciousnessTier::Observer,
+            issued_at: 0,
+            expires_at: u64::MAX,
+            issuer: "did:mycelix:issuer".into(),
+        };
+        assert!(cred.is_expired(u64::MAX));
+    }
+
+    // -- Progressive weight composition edge cases --
+
+    #[test]
+    fn weight_composition_no_overflow_at_max() {
+        // (10000 * 10000) / 10000 = 10000 — no overflow in u64 intermediate
+        let role_bp: u64 = 10000;
+        let consciousness_bp: u64 = 10000;
+        let result = (role_bp * consciousness_bp / 10000) as u32;
+        assert_eq!(result, 10000);
+    }
+
+    #[test]
+    fn weight_composition_observer_always_zero() {
+        let observer_bp = ConsciousnessTier::Observer.vote_weight_bp() as u64;
+        for role_bp in [0u64, 5000, 10000, u32::MAX as u64] {
+            let result = (role_bp * observer_bp / 10000) as u32;
+            assert_eq!(result, 0, "Observer * role {} should be 0", role_bp);
+        }
+    }
+
+    #[test]
+    fn weight_composition_zero_role_always_zero() {
+        for tier in [
+            ConsciousnessTier::Participant,
+            ConsciousnessTier::Citizen,
+            ConsciousnessTier::Steward,
+            ConsciousnessTier::Guardian,
+        ] {
+            let tier_bp = tier.vote_weight_bp() as u64;
+            let result = (0u64 * tier_bp / 10000) as u32;
+            assert_eq!(result, 0, "Role 0 * {:?} should be 0", tier);
+        }
+    }
+
+    #[test]
+    fn weight_composition_all_tiers_all_standard_roles() {
+        // Standard Mycelix role weights: Youth=5000, Adult=10000, Elder=10000
+        let roles = [(5000u64, "Youth"), (10000u64, "Adult"), (10000u64, "Elder")];
+        let tiers = [
+            (ConsciousnessTier::Observer, 0u32),
+            (ConsciousnessTier::Participant, 5000),
+            (ConsciousnessTier::Citizen, 7500),
+            (ConsciousnessTier::Steward, 10000),
+            (ConsciousnessTier::Guardian, 10000),
+        ];
+        for (role_bp, role_name) in &roles {
+            for (tier, tier_bp) in &tiers {
+                let expected = (*role_bp * *tier_bp as u64 / 10000) as u32;
+                let actual = (*role_bp * tier.vote_weight_bp() as u64 / 10000) as u32;
+                assert_eq!(
+                    actual, expected,
+                    "{} ({}) x {:?} ({}): expected {}, got {}",
+                    role_name, role_bp, tier, tier_bp, expected, actual
+                );
+            }
+        }
+    }
+
+    // -- Tier from_score edge cases --
+
+    #[test]
+    fn tier_from_score_negative_is_observer() {
+        assert_eq!(ConsciousnessTier::from_score(-1.0), ConsciousnessTier::Observer);
+        assert_eq!(ConsciousnessTier::from_score(-0.001), ConsciousnessTier::Observer);
+    }
+
+    #[test]
+    fn tier_from_score_above_one_is_guardian() {
+        assert_eq!(ConsciousnessTier::from_score(1.5), ConsciousnessTier::Guardian);
+        assert_eq!(ConsciousnessTier::from_score(100.0), ConsciousnessTier::Guardian);
+    }
+}

@@ -44,13 +44,19 @@
  */
 
 // ============================================================================
+// Re-exports from shared bridge-routing types
+// ============================================================================
+
+export type { CivicZome, CivicDomain, ConsciousnessCredential, GovernanceEligibility } from '../bridge-routing.js';
+
+// ============================================================================
 // Types
 // ============================================================================
 
 /** Input for cross-domain dispatch via the bridge */
 export interface DispatchInput {
   /** Target zome name (e.g., "justice_cases", "emergency_incidents") */
-  zome: string;
+  zome: import('../bridge-routing.js').CivicZome | string;
   /** Target function name */
   fn_name: string;
   /** MessagePack-encoded payload */
@@ -66,14 +72,14 @@ export interface DispatchResult {
 
 /** Input for an audited cross-domain query */
 export interface CivicQueryInput {
-  domain: 'justice' | 'emergency' | 'media';
+  domain: import('../bridge-routing.js').CivicDomain | string;
   query_type: string;
   params: string;
 }
 
 /** Input for broadcasting a cross-domain event */
 export interface CivicEventInput {
-  domain: 'justice' | 'emergency' | 'media';
+  domain: import('../bridge-routing.js').CivicDomain | string;
   event_type: string;
   payload: string;
   related_hashes?: string[];

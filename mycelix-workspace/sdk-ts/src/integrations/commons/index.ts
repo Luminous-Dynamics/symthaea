@@ -47,10 +47,13 @@
 // Types
 // ============================================================================
 
+/** Re-export typed routing types for convenience */
+export type { CommonsZome, CommonsDomain, ConsciousnessCredential, GovernanceEligibility } from '../bridge-routing.js';
+
 /** Input for cross-domain dispatch via the bridge */
 export interface DispatchInput {
-  /** Target zome name (e.g., "property_registry", "housing_clt") */
-  zome: string;
+  /** Target zome name — typed as CommonsZome for safety, accepts any string for extensibility */
+  zome: import('../bridge-routing.js').CommonsZome | string;
   /** Target function name */
   fn_name: string;
   /** MessagePack-encoded payload (use @msgpack/msgpack to encode) */
@@ -66,14 +69,14 @@ export interface DispatchResult {
 
 /** Input for an audited cross-domain query */
 export interface CommonsQueryInput {
-  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport' | 'support' | 'space';
+  domain: import('../bridge-routing.js').CommonsDomain | string;
   query_type: string;
   params: string;
 }
 
 /** Input for broadcasting a cross-domain event */
 export interface CommonsEventInput {
-  domain: 'property' | 'housing' | 'care' | 'mutualaid' | 'water' | 'food' | 'transport' | 'support' | 'space';
+  domain: import('../bridge-routing.js').CommonsDomain | string;
   event_type: string;
   payload: string;
   related_hashes?: string[];

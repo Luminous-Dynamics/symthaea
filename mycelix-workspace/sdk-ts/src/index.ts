@@ -72,6 +72,9 @@ export * as marketplace from './integrations/marketplace/index.js';
 export * as edunet from './integrations/edunet/index.js';
 export * as supplychain from './integrations/supplychain/index.js';
 
+// Bridge routing types (shared across clusters)
+export * as bridgeRouting from './integrations/bridge-routing.js';
+
 // Core hApp integrations
 export * as governance from './integrations/governance/index.js';
 export * as finance from './integrations/finance/index.js';

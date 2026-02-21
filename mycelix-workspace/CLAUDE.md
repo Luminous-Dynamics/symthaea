@@ -118,7 +118,7 @@ hc dna pack .
 | Identity unit | 23 | Pass (recovery + trust_credential) |
 | Commons cluster unit | 4,126 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation + DoS hardening + link tag validation + delete auth + update bypass fix across all 35 zomes (35/35 integrity tested) |
 | Civic cluster unit | 2,030 | Bridge dispatch + cross-domain + cross-cluster + rate limiting + typed helpers + signals + audit trail + integrity validation + DoS hardening + link tag validation + delete auth + update bypass fix across all 16 zomes |
-| Bridge-common | 55 | Shared dispatch types, allowlist validation, rate limiting, typed helpers, audit trail, cross-cluster emergency |
+| Bridge-common | 212 | Shared dispatch types, allowlist validation, rate limiting, typed helpers, audit trail, cross-cluster emergency, consciousness profile (4D gating, tiers, progressive weights), type-safe routing (53 zome enums, case-insensitive) |
 | SDK cluster integration | 49 | CommonsBridgeClient + CivicBridgeClient + typed convenience + cross-cluster + signal type guards + audit trail |
 | SDK conductor cluster | 22 | Typed convenience, rate limiting, allowlist, audit trail mock tests |
 | Sweettest cross-cluster | 12 | OtherRole dispatch, allowlist enforcement, typed helpers, bidirectional health |

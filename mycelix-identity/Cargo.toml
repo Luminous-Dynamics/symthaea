@@ -49,6 +49,9 @@ bs58 = { version = "0.5", default-features = false, features = ["alloc"] }
 # Crypto-agile abstraction layer
 mycelix-crypto = { path = "crates/mycelix-crypto", default-features = false, features = ["wasm"] }
 
+# Bridge common types (consciousness profile, routing)
+mycelix-bridge-common = { path = "../crates/mycelix-bridge-common" }
+
 # Utilities
 thiserror = "1.0"
 derive_more = "0.99"

@@ -4,10 +4,65 @@
 use hdk::prelude::*;
 use mutualaid_governance_integrity::*;
 use mutualaid_common::{Proposal, Vote};
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal, requirement_for_voting,
+};
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+/// Fetch the calling agent's consciousness credential via the commons bridge
+/// and evaluate it against the given governance requirement.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+
+    let eligibility = evaluate_governance(&credential.profile, requirement);
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
+}
+
+// ============================================================================
+// Extern Functions
+// ============================================================================
 
 /// Create a governance proposal
 #[hdk_extern]
 pub fn create_proposal(proposal: Proposal) -> ExternResult<Record> {
+    // Consciousness gate: Participant tier + identity >= 0.25
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let action_hash = create_entry(&EntryTypes::Proposal(proposal))?;
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created proposal".into())))
@@ -22,6 +77,9 @@ pub fn get_all_proposals(_: ()) -> ExternResult<Vec<Record>> {
 /// Cast a vote on a proposal
 #[hdk_extern]
 pub fn cast_vote(vote: Vote) -> ExternResult<Record> {
+    // Consciousness gate: Citizen tier + identity >= 0.25
+    let _eligibility = require_consciousness(&requirement_for_voting())?;
+
     let action_hash = create_entry(&EntryTypes::Vote(vote))?;
     get(action_hash, GetOptions::default())?
         .ok_or(wasm_error!(WasmErrorInner::Guest("Could not find created vote".into())))

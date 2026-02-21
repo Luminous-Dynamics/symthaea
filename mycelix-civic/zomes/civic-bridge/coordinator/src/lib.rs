@@ -22,6 +22,8 @@ use mycelix_bridge_common::{
     ShelterCapacityQuery, ShelterCapacityResult,
     EmergencyCareQuery, EmergencyCareResult,
     RATE_LIMIT_WINDOW_SECS, check_rate_limit_count,
+    BridgeDomain, CivicZome, resolve_civic_zome,
+    ConsciousnessCredential, ConsciousnessTier,
 };
 
 // ============================================================================
@@ -135,8 +137,11 @@ pub fn query_civic(query: CivicQueryEntry) -> ExternResult<Record> {
     let domain_anchor = ensure_anchor(&format!("domain_queries:{}", query.domain))?;
     create_link(domain_anchor, action_hash.clone(), LinkTypes::DomainToQuery, ())?;
 
-    // Attempt auto-dispatch
-    if let Some(zome_name) = resolve_domain_zome(&query.domain, &query.query_type) {
+    // Attempt auto-dispatch using type-safe routing
+    let target = BridgeDomain::from_str_loose(&query.domain)
+        .and_then(|d| resolve_civic_zome(d, &query.query_type));
+    if let Some(zome) = target {
+        let zome_name = zome.as_str().to_string();
         let payload_bytes = ExternIO::encode(query.params.clone())
             .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
             .0;
@@ -164,33 +169,11 @@ pub fn query_civic(query: CivicQueryEntry) -> ExternResult<Record> {
     )))
 }
 
-/// Map a domain name to its primary coordinator zome for auto-dispatch.
+/// Backward-compatible wrapper — delegates to type-safe routing from bridge-common.
 fn resolve_domain_zome(domain: &str, query_type: &str) -> Option<String> {
-    let zome = match domain {
-        "justice" => match query_type {
-            s if s.contains("evidence") => "justice_evidence",
-            s if s.contains("arbitrat") => "justice_arbitration",
-            s if s.contains("restorative") || s.contains("mediat") => "justice_restorative",
-            s if s.contains("enforce") || s.contains("sanction") => "justice_enforcement",
-            _ => "justice_cases",
-        },
-        "emergency" => match query_type {
-            s if s.contains("triage") || s.contains("priorit") => "emergency_triage",
-            s if s.contains("resource") || s.contains("supply") => "emergency_resources",
-            s if s.contains("coordinat") => "emergency_coordination",
-            s if s.contains("shelter") => "emergency_shelters",
-            s if s.contains("comm") || s.contains("alert") => "emergency_comms",
-            _ => "emergency_incidents",
-        },
-        "media" => match query_type {
-            s if s.contains("attribution") || s.contains("source") => "media_attribution",
-            s if s.contains("fact") || s.contains("check") || s.contains("verify") => "media_factcheck",
-            s if s.contains("curat") || s.contains("recommend") => "media_curation",
-            _ => "media_publication",
-        },
-        _ => return None,
-    };
-    Some(zome.to_string())
+    BridgeDomain::from_str_loose(domain)
+        .and_then(|d| resolve_civic_zome(d, query_type))
+        .map(|z| z.as_str().to_string())
 }
 
 // ============================================================================
@@ -1001,6 +984,98 @@ pub fn get_agent_trust_score(did: String) -> ExternResult<DispatchResult> {
 }
 
 // ============================================================================
+// Consciousness Credential (cross-cluster → identity)
+// ============================================================================
+
+/// Get a consciousness credential for the specified DID.
+///
+/// Cross-cluster call to `identity_bridge.issue_consciousness_credential` to
+/// obtain identity, reputation, and community dimensions, then fills in the
+/// engagement dimension locally from this cluster's activity data (events +
+/// queries in the last 90 days with 30-day half-life exponential decay).
+#[hdk_extern]
+pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    enforce_rate_limit("identity:identity_bridge")?;
+
+    let payload = ExternIO::encode(did)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+        .0;
+    let dispatch = CrossClusterDispatchInput {
+        role: IDENTITY_ROLE.to_string(),
+        zome: "identity_bridge".to_string(),
+        fn_name: "issue_consciousness_credential".to_string(),
+        payload,
+    };
+    let result = bridge::dispatch_call_cross_cluster(&dispatch, ALLOWED_IDENTITY_ZOMES)?;
+
+    if !result.success {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Failed to issue consciousness credential: {}",
+            result.error.unwrap_or_else(|| "unknown".to_string())
+        ))));
+    }
+    let response_bytes = result.response.ok_or_else(|| {
+        wasm_error!(WasmErrorInner::Guest(
+            "Empty response from identity bridge".into()
+        ))
+    })?;
+    let mut credential: ConsciousnessCredential = ExternIO(response_bytes)
+        .decode()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {:?}",
+                e
+            )))
+        })?;
+
+    credential.profile.engagement = calculate_local_engagement()?;
+    credential.tier = ConsciousnessTier::from_score(credential.profile.combined_score());
+
+    Ok(credential)
+}
+
+/// Calculate local engagement score from this cluster's activity.
+fn calculate_local_engagement() -> ExternResult<f64> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let now = sys_time()?;
+    let ninety_days_micros = 90i64 * 24 * 60 * 60 * 1_000_000;
+    let cutoff = Timestamp::from_micros(now.as_micros() - ninety_days_micros);
+    let half_life_micros = 30.0 * 24.0 * 60.0 * 60.0 * 1_000_000.0;
+
+    let mut weighted_count = 0.0f64;
+
+    if let Ok(event_anchor) = anchor_hash(&format!("agent_events:{}", agent)) {
+        if let Ok(event_links) = get_links(
+            LinkQuery::try_new(event_anchor, LinkTypes::AgentToEvent)?,
+            GetStrategy::Local,
+        ) {
+            for link in &event_links {
+                if link.timestamp >= cutoff {
+                    let age_micros = (now.as_micros() - link.timestamp.as_micros()) as f64;
+                    weighted_count += (-age_micros * 0.693 / half_life_micros).exp();
+                }
+            }
+        }
+    }
+
+    if let Ok(query_anchor) = anchor_hash(&format!("agent_queries:{}", agent)) {
+        if let Ok(query_links) = get_links(
+            LinkQuery::try_new(query_anchor, LinkTypes::AgentToQuery)?,
+            GetStrategy::Local,
+        ) {
+            for link in &query_links {
+                if link.timestamp >= cutoff {
+                    let age_micros = (now.as_micros() - link.timestamp.as_micros()) as f64;
+                    weighted_count += (-age_micros * 0.693 / half_life_micros).exp();
+                }
+            }
+        }
+    }
+
+    Ok((weighted_count / 50.0).min(1.0))
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -1596,12 +1671,12 @@ mod tests {
     }
 
     #[test]
-    fn resolve_case_sensitive_domain() {
-        // Domain matching is case-sensitive
-        assert!(resolve_domain_zome("Justice", "file_case").is_none());
-        assert!(resolve_domain_zome("JUSTICE", "file_case").is_none());
-        assert!(resolve_domain_zome("EMERGENCY", "report_incident").is_none());
-        assert!(resolve_domain_zome("Media", "submit_article").is_none());
+    fn resolve_case_insensitive_domain() {
+        // Domain matching is now case-insensitive (fixed via routing module)
+        assert_eq!(resolve_domain_zome("Justice", "file_case").unwrap(), "justice_cases");
+        assert_eq!(resolve_domain_zome("JUSTICE", "file_case").unwrap(), "justice_cases");
+        assert_eq!(resolve_domain_zome("EMERGENCY", "report_incident").unwrap(), "emergency_incidents");
+        assert_eq!(resolve_domain_zome("Media", "submit_article").unwrap(), "media_publication");
     }
 
     #[test]

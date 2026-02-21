@@ -3,11 +3,60 @@
 
 use hdk::prelude::*;
 use housing_governance_integrity::*;
+use mycelix_bridge_common::{
+    ConsciousnessCredential, GovernanceEligibility, GovernanceRequirement,
+    evaluate_governance, requirement_for_proposal, requirement_for_voting,
+    requirement_for_constitutional,
+};
 use std::collections::HashMap;
 
 fn anchor_hash(anchor_str: &str) -> ExternResult<EntryHash> {
     let anchor = Anchor(anchor_str.to_string());
     hash_entry(&EntryTypes::Anchor(anchor))
+}
+
+// ============================================================================
+// Consciousness Gating
+// ============================================================================
+
+/// Fetch the calling agent's consciousness credential via the commons bridge
+/// and evaluate it against the given governance requirement.
+fn require_consciousness(
+    requirement: &GovernanceRequirement,
+) -> ExternResult<GovernanceEligibility> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let did = format!("did:mycelix:{}", agent);
+
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("commons_bridge"),
+        FunctionName::new("get_consciousness_credential"),
+        None,
+        did,
+    )?;
+
+    let credential: ConsciousnessCredential = match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode consciousness credential: {}", e
+            )))
+        })?,
+        other => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Consciousness credential call failed: {:?}", other
+            ))));
+        }
+    };
+
+    let eligibility = evaluate_governance(&credential.profile, requirement);
+    if !eligibility.eligible {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Consciousness gate: tier {:?} insufficient. Reasons: {}",
+            eligibility.tier,
+            eligibility.reasons.join(", ")
+        ))));
+    }
+    Ok(eligibility)
 }
 
 /// Schedule a board meeting
@@ -69,6 +118,9 @@ pub fn record_minutes(input: RecordMinutesInput) -> ExternResult<Record> {
 /// Propose a resolution (optionally tied to a meeting)
 #[hdk_extern]
 pub fn propose_resolution(resolution: Resolution) -> ExternResult<Record> {
+    // Consciousness gate: Participant tier + identity >= 0.25
+    let _eligibility = require_consciousness(&requirement_for_proposal())?;
+
     let action_hash = create_entry(&EntryTypes::Resolution(resolution.clone()))?;
 
     // Link meeting to resolution if applicable
@@ -106,6 +158,9 @@ pub struct VoteOnResolutionInput {
 /// Record votes on a resolution and determine if it passed
 #[hdk_extern]
 pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> {
+    // Consciousness gate: Citizen tier + identity >= 0.25
+    let _eligibility = require_consciousness(&requirement_for_voting())?;
+
     let record = get(input.resolution_hash.clone(), GetOptions::default())?.ok_or(wasm_error!(
         WasmErrorInner::Guest("Resolution not found".into())
     ))?;
@@ -141,6 +196,9 @@ pub fn vote_on_resolution(input: VoteOnResolutionInput) -> ExternResult<Record> 
 /// Adopt a new bylaw
 #[hdk_extern]
 pub fn adopt_bylaw(bylaw: ByLaw) -> ExternResult<Record> {
+    // Consciousness gate: Steward tier + identity >= 0.5 + community >= 0.3
+    let _eligibility = require_consciousness(&requirement_for_constitutional())?;
+
     let action_hash = create_entry(&EntryTypes::ByLaw(bylaw.clone()))?;
 
     create_entry(&EntryTypes::Anchor(Anchor("all_bylaws".to_string())))?;
@@ -176,6 +234,9 @@ pub struct AmendByLawInput {
 /// Amend an existing bylaw (creates a new version)
 #[hdk_extern]
 pub fn amend_bylaw(input: AmendByLawInput) -> ExternResult<Record> {
+    // Consciousness gate: Steward tier + identity >= 0.5 + community >= 0.3
+    let _eligibility = require_consciousness(&requirement_for_constitutional())?;
+
     if input.new_content.is_empty() {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Amended content cannot be empty".into()
@@ -250,6 +311,9 @@ pub fn create_election(election: Election) -> ExternResult<Record> {
 /// Cast a ballot in an election
 #[hdk_extern]
 pub fn cast_ballot(ballot: Ballot) -> ExternResult<Record> {
+    // Consciousness gate: Citizen tier + identity >= 0.25
+    let _eligibility = require_consciousness(&requirement_for_voting())?;
+
     // Verify the election exists and is open
     let election_record = get(ballot.election_hash.clone(), GetOptions::default())?.ok_or(
         wasm_error!(WasmErrorInner::Guest("Election not found".into())),

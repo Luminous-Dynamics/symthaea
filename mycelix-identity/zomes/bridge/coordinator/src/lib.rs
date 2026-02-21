@@ -7,6 +7,9 @@
 
 use hdk::prelude::*;
 use identity_bridge_integrity::*;
+use mycelix_bridge_common::consciousness_profile::{
+    ConsciousnessCredential, ConsciousnessProfile, ConsciousnessTier,
+};
 
 // Local type definition for DID document data we receive from cross-zome calls
 // This mirrors the did_registry_integrity::DidDocument but avoids importing that crate
@@ -603,6 +606,13 @@ fn is_did_deactivated(did: &str) -> ExternResult<bool> {
 /// Report reputation for a DID from another hApp
 #[hdk_extern]
 pub fn report_reputation(input: ReportReputationInput) -> ExternResult<Record> {
+    // Validate DID format
+    if !input.did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format — must start with did:mycelix:".into()
+        )));
+    }
+
     // Validate score bounds
     if input.score < 0.0 || input.score > 1.0 {
         return Err(wasm_error!(WasmErrorInner::Guest(
@@ -1298,6 +1308,207 @@ pub struct MfaAssuranceLevelResult {
     pub assurance_score: f64,
     pub factor_count: u32,
     pub fl_eligible: bool,
+}
+
+// ==================== CONSCIOUSNESS CREDENTIAL ISSUANCE ====================
+
+/// Issue a consciousness credential for a DID.
+///
+/// Aggregates identity (MFA), reputation, and community trust dimensions
+/// into a `ConsciousnessProfile`. The engagement dimension is left at 0.0 —
+/// the calling cluster bridge fills it in locally from its own DHT data.
+#[hdk_extern]
+pub fn issue_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    if !did.starts_with("did:mycelix:") {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Invalid DID format — must start with did:mycelix:".into()
+        )));
+    }
+
+    // 1. Identity dimension — from MFA assurance level
+    let identity_score = get_mfa_assurance_for_did(&did)?;
+
+    // 2. Reputation dimension — existing aggregated reputation
+    let reputation_score = get_aggregated_reputation(&did)?;
+
+    // 3. Community dimension — aggregated peer trust credentials
+    let community_score = get_community_trust_score(&did)?;
+
+    // 4. Engagement is 0.0 here — caller's bridge fills it in locally
+    let profile = ConsciousnessProfile {
+        identity: identity_score,
+        reputation: reputation_score,
+        community: community_score,
+        engagement: 0.0,
+    };
+
+    let tier = ConsciousnessTier::from_score(profile.combined_score());
+    let now = sys_time()?;
+    let now_us = now.as_micros() as u64;
+
+    Ok(ConsciousnessCredential {
+        did,
+        profile,
+        tier,
+        issued_at: now_us,
+        expires_at: now_us + ConsciousnessCredential::DEFAULT_TTL_US,
+        issuer: format!("did:mycelix:{}", agent_info()?.agent_initial_pubkey),
+    })
+}
+
+/// Compute a community trust score for a DID from peer trust credentials.
+///
+/// Queries all non-revoked, non-expired trust credentials where
+/// `subject_did == did`, weighted by attestor tier (higher-consciousness
+/// peers count more). Returns a 0.0–1.0 score.
+fn get_community_trust_score(did: &str) -> ExternResult<f64> {
+    // Call trust_credential zome to get credentials for this subject
+    let response = call(
+        CallTargetCell::Local,
+        ZomeName::new("trust_credential"),
+        FunctionName::new("get_subject_credentials"),
+        None,
+        did.to_string(),
+    )?;
+
+    let credential_records: Vec<Record> = match response {
+        ZomeCallResponse::Ok(result) => result.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode get_subject_credentials response: {:?}",
+                e
+            )))
+        })?,
+        ZomeCallResponse::Unauthorized(_, _, _, _)
+        | ZomeCallResponse::AuthenticationFailed(_, _) => {
+            return Ok(0.0);
+        }
+        ZomeCallResponse::NetworkError(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Network error calling trust_credential zome: {}",
+                err
+            ))));
+        }
+        ZomeCallResponse::CountersigningSession(err) => {
+            return Err(wasm_error!(WasmErrorInner::Guest(format!(
+                "Countersigning error: {}",
+                err
+            ))));
+        }
+    };
+
+    if credential_records.is_empty() {
+        return Ok(0.0);
+    }
+
+    let now = sys_time()?;
+    let now_micros = now.as_micros() as f64;
+    let mut total_weight = 0.0f64;
+    let mut weighted_sum = 0.0f64;
+
+    for record in &credential_records {
+        // Decode TrustCredential from the record — uses the integrity types
+        // imported via trust_credential_integrity (available in this DNA)
+        let cred_data: Option<serde_json::Value> = record
+            .entry()
+            .as_option()
+            .map(|entry| {
+                serde_json::from_slice(
+                    &holochain_serialized_bytes::encode(entry)
+                        .unwrap_or_default(),
+                )
+                .ok()
+            })
+            .flatten();
+
+        if let Some(cred) = cred_data {
+            // Skip revoked or self-attested (issuer == subject)
+            let revoked = cred.get("revoked").and_then(|v| v.as_bool()).unwrap_or(true);
+            if revoked {
+                continue;
+            }
+
+            let subject = cred.get("subject_did").and_then(|v| v.as_str()).unwrap_or("");
+            let issuer = cred.get("issuer_did").and_then(|v| v.as_str()).unwrap_or("");
+            if subject == issuer {
+                // Self-attestation: weight at 0.1 (low trust)
+                // but still count it
+            }
+
+            // Check expiry
+            if let Some(expires) = cred.get("expires_at") {
+                if let Some(exp_micros) = expires.get("0").and_then(|v| v.as_i64()) {
+                    if (exp_micros as f64) < now_micros {
+                        continue; // Expired
+                    }
+                }
+            }
+
+            // Get trust score from range midpoint
+            let score = cred
+                .get("trust_score_range")
+                .and_then(|r| {
+                    let lower = r.get("lower").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let upper = r.get("upper").and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    Some((lower + upper) / 2.0)
+                })
+                .unwrap_or(0.0);
+
+            // Weight by attestor tier — higher tiers count more
+            let is_self_attest = subject == issuer;
+            let attestor_weight = if is_self_attest {
+                0.1 // Self-attestation has low weight
+            } else {
+                // Weight based on the credential's trust tier
+                match cred.get("trust_tier").and_then(|v| v.as_str()) {
+                    Some("Guardian") => 2.0,
+                    Some("Elevated") => 1.5,
+                    Some("Standard") => 1.0,
+                    Some("Basic") => 0.5,
+                    _ => 0.3,
+                }
+            };
+
+            // Apply time decay (same 30-day half-life as reputation)
+            let issued_micros = cred
+                .get("issued_at")
+                .and_then(|v| v.get("0").and_then(|v| v.as_i64()))
+                .unwrap_or(0) as f64;
+            let age_micros = (now_micros - issued_micros).max(0.0);
+            let decay =
+                (-age_micros / REPUTATION_HALF_LIFE_MICROS * core::f64::consts::LN_2).exp();
+
+            let effective_weight = attestor_weight * decay;
+            weighted_sum += score * effective_weight;
+            total_weight += effective_weight;
+        }
+    }
+
+    if total_weight < f64::EPSILON {
+        Ok(0.0)
+    } else {
+        Ok((weighted_sum / total_weight).clamp(0.0, 1.0))
+    }
+}
+
+// ==================== HEALTH CHECK ====================
+
+/// Identity bridge health check — returns basic operational status.
+#[hdk_extern]
+pub fn health_check(_: ()) -> ExternResult<IdentityBridgeHealth> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    Ok(IdentityBridgeHealth {
+        healthy: true,
+        agent: format!("{}", agent),
+        api_version: API_VERSION,
+    })
+}
+
+/// Identity bridge health status.
+#[derive(Serialize, Deserialize, Debug)]
+pub struct IdentityBridgeHealth {
+    pub healthy: bool,
+    pub agent: String,
+    pub api_version: u16,
 }
 
 #[cfg(test)]
