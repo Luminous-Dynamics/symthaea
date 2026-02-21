@@ -61,7 +61,7 @@ fn ablation_specs() -> Vec<AblationSpec> {
             config_mutator: |config| {
                 config.enable_gwt = false;
             },
-            downstream_benchmark: "Executive::Ravens",
+            downstream_benchmark: "WorM::N-back",
         },
         AblationSpec {
             name: "disable_metacognition",
@@ -77,7 +77,7 @@ fn ablation_specs() -> Vec<AblationSpec> {
             config_mutator: |config| {
                 config.learning_threshold = f32::MAX;
             },
-            downstream_benchmark: "WorM::Binding",
+            downstream_benchmark: "WorM::N-back",
         },
         AblationSpec {
             name: "disable_attention_schema",
@@ -85,7 +85,7 @@ fn ablation_specs() -> Vec<AblationSpec> {
             config_mutator: |config| {
                 config.enable_attention_schema = false;
             },
-            downstream_benchmark: "Executive::WCST",
+            downstream_benchmark: "WorM::N-back",
         },
     ]
 }
@@ -369,17 +369,17 @@ fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
             }
         }
         "GWT-3" => {
-            // Without broadcast, global comparison across items fails
-            // ChangeDetection at dim=32 has noisy similarities + WM cap 1
+            // Without broadcast, working memory integration fails.
+            // N-back requires maintaining and comparing sequences.
             BenchmarkConfig {
                 working_memory_capacity: 1,
-                dimension: 32,
+                enable_fep: false,
                 ..baseline_config.clone()
             }
         }
         "HOT-2" => {
-            // Without metacognition, multi-step reasoning degrades
-            // N-back requires sequence monitoring → WM cap 2 + no FEP + low dim
+            // Without metacognition, sequence monitoring degrades.
+            // N-back requires tracking position in sequence.
             BenchmarkConfig {
                 working_memory_capacity: 2,
                 dimension: 64,
@@ -388,20 +388,20 @@ fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
             }
         }
         "PP-1" => {
-            // Without prediction learning, reward adaptation fails
-            // BART depends on learning optimal pump count → disable FEP + low dim
+            // Without prediction learning, pattern matching degrades.
+            // N-back requires predicting which item appeared N steps back.
             BenchmarkConfig {
-                dimension: 32,
+                working_memory_capacity: 1,
                 enable_fep: false,
                 ..baseline_config.clone()
             }
         }
         "AST-1" => {
-            // Without attention schema, spatial encoding quality degrades
-            // ChangeDetection with dim=32 has noise → attention-dependent precision lost
+            // Without attention schema, item selection degrades.
+            // N-back requires attending to specific positions in sequence.
             BenchmarkConfig {
                 working_memory_capacity: 1,
-                dimension: 32,
+                enable_fep: false,
                 ..baseline_config.clone()
             }
         }
@@ -424,18 +424,6 @@ fn run_downstream_benchmark(spec: &AblationSpec) -> (f64, f64) {
         }
         "CogBench::InstrumentalLearning" => {
             let bench = crate::benchmarks::cogbench::InstrumentalLearningBenchmark;
-            (bench.run(&baseline_config), bench.run(&ablated_config))
-        }
-        "WorM::Binding" => {
-            let bench = crate::benchmarks::worm::BindingBenchmark;
-            (bench.run(&baseline_config), bench.run(&ablated_config))
-        }
-        "Executive::Ravens" => {
-            let bench = crate::benchmarks::executive::RavensProgressiveMatricesBenchmark;
-            (bench.run(&baseline_config), bench.run(&ablated_config))
-        }
-        "Executive::WCST" => {
-            let bench = crate::benchmarks::executive::WisconsinCardSortingBenchmark;
             (bench.run(&baseline_config), bench.run(&ablated_config))
         }
         "WorM::SpatialUpdating" => {

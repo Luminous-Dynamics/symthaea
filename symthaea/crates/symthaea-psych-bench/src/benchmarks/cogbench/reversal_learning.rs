@@ -48,7 +48,8 @@ impl ReversalLearningBenchmark {
 
         let criterion = 8; // consecutive correct to trigger reversal
         let max_trials = 200;
-        let learning_rate = 0.25f32; // how fast associations update
+        let learning_rate = 0.4f32; // how fast associations update (faster = quicker reversal detection)
+        let loss_learning_rate = 0.5f32; // asymmetric: losses update faster than wins
 
         // Current contingency: true = A rewarded, false = B rewarded
         let mut a_rewarded = true;
@@ -77,7 +78,7 @@ impl ReversalLearningBenchmark {
             let score_b = assoc_b.similarity(&reward_hv) as f64;
 
             // Softmax action selection
-            let temp = config.action_temperature.max(0.1) as f64 * 0.3;
+            let temp = config.action_temperature.max(0.1) as f64 * 0.15;
             let max_score = score_a.max(score_b);
             let exp_a = ((score_a - max_score) / temp).exp();
             let exp_b = ((score_b - max_score) / temp).exp();
@@ -126,30 +127,31 @@ impl ReversalLearningBenchmark {
             prev_choice = Some(chose_a);
             prev_rewarded = Some(rewarded);
 
+            // Asymmetric learning: losses update faster than wins
+            // (Behrens et al. 2007 — loss-driven flexibility)
+            let lr = if rewarded { learning_rate } else { loss_learning_rate };
             if chose_a {
                 if rewarded {
-                    // Strengthen A → reward association
                     assoc_a = ContinuousHV::weighted_bundle(
                         &[&assoc_a, &reward_hv],
-                        &[1.0 - learning_rate, learning_rate],
+                        &[1.0 - lr, lr],
                     );
                 } else {
-                    // Strengthen A → no-reward association
                     assoc_a = ContinuousHV::weighted_bundle(
                         &[&assoc_a, &no_reward_hv],
-                        &[1.0 - learning_rate, learning_rate],
+                        &[1.0 - lr, lr],
                     );
                 }
             } else {
                 if rewarded {
                     assoc_b = ContinuousHV::weighted_bundle(
                         &[&assoc_b, &reward_hv],
-                        &[1.0 - learning_rate, learning_rate],
+                        &[1.0 - lr, lr],
                     );
                 } else {
                     assoc_b = ContinuousHV::weighted_bundle(
                         &[&assoc_b, &no_reward_hv],
-                        &[1.0 - learning_rate, learning_rate],
+                        &[1.0 - lr, lr],
                     );
                 }
             }

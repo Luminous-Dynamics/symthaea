@@ -98,7 +98,7 @@ impl WisconsinCardSortingBenchmark {
         // Explicit hypothesis testing: 3 rule confidences [color, shape, number]
         let mut rule_confidence = [1.0f64, 0.0, 0.0]; // Start believing color
         let lr_correct = 0.2; // Moderate reinforcement (lower cap = less needed)
-        let lr_error = 0.5;   // Error penalty (additive)
+        let lr_error = 0.8;   // Stronger error penalty for faster set-shifting
 
         let all_colors = [Color::Red, Color::Blue, Color::Green, Color::Yellow];
         let all_shapes = [Shape::Triangle, Shape::Circle, Shape::Square, Shape::Star];
@@ -135,7 +135,7 @@ impl WisconsinCardSortingBenchmark {
 
             // Softmax over rule confidences for stochastic selection
             let max_conf = rule_confidence.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
-            let exp_conf: Vec<f64> = rule_confidence.iter().map(|c| ((c - max_conf) * 3.0).exp()).collect();
+            let exp_conf: Vec<f64> = rule_confidence.iter().map(|c| ((c - max_conf) * 1.5).exp()).collect();
             let exp_sum: f64 = exp_conf.iter().sum();
 
             rng ^= rng << 13;
@@ -217,10 +217,10 @@ impl WisconsinCardSortingBenchmark {
                 prev_rule = Some(current_rule);
                 current_rule = current_rule.cycle();
                 consecutive_correct = 0;
-                // Dampen all confidences after category completion.
+                // Strongly dampen all confidences after category completion.
                 // Agent "expects" rule may change, reducing perseveration.
                 for c in &mut rule_confidence {
-                    *c *= 0.5;
+                    *c *= 0.25;
                 }
             }
         }
