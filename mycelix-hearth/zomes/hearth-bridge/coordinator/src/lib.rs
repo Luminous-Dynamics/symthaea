@@ -712,16 +712,84 @@ pub fn health_check(_: ()) -> ExternResult<BridgeHealth> {
 // Consciousness Credential (cross-cluster → identity)
 // ============================================================================
 
+/// 10-minute cache TTL for consciousness credentials (in microseconds).
+const CREDENTIAL_CACHE_TTL_US: i64 = 600_000_000;
+
+/// Check for a cached consciousness credential that is still valid (< 10 min old).
+fn get_cached_credential(did: &str) -> ExternResult<Option<ConsciousnessCredential>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let links = get_links(
+        LinkQuery::try_new(agent, LinkTypes::AgentToCredentialCache)?,
+        GetStrategy::Local,
+    )?;
+
+    if links.is_empty() {
+        return Ok(None);
+    }
+
+    let link = links.into_iter().max_by_key(|l| l.timestamp).unwrap();
+    let target = link.target.into_action_hash().ok_or_else(||
+        wasm_error!(WasmErrorInner::Guest("Invalid credential cache link target".into())))?;
+
+    if let Some(record) = get(target, GetOptions::default())? {
+        let cached: CachedCredentialEntry = record.entry()
+            .to_app_option()
+            .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
+            .ok_or_else(|| wasm_error!(WasmErrorInner::Guest("No entry in cached credential record".into())))?;
+
+        if cached.did == did {
+            let now = sys_time()?.as_micros();
+            if now - cached.cached_at_us < CREDENTIAL_CACHE_TTL_US {
+                let credential: ConsciousnessCredential = serde_json::from_str(&cached.credential_json)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+                        "Credential cache decode error: {}", e
+                    ))))?;
+                return Ok(Some(credential));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Store a consciousness credential in the local cache.
+fn cache_credential(credential: &ConsciousnessCredential) -> ExternResult<()> {
+    let now = sys_time()?.as_micros();
+    let json = serde_json::to_string(credential)
+        .map_err(|e| wasm_error!(WasmErrorInner::Guest(format!(
+            "Credential cache encode error: {}", e
+        ))))?;
+
+    let entry = CachedCredentialEntry {
+        did: credential.did.clone(),
+        credential_json: json,
+        cached_at_us: now,
+    };
+
+    let action_hash = create_entry(&EntryTypes::CachedCredential(entry))?;
+    let agent = agent_info()?.agent_initial_pubkey;
+    create_link(agent, action_hash, LinkTypes::AgentToCredentialCache, ())?;
+
+    Ok(())
+}
+
 /// Get a consciousness credential for the specified DID.
 ///
-/// Cross-cluster call to `identity_bridge.issue_consciousness_credential` to
+/// First checks the local cache (10-minute TTL). On cache miss, makes a
+/// cross-cluster call to `identity_bridge.issue_consciousness_credential` to
 /// obtain identity, reputation, and community dimensions, then fills in the
-/// engagement dimension locally from this cluster's activity data (events +
-/// queries in the last 90 days with 30-day half-life exponential decay).
+/// engagement dimension locally from this cluster's activity data.
+/// The result is cached for subsequent calls.
 #[hdk_extern]
 pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCredential> {
+    // 1. Check cache first (avoids cross-cluster call if recent)
+    if let Some(cached) = get_cached_credential(&did)? {
+        return Ok(cached);
+    }
+
     enforce_rate_limit("identity:identity_bridge")?;
 
+    // 2. Cross-cluster call to identity: issue_consciousness_credential
     let payload = ExternIO::encode(did)
         .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))?
         .0;
@@ -753,8 +821,14 @@ pub fn get_consciousness_credential(did: String) -> ExternResult<ConsciousnessCr
             )))
         })?;
 
+    // 3. Fill in engagement dimension locally
     credential.profile.engagement = calculate_local_engagement()?;
+
+    // 4. Recalculate tier with engagement included
     credential.tier = ConsciousnessTier::from_score(credential.profile.combined_score());
+
+    // 5. Cache the result for subsequent calls
+    let _ = cache_credential(&credential);
 
     Ok(credential)
 }

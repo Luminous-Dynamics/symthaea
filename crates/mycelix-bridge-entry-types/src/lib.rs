@@ -94,6 +94,60 @@ impl TryFrom<&Entry> for BridgeEventEntry {
 }
 
 // ============================================================================
+// Cached credential entry
+// ============================================================================
+
+/// Cached consciousness credential stored on the agent's source chain.
+///
+/// Stores the serialized `ConsciousnessCredential` (from bridge-common) as JSON
+/// to avoid a circular dependency. The coordinator layer (which has both deps)
+/// handles serialization/deserialization.
+///
+/// TTL checking is done at the coordinator level — integrity only validates
+/// structural constraints.
+#[derive(Clone, PartialEq, Serialize, Deserialize, Debug, SerializedBytes)]
+pub struct CachedCredentialEntry {
+    /// The DID this credential was issued for
+    pub did: String,
+    /// Serialized ConsciousnessCredential as JSON
+    pub credential_json: String,
+    /// When this cache entry was stored (microseconds since epoch)
+    pub cached_at_us: i64,
+}
+
+impl TryFrom<&Entry> for CachedCredentialEntry {
+    type Error = WasmError;
+    fn try_from(entry: &Entry) -> Result<Self, Self::Error> {
+        match entry {
+            Entry::App(bytes) => {
+                let sb = SerializedBytes::from(UnsafeBytes::from(bytes.bytes().to_vec()));
+                <Self as TryFrom<SerializedBytes>>::try_from(sb)
+                    .map_err(|e| wasm_error!(WasmErrorInner::Guest(e.to_string())))
+            }
+            _ => Err(wasm_error!(WasmErrorInner::Guest(
+                "Not an app entry".into(),
+            ))),
+        }
+    }
+}
+
+/// Validate a cached credential entry.
+///
+/// Returns `Ok(())` if valid, or `Err(reason)` if invalid.
+pub fn validate_cached_credential(entry: &CachedCredentialEntry) -> Result<(), String> {
+    if entry.did.is_empty() {
+        return Err("Cached credential DID cannot be empty".into());
+    }
+    if entry.credential_json.is_empty() {
+        return Err("Cached credential JSON cannot be empty".into());
+    }
+    if entry.credential_json.len() > 16384 {
+        return Err("Cached credential JSON too large (max 16384 bytes)".into());
+    }
+    Ok(())
+}
+
+// ============================================================================
 // Validation helpers
 // ============================================================================
 
@@ -547,6 +601,74 @@ mod tests {
         assert_eq!(q2.query_type, "");
         assert_eq!(q2.params, "");
         assert_eq!(q, q2);
+    }
+
+    // ---- CachedCredentialEntry validation ----
+
+    fn make_cached_credential(did: &str, json: &str) -> CachedCredentialEntry {
+        CachedCredentialEntry {
+            did: did.into(),
+            credential_json: json.into(),
+            cached_at_us: 1_000_000,
+        }
+    }
+
+    #[test]
+    fn cached_credential_valid() {
+        let c = make_cached_credential("did:mycelix:abc123", r#"{"profile":{}}"#);
+        assert!(validate_cached_credential(&c).is_ok());
+    }
+
+    #[test]
+    fn cached_credential_empty_did_rejected() {
+        let c = make_cached_credential("", r#"{"profile":{}}"#);
+        let err = validate_cached_credential(&c).unwrap_err();
+        assert!(err.contains("DID cannot be empty"));
+    }
+
+    #[test]
+    fn cached_credential_empty_json_rejected() {
+        let c = make_cached_credential("did:mycelix:abc", "");
+        let err = validate_cached_credential(&c).unwrap_err();
+        assert!(err.contains("JSON cannot be empty"));
+    }
+
+    #[test]
+    fn cached_credential_oversized_json_rejected() {
+        let big = "x".repeat(16385);
+        let c = make_cached_credential("did:mycelix:abc", &big);
+        let err = validate_cached_credential(&c).unwrap_err();
+        assert!(err.contains("16384"));
+    }
+
+    #[test]
+    fn cached_credential_at_json_boundary_accepted() {
+        let json = "x".repeat(16384);
+        let c = make_cached_credential("did:mycelix:abc", &json);
+        assert!(validate_cached_credential(&c).is_ok());
+    }
+
+    #[test]
+    fn cached_credential_serde_roundtrip() {
+        let c = make_cached_credential(
+            "did:mycelix:agent123",
+            r#"{"did":"did:mycelix:agent123","profile":{"identity":0.5}}"#,
+        );
+        let bytes = serde_json::to_vec(&c).unwrap();
+        let c2: CachedCredentialEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(c, c2);
+    }
+
+    #[test]
+    fn cached_credential_negative_timestamp_roundtrip() {
+        let c = CachedCredentialEntry {
+            did: "did:mycelix:test".into(),
+            credential_json: "{}".into(),
+            cached_at_us: -1,
+        };
+        let bytes = serde_json::to_vec(&c).unwrap();
+        let c2: CachedCredentialEntry = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(c.cached_at_us, c2.cached_at_us);
     }
 
     #[test]

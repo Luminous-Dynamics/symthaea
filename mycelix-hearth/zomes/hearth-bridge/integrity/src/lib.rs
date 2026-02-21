@@ -4,7 +4,10 @@
 //! Uses shared bridge entry types from mycelix-bridge-entry-types.
 
 use hdi::prelude::*;
-use mycelix_bridge_entry_types::{BridgeEventEntry, BridgeQueryEntry};
+use mycelix_bridge_entry_types::{
+    BridgeEventEntry, BridgeQueryEntry, validate_cached_credential,
+};
+pub use mycelix_bridge_entry_types::CachedCredentialEntry;
 
 /// Anchor entry for deterministic link bases.
 #[hdk_entry_helper]
@@ -23,6 +26,7 @@ pub enum EntryTypes {
     Anchor(Anchor),
     BridgeQuery(BridgeQueryEntry),
     BridgeEvent(BridgeEventEntry),
+    CachedCredential(CachedCredentialEntry),
 }
 
 #[hdk_link_types]
@@ -34,6 +38,7 @@ pub enum LinkTypes {
     AgentToEvent,
     DomainToEvent,
     DispatchRateLimit,
+    AgentToCredentialCache,
 }
 
 #[hdk_extern]
@@ -51,11 +56,13 @@ pub fn validate(op: Op) -> ExternResult<ValidateCallbackResult> {
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             EntryTypes::BridgeQuery(query) => validate_query(&query),
             EntryTypes::BridgeEvent(event) => validate_event(&event),
+            EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
         },
         FlatOp::StoreEntry(OpEntry::UpdateEntry { app_entry, .. }) => match app_entry {
             EntryTypes::Anchor(_) => Ok(ValidateCallbackResult::Valid),
             EntryTypes::BridgeQuery(query) => validate_query(&query),
             EntryTypes::BridgeEvent(event) => validate_event(&event),
+            EntryTypes::CachedCredential(cred) => validate_credential_cache(&cred),
         },
         FlatOp::StoreEntry(_) => Ok(ValidateCallbackResult::Valid),
         _ => Ok(ValidateCallbackResult::Valid),
@@ -90,6 +97,13 @@ fn validate_query(query: &BridgeQueryEntry) -> ExternResult<ValidateCallbackResu
         )));
     }
     Ok(ValidateCallbackResult::Valid)
+}
+
+fn validate_credential_cache(cred: &CachedCredentialEntry) -> ExternResult<ValidateCallbackResult> {
+    match validate_cached_credential(cred) {
+        Ok(()) => Ok(ValidateCallbackResult::Valid),
+        Err(msg) => Ok(ValidateCallbackResult::Invalid(msg)),
+    }
 }
 
 fn validate_event(event: &BridgeEventEntry) -> ExternResult<ValidateCallbackResult> {
