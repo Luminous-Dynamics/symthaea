@@ -393,6 +393,10 @@ pub mod gui_bridge;
 #[cfg(feature = "physics")]
 pub mod physics;
 
+// Flight: HDC-LTC + FEP Active Inference quadrotor flight control
+#[cfg(feature = "flight")]
+pub use symthaea_flight as flight;
+
 // Meta: Self-analysis, code quality metrics, active inference exploration, dream synthesis
 #[cfg(feature = "code_generation")]
 pub mod meta;
