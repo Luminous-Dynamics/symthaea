@@ -55,13 +55,14 @@ fn test_continuous_mind_perceive_fills_working_memory() {
     let mut mind = ContinuousMind::new(config);
     mind.awaken();
 
-    // Perceive several items
+    // Perceive several items and tick to process them into working memory
     for i in 0..5 {
         let hv = symthaea::symthaea_core::hdc::unified_hv::ContinuousHV::random(
             symthaea::symthaea_core::hdc::HDC_DIMENSION,
             i as u64,
         );
         mind.perceive(hv);
+        mind.tick();
     }
 
     // Working memory should have items
@@ -82,13 +83,14 @@ fn test_continuous_mind_eviction() {
     let mut mind = ContinuousMind::new(config);
     mind.awaken();
 
-    // Perceive more items than capacity
+    // Perceive more items than capacity, ticking each to process
     for i in 0..6 {
         let hv = symthaea::symthaea_core::hdc::unified_hv::ContinuousHV::random(
             symthaea::symthaea_core::hdc::HDC_DIMENSION,
             i as u64,
         );
         mind.perceive(hv);
+        mind.tick();
     }
 
     // Should have evicted items
@@ -186,12 +188,13 @@ fn test_continuous_mind_goals() {
     let mut mind = ContinuousMind::new(config);
     mind.awaken();
 
-    // Set a goal
+    // Set a goal and tick to process it
     let goal_embedding = symthaea::symthaea_core::hdc::unified_hv::ContinuousHV::random(
         symthaea::symthaea_core::hdc::HDC_DIMENSION,
         99,
     );
     mind.set_goal("Test goal", goal_embedding, 0.8);
+    mind.tick();
 
     // Should have active goals
     let goals = mind.active_goals();
