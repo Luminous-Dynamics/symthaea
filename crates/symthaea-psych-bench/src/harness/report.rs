@@ -674,22 +674,23 @@ mod tests {
     #[test]
     fn test_cognitive_profile_domains_present() {
         let mut report = BenchmarkReport::new();
-        let mut r1 = BenchmarkResult::new("WorM::N-back", None);
-        r1.insert("nback_2::accuracy", MetricValue::from_samples(&[0.9, 0.85]));
+        // Use benchmark names/metrics that map through key_metric_for_benchmark + baselines
+        let mut r1 = BenchmarkResult::new("WorM::DigitSpan", None);
+        r1.insert("forward_span", MetricValue::from_samples(&[6.0, 6.5]));
         report.add(r1);
-        let mut r2 = BenchmarkResult::new("Executive::WCST", None);
-        r2.insert("categories_completed", MetricValue::from_samples(&[5.0, 4.5]));
+        let mut r2 = BenchmarkResult::new("Executive::Stroop", None);
+        r2.insert("stroop_effect", MetricValue::from_samples(&[0.08, 0.09]));
         report.add(r2);
         let profile = report.cognitive_profile();
-        assert!(profile.contains_key("WorM"));
-        assert!(profile.contains_key("Executive"));
+        assert!(profile.contains_key("WorM"), "profile: {:?}", profile);
+        assert!(profile.contains_key("Executive"), "profile: {:?}", profile);
     }
 
     #[test]
     fn test_cognitive_profile_values_clamped() {
         let mut report = BenchmarkReport::new();
-        let mut r = BenchmarkResult::new("WorM::N-back", None);
-        r.insert("nback_2::accuracy", MetricValue::from_samples(&[2.0, 1.8])); // way above human
+        let mut r = BenchmarkResult::new("WorM::DigitSpan", None);
+        r.insert("forward_span", MetricValue::from_samples(&[20.0, 18.0])); // way above human
         report.add(r);
         let profile = report.cognitive_profile();
         for (_, &score) in &profile {
@@ -700,13 +701,13 @@ mod tests {
     #[test]
     fn test_format_profile_non_empty() {
         let mut report = BenchmarkReport::new();
-        let mut r = BenchmarkResult::new("WorM::N-back", None);
-        r.insert("nback_2::accuracy", MetricValue::from_samples(&[0.85]));
+        let mut r = BenchmarkResult::new("WorM::DigitSpan", None);
+        r.insert("forward_span", MetricValue::from_samples(&[6.5]));
         report.add(r);
         let output = report.format_profile();
         assert!(!output.is_empty());
-        assert!(output.contains("Cognitive Profile"));
-        assert!(output.contains("WorM"));
+        assert!(output.contains("Cognitive Profile"), "output: {}", output);
+        assert!(output.contains("WorM"), "output: {}", output);
     }
 
     #[test]

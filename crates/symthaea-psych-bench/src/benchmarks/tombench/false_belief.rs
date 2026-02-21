@@ -185,7 +185,10 @@ impl FalseBeliefBenchmark {
         let belief_hv = adapter.encode(&Scenario::new(scenario.belief_location), dim);
         let reality_hv = adapter.encode(&Scenario::new(scenario.reality_location), dim);
 
-        let agent = agent_belief.unwrap();
+        let Some(agent) = agent_belief else {
+            // No setup sentences; fall back to structural score only
+            return if structural_score > 0.0 { 1.0 } else { 0.0 };
+        };
         let belief_sim = agent.similarity(&belief_hv);
         let reality_sim = agent.similarity(&reality_hv);
         let geo_signal = (belief_sim - reality_sim) as f64;
