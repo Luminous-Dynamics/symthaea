@@ -297,11 +297,8 @@ impl CognitiveLoopService {
         // When enabled, feed prediction error to surprise bridge. If surprise
         // exceeds the adaptive threshold, lower the boredom threshold to
         // encourage exploration of novel states.
-        let mut surprise_triggered = false;
-        let mut exploration_action: Option<String> = None;
         // Pre-compute compressed state once for the entire cycle.
         // Used by: surprise bridge, CfC step, world model, training, experience buffer.
-        // Previously computed twice (here and at Phase 2); now single-call.
         // Phi-guided attention: scale compressed state by attention weight.
         // High unified_psi → weight > 1.0 (amplify); Low → weight < 1.0 (attenuate).
         // Science: Tononi (2015) — Phi selects which information gets integrated.
@@ -311,10 +308,8 @@ impl CognitiveLoopService {
             .iter()
             .map(|v| v * phi_attention_weight)
             .collect();
-        let (surprise_result, explore_action) =
+        let (surprise_triggered, exploration_action) =
             self.run_surprise_exploration(&compressed_state);
-        surprise_triggered = surprise_result;
-        exploration_action = explore_action;
 
         module_timings.surprise_exploration = _t.elapsed().as_micros() as u64;
 
