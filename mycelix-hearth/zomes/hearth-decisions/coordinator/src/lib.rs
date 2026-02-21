@@ -34,6 +34,58 @@ pub struct FinalizeDecisionInput {
 }
 
 // ============================================================================
+// Helpers
+// ============================================================================
+
+/// Decode a typed value from a ZomeCallResponse.
+fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    response: ZomeCallResponse,
+    context: &str,
+) -> ExternResult<T> {
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode {} response: {}",
+                context, e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to {} failed: {:?}",
+            context, other
+        )))),
+    }
+}
+
+/// Check whether a choice index is within the valid range of options.
+fn is_choice_valid(choice: u32, option_count: usize) -> bool {
+    (choice as usize) < option_count
+}
+
+/// Check whether a role is in the list of eligible roles.
+fn is_role_eligible(role: &MemberRole, eligible_roles: &[MemberRole]) -> bool {
+    eligible_roles.contains(role)
+}
+
+/// Check whether a decision is in a votable state (Open).
+fn is_decision_votable(status: &DecisionStatus) -> bool {
+    *status == DecisionStatus::Open
+}
+
+/// Check whether the current time is at or past the deadline.
+fn is_deadline_passed(now: &Timestamp, deadline: &Timestamp) -> bool {
+    now >= deadline
+}
+
+/// Compute participation rate in basis points (0–10000).
+/// Returns 0 if active_members is 0. Capped at 10000.
+fn participation_rate_bp(voter_count: u32, active_members: u32) -> u32 {
+    if active_members == 0 {
+        return 0;
+    }
+    ((voter_count as u64 * 10000) / active_members as u64).min(10000) as u32
+}
+
+// ============================================================================
 // Extern Functions
 // ============================================================================
 
@@ -74,19 +126,116 @@ pub fn create_decision(input: CreateDecisionInput) -> ExternResult<Record> {
 }
 
 /// Cast a vote on a decision.
-/// For simplicity, uses a constant weight of 10000 since we cannot
-/// easily read the caller's role from another zome without a bridge call.
+/// Vote weight is determined by the caller's role via cross-zome call to kinship.
 /// Links the vote from the decision and from the agent.
 #[hdk_extern]
 pub fn cast_vote(input: CastVoteInput) -> ExternResult<Record> {
     let now = sys_time()?;
     let agent = agent_info()?.agent_initial_pubkey;
 
+    // Get the decision to find its hearth_hash
+    let decision_record = get(input.decision_hash.clone(), GetOptions::default())?.ok_or(
+        wasm_error!(WasmErrorInner::Guest("Decision not found".into())),
+    )?;
+    let decision: Decision = decision_record
+        .entry()
+        .to_app_option()
+        .map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to deserialize decision: {e}"
+            )))
+        })?
+        .ok_or(wasm_error!(WasmErrorInner::Guest(
+            "Decision entry is missing".into()
+        )))?;
+
+    // 1. Decision must be Open
+    if !is_decision_votable(&decision.status) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot vote on a decision with status {:?} (must be Open)",
+            decision.status
+        ))));
+    }
+
+    // 2. Deadline must not have passed
+    if is_deadline_passed(&now, &decision.deadline) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot vote: the decision deadline has passed".into()
+        )));
+    }
+
+    // 3. Choice must be within bounds
+    if !is_choice_valid(input.choice, decision.options.len()) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Invalid choice {}: decision has {} options (0..{})",
+            input.choice,
+            decision.options.len(),
+            decision.options.len().saturating_sub(1)
+        ))));
+    }
+
+    // 4. No duplicate votes — check if this agent already voted on this decision
+    let my_vote_links = get_links(
+        LinkQuery::try_new(agent.clone(), LinkTypes::AgentToVotes)?,
+        GetStrategy::default(),
+    )?;
+    for link in my_vote_links {
+        let target = link
+            .target
+            .into_action_hash()
+            .ok_or(wasm_error!(WasmErrorInner::Guest(
+                "Link target is not an ActionHash".into()
+            )))?;
+        if let Some(record) = get(target, GetOptions::default())? {
+            let existing_vote: Vote = record
+                .entry()
+                .to_app_option()
+                .map_err(|e| {
+                    wasm_error!(WasmErrorInner::Guest(format!(
+                        "Failed to deserialize vote: {e}"
+                    )))
+                })?
+                .ok_or(wasm_error!(WasmErrorInner::Guest(
+                    "Vote entry is missing".into()
+                )))?;
+            if existing_vote.decision_hash == input.decision_hash {
+                return Err(wasm_error!(WasmErrorInner::Guest(
+                    "You have already voted on this decision".into()
+                )));
+            }
+        }
+    }
+
+    // 5. Eligible role — get caller's role via kinship cross-zome call
+    let caller_role: Option<MemberRole> = decode_zome_response(
+        call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_kinship"),
+            FunctionName::new("get_caller_role"),
+            None,
+            decision.hearth_hash,
+        )?,
+        "get_caller_role",
+    )?;
+
+    let role = caller_role.ok_or(wasm_error!(WasmErrorInner::Guest(
+        "You are not an active member of this hearth".into()
+    )))?;
+
+    if !is_role_eligible(&role, &decision.eligible_roles) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Your role {:?} is not eligible for this decision (eligible: {:?})",
+            role, decision.eligible_roles
+        ))));
+    }
+
+    let weight_bp = role.default_vote_weight_bp();
+
     let vote = Vote {
         decision_hash: input.decision_hash.clone(),
         voter: agent.clone(),
         choice: input.choice,
-        weight_bp: 10000,
+        weight_bp,
         reasoning: input.reasoning,
         created_at: now,
     };
@@ -174,6 +323,21 @@ pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
             "Decision entry is missing".into()
         )))?;
 
+    // 1. Decision must be Open (prevents re-finalization)
+    if !is_decision_votable(&decision.status) {
+        return Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cannot finalize a decision with status {:?} (must be Open)",
+            decision.status
+        ))));
+    }
+
+    // 2. Deadline must have passed (prevents premature finalization)
+    if !is_deadline_passed(&now, &decision.deadline) {
+        return Err(wasm_error!(WasmErrorInner::Guest(
+            "Cannot finalize: the decision deadline has not yet passed".into()
+        )));
+    }
+
     // Tally votes
     let tallies = tally_votes(input.decision_hash.clone())?;
 
@@ -184,20 +348,26 @@ pub fn finalize_decision(input: FinalizeDecisionInput) -> ExternResult<Record> {
         .map(|(idx, _)| *idx)
         .unwrap_or(0);
 
-    // Calculate participation rate: total votes / eligible member count
-    // Since we can't query membership from this zome, we use total_weight / (voters * 10000)
-    // as a rough proxy. For now, count distinct voters.
+    // Calculate participation rate: voter count / active member count
     let vote_links = get_links(
         LinkQuery::try_new(input.decision_hash.clone(), LinkTypes::DecisionToVotes)?,
         GetStrategy::default(),
     )?;
     let voter_count = vote_links.len() as u32;
 
-    // Participation rate: we don't know total eligible members, so we store
-    // the voter count scaled. If no voters, participation is 0.
-    // For a proper implementation this would query the kinship zome.
-    // Here we just store the voter count as a raw basis-point value capped at 10000.
-    let participation_rate_bp = voter_count.min(10000);
+    // Get active member count via kinship cross-zome call
+    let active_members: u32 = decode_zome_response(
+        call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_kinship"),
+            FunctionName::new("get_active_member_count"),
+            None,
+            decision.hearth_hash.clone(),
+        )?,
+        "get_active_member_count",
+    )?;
+
+    let participation_rate_bp = participation_rate_bp(voter_count, active_members);
 
     // Create the outcome
     let outcome = DecisionOutcome {
@@ -494,5 +664,130 @@ mod tests {
         let json = serde_json::to_string(&input).unwrap();
         let back: CastVoteInput = serde_json::from_str(&json).unwrap();
         assert_eq!(back.choice, 19);
+    }
+
+    // ---- Pure helper: is_choice_valid ----
+
+    #[test]
+    fn choice_valid_first_option() {
+        assert!(is_choice_valid(0, 3));
+    }
+
+    #[test]
+    fn choice_valid_last_option() {
+        assert!(is_choice_valid(2, 3));
+    }
+
+    #[test]
+    fn choice_invalid_out_of_bounds() {
+        assert!(!is_choice_valid(3, 3));
+    }
+
+    #[test]
+    fn choice_invalid_empty_options() {
+        assert!(!is_choice_valid(0, 0));
+    }
+
+    #[test]
+    fn choice_invalid_large_index() {
+        assert!(!is_choice_valid(100, 5));
+    }
+
+    // ---- Pure helper: is_role_eligible ----
+
+    #[test]
+    fn role_eligible_adult_in_list() {
+        let eligible = vec![MemberRole::Adult, MemberRole::Elder];
+        assert!(is_role_eligible(&MemberRole::Adult, &eligible));
+    }
+
+    #[test]
+    fn role_not_eligible_youth_excluded() {
+        let eligible = vec![MemberRole::Adult, MemberRole::Elder];
+        assert!(!is_role_eligible(&MemberRole::Youth, &eligible));
+    }
+
+    #[test]
+    fn role_eligible_all_roles() {
+        let eligible = vec![
+            MemberRole::Founder,
+            MemberRole::Elder,
+            MemberRole::Adult,
+            MemberRole::Youth,
+            MemberRole::Child,
+        ];
+        assert!(is_role_eligible(&MemberRole::Youth, &eligible));
+    }
+
+    #[test]
+    fn role_not_eligible_empty_list() {
+        assert!(!is_role_eligible(&MemberRole::Adult, &[]));
+    }
+
+    // ---- Pure helper: is_decision_votable ----
+
+    #[test]
+    fn decision_votable_open() {
+        assert!(is_decision_votable(&DecisionStatus::Open));
+    }
+
+    #[test]
+    fn decision_not_votable_closed() {
+        assert!(!is_decision_votable(&DecisionStatus::Closed));
+    }
+
+    #[test]
+    fn decision_not_votable_finalized() {
+        assert!(!is_decision_votable(&DecisionStatus::Finalized));
+    }
+
+    // ---- Pure helper: is_deadline_passed ----
+
+    #[test]
+    fn deadline_not_passed_before() {
+        let now = Timestamp::from_micros(1_000_000);
+        let deadline = Timestamp::from_micros(2_000_000);
+        assert!(!is_deadline_passed(&now, &deadline));
+    }
+
+    #[test]
+    fn deadline_passed_exact() {
+        let t = Timestamp::from_micros(2_000_000);
+        assert!(is_deadline_passed(&t, &t));
+    }
+
+    #[test]
+    fn deadline_passed_after() {
+        let now = Timestamp::from_micros(3_000_000);
+        let deadline = Timestamp::from_micros(2_000_000);
+        assert!(is_deadline_passed(&now, &deadline));
+    }
+
+    // ---- Pure helper: participation_rate_bp ----
+
+    #[test]
+    fn participation_full() {
+        assert_eq!(participation_rate_bp(5, 5), 10000);
+    }
+
+    #[test]
+    fn participation_half() {
+        assert_eq!(participation_rate_bp(5, 10), 5000);
+    }
+
+    #[test]
+    fn participation_zero_voters() {
+        assert_eq!(participation_rate_bp(0, 10), 0);
+    }
+
+    #[test]
+    fn participation_zero_members() {
+        assert_eq!(participation_rate_bp(5, 0), 0);
+    }
+
+    #[test]
+    fn participation_capped_at_10000() {
+        // More voters than members shouldn't exceed 10000
+        assert_eq!(participation_rate_bp(15, 10), 10000);
     }
 }

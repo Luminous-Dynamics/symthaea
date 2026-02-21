@@ -466,6 +466,7 @@ pub fn query_timebank_balance(agent: AgentPubKey) -> ExternResult<DispatchResult
 /// a personal vault export via the Personal cluster.
 #[hdk_extern]
 pub fn initiate_severance(input: SeveranceInput) -> ExternResult<Record> {
+    enforce_rate_limit("kinship:severance")?;
     let caller = agent_info()?.agent_initial_pubkey;
     let now = sys_time()?;
 
@@ -534,6 +535,25 @@ pub struct HearthSyncInput {
     pub hearth_hash: ActionHash,
     pub epoch_start: Timestamp,
     pub epoch_end: Timestamp,
+}
+
+/// Decode a typed value from a ZomeCallResponse (for direct cross-zome calls).
+fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    response: ZomeCallResponse,
+    context: &str,
+) -> ExternResult<T> {
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode {} response: {}",
+                context, e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to {} failed: {:?}",
+            context, other
+        )))),
+    }
 }
 
 /// Decode a typed response from a DispatchResult.
@@ -617,20 +637,7 @@ pub fn hearth_sync(input: HearthSyncInput) -> ExternResult<Record> {
         None,
         input.hearth_hash.clone(),
     )?;
-    let bond_updates: Vec<BondUpdate> = match bond_response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode bond snapshots: {}",
-                e
-            )))
-        })?,
-        other => {
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Cross-zome call to get_bond_snapshots failed: {:?}",
-                other
-            ))))
-        }
-    };
+    let bond_updates: Vec<BondUpdate> = decode_zome_response(bond_response, "get_bond_snapshots")?;
 
     // Assemble the WeeklyDigest
     let digest = WeeklyDigest {
@@ -653,21 +660,7 @@ pub fn hearth_sync(input: HearthSyncInput) -> ExternResult<Record> {
         None,
         digest,
     )?;
-    match digest_response {
-        ZomeCallResponse::Ok(extern_io) => {
-            let record: Record = extern_io.decode().map_err(|e| {
-                wasm_error!(WasmErrorInner::Guest(format!(
-                    "Failed to decode created digest: {}",
-                    e
-                )))
-            })?;
-            Ok(record)
-        }
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-zome call to create_weekly_digest failed: {:?}",
-            other
-        )))),
-    }
+    decode_zome_response(digest_response, "create_weekly_digest")
 }
 
 /// Get all weekly digests for a hearth (delegates to kinship).
@@ -680,18 +673,7 @@ pub fn get_weekly_digests(hearth_hash: ActionHash) -> ExternResult<Vec<Record>> 
         None,
         hearth_hash,
     )?;
-    match response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode weekly digests: {}",
-                e
-            )))
-        }),
-        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
-            "Cross-zome call to get_weekly_digests failed: {:?}",
-            other
-        )))),
-    }
+    decode_zome_response(response, "get_weekly_digests")
 }
 
 // ============================================================================

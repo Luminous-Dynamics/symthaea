@@ -52,6 +52,25 @@ pub struct CheckCapabilityInput {
 // Helpers
 // ============================================================================
 
+/// Decode a typed value from a ZomeCallResponse.
+fn decode_zome_response<T: serde::de::DeserializeOwned + std::fmt::Debug>(
+    response: ZomeCallResponse,
+    context: &str,
+) -> ExternResult<T> {
+    match response {
+        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
+            wasm_error!(WasmErrorInner::Guest(format!(
+                "Failed to decode {} response: {}",
+                context, e
+            )))
+        }),
+        other => Err(wasm_error!(WasmErrorInner::Guest(format!(
+            "Cross-zome call to {} failed: {:?}",
+            context, other
+        )))),
+    }
+}
+
 fn records_from_links(links: Vec<Link>) -> ExternResult<Vec<Record>> {
     let mut records = Vec::new();
     for link in links {
@@ -75,28 +94,16 @@ pub fn create_autonomy_profile(input: CreateAutonomyProfileInput) -> ExternResul
     let now = sys_time()?;
 
     // Verify the caller has a guardian-level role in this hearth.
-    // Cross-zome call to kinship coordinator's is_guardian() function.
-    let guardian_response = call(
-        CallTargetCell::Local,
-        ZomeName::new("hearth_kinship"),
-        FunctionName::new("is_guardian"),
-        None,
-        input.hearth_hash.clone(),
+    let is_guardian: bool = decode_zome_response(
+        call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_kinship"),
+            FunctionName::new("is_guardian"),
+            None,
+            input.hearth_hash.clone(),
+        )?,
+        "is_guardian",
     )?;
-    let is_guardian: bool = match guardian_response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode is_guardian response: {}",
-                e
-            )))
-        })?,
-        other => {
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Cross-zome call to is_guardian failed: {:?}",
-                other
-            ))))
-        }
-    };
     if !is_guardian {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only guardians (Founder, Elder, or Adult) can create autonomy profiles".into()
@@ -190,27 +197,16 @@ pub fn approve_capability(input: ApproveCapabilityInput) -> ExternResult<Record>
         )))?;
 
     // Verify the caller has a guardian-level role in this hearth.
-    let guardian_response = call(
-        CallTargetCell::Local,
-        ZomeName::new("hearth_kinship"),
-        FunctionName::new("is_guardian"),
-        None,
-        request.hearth_hash.clone(),
+    let is_guardian: bool = decode_zome_response(
+        call(
+            CallTargetCell::Local,
+            ZomeName::new("hearth_kinship"),
+            FunctionName::new("is_guardian"),
+            None,
+            request.hearth_hash.clone(),
+        )?,
+        "is_guardian",
     )?;
-    let is_guardian: bool = match guardian_response {
-        ZomeCallResponse::Ok(extern_io) => extern_io.decode().map_err(|e| {
-            wasm_error!(WasmErrorInner::Guest(format!(
-                "Failed to decode is_guardian response: {}",
-                e
-            )))
-        })?,
-        other => {
-            return Err(wasm_error!(WasmErrorInner::Guest(format!(
-                "Cross-zome call to is_guardian failed: {:?}",
-                other
-            ))))
-        }
-    };
     if !is_guardian {
         return Err(wasm_error!(WasmErrorInner::Guest(
             "Only guardians (Founder, Elder, or Adult) can approve capabilities".into()
@@ -330,13 +326,19 @@ pub fn advance_tier(input: AdvanceTierInput) -> ExternResult<Record> {
             new_role: MemberRole::Adult,
         };
         // Best-effort: don't block tier advancement on severance failure
-        let _ = call(
+        if let Err(e) = call(
             CallTargetCell::Local,
             ZomeName::new("hearth_bridge"),
             FunctionName::new("initiate_severance"),
             None,
             severance_input,
-        );
+        ) {
+            let _ = emit_signal(&HearthSignal::CrossZomeCallFailed {
+                zome: "hearth_bridge".into(),
+                function: "initiate_severance".into(),
+                error: format!("{e:?}"),
+            });
+        }
     }
 
     get(action_hash, GetOptions::default())?.ok_or(wasm_error!(WasmErrorInner::Guest(
@@ -597,7 +599,7 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let back: ApproveCapabilityInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.approved, true);
+        assert!(back.approved);
         assert_eq!(back.conditions, Some("Only weekdays".to_string()));
     }
 
@@ -610,7 +612,7 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let back: ApproveCapabilityInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.approved, false);
+        assert!(!back.approved);
         assert_eq!(back.conditions, None);
     }
 

@@ -631,6 +631,13 @@ pub enum HearthSignal {
         agent: AgentPubKey,
         status: PresenceStatusType,
     },
+    /// Emitted when a best-effort cross-zome/cross-cluster call fails.
+    /// Provides observability without blocking the caller.
+    CrossZomeCallFailed {
+        zome: String,
+        function: String,
+        error: String,
+    },
 }
 
 #[cfg(test)]
@@ -962,7 +969,7 @@ mod tests {
         };
         let json = serde_json::to_string(&input).unwrap();
         let back: SeveranceInput = serde_json::from_str(&json).unwrap();
-        assert_eq!(back.export_milestones, true);
+        assert!(back.export_milestones);
         assert_eq!(back.new_role, MemberRole::Adult);
     }
 
@@ -978,6 +985,25 @@ mod tests {
         };
         let json = serde_json::to_string(&sig).unwrap();
         assert!(json.contains("GratitudeExpressed"));
+    }
+
+    #[test]
+    fn hearth_signal_cross_zome_failed_serde() {
+        let sig = HearthSignal::CrossZomeCallFailed {
+            zome: "recovery".into(),
+            function: "setup_recovery".into(),
+            error: "network timeout".into(),
+        };
+        let json = serde_json::to_string(&sig).unwrap();
+        assert!(json.contains("CrossZomeCallFailed"));
+        let back: HearthSignal = serde_json::from_str(&json).unwrap();
+        match back {
+            HearthSignal::CrossZomeCallFailed { zome, function, .. } => {
+                assert_eq!(zome, "recovery");
+                assert_eq!(function, "setup_recovery");
+            }
+            _ => panic!("Wrong variant"),
+        }
     }
 
     #[test]
@@ -1044,6 +1070,60 @@ mod tests {
         let json = serde_json::to_string(&rt).unwrap();
         let back: RhythmType = serde_json::from_str(&json).unwrap();
         assert_eq!(back, rt);
+    }
+
+    // ---- Summary types ----
+
+    #[test]
+    fn bond_update_serde_roundtrip() {
+        let bu = BondUpdate {
+            member_a: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            member_b: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            co_creation_count: 5,
+            quality_sum_bp: 42000,
+        };
+        let json = serde_json::to_string(&bu).unwrap();
+        let back: BondUpdate = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.co_creation_count, 5);
+        assert_eq!(back.quality_sum_bp, 42000);
+    }
+
+    #[test]
+    fn care_summary_serde_roundtrip() {
+        let cs = CareSummary {
+            assignee: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            tasks_completed: 12,
+            hours_hundredths: 3550,
+        };
+        let json = serde_json::to_string(&cs).unwrap();
+        let back: CareSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.tasks_completed, 12);
+        assert_eq!(back.hours_hundredths, 3550);
+    }
+
+    #[test]
+    fn gratitude_summary_serde_roundtrip() {
+        let gs = GratitudeSummary {
+            from_agent: AgentPubKey::from_raw_36(vec![0u8; 36]),
+            to_agent: AgentPubKey::from_raw_36(vec![1u8; 36]),
+            count: 7,
+        };
+        let json = serde_json::to_string(&gs).unwrap();
+        let back: GratitudeSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.count, 7);
+    }
+
+    #[test]
+    fn rhythm_summary_serde_roundtrip() {
+        let rs = RhythmSummary {
+            rhythm_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            occurrences: 4,
+            avg_participation_bp: 8500,
+        };
+        let json = serde_json::to_string(&rs).unwrap();
+        let back: RhythmSummary = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.occurrences, 4);
+        assert_eq!(back.avg_participation_bp, 8500);
     }
 
     // ---- DigestEpochInput ----

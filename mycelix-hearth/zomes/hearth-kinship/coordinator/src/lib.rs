@@ -699,6 +699,80 @@ pub fn is_guardian(hearth_hash: ActionHash) -> ExternResult<bool> {
     }
 }
 
+/// Get the caller's vote weight in basis points for a given hearth.
+/// Returns the role-based default (e.g. Adult=10000, Youth=5000, Child=0).
+/// Returns 0 if the caller is not an active member.
+#[hdk_extern]
+pub fn get_caller_vote_weight(hearth_hash: ActionHash) -> ExternResult<u32> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let links = get_links(
+        LinkQuery::try_new(hearth_hash, LinkTypes::HearthToMembers)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        let target = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(target, GetOptions::default())? {
+            let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
+            if membership.agent == agent && membership.status == MembershipStatus::Active {
+                return Ok(membership.role.default_vote_weight_bp());
+            }
+        }
+    }
+
+    Ok(0)
+}
+
+/// Get the caller's role in a given hearth.
+/// Returns None if the caller is not an active member.
+/// Used by decisions zome to check eligible_roles and derive vote weight.
+#[hdk_extern]
+pub fn get_caller_role(hearth_hash: ActionHash) -> ExternResult<Option<MemberRole>> {
+    let agent = agent_info()?.agent_initial_pubkey;
+    let links = get_links(
+        LinkQuery::try_new(hearth_hash, LinkTypes::HearthToMembers)?,
+        GetStrategy::default(),
+    )?;
+
+    for link in links {
+        let target = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(target, GetOptions::default())? {
+            let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
+            if membership.agent == agent && membership.status == MembershipStatus::Active {
+                return Ok(Some(membership.role));
+            }
+        }
+    }
+
+    Ok(None)
+}
+
+/// Get the count of active members in a hearth.
+/// Used by decisions zome for participation rate calculation.
+#[hdk_extern]
+pub fn get_active_member_count(hearth_hash: ActionHash) -> ExternResult<u32> {
+    let links = get_links(
+        LinkQuery::try_new(hearth_hash, LinkTypes::HearthToMembers)?,
+        GetStrategy::default(),
+    )?;
+
+    let mut count: u32 = 0;
+    for link in links {
+        let target = ActionHash::try_from(link.target)
+            .map_err(|_| wasm_error!(WasmErrorInner::Guest("Invalid link target".into())))?;
+        if let Some(record) = get(target, GetOptions::default())? {
+            let membership: HearthMembership = entry_from_record(&record, "HearthMembership")?;
+            if membership.status == MembershipStatus::Active {
+                count += 1;
+            }
+        }
+    }
+
+    Ok(count)
+}
+
 /// Compute the recovery threshold: 60% of adult_count, rounded up.
 fn recovery_threshold(adult_count: usize) -> usize {
     (adult_count * 60).div_ceil(100)
@@ -745,13 +819,19 @@ fn propose_auto_recovery(hearth_hash: &ActionHash) -> ExternResult<()> {
     };
 
     // Best-effort: don't block hearth operations on recovery setup failure
-    let _ = call(
+    if let Err(e) = call(
         CallTargetCell::OtherRole(RoleName::from("identity")),
         ZomeName::new("recovery"),
         FunctionName::new("setup_recovery"),
         None,
         recovery_input,
-    );
+    ) {
+        let _ = emit_signal(&HearthSignal::CrossZomeCallFailed {
+            zome: "recovery".into(),
+            function: "setup_recovery".into(),
+            error: format!("{e:?}"),
+        });
+    }
 
     Ok(())
 }
@@ -873,6 +953,38 @@ pub fn get_bond_snapshots(hearth_hash: ActionHash) -> ExternResult<Vec<BondUpdat
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ---- Pure helpers (testable without conductor) ----
+
+    /// Find the vote weight for an agent from a list of memberships.
+    /// Returns 0 if the agent is not found or not active.
+    fn find_member_vote_weight(agent: &AgentPubKey, memberships: &[HearthMembership]) -> u32 {
+        memberships
+            .iter()
+            .find(|m| m.agent == *agent && m.status == MembershipStatus::Active)
+            .map(|m| m.role.default_vote_weight_bp())
+            .unwrap_or(0)
+    }
+
+    /// Count active memberships in a list.
+    fn count_active_memberships(memberships: &[HearthMembership]) -> u32 {
+        memberships
+            .iter()
+            .filter(|m| m.status == MembershipStatus::Active)
+            .count() as u32
+    }
+
+    /// Find the role for an agent from a list of memberships.
+    /// Returns None if the agent is not found or not active.
+    fn find_member_role(
+        agent: &AgentPubKey,
+        memberships: &[HearthMembership],
+    ) -> Option<MemberRole> {
+        memberships
+            .iter()
+            .find(|m| m.agent == *agent && m.status == MembershipStatus::Active)
+            .map(|m| m.role.clone())
+    }
 
     // ---- Entry Type Existence ----
 
@@ -1150,5 +1262,176 @@ mod tests {
                 "threshold {t} for {n} adults is below 60%"
             );
         }
+    }
+
+    // ---- Pure helper test fixtures ----
+
+    fn fake_agent_a() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![1u8; 36])
+    }
+
+    fn fake_agent_b() -> AgentPubKey {
+        AgentPubKey::from_raw_36(vec![2u8; 36])
+    }
+
+    fn make_membership(
+        agent: &AgentPubKey,
+        role: MemberRole,
+        status: MembershipStatus,
+    ) -> HearthMembership {
+        HearthMembership {
+            hearth_hash: ActionHash::from_raw_36(vec![0u8; 36]),
+            agent: agent.clone(),
+            role,
+            status,
+            display_name: "test".into(),
+            joined_at: Timestamp::from_micros(0),
+        }
+    }
+
+    // ---- find_member_vote_weight ----
+
+    #[test]
+    fn vote_weight_active_adult() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Adult,
+            MembershipStatus::Active,
+        )];
+        assert_eq!(
+            find_member_vote_weight(&fake_agent_a(), &memberships),
+            10000
+        );
+    }
+
+    #[test]
+    fn vote_weight_active_youth() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Youth,
+            MembershipStatus::Active,
+        )];
+        assert_eq!(find_member_vote_weight(&fake_agent_a(), &memberships), 5000);
+    }
+
+    #[test]
+    fn vote_weight_active_child() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Child,
+            MembershipStatus::Active,
+        )];
+        assert_eq!(find_member_vote_weight(&fake_agent_a(), &memberships), 0);
+    }
+
+    #[test]
+    fn vote_weight_departed_returns_zero() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Adult,
+            MembershipStatus::Departed,
+        )];
+        assert_eq!(find_member_vote_weight(&fake_agent_a(), &memberships), 0);
+    }
+
+    #[test]
+    fn vote_weight_not_found_returns_zero() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Adult,
+            MembershipStatus::Active,
+        )];
+        assert_eq!(find_member_vote_weight(&fake_agent_b(), &memberships), 0);
+    }
+
+    #[test]
+    fn vote_weight_empty_list() {
+        assert_eq!(find_member_vote_weight(&fake_agent_a(), &[]), 0);
+    }
+
+    // ---- count_active_memberships ----
+
+    #[test]
+    fn count_active_all_active() {
+        let memberships = vec![
+            make_membership(&fake_agent_a(), MemberRole::Adult, MembershipStatus::Active),
+            make_membership(&fake_agent_b(), MemberRole::Elder, MembershipStatus::Active),
+        ];
+        assert_eq!(count_active_memberships(&memberships), 2);
+    }
+
+    #[test]
+    fn count_active_mixed_statuses() {
+        let memberships = vec![
+            make_membership(&fake_agent_a(), MemberRole::Adult, MembershipStatus::Active),
+            make_membership(
+                &fake_agent_b(),
+                MemberRole::Elder,
+                MembershipStatus::Departed,
+            ),
+        ];
+        assert_eq!(count_active_memberships(&memberships), 1);
+    }
+
+    #[test]
+    fn count_active_all_departed() {
+        let memberships = vec![
+            make_membership(
+                &fake_agent_a(),
+                MemberRole::Adult,
+                MembershipStatus::Departed,
+            ),
+            make_membership(
+                &fake_agent_b(),
+                MemberRole::Elder,
+                MembershipStatus::Departed,
+            ),
+        ];
+        assert_eq!(count_active_memberships(&memberships), 0);
+    }
+
+    #[test]
+    fn count_active_empty_list() {
+        assert_eq!(count_active_memberships(&[]), 0);
+    }
+
+    // ---- find_member_role ----
+
+    #[test]
+    fn find_role_active_adult() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Adult,
+            MembershipStatus::Active,
+        )];
+        assert_eq!(
+            find_member_role(&fake_agent_a(), &memberships),
+            Some(MemberRole::Adult)
+        );
+    }
+
+    #[test]
+    fn find_role_departed_returns_none() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Adult,
+            MembershipStatus::Departed,
+        )];
+        assert_eq!(find_member_role(&fake_agent_a(), &memberships), None);
+    }
+
+    #[test]
+    fn find_role_not_found_returns_none() {
+        let memberships = vec![make_membership(
+            &fake_agent_a(),
+            MemberRole::Adult,
+            MembershipStatus::Active,
+        )];
+        assert_eq!(find_member_role(&fake_agent_b(), &memberships), None);
+    }
+
+    #[test]
+    fn find_role_empty_list() {
+        assert_eq!(find_member_role(&fake_agent_a(), &[]), None);
     }
 }
