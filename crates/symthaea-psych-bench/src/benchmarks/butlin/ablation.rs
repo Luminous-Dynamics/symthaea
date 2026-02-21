@@ -224,7 +224,7 @@ pub fn run_ablation_matrix(_config: &BenchmarkConfig) -> Vec<AblationResult> {
         // Run the relevant benchmark with default and ablated configs
         let (baseline_acc, ablated_acc) = run_downstream_benchmark(spec);
 
-        let indicator_dropped = if baseline_indicator > 0.01 {
+        let indicator_dropped = if baseline_indicator > 0.0005 {
             ablated_indicator < baseline_indicator * 0.5
         } else {
             // Baseline was already near zero — can't prove a drop

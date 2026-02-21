@@ -92,6 +92,16 @@ pub(crate) struct CycleCarryover {
     /// Recent BinaryHV ring buffer for multi-component consciousness profile.
     /// Holds last 4 cycle BinaryHVs to make gradient/diversity/coherence meaningful.
     pub(crate) recent_hvs: Vec<crate::hdc::BinaryHV>,
+    /// Cached causal relations count (avoids calling summarize_understanding every cycle).
+    pub(crate) last_causal_relations: usize,
+    /// Cached causal average confidence (avoids calling summarize_understanding every cycle).
+    pub(crate) last_causal_confidence: f64,
+    /// Cached consciousness profile composite (avoids computing every cycle).
+    pub(crate) last_profile_composite: f64,
+    /// Cached synergy-enhanced composite.
+    pub(crate) last_synergy_composite: f64,
+    /// Cached emergent properties count.
+    pub(crate) last_emergent_count: usize,
 }
 
 impl Default for CycleCarryover {
@@ -132,6 +142,11 @@ impl Default for CycleCarryover {
             last_consciousness_state: String::new(),
             last_epistemic_confidence: 0.5,
             recent_hvs: Vec::with_capacity(4),
+            last_causal_relations: 0,
+            last_causal_confidence: 0.0,
+            last_profile_composite: 0.0,
+            last_synergy_composite: 0.0,
+            last_emergent_count: 0,
         }
     }
 }
