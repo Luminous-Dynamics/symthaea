@@ -1,21 +1,23 @@
 /**
- * TypeScript types for Hearth Decisions zome.
- * Mirrors the Rust entry types and input structs.
+ * TypeScript types for the Mycelix Hearth cluster.
+ * Mirrors Rust entry types, input structs, and signal enums from all 11 zomes.
  */
 
 import type { ActionHash, AgentPubKey, Timestamp } from '@holochain/client';
 
 // ============================================================================
-// Enums (represented as string unions)
+// Enums — Hearth Core
 // ============================================================================
 
-export type DecisionType =
-  | 'Consensus'
-  | 'MajorityVote'
-  | 'ElderDecision'
-  | 'GuardianDecision';
-
-export type DecisionStatus = 'Open' | 'Closed' | 'Finalized';
+export type HearthType =
+  | 'Nuclear'
+  | 'Extended'
+  | 'Chosen'
+  | 'Blended'
+  | 'Multigenerational'
+  | 'Intentional'
+  | 'CoPod'
+  | { Custom: string };
 
 export type MemberRole =
   | 'Founder'
@@ -26,8 +28,234 @@ export type MemberRole =
   | 'Guest'
   | 'Ancestor';
 
+export type MembershipStatus = 'Active' | 'Invited' | 'Departed' | 'Ancestral';
+
+export type BondType =
+  | 'Parent'
+  | 'Child'
+  | 'Sibling'
+  | 'Partner'
+  | 'Grandparent'
+  | 'Grandchild'
+  | 'AuntUncle'
+  | 'NieceNephew'
+  | 'Cousin'
+  | 'ChosenFamily'
+  | 'Guardian'
+  | 'Ward'
+  | { Custom: string };
+
+export type InvitationStatus = 'Pending' | 'Accepted' | 'Declined' | 'Expired';
+
 // ============================================================================
-// Entry Types
+// Enums — Decisions
+// ============================================================================
+
+export type DecisionType =
+  | 'Consensus'
+  | 'MajorityVote'
+  | 'ElderDecision'
+  | 'GuardianDecision';
+
+export type DecisionStatus = 'Open' | 'Closed' | 'Finalized';
+
+// ============================================================================
+// Enums — Autonomy
+// ============================================================================
+
+export type AutonomyTier =
+  | 'Dependent'
+  | 'Supervised'
+  | 'Guided'
+  | 'SemiAutonomous'
+  | 'Autonomous';
+
+export type AutonomyRequestStatus = 'Pending' | 'Approved' | 'Denied';
+
+// ============================================================================
+// Enums — Visibility
+// ============================================================================
+
+export type HearthVisibility =
+  | 'AllMembers'
+  | 'AdultsOnly'
+  | 'GuardiansOnly'
+  | { Specified: AgentPubKey[] };
+
+// ============================================================================
+// Enums — Care
+// ============================================================================
+
+export type CareType =
+  | 'Childcare'
+  | 'Eldercare'
+  | 'PetCare'
+  | 'Chore'
+  | 'MealPrep'
+  | 'Medical'
+  | 'Emotional'
+  | { Custom: string };
+
+export type CareScheduleStatus = 'Active' | 'Paused' | 'Completed';
+
+export type SwapStatus = 'Proposed' | 'Accepted' | 'Declined' | 'Completed';
+
+export type Recurrence =
+  | 'Daily'
+  | 'Weekly'
+  | 'Monthly'
+  | { Custom: string };
+
+// ============================================================================
+// Enums — Emergency
+// ============================================================================
+
+export type AlertSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
+
+export type AlertType =
+  | 'Medical'
+  | 'Natural'
+  | 'Security'
+  | 'Missing'
+  | 'Fire'
+  | { Custom: string };
+
+export type SafetyStatus = 'Safe' | 'NeedHelp' | 'NoResponse';
+
+// ============================================================================
+// Enums — Gratitude
+// ============================================================================
+
+export type GratitudeType =
+  | 'Appreciation'
+  | 'Acknowledgment'
+  | 'Celebration'
+  | 'Blessing'
+  | { Custom: string };
+
+export type CircleStatus = 'Open' | 'InProgress' | 'Completed';
+
+// ============================================================================
+// Enums — Stories
+// ============================================================================
+
+export type StoryType =
+  | 'Memory'
+  | 'Tradition'
+  | 'Recipe'
+  | 'Wisdom'
+  | 'Origin'
+  | 'Migration'
+  | { Custom: string };
+
+// ============================================================================
+// Enums — Milestones & Transitions
+// ============================================================================
+
+export type MilestoneType =
+  | 'Birth'
+  | 'Birthday'
+  | 'FirstStep'
+  | 'SchoolStart'
+  | 'Graduation'
+  | 'Engagement'
+  | 'Marriage'
+  | 'NewHome'
+  | 'Retirement'
+  | 'Passing'
+  | { Custom: string };
+
+export type TransitionType =
+  | 'JoiningHearth'
+  | 'LeavingHearth'
+  | 'ComingOfAge'
+  | 'Retirement'
+  | 'Bereavement'
+  | { Custom: string };
+
+export type TransitionPhase =
+  | 'PreLiminal'
+  | 'Liminal'
+  | 'PostLiminal'
+  | 'Integrated';
+
+// ============================================================================
+// Enums — Resources
+// ============================================================================
+
+export type ResourceType =
+  | 'Tool'
+  | 'Vehicle'
+  | 'Book'
+  | 'Kitchen'
+  | 'Electronics'
+  | 'Clothing'
+  | { Custom: string };
+
+export type LoanStatus = 'Active' | 'Returned' | 'Overdue';
+
+// ============================================================================
+// Enums — Rhythms
+// ============================================================================
+
+export type RhythmType =
+  | 'Morning'
+  | 'Evening'
+  | 'Weekly'
+  | 'Seasonal'
+  | { Custom: string };
+
+export type PresenceStatusType =
+  | 'Home'
+  | 'Away'
+  | 'Working'
+  | 'Sleeping'
+  | 'DoNotDisturb';
+
+// ============================================================================
+// Entry Types — Kinship
+// ============================================================================
+
+export interface Hearth {
+  name: string;
+  description: string;
+  hearth_type: HearthType;
+  created_by: AgentPubKey;
+  created_at: Timestamp;
+  max_members: number;
+}
+
+export interface HearthMembership {
+  hearth_hash: ActionHash;
+  agent: AgentPubKey;
+  role: MemberRole;
+  status: MembershipStatus;
+  display_name: string;
+  joined_at: Timestamp;
+}
+
+export interface KinshipBond {
+  hearth_hash: ActionHash;
+  member_a: AgentPubKey;
+  member_b: AgentPubKey;
+  bond_type: BondType;
+  strength_bp: number;
+  last_tended: Timestamp;
+  created_at: Timestamp;
+}
+
+export interface HearthInvitation {
+  hearth_hash: ActionHash;
+  inviter: AgentPubKey;
+  invitee_agent: AgentPubKey;
+  proposed_role: MemberRole;
+  message: string;
+  expires_at: Timestamp;
+  status: InvitationStatus;
+}
+
+// ============================================================================
+// Entry Types — Decisions
 // ============================================================================
 
 export interface Decision {
@@ -62,7 +290,370 @@ export interface DecisionOutcome {
 }
 
 // ============================================================================
-// Input Types
+// Entry Types — Gratitude
+// ============================================================================
+
+export interface GratitudeExpression {
+  hearth_hash: ActionHash;
+  from_agent: AgentPubKey;
+  to_agent: AgentPubKey;
+  message: string;
+  gratitude_type: GratitudeType;
+  visibility: HearthVisibility;
+  created_at: Timestamp;
+}
+
+export interface AppreciationCircle {
+  hearth_hash: ActionHash;
+  theme: string;
+  participants: AgentPubKey[];
+  started_at: Timestamp;
+  completed_at?: Timestamp;
+  status: CircleStatus;
+}
+
+export interface GratitudeAnchor {
+  agent: AgentPubKey;
+  hearth_hash: ActionHash;
+  total_given: number;
+  total_received: number;
+  current_streak_days: number;
+}
+
+// ============================================================================
+// Entry Types — Stories
+// ============================================================================
+
+export interface FamilyStory {
+  hearth_hash: ActionHash;
+  title: string;
+  content: string;
+  storyteller: AgentPubKey;
+  story_type: StoryType;
+  media_hashes: ActionHash[];
+  tags: string[];
+  visibility: HearthVisibility;
+  created_at: Timestamp;
+}
+
+export interface StoryCollection {
+  hearth_hash: ActionHash;
+  name: string;
+  description: string;
+  story_hashes: ActionHash[];
+  curator: AgentPubKey;
+}
+
+export interface FamilyTradition {
+  hearth_hash: ActionHash;
+  name: string;
+  description: string;
+  frequency: Recurrence;
+  season?: string;
+  instructions: string;
+  last_observed?: Timestamp;
+  next_due?: Timestamp;
+}
+
+// ============================================================================
+// Entry Types — Care
+// ============================================================================
+
+export interface CareSchedule {
+  hearth_hash: ActionHash;
+  care_type: CareType;
+  title: string;
+  description: string;
+  assigned_to: AgentPubKey;
+  recurrence: Recurrence;
+  notes: string;
+  status: CareScheduleStatus;
+  completed_at?: Timestamp;
+}
+
+export interface CareSwap {
+  hearth_hash: ActionHash;
+  requester: AgentPubKey;
+  responder: AgentPubKey;
+  original_schedule_hash: ActionHash;
+  swap_date: Timestamp;
+  status: SwapStatus;
+}
+
+export interface MealPlan {
+  hearth_hash: ActionHash;
+  week_start: Timestamp;
+  meals: PlannedMeal[];
+  shopper: AgentPubKey;
+  cook: AgentPubKey;
+  dietary_notes: string;
+}
+
+export interface PlannedMeal {
+  day: string;
+  meal_type: string;
+  recipe: string;
+  servings: number;
+}
+
+// ============================================================================
+// Entry Types — Autonomy
+// ============================================================================
+
+export interface AutonomyProfile {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  guardian_agents: AgentPubKey[];
+  current_tier: AutonomyTier;
+  capabilities: string[];
+  restrictions: string[];
+  review_schedule?: string;
+  created_at: Timestamp;
+}
+
+export interface AutonomyRequest {
+  hearth_hash: ActionHash;
+  requester: AgentPubKey;
+  capability: string;
+  justification: string;
+  status: AutonomyRequestStatus;
+  created_at: Timestamp;
+}
+
+export interface GuardianApproval {
+  request_hash: ActionHash;
+  guardian: AgentPubKey;
+  approved: boolean;
+  conditions?: string;
+  created_at: Timestamp;
+}
+
+export interface TierTransition {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  from_tier: AutonomyTier;
+  to_tier: AutonomyTier;
+  transition_phase: TransitionPhase;
+  recategorization_blocked: boolean;
+  started_at: Timestamp;
+  completed_at?: Timestamp;
+}
+
+// ============================================================================
+// Entry Types — Emergency
+// ============================================================================
+
+export interface EmergencyPlan {
+  hearth_hash: ActionHash;
+  contacts: EmergencyContact[];
+  meeting_points: string[];
+  medical_info_hashes: ActionHash[];
+  last_reviewed: Timestamp;
+}
+
+export interface EmergencyAlert {
+  hearth_hash: ActionHash;
+  alert_type: AlertType;
+  severity: AlertSeverity;
+  message: string;
+  reporter: AgentPubKey;
+  location_hint?: string;
+  created_at: Timestamp;
+  resolved_at?: Timestamp;
+}
+
+export interface SafetyCheckIn {
+  hearth_hash: ActionHash;
+  alert_hash: ActionHash;
+  member: AgentPubKey;
+  status: SafetyStatus;
+  location_hint?: string;
+  checked_in_at: Timestamp;
+}
+
+export interface EmergencyContact {
+  name: string;
+  phone: string;
+  relationship: string;
+  priority_order: number;
+}
+
+// ============================================================================
+// Entry Types — Resources
+// ============================================================================
+
+export interface SharedResource {
+  hearth_hash: ActionHash;
+  name: string;
+  description: string;
+  resource_type: ResourceType;
+  current_holder?: AgentPubKey;
+  condition: string;
+  location: string;
+}
+
+export interface ResourceLoan {
+  resource_hash: ActionHash;
+  lender_hearth: ActionHash;
+  borrower: AgentPubKey;
+  due_date: Timestamp;
+  status: LoanStatus;
+  created_at: Timestamp;
+}
+
+export interface BudgetCategory {
+  hearth_hash: ActionHash;
+  category: string;
+  monthly_target_cents: number;
+  current_month_actual_cents: number;
+}
+
+// ============================================================================
+// Entry Types — Milestones
+// ============================================================================
+
+export interface Milestone {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  milestone_type: MilestoneType;
+  date: Timestamp;
+  description: string;
+  witnesses: AgentPubKey[];
+  media_hashes: ActionHash[];
+  created_at: Timestamp;
+}
+
+export interface LifeTransition {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  transition_type: TransitionType;
+  current_phase: TransitionPhase;
+  supporting_members: AgentPubKey[];
+  recategorization_blocked: boolean;
+  started_at: Timestamp;
+  completed_at?: Timestamp;
+}
+
+// ============================================================================
+// Entry Types — Rhythms
+// ============================================================================
+
+export interface Rhythm {
+  hearth_hash: ActionHash;
+  name: string;
+  rhythm_type: RhythmType;
+  schedule: string;
+  participants: AgentPubKey[];
+  description: string;
+  created_at: Timestamp;
+}
+
+export interface RhythmOccurrence {
+  rhythm_hash: ActionHash;
+  date: Timestamp;
+  participants_present: AgentPubKey[];
+  notes: string;
+  mood_bp?: number;
+  created_at: Timestamp;
+}
+
+export interface PresenceStatus {
+  hearth_hash: ActionHash;
+  agent: AgentPubKey;
+  status: PresenceStatusType;
+  expected_return?: Timestamp;
+  updated_at: Timestamp;
+}
+
+// ============================================================================
+// Entry Types — Epoch Rollups
+// ============================================================================
+
+export interface WeeklyDigest {
+  hearth_hash: ActionHash;
+  epoch_start: Timestamp;
+  epoch_end: Timestamp;
+  bond_updates: BondUpdate[];
+  care_summary: CareSummary[];
+  gratitude_summary: GratitudeSummary[];
+  rhythm_summary: RhythmSummary[];
+  created_by: AgentPubKey;
+  created_at: Timestamp;
+}
+
+export interface BondUpdate {
+  member_a: AgentPubKey;
+  member_b: AgentPubKey;
+  co_creation_count: number;
+  quality_sum_bp: number;
+}
+
+export interface CareSummary {
+  assignee: AgentPubKey;
+  tasks_completed: number;
+  hours_hundredths: number;
+}
+
+export interface GratitudeSummary {
+  from_agent: AgentPubKey;
+  to_agent: AgentPubKey;
+  count: number;
+}
+
+export interface RhythmSummary {
+  rhythm_hash: ActionHash;
+  occurrences: number;
+  avg_participation_bp: number;
+}
+
+// ============================================================================
+// Input Types — Kinship
+// ============================================================================
+
+export interface CreateHearthInput {
+  name: string;
+  description: string;
+  hearth_type: HearthType;
+  max_members?: number;
+}
+
+export interface InviteMemberInput {
+  hearth_hash: ActionHash;
+  invitee_agent: AgentPubKey;
+  proposed_role: MemberRole;
+  message: string;
+  expires_at: Timestamp;
+}
+
+export interface AcceptInvitationInput {
+  invitation_hash: ActionHash;
+  display_name: string;
+}
+
+export interface UpdateMemberRoleInput {
+  membership_hash: ActionHash;
+  new_role: MemberRole;
+}
+
+export interface CreateBondInput {
+  hearth_hash: ActionHash;
+  member_b: AgentPubKey;
+  bond_type: BondType;
+  initial_strength_bp?: number;
+}
+
+export interface TendBondInput {
+  bond_hash: ActionHash;
+  description: string;
+  quality_bp: number;
+}
+
+export interface GetBondHealthInput {
+  bond_hash: ActionHash;
+}
+
+// ============================================================================
+// Input Types — Decisions
 // ============================================================================
 
 export interface CreateDecisionInput {
@@ -97,7 +688,320 @@ export interface AmendVoteInput {
 }
 
 // ============================================================================
-// Signal Types (mirrors Rust HearthSignal decision variants)
+// Input Types — Gratitude
+// ============================================================================
+
+export interface ExpressGratitudeInput {
+  hearth_hash: ActionHash;
+  to_agent: AgentPubKey;
+  message: string;
+  gratitude_type: GratitudeType;
+  visibility: HearthVisibility;
+}
+
+export interface StartCircleInput {
+  hearth_hash: ActionHash;
+  theme: string;
+  participants: AgentPubKey[];
+}
+
+// ============================================================================
+// Input Types — Stories
+// ============================================================================
+
+export interface CreateStoryInput {
+  hearth_hash: ActionHash;
+  title: string;
+  content: string;
+  story_type: StoryType;
+  media_hashes: ActionHash[];
+  tags: string[];
+  visibility: HearthVisibility;
+}
+
+export interface UpdateStoryInput {
+  story_hash: ActionHash;
+  title: string;
+  content: string;
+  tags: string[];
+}
+
+export interface CreateCollectionInput {
+  hearth_hash: ActionHash;
+  name: string;
+  description: string;
+}
+
+export interface CreateTraditionInput {
+  hearth_hash: ActionHash;
+  name: string;
+  description: string;
+  frequency: Recurrence;
+  season?: string;
+  instructions: string;
+}
+
+export interface AddMediaInput {
+  story_hash: ActionHash;
+  media_hash: ActionHash;
+}
+
+export interface AddToCollectionInput {
+  collection_hash: ActionHash;
+  story_hash: ActionHash;
+}
+
+// ============================================================================
+// Input Types — Care
+// ============================================================================
+
+export interface CreateCareScheduleInput {
+  hearth_hash: ActionHash;
+  care_type: CareType;
+  title: string;
+  description: string;
+  assigned_to: AgentPubKey;
+  recurrence: Recurrence;
+  notes: string;
+}
+
+export interface CompleteTaskInput {
+  schedule_hash: ActionHash;
+}
+
+export interface ProposeSwapInput {
+  hearth_hash: ActionHash;
+  original_schedule_hash: ActionHash;
+  swap_date: Timestamp;
+}
+
+export interface CreateMealPlanInput {
+  hearth_hash: ActionHash;
+  week_start: Timestamp;
+  meals: PlannedMeal[];
+  shopper: AgentPubKey;
+  cook: AgentPubKey;
+  dietary_notes: string;
+}
+
+// ============================================================================
+// Input Types — Autonomy
+// ============================================================================
+
+export interface CreateAutonomyProfileInput {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  guardian_agents: AgentPubKey[];
+  initial_tier: AutonomyTier;
+  capabilities: string[];
+  restrictions: string[];
+  review_schedule?: string;
+}
+
+export interface RequestCapabilityInput {
+  hearth_hash: ActionHash;
+  capability: string;
+  justification: string;
+}
+
+export interface ApproveCapabilityInput {
+  request_hash: ActionHash;
+  approved: boolean;
+  conditions?: string;
+}
+
+export interface AdvanceTierInput {
+  profile_hash: ActionHash;
+  new_tier: AutonomyTier;
+}
+
+export interface CheckCapabilityInput {
+  member: AgentPubKey;
+  capability: string;
+}
+
+// ============================================================================
+// Input Types — Emergency
+// ============================================================================
+
+export interface CreateEmergencyPlanInput {
+  hearth_hash: ActionHash;
+  contacts: EmergencyContact[];
+  meeting_points: string[];
+  medical_info_hashes: ActionHash[];
+}
+
+export interface UpdatePlanInput {
+  plan_hash: ActionHash;
+  input: CreateEmergencyPlanInput;
+}
+
+export interface RaiseAlertInput {
+  hearth_hash: ActionHash;
+  alert_type: AlertType;
+  severity: AlertSeverity;
+  message: string;
+  location_hint?: string;
+}
+
+export interface CheckInInput {
+  alert_hash: ActionHash;
+  status: SafetyStatus;
+  location_hint?: string;
+}
+
+// ============================================================================
+// Input Types — Resources
+// ============================================================================
+
+export interface RegisterResourceInput {
+  hearth_hash: ActionHash;
+  name: string;
+  description: string;
+  resource_type: ResourceType;
+  condition: string;
+  location: string;
+}
+
+export interface LendResourceInput {
+  resource_hash: ActionHash;
+  borrower: AgentPubKey;
+  due_date: Timestamp;
+}
+
+export interface CreateBudgetInput {
+  hearth_hash: ActionHash;
+  category: string;
+  monthly_target_cents: number;
+}
+
+export interface LogExpenseInput {
+  budget_hash: ActionHash;
+  amount_cents: number;
+}
+
+// ============================================================================
+// Input Types — Milestones
+// ============================================================================
+
+export interface RecordMilestoneInput {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  milestone_type: MilestoneType;
+  date: Timestamp;
+  description: string;
+  witnesses: AgentPubKey[];
+  media_hashes: ActionHash[];
+}
+
+export interface BeginTransitionInput {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  transition_type: TransitionType;
+  supporting_members: AgentPubKey[];
+}
+
+// ============================================================================
+// Input Types — Rhythms
+// ============================================================================
+
+export interface CreateRhythmInput {
+  hearth_hash: ActionHash;
+  name: string;
+  rhythm_type: RhythmType;
+  schedule: string;
+  participants: AgentPubKey[];
+  description: string;
+}
+
+export interface LogOccurrenceInput {
+  rhythm_hash: ActionHash;
+  participants_present: AgentPubKey[];
+  notes: string;
+  mood_bp?: number;
+}
+
+export interface SetPresenceInput {
+  hearth_hash: ActionHash;
+  status: PresenceStatusType;
+  expected_return?: Timestamp;
+}
+
+// ============================================================================
+// Input Types — Shared / Bridge
+// ============================================================================
+
+export interface DigestEpochInput {
+  hearth_hash: ActionHash;
+  epoch_start: Timestamp;
+  epoch_end: Timestamp;
+}
+
+export interface SeveranceInput {
+  hearth_hash: ActionHash;
+  member_hash: ActionHash;
+  export_milestones: boolean;
+  export_care_history: boolean;
+  export_bond_snapshot: boolean;
+  new_role: MemberRole;
+}
+
+export interface SeveranceSummaryData {
+  hearth_hash: ActionHash;
+  member: AgentPubKey;
+  milestones_exported: number;
+  care_records_exported: number;
+  bond_snapshot_exported: boolean;
+  new_role: MemberRole;
+  completed_at: Timestamp;
+}
+
+export interface HearthSyncInput {
+  hearth_hash: ActionHash;
+  epoch_start: Timestamp;
+  epoch_end: Timestamp;
+}
+
+export interface DispatchInput {
+  zome: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+export interface DispatchResult {
+  success: boolean;
+  response?: Uint8Array;
+  error?: string;
+}
+
+export interface CrossClusterDispatchInput {
+  role: string;
+  zome: string;
+  fn_name: string;
+  payload: Uint8Array;
+}
+
+export interface EventTypeQuery {
+  domain: string;
+  event_type: string;
+}
+
+export interface ResolveQueryInput {
+  query_hash: ActionHash;
+  result: string;
+  success: boolean;
+}
+
+export interface BridgeHealth {
+  healthy: boolean;
+  agent: string;
+  total_events: number;
+  total_queries: number;
+  domains: string[];
+}
+
+// ============================================================================
+// Signal Types — Decision Signals
 // ============================================================================
 
 export interface VoteCastSignal {
@@ -135,3 +1039,95 @@ export type DecisionSignal =
   | DecisionFinalizedSignal;
 
 export type DecisionSignalType = DecisionSignal['type'];
+
+// ============================================================================
+// Signal Types — Kinship Signals
+// ============================================================================
+
+export interface MemberJoinedSignal {
+  type: 'MemberJoined';
+  hearth_hash: ActionHash;
+  agent: AgentPubKey;
+  role: MemberRole;
+}
+
+export interface MemberDepartedSignal {
+  type: 'MemberDeparted';
+  hearth_hash: ActionHash;
+  agent: AgentPubKey;
+}
+
+export interface BondTendedSignal {
+  type: 'BondTended';
+  member_a: AgentPubKey;
+  member_b: AgentPubKey;
+  quality_bp: number;
+}
+
+export type KinshipSignal =
+  | MemberJoinedSignal
+  | MemberDepartedSignal
+  | BondTendedSignal;
+
+export type KinshipSignalType = KinshipSignal['type'];
+
+// ============================================================================
+// Signal Types — Domain Signals
+// ============================================================================
+
+export interface GratitudeExpressedSignal {
+  type: 'GratitudeExpressed';
+  from_agent: AgentPubKey;
+  to_agent: AgentPubKey;
+  message: string;
+  gratitude_type: GratitudeType;
+}
+
+export interface CareTaskCompletedSignal {
+  type: 'CareTaskCompleted';
+  assignee: AgentPubKey;
+  schedule_hash: ActionHash;
+  care_type: CareType;
+}
+
+export interface EmergencyAlertSignal {
+  type: 'EmergencyAlert';
+  alert_hash: ActionHash;
+  severity: AlertSeverity;
+  message: string;
+}
+
+export interface RhythmOccurredSignal {
+  type: 'RhythmOccurred';
+  rhythm_hash: ActionHash;
+  participants: AgentPubKey[];
+}
+
+export interface PresenceChangedSignal {
+  type: 'PresenceChanged';
+  agent: AgentPubKey;
+  status: PresenceStatusType;
+}
+
+export interface CrossZomeCallFailedSignal {
+  type: 'CrossZomeCallFailed';
+  zome: string;
+  function: string;
+  error: string;
+}
+
+// ============================================================================
+// Unified HearthSignal
+// ============================================================================
+
+export type HearthSignal =
+  | DecisionSignal
+  | KinshipSignal
+  | GratitudeExpressedSignal
+  | CareTaskCompletedSignal
+  | EmergencyAlertSignal
+  | RhythmOccurredSignal
+  | PresenceChangedSignal
+  | CrossZomeCallFailedSignal;
+
+export type HearthSignalType = HearthSignal['type'];
